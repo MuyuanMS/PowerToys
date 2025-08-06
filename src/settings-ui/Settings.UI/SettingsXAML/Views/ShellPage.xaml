@@ -199,6 +199,12 @@
                             AutomationProperties.AutomationId="AwakeNavItem"
                             Icon="{ui:BitmapIcon Source=/Assets/Settings/Icons/Awake.png}" />
                         <NavigationViewItem
+                            x:Name="ClipPingNavigationItem"
+                            x:Uid="Shell_ClipPing"
+                            helpers:NavHelper.NavigateTo="views:ClipPingPage"
+                            AutomationProperties.AutomationId="ClipPingNavItem"
+                            Icon="{ui:BitmapIcon Source=/Assets/Settings/Icons/ClipPing.png}" />
+                        <NavigationViewItem
                             x:Name="CmdPalNavigationItem"
                             x:Uid="Shell_CmdPal"
                             helpers:NavHelper.NavigateTo="views:CmdPalPage"

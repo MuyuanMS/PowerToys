@@ -312,5 +312,12 @@ namespace winrt::PowerToys::Interop::implementation
     {
         return CommonSharedConstants::KEYBOARD_MANAGER_ENGINE_INSTANCE_MUTEX;
     }
+    hstring Constants::ClipPingExitEvent()
+    {
+        return CommonSharedConstants::CLIPPING_EXIT_EVENT;
+    }
+    hstring Constants::ClipPingShowOverlayEvent()
+    {
+        return CommonSharedConstants::CLIPPING_SHOW_OVERLAY_EVENT;
+    }
 }
-
