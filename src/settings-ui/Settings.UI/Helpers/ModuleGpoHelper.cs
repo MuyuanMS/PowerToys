@@ -20,6 +20,7 @@ namespace Microsoft.PowerToys.Settings.UI.Helpers
                 case ModuleType.AlwaysOnTop: return GPOWrapper.GetConfiguredAlwaysOnTopEnabledValue();
                 case ModuleType.Awake: return GPOWrapper.GetConfiguredAwakeEnabledValue();
                 case ModuleType.CmdPal: return GPOWrapper.GetConfiguredCmdPalEnabledValue();
+                case ModuleType.ClipPing: return GPOWrapper.GetConfiguredClipPingEnabledValue();
                 case ModuleType.ColorPicker: return GPOWrapper.GetConfiguredColorPickerEnabledValue();
                 case ModuleType.CropAndLock: return GPOWrapper.GetConfiguredCropAndLockEnabledValue();
                 case ModuleType.CursorWrap: return GPOWrapper.GetConfiguredCursorWrapEnabledValue();
@@ -61,6 +62,7 @@ namespace Microsoft.PowerToys.Settings.UI.Helpers
                 ModuleType.AlwaysOnTop => typeof(AlwaysOnTopPage),
                 ModuleType.Awake => typeof(AwakePage),
                 ModuleType.CmdPal => typeof(CmdPalPage),
+                ModuleType.ClipPing => typeof(ClipPingPage),
                 ModuleType.ColorPicker => typeof(ColorPickerPage),
                 ModuleType.CropAndLock => typeof(CropAndLockPage),
                 ModuleType.CursorWrap => typeof(MouseUtilsPage),

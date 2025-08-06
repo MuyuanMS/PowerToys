@@ -50,6 +50,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Helpers
                 ModuleType.AlwaysOnTop => generalSettingsConfig.Enabled.AlwaysOnTop,
                 ModuleType.Awake => generalSettingsConfig.Enabled.Awake,
                 ModuleType.CmdPal => generalSettingsConfig.Enabled.CmdPal,
+                ModuleType.ClipPing => generalSettingsConfig.Enabled.ClipPing,
                 ModuleType.ColorPicker => generalSettingsConfig.Enabled.ColorPicker,
                 ModuleType.CropAndLock => generalSettingsConfig.Enabled.CropAndLock,
                 ModuleType.CursorWrap => generalSettingsConfig.Enabled.CursorWrap,
@@ -92,6 +93,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Helpers
                 case ModuleType.AlwaysOnTop: generalSettingsConfig.Enabled.AlwaysOnTop = isEnabled; break;
                 case ModuleType.Awake: generalSettingsConfig.Enabled.Awake = isEnabled; break;
                 case ModuleType.CmdPal: generalSettingsConfig.Enabled.CmdPal = isEnabled; break;
+                case ModuleType.ClipPing: generalSettingsConfig.Enabled.ClipPing = isEnabled; break;
                 case ModuleType.ColorPicker: generalSettingsConfig.Enabled.ColorPicker = isEnabled; break;
                 case ModuleType.CropAndLock: generalSettingsConfig.Enabled.CropAndLock = isEnabled; break;
                 case ModuleType.CursorWrap: generalSettingsConfig.Enabled.CursorWrap = isEnabled; break;
@@ -137,6 +139,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Helpers
                 ModuleType.AlwaysOnTop => AlwaysOnTopSettings.ModuleName,
                 ModuleType.Awake => AwakeSettings.ModuleName,
                 ModuleType.CmdPal => "CmdPal", // No dedicated settings class
+                ModuleType.ClipPing => ClipPingSettings.ModuleName,
                 ModuleType.ColorPicker => ColorPickerSettings.ModuleName,
                 ModuleType.CropAndLock => CropAndLockSettings.ModuleName,
                 ModuleType.CursorWrap => CursorWrapSettings.ModuleName,

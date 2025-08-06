@@ -46,6 +46,7 @@ namespace Common.UI
             CmdPal,
             ZoomIt,
             PowerDisplay,
+            ClipPing,
         }
 
         private static string SettingsWindowNameToString(SettingsWindow value)
@@ -118,6 +119,8 @@ namespace Common.UI
                     return "ZoomIt";
                 case SettingsWindow.PowerDisplay:
                     return "PowerDisplay";
+                case SettingsWindow.ClipPing:
+                    return "ClipPing";
                 default:
                     {
                         return string.Empty;
