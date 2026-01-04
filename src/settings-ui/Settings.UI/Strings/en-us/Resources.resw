@@ -2121,7 +2121,7 @@ Made with 💗 by Microsoft and the PowerToys community.</value>
   <data name="PasteAsJson_Shortcut.Header" xml:space="preserve">
     <value>Paste as JSON directly</value>
   </data>
-  <data name="PasteAsKeystroke_Shortcut.Header" xml:space="preserve">
+  <data name="PasteAsKeystrokes_Shortcut.Header" xml:space="preserve">
     <value>Paste as keystrokes directly</value>
   </data>
   <data name="PasteAsCustom_Shortcut.Header" xml:space="preserve">
