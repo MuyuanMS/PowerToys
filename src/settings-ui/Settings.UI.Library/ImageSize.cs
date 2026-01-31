@@ -57,6 +57,9 @@ public partial class ImageSize : INotifyPropertyChanged, IHasId
     // Store last percent values to restore when switching back to Percent
     private double _lastPercentWidth = 100.0;
     private double _lastPercentHeight = 100.0;
+    
+    // Flag to prevent updating stored percent values during restoration
+    private bool _isRestoringPercentValues = false;
 
     public int Id
     {
@@ -116,8 +119,8 @@ public partial class ImageSize : INotifyPropertyChanged, IHasId
             var newValue = value < 0 || double.IsNaN(value) ? 0 : value;
             if (SetProperty(ref _width, newValue))
             {
-                // Store the value if we're currently in Percent unit
-                if (_unit == ResizeUnit.Percent)
+                // Store the value if we're currently in Percent unit (but not during restoration)
+                if (_unit == ResizeUnit.Percent && !_isRestoringPercentValues)
                 {
                     _lastPercentWidth = newValue;
                 }
@@ -134,8 +137,8 @@ public partial class ImageSize : INotifyPropertyChanged, IHasId
             var newValue = value < 0 || double.IsNaN(value) ? 0 : value;
             if (SetProperty(ref _height, newValue))
             {
-                // Store the value if we're currently in Percent unit
-                if (_unit == ResizeUnit.Percent)
+                // Store the value if we're currently in Percent unit (but not during restoration)
+                if (_unit == ResizeUnit.Percent && !_isRestoringPercentValues)
                 {
                     _lastPercentHeight = newValue;
                 }
@@ -156,14 +159,10 @@ public partial class ImageSize : INotifyPropertyChanged, IHasId
                 // or default to 100% if this is the first time switching to Percent
                 if (value == ResizeUnit.Percent && previousUnit != ResizeUnit.Percent)
                 {
+                    _isRestoringPercentValues = true;
                     Width = _lastPercentWidth;
                     Height = _lastPercentHeight;
-                }
-                // When switching from Percent to another unit, save the current percent values
-                else if (previousUnit == ResizeUnit.Percent && value != ResizeUnit.Percent)
-                {
-                    _lastPercentWidth = _width;
-                    _lastPercentHeight = _height;
+                    _isRestoringPercentValues = false;
                 }
                 
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsHeightUsed)));
