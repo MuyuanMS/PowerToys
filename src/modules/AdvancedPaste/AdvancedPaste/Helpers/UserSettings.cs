@@ -44,6 +44,10 @@ namespace AdvancedPaste.Settings
 
         public bool EnableClipboardPreview { get; private set; }
 
+        public int KeystrokeDelayMs { get; private set; }
+
+        public int KeystrokeBatchSize { get; private set; }
+
         public IReadOnlyList<PasteFormats> AdditionalActions => _additionalActions;
 
         public IReadOnlyList<AdvancedPasteCustomAction> CustomActions => _customActions;
@@ -75,6 +79,8 @@ namespace AdvancedPaste.Settings
             ShowAIPaste = true;
             CloseAfterLosingFocus = false;
             EnableClipboardPreview = true;
+            KeystrokeDelayMs = AdvancedPasteProperties.DefaultKeystrokeDelayMs;
+            KeystrokeBatchSize = AdvancedPasteProperties.DefaultKeystrokeBatchSize;
             PasteAIConfiguration = new PasteAIConfiguration();
             _additionalActions = [];
             _customActions = [];
@@ -131,6 +137,8 @@ namespace AdvancedPaste.Settings
                                 ShowAIPaste = properties.ShowAIPaste;
                                 CloseAfterLosingFocus = properties.CloseAfterLosingFocus;
                                 EnableClipboardPreview = properties.EnableClipboardPreview;
+                                KeystrokeDelayMs = properties.KeystrokeDelayMs > 0 ? properties.KeystrokeDelayMs : AdvancedPasteProperties.DefaultKeystrokeDelayMs;
+                                KeystrokeBatchSize = properties.KeystrokeBatchSize > 0 ? properties.KeystrokeBatchSize : AdvancedPasteProperties.DefaultKeystrokeBatchSize;
                                 PasteAIConfiguration = properties.PasteAIConfiguration ?? new PasteAIConfiguration();
 
                                 var fixSpellingAction = properties.AdditionalActions.FixSpellingAndGrammar;
