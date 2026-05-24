@@ -43,6 +43,10 @@ namespace AdvancedPaste.Settings
 
         public string FixSpellingAndGrammarCoachingProviderId { get; }
 
+        public int KeystrokeDelayMs { get; }
+
+        public int KeystrokeBatchSize { get; }
+
         public PasteAIConfiguration PasteAIConfiguration { get; }
 
         public event EventHandler Changed;
