@@ -222,6 +222,16 @@
         <decimal value="0" />
       </disabledValue>
     </policy>
+    <policy name="ConfigureEnabledUtilityFileExplorerMarkdownLocalImages" class="Both" displayName="$(string.ConfigureEnabledUtilityFileExplorerMarkdownLocalImages)" explainText="$(string.ConfigureEnabledUtilityFileExplorerMarkdownLocalImagesDescription)" key="Software\Policies\PowerToys" valueName="ConfigureEnabledUtilityFileExplorerMarkdownLocalImages">
+      <parentCategory ref="PowerToys" />
+      <supportedOn ref="SUPPORTED_POWERTOYS_0_100_0" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
     <policy name="ConfigureEnabledUtilityFileExplorerMonacoPreview" class="Both" displayName="$(string.ConfigureEnabledUtilityFileExplorerMonacoPreview)" explainText="$(string.ConfigureEnabledUtilityDescription)" key="Software\Policies\PowerToys" valueName="ConfigureEnabledUtilityFileExplorerMonacoPreview">
       <parentCategory ref="PowerToys" />
       <supportedOn ref="SUPPORTED_POWERTOYS_0_64_0" />
