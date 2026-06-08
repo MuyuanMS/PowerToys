@@ -46,26 +46,34 @@
                 Spacing="8"
                 Visibility="Collapsed">
                 <TextBlock
+                    x:Name="MonitorHeaderText"
                     x:Uid="PinToDock_MonitorHeader"
                     FontWeight="SemiBold"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                <ComboBox x:Name="MonitorComboBox" HorizontalAlignment="Stretch" />
+                <ComboBox
+                    x:Name="MonitorComboBox"
+                    AutomationProperties.AutomationId="PinToDock_MonitorComboBox"
+                    AutomationProperties.LabeledBy="{x:Bind MonitorHeaderText}"
+                    HorizontalAlignment="Stretch" />
             </StackPanel>
 
             <!--  Dock Section Selector  -->
             <StackPanel Spacing="8">
                 <TextBlock
+                    x:Name="SectionHeaderText"
                     x:Uid="PinToDock_SectionHeader"
                     FontWeight="SemiBold"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 <tkcontrols:Segmented
                     x:Name="SectionSegmented"
+                    AutomationProperties.AutomationId="PinToDock_SectionSegmented"
+                    AutomationProperties.LabeledBy="{x:Bind SectionHeaderText}"
                     HorizontalAlignment="Stretch"
                     SelectedIndex="0"
                     SelectionMode="Single">
-                    <tkcontrols:SegmentedItem x:Name="StartSegmentedItem" x:Uid="PinToDock_Start" />
-                    <tkcontrols:SegmentedItem x:Name="CenterSegmentedItem" x:Uid="PinToDock_Center" />
-                    <tkcontrols:SegmentedItem x:Name="EndSegmentedItem" x:Uid="PinToDock_End" />
+                    <tkcontrols:SegmentedItem x:Name="StartSegmentedItem" x:Uid="PinToDock_Start" AutomationProperties.AutomationId="PinToDock_StartSegmentedItem" />
+                    <tkcontrols:SegmentedItem x:Name="CenterSegmentedItem" x:Uid="PinToDock_Center" AutomationProperties.AutomationId="PinToDock_CenterSegmentedItem" />
+                    <tkcontrols:SegmentedItem x:Name="EndSegmentedItem" x:Uid="PinToDock_End" AutomationProperties.AutomationId="PinToDock_EndSegmentedItem" />
                 </tkcontrols:Segmented>
             </StackPanel>
 
@@ -74,12 +82,14 @@
                 <CheckBox
                     x:Name="ShowTitleCheckBox"
                     x:Uid="PinToDock_ShowTitle"
+                    AutomationProperties.AutomationId="PinToDock_ShowTitleCheckBox"
                     Checked="OnLabelOptionChanged"
                     IsChecked="True"
                     Unchecked="OnLabelOptionChanged" />
                 <CheckBox
                     x:Name="ShowSubtitleCheckBox"
                     x:Uid="PinToDock_ShowSubtitle"
+                    AutomationProperties.AutomationId="PinToDock_ShowSubtitleCheckBox"
                     Checked="OnLabelOptionChanged"
                     IsChecked="True"
                     Unchecked="OnLabelOptionChanged" />
