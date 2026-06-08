@@ -103,6 +103,10 @@
 
             <!--  Preview  -->
             <StackPanel Spacing="8">
+                <TextBlock
+                    x:Uid="PinToDock_PreviewHeader"
+                    FontWeight="SemiBold"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 <Border
                     Padding="12,8"
                     HorizontalAlignment="Left"
