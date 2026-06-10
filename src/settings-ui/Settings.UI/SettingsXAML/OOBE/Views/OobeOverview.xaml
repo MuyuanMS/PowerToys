@@ -10,7 +10,7 @@
     <Page.Resources>
         <ResourceDictionary>
             <ResourceDictionary.ThemeDictionaries>
-                <ResourceDictionary x:Key="Default">
+                <ResourceDictionary x:Key="Dark">
                     <ImageSource x:Key="HeroImageUrl">ms-appx:///Assets/Settings/Modules/OOBE/pt-hero.dark.png</ImageSource>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Light">
@@ -74,8 +74,6 @@
                                 <FontIcon FontSize="14" Glyph="&#xE713;" />
                                 <TextBlock
                                     x:Uid="Oobe_Overview_ConfigurePowerToysButton_Text"
-                                    Grid.Row="1"
-                                    Margin="0,-1,0,0"
                                     HorizontalAlignment="Center" />
                             </StackPanel>
                         </Button>
