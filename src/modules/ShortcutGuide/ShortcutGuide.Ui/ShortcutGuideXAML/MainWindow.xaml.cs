@@ -7,10 +7,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Common.UI;
 using ManagedCommon;
 using Microsoft.PowerToys.Settings.UI.Library;
-using Microsoft.PowerToys.Telemetry;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -19,7 +19,6 @@ using Microsoft.UI.Xaml.Media.Imaging;
 using ShortcutGuide.Helpers;
 using ShortcutGuide.Models;
 using ShortcutGuide.Pages;
-using ShortcutGuide.Telemetry;
 using Windows.Foundation;
 using Windows.Graphics;
 using Windows.System;
@@ -32,8 +31,10 @@ namespace ShortcutGuide
 {
     public sealed partial class MainWindow : WindowEx
     {
-        private readonly Dictionary<string, string?> _currentApplicationIds;
         private readonly Stopwatch _sessionStopwatch = Stopwatch.StartNew();
+        private readonly Task<Dictionary<string, string?>> _getAppIdsTask;
+        private Task? _initializeNavItemsTask;
+        private Dictionary<string, string?> _currentApplicationIds = [];
         private ShortcutFile? _shortcutFile;
         private string _selectedAppName = null!;
         private string _closeType = "Unknown";
@@ -46,9 +47,13 @@ namespace ShortcutGuide
 
         public MainWindow()
         {
-            this._currentApplicationIds = ManifestInterpreter.GetAllCurrentApplicationIds();
-
             this.InitializeComponent();
+
+            _getAppIdsTask = Task.Run(() =>
+            {
+                Program.CopyAndIndexGenerationThread.Join();
+                return ManifestInterpreter.GetAllCurrentApplicationIds();
+            });
 
             Title = ResourceLoaderInstance.ResourceLoader.GetString("Title")!;
             ExtendsContentIntoTitleBar = true;
@@ -151,7 +156,22 @@ namespace ShortcutGuide
                 };
             }
 
-            this.SetNavItems();
+            _initializeNavItemsTask ??= this.InitializeNavItemsAsync();
+        }
+
+        private async Task InitializeNavItemsAsync()
+        {
+            try
+            {
+                _currentApplicationIds = await _getAppIdsTask.ConfigureAwait(true);
+                this.SetNavItems();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Failed to initialize navigation items.", ex);
+                _closeType = "InitializationFailed";
+                this.DispatcherQueue.TryEnqueue(() => this.Close());
+            }
         }
 
         private void SetNavItems()
@@ -160,7 +180,7 @@ namespace ShortcutGuide
             // TO DO: Check if Settings button is considered an item too.
             if (this.WindowSelector.MenuItems.Count == 0)
             {
-                string defaultShellName = ManifestInterpreter.GetIndexYamlFile().DefaultShellName;
+                string defaultShellName = ManifestInterpreter.GetCachedIndexYamlFile().DefaultShellName;
 
                 foreach (var (item, executablePath) in this._currentApplicationIds)
                 {
@@ -275,5 +295,6 @@ namespace ShortcutGuide
         {
             SettingsDeepLink.OpenSettings(SettingsDeepLink.SettingsWindow.ShortcutGuide);
         }
+
     }
 }
