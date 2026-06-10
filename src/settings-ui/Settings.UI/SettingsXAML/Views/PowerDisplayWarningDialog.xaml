@@ -15,7 +15,22 @@
             IsClosable="False"
             IsOpen="True"
             Severity="Warning" />
-        <TextBlock x:Name="WarningBody" TextWrapping="Wrap" />
-        <HyperlinkButton x:Name="LearnMoreLink" Margin="-12,0,0,0" />
+        <TextBlock x:Name="WarningDescription" TextWrapping="WrapWholeWords" />
+        <ItemsControl x:Name="WarningList" Margin="20,0,0,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Spacing="4" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                    <TextBlock Text="{x:Bind}" TextWrapping="WrapWholeWords" />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <HyperlinkButton
+            x:Name="LearnMoreLink"
+            Margin="-12,0,0,0"
+            AutomationProperties.AutomationId="PowerDisplayWarningLearnMoreLink" />
     </StackPanel>
 </ContentDialog>

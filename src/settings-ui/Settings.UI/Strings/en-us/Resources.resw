@@ -5583,6 +5583,14 @@ The break timer font matches the text font.</value>
     <value>Learn more about Power Display</value>
     <comment>Text for the learn-more hyperlink shown at the bottom of every Power Display warning ContentDialog.</comment>
   </data>
+  <data name="PowerDisplay_Warning_Default_InfoBar" xml:space="preserve">
+    <value>This feature may not behave correctly on some monitors</value>
+    <comment>Fallback title shown in the Warning InfoBar if a Power Display warning variant is missing its specific resource entry.</comment>
+  </data>
+  <data name="PowerDisplay_Warning_Default_Body" xml:space="preserve">
+    <value>Your monitor may not fully support this feature over DDC/CI. Continue only if you understand the risk.</value>
+    <comment>Fallback body shown if a Power Display warning variant is missing its specific resource entry.</comment>
+  </data>
   <data name="PowerDisplay_Warning_ColorTemperature_InfoBar" xml:space="preserve">
     <value>Color temperature changes may not be reversible on some monitors</value>
     <comment>Title shown in the Warning InfoBar at the top of the color temperature confirmation dialog.</comment>
