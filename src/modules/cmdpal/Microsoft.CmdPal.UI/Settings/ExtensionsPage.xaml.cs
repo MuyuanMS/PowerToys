@@ -46,9 +46,22 @@ public sealed partial class ExtensionsPage : Page
 
     private void SettingsCard_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
     {
-        // Store the card reference keyed by Id (not the VM itself) to avoid leaking VM references
-        if (sender is SettingsCard card && card.DataContext is ProviderSettingsViewModel newVm)
+        if (sender is not SettingsCard card)
         {
+            return;
+        }
+
+        // Unsubscribe from previous VM to prevent duplicate handlers and memory leaks
+        // when the card is recycled by ItemsRepeater virtualization.
+        if (args.NewValue != card.Tag && card.Tag is ProviderSettingsViewModel oldVm)
+        {
+            oldVm.PropertyChanged -= ProviderViewModel_PropertyChanged;
+        }
+
+        if (card.DataContext is ProviderSettingsViewModel newVm)
+        {
+            // Track the current VM on the card's Tag to detect recycling
+            card.Tag = newVm;
             _vmToCardMap[newVm.Id] = new WeakReference<SettingsCard>(card);
             newVm.PropertyChanged += ProviderViewModel_PropertyChanged;
 

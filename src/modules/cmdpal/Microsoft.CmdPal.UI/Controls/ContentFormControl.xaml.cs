@@ -114,11 +114,17 @@ public sealed partial class ContentFormControl : UserControl
 
     private void OnFrameworkElementLayoutUpdated(object? sender, object e)
     {
-        // Only fix once — unhook after first layout pass
+        // Only fix once — unhook after first layout pass.
+        // Always unhook to avoid repeated calls (LayoutUpdated fires very frequently).
         if (_renderedCard?.FrameworkElement is FrameworkElement element)
         {
             element.LayoutUpdated -= OnFrameworkElementLayoutUpdated;
             FixToggleAccessibilityNames(element);
+        }
+        else if (sender is FrameworkElement senderElement)
+        {
+            // Defensive: unhook even if _renderedCard was cleared to prevent infinite firing
+            senderElement.LayoutUpdated -= OnFrameworkElementLayoutUpdated;
         }
     }
 

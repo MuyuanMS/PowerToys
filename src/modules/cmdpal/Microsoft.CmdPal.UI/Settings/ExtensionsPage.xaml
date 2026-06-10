@@ -255,7 +255,9 @@
                                         provider-derived AutomationId (Provider.Id), so tests can locate
                                         the toggle relative to that without ambiguity across rows.
                                     -->
-                                    <ToggleSwitch IsOn="{x:Bind IsEnabled, Mode=TwoWay}" />
+                                    <ToggleSwitch
+                                        AutomationProperties.Name="{x:Bind DisplayName, Mode=OneWay}"
+                                        IsOn="{x:Bind IsEnabled, Mode=TwoWay}" />
                                 </controls:SettingsCard>
                             </DataTemplate>
                         </ItemsRepeater.ItemTemplate>
