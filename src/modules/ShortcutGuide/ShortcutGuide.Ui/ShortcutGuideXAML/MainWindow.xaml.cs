@@ -13,6 +13,7 @@ using ManagedCommon;
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -37,6 +38,7 @@ namespace ShortcutGuide
         private ShortcutFile? _shortcutFile;
         private string _selectedAppName = null!;
         private string _closeType = "Unknown";
+        private bool _navItemsInitialized;
 
         internal long SessionDurationMs => _sessionStopwatch.ElapsedMilliseconds;
 
@@ -161,6 +163,13 @@ namespace ShortcutGuide
 
         private async Task InitializeNavItemsAsync()
         {
+            if (_navItemsInitialized)
+            {
+                return;
+            }
+
+            _navItemsInitialized = true;
+
             try
             {
                 _currentApplicationIds = await _getAppIdsTask.ConfigureAwait(true);
@@ -182,18 +191,24 @@ namespace ShortcutGuide
             {
                 string defaultShellName = ManifestInterpreter.GetCachedIndexYamlFile().DefaultShellName;
 
+                string windowsLabel = ResourceLoaderInstance.ResourceLoader.GetString("WindowsNavLabel") ?? "Windows";
+
                 foreach (var (item, executablePath) in this._currentApplicationIds)
                 {
                     if (item == defaultShellName)
                     {
-                        this.WindowSelector.MenuItems.Add(new NavigationViewItem { Name = item, Content = "Windows", Icon = new FontIcon() { Glyph = "\xE770" } });
+                        var navItem = new NavigationViewItem { Name = item, Content = windowsLabel, Icon = new FontIcon() { Glyph = "\xE770" } };
+                        AutomationProperties.SetAutomationId(navItem, "NavItem_" + item);
+                        this.WindowSelector.MenuItems.Add(navItem);
                     }
                     else
                     {
                         try
                         {
                             IconElement icon = BuildNavIcon(executablePath);
-                            this.WindowSelector.MenuItems.Add(new NavigationViewItem { Name = item, Content = ManifestInterpreter.GetShortcutsOfApplication(item).Name, Icon = icon });
+                            var navItem = new NavigationViewItem { Name = item, Content = ManifestInterpreter.GetShortcutsOfApplication(item).Name, Icon = icon };
+                            AutomationProperties.SetAutomationId(navItem, "NavItem_" + item);
+                            this.WindowSelector.MenuItems.Add(navItem);
                         }
                         catch (IOException ex)
                         {

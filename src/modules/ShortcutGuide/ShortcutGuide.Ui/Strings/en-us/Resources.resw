@@ -207,4 +207,8 @@
   <data name="SettingsButton.Content" xml:space="preserve">
     <value>Settings</value>
   </data>
+  <data name="WindowsNavLabel" xml:space="preserve">
+    <value>Windows</value>
+    <comment>Navigation label for the default Windows shell shortcuts section</comment>
+  </data>
 </root>

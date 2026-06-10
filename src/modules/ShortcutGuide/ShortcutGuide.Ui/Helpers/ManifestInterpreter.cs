@@ -121,7 +121,8 @@ namespace ShortcutGuide.Helpers
 
                 try
                 {
-                    ProcessModule? mainModule = Process.GetProcessById((int)processId).MainModule;
+                    using Process foregroundProcess = Process.GetProcessById((int)processId);
+                    ProcessModule? mainModule = foregroundProcess.MainModule;
                     name = mainModule?.ModuleName;
                     executablePath = mainModule?.FileName;
                 }
