@@ -46,10 +46,24 @@ public sealed partial class ExtensionsPage : Page
 
     private void SettingsCard_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
     {
-        // Store the card reference keyed by Id (not the VM itself) to avoid leaking VM references
-        if (sender is SettingsCard card && card.DataContext is ProviderSettingsViewModel newVm)
+        // ItemsRepeater can recycle containers, so keep the PropertyChanged subscription in sync
+        // with the card's current DataContext to avoid duplicate handlers and stale references.
+        if (sender is not SettingsCard card)
         {
+            return;
+        }
+
+        if (card.Tag is ProviderSettingsViewModel oldVm)
+        {
+            oldVm.PropertyChanged -= ProviderViewModel_PropertyChanged;
+            RemoveMappedCard(oldVm.Id, card);
+        }
+
+        if (card.DataContext is ProviderSettingsViewModel newVm)
+        {
+            card.Tag = newVm;
             _vmToCardMap[newVm.Id] = new WeakReference<SettingsCard>(card);
+            newVm.PropertyChanged -= ProviderViewModel_PropertyChanged;
             newVm.PropertyChanged += ProviderViewModel_PropertyChanged;
 
             // Immediately update automation name in case DisplayName is already available
@@ -57,6 +71,20 @@ public sealed partial class ExtensionsPage : Page
             {
                 AutomationProperties.SetName(toggle, newVm.DisplayName);
             }
+        }
+        else
+        {
+            card.Tag = null;
+        }
+    }
+
+    private void SettingsCard_Unloaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is SettingsCard card && card.Tag is ProviderSettingsViewModel vm)
+        {
+            vm.PropertyChanged -= ProviderViewModel_PropertyChanged;
+            RemoveMappedCard(vm.Id, card);
+            card.Tag = null;
         }
     }
 
@@ -73,6 +101,16 @@ public sealed partial class ExtensionsPage : Page
                     AutomationProperties.SetName(toggle, vm.DisplayName);
                 }
             }
+        }
+    }
+
+    private void RemoveMappedCard(string providerId, SettingsCard card)
+    {
+        if (_vmToCardMap.TryGetValue(providerId, out var cardRef) &&
+            cardRef.TryGetTarget(out var mappedCard) &&
+            ReferenceEquals(mappedCard, card))
+        {
+            _vmToCardMap.Remove(providerId);
         }
     }
 

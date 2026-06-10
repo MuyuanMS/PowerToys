@@ -222,7 +222,8 @@
                                     DataContextChanged="SettingsCard_DataContextChanged"
                                     Description="{x:Bind ExtensionSubtext, Mode=OneWay}"
                                     Header="{x:Bind DisplayName, Mode=OneWay}"
-                                    IsClickEnabled="True">
+                                    IsClickEnabled="True"
+                                    Unloaded="SettingsCard_Unloaded">
                                     <controls:SettingsCard.HeaderIcon>
                                         <cpcontrols:ContentIcon>
                                             <cpcontrols:ContentIcon.Content>
