@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.Messaging;
 using CommunityToolkit.WinUI.Controls;
 using ManagedCommon;
@@ -9,6 +10,7 @@ using Microsoft.CmdPal.UI.ViewModels;
 using Microsoft.CmdPal.UI.ViewModels.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 
@@ -19,6 +21,7 @@ public sealed partial class ExtensionsPage : Page
     private readonly TaskScheduler _mainTaskScheduler = TaskScheduler.FromCurrentSynchronizationContext();
 
     private readonly SettingsViewModel? viewModel;
+    private readonly Dictionary<string, WeakReference<SettingsCard>> _vmToCardMap = new();
 
     public ExtensionsPage()
     {
@@ -37,6 +40,51 @@ public sealed partial class ExtensionsPage : Page
             if (card.DataContext is ProviderSettingsViewModel vm)
             {
                 WeakReferenceMessenger.Default.Send<NavigateToExtensionSettingsMessage>(new(vm));
+            }
+        }
+    }
+
+    private void SettingsCard_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
+    {
+        if (sender is not SettingsCard card)
+        {
+            return;
+        }
+
+        // Unsubscribe from previous VM to prevent duplicate handlers and memory leaks
+        // when the card is recycled by ItemsRepeater virtualization.
+        if (args.NewValue != card.Tag && card.Tag is ProviderSettingsViewModel oldVm)
+        {
+            oldVm.PropertyChanged -= ProviderViewModel_PropertyChanged;
+        }
+
+        if (card.DataContext is ProviderSettingsViewModel newVm)
+        {
+            // Track the current VM on the card's Tag to detect recycling
+            card.Tag = newVm;
+            _vmToCardMap[newVm.Id] = new WeakReference<SettingsCard>(card);
+            newVm.PropertyChanged += ProviderViewModel_PropertyChanged;
+
+            // Immediately update automation name in case DisplayName is already available
+            if (card.Content is ToggleSwitch toggle && !string.IsNullOrEmpty(newVm.DisplayName))
+            {
+                AutomationProperties.SetName(toggle, newVm.DisplayName);
+            }
+        }
+    }
+
+    private void ProviderViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        // When DisplayName changes, update the ToggleSwitch's automation name
+        if (e.PropertyName == nameof(ProviderSettingsViewModel.DisplayName) && sender is ProviderSettingsViewModel vm && !string.IsNullOrEmpty(vm.DisplayName))
+        {
+            // Get the card reference from our map
+            if (_vmToCardMap.TryGetValue(vm.Id, out var cardRef) && cardRef.TryGetTarget(out var card))
+            {
+                if (card.Content is ToggleSwitch toggle)
+                {
+                    AutomationProperties.SetName(toggle, vm.DisplayName);
+                }
             }
         }
     }
