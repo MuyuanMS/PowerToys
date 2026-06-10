@@ -216,6 +216,7 @@
                             <!--  Background tint color and intensity  -->
                             <controls:SettingsCard x:Uid="DockAppearance_BackgroundTint_SettingsCard" Visibility="{x:Bind ViewModel.DockAppearance.IsCustomTintVisible, Mode=OneWay}">
                                 <cpControls:ColorPickerButton
+                                    AutomationProperties.AutomationId="CmdPal_DockSettingsPage_BgTintColor"
                                     HasSelectedColor="True"
                                     IsAlphaEnabled="False"
                                     PaletteColors="{x:Bind ViewModel.DockAppearance.Swatches}"
