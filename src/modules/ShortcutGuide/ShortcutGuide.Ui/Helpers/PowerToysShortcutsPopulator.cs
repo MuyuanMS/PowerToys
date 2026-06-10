@@ -186,7 +186,7 @@ namespace ShortcutGuide.Helpers
         private static string HotkeySettingsToYaml(HotkeySettings hotkeySettings, string moduleName, string? description = null)
         {
             string content = string.Empty;
-            content += "      - Name: " + moduleName + Environment.NewLine;
+            content += "      - Name: " + EscapeYamlString(moduleName) + Environment.NewLine;
             content += "        Shortcut: " + Environment.NewLine;
             content += "        - Win: " + hotkeySettings.Win.ToString() + Environment.NewLine;
             content += "          Ctrl: " + hotkeySettings.Ctrl.ToString() + Environment.NewLine;
@@ -196,7 +196,7 @@ namespace ShortcutGuide.Helpers
             content += "            - " + hotkeySettings.Code.ToString(CultureInfo.InvariantCulture) + Environment.NewLine;
             if (description != null)
             {
-                content += "        Description: " + description + Environment.NewLine;
+                content += "        Description: " + EscapeYamlString(description) + Environment.NewLine;
             }
 
             return content;
@@ -211,6 +211,15 @@ namespace ShortcutGuide.Helpers
             }
 
             return HotkeySettingsToYaml(hotkeySettings.Value, moduleName, description);
+        }
+
+        private static string EscapeYamlString(string value)
+        {
+            return '"' + value
+                .Replace("\\", "\\\\", StringComparison.Ordinal)
+                .Replace("\"", "\\\"", StringComparison.Ordinal)
+                .Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal) + '"';
         }
 
         [GeneratedRegex(@"# <Populate start>[\s\S\n\r]*# <Populate end>")]

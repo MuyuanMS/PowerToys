@@ -29,10 +29,11 @@ using WinUIEx.Messaging;
 
 namespace ShortcutGuide
 {
-    public sealed partial class MainWindow : WindowEx, IDisposable
+    public sealed partial class MainWindow : WindowEx
     {
         private readonly Stopwatch _sessionStopwatch = Stopwatch.StartNew();
         private readonly Task<Dictionary<string, string?>> _getAppIdsTask;
+        private Task? _initializeNavItemsTask;
         private Dictionary<string, string?> _currentApplicationIds = [];
         private ShortcutFile? _shortcutFile;
         private string _selectedAppName = null!;
@@ -51,8 +52,7 @@ namespace ShortcutGuide
             _getAppIdsTask = Task.Run(() =>
             {
                 Program.CopyAndIndexGenerationThread.Join();
-                _currentApplicationIds = ManifestInterpreter.GetAllCurrentApplicationIds();
-                return _currentApplicationIds;
+                return ManifestInterpreter.GetAllCurrentApplicationIds();
             });
 
             Title = ResourceLoaderInstance.ResourceLoader.GetString("Title")!;
@@ -156,7 +156,7 @@ namespace ShortcutGuide
                 };
             }
 
-            _ = this.InitializeNavItemsAsync();
+            _initializeNavItemsTask ??= this.InitializeNavItemsAsync();
         }
 
         private async Task InitializeNavItemsAsync()
@@ -296,9 +296,5 @@ namespace ShortcutGuide
             SettingsDeepLink.OpenSettings(SettingsDeepLink.SettingsWindow.ShortcutGuide);
         }
 
-        public void Dispose()
-        {
-            _getAppIdsTask.Dispose();
-        }
     }
 }
