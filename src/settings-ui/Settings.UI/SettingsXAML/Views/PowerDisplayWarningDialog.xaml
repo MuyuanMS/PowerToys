@@ -12,10 +12,17 @@
     <StackPanel Spacing="12">
         <controls:InfoBar
             x:Name="WarningInfoBar"
+            AutomationProperties.AutomationId="PowerDisplayWarningInfoBar"
             IsClosable="False"
             IsOpen="True"
             Severity="Warning" />
-        <TextBlock x:Name="WarningBody" TextWrapping="Wrap" />
-        <HyperlinkButton x:Name="LearnMoreLink" Margin="-12,0,0,0" />
+        <TextBlock
+            x:Name="WarningBody"
+            Style="{StaticResource BodyTextBlockStyle}"
+            TextWrapping="Wrap" />
+        <HyperlinkButton
+            x:Name="LearnMoreLink"
+            AutomationProperties.AutomationId="PowerDisplayWarningLearnMoreLink"
+            Margin="-12,0,0,0" />
     </StackPanel>
 </ContentDialog>
