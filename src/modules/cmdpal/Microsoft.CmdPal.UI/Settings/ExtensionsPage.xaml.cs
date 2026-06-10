@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using CommunityToolkit.Mvvm.Messaging;
 using CommunityToolkit.WinUI.Controls;
 using ManagedCommon;
@@ -22,6 +23,7 @@ public sealed partial class ExtensionsPage : Page
 
     private readonly SettingsViewModel? viewModel;
     private readonly Dictionary<string, WeakReference<SettingsCard>> _vmToCardMap = new();
+    private readonly ConditionalWeakTable<SettingsCard, ProviderSettingsViewModel> _cardToSubscribedVm = new();
 
     public ExtensionsPage()
     {
@@ -49,6 +51,15 @@ public sealed partial class ExtensionsPage : Page
         // Store the card reference keyed by Id (not the VM itself) to avoid leaking VM references
         if (sender is SettingsCard card && card.DataContext is ProviderSettingsViewModel newVm)
         {
+            // Unsubscribe from the previously associated VM to prevent duplicate handlers
+            // when ItemsRepeater recycles this card for a different data item.
+            if (_cardToSubscribedVm.TryGetValue(card, out var oldVm))
+            {
+                oldVm.PropertyChanged -= ProviderViewModel_PropertyChanged;
+                _cardToSubscribedVm.Remove(card);
+            }
+
+            _cardToSubscribedVm.AddOrUpdate(card, newVm);
             _vmToCardMap[newVm.Id] = new WeakReference<SettingsCard>(card);
             newVm.PropertyChanged += ProviderViewModel_PropertyChanged;
 
