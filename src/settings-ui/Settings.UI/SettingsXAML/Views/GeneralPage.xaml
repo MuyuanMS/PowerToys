@@ -465,7 +465,7 @@
                             <tkcontrols:SettingsCard
                                 x:Name="GeneralPageEnableViewDiagnosticData"
                                 ContentAlignment="Left"
-                                IsEnabled="{x:Bind ViewModel.EnableDataDiagnostics, Mode=TwoWay}">
+                                IsEnabled="{x:Bind ViewModel.EnableDataDiagnostics, Mode=OneWay}">
                                 <StackPanel Orientation="Vertical">
                                     <ptcontrols:CheckBoxWithDescriptionControl x:Uid="GeneralPage_EnableViewDiagnosticData" IsChecked="{x:Bind ViewModel.EnableViewDataDiagnostics, Mode=TwoWay}" />
                                     <HyperlinkButton

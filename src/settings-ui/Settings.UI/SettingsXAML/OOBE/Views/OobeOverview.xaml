@@ -34,6 +34,7 @@
             Height="280"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"
+            AutomationProperties.AccessibilityView="Raw"
             Source="{ThemeResource HeroImageUrl}"
             Stretch="UniformToFill" />
 
@@ -68,15 +69,15 @@
                         Spacing="16">
                         <Button
                             x:Uid="Oobe_Overview_ConfigurePowerToysButton"
+                            AutomationProperties.AutomationId="Oobe_Overview_ConfigurePowerToysButton"
                             VerticalAlignment="Center"
                             Click="SettingsLaunchButton_Click">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon FontSize="14" Glyph="&#xE713;" />
                                 <TextBlock
-                                    x:Uid="Oobe_Overview_ConfigurePowerToysButton_Text"
-                                    Grid.Row="1"
-                                    Margin="0,-1,0,0"
-                                    HorizontalAlignment="Center" />
+                                            x:Uid="Oobe_Overview_ConfigurePowerToysButton_Text"
+                                            Margin="0,-1,0,0"
+                                            HorizontalAlignment="Center" />
                             </StackPanel>
                         </Button>
 
@@ -114,7 +115,10 @@
                                 FontWeight="SemiBold" />
                         </StackPanel>
                     </tkcontrols:SettingsCard.Description>
-                    <ToggleSwitch x:Uid="ToggleSwitch" IsOn="{x:Bind EnableDataDiagnostics, Mode=TwoWay}" />
+                    <ToggleSwitch
+                        x:Uid="ToggleSwitch"
+                        AutomationProperties.AutomationId="Oobe_Overview_DataDiagnosticsToggle"
+                        IsOn="{x:Bind EnableDataDiagnostics, Mode=TwoWay}" />
                 </tkcontrols:SettingsCard>
             </Grid>
         </ScrollViewer>
