@@ -162,7 +162,7 @@
                                         <DataTemplate x:DataType="viewModels:FallbackSettingsViewModel">
                                             <controls:SettingsExpander
                                                 Grid.Column="1"
-                                                AutomationProperties.AutomationId="{x:Bind Id, Mode=OneWay}"
+                                                AutomationProperties.AutomationId="{x:Bind Id, Mode=OneTime}"
                                                 Header="{x:Bind DisplayName, Mode=OneWay}"
                                                 IsExpanded="False">
                                                 <controls:SettingsExpander.HeaderIcon>

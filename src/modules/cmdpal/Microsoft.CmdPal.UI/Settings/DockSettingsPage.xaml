@@ -259,7 +259,7 @@
                         <ItemsRepeater.ItemTemplate>
                             <DataTemplate x:DataType="dockVm:DockMonitorConfigViewModel">
                                 <controls:SettingsExpander
-                                    AutomationProperties.AutomationId="{x:Bind DeviceId, Mode=OneWay}"
+                                    AutomationProperties.AutomationId="{x:Bind DeviceId, Mode=OneTime}"
                                     Description="{x:Bind Resolution, Mode=OneWay}"
                                     Header="{x:Bind DisplayName, Mode=OneWay}"
                                     HeaderIcon="{ui:FontIcon Glyph=&#xE7F4;}"

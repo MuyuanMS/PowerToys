@@ -216,7 +216,7 @@
                         <ItemsRepeater.ItemTemplate>
                             <DataTemplate x:DataType="viewModels:ProviderSettingsViewModel">
                                 <controls:SettingsCard
-                                    AutomationProperties.AutomationId="{x:Bind Id, Mode=OneWay}"
+                                    AutomationProperties.AutomationId="{x:Bind Id, Mode=OneTime}"
                                     Click="SettingsCard_Click"
                                     DataContext="{x:Bind}"
                                     Description="{x:Bind ExtensionSubtext, Mode=OneWay}"

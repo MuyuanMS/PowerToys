@@ -84,7 +84,7 @@
                         Name="Command"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Left"
-                        AutomationProperties.AutomationId="{x:Bind Id, Mode=OneWay}"
+                        AutomationProperties.AutomationId="{x:Bind Id, Mode=OneTime}"
                         Click="Command_Click"
                         Style="{StaticResource SubtleButtonStyle}"
                         UseSystemFocusVisuals="{StaticResource UseSystemFocusVisuals}">
