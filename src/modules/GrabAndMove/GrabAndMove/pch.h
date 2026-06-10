@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <objidl.h>
 #include <gdiplus.h>
+#include <dwmapi.h>
 #include <shellapi.h>
 #include <commctrl.h>
 #include <TraceLoggingProvider.h>
@@ -16,4 +17,3 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
-
