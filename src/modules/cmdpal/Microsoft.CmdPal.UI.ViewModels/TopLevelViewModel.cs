@@ -52,6 +52,14 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
 
     public string Id => string.IsNullOrWhiteSpace(IdFromModel) ? _generatedId : IdFromModel;
 
+    public string SettingsAutomationId => $"{Id}_Settings";
+
+    public string HotkeyAutomationId => $"{Id}_Hotkey";
+
+    public string AliasTextAutomationId => $"{Id}_AliasText";
+
+    public string AliasActivationAutomationId => $"{Id}_AliasActivation";
+
     public CommandPaletteHost ExtensionHost { get; private set; }
 
     public string ExtensionName => ExtensionHost.GetExtensionDisplayName() ?? string.Empty;

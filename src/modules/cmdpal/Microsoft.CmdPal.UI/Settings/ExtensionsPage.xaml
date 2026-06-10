@@ -124,6 +124,7 @@
                             x:Name="SearchBox"
                             x:Uid="Settings_ExtensionsPage_SearchBox_Placeholder"
                             HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="CmdPal_ExtensionsPage_Search"
                             Text="{x:Bind viewModel.Extensions.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
                             <AutoSuggestBox.QueryIcon>
                                 <SymbolIcon Symbol="Find" />
@@ -164,6 +165,7 @@
                             <Button
                                 x:Name="MoreButton"
                                 x:Uid="Settings_ExtensionsPage_More_Button"
+                                AutomationProperties.AutomationId="CmdPal_ExtensionsPage_More"
                                 Style="{StaticResource SubtleButtonStyle}">
                                 <Button.Flyout>
                                     <MenuFlyout Placement="BottomEdgeAlignedRight">
@@ -248,13 +250,7 @@
                                             </cpcontrols:ContentIcon.Content>
                                         </cpcontrols:ContentIcon>
                                     </controls:SettingsCard.HeaderIcon>
-                                    <!--
-                                        AutomationId on the inner ToggleSwitch is intentionally omitted
-                                        because the parent SettingsCard already exposes a unique
-                                        provider-derived AutomationId (Provider.Id), so tests can locate
-                                        the toggle relative to that without ambiguity across rows.
-                                    -->
-                                    <ToggleSwitch IsOn="{x:Bind IsEnabled, Mode=TwoWay}" />
+                                    <ToggleSwitch AutomationProperties.AutomationId="{x:Bind ToggleAutomationId, Mode=OneWay}" IsOn="{x:Bind IsEnabled, Mode=TwoWay}" />
                                 </controls:SettingsCard>
                             </DataTemplate>
                         </ItemsRepeater.ItemTemplate>

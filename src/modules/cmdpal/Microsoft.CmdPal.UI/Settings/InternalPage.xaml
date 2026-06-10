@@ -92,6 +92,7 @@
                         <TextBox
                             x:Name="GalleryFeedUrlTextBox"
                             MinWidth="400"
+                            AutomationProperties.AutomationId="CmdPal_InternalPage_GalleryFeedUrl"
                             LostFocus="GalleryFeedUrlTextBox_LostFocus"
                             PlaceholderText="https://..."
                             Text="{x:Bind GalleryFeedUrl, Mode=OneTime}" />

@@ -60,6 +60,7 @@
                         <ComboBox
                             x:Name="DockPositionComboBox"
                             MinWidth="{StaticResource SettingActionControlMinWidth}"
+                            AutomationProperties.AutomationId="CmdPal_DockSettingsPage_Position"
                             SelectedIndex="{x:Bind SelectedSideIndex, Mode=TwoWay}">
                             <ComboBoxItem x:Uid="DockAppearance_DockPosition_Left" />
                             <ComboBoxItem x:Uid="DockAppearance_DockPosition_Top" />
@@ -76,6 +77,7 @@
                         <ComboBox
                             x:Name="DockSizeComboBox"
                             MinWidth="{StaticResource SettingActionControlMinWidth}"
+                            AutomationProperties.AutomationId="CmdPal_DockSettingsPage_Size"
                             SelectedIndex="{x:Bind SelectedDockSizeIndex, Mode=TwoWay}">
                             <ComboBoxItem x:Uid="DockAppearance_DockSize_Default" />
                             <ComboBoxItem x:Uid="DockAppearance_DockSize_Compact" />
@@ -116,6 +118,7 @@
                         <ComboBox
                             x:Name="BackdropComboBox"
                             MinWidth="{StaticResource SettingActionControlMinWidth}"
+                            AutomationProperties.AutomationId="CmdPal_DockSettingsPage_BackdropStyle"
                             SelectedIndex="{x:Bind ViewModel.DockAppearance.BackdropIndex, Mode=TwoWay}">
                             <ComboBoxItem x:Uid="DockAppearance_Backdrop_Transparent" />
                             <ComboBoxItem x:Uid="DockAppearance_Backdrop_Acrylic" />
@@ -216,6 +219,7 @@
                             <!--  Background tint color and intensity  -->
                             <controls:SettingsCard x:Uid="DockAppearance_BackgroundTint_SettingsCard" Visibility="{x:Bind ViewModel.DockAppearance.IsCustomTintVisible, Mode=OneWay}">
                                 <cpControls:ColorPickerButton
+                                    AutomationProperties.AutomationId="CmdPal_DockSettingsPage_BgTintColor"
                                     HasSelectedColor="True"
                                     IsAlphaEnabled="False"
                                     PaletteColors="{x:Bind ViewModel.DockAppearance.Swatches}"
@@ -264,17 +268,12 @@
                                     Header="{x:Bind DisplayName, Mode=OneWay}"
                                     HeaderIcon="{ui:FontIcon Glyph=&#xE7F4;}"
                                     IsExpanded="False">
-                                    <!--
-                                        AutomationId on the inner ToggleSwitch / ComboBox is intentionally
-                                        omitted because the parent SettingsExpander already exposes a
-                                        per-monitor unique AutomationId (DeviceId), so tests can locate
-                                        each control relative to its monitor without ambiguity.
-                                    -->
-                                    <ToggleSwitch IsOn="{x:Bind IsEnabled, Mode=TwoWay}" />
+                                    <ToggleSwitch AutomationProperties.AutomationId="{x:Bind ToggleAutomationId, Mode=OneWay}" IsOn="{x:Bind IsEnabled, Mode=TwoWay}" />
                                     <controls:SettingsExpander.Items>
                                         <controls:SettingsCard x:Uid="DockMonitor_Position_SettingsCard">
                                             <ComboBox
                                                 MinWidth="{StaticResource SettingActionControlMinWidth}"
+                                                AutomationProperties.AutomationId="{x:Bind PositionAutomationId, Mode=OneWay}"
                                                 IsEnabled="{x:Bind IsEnabled, Mode=OneWay}"
                                                 SelectedIndex="{x:Bind SideOverrideIndex, Mode=TwoWay}">
                                                 <ComboBoxItem x:Uid="DockMonitor_Position_UseDefault" />

@@ -57,6 +57,8 @@ public partial class ProviderSettingsViewModel : ObservableObject
     /// </summary>
     public string Id => _provider.Id;
 
+    public string ToggleAutomationId => $"{Id}_Enable";
+
     public string ExtensionName => _provider.Extension?.ExtensionDisplayName ?? Resources.builtin_extension_name;
 
     public string ExtensionSubtext
