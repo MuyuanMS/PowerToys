@@ -5,6 +5,7 @@
     xmlns:controls="using:Microsoft.UI.Xaml.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    AutomationProperties.AutomationId="PowerDisplayWarningDialog"
     DefaultButton="Close"
     Style="{StaticResource DefaultContentDialogStyle}"
     mc:Ignorable="d">
@@ -12,10 +13,18 @@
     <StackPanel Spacing="12">
         <controls:InfoBar
             x:Name="WarningInfoBar"
+            AutomationProperties.AutomationId="PowerDisplayWarningInfoBar"
             IsClosable="False"
             IsOpen="True"
             Severity="Warning" />
-        <TextBlock x:Name="WarningBody" TextWrapping="Wrap" />
-        <HyperlinkButton x:Name="LearnMoreLink" Margin="-12,0,0,0" />
+        <TextBlock
+            x:Name="WarningBody"
+            AutomationProperties.AutomationId="PowerDisplayWarningBody"
+            Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+            TextWrapping="Wrap" />
+        <HyperlinkButton
+            x:Name="LearnMoreLink"
+            Margin="-12,0,0,0"
+            AutomationProperties.AutomationId="PowerDisplayWarningLearnMoreLink" />
     </StackPanel>
 </ContentDialog>

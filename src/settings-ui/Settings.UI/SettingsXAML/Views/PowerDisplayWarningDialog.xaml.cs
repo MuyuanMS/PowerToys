@@ -29,17 +29,17 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             var loader = ResourceLoaderInstance.ResourceLoader;
 
             // Shared chrome: same title, hyperlink, and buttons on every variant.
-            Title = loader.GetString("PowerDisplay_Warning_Title");
-            PrimaryButtonText = loader.GetString("PowerDisplay_Dialog_Enable");
-            CloseButtonText = loader.GetString("PowerDisplay_Dialog_Cancel");
-            LearnMoreLink.Content = loader.GetString("PowerDisplay_Warning_LearnMore");
+            Title = loader.GetString("PowerDisplay_Warning_Title") ?? string.Empty;
+            PrimaryButtonText = loader.GetString("PowerDisplay_Dialog_Enable") ?? string.Empty;
+            CloseButtonText = loader.GetString("PowerDisplay_Dialog_Cancel") ?? string.Empty;
+            LearnMoreLink.Content = loader.GetString("PowerDisplay_Warning_LearnMore") ?? string.Empty;
             LearnMoreLink.NavigateUri = new Uri(LearnMoreUrl);
 
             // Variant-specific content. The resw key pair is derived from the enum name so
             // adding a new warning is one enum value + two resw entries — no code change here.
             var prefix = $"PowerDisplay_Warning_{kind}";
-            WarningInfoBar.Title = loader.GetString($"{prefix}_InfoBar");
-            WarningBody.Text = loader.GetString($"{prefix}_Body");
+            WarningInfoBar.Title = loader.GetString($"{prefix}_InfoBar") ?? string.Empty;
+            WarningBody.Text = loader.GetString($"{prefix}_Body") ?? string.Empty;
         }
     }
 }
