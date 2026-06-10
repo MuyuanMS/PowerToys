@@ -155,7 +155,7 @@ namespace ShortcutGuide.Helpers
             {
                 string filter = item.WindowFilter;
 
-                if (filter.EndsWith(".exe", StringComparison.InvariantCultureIgnoreCase))
+                if (filter.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
                 {
                     filter = filter[..^4];
                 }

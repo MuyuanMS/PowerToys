@@ -31,6 +31,7 @@
             <NavigationView
                 x:Name="WindowSelector"
                 Grid.Row="1"
+                AutomationProperties.AutomationId="WindowSelector"
                 IsBackButtonVisible="Collapsed"
                 IsPaneToggleButtonVisible="False"
                 IsSettingsVisible="False"
@@ -41,12 +42,14 @@
                     <!--  If footer only has one item, a visual bug can occur. This fake settings button will have set height to zero as soon as the content is loaded  -->
                     <NavigationViewItem
                         x:Name="FakeSettingsButton"
+                        AutomationProperties.AutomationId="FakeSettingsButton"
                         Icon="Setting"
                         SelectsOnInvoked="False"
                         Tag="Settings"
                         Tapped="Settings_Tapped" />
                     <NavigationViewItem
                         x:Uid="SettingsButton"
+                        AutomationProperties.AutomationId="SettingsButton"
                         Icon="Setting"
                         SelectsOnInvoked="False"
                         Tag="Settings"
@@ -55,6 +58,7 @@
                 <NavigationView.Content>
                     <Frame
                         x:Name="ContentFrame"
+                        AutomationProperties.AutomationId="ContentFrame"
                         Background="{ThemeResource LayerFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1,1,0,0"

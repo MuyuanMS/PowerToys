@@ -13,6 +13,7 @@ using ManagedCommon;
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -186,14 +187,18 @@ namespace ShortcutGuide
                 {
                     if (item == defaultShellName)
                     {
-                        this.WindowSelector.MenuItems.Add(new NavigationViewItem { Name = item, Content = "Windows", Icon = new FontIcon() { Glyph = "\xE770" } });
+                        var navItem = new NavigationViewItem { Name = item, Content = "Windows", Icon = new FontIcon() { Glyph = "\xE770" } };
+                        AutomationProperties.SetAutomationId(navItem, $"NavItem_{item}");
+                        this.WindowSelector.MenuItems.Add(navItem);
                     }
                     else
                     {
                         try
                         {
                             IconElement icon = BuildNavIcon(executablePath);
-                            this.WindowSelector.MenuItems.Add(new NavigationViewItem { Name = item, Content = ManifestInterpreter.GetShortcutsOfApplication(item).Name, Icon = icon });
+                            var navItem = new NavigationViewItem { Name = item, Content = ManifestInterpreter.GetShortcutsOfApplication(item).Name, Icon = icon };
+                            AutomationProperties.SetAutomationId(navItem, $"NavItem_{item}");
+                            this.WindowSelector.MenuItems.Add(navItem);
                         }
                         catch (IOException ex)
                         {
@@ -298,7 +303,10 @@ namespace ShortcutGuide
 
         public void Dispose()
         {
-            _getAppIdsTask.Dispose();
+            if (_getAppIdsTask.IsCompleted)
+            {
+                _getAppIdsTask.Dispose();
+            }
         }
     }
 }
