@@ -470,7 +470,7 @@
                                     <ptcontrols:CheckBoxWithDescriptionControl x:Uid="GeneralPage_EnableViewDiagnosticData" IsChecked="{x:Bind ViewModel.EnableViewDataDiagnostics, Mode=TwoWay}" />
                                     <HyperlinkButton
                                         x:Uid="GeneralPage_ViewDiagnosticDataButton"
-                                        Margin="16,-4,0,0"
+                                        Margin="16,0,0,0"
                                         Click="ViewDiagnosticData_Click"
                                         FontSize="12"
                                         FontWeight="SemiBold" />
