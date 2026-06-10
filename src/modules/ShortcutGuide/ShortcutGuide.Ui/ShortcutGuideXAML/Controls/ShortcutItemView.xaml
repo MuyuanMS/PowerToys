@@ -18,7 +18,7 @@
         </Grid.ColumnDefinitions>
         <Grid.ContextFlyout>
             <MenuFlyout Opening="PinFlyout_Opening">
-                <MenuFlyoutItem x:Name="PinMenuItem" Click="Pin_Click" />
+                <MenuFlyoutItem x:Name="PinMenuItem" AutomationProperties.AutomationId="PinMenuItem" Click="Pin_Click" />
             </MenuFlyout>
         </Grid.ContextFlyout>
         <StackPanel
