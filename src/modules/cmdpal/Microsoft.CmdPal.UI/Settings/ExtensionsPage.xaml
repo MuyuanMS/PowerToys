@@ -92,6 +92,7 @@
                             <HyperlinkButton
                                 x:Uid="Settings_ExtensionsPage_Banner_Hyperlink"
                                 Padding="0"
+                                AutomationProperties.AutomationId="CmdPal_ExtensionsPage_LearnMore"
                                 NavigateUri="https://aka.ms/building-cmdpal-extensions" />
                         </StackPanel>
                         <StackPanel
@@ -99,7 +100,10 @@
                             Grid.Column="1"
                             Orientation="Horizontal"
                             Spacing="8">
-                            <Button x:Uid="Settings_ExtensionsPage_FindExtensions_MicrosoftStore" Command="{x:Bind viewModel.Extensions.OpenStoreWithExtensionCommand}">
+                            <Button
+                                x:Uid="Settings_ExtensionsPage_FindExtensions_MicrosoftStore"
+                                AutomationProperties.AutomationId="CmdPal_ExtensionsPage_OpenMicrosoftStore"
+                                Command="{x:Bind viewModel.Extensions.OpenStoreWithExtensionCommand}">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <Viewbox Width="16">
                                         <Image AutomationProperties.AccessibilityView="Raw" Source="{ThemeResource StoreLogo}" />
@@ -120,6 +124,7 @@
                             x:Name="SearchBox"
                             x:Uid="Settings_ExtensionsPage_SearchBox_Placeholder"
                             HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="CmdPal_ExtensionsPage_Search"
                             Text="{x:Bind viewModel.Extensions.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
                             <AutoSuggestBox.QueryIcon>
                                 <SymbolIcon Symbol="Find" />
@@ -160,6 +165,7 @@
                             <Button
                                 x:Name="MoreButton"
                                 x:Uid="Settings_ExtensionsPage_More_Button"
+                                AutomationProperties.AutomationId="CmdPal_ExtensionsPage_More"
                                 Style="{StaticResource SubtleButtonStyle}">
                                 <Button.Flyout>
                                     <MenuFlyout Placement="BottomEdgeAlignedRight">
@@ -212,6 +218,7 @@
                         <ItemsRepeater.ItemTemplate>
                             <DataTemplate x:DataType="viewModels:ProviderSettingsViewModel">
                                 <controls:SettingsCard
+                                    AutomationProperties.AutomationId="{x:Bind Id, Mode=OneWay}"
                                     Click="SettingsCard_Click"
                                     DataContext="{x:Bind}"
                                     Description="{x:Bind ExtensionSubtext, Mode=OneWay}"
@@ -243,7 +250,7 @@
                                             </cpcontrols:ContentIcon.Content>
                                         </cpcontrols:ContentIcon>
                                     </controls:SettingsCard.HeaderIcon>
-                                    <ToggleSwitch IsOn="{x:Bind IsEnabled, Mode=TwoWay}" />
+                                    <ToggleSwitch AutomationProperties.AutomationId="{x:Bind ToggleAutomationId, Mode=OneWay}" IsOn="{x:Bind IsEnabled, Mode=TwoWay}" />
                                 </controls:SettingsCard>
                             </DataTemplate>
                         </ItemsRepeater.ItemTemplate>

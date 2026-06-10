@@ -42,6 +42,10 @@ public partial class DockMonitorConfigViewModel : ObservableObject
     /// <summary>Gets the stable device identifier for this monitor.</summary>
     public string DeviceId => _monitorInfo.DeviceId;
 
+    public string ToggleAutomationId => $"{DeviceId}_Enable";
+
+    public string PositionAutomationId => $"{DeviceId}_Position";
+
     /// <summary>Gets a value indicating whether this is the primary monitor.</summary>
     public bool IsPrimary => _monitorInfo.IsPrimary;
 

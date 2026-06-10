@@ -22,6 +22,10 @@ public partial class FallbackSettingsViewModel : ObservableObject
 
     public string Id { get; private set; } = string.Empty;
 
+    public string ToggleAutomationId => $"{Id}_Enable";
+
+    public string IncludeInGlobalResultsAutomationId => $"{Id}_IncludeInGlobalResults";
+
     public bool IsEnabled
     {
         get => _fallbackSettings.IsEnabled;
