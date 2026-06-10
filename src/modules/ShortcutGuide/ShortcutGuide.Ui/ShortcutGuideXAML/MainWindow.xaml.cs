@@ -13,8 +13,11 @@ using ManagedCommon;
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Markup;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using ShortcutGuide.Helpers;
 using ShortcutGuide.Models;
@@ -136,12 +139,6 @@ namespace ShortcutGuide
             // The code below sets the position of the window to the center of the monitor, but only if it hasn't been set before.
             if (!this._setPosition)
             {
-                Content.GettingFocus += (_, _) =>
-                {
-                    this.FakeSettingsButton.Height = 10;
-                    this.FakeSettingsButton.Height = 0;
-                };
-
                 this.SetWindowPosition();
                 this._setPosition = true;
 
@@ -181,19 +178,33 @@ namespace ShortcutGuide
             if (this.WindowSelector.MenuItems.Count == 0)
             {
                 string defaultShellName = ManifestInterpreter.GetCachedIndexYamlFile().DefaultShellName;
+                string windowsNavItemLabel = ResourceLoaderInstance.ResourceLoader.GetString("WindowsNavigationItem.Content");
+                windowsNavItemLabel = string.IsNullOrWhiteSpace(windowsNavItemLabel) ? "Windows" : windowsNavItemLabel;
 
                 foreach (var (item, executablePath) in this._currentApplicationIds)
                 {
                     if (item == defaultShellName)
                     {
-                        this.WindowSelector.MenuItems.Add(new NavigationViewItem { Name = item, Content = "Windows", Icon = new FontIcon() { Glyph = "\xE770" } });
+                        var pathData = (string)Application.Current.Resources["WindowsLogoPathData"];
+                        var navItem = new NavigationViewItem { Name = item, Content = windowsNavItemLabel, Icon = CreatePathIcon(pathData) };
+                        AutomationProperties.SetAutomationId(navItem, "NavItem_Windows");
+                        this.WindowSelector.MenuItems.Add(navItem);
+                    }
+                    else if (item == "Microsoft.PowerToys")
+                    {
+                        var pathData = (string)Application.Current.Resources["PowerToysLogoPathData"];
+                        var navItem = new NavigationViewItem { Name = item, Content = ManifestInterpreter.GetShortcutsOfApplication(item).Name, Icon = CreatePathIcon(pathData) };
+                        AutomationProperties.SetAutomationId(navItem, "NavItem_PowerToys");
+                        this.WindowSelector.MenuItems.Add(navItem);
                     }
                     else
                     {
                         try
                         {
                             IconElement icon = BuildNavIcon(executablePath);
-                            this.WindowSelector.MenuItems.Add(new NavigationViewItem { Name = item, Content = ManifestInterpreter.GetShortcutsOfApplication(item).Name, Icon = icon });
+                            var navItem = new NavigationViewItem { Name = item, Content = ManifestInterpreter.GetShortcutsOfApplication(item).Name, Icon = icon };
+                            AutomationProperties.SetAutomationId(navItem, $"NavItem_{item}");
+                            this.WindowSelector.MenuItems.Add(navItem);
                         }
                         catch (IOException ex)
                         {
@@ -218,6 +229,17 @@ namespace ShortcutGuide
             }
 
             return new FontIcon { Glyph = "\uEB91" };
+        }
+
+        private static PathIcon CreatePathIcon(string pathData)
+        {
+            var geometry = (Geometry)XamlBindingHelper.ConvertValue(typeof(Geometry), pathData);
+            return new PathIcon
+            {
+                Data = geometry,
+                Width = 20,
+                Height = 20,
+            };
         }
 
         private bool _hasMovedToRightMonitor;
