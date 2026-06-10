@@ -153,7 +153,10 @@ namespace ShortcutGuide
                 };
             }
 
-            _ = this.InitializeNavItemsAsync();
+            if (this.WindowSelector.MenuItems.Count == 0)
+            {
+                _ = this.InitializeNavItemsAsync();
+            }
         }
 
         private async Task InitializeNavItemsAsync()
@@ -178,13 +181,15 @@ namespace ShortcutGuide
             if (this.WindowSelector.MenuItems.Count == 0)
             {
                 string defaultShellName = ManifestInterpreter.GetCachedIndexYamlFile().DefaultShellName;
-
+                string windowsNavItemLabel = ResourceLoaderInstance.ResourceLoader.GetString("WindowsNavigationItem.Content");
+                windowsNavItemLabel = string.IsNullOrWhiteSpace(windowsNavItemLabel) ? "Windows" : windowsNavItemLabel;
+ 
                 foreach (var (item, executablePath) in this._currentApplicationIds)
                 {
                     if (item == defaultShellName)
                     {
                         var pathData = (string)Application.Current.Resources["WindowsLogoPathData"];
-                        var navItem = new NavigationViewItem { Name = item, Content = "Windows", Icon = CreatePathIcon(pathData) };
+                        var navItem = new NavigationViewItem { Name = item, Content = windowsNavItemLabel, Icon = CreatePathIcon(pathData) };
                         AutomationProperties.SetAutomationId(navItem, "NavItem_Windows");
                         this.WindowSelector.MenuItems.Add(navItem);
                     }
