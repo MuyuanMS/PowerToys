@@ -424,6 +424,11 @@ public partial class PowerAccent : IDisposable
         }
     }
 
+    public void ForceResetKeyboardState()
+    {
+        _keyboardListener.ForceReset();
+    }
+
     public void Dispose()
     {
         _keyboardListener.UnInitHook();
