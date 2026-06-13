@@ -78,6 +78,7 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
             AddFlyoutMenuItem(ModuleType.LightSwitch);
             AddFlyoutMenuItem(ModuleType.MousePointerCrosshairs);
             AddFlyoutMenuItem(ModuleType.MouseWithoutBorders);
+            AddFlyoutMenuItem(ModuleType.MousePointerCrosshairs);
             AddFlyoutMenuItem(ModuleType.PowerDisplay);
             AddFlyoutMenuItem(ModuleType.PowerLauncher);
             AddFlyoutMenuItem(ModuleType.PowerOCR);
