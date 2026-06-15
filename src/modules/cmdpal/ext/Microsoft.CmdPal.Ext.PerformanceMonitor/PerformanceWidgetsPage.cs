@@ -35,6 +35,7 @@ internal enum PerformanceMetricKind
     Disk,
     Gpu,
     Battery,
+    Temperature,
 }
 
 /// <summary>
@@ -65,6 +66,7 @@ internal sealed partial class PerformanceWidgetsPage : OnLoadStaticListPage, IDi
         PerformanceMetricKind.Disk => Icons.HardDriveIcon,
         PerformanceMetricKind.Gpu => Icons.GpuIcon,
         PerformanceMetricKind.Battery => _batteryPage?.CurrentIcon ?? Icons.BatteryIcon,
+        PerformanceMetricKind.Temperature => Icons.TemperatureIcon,
         _ => Icons.PerformanceMonitorIcon,
     };
 
@@ -89,6 +91,9 @@ internal sealed partial class PerformanceWidgetsPage : OnLoadStaticListPage, IDi
 
     private readonly SystemBatteryUsageWidgetPage? _batteryPage;
     private readonly ListItem? _batteryItem;
+
+    private readonly SystemTemperatureWidgetPage? _temperaturePage;
+    private readonly ListItem? _temperatureItem;
 
     // For the network band, show one item for upload and one for download.
     private ListItem? _networkUpItem;
@@ -216,6 +221,21 @@ internal sealed partial class PerformanceWidgetsPage : OnLoadStaticListPage, IDi
             }
         }
 
+        if (IncludesMetric(PerformanceMetricKind.Temperature))
+        {
+            _temperaturePage = new SystemTemperatureWidgetPage();
+            _temperatureItem = new ListItem(_temperaturePage)
+            {
+                Title = _temperaturePage.GetItemTitle(isBandPage),
+                Icon = Icons.TemperatureIcon,
+            };
+
+            _temperaturePage.Updated += (s, e) =>
+            {
+                _temperatureItem.Title = _temperaturePage.GetItemTitle(isBandPage);
+            };
+        }
+
         if (_isBandPage)
         {
             // add subtitles to them all
@@ -249,6 +269,11 @@ internal sealed partial class PerformanceWidgetsPage : OnLoadStaticListPage, IDi
             {
                 _batteryItem.Subtitle = Resources.GetResource("Battery_Usage_Subtitle");
             }
+
+            if (_temperatureItem is not null)
+            {
+                _temperatureItem.Subtitle = Resources.GetResource("Temperature_Usage_Subtitle");
+            }
         }
     }
 
@@ -260,6 +285,7 @@ internal sealed partial class PerformanceWidgetsPage : OnLoadStaticListPage, IDi
         _diskPage?.PushActivate();
         _gpuPage?.PushActivate();
         _batteryPage?.PushActivate();
+        _temperaturePage?.PushActivate();
     }
 
     protected override void Unloaded()
@@ -270,6 +296,7 @@ internal sealed partial class PerformanceWidgetsPage : OnLoadStaticListPage, IDi
         _diskPage?.PopActivate();
         _gpuPage?.PopActivate();
         _batteryPage?.PopActivate();
+        _temperaturePage?.PopActivate();
     }
 
     public override IListItem[] GetItems()
@@ -299,6 +326,7 @@ internal sealed partial class PerformanceWidgetsPage : OnLoadStaticListPage, IDi
                 PerformanceMetricKind.Disk => new IListItem[] { _diskItem! },
                 PerformanceMetricKind.Gpu => new IListItem[] { _gpuItem! },
                 PerformanceMetricKind.Battery => new IListItem[] { _batteryItem! },
+                PerformanceMetricKind.Temperature => new IListItem[] { _temperatureItem! },
                 _ => Array.Empty<IListItem>(),
             };
         }
@@ -306,9 +334,18 @@ internal sealed partial class PerformanceWidgetsPage : OnLoadStaticListPage, IDi
         if (!_isBandPage)
         {
             // TODO add details
-            return _batteryItem is not null
-                ? new[] { _cpuItem!, _memoryItem!, _networkItem!, _diskItem!, _gpuItem!, _batteryItem! }
-                : new[] { _cpuItem!, _memoryItem!, _networkItem!, _diskItem!, _gpuItem! };
+            var items = new System.Collections.Generic.List<IListItem> { _cpuItem!, _memoryItem!, _networkItem!, _diskItem!, _gpuItem! };
+            if (_batteryItem is not null)
+            {
+                items.Add(_batteryItem);
+            }
+
+            if (_temperatureItem is not null)
+            {
+                items.Add(_temperatureItem);
+            }
+
+            return items.ToArray();
         }
 
         return [_cpuItem!, _memoryItem!];
@@ -364,6 +401,7 @@ internal sealed partial class PerformanceWidgetsPage : OnLoadStaticListPage, IDi
         _diskPage?.Dispose();
         _gpuPage?.Dispose();
         _batteryPage?.Dispose();
+        _temperaturePage?.Dispose();
     }
 
     internal static string GetBandId(PerformanceMetricKind? metric)
@@ -393,6 +431,7 @@ internal sealed partial class PerformanceWidgetsPage : OnLoadStaticListPage, IDi
             PerformanceMetricKind.Disk => "disk",
             PerformanceMetricKind.Gpu => "gpu",
             PerformanceMetricKind.Battery => "battery",
+            PerformanceMetricKind.Temperature => "temperature",
             _ => "unknown",
         };
     }
@@ -1472,6 +1511,98 @@ internal sealed partial class SystemBatteryUsageWidgetPage : WidgetPage, IDispos
     protected override void OnActivated() => _dataManager.Start();
 
     protected override void OnDeactivated() => _dataManager.Stop();
+
+    public void Dispose()
+    {
+        _dataManager.Dispose();
+    }
+}
+
+internal sealed partial class SystemTemperatureWidgetPage : WidgetPage, IDisposable
+{
+    public override string Id => "com.microsoft.cmdpal.temperature_widget";
+
+    public override string Title => Resources.GetResource("Temperature_Usage_Title");
+
+    public override IconInfo Icon => Icons.TemperatureIcon;
+
+    private readonly DataManager _dataManager;
+
+    public SystemTemperatureWidgetPage()
+    {
+        _dataManager = new(DataType.Temperature, () => UpdateWidget());
+    }
+
+    protected override void LoadContentData()
+    {
+        try
+        {
+            ContentData.Clear();
+
+            var stats = _dataManager.GetTemperatureStats();
+
+            if (!stats.IsAvailable || stats.CpuTemperatureCelsius < 0)
+            {
+                ContentData["cpuTemperature"] = Resources.GetResource("Temperature_Usage_Unknown");
+                ContentData["temperatureSource"] = Resources.GetResource("Temperature_Usage_Unavailable");
+                return;
+            }
+
+            ContentData["cpuTemperature"] = $"{stats.CpuTemperatureCelsius:F1} °C";
+            ContentData["temperatureSource"] = Resources.GetResource("Temperature_Source_Acpi");
+        }
+        catch (Exception e)
+        {
+            ContentData.Clear();
+            ContentData["errorMessage"] = e.Message;
+        }
+    }
+
+    protected override string GetTemplatePath(WidgetPageState page)
+    {
+        return page switch
+        {
+            WidgetPageState.Content => @"DevHome\Templates\SystemTemperatureTemplate.json",
+            WidgetPageState.Loading => @"DevHome\Templates\SystemTemperatureTemplate.json",
+            _ => throw new NotImplementedException(),
+        };
+    }
+
+    public string GetItemTitle(bool isBandPage)
+    {
+        if (!ContentData.TryGetValue("cpuTemperature", out var temp)
+            || temp == Resources.GetResource("Temperature_Usage_Unknown"))
+        {
+            return isBandPage
+                ? Resources.GetResource("Temperature_Usage_Unknown")
+                : Resources.GetResource("Temperature_Usage_Unknown_Label");
+        }
+
+        return isBandPage
+            ? temp
+            : string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                Resources.GetResource("Temperature_Usage_Label"),
+                temp);
+    }
+
+    internal override void PushActivate()
+    {
+        base.PushActivate();
+        if (IsActive)
+        {
+            _dataManager.Start();
+        }
+    }
+
+    internal override void PopActivate()
+    {
+        base.PopActivate();
+        if (!IsActive)
+        {
+            _dataManager.Stop();
+        }
+    }
 
     public void Dispose()
     {
