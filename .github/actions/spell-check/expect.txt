@@ -1088,6 +1088,7 @@ minwindef
 Mip
 mkdn
 mlcfg
+mmb
 mmc
 mmcexe
 mmi
@@ -1103,6 +1104,7 @@ MONITORINFOEX
 MONITORINFOEXW
 monitorinfof
 MOUSEACTIVATE
+mousebuttonlock
 mousecrosshairs
 MOUSEDATA
 MOUSEEVENTF
@@ -1606,6 +1608,7 @@ RIDEV
 RIGHTBUTTON
 RIGHTSCROLLBAR
 riid
+rmb
 rollups
 ROUNDSMALL
 rpcrt
