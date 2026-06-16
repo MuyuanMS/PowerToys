@@ -439,6 +439,13 @@ namespace Microsoft.PowerToys.Run.Plugin.TimeDate.Components
 
             if (roundedMinutes < 60)
             {
+                if (roundedMinutes == 1)
+                {
+                    return isPast
+                        ? Resources.Microsoft_plugin_timedate_FriendlyMinuteAgo
+                        : Resources.Microsoft_plugin_timedate_FriendlyInMinute;
+                }
+
                 string key = isPast
                     ? Resources.Microsoft_plugin_timedate_FriendlyMinutesAgo
                     : Resources.Microsoft_plugin_timedate_FriendlyInMinutes;
@@ -446,13 +453,16 @@ namespace Microsoft.PowerToys.Run.Plugin.TimeDate.Components
             }
 
             int roundedHours = (int)Math.Round(Math.Abs(delta.TotalHours));
-            if (roundedHours < 1)
-            {
-                roundedHours = 1;
-            }
 
             if (roundedHours < 24)
             {
+                if (roundedHours == 1)
+                {
+                    return isPast
+                        ? Resources.Microsoft_plugin_timedate_FriendlyHourAgo
+                        : Resources.Microsoft_plugin_timedate_FriendlyInHour;
+                }
+
                 string key = isPast
                     ? Resources.Microsoft_plugin_timedate_FriendlyHoursAgo
                     : Resources.Microsoft_plugin_timedate_FriendlyInHours;
