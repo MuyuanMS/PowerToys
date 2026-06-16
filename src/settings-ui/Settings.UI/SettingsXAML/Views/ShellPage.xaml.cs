@@ -11,7 +11,6 @@ using System.Threading.Tasks;
 using Common.Search;
 using Common.Search.FuzzSearch;
 using ManagedCommon;
-using Microsoft.PowerToys.Settings.UI.Controls;
 using Microsoft.PowerToys.Settings.UI.Helpers;
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.PowerToys.Settings.UI.Library.Utilities;
@@ -94,7 +93,7 @@ namespace Microsoft.PowerToys.Settings.UI.Views
 
         public static bool IsUserAnAdmin { get; set; }
 
-        public Controls.TitleBar TitleBar => AppTitleBar;
+        public TitleBar TitleBar => AppTitleBar;
 
         private Dictionary<Type, NavigationViewItem> _navViewParentLookup = new Dictionary<Type, NavigationViewItem>();
         private List<string> _searchSuggestions = [];
@@ -366,15 +365,15 @@ namespace Microsoft.PowerToys.Settings.UI.Views
         {
             if (args.DisplayMode == NavigationViewDisplayMode.Compact || args.DisplayMode == NavigationViewDisplayMode.Minimal)
             {
-                AppTitleBar.IsPaneButtonVisible = true;
+                AppTitleBar.IsPaneToggleButtonVisible = true;
             }
             else
             {
-                AppTitleBar.IsPaneButtonVisible = false;
+                AppTitleBar.IsPaneToggleButtonVisible = false;
             }
         }
 
-        private void PaneToggleBtn_Click(object sender, RoutedEventArgs e)
+        private void PaneToggleBtn_Click(TitleBar sender, object args)
         {
             navigationView.IsPaneOpen = !navigationView.IsPaneOpen;
         }
