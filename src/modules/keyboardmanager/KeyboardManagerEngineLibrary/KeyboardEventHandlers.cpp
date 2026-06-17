@@ -96,11 +96,16 @@ namespace KeyboardEventHandlers
         {
             UpdateNumpadWithShift(data, state);
 
-            // Check app-specific single key remaps first (per-app mapping has priority over global)
+            // Check app-specific single key remaps first (per-app mapping has priority over global).
+            // Skip the process-name lookup entirely when no app-specific remaps are configured
+            // to avoid the overhead on every key event in the low-level hook (hot path).
             std::wstring process_name;
-            process_name.resize(MAX_PATH);
-            ii.GetForegroundProcess(process_name);
-            process_name.erase(std::find(process_name.begin(), process_name.end(), L'\0'), process_name.end());
+            if (!state.appSpecificSingleKeyReMap.empty())
+            {
+                process_name.resize(MAX_PATH);
+                ii.GetForegroundProcess(process_name);
+                process_name.erase(std::find(process_name.begin(), process_name.end(), L'\0'), process_name.end());
+            }
 
             if (!process_name.empty())
             {
@@ -129,16 +134,6 @@ namespace KeyboardEventHandlers
                         {
                             return 1;
                         }
-                    }
-
-                    int key_count;
-                    if (remapToKey)
-                    {
-                        key_count = 1;
-                    }
-                    else
-                    {
-                        key_count = std::get<Shortcut>(it->second).Size();
                     }
 
                     std::vector<INPUT> keyEventList;
@@ -200,12 +195,26 @@ namespace KeyboardEventHandlers
                             }
                         }
 
-                        static int dayWeLastSentKeyToKeyTelemetryOn = -1;
-                        auto currentDay = std::chrono::duration_cast<std::chrono::days>(std::chrono::system_clock::now().time_since_epoch()).count();
-                        if (dayWeLastSentKeyToKeyTelemetryOn != currentDay)
+                        // Send daily telemetry event for Keyboard Manager key activation.
+                        if (remapToKey)
                         {
-                            Trace::DailyKeyToKeyRemapInvoked();
-                            dayWeLastSentKeyToKeyTelemetryOn = currentDay;
+                            static int dayWeLastSentAppSpecificKeyToKeyTelemetryOn = -1;
+                            auto currentDay = std::chrono::duration_cast<std::chrono::days>(std::chrono::system_clock::now().time_since_epoch()).count();
+                            if (dayWeLastSentAppSpecificKeyToKeyTelemetryOn != currentDay)
+                            {
+                                Trace::DailyKeyToKeyRemapInvoked();
+                                dayWeLastSentAppSpecificKeyToKeyTelemetryOn = currentDay;
+                            }
+                        }
+                        else
+                        {
+                            static int dayWeLastSentAppSpecificKeyToShortcutTelemetryOn = -1;
+                            auto currentDay = std::chrono::duration_cast<std::chrono::days>(std::chrono::system_clock::now().time_since_epoch()).count();
+                            if (dayWeLastSentAppSpecificKeyToShortcutTelemetryOn != currentDay)
+                            {
+                                Trace::DailyKeyToShortcutRemapInvoked();
+                                dayWeLastSentAppSpecificKeyToShortcutTelemetryOn = currentDay;
+                            }
                         }
                     }
 
