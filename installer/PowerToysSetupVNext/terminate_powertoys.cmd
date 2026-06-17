@@ -13,7 +13,7 @@ if errorlevel 1 exit /b 0
 for /l %%x in (1, 1, 100) do (
     taskkill /IM PowerToys.exe 1>NUL 2>NUL
     if !ERRORLEVEL! NEQ 0 exit /b 0
-    ping -n 1 127.0.0.1 >NUL 2>NUL
+    ping -n 2 127.0.0.1 >NUL 2>NUL
 )
 
 @REM Force kill if graceful close failed after all attempts
