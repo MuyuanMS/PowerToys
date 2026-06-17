@@ -1350,14 +1350,15 @@ UINT __stdcall ForceRemoveOldVersionCA(MSIHANDLE hInstall)
 
     try
     {
-        LPWSTR currentScope = nullptr;
-        hr = WcaGetProperty(L"InstallScope", &currentScope);
-        if (FAILED(hr))
+        LPWSTR customActionData = nullptr;
+        hr = WcaGetProperty(L"CustomActionData", &customActionData);
+        if (FAILED(hr) || !customActionData || customActionData[0] == L'\0')
         {
             return WcaFinalize(ERROR_SUCCESS);
         }
 
-        // Get the current product code to skip it during uninstall enumeration
+        // Get the current product code to skip it during uninstall enumeration.
+        // In deferred context, ProductCode is one of the few accessible properties.
         wchar_t currentProductCode[39] = {};
         DWORD currentProductCodeSize = ARRAYSIZE(currentProductCode);
         if (MsiGetPropertyW(hInstall, L"ProductCode", currentProductCode, &currentProductCodeSize) != ERROR_SUCCESS)
@@ -1365,7 +1366,7 @@ UINT __stdcall ForceRemoveOldVersionCA(MSIHANDLE hInstall)
             currentProductCode[0] = L'\0';
         }
 
-        const wchar_t* upgradeCode = (std::wstring(currentScope) == L"perUser")
+        const wchar_t* upgradeCode = (std::wstring(customActionData) == L"perUser")
             ? POWERTOYS_UPGRADE_CODE_USER
             : POWERTOYS_UPGRADE_CODE;
 
@@ -1395,6 +1396,7 @@ UINT __stdcall ForceRemoveOldVersionCA(MSIHANDLE hInstall)
             {
                 continue;
             }
+            localPackage.resize(pathSize);
 
             if (!std::filesystem::exists(localPackage.c_str()))
             {
