@@ -13,12 +13,11 @@
 #include <FancyZonesLib/util.h>
 
 #include <wrl/client.h>
-#pragma comment(lib, "Shell32.lib")
-#include <Shobjidl.h>
-#pragma comment(lib, "Propsys.lib")
 #include <propsys.h>
 #include <propkey.h>
-#include <wil/resource.h>
+
+#pragma comment(lib, "Shell32.lib")
+#pragma comment(lib, "Propsys.lib")
 
 using namespace Microsoft::WRL;
 
@@ -345,13 +344,13 @@ std::wstring AppZoneHistory::GetProcessPathWithAUMID(HWND window) noexcept
 
 bool AppZoneHistory::SetAppLastZones(HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId, const GUID& layoutId, const ZoneIndexSet& zoneIndexSet)
 {
-    if (IsAnotherWindowOfApplicationInstanceZoned(window, workAreaId))
+    auto processPath = GetProcessPathWithAUMID(window);
+    if (processPath.empty())
     {
         return false;
     }
 
-    auto processPath = GetProcessPathWithAUMID(window);
-    if (processPath.empty())
+    if (IsAnotherWindowOfApplicationInstanceZoned(processPath, window, workAreaId))
     {
         return false;
     }
@@ -524,6 +523,11 @@ std::optional<FancyZonesDataTypes::AppZoneHistoryData> AppZoneHistory::GetZoneHi
 bool AppZoneHistory::IsAnotherWindowOfApplicationInstanceZoned(HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId) const noexcept
 {
     auto processPath = GetProcessPathWithAUMID(window);
+    return IsAnotherWindowOfApplicationInstanceZoned(processPath, window, workAreaId);
+}
+
+bool AppZoneHistory::IsAnotherWindowOfApplicationInstanceZoned(const std::wstring& processPath, HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId) const noexcept
+{
     if (!processPath.empty())
     {
         auto history = m_history.find(processPath);
