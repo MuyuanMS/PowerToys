@@ -160,7 +160,7 @@ namespace Peek.UI
             }
         }
 
-        private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+        private static void CurrentDomain_UnhandledException(object sender, System.UnhandledExceptionEventArgs e)
         {
             if (e.ExceptionObject is Exception ex)
             {
