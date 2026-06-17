@@ -30,6 +30,7 @@ public partial class ImageSize : INotifyPropertyChanged, IHasId
         return changed;
     }
 
+    [JsonConstructor]
     public ImageSize(int id = 0, string name = "", ResizeFit fit = ResizeFit.Fit, double width = 0, double height = 0, ResizeUnit unit = ResizeUnit.Pixel)
     {
         _id = id;
@@ -59,7 +60,7 @@ public partial class ImageSize : INotifyPropertyChanged, IHasId
     private double _lastPercentHeight = 100.0;
     
     // Flag to prevent updating stored percent values during restoration
-    private bool _isRestoringPercentValues = false;
+    private bool _isRestoringPercentValues;
 
     public int Id
     {
@@ -152,12 +153,11 @@ public partial class ImageSize : INotifyPropertyChanged, IHasId
         get => _unit;
         set
         {
-            var previousUnit = _unit;
             if (SetProperty(ref _unit, value))
             {
                 // When switching to Percent unit from another unit, restore last percent values
                 // or default to 100% if this is the first time switching to Percent
-                if (value == ResizeUnit.Percent && previousUnit != ResizeUnit.Percent)
+                if (value == ResizeUnit.Percent)
                 {
                     _isRestoringPercentValues = true;
                     try
