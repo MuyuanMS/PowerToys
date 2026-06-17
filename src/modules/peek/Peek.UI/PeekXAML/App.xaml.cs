@@ -154,7 +154,7 @@ namespace Peek.UI
 
             // Only suppress CoreMessaging/COM exceptions to prevent the crash dialog for known transient issues.
             // Let other unexpected exceptions propagate to avoid masking corrupted application state.
-            if (e.Exception is System.Runtime.InteropServices.COMException)
+            if (e.Exception is COMException)
             {
                 e.Handled = true;
             }
@@ -162,12 +162,27 @@ namespace Peek.UI
 
         private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
-            Logger.LogError("AppDomain unhandled exception: " + (e.ExceptionObject?.ToString() ?? "null"));
+            if (e.ExceptionObject is Exception ex)
+            {
+                Logger.LogError("AppDomain unhandled exception", ex);
+            }
+            else
+            {
+                Logger.LogError("AppDomain unhandled exception: " + (e.ExceptionObject?.ToString() ?? "null"));
+            }
         }
 
         private static void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
         {
-            Logger.LogError("Unobserved task exception: " + (e.Exception?.ToString() ?? "null"));
+            if (e.Exception != null)
+            {
+                Logger.LogError("Unobserved task exception", e.Exception);
+            }
+            else
+            {
+                Logger.LogError("Unobserved task exception: null");
+            }
+
             e.SetObserved();
         }
 
