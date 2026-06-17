@@ -174,15 +174,7 @@ namespace Peek.UI
 
         private static void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
         {
-            if (e.Exception != null)
-            {
-                Logger.LogError("Unobserved task exception", e.Exception);
-            }
-            else
-            {
-                Logger.LogError("Unobserved task exception: null");
-            }
-
+            Logger.LogError("Unobserved task exception", e.Exception);
             e.SetObserved();
         }
 
