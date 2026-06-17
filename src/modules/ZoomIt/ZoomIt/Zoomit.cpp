@@ -6935,7 +6935,9 @@ static auto GetUniqueRecordingFilename()
 
     std::filesystem::path baseFilename{ g_RecordingSaveBaseFilename };
     std::wstring baseStem = baseFilename.stem().wstring();
-    std::wstring baseExtension = baseFilename.extension().wstring();
+    // Use the current recording format's extension rather than the stored one,
+    // so that switching formats (MP4 <-> GIF) doesn't suggest a mismatched extension.
+    std::wstring baseExtension = (g_RecordingFormat == RecordingFormat::GIF) ? L".gif" : L".mp4";
 
     std::wstring candidateName = baseStem + baseExtension;
     std::filesystem::path testPath = saveFolder / candidateName;
