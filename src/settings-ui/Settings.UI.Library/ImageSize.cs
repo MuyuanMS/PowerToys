@@ -39,7 +39,7 @@ public partial class ImageSize : INotifyPropertyChanged, IHasId
         _width = width < 0 || double.IsNaN(width) ? 0 : width;
         _height = height < 0 || double.IsNaN(height) ? 0 : height;
         _unit = unit;
-        
+
         // If constructed with Percent unit, store these as the last percent values
         if (unit == ResizeUnit.Percent)
         {
@@ -54,11 +54,11 @@ public partial class ImageSize : INotifyPropertyChanged, IHasId
     private double _height;
     private double _width;
     private ResizeUnit _unit;
-    
+
     // Store last percent values to restore when switching back to Percent
     private double _lastPercentWidth = 100.0;
     private double _lastPercentHeight = 100.0;
-    
+
     // Flag to prevent updating stored percent values during restoration
     private bool _isRestoringPercentValues;
 
@@ -170,7 +170,7 @@ public partial class ImageSize : INotifyPropertyChanged, IHasId
                         _isRestoringPercentValues = false;
                     }
                 }
-                
+
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsHeightUsed)));
             }
         }
