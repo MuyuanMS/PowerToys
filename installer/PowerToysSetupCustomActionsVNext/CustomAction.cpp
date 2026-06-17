@@ -1348,12 +1348,14 @@ UINT __stdcall ForceRemoveOldVersionCA(MSIHANDLE hInstall)
     UINT er = ERROR_SUCCESS;
     hr = WcaInitialize(hInstall, "ForceRemoveOldVersionCA");
 
+    LPWSTR customActionData = nullptr;
+
     try
     {
-        LPWSTR customActionData = nullptr;
         hr = WcaGetProperty(L"CustomActionData", &customActionData);
         if (FAILED(hr) || !customActionData || customActionData[0] == L'\0')
         {
+            ReleaseStr(customActionData);
             return WcaFinalize(ERROR_SUCCESS);
         }
 
@@ -1423,6 +1425,7 @@ UINT __stdcall ForceRemoveOldVersionCA(MSIHANDLE hInstall)
         Logger::error("ForceRemoveOldVersionCA unknown exception");
     }
 
+    ReleaseStr(customActionData);
     er = SUCCEEDED(hr) ? ERROR_SUCCESS : ERROR_INSTALL_FAILURE;
     return WcaFinalize(er);
 }
