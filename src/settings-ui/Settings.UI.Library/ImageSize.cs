@@ -33,7 +33,7 @@ public partial class ImageSize : INotifyPropertyChanged, IHasId
     public ImageSize(int id = 0, string name = "", ResizeFit fit = ResizeFit.Fit, double width = 0, double height = 0, ResizeUnit unit = ResizeUnit.Pixel)
     {
         _id = id;
-        _name = name;
+        _name = string.IsNullOrWhiteSpace(name) ? string.Empty : name;
         _fit = fit;
         _width = width < 0 || double.IsNaN(width) ? 0 : width;
         _height = height < 0 || double.IsNaN(height) ? 0 : height;
@@ -160,9 +160,15 @@ public partial class ImageSize : INotifyPropertyChanged, IHasId
                 if (value == ResizeUnit.Percent && previousUnit != ResizeUnit.Percent)
                 {
                     _isRestoringPercentValues = true;
-                    Width = _lastPercentWidth;
-                    Height = _lastPercentHeight;
-                    _isRestoringPercentValues = false;
+                    try
+                    {
+                        Width = _lastPercentWidth;
+                        Height = _lastPercentHeight;
+                    }
+                    finally
+                    {
+                        _isRestoringPercentValues = false;
+                    }
                 }
                 
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsHeightUsed)));

@@ -115,5 +115,21 @@ namespace Microsoft.PowerToys.Settings.UI.UnitTests.ModelsTests
             Assert.AreEqual(50.0, imageSize.Width, "Width should be preserved when constructed with Percent unit");
             Assert.AreEqual(75.0, imageSize.Height, "Height should be preserved when constructed with Percent unit");
         }
+
+        [TestMethod]
+        public void WhenSerializedAndDeserialized_PercentValuesShouldBePreserved()
+        {
+            // Arrange
+            var imageSize = new ImageSize(1, "Test", ResizeFit.Stretch, 50, 75, ResizeUnit.Percent);
+
+            // Act - Round-trip through JSON
+            var json = imageSize.ToJsonString();
+            var deserialized = System.Text.Json.JsonSerializer.Deserialize<ImageSize>(json);
+
+            // Assert - Values should survive serialization
+            Assert.AreEqual(50.0, deserialized.Width, "Width should be preserved after JSON round-trip with Percent unit");
+            Assert.AreEqual(75.0, deserialized.Height, "Height should be preserved after JSON round-trip with Percent unit");
+            Assert.AreEqual(ResizeUnit.Percent, deserialized.Unit, "Unit should be preserved after JSON round-trip");
+        }
     }
 }
