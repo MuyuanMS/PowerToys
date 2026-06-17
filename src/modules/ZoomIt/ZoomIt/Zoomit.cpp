@@ -203,16 +203,19 @@ BOOLEAN g_StartedByPowerToys = FALSE;
 BOOLEAN g_running = TRUE;
 
 // Screen recording globals
-#define DEFAULT_RECORDING_FILE		L"Recording.mp4"
-#define DEFAULT_GIF_RECORDING_FILE	L"Recording.gif"
+constexpr auto DEFAULT_RECORDING_FILE = L"Recording.mp4";
+constexpr auto DEFAULT_GIF_RECORDING_FILE = L"Recording.gif";
 #define DEFAULT_SCREENSHOT_FILE		L"ZoomIt.png"
 
 BOOL	g_RecordToggle = FALSE;
 BOOL	g_RecordCropping = FALSE;
 SelectRectangle g_SelectRectangle;
 WebcamPreviewWindow g_WebcamPreview;
+// The full path of the last saved recording file.
 std::wstring	g_RecordingSaveLocation;
 std::wstring	g_ScreenshotSaveLocation;
+// The last user-chosen recording filename (without path). Used to construct unique recording filenames.
+std::wstring    g_RecordingSaveBaseFilename;
 winrt::IDirect3DDevice	g_RecordDevice{ nullptr };
 std::shared_ptr<VideoRecordingSession> g_RecordingSession = nullptr;
 std::shared_ptr<GifRecordingSession> g_GifRecordingSession = nullptr;
@@ -6796,6 +6799,44 @@ void StopRecording()
 
 //----------------------------------------------------------------------------
 //
+// GetTimestampSuffix
+//
+// Returns a timestamp string for disambiguating filenames.
+// Format: " YYYY-MM-DD HHMMSS", e.g. " 2025-11-02 143000".
+//
+// Used as a suffix for the default recording filename. Ensures
+// chronological name sorting in Explorer.
+//
+//----------------------------------------------------------------------------
+static std::wstring GetTimestampSuffix()
+{
+    SYSTEMTIME lt;
+    GetLocalTime( &lt );
+
+    wchar_t buffer[32];
+    swprintf_s( buffer, L" %04d-%02d-%02d %02d%02d%02d",
+        lt.wYear, lt.wMonth, lt.wDay,
+        lt.wHour, lt.wMinute, lt.wSecond );
+
+    return std::wstring( buffer );
+}
+
+//----------------------------------------------------------------------------
+//
+// IsDefaultRecordingFilename
+//
+// Determines if the provided filename matches one of the default recording
+// names (MP4 or GIF). Case-insensitive comparison.
+//
+//----------------------------------------------------------------------------
+static bool IsDefaultRecordingFilename( const std::wstring& filename )
+{
+    return CompareStringOrdinal( DEFAULT_RECORDING_FILE, -1, filename.c_str(), -1, TRUE ) == CSTR_EQUAL
+        || CompareStringOrdinal( DEFAULT_GIF_RECORDING_FILE, -1, filename.c_str(), -1, TRUE ) == CSTR_EQUAL;
+}
+
+//----------------------------------------------------------------------------
+//
 // GetUniqueFilename
 //
 // Returns a unique filename by checking for existing files and adding (1), (2), etc.
@@ -6847,19 +6888,66 @@ std::wstring GetUniqueFilename(const std::wstring& lastSavePath, const wchar_t* 
 //
 // GetUniqueRecordingFilename
 //
-// Gets a unique file name for recording saves, using the " (N)" suffix
-// approach so that the user can hit OK without worrying about overwriting
-// if they are making multiple recordings in one session or don't want to
-// always see an overwrite dialog or stop to clean up files.
+// Generates a unique filename to be suggested in the "Save As" recording
+// dialog, based on the user's last chosen filename and save location.
+//
+// There are two distinct behaviors based on the last used filename:
+//
+// 1. For the default filename ("Recording.mp4" or "Recording.gif"):
+//    Generates a more descriptive name by appending a timestamp, e.g.
+//    "Recording 2025-11-03 143015.mp4". This ensures chronological sorting
+//    in Explorer when ordered by name and is consistent with other tools.
+//
+// 2. For custom filenames (e.g. "Presentation.mp4"):
+//    Appends a numeric suffix if the file already exists, e.g.
+//    "Presentation (1).mp4", "Presentation (2).mp4", etc.
 //
 //----------------------------------------------------------------------------
-auto GetUniqueRecordingFilename()
+static auto GetUniqueRecordingFilename()
 {
     const wchar_t* defaultFile = (g_RecordingFormat == RecordingFormat::GIF)
         ? DEFAULT_GIF_RECORDING_FILE
         : DEFAULT_RECORDING_FILE;
 
-    return GetUniqueFilename(g_RecordingSaveLocation, defaultFile, FOLDERID_Videos);
+    // If no base filename has been set yet, or it's a default name, use timestamp approach
+    if ( g_RecordingSaveBaseFilename.empty() || IsDefaultRecordingFilename( g_RecordingSaveBaseFilename ) )
+    {
+        std::filesystem::path defaultPath{ defaultFile };
+        return defaultPath.stem().wstring() + GetTimestampSuffix() + defaultPath.extension().wstring();
+    }
+
+    // For custom filenames, use numeric suffixes to avoid collisions.
+    // Get the folder where the file will be saved
+    std::filesystem::path saveFolder;
+    if ( !g_RecordingSaveLocation.empty() )
+    {
+        saveFolder = std::filesystem::path( g_RecordingSaveLocation ).parent_path();
+    }
+
+    if ( saveFolder.empty() )
+    {
+        wil::unique_cotaskmem_string folderPath;
+        if ( SUCCEEDED( SHGetKnownFolderPath( FOLDERID_Videos, KF_FLAG_DEFAULT, nullptr, folderPath.put() ) ) )
+        {
+            saveFolder = folderPath.get();
+        }
+    }
+
+    std::filesystem::path baseFilename{ g_RecordingSaveBaseFilename };
+    std::wstring baseStem = baseFilename.stem().wstring();
+    std::wstring baseExtension = baseFilename.extension().wstring();
+
+    std::wstring candidateName = baseStem + baseExtension;
+    std::filesystem::path testPath = saveFolder / candidateName;
+
+    std::error_code ec;
+    for ( int index = 1; std::filesystem::exists( testPath, ec ); index++ )
+    {
+        candidateName = baseStem + L" (" + std::to_wstring( index ) + L")" + baseExtension;
+        testPath = saveFolder / candidateName;
+    }
+
+    return candidateName;
 }
 
 //----------------------------------------------------------------------------
@@ -7136,6 +7224,26 @@ winrt::fire_and_forget StartRecordingAsync( HWND hWnd, LPRECT rcCrop, HWND hWndR
             if (!finalPath.empty())
             {
                 auto path = std::filesystem::path(finalPath);
+                std::wstring filename = path.filename().wstring();
+
+                // Update our base filename state for the next recording based on the user's choice.
+                if ( IsDefaultRecordingFilename( filename ) )
+                {
+                    // The user accepted or re-typed the default filename.
+                    // Clear the base so the subsequent suggestion will also use a timestamp.
+                    g_RecordingSaveBaseFilename.clear();
+                }
+                else if ( CompareStringOrdinal( suggestedName.c_str(), -1, filename.c_str(), -1, TRUE ) != CSTR_EQUAL )
+                {
+                    // The user chose their own filename instead of the suggested one, so update the
+                    // base filename. The next time they save, we will generate numeric suffixes based
+                    // on this name.
+                    g_RecordingSaveBaseFilename = filename;
+                }
+                // Note: if the user accepted the suggested filename, we do nothing, and the base
+                // filename is unchanged. This ensures suffix numbers increment consistently from
+                // the original chosen name.
+
                 winrt::StorageFolder folder{ co_await winrt::StorageFolder::GetFolderFromPathAsync(path.parent_path().c_str()) };
                 destFile = co_await folder.CreateFileAsync(path.filename().c_str(), winrt::CreationCollisionOption::ReplaceExisting);
 
