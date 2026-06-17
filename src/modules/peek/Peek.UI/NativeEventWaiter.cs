@@ -29,8 +29,8 @@ namespace Peek.UI.Native
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError($"NativeEventWaiter error for {eventName}: {ex.Message}");
-                        break;
+                        Logger.LogError($"NativeEventWaiter error for {eventName}", ex);
+                        Thread.Sleep(100);
                     }
                 }
             });

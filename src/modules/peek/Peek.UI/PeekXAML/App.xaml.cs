@@ -4,6 +4,7 @@
 
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using ManagedCommon;
@@ -148,9 +149,15 @@ namespace Peek.UI
 
         private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
         {
-            Logger.LogError("Unhandled UI exception: " + e.Exception.ToString());
+            Logger.LogError("Unhandled UI exception", e.Exception);
             PowerToysTelemetry.Log.WriteEvent(new ErrorEvent() { HResult = (Common.Models.HResult)e.Exception.HResult, Failure = ErrorEvent.FailureType.AppCrash });
-            e.Handled = true;
+
+            // Only suppress CoreMessaging/COM exceptions to prevent the crash dialog for known transient issues.
+            // Let other unexpected exceptions propagate to avoid masking corrupted application state.
+            if (e.Exception is System.Runtime.InteropServices.COMException)
+            {
+                e.Handled = true;
+            }
         }
 
         private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
