@@ -24,25 +24,6 @@ namespace Peek.FilePreviewer.Previewers.SQLitePreviewer
 {
     public partial class SQLitePreviewer : ObservableObject, ISQLitePreviewer
     {
-        /// <summary>
-        /// Quotes a SQLite identifier using double-quote syntax (SQL standard).
-        /// Any internal double-quote characters are doubled to prevent injection.
-        /// </summary>
-        private static string QuoteIdentifier(string identifier)
-        {
-            return $"\"{identifier.Replace("\"", "\"\"")}\"";
-        }
-
-        /// <summary>
-        /// Replaces characters that are special in WinUI property-path syntax
-        /// with underscores so the indexer binding path works for any column name.
-        /// Must match the sanitization in SQLiteControl.SanitizeBindingKey.
-        /// </summary>
-        private static string SanitizeBindingKey(string name)
-        {
-            return name.Replace('.', '_').Replace('[', '_').Replace(']', '_').Replace('/', '_');
-        }
-
         [ObservableProperty]
         private PreviewState _state;
 
@@ -109,7 +90,7 @@ namespace Peek.FilePreviewer.Previewers.SQLitePreviewer
 
                 using (var cmd = connection.CreateCommand())
                 {
-                    cmd.CommandText = $"PRAGMA table_info({QuoteIdentifier(tableName)});";
+                    cmd.CommandText = $"PRAGMA table_info({SQLiteHelpers.QuoteIdentifier(tableName)});";
                     using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
                     while (await reader.ReadAsync(cancellationToken))
                     {
@@ -125,20 +106,20 @@ namespace Peek.FilePreviewer.Previewers.SQLitePreviewer
 
                 using (var cmd = connection.CreateCommand())
                 {
-                    cmd.CommandText = $"SELECT COUNT(*) FROM {QuoteIdentifier(tableName)};";
+                    cmd.CommandText = $"SELECT COUNT(*) FROM {SQLiteHelpers.QuoteIdentifier(tableName)};";
                     tableInfo.RowCount = (long)(await cmd.ExecuteScalarAsync(cancellationToken) ?? 0L);
                 }
 
                 using (var cmd = connection.CreateCommand())
                 {
-                    cmd.CommandText = $"SELECT * FROM {QuoteIdentifier(tableName)} LIMIT 200;";
+                    cmd.CommandText = $"SELECT * FROM {SQLiteHelpers.QuoteIdentifier(tableName)} LIMIT 200;";
                     using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
                     while (await reader.ReadAsync(cancellationToken))
                     {
                         var row = new Dictionary<string, string?>(reader.FieldCount, StringComparer.Ordinal);
                         for (int i = 0; i < reader.FieldCount; i++)
                         {
-                            var key = SanitizeBindingKey(reader.GetName(i));
+                            var key = SQLiteHelpers.SanitizeBindingKey(reader.GetName(i));
                             row[key] = reader.IsDBNull(i) ? null : reader.GetValue(i)?.ToString();
                         }
 
