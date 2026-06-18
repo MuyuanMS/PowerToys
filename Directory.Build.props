@@ -1,7 +1,6 @@
 <Project>
   <PropertyGroup>
     <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
-    <SpectreMitigation Condition="'$(POWERTOYS_DISABLE_SPECTRE)' == '1'">false</SpectreMitigation>
   </PropertyGroup>
   <Import Project="$(RepoRoot)src\Version.props" />
   <PropertyGroup>

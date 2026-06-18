@@ -104,6 +104,8 @@ namespace Peek.FilePreviewer.Previewers.SQLitePreviewer
                     }
                 }
 
+                SQLiteHelpers.AssignBindingKeys(tableInfo.Columns);
+
                 using (var cmd = connection.CreateCommand())
                 {
                     cmd.CommandText = $"SELECT COUNT(*) FROM {SQLiteHelpers.QuoteIdentifier(tableName)};";
@@ -119,8 +121,8 @@ namespace Peek.FilePreviewer.Previewers.SQLitePreviewer
                         var row = new Dictionary<string, string?>(reader.FieldCount, StringComparer.Ordinal);
                         for (int i = 0; i < reader.FieldCount; i++)
                         {
-                            var key = SQLiteHelpers.SanitizeBindingKey(reader.GetName(i));
-                            row[key] = reader.IsDBNull(i) ? null : reader.GetValue(i)?.ToString();
+                            var col = tableInfo.Columns[i];
+                            row[col.BindingKey] = reader.IsDBNull(i) ? null : reader.GetValue(i)?.ToString();
                         }
 
                         tableInfo.Rows.Add(row);

@@ -126,13 +126,10 @@ namespace Peek.FilePreviewer.Controls
             TableDataGrid.Columns.Clear();
             foreach (var col in table.Columns)
             {
-                // Use sanitized key for binding path to avoid issues with special
-                // characters (., [, ], /) in column names that break property paths.
-                var bindingKey = SQLiteHelpers.SanitizeBindingKey(col.Name);
                 TableDataGrid.Columns.Add(new DataGridTextColumn
                 {
                     Header = col.Name,
-                    Binding = new Binding { Path = new PropertyPath($"[{bindingKey}]") },
+                    Binding = new Binding { Path = new PropertyPath($"[{col.BindingKey}]") },
                     IsReadOnly = true,
                 });
             }
