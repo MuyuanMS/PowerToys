@@ -143,10 +143,16 @@ namespace Peek.FilePreviewer.Controls
             // so ActualWidth values are valid when we decide whether to stretch the last column.
             TableDataGrid.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, AdjustLastColumnWidth);
 
-            RecordCountText.Text = string.Format(
-                CultureInfo.CurrentCulture,
-                ResourceLoaderInstance.ResourceLoader.GetString("SQLite_Row_Count"),
-                table.RowCount);
+            RecordCountText.Text = table.RowCount > table.Rows.Count
+                ? string.Format(
+                    CultureInfo.CurrentCulture,
+                    ResourceLoaderInstance.ResourceLoader.GetString("SQLite_Row_Count_Truncated"),
+                    table.Rows.Count,
+                    table.RowCount)
+                : string.Format(
+                    CultureInfo.CurrentCulture,
+                    ResourceLoaderInstance.ResourceLoader.GetString("SQLite_Row_Count"),
+                    table.RowCount);
 
             RecordCountHeader.Visibility = Visibility.Visible;
             TableDataGrid.Visibility = Visibility.Visible;
