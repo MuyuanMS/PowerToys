@@ -126,10 +126,13 @@ namespace Peek.FilePreviewer.Controls
             TableDataGrid.Columns.Clear();
             foreach (var col in table.Columns)
             {
+                // Use sanitized key for binding path to avoid issues with special
+                // characters (., [, ], /) in column names that break property paths.
+                var bindingKey = SanitizeBindingKey(col.Name);
                 TableDataGrid.Columns.Add(new DataGridTextColumn
                 {
                     Header = col.Name,
-                    Binding = new Binding { Path = new PropertyPath($"[{col.Name}]") },
+                    Binding = new Binding { Path = new PropertyPath($"[{bindingKey}]") },
                     IsReadOnly = true,
                 });
             }
@@ -201,6 +204,17 @@ namespace Peek.FilePreviewer.Controls
             RecordCountHeader.Visibility = Visibility.Collapsed;
             TableDataGrid.Visibility = Visibility.Collapsed;
             NoSelectionText.Visibility = Visibility.Visible;
+        }
+
+        /// <summary>
+        /// Replaces characters that are special in WinUI property-path syntax
+        /// with underscores so the indexer binding path works for any column name.
+        /// The same sanitization is applied when building the row dictionaries.
+        /// </summary>
+        private static string SanitizeBindingKey(string name)
+        {
+            // Characters that break PropertyPath indexer syntax: . [ ] /
+            return name.Replace('.', '_').Replace('[', '_').Replace(']', '_').Replace('/', '_');
         }
     }
 }
