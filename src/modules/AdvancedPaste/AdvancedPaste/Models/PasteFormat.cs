@@ -42,6 +42,14 @@ public sealed class PasteFormat
             ProviderId = providerId ?? string.Empty,
         };
 
+    public static PasteFormat CreatePythonScriptFormat(string name, string scriptPath, ClipboardFormat availableFormats) =>
+        new(PasteFormats.PythonScript, availableFormats, isAIServiceEnabled: false)
+        {
+            Name = name,
+            Prompt = scriptPath,
+            IsSavedQuery = true,
+        };
+
     public PasteFormatMetadataAttribute Metadata => MetadataDict[Format];
 
     public string IconGlyph => Metadata.IconGlyph;
