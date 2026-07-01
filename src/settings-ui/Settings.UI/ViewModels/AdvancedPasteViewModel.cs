@@ -675,7 +675,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 {
                     formats = val;
                 }
-                else if (TryParseTag(trimmed, "@advancedpaste:disabled", out _))
+                else if (TryParseTag(trimmed, "@advancedpaste:disabled", out _, presenceBased: true))
                 {
                     enabled = false;
                 }
@@ -715,7 +715,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             };
         }
 
-        private static bool TryParseTag(string line, string tag, out string value)
+        private static bool TryParseTag(string line, string tag, out string value, bool presenceBased = false)
         {
             var idx = line.IndexOf(tag, StringComparison.OrdinalIgnoreCase);
             if (idx < 0)
@@ -725,7 +725,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
 
             value = line[(idx + tag.Length)..].Trim();
-            return value.Length > 0;
+            return presenceBased || value.Length > 0;
         }
 
         public static IEnumerable<AIServiceTypeMetadata> AvailableProviders => AIServiceTypeRegistry.GetAvailableServiceTypes();

@@ -73,7 +73,16 @@ public sealed class PasteFormatExecutor(
         // Security: ensure the script is trusted before executing.
         if (!_pythonScriptTrustService.IsTrusted(scriptPath))
         {
-            var hash = _pythonScriptTrustService.ComputeHash(scriptPath);
+            string hash;
+            try
+            {
+                hash = _pythonScriptTrustService.ComputeHash(scriptPath);
+            }
+            catch (System.IO.FileNotFoundException)
+            {
+                throw new InvalidOperationException(ResourceLoaderInstance.ResourceLoader.GetString("PythonScriptNotFound"));
+            }
+
             var approved = await _pythonScriptTrustService.RequestTrustAsync(scriptPath, hash);
 
             if (!approved)
@@ -137,16 +146,19 @@ public sealed class PasteFormatExecutor(
         {
             pkg.SetText(await view.GetTextAsync());
         }
-        else if (view.Contains(StandardDataFormats.Html))
+
+        if (view.Contains(StandardDataFormats.Html))
         {
             pkg.SetHtmlFormat(await view.GetHtmlFormatAsync());
         }
-        else if (view.Contains(StandardDataFormats.StorageItems))
+
+        if (view.Contains(StandardDataFormats.StorageItems))
         {
             var items = await view.GetStorageItemsAsync();
             pkg.SetStorageItems(items);
         }
-        else if (view.Contains(StandardDataFormats.Bitmap))
+
+        if (view.Contains(StandardDataFormats.Bitmap))
         {
             var bitmap = await view.GetBitmapAsync();
             pkg.SetBitmap(bitmap);
