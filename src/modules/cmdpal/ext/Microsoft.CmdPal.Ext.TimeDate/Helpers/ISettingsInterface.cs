@@ -24,5 +24,7 @@ public interface ISettingsInterface
 
     public bool DateWithWeekday { get; }
 
+    public bool ShowWeekNumberInClockBand { get; }
+
     public List<string> CustomFormats { get; }
 }
