@@ -807,6 +807,12 @@ namespace KeyboardManagerEditorUI.Controls
         public ElevationLevel GetElevationLevel() => (ElevationLevel)(ElevationComboBox?.SelectedIndex ?? 0);
 
         /// <summary>
+        /// Gets the single-key remap condition (Always/Alone). Only meaningful for single-key remaps.
+        /// </summary>
+        public KeyboardManagerEditorUI.Interop.SingleKeyRemapCondition GetCondition() =>
+            (KeyboardManagerEditorUI.Interop.SingleKeyRemapCondition)(ConditionComboBox?.SelectedIndex ?? 0);
+
+        /// <summary>
         /// Gets the window visibility (for OpenApp action type).
         /// </summary>
         public StartWindowType GetVisibility() => (StartWindowType)(VisibilityComboBox?.SelectedIndex ?? 0);
@@ -971,6 +977,17 @@ namespace KeyboardManagerEditorUI.Controls
             if (ElevationComboBox != null)
             {
                 ElevationComboBox.SelectedIndex = (int)elevationLevel;
+            }
+        }
+
+        /// <summary>
+        /// Sets the single-key remap condition (Always/Alone).
+        /// </summary>
+        public void SetCondition(KeyboardManagerEditorUI.Interop.SingleKeyRemapCondition condition)
+        {
+            if (ConditionComboBox != null)
+            {
+                ConditionComboBox.SelectedIndex = (int)condition;
             }
         }
 
@@ -1192,6 +1209,11 @@ namespace KeyboardManagerEditorUI.Controls
             if (ElevationComboBox != null)
             {
                 ElevationComboBox.SelectedIndex = 0;
+            }
+
+            if (ConditionComboBox != null)
+            {
+                ConditionComboBox.SelectedIndex = 0;
             }
 
             if (IfRunningComboBox != null)
