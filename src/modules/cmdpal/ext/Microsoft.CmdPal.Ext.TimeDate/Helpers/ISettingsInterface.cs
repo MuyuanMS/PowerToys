@@ -26,5 +26,9 @@ public interface ISettingsInterface
 
     public bool ShowWeekNumberInClockBand { get; }
 
+    public int WeekNumberFormatInClockBand { get; }
+
+    public bool ClockBandOpensNotificationCenter { get; }
+
     public List<string> CustomFormats { get; }
 }
