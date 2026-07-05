@@ -15,8 +15,8 @@ public class Settings : ISettingsInterface
     private readonly bool timeWithSecond;
     private readonly bool dockClockWithSecond;
     private readonly bool dateWithWeekday;
-    private readonly bool showWeekNumberInClockBand;
-    private readonly int weekNumberFormatInClockBand;
+    private readonly int clockBandDateMode;
+    private readonly string customDateFormatInClockBand;
     private readonly bool clockBandOpensNotificationCenter;
     private readonly List<string> customFormats;
 
@@ -27,8 +27,8 @@ public class Settings : ISettingsInterface
         bool timeWithSecond = false,
         bool dockClockWithSecond = false,
         bool dateWithWeekday = false,
-        bool showWeekNumberInClockBand = false,
-        int weekNumberFormatInClockBand = 0,
+        int clockBandDateMode = 0,
+        string customDateFormatInClockBand = "",
         bool clockBandOpensNotificationCenter = true,
         List<string> customFormats = null)
     {
@@ -38,8 +38,8 @@ public class Settings : ISettingsInterface
         this.timeWithSecond = timeWithSecond;
         this.dockClockWithSecond = dockClockWithSecond;
         this.dateWithWeekday = dateWithWeekday;
-        this.showWeekNumberInClockBand = showWeekNumberInClockBand;
-        this.weekNumberFormatInClockBand = weekNumberFormatInClockBand;
+        this.clockBandDateMode = clockBandDateMode;
+        this.customDateFormatInClockBand = customDateFormatInClockBand;
         this.clockBandOpensNotificationCenter = clockBandOpensNotificationCenter;
         this.customFormats = customFormats ?? new List<string>();
     }
@@ -56,9 +56,9 @@ public class Settings : ISettingsInterface
 
     public bool DateWithWeekday => dateWithWeekday;
 
-    public bool ShowWeekNumberInClockBand => showWeekNumberInClockBand;
+    public int ClockBandDateMode => clockBandDateMode;
 
-    public int WeekNumberFormatInClockBand => weekNumberFormatInClockBand;
+    public string CustomDateFormatInClockBand => customDateFormatInClockBand;
 
     public bool ClockBandOpensNotificationCenter => clockBandOpensNotificationCenter;
 
