@@ -16,6 +16,8 @@ public class Settings : ISettingsInterface
     private readonly bool dockClockWithSecond;
     private readonly bool dateWithWeekday;
     private readonly bool showWeekNumberInClockBand;
+    private readonly int weekNumberFormatInClockBand;
+    private readonly bool clockBandOpensNotificationCenter;
     private readonly List<string> customFormats;
 
     public Settings(
@@ -26,6 +28,8 @@ public class Settings : ISettingsInterface
         bool dockClockWithSecond = false,
         bool dateWithWeekday = false,
         bool showWeekNumberInClockBand = false,
+        int weekNumberFormatInClockBand = 0,
+        bool clockBandOpensNotificationCenter = true,
         List<string> customFormats = null)
     {
         this.firstWeekOfYear = firstWeekOfYear;
@@ -35,6 +39,8 @@ public class Settings : ISettingsInterface
         this.dockClockWithSecond = dockClockWithSecond;
         this.dateWithWeekday = dateWithWeekday;
         this.showWeekNumberInClockBand = showWeekNumberInClockBand;
+        this.weekNumberFormatInClockBand = weekNumberFormatInClockBand;
+        this.clockBandOpensNotificationCenter = clockBandOpensNotificationCenter;
         this.customFormats = customFormats ?? new List<string>();
     }
 
@@ -51,6 +57,10 @@ public class Settings : ISettingsInterface
     public bool DateWithWeekday => dateWithWeekday;
 
     public bool ShowWeekNumberInClockBand => showWeekNumberInClockBand;
+
+    public int WeekNumberFormatInClockBand => weekNumberFormatInClockBand;
+
+    public bool ClockBandOpensNotificationCenter => clockBandOpensNotificationCenter;
 
     public List<string> CustomFormats => customFormats;
 }
