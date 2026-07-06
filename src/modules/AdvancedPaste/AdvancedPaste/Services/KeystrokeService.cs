@@ -76,6 +76,12 @@ public sealed class KeystrokeService : IKeystrokeService
                 currentChunkLength++;
             }
 
+            // Avoid splitting \r\n across batches so it collapses to a single Enter
+            if (currentChunkLength < text.Length - i && text[i + currentChunkLength - 1] == '\r' && text[i + currentChunkLength] == '\n')
+            {
+                currentChunkLength++;
+            }
+
             if (currentChunkLength > 0)
             {
                 var inputs = CreateInputSequence(text.AsSpan(i, currentChunkLength));
