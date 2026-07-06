@@ -66,48 +66,58 @@ public sealed class PrecomputedFuzzyMatcher : IPrecomputedFuzzyMatcher
             }
         }
 
-        // 2. Secondary → Secondary
-        if (query.HasSecondary && target.HasSecondary)
+        // 2 & 3. Query (primary and secondary) → each secondary target variant.
+        // Secondary targets can hold several pinyin readings (including polyphonic
+        // alternatives), so we evaluate every variant and keep the best score.
+        if (target.HasSecondary)
         {
-            var qSecFold = query.SecondaryFoldedSpan;
+            var secondaryCount = target.SecondaryCount;
+            var qSecFold = query.HasSecondary ? query.SecondaryFoldedSpan : default;
 
-            if (target.SecondaryLength >= query.SecondaryEffectiveLength &&
-                _bloom.MightContain(target.SecondaryBloom, query.SecondaryBloom) &&
-                CanMatchSubsequence(qSecFold, target.SecondaryFoldedSpan, skipWordSeparators))
+            for (var i = 0; i < secondaryCount; i++)
             {
-                var score = ScoreNonContiguous(
-                    qRaw: query.SecondaryOriginalSpan,
-                    qFold: qSecFold,
-                    qEffectiveLen: query.SecondaryEffectiveLength,
-                    tRaw: target.SecondaryOriginalSpan,
-                    tFold: target.SecondaryFoldedSpan,
-                    ignoreSameCaseBonusForThisQuery: _options.IgnoreSameCaseBonusIfQueryIsAllLowercase && query.SecondaryIsAllLowercaseAsciiOrNonLetter);
+                var tSecFold = target.SecondaryFoldedSpan(i);
+                var tSecLen = tSecFold.Length;
+                var tSecBloom = target.SecondaryBloom(i);
+                var tSecRaw = target.SecondaryOriginalSpan(i);
 
-                if (score > bestScore)
+                // Secondary query → secondary target variant
+                if (query.HasSecondary &&
+                    tSecLen >= query.SecondaryEffectiveLength &&
+                    _bloom.MightContain(tSecBloom, query.SecondaryBloom) &&
+                    CanMatchSubsequence(qSecFold, tSecFold, skipWordSeparators))
                 {
-                    bestScore = score;
+                    var score = ScoreNonContiguous(
+                        qRaw: query.SecondaryOriginalSpan,
+                        qFold: qSecFold,
+                        qEffectiveLen: query.SecondaryEffectiveLength,
+                        tRaw: tSecRaw,
+                        tFold: tSecFold,
+                        ignoreSameCaseBonusForThisQuery: _options.IgnoreSameCaseBonusIfQueryIsAllLowercase && query.SecondaryIsAllLowercaseAsciiOrNonLetter);
+
+                    if (score > bestScore)
+                    {
+                        bestScore = score;
+                    }
                 }
-            }
-        }
 
-        // 3. Primary query → Secondary target
-        if (target.HasSecondary &&
-            target.SecondaryLength >= query.EffectiveLength &&
-            _bloom.MightContain(target.SecondaryBloom, query.Bloom))
-        {
-            if (CanMatchSubsequence(qFold, target.SecondaryFoldedSpan, skipWordSeparators))
-            {
-                var score = ScoreNonContiguous(
-                    qRaw: query.OriginalSpan,
-                    qFold: qFold,
-                    qEffectiveLen: query.EffectiveLength,
-                    tRaw: target.SecondaryOriginalSpan,
-                    tFold: target.SecondaryFoldedSpan,
-                    ignoreSameCaseBonusForThisQuery: _options.IgnoreSameCaseBonusIfQueryIsAllLowercase && query.IsAllLowercaseAsciiOrNonLetter);
-
-                if (score > bestScore)
+                // Primary query → secondary target variant
+                if (tSecLen >= query.EffectiveLength &&
+                    _bloom.MightContain(tSecBloom, query.Bloom) &&
+                    CanMatchSubsequence(qFold, tSecFold, skipWordSeparators))
                 {
-                    bestScore = score;
+                    var score = ScoreNonContiguous(
+                        qRaw: query.OriginalSpan,
+                        qFold: qFold,
+                        qEffectiveLen: query.EffectiveLength,
+                        tRaw: tSecRaw,
+                        tFold: tSecFold,
+                        ignoreSameCaseBonusForThisQuery: _options.IgnoreSameCaseBonusIfQueryIsAllLowercase && query.IsAllLowercaseAsciiOrNonLetter);
+
+                    if (score > bestScore)
+                    {
+                        bestScore = score;
+                    }
                 }
             }
         }
