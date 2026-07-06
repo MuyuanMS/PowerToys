@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using AdvancedPaste.Models;
 using AdvancedPaste.Services;
 using AdvancedPaste.Settings;
 using Microsoft.PowerToys.Settings.UI.Library;
@@ -19,6 +20,8 @@ public sealed class KeystrokeServiceTests
         public bool IsAIEnabled { get; set; }
 
         public bool ShowCustomPreview { get; set; }
+
+        public bool ShowAIPaste { get; set; }
 
         public bool CloseAfterLosingFocus { get; set; }
 
