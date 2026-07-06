@@ -61,33 +61,6 @@ public sealed class UserSettingsKeystrokeTests
     }
 
     [TestMethod]
-    public void LoadSettings_WithNegativeKeystrokeValues_UseDefaults()
-    {
-        // Arrange
-        // Negative values should not be used; defaults should apply
-
-        // Act
-        var userSettings = new UserSettings(_fileSystem);
-
-        // Assert
-        Assert.AreEqual(AdvancedPasteProperties.DefaultKeystrokeDelayMs, userSettings.KeystrokeDelayMs);
-        Assert.AreEqual(AdvancedPasteProperties.DefaultKeystrokeBatchSize, userSettings.KeystrokeBatchSize);
-    }
-
-    [TestMethod]
-    public void Constructor_WithLargeKeystrokeValues()
-    {
-        // Act
-        var userSettings = new UserSettings(_fileSystem);
-
-        // Assert
-        // Constructor should accept any positive keystroke values
-        Assert.IsNotNull(userSettings);
-        Assert.IsTrue(userSettings.KeystrokeDelayMs > 0);
-        Assert.IsTrue(userSettings.KeystrokeBatchSize > 0);
-    }
-
-    [TestMethod]
     public void DefaultKeystrokeDelayMs_Is30Milliseconds()
     {
         // Assert
@@ -100,15 +73,15 @@ public sealed class UserSettingsKeystrokeTests
         // Assert
         Assert.AreEqual(1, AdvancedPasteProperties.DefaultKeystrokeBatchSize);
     }
-}
 
-/// <summary>
-/// Helper class to build mock file paths compatible with MockFileSystem.
-/// </summary>
-internal static class MockPathHelper
-{
-    public static string BuildPath(string path)
+    [TestMethod]
+    public void Constructor_WithNoSettingsFile_KeystrokeValuesArePositive()
     {
-        return path;
+        // Act
+        var userSettings = new UserSettings(_fileSystem);
+
+        // Assert — without a settings file, defaults are applied and values are > 0
+        Assert.IsTrue(userSettings.KeystrokeDelayMs > 0);
+        Assert.IsTrue(userSettings.KeystrokeBatchSize > 0);
     }
 }

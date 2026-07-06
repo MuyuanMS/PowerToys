@@ -17,20 +17,22 @@ namespace AdvancedPaste.Services;
 /// </summary>
 public sealed class KeystrokeService : IKeystrokeService
 {
-    private readonly int _delayMs;
-    private readonly int _batchSize;
+    private readonly IUserSettings _userSettings;
 
     public KeystrokeService(IUserSettings userSettings)
     {
         ArgumentNullException.ThrowIfNull(userSettings);
-        _delayMs = userSettings.KeystrokeDelayMs > 0 ? userSettings.KeystrokeDelayMs : AdvancedPasteProperties.DefaultKeystrokeDelayMs;
-        _batchSize = userSettings.KeystrokeBatchSize > 0 ? userSettings.KeystrokeBatchSize : AdvancedPasteProperties.DefaultKeystrokeBatchSize;
+        _userSettings = userSettings;
     }
 
-    // Exposed for unit testing
-    internal int EffectiveDelayMs => _delayMs;
+    // Exposed for unit testing — reads live from settings each time
+    internal int EffectiveDelayMs => _userSettings.KeystrokeDelayMs > 0
+        ? _userSettings.KeystrokeDelayMs
+        : AdvancedPasteProperties.DefaultKeystrokeDelayMs;
 
-    internal int EffectiveBatchSize => _batchSize;
+    internal int EffectiveBatchSize => _userSettings.KeystrokeBatchSize > 0
+        ? _userSettings.KeystrokeBatchSize
+        : AdvancedPasteProperties.DefaultKeystrokeBatchSize;
 
     /// <summary>
     /// Sends text as individual Unicode keystroke events.
@@ -55,7 +57,7 @@ public sealed class KeystrokeService : IKeystrokeService
 
         var targetWindow = Helpers.NativeMethods.GetForegroundWindow();
 
-        for (int i = 0; i < text.Length; i += _batchSize)
+        for (int i = 0; i < text.Length;)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -66,13 +68,21 @@ public sealed class KeystrokeService : IKeystrokeService
                 break;
             }
 
-            int currentChunkLength = Math.Min(_batchSize, text.Length - i);
+            int currentChunkLength = Math.Min(EffectiveBatchSize, text.Length - i);
+
+            // Avoid splitting a surrogate pair across batches
+            if (currentChunkLength < text.Length - i && char.IsHighSurrogate(text[i + currentChunkLength - 1]))
+            {
+                currentChunkLength++;
+            }
 
             if (currentChunkLength > 0)
             {
                 var inputs = CreateInputSequence(text.AsSpan(i, currentChunkLength));
                 SendInputEvents(inputs);
             }
+
+            i += currentChunkLength;
         }
     }
 
@@ -122,6 +132,6 @@ public sealed class KeystrokeService : IKeystrokeService
         }
 
         // SendInput cannot handle rapid sequences of inputs. Delay is configurable.
-        System.Threading.Thread.Sleep(_delayMs);
+        System.Threading.Thread.Sleep(EffectiveDelayMs);
     }
 }
