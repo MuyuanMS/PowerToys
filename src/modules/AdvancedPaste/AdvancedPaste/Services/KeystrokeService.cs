@@ -130,7 +130,7 @@ public sealed class KeystrokeService : IKeystrokeService
         };
     }
 
-    private static Helpers.NativeMethods.INPUT CreateVirtualKeyInput(ushort vk, bool isKeyUp)
+    private static Helpers.NativeMethods.INPUT CreateVirtualKeyInput(short vk, bool isKeyUp)
     {
         return new Helpers.NativeMethods.INPUT
         {
@@ -166,7 +166,7 @@ public sealed class KeystrokeService : IKeystrokeService
             // Use VK_RETURN for newline characters instead of Unicode input
             if (c == '\n' || c == '\r')
             {
-                const ushort VK_RETURN = 0x0D;
+                const short VK_RETURN = 0x0D;
                 inputs.Add(CreateVirtualKeyInput(VK_RETURN, isKeyUp: false));
                 inputs.Add(CreateVirtualKeyInput(VK_RETURN, isKeyUp: true));
             }

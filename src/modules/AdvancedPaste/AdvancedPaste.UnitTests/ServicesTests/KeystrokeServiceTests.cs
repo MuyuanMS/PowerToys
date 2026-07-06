@@ -37,7 +37,9 @@ public sealed class KeystrokeServiceTests
 
         public PasteAIConfiguration PasteAIConfiguration { get; set; } = new();
 
+#pragma warning disable CS0067 // Event is never used (required by interface)
         public event EventHandler Changed;
+#pragma warning restore CS0067
 
         public System.Threading.Tasks.Task SetActiveAIProviderAsync(string providerId)
         {
@@ -238,6 +240,7 @@ public sealed class KeystrokeServiceTests
     {
         // \r\n with batch size 1 at index where chunk ends on \r → extends to include \n
         string text = "A\r\nB";
+
         // At index 1, batch 1 → would be just \r, but extends to \r\n
         Assert.AreEqual(2, KeystrokeService.GetChunkLength(text, 1, 1));
     }
