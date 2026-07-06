@@ -106,15 +106,51 @@ public sealed class KeystrokeService : IKeystrokeService
         };
     }
 
+    private static Helpers.NativeMethods.INPUT CreateVirtualKeyInput(ushort vk, bool isKeyUp)
+    {
+        return new Helpers.NativeMethods.INPUT
+        {
+            type = Helpers.NativeMethods.INPUTTYPE.INPUT_KEYBOARD,
+            data = new Helpers.NativeMethods.InputUnion
+            {
+                ki = new Helpers.NativeMethods.KEYBDINPUT
+                {
+                    wVk = vk,
+                    wScan = 0,
+                    dwFlags = isKeyUp ? (uint)Helpers.NativeMethods.KeyEventF.KeyUp : 0,
+                    time = 0,
+                    dwExtraInfo = UIntPtr.Zero,
+                },
+            },
+        };
+    }
+
     private List<Helpers.NativeMethods.INPUT> CreateInputSequence(ReadOnlySpan<char> text)
     {
         var inputs = new List<Helpers.NativeMethods.INPUT>(text.Length * 2);
 
-        foreach (char c in text)
+        for (int i = 0; i < text.Length; i++)
         {
-            inputs.Add(CreateUnicodeInput(c, isKeyUp: false));
+            char c = text[i];
 
-            inputs.Add(CreateUnicodeInput(c, isKeyUp: true));
+            // Skip \r when followed by \n (handle \r\n as a single Enter)
+            if (c == '\r' && i + 1 < text.Length && text[i + 1] == '\n')
+            {
+                continue;
+            }
+
+            // Use VK_RETURN for newline characters instead of Unicode input
+            if (c == '\n' || c == '\r')
+            {
+                const ushort VK_RETURN = 0x0D;
+                inputs.Add(CreateVirtualKeyInput(VK_RETURN, isKeyUp: false));
+                inputs.Add(CreateVirtualKeyInput(VK_RETURN, isKeyUp: true));
+            }
+            else
+            {
+                inputs.Add(CreateUnicodeInput(c, isKeyUp: false));
+                inputs.Add(CreateUnicodeInput(c, isKeyUp: true));
+            }
         }
 
         return inputs;
