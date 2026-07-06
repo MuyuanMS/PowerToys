@@ -22,5 +22,8 @@ public interface IKeystrokeService
     /// <exception cref="System.OperationCanceledException">
     /// Thrown when the operation is cancelled via <paramref name="cancellationToken"/>.
     /// </exception>
+    /// <exception cref="System.InvalidOperationException">
+    /// Thrown when the underlying SendInput call fails to send all input events.
+    /// </exception>
     void SendTextAsKeystrokes(string text, CancellationToken cancellationToken = default);
 }
