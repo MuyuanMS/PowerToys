@@ -68,19 +68,7 @@ public sealed class KeystrokeService : IKeystrokeService
                 break;
             }
 
-            int currentChunkLength = Math.Min(EffectiveBatchSize, text.Length - i);
-
-            // Avoid splitting a surrogate pair across batches
-            if (currentChunkLength < text.Length - i && char.IsHighSurrogate(text[i + currentChunkLength - 1]))
-            {
-                currentChunkLength++;
-            }
-
-            // Avoid splitting \r\n across batches so it collapses to a single Enter
-            if (currentChunkLength < text.Length - i && text[i + currentChunkLength - 1] == '\r' && text[i + currentChunkLength] == '\n')
-            {
-                currentChunkLength++;
-            }
+            int currentChunkLength = GetChunkLength(text, i, EffectiveBatchSize);
 
             if (currentChunkLength > 0)
             {
@@ -91,6 +79,36 @@ public sealed class KeystrokeService : IKeystrokeService
             i += currentChunkLength;
         }
     }
+
+    /// <summary>
+    /// Computes the chunk length at position <paramref name="startIndex"/>, ensuring surrogate pairs
+    /// and \r\n sequences are never split across batches.
+    /// </summary>
+    internal static int GetChunkLength(string text, int startIndex, int batchSize)
+    {
+        int remaining = text.Length - startIndex;
+        int chunkLength = Math.Min(batchSize, remaining);
+
+        // Avoid splitting a surrogate pair across batches
+        if (chunkLength < remaining && char.IsHighSurrogate(text[startIndex + chunkLength - 1]))
+        {
+            chunkLength++;
+        }
+
+        // Avoid splitting \r\n across batches so it collapses to a single Enter
+        if (chunkLength < remaining && text[startIndex + chunkLength - 1] == '\r' && text[startIndex + chunkLength] == '\n')
+        {
+            chunkLength++;
+        }
+
+        return chunkLength;
+    }
+
+    /// <summary>
+    /// Returns true if the \r at position <paramref name="i"/> should be skipped (followed by \n).
+    /// </summary>
+    internal static bool IsSkippableCarriageReturn(ReadOnlySpan<char> text, int i)
+        => text[i] == '\r' && i + 1 < text.Length && text[i + 1] == '\n';
 
     private static Helpers.NativeMethods.INPUT CreateUnicodeInput(char character, bool isKeyUp)
     {

@@ -831,6 +831,8 @@ namespace AdvancedPaste.ViewModels
             }
             finally
             {
+                _pasteActionCancellationTokenSource?.Dispose();
+                _pasteActionCancellationTokenSource = null;
                 IsBusy = false;
             }
         }

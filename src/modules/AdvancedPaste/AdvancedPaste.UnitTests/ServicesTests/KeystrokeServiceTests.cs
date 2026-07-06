@@ -207,4 +207,64 @@ public sealed class KeystrokeServiceTests
         // Act
         service.SendTextAsKeystrokes(null);
     }
+
+    [TestMethod]
+    public void GetChunkLength_NormalText_ReturnsBatchSize()
+    {
+        // "Hello" with batch size 2 at index 0 → chunk of 2
+        Assert.AreEqual(2, KeystrokeService.GetChunkLength("Hello", 0, 2));
+    }
+
+    [TestMethod]
+    public void GetChunkLength_AtEnd_ReturnsRemaining()
+    {
+        // "Hello" with batch size 3 at index 3 → only 2 remaining
+        Assert.AreEqual(2, KeystrokeService.GetChunkLength("Hello", 3, 3));
+    }
+
+    [TestMethod]
+    public void GetChunkLength_SurrogatePair_ExtendsChunk()
+    {
+        // 🎉 = \uD83C\uDF89 (surrogate pair). With batch 1 at index 0, chunk must include both chars
+        string text = "\uD83C\uDF89X";
+        Assert.AreEqual(2, KeystrokeService.GetChunkLength(text, 0, 1));
+    }
+
+    [TestMethod]
+    public void GetChunkLength_CrLf_ExtendsChunk()
+    {
+        // \r\n with batch size 1 at index where chunk ends on \r → extends to include \n
+        string text = "A\r\nB";
+        // At index 1, batch 1 → would be just \r, but extends to \r\n
+        Assert.AreEqual(2, KeystrokeService.GetChunkLength(text, 1, 1));
+    }
+
+    [TestMethod]
+    public void GetChunkLength_LoneCr_DoesNotExtend()
+    {
+        // \r not followed by \n should not extend
+        string text = "A\rB";
+        Assert.AreEqual(1, KeystrokeService.GetChunkLength(text, 1, 1));
+    }
+
+    [TestMethod]
+    public void IsSkippableCarriageReturn_CrLf_ReturnsTrue()
+    {
+        ReadOnlySpan<char> text = "\r\n".AsSpan();
+        Assert.IsTrue(KeystrokeService.IsSkippableCarriageReturn(text, 0));
+    }
+
+    [TestMethod]
+    public void IsSkippableCarriageReturn_LoneCr_ReturnsFalse()
+    {
+        ReadOnlySpan<char> text = "\rX".AsSpan();
+        Assert.IsFalse(KeystrokeService.IsSkippableCarriageReturn(text, 0));
+    }
+
+    [TestMethod]
+    public void IsSkippableCarriageReturn_NotCr_ReturnsFalse()
+    {
+        ReadOnlySpan<char> text = "AB".AsSpan();
+        Assert.IsFalse(KeystrokeService.IsSkippableCarriageReturn(text, 0));
+    }
 }
