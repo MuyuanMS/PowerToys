@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 using AdvancedPaste.Settings;
 using ManagedCommon;
@@ -26,14 +27,21 @@ public sealed class KeystrokeService : IKeystrokeService
         _batchSize = userSettings.KeystrokeBatchSize > 0 ? userSettings.KeystrokeBatchSize : AdvancedPasteProperties.DefaultKeystrokeBatchSize;
     }
 
+    // Exposed for unit testing
+    internal int EffectiveDelayMs => _delayMs;
+
+    internal int EffectiveBatchSize => _batchSize;
+
     /// <summary>
     /// Sends text as individual Unicode keystroke events.
     /// This is useful for applications that don't support standard clipboard paste operations.
     /// </summary>
     /// <param name="text">The text to send as keystrokes.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <exception cref="ArgumentNullException">Thrown when text is null.</exception>
+    /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled.</exception>
     /// <exception cref="InvalidOperationException">Thrown when SendInput fails to send all inputs.</exception>
-    public void SendTextAsKeystrokes(string text)
+    public void SendTextAsKeystrokes(string text, CancellationToken cancellationToken = default)
     {
         Logger.LogTrace();
 
@@ -49,6 +57,8 @@ public sealed class KeystrokeService : IKeystrokeService
 
         for (int i = 0; i < text.Length; i += _batchSize)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var currentForeground = Helpers.NativeMethods.GetForegroundWindow();
             if (targetWindow != IntPtr.Zero && currentForeground != targetWindow)
             {
@@ -57,9 +67,6 @@ public sealed class KeystrokeService : IKeystrokeService
             }
 
             int currentChunkLength = Math.Min(_batchSize, text.Length - i);
-
-            Logger.LogDebug(
-                $"Sending keystroke chunk starting at index {i} with length {currentChunkLength}");
 
             if (currentChunkLength > 0)
             {
@@ -116,7 +123,5 @@ public sealed class KeystrokeService : IKeystrokeService
 
         // SendInput cannot handle rapid sequences of inputs. Delay is configurable.
         System.Threading.Thread.Sleep(_delayMs);
-
-        Logger.LogDebug($"Successfully sent {inputs.Count} keystrokes");
     }
 }

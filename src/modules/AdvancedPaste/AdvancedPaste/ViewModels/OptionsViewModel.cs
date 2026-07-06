@@ -785,6 +785,10 @@ namespace AdvancedPaste.ViewModels
             IsBusy = true;
             PasteActionError = PasteActionError.None;
 
+            _pasteActionCancellationTokenSource?.Dispose();
+            _pasteActionCancellationTokenSource = new();
+            var cancellationToken = _pasteActionCancellationTokenSource.Token;
+
             try
             {
                 var text = ClipboardData != null ? await ClipboardData.GetTextOrEmptyAsync() : string.Empty;
@@ -799,10 +803,10 @@ namespace AdvancedPaste.ViewModels
                 HideWindow();
 
                 // Small delay to ensure window is hidden and target application is focused
-                await Task.Delay(100);
+                await Task.Delay(100, cancellationToken);
 
                 // Send the text as keystrokes on a background thread
-                await Task.Run(() => _keystrokeService.SendTextAsKeystrokes(text));
+                await Task.Run(() => _keystrokeService.SendTextAsKeystrokes(text, cancellationToken), cancellationToken);
 
                 Logger.LogDebug($"Completed executing PasteAsKeystrokes in {elapsedWatch.ElapsedMilliseconds}ms");
 
@@ -815,6 +819,10 @@ namespace AdvancedPaste.ViewModels
                 {
                     PowerToysTelemetry.Log.WriteEvent(new Telemetry.AdvancedPasteInAppKeyboardShortcutEvent(PasteFormats.PasteAsKeystrokes));
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                Logger.LogDebug("PasteAsKeystrokes operation was cancelled");
             }
             catch (Exception ex)
             {

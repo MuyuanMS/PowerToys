@@ -34,28 +34,15 @@ public sealed class UserSettingsKeystrokeTests
     [TestMethod]
     public void LoadSettings_WithValidKeystrokeValues()
     {
-        // Arrange
-        const string settingsJson = @"{
-            ""AdvancedPaste"": {
-                ""properties"": {
-                    ""keystroke-delay-ms"": 50,
-                    ""keystroke-batch-size"": 5
-                }
-            }
-        }";
-
-        var settingsPath = MockPathHelper.BuildPath(@"C:\Users\TestUser\AppData\Local\Microsoft\PowerToys\AdvancedPaste\settings.json");
-        _fileSystem.AddFile(settingsPath, new MockFileData(settingsJson));
-
-        // Arrange mock to return the settings path
-        // Note: This is a simplified test. In a real scenario, you would mock SettingsUtils
-        // For now, we're testing that the constructor doesn't fail with valid settings
-
-        // Act
+        // Arrange & Act
+        // Note: UserSettings reads from SettingsUtils which requires a full settings path.
+        // Since MockFileSystem doesn't integrate with SettingsUtils, this test verifies
+        // that construction with no settings file uses defaults correctly.
         var userSettings = new UserSettings(_fileSystem);
 
-        // Assert - Constructor should complete without error
-        Assert.IsNotNull(userSettings);
+        // Assert - defaults are applied when no settings file exists
+        Assert.AreEqual(AdvancedPasteProperties.DefaultKeystrokeDelayMs, userSettings.KeystrokeDelayMs);
+        Assert.AreEqual(AdvancedPasteProperties.DefaultKeystrokeBatchSize, userSettings.KeystrokeBatchSize);
     }
 
     [TestMethod]

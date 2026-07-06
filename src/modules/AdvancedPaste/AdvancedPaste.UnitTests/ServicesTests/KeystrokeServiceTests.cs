@@ -56,10 +56,8 @@ public sealed class KeystrokeServiceTests
         var service = new KeystrokeService(userSettings);
 
         // Assert
-        // Verify that the service was created successfully with the provided values
-        // We can't directly access private fields, but we can verify behavior through SendTextAsKeystrokes
-        // This test primarily verifies that the constructor accepts valid values
-        Assert.IsNotNull(service);
+        Assert.AreEqual(50, service.EffectiveDelayMs);
+        Assert.AreEqual(5, service.EffectiveBatchSize);
     }
 
     [TestMethod]
@@ -76,8 +74,8 @@ public sealed class KeystrokeServiceTests
         var service = new KeystrokeService(userSettings);
 
         // Assert
-        Assert.IsNotNull(service);
-        // The service should use the default delay (30ms) instead of 0
+        Assert.AreEqual(AdvancedPasteProperties.DefaultKeystrokeDelayMs, service.EffectiveDelayMs);
+        Assert.AreEqual(2, service.EffectiveBatchSize);
     }
 
     [TestMethod]
@@ -94,8 +92,8 @@ public sealed class KeystrokeServiceTests
         var service = new KeystrokeService(userSettings);
 
         // Assert
-        Assert.IsNotNull(service);
-        // The service should use the default delay (30ms) instead of negative value
+        Assert.AreEqual(AdvancedPasteProperties.DefaultKeystrokeDelayMs, service.EffectiveDelayMs);
+        Assert.AreEqual(3, service.EffectiveBatchSize);
     }
 
     [TestMethod]
@@ -112,8 +110,8 @@ public sealed class KeystrokeServiceTests
         var service = new KeystrokeService(userSettings);
 
         // Assert
-        Assert.IsNotNull(service);
-        // The service should use the default batch size (1) instead of 0
+        Assert.AreEqual(25, service.EffectiveDelayMs);
+        Assert.AreEqual(AdvancedPasteProperties.DefaultKeystrokeBatchSize, service.EffectiveBatchSize);
     }
 
     [TestMethod]
@@ -130,8 +128,8 @@ public sealed class KeystrokeServiceTests
         var service = new KeystrokeService(userSettings);
 
         // Assert
-        Assert.IsNotNull(service);
-        // The service should use the default batch size (1) instead of negative value
+        Assert.AreEqual(25, service.EffectiveDelayMs);
+        Assert.AreEqual(AdvancedPasteProperties.DefaultKeystrokeBatchSize, service.EffectiveBatchSize);
     }
 
     [TestMethod]
@@ -148,7 +146,8 @@ public sealed class KeystrokeServiceTests
         var service = new KeystrokeService(userSettings);
 
         // Assert
-        Assert.IsNotNull(service);
+        Assert.AreEqual(AdvancedPasteProperties.DefaultKeystrokeDelayMs, service.EffectiveDelayMs);
+        Assert.AreEqual(AdvancedPasteProperties.DefaultKeystrokeBatchSize, service.EffectiveBatchSize);
     }
 
     [TestMethod]
@@ -157,8 +156,6 @@ public sealed class KeystrokeServiceTests
     {
         // Act
         var service = new KeystrokeService(null);
-
-        // Assert - Exception should be thrown
     }
 
     [TestMethod]
@@ -175,7 +172,7 @@ public sealed class KeystrokeServiceTests
         var service = new KeystrokeService(userSettings);
 
         // Assert
-        Assert.IsNotNull(service);
+        Assert.AreEqual(1000, service.EffectiveDelayMs);
     }
 
     [TestMethod]
@@ -192,6 +189,22 @@ public sealed class KeystrokeServiceTests
         var service = new KeystrokeService(userSettings);
 
         // Assert
-        Assert.IsNotNull(service);
+        Assert.AreEqual(100, service.EffectiveBatchSize);
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentNullException))]
+    public void SendTextAsKeystrokes_WithNullText_ThrowsArgumentNullException()
+    {
+        // Arrange
+        var userSettings = new TestUserSettings
+        {
+            KeystrokeDelayMs = 30,
+            KeystrokeBatchSize = 1,
+        };
+        var service = new KeystrokeService(userSettings);
+
+        // Act
+        service.SendTextAsKeystrokes(null);
     }
 }

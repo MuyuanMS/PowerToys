@@ -51,6 +51,7 @@ namespace Microsoft.AdvancedPaste.UITests
             // paste as plain text: win + ctrl + alt + o
             // paste as markdown text: win + ctrl + alt + m
             // paste as json text: win + ctrl + alt + j
+            // paste as keystroke text: win + ctrl + alt + k
             CopySettingsFileBeforeTests();
         }
 
