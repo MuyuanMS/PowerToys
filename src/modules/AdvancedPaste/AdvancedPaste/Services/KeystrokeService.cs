@@ -158,7 +158,7 @@ public sealed class KeystrokeService : IKeystrokeService
             char c = text[i];
 
             // Skip \r when followed by \n (handle \r\n as a single Enter)
-            if (c == '\r' && i + 1 < text.Length && text[i + 1] == '\n')
+            if (IsSkippableCarriageReturn(text, i))
             {
                 continue;
             }
