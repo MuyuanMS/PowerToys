@@ -42,6 +42,7 @@ internal sealed partial class NowDockBand : ListItem, IDisposable
             Name = Resources.timedate_show_notification_center_command_name,
             Result = CommandResult.Dismiss(),
         };
+        _noOpCommand = new NoOpCommand() { Id = "com.microsoft.cmdpal.timedate.dockBand", Name = Resources.Microsoft_plugin_timedate_dock_band_title };
         _copyTimeCommand = new CopyTextCommand(string.Empty) { Name = Resources.timedate_copy_time_command_name };
         _copyDateCommand = new CopyTextCommand(string.Empty) { Name = Resources.timedate_copy_date_command_name };
         MoreCommands =
@@ -121,6 +122,19 @@ internal sealed partial class NowDockBand : ListItem, IDisposable
         var dateString = now.ToString(
             TimeAndDateHelper.GetStringFormat(FormatStringType.Date, false, false),
             CultureInfo.CurrentCulture);
+
+        var dateMode = _settings.ClockBandDateMode;
+        var subtitleString = TimeAndDateHelper.GetClockBandDateLine(now, _settings);
+
+        // The week number is part of the band (subtitle and copy command) in the
+        // week number and ISO week date modes. The copy command matches what is
+        // shown: the configured week number in mode 1, the ISO week number in mode 2.
+        var showWeekNumber = dateMode is 1 or 2;
+        if (showWeekNumber)
+        {
+            var weekNumber = dateMode == 2 ? ISOWeek.GetWeekOfYear(now) : TimeAndDateHelper.GetWeekOfYear(now, _settings);
+            _copyWeekNumberCommand.Text = weekNumber.ToString(CultureInfo.CurrentCulture);
+        }
 
         Title = timeString;
         Subtitle = dateString;
