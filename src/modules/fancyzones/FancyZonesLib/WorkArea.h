@@ -57,6 +57,7 @@ public:
     void HideZones();
     void FlashZones();
     void ShowMonitorRotationPreview(const std::vector<RECT>& windowRects, size_t monitorNumber, std::optional<bool> reverse, bool animateRotation);
+    void ShowLayoutNameLabel(const std::wstring& name);
     
     void CycleWindows(HWND window, bool reverse);
 

@@ -40,6 +40,14 @@ class ZonesOverlay
         Both,
     };
 
+    struct LayoutNameLabel
+    {
+        std::wstring text;
+        D2D1_COLOR_F textColor;
+        D2D1_COLOR_F backgroundColor;
+        std::chrono::steady_clock::time_point tStart;
+    };
+
     enum struct RenderResult
     {
         Ok,
@@ -51,6 +59,7 @@ class ZonesOverlay
     RECT m_clientRect{};
     ID2D1HwndRenderTarget* m_renderTarget = nullptr;
     std::optional<AnimationInfo> m_animation;
+    std::optional<LayoutNameLabel> m_layoutNameLabel;
 
     std::mutex m_mutex;
     std::vector<DrawableRect> m_sceneRects;
@@ -61,6 +70,7 @@ class ZonesOverlay
     std::optional<std::chrono::steady_clock::time_point> m_rotationPulseStart;
 
     float GetAnimationAlpha();
+    float GetLayoutNameLabelAlpha();
     static IDWriteFactory* GetWriteFactory();
     static D2D1_COLOR_F ConvertColor(COLORREF color);
     static D2D1_RECT_F ConvertRect(RECT rect);
@@ -85,4 +95,5 @@ public:
                            const Colors::ZoneColors& colors,
                            const bool showZoneText);
     void DrawMonitorRotationPreview(const std::vector<RECT>& windowRects, size_t monitorNumber, std::optional<bool> reverse, bool animateRotation);
+    void ShowLayoutName(const std::wstring& text, const Colors::ZoneColors& colors);
 };

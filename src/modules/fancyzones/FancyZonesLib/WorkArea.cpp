@@ -229,6 +229,14 @@ void WorkArea::ShowMonitorRotationPreview(const std::vector<RECT>& windowRects, 
     m_zonesOverlay->Show();
 }
 
+void WorkArea::ShowLayoutNameLabel(const std::wstring& name)
+{
+    if (m_zonesOverlay)
+    {
+        m_zonesOverlay->ShowLayoutName(name, Colors::GetZoneColors());
+    }
+}
+
 void WorkArea::InitLayout()
 {
     InitLayout({});
