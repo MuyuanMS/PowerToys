@@ -103,7 +103,13 @@ namespace KeyboardEventHandlers
 
             std::vector<INPUT> keyEventList;
             Helpers::SetKeyEvent(keyEventList, INPUT_KEYBOARD, static_cast<WORD>(pendingKey), 0, KeyboardManagerConstants::KEYBOARDMANAGER_SINGLEKEY_FLAG);
-            ii.SendVirtualInput(keyEventList);
+            if (!ii.SendVirtualInput(keyEventList))
+            {
+                // Injection was blocked (e.g. by UIPI). Leave the key pending rather than
+                // marking it a combination whose real key-down never landed -- doing so would
+                // later inject an unmatched real key-up on release.
+                continue;
+            }
 
             state.SetAloneCombination(pendingKey);
         }
@@ -165,7 +171,13 @@ namespace KeyboardEventHandlers
                         // releases the real key and never fires the alone action.
                         std::vector<INPUT> keyEventList;
                         Helpers::SetKeyEvent(keyEventList, INPUT_KEYBOARD, static_cast<WORD>(vk), 0, KeyboardManagerConstants::KEYBOARDMANAGER_SINGLEKEY_FLAG);
-                        ii.SendVirtualInput(keyEventList);
+                        if (!ii.SendVirtualInput(keyEventList))
+                        {
+                            // Injection was blocked (e.g. by UIPI). Pass the physical key-down
+                            // through instead of suppressing it, so the key is not swallowed.
+                            state.ClearAloneKeyState(vk);
+                            return 0;
+                        }
                         state.SetAloneCombination(vk);
                     }
                     else
@@ -206,9 +218,12 @@ namespace KeyboardEventHandlers
                     }
                     // NOTE: text-valued alone targets are a later phase (no producer yet).
 
-                    if (!keyEventList.empty())
+                    if (!keyEventList.empty() && !ii.SendVirtualInput(keyEventList))
                     {
-                        ii.SendVirtualInput(keyEventList);
+                        // Injection was blocked (e.g. by UIPI). Pass the physical key-up
+                        // through instead of suppressing it, so input is not swallowed.
+                        state.ClearAloneKeyState(vk);
+                        return 0;
                     }
 
                     state.ClearAloneKeyState(vk);
@@ -220,7 +235,13 @@ namespace KeyboardEventHandlers
                     // Was used in combination: release the real key we injected on its key-down.
                     std::vector<INPUT> keyEventList;
                     Helpers::SetKeyEvent(keyEventList, INPUT_KEYBOARD, static_cast<WORD>(vk), KEYEVENTF_KEYUP, KeyboardManagerConstants::KEYBOARDMANAGER_SINGLEKEY_FLAG);
-                    ii.SendVirtualInput(keyEventList);
+                    if (!ii.SendVirtualInput(keyEventList))
+                    {
+                        // Injection was blocked (e.g. by UIPI). Pass the physical key-up
+                        // through instead of suppressing it, so input is not swallowed.
+                        state.ClearAloneKeyState(vk);
+                        return 0;
+                    }
 
                     state.ClearAloneKeyState(vk);
                     return 1;
