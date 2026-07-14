@@ -31,6 +31,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             AdditionalActions = new();
             IsAIEnabled = false;
             ShowCustomPreview = true;
+            ShowAIPaste = true;
             CloseAfterLosingFocus = false;
             EnableClipboardPreview = true;
             AutoCopySelectionForCustomActionHotkey = false;
@@ -80,6 +81,9 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
         [JsonConverter(typeof(BoolPropertyJsonConverter))]
         public bool ShowCustomPreview { get; set; }
+
+        [JsonConverter(typeof(BoolPropertyJsonConverter))]
+        public bool ShowAIPaste { get; set; }
 
         [JsonConverter(typeof(BoolPropertyJsonConverter))]
         public bool CloseAfterLosingFocus { get; set; }

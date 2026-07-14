@@ -38,6 +38,8 @@ namespace AdvancedPaste.Settings
 
         public bool ShowCustomPreview { get; private set; }
 
+        public bool ShowAIPaste { get; private set; }
+
         public bool CloseAfterLosingFocus { get; private set; }
 
         public bool EnableClipboardPreview { get; private set; }
@@ -58,6 +60,7 @@ namespace AdvancedPaste.Settings
 
             IsAIEnabled = false;
             ShowCustomPreview = true;
+            ShowAIPaste = true;
             CloseAfterLosingFocus = false;
             EnableClipboardPreview = true;
             KeystrokeDelayMs = AdvancedPasteProperties.DefaultKeystrokeDelayMs;
@@ -115,6 +118,7 @@ namespace AdvancedPaste.Settings
 
                                 IsAIEnabled = properties.IsAIEnabled;
                                 ShowCustomPreview = properties.ShowCustomPreview;
+                                ShowAIPaste = properties.ShowAIPaste;
                                 CloseAfterLosingFocus = properties.CloseAfterLosingFocus;
                                 EnableClipboardPreview = properties.EnableClipboardPreview;
                                 KeystrokeDelayMs = properties.KeystrokeDelayMs > 0 ? properties.KeystrokeDelayMs : AdvancedPasteProperties.DefaultKeystrokeDelayMs;
