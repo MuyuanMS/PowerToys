@@ -57,6 +57,10 @@ internal sealed class IntegrationTestUserSettings : IUserSettings
 
     public IReadOnlyList<PasteFormats> AdditionalActions => _additionalActions;
 
+    public int KeystrokeDelayMs => AdvancedPasteProperties.DefaultKeystrokeDelayMs;
+
+    public int KeystrokeBatchSize => AdvancedPasteProperties.DefaultKeystrokeBatchSize;
+
     public PasteAIConfiguration PasteAIConfiguration => _configuration;
 
     public event EventHandler Changed;

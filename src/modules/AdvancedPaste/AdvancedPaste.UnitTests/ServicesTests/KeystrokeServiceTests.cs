@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using AdvancedPaste.Models;
 using AdvancedPaste.Services;
 using AdvancedPaste.Settings;
 using Microsoft.PowerToys.Settings.UI.Library;
@@ -20,6 +21,8 @@ public sealed class KeystrokeServiceTests
 
         public bool ShowCustomPreview { get; set; }
 
+        public bool ShowAIPaste { get; set; }
+
         public bool CloseAfterLosingFocus { get; set; }
 
         public bool EnableClipboardPreview { get; set; }
@@ -34,7 +37,11 @@ public sealed class KeystrokeServiceTests
 
         public PasteAIConfiguration PasteAIConfiguration { get; set; } = new();
 
-        public event EventHandler Changed;
+        public event EventHandler Changed
+        {
+            add { }
+            remove { }
+        }
 
         public System.Threading.Tasks.Task SetActiveAIProviderAsync(string providerId)
         {
@@ -77,6 +84,7 @@ public sealed class KeystrokeServiceTests
 
         // Assert
         Assert.IsNotNull(service);
+
         // The service should use the default delay (30ms) instead of 0
     }
 
@@ -95,6 +103,7 @@ public sealed class KeystrokeServiceTests
 
         // Assert
         Assert.IsNotNull(service);
+
         // The service should use the default delay (30ms) instead of negative value
     }
 
@@ -113,6 +122,7 @@ public sealed class KeystrokeServiceTests
 
         // Assert
         Assert.IsNotNull(service);
+
         // The service should use the default batch size (1) instead of 0
     }
 
@@ -131,6 +141,7 @@ public sealed class KeystrokeServiceTests
 
         // Assert
         Assert.IsNotNull(service);
+
         // The service should use the default batch size (1) instead of negative value
     }
 

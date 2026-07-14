@@ -179,6 +179,7 @@ public sealed class AdvancedPastePropertiesTests
 
         // Assert
         Assert.IsNotNull(deserialized);
+
         // Missing properties should have default values of 0 (not initialized)
         Assert.AreEqual(0, deserialized.KeystrokeDelayMs);
         Assert.AreEqual(0, deserialized.KeystrokeBatchSize);

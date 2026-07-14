@@ -114,14 +114,3 @@ public sealed class UserSettingsKeystrokeTests
         Assert.AreEqual(1, AdvancedPasteProperties.DefaultKeystrokeBatchSize);
     }
 }
-
-/// <summary>
-/// Helper class to build mock file paths compatible with MockFileSystem.
-/// </summary>
-internal static class MockPathHelper
-{
-    public static string BuildPath(string path)
-    {
-        return path;
-    }
-}
