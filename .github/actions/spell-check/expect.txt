@@ -918,6 +918,7 @@ lcid
 LCIDTo
 lcl
 Lclean
+lctrl
 Ldone
 Ldr
 LEFTALIGN
@@ -1524,6 +1525,7 @@ RAWPATH
 rbhid
 Rbuttondown
 rclsid
+rctrl
 RCW
 RCZOOMIT
 rdp
