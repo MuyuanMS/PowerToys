@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using ManagedCommon;
@@ -76,14 +77,15 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                 byte alpha = (byte)((opacityPercent * 255 + 50) / 100);
 
                 string bgColor = Properties.BackgroundColor?.Value ?? string.Empty;
-                if (bgColor.Length == 7 && bgColor.StartsWith("#", System.StringComparison.OrdinalIgnoreCase))
+                if (bgColor.Length == 7 && bgColor.StartsWith("#", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Old RGB format (#RRGGBB) — prepend alpha to produce #AARRGGBB
+                    // Old RGB format (#RRGGBB) — prepend alpha to produce #AARRGGBB.
+                    // ToUpperInvariant normalises the RGB portion in case the stored value used lowercase hex.
                     Properties.BackgroundColor = new StringProperty($"#{alpha:X2}{bgColor.Substring(1).ToUpperInvariant()}");
                 }
 
                 string spotlightColor = Properties.SpotlightColor?.Value ?? string.Empty;
-                if (spotlightColor.Length == 7 && spotlightColor.StartsWith("#", System.StringComparison.OrdinalIgnoreCase))
+                if (spotlightColor.Length == 7 && spotlightColor.StartsWith("#", StringComparison.OrdinalIgnoreCase))
                 {
                     Properties.SpotlightColor = new StringProperty($"#{alpha:X2}{spotlightColor.Substring(1).ToUpperInvariant()}");
                 }
