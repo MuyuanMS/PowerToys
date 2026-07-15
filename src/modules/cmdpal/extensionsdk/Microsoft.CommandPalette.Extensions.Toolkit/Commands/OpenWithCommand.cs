@@ -50,7 +50,14 @@ public partial class OpenWithCommand : InvokableCommand
 
     public override CommandResult Invoke()
     {
-        OpenWith(_path);
+        try
+        {
+            OpenWith(_path);
+        }
+        catch (Exception ex)
+        {
+            ExtensionHost.LogMessage(new LogMessage($"Error opening 'Open with' dialog for '{_path}'\n{ex.Message}\n{ex.StackTrace}") { State = MessageState.Error });
+        }
 
         return CommandResult.GoHome();
     }
