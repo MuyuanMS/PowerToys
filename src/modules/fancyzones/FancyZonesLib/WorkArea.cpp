@@ -216,7 +216,7 @@ void WorkArea::InitLayout()
 
 void WorkArea::UpdateWindowPositions()
 {
-    const auto snappedWindows = m_layoutWindows.SnappedWindows();
+    const auto& snappedWindows = m_layoutWindows.SnappedWindows();
     for (const auto& [window, zones] : snappedWindows)
     {
         if (!Snap(window, zones, true) && m_layout && !zones.empty())
