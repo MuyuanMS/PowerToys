@@ -467,7 +467,23 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
         write_crash_marker_message("[PowerToys Runner] CRASH: std::terminate called (uncaught exception or internal error).\n");
         try
         {
+            std::exception_ptr ep = std::current_exception();
+            if (ep)
+            {
+                std::rethrow_exception(ep);
+            }
             Logger::critical(L"Runner is terminating unexpectedly (std::terminate called). Possible uncaught exception or internal error.");
+        }
+        catch (const std::exception& e)
+        {
+            Logger::critical("Runner terminated via std::terminate. Exception: {}", e.what());
+        }
+        catch (...)
+        {
+            Logger::critical(L"Runner terminated via std::terminate. Unknown exception type.");
+        }
+        try
+        {
             Logger::flush();
         }
         catch (...)

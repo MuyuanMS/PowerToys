@@ -28,11 +28,7 @@ static void write_crash_marker(const char* msg) noexcept
     {
         return;
     }
-    DWORD len = 0;
-    while (msg[len] != '\0')
-    {
-        ++len;
-    }
+    DWORD len = static_cast<DWORD>(strlen(msg));
     if (len > 0)
     {
         DWORD written = 0;
@@ -190,14 +186,13 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
         }
         // Primary: allocation-free, mutex-free persistent marker.  Works even before
         // Logger is initialised and even if the heap or spdlog internals are corrupted.
+        // _snprintf_s with _TRUNCATE returns -1 on truncation but still fills crashMsg
+        // with a valid null-terminated string, so we write unconditionally.
         char crashMsg[128];
-        int msgLen = _snprintf_s(crashMsg, sizeof(crashMsg), _TRUNCATE,
-                                 "[PowerToys Runner] CRASH: Unhandled exception code=0x%08X\n",
-                                 static_cast<unsigned int>(code));
-        if (msgLen > 0)
-        {
-            write_crash_marker(crashMsg);
-        }
+        _snprintf_s(crashMsg, sizeof(crashMsg), _TRUNCATE,
+                    "[PowerToys Runner] CRASH: Unhandled exception code=0x%08X\n",
+                    static_cast<unsigned int>(code));
+        write_crash_marker(crashMsg);
         // Best-effort: full Logger path (may fail/deadlock if the fault holds a spdlog lock).
         try
         {
@@ -249,6 +244,7 @@ void init_global_error_handlers()
     if (envLen > 0 && envLen < MAX_PATH)
     {
         wchar_t dirPath[MAX_PATH];
+        // _snwprintf_s returns -1 on truncation; a truncated path would be unusable.
         if (_snwprintf_s(dirPath, MAX_PATH, _TRUNCATE,
                          L"%s\\Microsoft\\PowerToys", localAppData) > 0)
         {
@@ -257,9 +253,11 @@ void init_global_error_handlers()
             if (_snwprintf_s(crashPath, MAX_PATH, _TRUNCATE,
                              L"%s\\runner-crash.log", dirPath) > 0)
             {
+                // FILE_APPEND_DATA ensures each crash is appended rather than overwriting
+                // a prior record, so multiple faults in a session are all preserved.
                 g_crash_marker_handle = CreateFileW(
                     crashPath,
-                    GENERIC_WRITE,
+                    FILE_APPEND_DATA,
                     FILE_SHARE_READ,
                     nullptr,
                     OPEN_ALWAYS,
