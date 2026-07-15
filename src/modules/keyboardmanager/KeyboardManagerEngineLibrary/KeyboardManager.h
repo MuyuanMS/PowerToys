@@ -66,6 +66,8 @@ private:
 
     // Thread priority that was active on the hook thread before StartLowlevelKeyboardHook
     // elevated it.  Saved so StopLowlevelKeyboardHook can restore the original value exactly.
+    // Default THREAD_PRIORITY_NORMAL is a safe fallback used if GetThreadPriority() fails
+    // during hook installation.
     std::atomic<int> hookThreadPriorityBeforeElevation{ THREAD_PRIORITY_NORMAL };
 
     // Hook procedure definition
