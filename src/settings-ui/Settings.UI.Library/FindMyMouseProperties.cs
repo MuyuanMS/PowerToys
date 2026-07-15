@@ -52,6 +52,13 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         [JsonPropertyName("shaking_factor")]
         public IntProperty ShakingFactor { get; set; }
 
+        // Legacy property: read from old settings files that stored opacity as a separate integer (0-100).
+        // Migrated into the alpha channel of BackgroundColor and SpotlightColor.
+        // Excluded from serialization once migrated (null after migration).
+        [JsonPropertyName("overlay_opacity")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public IntProperty? LegacyOverlayOpacity { get; set; }
+
         public FindMyMouseProperties()
         {
             ActivationMethod = new IntProperty(0);

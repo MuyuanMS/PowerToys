@@ -21,7 +21,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         {
             Name = ModuleName;
             Properties = new FindMyMouseProperties();
-            Version = "1.1";
+            Version = "1.2";
         }
 
         public string GetModuleName()
@@ -47,6 +47,8 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         // This can be utilized in the future if the settings.json file is to be modified/deleted.
         public bool UpgradeSettingsConfiguration()
         {
+            bool upgraded = false;
+
             if (Version == "1.0")
             {
                 if (Properties.ActivationMethod.Value == 1)
@@ -55,10 +57,43 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                 }
 
                 Version = "1.1";
-                return true;
+                upgraded = true;
             }
 
-            return false;
+            if (Version == "1.1")
+            {
+                // Migrate old RGB colors + legacy overlay_opacity to new ARGB format.
+                // Old schema: colors stored as #RRGGBB + separate overlay_opacity (0-100 integer).
+                // New schema: colors stored as #AARRGGBB with alpha channel embedded.
+                int opacityPercent = Properties.LegacyOverlayOpacity?.Value ?? 50;
+                if (opacityPercent < 0 || opacityPercent > 100)
+                {
+                    opacityPercent = 50;
+                }
+
+                byte alpha = (byte)((opacityPercent * 255 + 50) / 100);
+
+                string bgColor = Properties.BackgroundColor?.Value ?? string.Empty;
+                if (bgColor.Length == 7 && bgColor.StartsWith("#", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    // Old RGB format (#RRGGBB) — prepend alpha to produce #AARRGGBB
+                    Properties.BackgroundColor = new StringProperty($"#{alpha:X2}{bgColor.Substring(1).ToUpperInvariant()}");
+                }
+
+                string spotlightColor = Properties.SpotlightColor?.Value ?? string.Empty;
+                if (spotlightColor.Length == 7 && spotlightColor.StartsWith("#", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    Properties.SpotlightColor = new StringProperty($"#{alpha:X2}{spotlightColor.Substring(1).ToUpperInvariant()}");
+                }
+
+                // Clear legacy property so it is excluded from the re-saved settings file
+                Properties.LegacyOverlayOpacity = null;
+
+                Version = "1.2";
+                upgraded = true;
+            }
+
+            return upgraded;
         }
     }
 }
