@@ -68,6 +68,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                 int opacityPercent = Properties.LegacyOverlayOpacity?.Value ?? 50;
                 if (opacityPercent < 0 || opacityPercent > 100)
                 {
+                    Logger.LogWarning($"FindMyMouse: invalid legacy overlay_opacity value {opacityPercent} encountered during migration; defaulting to 50.");
                     opacityPercent = 50;
                 }
 

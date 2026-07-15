@@ -40,8 +40,8 @@ Sets the background color (including transparency) of the spotlight overlay.
 **Format:** `"#AARRGGBB"` (alpha, red, green, blue)  
 **Default:** `"#80000000"` (50% opaque black)
 
-> **Note:** The alpha channel (`AA`) controls opacity. `FF` is fully opaque, `00` is fully
-> transparent. For example, `#80000000` means 50% opaque black.
+> **Note:** The alpha channel (`AA`) controls opacity, where `FF` (255) is fully opaque and
+> `00` (0) is fully transparent. For example, `#80000000` means 50% opaque black.
 
 ### SpotlightColor
 
@@ -51,8 +51,8 @@ Sets the color (including transparency) of the spotlight circle around the curso
 **Format:** `"#AARRGGBB"` (alpha, red, green, blue)  
 **Default:** `"#80FFFFFF"` (50% opaque white)
 
-> **Note:** The alpha channel (`AA`) controls opacity. `FF` is fully opaque, `00` is fully
-> transparent. For example, `#80FFFFFF` means 50% opaque white.
+> **Note:** The alpha channel (`AA`) controls opacity, where `FF` (255) is fully opaque and
+> `00` (0) is fully transparent. For example, `#80FFFFFF` means 50% opaque white.
 
 ### SpotlightRadius
 
