@@ -605,12 +605,12 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             foreach (var kvp in additionalPaths)
             {
                 var pathKey = kvp.Key;
-                var basePath = kvp.Value;
+                var basePath = kvp.Value.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                 foreach (var file in GetSettingsFiles(settings, basePath))
                 {
                     // Build a key that is unique across all base paths:
                     // "\Microsoft.CmdPal\settings.json", "\Microsoft.CmdPal\foo.settings.json", …
-                    var relativeWithinBase = file.Substring(basePath.Length); // already starts with separator
+                    var relativeWithinBase = file.Substring(basePath.Length); // always starts with separator
                     var combinedKey = Path.DirectorySeparatorChar + pathKey + relativeWithinBase;
                     settingsFiles[combinedKey] = file;
                 }
@@ -984,8 +984,6 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                 if (backupRestoreSettings["IgnoredSettings"][settingFileKey] != null)
                 {
                     var settingsArray = (JsonArray)backupRestoreSettings["IgnoredSettings"][settingFileKey];
-
-                    Console.WriteLine("settingsArray " + settingsArray.GetType().FullName);
 
                     var settingsList = new List<string>();
 
