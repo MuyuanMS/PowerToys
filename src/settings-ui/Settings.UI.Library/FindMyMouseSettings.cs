@@ -71,6 +71,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                     opacityPercent = 50;
                 }
 
+                // Round to nearest integer: (percent * 255 + 50) / 100
                 byte alpha = (byte)((opacityPercent * 255 + 50) / 100);
 
                 string bgColor = Properties.BackgroundColor?.Value ?? string.Empty;

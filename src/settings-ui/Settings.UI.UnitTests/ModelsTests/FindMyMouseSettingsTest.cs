@@ -46,8 +46,8 @@ namespace CommonLibTest
             Assert.AreEqual("1.2", settings.Version);
 
             // 50% opacity → alpha = (50 * 255 + 50) / 100 = 128 = 0x80
-            Assert.AreEqual("#80000000", settings.Properties.BackgroundColor.Value, StringComparer.OrdinalIgnoreCase);
-            Assert.AreEqual("#80FFFFFF", settings.Properties.SpotlightColor.Value, StringComparer.OrdinalIgnoreCase);
+            Assert.AreEqual("#80000000", settings.Properties.BackgroundColor.Value);
+            Assert.AreEqual("#80FFFFFF", settings.Properties.SpotlightColor.Value);
             Assert.IsNull(settings.Properties.LegacyOverlayOpacity, "LegacyOverlayOpacity should be cleared after migration.");
         }
 
@@ -70,8 +70,8 @@ namespace CommonLibTest
 
             Assert.IsTrue(upgraded);
             Assert.AreEqual("1.2", settings.Version);
-            Assert.AreEqual("#80000000", settings.Properties.BackgroundColor.Value, StringComparer.OrdinalIgnoreCase);
-            Assert.AreEqual("#80FFFFFF", settings.Properties.SpotlightColor.Value, StringComparer.OrdinalIgnoreCase);
+            Assert.AreEqual("#80000000", settings.Properties.BackgroundColor.Value);
+            Assert.AreEqual("#80FFFFFF", settings.Properties.SpotlightColor.Value);
         }
 
         /// <summary>
@@ -95,8 +95,8 @@ namespace CommonLibTest
             Assert.AreEqual("1.2", settings.Version);
 
             // Colors should be unchanged because they were already in #AARRGGBB format
-            Assert.AreEqual("#80000000", settings.Properties.BackgroundColor.Value, StringComparer.OrdinalIgnoreCase);
-            Assert.AreEqual("#80FFFFFF", settings.Properties.SpotlightColor.Value, StringComparer.OrdinalIgnoreCase);
+            Assert.AreEqual("#80000000", settings.Properties.BackgroundColor.Value);
+            Assert.AreEqual("#80FFFFFF", settings.Properties.SpotlightColor.Value);
         }
 
         /// <summary>
@@ -122,8 +122,8 @@ namespace CommonLibTest
             Assert.AreEqual(2, settings.Properties.ActivationMethod.Value, "Activation method should have been fixed from 1 to 2.");
 
             // 75% opacity → alpha = (75 * 255 + 50) / 100 = 191 = 0xBF
-            Assert.AreEqual("#BF000000", settings.Properties.BackgroundColor.Value, StringComparer.OrdinalIgnoreCase);
-            Assert.AreEqual("#BFFFFFFF", settings.Properties.SpotlightColor.Value, StringComparer.OrdinalIgnoreCase);
+            Assert.AreEqual("#BF000000", settings.Properties.BackgroundColor.Value);
+            Assert.AreEqual("#BFFFFFFF", settings.Properties.SpotlightColor.Value);
         }
     }
 }
