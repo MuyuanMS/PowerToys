@@ -161,7 +161,8 @@ void KeyboardManager::StartLowlevelKeyboardHook()
             int savedPriority = GetThreadPriority(realHandle);
             if (savedPriority == THREAD_PRIORITY_ERROR_RETURN)
             {
-                Logger::warn(L"GetThreadPriority() failed ({}); using THREAD_PRIORITY_NORMAL as the restore value.", GetLastError());
+                DWORD errorCode = GetLastError();
+                Logger::warn(L"GetThreadPriority() failed ({}); using THREAD_PRIORITY_NORMAL as the restore value.", errorCode);
                 savedPriority = THREAD_PRIORITY_NORMAL;
             }
             if (!SetThreadPriority(realHandle, THREAD_PRIORITY_TIME_CRITICAL))
