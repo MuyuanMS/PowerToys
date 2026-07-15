@@ -506,6 +506,36 @@ public class ExtensionGalleryViewModelTests
             viewModel.FilteredEntries.Select(entry => entry.Id).ToArray());
     }
 
+    [TestMethod]
+    public async Task LoadAsync_AfterDispose_DoesNotThrowObjectDisposedException()
+    {
+        // Regression test for https://github.com/MuyuanMS/PowerToys/issues/98
+        // Dispose() cancels and disposes _cts. A subsequent call to FetchCoreAsync ->
+        // ResetCancellation() must not crash with ObjectDisposedException.
+        var galleryService = new Mock<IExtensionGalleryService>();
+        galleryService.Setup(s => s.IsCustomFeed).Returns(false);
+        galleryService.Setup(s => s.GetBaseUrl()).Returns("https://example.com/index.json");
+        galleryService
+            .Setup(s => s.FetchExtensionsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GalleryFetchResult { Extensions = [] });
+
+        var extensionService = new Mock<IExtensionService>();
+        extensionService
+            .Setup(s => s.GetInstalledExtensionsAsync(true))
+            .ReturnsAsync(Array.Empty<IExtensionWrapper>());
+
+        var viewModel = new ExtensionGalleryViewModel(
+            galleryService.Object,
+            new[] { extensionService.Object },
+            NullLogger<ExtensionGalleryViewModel>.Instance,
+            CreateGalleryExtensionViewModelFactory());
+
+        viewModel.Dispose();
+
+        // Must not throw ObjectDisposedException after Dispose() has been called.
+        await viewModel.LoadAsync();
+    }
+
     private static Mock<IExtensionGalleryService> CreateGalleryService(params GalleryExtensionEntry[] entries)
     {
         var galleryService = new Mock<IExtensionGalleryService>();

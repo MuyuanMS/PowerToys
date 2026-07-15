@@ -228,6 +228,11 @@ public sealed partial class ExtensionGalleryViewModel : ObservableObject, IDispo
 
     private async Task FetchCoreAsync(Func<CancellationToken, Task<GalleryFetchResult>> fetchFunc, bool refreshInstallationStatus)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         var cts = ResetCancellation();
 
         IsLoading = true;
@@ -335,7 +340,15 @@ public sealed partial class ExtensionGalleryViewModel : ObservableObject, IDispo
         var oldCts = _cts;
         var newCts = new CancellationTokenSource();
         _cts = newCts;
-        oldCts.Cancel();
+        try
+        {
+            oldCts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The old CancellationTokenSource was already disposed (e.g. by Dispose()), nothing to cancel.
+        }
+
         oldCts.Dispose();
         return newCts;
     }
