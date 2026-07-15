@@ -1,5 +1,11 @@
 {
   "RestartAfterRestore": true,
+  "AdditionalSettingsPaths": [
+    {
+      "PathKey": "Microsoft.CmdPal",
+      "FullPath": "%LOCALAPPDATA%\\Microsoft.CmdPal"
+    }
+  ],
   "IncludeFiles": [
     "*Keyboard Manager\\default.json",
     "*settings.json",
