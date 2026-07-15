@@ -1,16 +1,16 @@
 #include "pch.h"
-#if _DEBUG && _WIN64
 #include "unhandled_exception_handler.h"
+#include <common/logger/logger.h>
+#include <csignal>
+#include <string>
+
+#if _DEBUG && _WIN64
 #include <DbgHelp.h>
 #pragma comment(lib, "DbgHelp.lib")
-#include <string>
 #include <sstream>
-#include <csignal>
+#endif
 
-static IMAGEHLP_SYMBOL64* p_symbol = static_cast<IMAGEHLP_SYMBOL64*>(malloc(sizeof(IMAGEHLP_SYMBOL64) + MAX_PATH * sizeof(WCHAR)));
-static IMAGEHLP_LINE64 line;
 static bool processing_exception = false;
-static WCHAR module_path[MAX_PATH];
 static LPTOP_LEVEL_EXCEPTION_FILTER default_top_level_exception_handler = NULL;
 
 static const WCHAR* exception_description(const DWORD& code)
@@ -61,6 +61,11 @@ static const WCHAR* exception_description(const DWORD& code)
         return L"UNKNOWN EXCEPTION";
     }
 }
+
+#if _DEBUG && _WIN64
+static IMAGEHLP_SYMBOL64* p_symbol = static_cast<IMAGEHLP_SYMBOL64*>(malloc(sizeof(IMAGEHLP_SYMBOL64) + MAX_PATH * sizeof(WCHAR)));
+static IMAGEHLP_LINE64 line;
+static WCHAR module_path[MAX_PATH];
 
 void init_symbols()
 {
@@ -139,6 +144,7 @@ void log_stack_trace(std::wstring& generalErrorDescription)
     auto errorString = ss.str();
     MessageBoxW(NULL, errorString.c_str(), L"Unhandled Error", MB_OK | MB_ICONERROR);
 }
+#endif // _DEBUG && _WIN64
 
 LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
 {
@@ -147,13 +153,19 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
         processing_exception = true;
         try
         {
-            init_symbols();
-            std::wstring ex_description = L"Exception code not available";
-            if (info != NULL && info->ExceptionRecord != NULL && info->ExceptionRecord->ExceptionCode != NULL)
+            DWORD code = 0;
+            if (info != NULL && info->ExceptionRecord != NULL)
             {
-                ex_description = exception_description(info->ExceptionRecord->ExceptionCode);
+                code = info->ExceptionRecord->ExceptionCode;
             }
+            // Log to disk so the crash is diagnosable even without a debugger or crash dump.
+            Logger::critical(L"Runner crashed with unhandled exception: {} (code: 0x{:08X})", exception_description(code), static_cast<unsigned int>(code));
+            Logger::flush();
+#if _DEBUG && _WIN64
+            init_symbols();
+            std::wstring ex_description = (info != NULL && info->ExceptionRecord != NULL) ? std::wstring{ exception_description(code) } : L"Exception code not available";
             log_stack_trace(ex_description);
+#endif
         }
         catch (...)
         {
@@ -169,9 +181,19 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
 
 extern "C" void AbortHandler(int /*signal_number*/)
 {
+    try
+    {
+        Logger::critical("Runner received SIGABRT (abort/assert failure).");
+        Logger::flush();
+    }
+    catch (...)
+    {
+    }
+#if _DEBUG && _WIN64
     init_symbols();
     std::wstring ex_description = L"SIGABRT was raised.";
     log_stack_trace(ex_description);
+#endif
 }
 
 void init_global_error_handlers()
@@ -179,4 +201,4 @@ void init_global_error_handlers()
     default_top_level_exception_handler = SetUnhandledExceptionFilter(unhandled_exception_handler);
     signal(SIGABRT, &AbortHandler);
 }
-#endif
+

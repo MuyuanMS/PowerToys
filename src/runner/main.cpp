@@ -41,9 +41,7 @@
 #include "ai_detection.h"
 #include <common/utils/package.h>
 
-#if _DEBUG && _WIN64
 #include "unhandled_exception_handler.h"
-#endif
 #include <common/logger/logger.h>
 #include <common/SettingsAPI/settings_helpers.h>
 #include <runner/settings_window.h>
@@ -182,12 +180,6 @@ int runner(bool isProcessElevated, bool openSettings, std::string settingsWindow
 {
     Logger::info("Runner is starting. Elevated={} openOobe={} openScoobe={} showRestartNotificationAfterUpdate={}", isProcessElevated, openOobe, openScoobe, showRestartNotificationAfterUpdate);
     DPIAware::EnableDPIAwarenessForThisProcess();
-
-#if _DEBUG && _WIN64
-//Global error handlers to diagnose errors.
-//We prefer this not to show any longer until there's a bug to diagnose.
-//init_global_error_handlers();
-#endif
     Trace::RegisterProvider();
 
     // Load settings from file before reading them
@@ -348,7 +340,21 @@ int runner(bool isProcessElevated, bool openSettings, std::string settingsWindow
     catch (std::runtime_error& err)
     {
         std::string err_what = err.what();
+        Logger::critical("Runner failed with a runtime_error: {}", err_what);
+        Logger::flush();
         MessageBoxW(nullptr, std::wstring(err_what.begin(), err_what.end()).c_str(), GET_RESOURCE_STRING(IDS_ERROR).c_str(), MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+        result = -1;
+    }
+    catch (std::exception& err)
+    {
+        Logger::critical("Runner failed with an exception: {}", err.what());
+        Logger::flush();
+        result = -1;
+    }
+    catch (...)
+    {
+        Logger::critical("Runner failed with an unknown exception.");
+        Logger::flush();
         result = -1;
     }
     Trace::UnregisterProvider();
@@ -495,6 +501,25 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
     logFilePath.append(LogSettings::runnerLogPath);
     Logger::init(LogSettings::runnerLoggerName, logFilePath.wstring(), PTSettingsHelper::get_log_settings_file_location());
 
+    // Register global error handlers immediately after the logger is ready so that
+    // any unhandled SEH exception or SIGABRT is captured to the log file rather
+    // than causing a silent, invisible exit.
+    init_global_error_handlers();
+
+    // Catch std::terminate() calls (uncaught exceptions from threads, pure-virtual
+    // calls, noexcept violations, etc.) and write a log entry before the process dies.
+    std::set_terminate([]() noexcept {
+        try
+        {
+            Logger::critical("Runner is terminating unexpectedly (std::terminate called). Possible uncaught exception or internal error.");
+            Logger::flush();
+        }
+        catch (...)
+        {
+        }
+        std::abort();
+    });
+
     const std::string cmdLine{ lpCmdLine };
     Logger::info("Running powertoys with cmd args: {}", cmdLine);
 
@@ -616,7 +641,21 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
     catch (std::runtime_error& err)
     {
         std::string err_what = err.what();
+        Logger::critical("WinMain failed with a runtime_error: {}", err_what);
+        Logger::flush();
         MessageBoxW(nullptr, std::wstring(err_what.begin(), err_what.end()).c_str(), GET_RESOURCE_STRING(IDS_ERROR).c_str(), MB_OK | MB_ICONERROR);
+        result = -1;
+    }
+    catch (std::exception& err)
+    {
+        Logger::critical("WinMain failed with an exception: {}", err.what());
+        Logger::flush();
+        result = -1;
+    }
+    catch (...)
+    {
+        Logger::critical("WinMain failed with an unknown exception.");
+        Logger::flush();
         result = -1;
     }
 
@@ -639,6 +678,9 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
         }
     }
     stop_tray_icon();
+
+    Logger::info("Runner exiting with result: {}", result);
+    Logger::flush();
 
     return result;
 }
