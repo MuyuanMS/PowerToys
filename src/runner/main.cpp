@@ -340,20 +340,21 @@ int runner(bool isProcessElevated, bool openSettings, std::string settingsWindow
     catch (std::runtime_error& err)
     {
         std::string err_what = err.what();
-        Logger::critical("Runner failed with a runtime_error: {}", err_what);
+        Logger::critical(L"Runner failed with a runtime_error: {}", std::wstring(err_what.begin(), err_what.end()));
         Logger::flush();
         MessageBoxW(nullptr, std::wstring(err_what.begin(), err_what.end()).c_str(), GET_RESOURCE_STRING(IDS_ERROR).c_str(), MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
         result = -1;
     }
     catch (std::exception& err)
     {
-        Logger::critical("Runner failed with an exception: {}", err.what());
+        std::string err_what = err.what();
+        Logger::critical(L"Runner failed with an exception: {}", std::wstring(err_what.begin(), err_what.end()));
         Logger::flush();
         result = -1;
     }
     catch (...)
     {
-        Logger::critical("Runner failed with an unknown exception.");
+        Logger::critical(L"Runner failed with an unknown exception.");
         Logger::flush();
         result = -1;
     }
@@ -511,7 +512,7 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
     std::set_terminate([]() noexcept {
         try
         {
-            Logger::critical("Runner is terminating unexpectedly (std::terminate called). Possible uncaught exception or internal error.");
+            Logger::critical(L"Runner is terminating unexpectedly (std::terminate called). Possible uncaught exception or internal error.");
             Logger::flush();
         }
         catch (...)
@@ -641,20 +642,21 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
     catch (std::runtime_error& err)
     {
         std::string err_what = err.what();
-        Logger::critical("WinMain failed with a runtime_error: {}", err_what);
+        Logger::critical(L"WinMain failed with a runtime_error: {}", std::wstring(err_what.begin(), err_what.end()));
         Logger::flush();
         MessageBoxW(nullptr, std::wstring(err_what.begin(), err_what.end()).c_str(), GET_RESOURCE_STRING(IDS_ERROR).c_str(), MB_OK | MB_ICONERROR);
         result = -1;
     }
     catch (std::exception& err)
     {
-        Logger::critical("WinMain failed with an exception: {}", err.what());
+        std::string err_what = err.what();
+        Logger::critical(L"WinMain failed with an exception: {}", std::wstring(err_what.begin(), err_what.end()));
         Logger::flush();
         result = -1;
     }
     catch (...)
     {
-        Logger::critical("WinMain failed with an unknown exception.");
+        Logger::critical(L"WinMain failed with an unknown exception.");
         Logger::flush();
         result = -1;
     }

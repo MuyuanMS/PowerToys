@@ -154,7 +154,7 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
         try
         {
             DWORD code = 0;
-            if (info != NULL && info->ExceptionRecord != NULL)
+            if (info != nullptr && info->ExceptionRecord != nullptr)
             {
                 code = info->ExceptionRecord->ExceptionCode;
             }
@@ -163,14 +163,14 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
             Logger::flush();
 #if _DEBUG && _WIN64
             init_symbols();
-            std::wstring ex_description = (info != NULL && info->ExceptionRecord != NULL) ? std::wstring{ exception_description(code) } : L"Exception code not available";
+            std::wstring ex_description = (info != nullptr && info->ExceptionRecord != nullptr) ? std::wstring{ exception_description(code) } : L"Exception code not available";
             log_stack_trace(ex_description);
 #endif
         }
         catch (...)
         {
         }
-        if (default_top_level_exception_handler != NULL && info != NULL)
+        if (default_top_level_exception_handler != nullptr && info != nullptr)
         {
             default_top_level_exception_handler(info);
         }
@@ -183,7 +183,7 @@ extern "C" void AbortHandler(int /*signal_number*/)
 {
     try
     {
-        Logger::critical("Runner received SIGABRT (abort/assert failure).");
+        Logger::critical(L"Runner received SIGABRT (abort/assert failure).");
         Logger::flush();
     }
     catch (...)
