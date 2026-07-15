@@ -454,9 +454,27 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
 
     // Register the SEH and SIGABRT handlers as early as possible so that faults in
     // winrt::init_apartment, COM security setup, and argument parsing are captured.
-    // Before Logger::init() these handlers fall back to OutputDebugStringW; once the
-    // logger is ready the full Logger::critical() path also runs.
+    // init_global_error_handlers() also opens the persistent crash-marker file so the
+    // handlers have an allocation-free on-disk sink from this point onward.
     init_global_error_handlers();
+
+    // Register the std::terminate handler immediately after the SEH/SIGABRT handlers
+    // so uncaught C++ exceptions from winrt::init_apartment, COM security init,
+    // argument parsing, and special-mode dispatch are also captured.
+    // Uses write_crash_marker_message (allocation-free WriteFile) as the primary sink;
+    // Logger calls are best-effort only since the logger may not be initialised yet.
+    std::set_terminate([]() noexcept {
+        write_crash_marker_message("[PowerToys Runner] CRASH: std::terminate called (uncaught exception or internal error).\n");
+        try
+        {
+            Logger::critical(L"Runner is terminating unexpectedly (std::terminate called). Possible uncaught exception or internal error.");
+            Logger::flush();
+        }
+        catch (...)
+        {
+        }
+        std::abort();
+    });
 
     winrt::init_apartment();
 
@@ -506,20 +524,6 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
     std::filesystem::path logFilePath(PTSettingsHelper::get_root_save_folder_location());
     logFilePath.append(LogSettings::runnerLogPath);
     Logger::init(LogSettings::runnerLoggerName, logFilePath.wstring(), PTSettingsHelper::get_log_settings_file_location());
-
-    // Catch std::terminate() calls (uncaught exceptions from threads, pure-virtual
-    // calls, noexcept violations, etc.) and write a log entry before the process dies.
-    std::set_terminate([]() noexcept {
-        try
-        {
-            Logger::critical(L"Runner is terminating unexpectedly (std::terminate called). Possible uncaught exception or internal error.");
-            Logger::flush();
-        }
-        catch (...)
-        {
-        }
-        std::abort();
-    });
 
     const std::string cmdLine{ lpCmdLine };
     Logger::info("Running powertoys with cmd args: {}", cmdLine);

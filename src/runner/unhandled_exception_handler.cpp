@@ -2,6 +2,7 @@
 #include "unhandled_exception_handler.h"
 #include <common/logger/logger.h>
 #include <csignal>
+#include <cstdio>
 #include <string>
 
 #if _DEBUG && _WIN64
@@ -12,6 +13,37 @@
 
 static bool processing_exception = false;
 static LPTOP_LEVEL_EXCEPTION_FILTER default_top_level_exception_handler = nullptr;
+
+// Pre-opened crash-marker file handle.  Opened once in init_global_error_handlers()
+// before any potentially-throwing startup code.  WriteFile to this handle is
+// allocation-free and mutex-free so it is safe to use from the SEH filter and the
+// SIGABRT handler.
+static HANDLE g_crash_marker_handle = INVALID_HANDLE_VALUE;
+
+// Write a null-terminated ASCII message to the crash marker file.
+// Must not allocate memory, lock mutexes, or throw.
+static void write_crash_marker(const char* msg) noexcept
+{
+    if (g_crash_marker_handle == INVALID_HANDLE_VALUE || msg == nullptr)
+    {
+        return;
+    }
+    DWORD len = 0;
+    while (msg[len] != '\0')
+    {
+        ++len;
+    }
+    if (len > 0)
+    {
+        DWORD written = 0;
+        WriteFile(g_crash_marker_handle, msg, len, &written, nullptr);
+    }
+}
+
+void write_crash_marker_message(const char* msg)
+{
+    write_crash_marker(msg);
+}
 
 static const WCHAR* exception_description(const DWORD& code)
 {
@@ -156,14 +188,19 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
         {
             code = info->ExceptionRecord->ExceptionCode;
         }
-        // OutputDebugString is used as a crash-safe baseline that works even before
-        // Logger has been initialised (early startup faults).
-        wchar_t debugMsg[128];
-        swprintf_s(debugMsg, L"[PowerToys Runner] Unhandled exception: 0x%08X\n", static_cast<unsigned int>(code));
-        OutputDebugStringW(debugMsg);
+        // Primary: allocation-free, mutex-free persistent marker.  Works even before
+        // Logger is initialised and even if the heap or spdlog internals are corrupted.
+        char crashMsg[128];
+        int msgLen = _snprintf_s(crashMsg, sizeof(crashMsg), _TRUNCATE,
+                                 "[PowerToys Runner] CRASH: Unhandled exception code=0x%08X\n",
+                                 static_cast<unsigned int>(code));
+        if (msgLen > 0)
+        {
+            write_crash_marker(crashMsg);
+        }
+        // Best-effort: full Logger path (may fail/deadlock if the fault holds a spdlog lock).
         try
         {
-            // Log to disk so the crash is diagnosable even without a debugger or crash dump.
             Logger::critical(L"Runner crashed with unhandled exception: {} (code: 0x{:08X})", exception_description(code), static_cast<unsigned int>(code));
             Logger::flush();
 #if _DEBUG && _WIN64
@@ -175,13 +212,11 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
         catch (...)
         {
         }
-        // Clear the recursion guard before invoking the previous handler so that any
-        // nested exception it raises can still be caught and logged.
-        processing_exception = false;
+        // Keep the recursion guard SET while invoking the previous handler.  Clearing it
+        // first would allow infinite re-entry if that filter raises a nested exception.
+        // Return its disposition so an existing crash reporter can still take control.
         if (default_top_level_exception_handler != nullptr && info != nullptr)
         {
-            // Preserve the previous filter's disposition (e.g. EXCEPTION_EXECUTE_HANDLER
-            // from an existing crash-reporter) rather than always continuing the search.
             return default_top_level_exception_handler(info);
         }
     }
@@ -190,10 +225,11 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
 
 extern "C" void AbortHandler(int /*signal_number*/)
 {
-    // Logger is not async-signal-safe: its sinks lock mutexes and allocate memory,
-    // which can deadlock or fault if abort() fires while those resources are held.
-    // OutputDebugStringW avoids that path and still produces a diagnosable entry
-    // visible in a debugger or ETW/DbgView.
+    // Logger is NOT called here: its sinks lock mutexes and allocate memory, which can
+    // deadlock or fault again if abort() fires while those resources are held.
+    // The pre-opened crash-marker handle gives a persistent, allocation-free on-disk record.
+    static const char k_abort_msg[] = "[PowerToys Runner] CRASH: SIGABRT received (abort/assert failure).\n";
+    write_crash_marker(k_abort_msg);
     OutputDebugStringW(L"[PowerToys Runner] SIGABRT received (abort/assert failure).\n");
 #if _DEBUG && _WIN64
     init_symbols();
@@ -204,6 +240,35 @@ extern "C" void AbortHandler(int /*signal_number*/)
 
 void init_global_error_handlers()
 {
+    // Open a crash-marker file before registering the handlers so the SEH filter and
+    // SIGABRT handler can write an allocation-free diagnostic to disk even before
+    // Logger::init() has been called.  GetEnvironmentVariableW requires no COM and is
+    // safe at the earliest startup point.
+    wchar_t localAppData[MAX_PATH];
+    DWORD envLen = GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, MAX_PATH);
+    if (envLen > 0 && envLen < MAX_PATH)
+    {
+        wchar_t dirPath[MAX_PATH];
+        if (_snwprintf_s(dirPath, MAX_PATH, _TRUNCATE,
+                         L"%s\\Microsoft\\PowerToys", localAppData) > 0)
+        {
+            CreateDirectoryW(dirPath, nullptr); // no-op if the directory already exists
+            wchar_t crashPath[MAX_PATH];
+            if (_snwprintf_s(crashPath, MAX_PATH, _TRUNCATE,
+                             L"%s\\runner-crash.log", dirPath) > 0)
+            {
+                g_crash_marker_handle = CreateFileW(
+                    crashPath,
+                    GENERIC_WRITE,
+                    FILE_SHARE_READ,
+                    nullptr,
+                    OPEN_ALWAYS,
+                    FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH,
+                    nullptr);
+            }
+        }
+    }
+
     default_top_level_exception_handler = SetUnhandledExceptionFilter(unhandled_exception_handler);
     signal(SIGABRT, &AbortHandler);
 }
