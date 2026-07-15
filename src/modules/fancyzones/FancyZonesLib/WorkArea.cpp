@@ -216,10 +216,23 @@ void WorkArea::InitLayout()
 
 void WorkArea::UpdateWindowPositions()
 {
-    const auto& snappedWindows = m_layoutWindows.SnappedWindows();
+    const auto snappedWindows = m_layoutWindows.SnappedWindows();
     for (const auto& [window, zones] : snappedWindows)
     {
-        Snap(window, zones, true);
+        if (!Snap(window, zones, true) && m_layout && !zones.empty())
+        {
+            // The saved zone set doesn't fully fit the new layout (e.g., after switching
+            // to a layout with fewer zones). Fall back to the first valid zone from the set.
+            const size_t layoutSize = m_layout->Zones().size();
+            for (ZoneIndex zone : zones)
+            {
+                if (static_cast<size_t>(zone) < layoutSize)
+                {
+                    Snap(window, { zone }, true);
+                    break;
+                }
+            }
+        }
     }
 }
 
