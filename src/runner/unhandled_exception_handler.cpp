@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "unhandled_exception_handler.h"
 #include <csignal>
+#include <cstdint>
 #include <cstdio>
 #include <string>
 
@@ -203,18 +204,19 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
         // Primary: allocation-free, mutex-free persistent marker.  Works even before
         // Logger is initialised and even if the heap or spdlog internals are corrupted.
         static constexpr char kCrashPrefix[] = "[PowerToys Runner] CRASH: Unhandled exception code=0x";
+        static constexpr size_t kPrefixLen = sizeof(kCrashPrefix) - 1;
         static constexpr int kHexDigitCount = 8;
         static constexpr int kSuffixCharCount = 2; // '\n' + '\0'
-        char crashMsg[sizeof(kCrashPrefix) + kHexDigitCount + kSuffixCharCount];
-        memcpy(crashMsg, kCrashPrefix, sizeof(kCrashPrefix) - 1);
+        char crashMsg[kPrefixLen + kHexDigitCount + kSuffixCharCount];
+        memcpy(crashMsg, kCrashPrefix, kPrefixLen);
         static constexpr char kHexDigits[] = "0123456789ABCDEF";
         for (int i = 0; i < kHexDigitCount; ++i)
         {
             // Extract each 4-bit nibble from most-significant to least-significant.
-            crashMsg[sizeof(kCrashPrefix) - 1 + i] = kHexDigits[(code >> (28 - (4 * i))) & 0xF];
+            crashMsg[kPrefixLen + i] = kHexDigits[(static_cast<uint32_t>(code) >> (28 - (4 * i))) & 0xF];
         }
-        crashMsg[sizeof(kCrashPrefix) - 1 + kHexDigitCount] = '\n';
-        crashMsg[sizeof(kCrashPrefix) - 1 + kHexDigitCount + 1] = '\0';
+        crashMsg[kPrefixLen + kHexDigitCount] = '\n';
+        crashMsg[kPrefixLen + kHexDigitCount + 1] = '\0';
         write_crash_marker(crashMsg);
 #if _DEBUG && _WIN64
         // DbgHelp/global symbol state is not thread-safe; use a process-wide non-blocking
