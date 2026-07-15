@@ -11,7 +11,7 @@
 #endif
 
 static bool processing_exception = false;
-static LPTOP_LEVEL_EXCEPTION_FILTER default_top_level_exception_handler = NULL;
+static LPTOP_LEVEL_EXCEPTION_FILTER default_top_level_exception_handler = nullptr;
 
 static const WCHAR* exception_description(const DWORD& code)
 {
