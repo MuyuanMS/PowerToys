@@ -626,8 +626,9 @@ public partial class Win32Program : IProgram
                 foreach (var childDirectory in Directory.EnumerateDirectories(currentDirectory, "*", new EnumerationOptions()
                 {
                     // https://learn.microsoft.com/dotnet/api/system.io.enumerationoptions?view=net-6.0
-                    // Allow traversal of directory junctions and symbolic links; cycle detection is handled
-                    // via the alreadyVisited set which tracks resolved (real) paths.
+                    // ReparsePoint is intentionally not skipped here so that directory junctions and
+                    // symbolic links are traversed. Cycle detection is handled via the alreadyVisited
+                    // set which tracks resolved (real) paths.
                     AttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
                     RecurseSubdirectories = false,
                 }))
