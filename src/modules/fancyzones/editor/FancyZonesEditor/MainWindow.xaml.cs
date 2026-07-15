@@ -241,7 +241,7 @@ namespace FancyZonesEditor
             Logger.LogTrace();
 
             var dataContext = ((FrameworkElement)sender).DataContext;
-            if (_openedDialog == EditLayoutDialog)
+            if (_openedDialog != null && _openedDialog == EditLayoutDialog)
             {
                 EditLayoutDialog.Hide();
             }
@@ -329,7 +329,7 @@ namespace FancyZonesEditor
         private void DeleteLayout_Click(object sender, RoutedEventArgs e)
         {
             Logger.LogTrace();
-            if (_openedDialog == EditLayoutDialog)
+            if (_openedDialog != null && _openedDialog == EditLayoutDialog)
             {
                 EditLayoutDialog.Hide();
             }
@@ -362,7 +362,7 @@ namespace FancyZonesEditor
             Logger.LogTrace();
             var dataContext = ((FrameworkElement)sender).DataContext;
             Select((LayoutModel)dataContext);
-            if (_openedDialog == EditLayoutDialog)
+            if (_openedDialog != null && _openedDialog == EditLayoutDialog)
             {
                 EditLayoutDialog.Hide();
             }
