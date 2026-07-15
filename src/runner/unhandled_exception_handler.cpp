@@ -214,13 +214,13 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
         // the guard after the call so that any later fault on this thread is handled
         // normally (e.g. EXCEPTION_CONTINUE_EXECUTION resumes execution and the next
         // fault must still produce a marker).
+        LONG disposition = EXCEPTION_CONTINUE_SEARCH;
         if (default_top_level_exception_handler != nullptr && info != nullptr)
         {
-            LONG disposition = default_top_level_exception_handler(info);
-            processing_exception = false;
-            return disposition;
+            disposition = default_top_level_exception_handler(info);
         }
         processing_exception = false;
+        return disposition;
     }
     return EXCEPTION_CONTINUE_SEARCH;
 }
@@ -251,20 +251,20 @@ void init_global_error_handlers()
     if (envLen > 0 && envLen < MAX_PATH)
     {
         wchar_t dirPath[MAX_PATH];
+        // Create the Microsoft parent directory, then the PowerToys child.
         // _snwprintf_s returns -1 on truncation; a truncated path would be unusable.
         if (_snwprintf_s(dirPath, MAX_PATH, _TRUNCATE,
                          L"%s\\Microsoft", localAppData) > 0)
         {
             CreateDirectoryW(dirPath, nullptr); // no-op if the directory already exists
         }
-        wchar_t ptDirPath[MAX_PATH];
-        if (_snwprintf_s(ptDirPath, MAX_PATH, _TRUNCATE,
+        if (_snwprintf_s(dirPath, MAX_PATH, _TRUNCATE,
                          L"%s\\Microsoft\\PowerToys", localAppData) > 0)
         {
-            CreateDirectoryW(ptDirPath, nullptr); // no-op if the directory already exists
+            CreateDirectoryW(dirPath, nullptr); // no-op if the directory already exists
             wchar_t crashPath[MAX_PATH];
             if (_snwprintf_s(crashPath, MAX_PATH, _TRUNCATE,
-                             L"%s\\runner-crash.log", ptDirPath) > 0)
+                             L"%s\\runner-crash.log", dirPath) > 0)
             {
                 // FILE_APPEND_DATA ensures each crash is appended rather than overwriting
                 // a prior record, so multiple faults in a session are all preserved.
