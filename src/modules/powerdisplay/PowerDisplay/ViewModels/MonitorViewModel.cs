@@ -94,7 +94,9 @@ public partial class MonitorViewModel : ObservableObject, IDisposable
     /// </summary>
     public async Task SetContrastAsync(int contrast)
     {
-        contrast = Math.Clamp(contrast, 0, 100);
+        // Clamp minimum to 1 to prevent sending 0 to DDC/CI, which causes some monitors
+        // to render a completely black screen (see issue #47953).
+        contrast = Math.Clamp(contrast, 1, 100);
 
         if (_contrast != contrast)
         {
@@ -247,7 +249,9 @@ public partial class MonitorViewModel : ObservableObject, IDisposable
 
         // Initialize basic properties from monitor
         _brightness = monitor.CurrentBrightness;
-        _contrast = monitor.CurrentContrast;
+
+        // Clamp persisted contrast to minimum 1; a stored 0 would cause a black screen on first apply.
+        _contrast = Math.Max(monitor.CurrentContrast, 1);
         _volume = monitor.CurrentVolume;
     }
 
@@ -812,6 +816,8 @@ public partial class MonitorViewModel : ObservableObject, IDisposable
         get => _contrast;
         set
         {
+            // Clamp to minimum 1; contrast 0 sends raw 0 to DDC/CI and blacks out the screen.
+            value = Math.Max(value, 1);
             if (_contrast != value)
             {
                 _contrast = value;
