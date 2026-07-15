@@ -612,6 +612,11 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                     // "\Microsoft.CmdPal\settings.json", "\Microsoft.CmdPal\foo.settings.json", …
                     var relativeWithinBase = file.Substring(basePath.Length); // always starts with separator
                     var combinedKey = Path.DirectorySeparatorChar + pathKey + relativeWithinBase;
+                    if (settingsFiles.ContainsKey(combinedKey))
+                    {
+                        Logger.LogWarning($"AddAdditionalPathFiles: key collision for '{combinedKey}', overwriting with '{file}'.");
+                    }
+
                     settingsFiles[combinedKey] = file;
                 }
             }
@@ -792,6 +797,9 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                             anyFileBackedUp = true;
 
                             // write the export version of the settings file to backup location.
+                            // Using the key (which equals "\relative\path.json") is equivalent to
+                            // currentFile.Value.Substring(appBasePath.Length + 1) for main-settings
+                            // files, and also correct for additional-path files (e.g. CmdPal).
                             var relativePath = currentFile.Key.TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                             var backupFullPath = Path.Combine(fullBackupDir, relativePath);
 
@@ -821,6 +829,8 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                     {
                         // if we did do a backup, we need to copy in all the settings files we skipped so the backup is complete.
                         // this is needed since we might use the backup on another machine/
+                        // Key-based relativePath is equivalent to value.Substring(appBasePath.Length+1) for main
+                        // settings and also correct for additional-path files (e.g. CmdPal).
                         var relativePath = currentFile.Key.TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                         var backupFullPath = Path.Combine(fullBackupDir, relativePath);
 
