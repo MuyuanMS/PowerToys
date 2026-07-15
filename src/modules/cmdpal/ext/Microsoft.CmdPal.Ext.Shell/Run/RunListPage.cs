@@ -48,6 +48,12 @@ namespace Microsoft.CmdPal.Ext.Run;
 /// </summary>
 public sealed partial class RunListPage : AsyncDynamicListPage
 {
+    /// <summary>
+    /// Maximum number of directory suggestions returned to prevent hangs on
+    /// directories with very large numbers of entries (e.g. WinSxS).
+    /// </summary>
+    internal const int MaxDirectorySuggestions = 200;
+
     private static readonly Tag HistoryTag = new() { Icon = Icons.HistoryIcon };
     private readonly Dictionary<string, ListItem> _historyItems = [];
     private readonly List<ListItem> _currentHistoryItems = [];
@@ -743,10 +749,19 @@ public sealed partial class RunListPage : AsyncDynamicListPage
         while (hr == HRESULT.S_OK)
         {
             var s = enumResult[0];
-            results.Add(new(s.AsSpan()));
+            if (results.Count < MaxDirectorySuggestions)
+            {
+                results.Add(new(s.AsSpan()));
+            }
+
             unsafe
             {
                 Marshal.FreeCoTaskMem((IntPtr)(char*)s);
+            }
+
+            if (results.Count >= MaxDirectorySuggestions)
+            {
+                break;
             }
 
             hr = enumString.Next(enumResult);
