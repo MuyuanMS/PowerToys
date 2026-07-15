@@ -151,13 +151,18 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
     if (!processing_exception)
     {
         processing_exception = true;
+        DWORD code = 0;
+        if (info != nullptr && info->ExceptionRecord != nullptr)
+        {
+            code = info->ExceptionRecord->ExceptionCode;
+        }
+        // OutputDebugString is used as a crash-safe baseline that works even before
+        // Logger has been initialised (early startup faults).
+        wchar_t debugMsg[128];
+        swprintf_s(debugMsg, L"[PowerToys Runner] Unhandled exception: 0x%08X\n", static_cast<unsigned int>(code));
+        OutputDebugStringW(debugMsg);
         try
         {
-            DWORD code = 0;
-            if (info != nullptr && info->ExceptionRecord != nullptr)
-            {
-                code = info->ExceptionRecord->ExceptionCode;
-            }
             // Log to disk so the crash is diagnosable even without a debugger or crash dump.
             Logger::critical(L"Runner crashed with unhandled exception: {} (code: 0x{:08X})", exception_description(code), static_cast<unsigned int>(code));
             Logger::flush();
@@ -170,25 +175,26 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
         catch (...)
         {
         }
+        // Clear the recursion guard before invoking the previous handler so that any
+        // nested exception it raises can still be caught and logged.
+        processing_exception = false;
         if (default_top_level_exception_handler != nullptr && info != nullptr)
         {
-            default_top_level_exception_handler(info);
+            // Preserve the previous filter's disposition (e.g. EXCEPTION_EXECUTE_HANDLER
+            // from an existing crash-reporter) rather than always continuing the search.
+            return default_top_level_exception_handler(info);
         }
-        processing_exception = false;
     }
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
 extern "C" void AbortHandler(int /*signal_number*/)
 {
-    try
-    {
-        Logger::critical(L"Runner received SIGABRT (abort/assert failure).");
-        Logger::flush();
-    }
-    catch (...)
-    {
-    }
+    // Logger is not async-signal-safe: its sinks lock mutexes and allocate memory,
+    // which can deadlock or fault if abort() fires while those resources are held.
+    // OutputDebugStringW avoids that path and still produces a diagnosable entry
+    // visible in a debugger or ETW/DbgView.
+    OutputDebugStringW(L"[PowerToys Runner] SIGABRT received (abort/assert failure).\n");
 #if _DEBUG && _WIN64
     init_symbols();
     std::wstring ex_description = L"SIGABRT was raised.";

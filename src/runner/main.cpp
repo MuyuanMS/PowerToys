@@ -452,6 +452,12 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
     ULONG_PTR gpToken;
     GdiplusStartup(&gpToken, &gpStartupInput, NULL);
 
+    // Register the SEH and SIGABRT handlers as early as possible so that faults in
+    // winrt::init_apartment, COM security setup, and argument parsing are captured.
+    // Before Logger::init() these handlers fall back to OutputDebugStringW; once the
+    // logger is ready the full Logger::critical() path also runs.
+    init_global_error_handlers();
+
     winrt::init_apartment();
 
     const wchar_t* securityDescriptor =
@@ -501,11 +507,6 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
     logFilePath.append(LogSettings::runnerLogPath);
     Logger::init(LogSettings::runnerLoggerName, logFilePath.wstring(), PTSettingsHelper::get_log_settings_file_location());
 
-    // Register global error handlers immediately after the logger is ready so that
-    // any unhandled SEH exception or SIGABRT is captured to the log file rather
-    // than causing a silent, invisible exit.
-    init_global_error_handlers();
-
     // Catch std::terminate() calls (uncaught exceptions from threads, pure-virtual
     // calls, noexcept violations, etc.) and write a log entry before the process dies.
     std::set_terminate([]() noexcept {
@@ -540,6 +541,8 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
     if (!msi_mutex)
     {
         open_menu_from_another_instance(settings_window);
+        Logger::info("Runner exiting: existing instance detected.");
+        Logger::flush();
         return 0;
     }
 
