@@ -824,8 +824,12 @@ DWORD WINAPI CPowerRenameManager::s_fileOpWorkerThread(_In_ void* pv)
                                                     // Collect item data for post-operation update
                                                     PWSTR originalName = nullptr;
                                                     PWSTR path = nullptr;
-                                                    if (SUCCEEDED(spItem->GetOriginalName(&originalName)) &&
-                                                        SUCCEEDED(spItem->GetPath(&path)))
+                                                    // Both GetOriginalName and GetPath are evaluated
+                                                    // regardless of short-circuit; CoTaskMemFree below
+                                                    // is always reached and handles nullptr safely.
+                                                    const bool gotNames = SUCCEEDED(spItem->GetOriginalName(&originalName)) &&
+                                                                         SUCCEEDED(spItem->GetPath(&path));
+                                                    if (gotNames)
                                                     {
                                                         std::wstring originalNameStr{ originalName };
                                                         std::wstring pathStr{ path };
@@ -843,9 +847,10 @@ DWORD WINAPI CPowerRenameManager::s_fileOpWorkerThread(_In_ void* pv)
                                                         int id = -1;
                                                         if (SUCCEEDED(spItem->GetId(&id)))
                                                         {
-                                                            pendingUpdates.push_back({ spItem, std::wstring{ newName }, pathStr, oldPathSize, id, isFolder });
+                                                            pendingUpdates.emplace_back(PendingItemUpdate{ spItem, std::wstring{ newName }, std::move(pathStr), oldPathSize, id, isFolder });
                                                         }
                                                     }
+                                                    // Free outside the if block; CoTaskMemFree(nullptr) is safe.
                                                     CoTaskMemFree(originalName);
                                                     CoTaskMemFree(path);
                                                 }
