@@ -524,7 +524,7 @@ public class ExtensionGalleryViewModelTests
             .Setup(s => s.GetInstalledExtensionsAsync(true))
             .ReturnsAsync(Array.Empty<IExtensionWrapper>());
 
-        var viewModel = new ExtensionGalleryViewModel(
+        using var viewModel = new ExtensionGalleryViewModel(
             galleryService.Object,
             new[] { extensionService.Object },
             NullLogger<ExtensionGalleryViewModel>.Instance,
@@ -534,6 +534,36 @@ public class ExtensionGalleryViewModelTests
 
         // Must not throw ObjectDisposedException after Dispose() has been called.
         await viewModel.LoadAsync();
+    }
+
+    [TestMethod]
+    public async Task RefreshCommand_AfterDispose_DoesNotThrowObjectDisposedException()
+    {
+        // Regression test for https://github.com/MuyuanMS/PowerToys/issues/98
+        // RefreshAsync() -> FetchCoreAsync() -> ResetCancellation() must not crash when
+        // the view model has already been disposed.
+        var galleryService = new Mock<IExtensionGalleryService>();
+        galleryService.Setup(s => s.IsCustomFeed).Returns(false);
+        galleryService.Setup(s => s.GetBaseUrl()).Returns("https://example.com/index.json");
+        galleryService
+            .Setup(s => s.RefreshAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GalleryFetchResult { Extensions = [] });
+
+        var extensionService = new Mock<IExtensionService>();
+        extensionService
+            .Setup(s => s.RefreshInstalledExtensionsAsync(true))
+            .ReturnsAsync(Array.Empty<IExtensionWrapper>());
+
+        using var viewModel = new ExtensionGalleryViewModel(
+            galleryService.Object,
+            new[] { extensionService.Object },
+            NullLogger<ExtensionGalleryViewModel>.Instance,
+            CreateGalleryExtensionViewModelFactory());
+
+        viewModel.Dispose();
+
+        // Must not throw ObjectDisposedException after Dispose() has been called.
+        await viewModel.RefreshCommand.ExecuteAsync(null);
     }
 
     private static Mock<IExtensionGalleryService> CreateGalleryService(params GalleryExtensionEntry[] entries)

@@ -343,13 +343,13 @@ public sealed partial class ExtensionGalleryViewModel : ObservableObject, IDispo
         try
         {
             oldCts.Cancel();
+            oldCts.Dispose();
         }
         catch (ObjectDisposedException)
         {
             // The old CancellationTokenSource was already disposed (e.g. by Dispose()), nothing to cancel.
         }
 
-        oldCts.Dispose();
         return newCts;
     }
 
