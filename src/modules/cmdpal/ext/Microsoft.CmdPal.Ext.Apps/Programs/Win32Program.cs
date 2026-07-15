@@ -567,19 +567,30 @@ public partial class Win32Program : IProgram
         var folderQueue = new Queue<string>();
         folderQueue.Enqueue(directory);
 
-        // Keep track of already visited directories to avoid cycles.
-        var alreadyVisited = new HashSet<string>();
+        // Keep track of already visited (resolved) directories to avoid cycles.
+        // OrdinalIgnoreCase is used because Windows paths are case-insensitive.
+        var alreadyVisited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         do
         {
             var currentDirectory = folderQueue.Dequeue();
 
-            if (alreadyVisited.Contains(currentDirectory))
+            // Resolve the real path to detect cycles caused by directory junctions or symbolic links.
+            string resolvedDirectory;
+            try
+            {
+                resolvedDirectory = Directory.ResolveLinkTarget(currentDirectory, returnFinalTarget: true)?.FullName ?? currentDirectory;
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+            {
+                Logger.LogError(e.Message);
+                resolvedDirectory = currentDirectory;
+            }
+
+            if (!alreadyVisited.Add(resolvedDirectory))
             {
                 continue;
             }
-
-            alreadyVisited.Add(currentDirectory);
 
             try
             {
@@ -615,8 +626,9 @@ public partial class Win32Program : IProgram
                 foreach (var childDirectory in Directory.EnumerateDirectories(currentDirectory, "*", new EnumerationOptions()
                 {
                     // https://learn.microsoft.com/dotnet/api/system.io.enumerationoptions?view=net-6.0
-                    // Exclude directories with the Reparse Point file attribute, to avoid loops due to symbolic links / directory junction / mount points.
-                    AttributesToSkip = FileAttributes.Hidden | FileAttributes.System | FileAttributes.ReparsePoint,
+                    // Allow traversal of directory junctions and symbolic links; cycle detection is handled
+                    // via the alreadyVisited set which tracks resolved (real) paths.
+                    AttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
                     RecurseSubdirectories = false,
                 }))
                 {
