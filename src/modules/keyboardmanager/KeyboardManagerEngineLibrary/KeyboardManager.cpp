@@ -199,10 +199,6 @@ void KeyboardManager::StartLowlevelKeyboardHook()
         {
             // Hook is active; take ownership of the duplicated handle so
             // StopLowlevelKeyboardHook can restore the priority from any thread.
-            if (hookThreadHandle)
-            {
-                CloseHandle(hookThreadHandle);
-            }
             hookThreadHandle = realHandle;
         }
     }
