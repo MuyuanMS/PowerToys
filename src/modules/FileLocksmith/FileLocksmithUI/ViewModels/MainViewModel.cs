@@ -203,6 +203,7 @@ namespace PowerToys.FileLocksmithUI.ViewModels
                 {
                     _cancelProcessWatching?.Cancel();
                     _cancelProcessWatching?.Dispose();
+                    _watcherTasks.Clear();
                     _disposed = true;
                 }
             }
