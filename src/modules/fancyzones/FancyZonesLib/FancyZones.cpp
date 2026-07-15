@@ -1191,7 +1191,8 @@ void FancyZones::ApplyQuickLayout(int key) noexcept
         return;
     }
 
-    auto workArea = m_workAreaConfiguration.GetWorkAreaFromWindow(GetForegroundWindow());
+    const auto foregroundWindow = GetForegroundWindow();
+    auto workArea = foregroundWindow ? m_workAreaConfiguration.GetWorkAreaFromWindow(foregroundWindow) : m_workAreaConfiguration.GetWorkAreaFromCursor();
     if (workArea)
     {
         if (AppliedLayouts::instance().ApplyLayout(workArea->UniqueId(), layout.value()))
