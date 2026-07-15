@@ -145,6 +145,11 @@ void KeyboardManager::StartLowlevelKeyboardHook()
         // NOTE: HookProc must remain strictly non-blocking so it always returns
         // well within the timeout.
         hookThreadPriorityBeforeElevation = GetThreadPriority(GetCurrentThread());
+        if (hookThreadPriorityBeforeElevation == THREAD_PRIORITY_ERROR_RETURN)
+        {
+            Logger::warn(L"GetThreadPriority() failed; using THREAD_PRIORITY_NORMAL as the restore value.");
+            hookThreadPriorityBeforeElevation = THREAD_PRIORITY_NORMAL;
+        }
         if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL))
         {
             DWORD errorCode = GetLastError();
@@ -171,7 +176,10 @@ void KeyboardManager::StopLowlevelKeyboardHook()
         hookHandle = nullptr;
 
         // Restore the thread priority that was active before the hook was installed.
-        SetThreadPriority(GetCurrentThread(), hookThreadPriorityBeforeElevation);
+        if (!SetThreadPriority(GetCurrentThread(), hookThreadPriorityBeforeElevation))
+        {
+            Logger::warn(L"SetThreadPriority() failed while restoring thread priority after unhooking (error {}).", GetLastError());
+        }
     }
 }
 
