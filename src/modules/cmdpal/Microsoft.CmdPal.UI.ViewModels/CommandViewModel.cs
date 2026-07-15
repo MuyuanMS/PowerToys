@@ -96,7 +96,11 @@ public partial class CommandViewModel : ExtensionObjectViewModel
             UpdatePropertiesFromExtension(command2);
         }
 
-        model.PropChanged += Model_PropChanged;
+        // Marshal WinRT event subscription to the UI thread to avoid a deadlock
+        // in the WinRT EventSourceCache (ReaderWriterLockSlim) that can occur when
+        // background threads subscribe while the UI thread concurrently unsubscribes
+        // during theme reapply (via CommunityToolkit DispatcherQueueTimer.Debounce).
+        DoOnUiThread(() => model.PropChanged += Model_PropChanged);
     }
 
     private void Model_PropChanged(object sender, IPropChangedEventArgs args)
@@ -147,7 +151,9 @@ public partial class CommandViewModel : ExtensionObjectViewModel
         var model = Model.Unsafe;
         if (model is not null)
         {
-            model.PropChanged -= Model_PropChanged;
+            // Marshal WinRT event unsubscription to the UI thread to match where
+            // it was subscribed, avoiding concurrent EventSourceCache lock contention.
+            DoOnUiThread(() => model.PropChanged -= Model_PropChanged);
         }
     }
 

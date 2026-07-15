@@ -258,7 +258,12 @@ public sealed partial class DockBandViewModel : ExtensionObjectViewModel
         if (list is not null)
         {
             InitializeFromList(list);
-            list.ItemsChanged += HandleItemsChanged;
+
+            // Marshal WinRT event subscription to the UI thread to avoid a deadlock
+            // in the WinRT EventSourceCache (ReaderWriterLockSlim) that can occur when
+            // background threads subscribe while the UI thread concurrently unsubscribes
+            // during theme reapply (via CommunityToolkit DispatcherQueueTimer.Debounce).
+            DoOnUiThread(() => list.ItemsChanged += HandleItemsChanged);
         }
         else
         {
@@ -286,7 +291,9 @@ public sealed partial class DockBandViewModel : ExtensionObjectViewModel
         var command = _rootItem.Command;
         if (command.Model.Unsafe is IListPage list)
         {
-            list.ItemsChanged -= HandleItemsChanged;
+            // Marshal WinRT event unsubscription to the UI thread to match where
+            // it was subscribed, avoiding concurrent EventSourceCache lock contention.
+            DoOnUiThread(() => list.ItemsChanged -= HandleItemsChanged);
         }
 
         foreach (var item in Items)

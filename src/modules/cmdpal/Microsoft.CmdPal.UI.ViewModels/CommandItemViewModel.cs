@@ -181,7 +181,12 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
         }
 
         // TODO: Do these need to go into FastInit?
-        model.PropChanged += Model_PropChanged;
+
+        // Marshal WinRT event subscription to the UI thread to avoid a deadlock
+        // in the WinRT EventSourceCache (ReaderWriterLockSlim) that can occur when
+        // background threads subscribe while the UI thread concurrently unsubscribes
+        // during theme reapply (via CommunityToolkit DispatcherQueueTimer.Debounce).
+        DoOnUiThread(() => model.PropChanged += Model_PropChanged);
         Command.PropertyChanged += Command_PropertyChanged;
 
         UpdateProperty(nameof(Name));
@@ -594,7 +599,9 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
         var model = _commandItemModel.Unsafe;
         if (model is not null)
         {
-            model.PropChanged -= Model_PropChanged;
+            // Marshal WinRT event unsubscription to the UI thread to match where
+            // it was subscribed, avoiding concurrent EventSourceCache lock contention.
+            DoOnUiThread(() => model.PropChanged -= Model_PropChanged);
         }
     }
 
