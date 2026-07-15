@@ -144,16 +144,32 @@ void KeyboardManager::StartLowlevelKeyboardHook()
         // ensures the thread is ready before that deadline expires.
         // NOTE: HookProc must remain strictly non-blocking so it always returns
         // well within the timeout.
-        int savedPriority = GetThreadPriority(GetCurrentThread());
-        if (savedPriority == THREAD_PRIORITY_ERROR_RETURN)
+        //
+        // StopLowlevelKeyboardHook can be called from a different thread (settings
+        // watcher), so we duplicate the current thread handle to obtain a real
+        // handle that stays valid across threads.
+        HANDLE realHandle = nullptr;
+        if (!DuplicateHandle(GetCurrentProcess(), GetCurrentThread(),
+                             GetCurrentProcess(), &realHandle,
+                             0, FALSE, DUPLICATE_SAME_ACCESS))
         {
-            Logger::warn(L"GetThreadPriority() failed; using THREAD_PRIORITY_NORMAL as the restore value.");
-            savedPriority = THREAD_PRIORITY_NORMAL;
+            Logger::warn(L"DuplicateHandle failed ({}); thread priority will not be elevated for the keyboard hook.", GetLastError());
         }
-        if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL))
+
+        if (realHandle)
         {
-            DWORD errorCode = GetLastError();
-            Logger::warn(L"SetThreadPriority(TIME_CRITICAL) failed ({}); hook may miss events under high CPU load.", errorCode);
+            int savedPriority = GetThreadPriority(realHandle);
+            if (savedPriority == THREAD_PRIORITY_ERROR_RETURN)
+            {
+                Logger::warn(L"GetThreadPriority() failed; using THREAD_PRIORITY_NORMAL as the restore value.");
+                savedPriority = THREAD_PRIORITY_NORMAL;
+            }
+            if (!SetThreadPriority(realHandle, THREAD_PRIORITY_TIME_CRITICAL))
+            {
+                DWORD errorCode = GetLastError();
+                Logger::warn(L"SetThreadPriority(TIME_CRITICAL) failed ({}); hook may miss events under high CPU load.", errorCode);
+            }
+            hookThreadPriorityBeforeElevation.store(savedPriority, std::memory_order_relaxed);
         }
 
         hookHandle = SetWindowsHookEx(WH_KEYBOARD_LL, HookProc, GetModuleHandle(NULL), NULL);
@@ -165,9 +181,14 @@ void KeyboardManager::StartLowlevelKeyboardHook()
 
             // Hook installation failed.  Restore thread priority so a subsequent
             // StartLowlevelKeyboardHook call starts from the real original value.
-            if (!SetThreadPriority(GetCurrentThread(), savedPriority))
+            if (realHandle)
             {
-                Logger::warn(L"SetThreadPriority() failed while restoring thread priority after hook installation failure (error {}).", GetLastError());
+                if (!SetThreadPriority(realHandle, hookThreadPriorityBeforeElevation.load(std::memory_order_relaxed)))
+                {
+                    Logger::warn(L"SetThreadPriority() failed while restoring thread priority after hook installation failure (error {}).", GetLastError());
+                }
+                CloseHandle(realHandle);
+                realHandle = nullptr;
             }
 
             show_last_error_message(L"SetWindowsHookEx", errorCode, L"PowerToys - Keyboard Manager");
@@ -176,9 +197,13 @@ void KeyboardManager::StartLowlevelKeyboardHook()
         }
         else
         {
-            // Hook is active; remember the pre-elevation priority so StopLowlevelKeyboardHook
-            // can restore it exactly.
-            hookThreadPriorityBeforeElevation = savedPriority;
+            // Hook is active; take ownership of the duplicated handle so
+            // StopLowlevelKeyboardHook can restore the priority from any thread.
+            if (hookThreadHandle)
+            {
+                CloseHandle(hookThreadHandle);
+            }
+            hookThreadHandle = realHandle;
         }
     }
 }
@@ -191,9 +216,15 @@ void KeyboardManager::StopLowlevelKeyboardHook()
         hookHandle = nullptr;
 
         // Restore the thread priority that was active before the hook was installed.
-        if (!SetThreadPriority(GetCurrentThread(), hookThreadPriorityBeforeElevation))
+        // Use the stored real handle so this works even when called from another thread.
+        if (hookThreadHandle)
         {
-            Logger::warn(L"SetThreadPriority() failed while restoring thread priority after unhooking (error {}).", GetLastError());
+            if (!SetThreadPriority(hookThreadHandle, hookThreadPriorityBeforeElevation.load(std::memory_order_relaxed)))
+            {
+                Logger::warn(L"SetThreadPriority() failed while restoring thread priority after unhooking (error {}).", GetLastError());
+            }
+            CloseHandle(hookThreadHandle);
+            hookThreadHandle = nullptr;
         }
     }
 }

@@ -18,6 +18,10 @@ public:
         {
             CloseHandle(editorIsRunningEvent);
         }
+        if (hookThreadHandle)
+        {
+            CloseHandle(hookThreadHandle);
+        }
     }
 
     void StartLowlevelKeyboardHook();
@@ -55,9 +59,14 @@ private:
 
     HANDLE editorIsRunningEvent = nullptr;
 
-    // Thread priority that was active before StartLowlevelKeyboardHook elevated it.
-    // Saved so StopLowlevelKeyboardHook can restore the original value exactly.
-    int hookThreadPriorityBeforeElevation = THREAD_PRIORITY_NORMAL;
+    // Real handle to the thread that installed the WH_KEYBOARD_LL hook (obtained via
+    // DuplicateHandle so it remains valid even when called from another thread).
+    // Used to set/restore the hook thread's scheduling priority from any thread.
+    HANDLE hookThreadHandle = nullptr;
+
+    // Thread priority that was active on the hook thread before StartLowlevelKeyboardHook
+    // elevated it.  Saved so StopLowlevelKeyboardHook can restore the original value exactly.
+    std::atomic<int> hookThreadPriorityBeforeElevation{ THREAD_PRIORITY_NORMAL };
 
     // Hook procedure definition
     static LRESULT CALLBACK HookProc(int nCode, WPARAM wParam, LPARAM lParam);
