@@ -835,12 +835,16 @@ DWORD WINAPI CPowerRenameManager::s_fileOpWorkerThread(_In_ void* pv)
                                                         pathStr.replace(fileNamePos + 1, originalNameStr.length(), std::wstring{ newName });
 
                                                         bool isFolder = false;
-                                                        spItem->GetIsFolder(&isFolder);
+                                                        if (FAILED(spItem->GetIsFolder(&isFolder)))
+                                                        {
+                                                            isFolder = false;
+                                                        }
 
                                                         int id = -1;
-                                                        spItem->GetId(&id);
-
-                                                        pendingUpdates.push_back({ spItem, std::wstring{ newName }, pathStr, oldPathSize, id, isFolder });
+                                                        if (SUCCEEDED(spItem->GetId(&id)))
+                                                        {
+                                                            pendingUpdates.push_back({ spItem, std::wstring{ newName }, pathStr, oldPathSize, id, isFolder });
+                                                        }
                                                     }
                                                     CoTaskMemFree(originalName);
                                                     CoTaskMemFree(path);
