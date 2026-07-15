@@ -449,7 +449,7 @@ namespace PowerDisplay.Helpers
             bool lockAcquired = await _discoveryLock.WaitAsync(0, cancellationToken);
             if (!lockAcquired)
             {
-                Logger.LogTrace("[MonitorManager] RefreshAllBrightness: Discovery in progress, skipping refresh.");
+                Logger.LogInfo("[MonitorManager] RefreshAllBrightness: Discovery in progress; skipping brightness refresh (fresh values will arrive via discovery).");
                 return;
             }
 
@@ -478,6 +478,9 @@ namespace PowerDisplay.Helpers
 
                 try
                 {
+                    // GetBrightnessAsync returns a VcpFeatureValue with raw Current/Maximum values.
+                    // ToPercentage() normalises these to a 0-100 range, accounting for monitors
+                    // that report a maximum other than 100 (e.g. some Samsung panels report 50).
                     var vcpValue = await controller.GetBrightnessAsync(monitor, cancellationToken);
                     monitor.CurrentBrightness = vcpValue.ToPercentage();
                 }

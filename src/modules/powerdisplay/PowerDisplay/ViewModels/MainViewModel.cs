@@ -316,7 +316,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         try
         {
-            await _monitorManager.RefreshAllBrightnessAsync(_cancellationTokenSource.Token);
+            // Access the token here; if the CTS was disposed (shutdown), we catch
+            // ObjectDisposedException below and bail out silently.
+            var token = _cancellationTokenSource.Token;
+            await _monitorManager.RefreshAllBrightnessAsync(token);
 
             _dispatcherQueue.TryEnqueue(() =>
             {
@@ -340,6 +343,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         catch (OperationCanceledException)
         {
             // Expected on shutdown; no action needed.
+        }
+        catch (ObjectDisposedException)
+        {
+            // CancellationTokenSource was disposed — app is shutting down; no action needed.
         }
         catch (Exception ex)
         {
