@@ -749,11 +749,7 @@ public sealed partial class RunListPage : AsyncDynamicListPage
         while (hr == HRESULT.S_OK)
         {
             var s = enumResult[0];
-            if (results.Count < MaxDirectorySuggestions)
-            {
-                results.Add(new(s.AsSpan()));
-            }
-
+            results.Add(new(s.AsSpan()));
             unsafe
             {
                 Marshal.FreeCoTaskMem((IntPtr)(char*)s);
