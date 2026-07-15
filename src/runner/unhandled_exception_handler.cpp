@@ -11,7 +11,7 @@
 #include <sstream>
 #endif
 
-static bool processing_exception = false;
+static thread_local bool processing_exception = false;
 static LPTOP_LEVEL_EXCEPTION_FILTER default_top_level_exception_handler = nullptr;
 
 // Pre-opened crash-marker file handle.  Opened once in init_global_error_handlers()
@@ -193,27 +193,34 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
                     "[PowerToys Runner] CRASH: Unhandled exception code=0x%08X\n",
                     static_cast<unsigned int>(code));
         write_crash_marker(crashMsg);
-        // Best-effort: full Logger path (may fail/deadlock if the fault holds a spdlog lock).
+#if _DEBUG && _WIN64
+        // Best-effort rich logger path — developer builds only.  In release builds the
+        // Logger sink can deadlock if the fault occurs while a spdlog mutex is held, so
+        // we limit the release SEH filter to the allocation-free WriteFile sink above.
         try
         {
             Logger::critical(L"Runner crashed with unhandled exception: {} (code: 0x{:08X})", exception_description(code), static_cast<unsigned int>(code));
             Logger::flush();
-#if _DEBUG && _WIN64
             init_symbols();
             std::wstring ex_description = (info != nullptr && info->ExceptionRecord != nullptr) ? std::wstring{ exception_description(code) } : L"Exception code not available";
             log_stack_trace(ex_description);
-#endif
         }
         catch (...)
         {
         }
-        // Keep the recursion guard SET while invoking the previous handler.  Clearing it
-        // first would allow infinite re-entry if that filter raises a nested exception.
-        // Return its disposition so an existing crash reporter can still take control.
+#endif
+        // Keep the recursion guard SET while invoking the previous handler so that a
+        // nested exception raised by that filter does not re-enter this code.  Reset
+        // the guard after the call so that any later fault on this thread is handled
+        // normally (e.g. EXCEPTION_CONTINUE_EXECUTION resumes execution and the next
+        // fault must still produce a marker).
         if (default_top_level_exception_handler != nullptr && info != nullptr)
         {
-            return default_top_level_exception_handler(info);
+            LONG disposition = default_top_level_exception_handler(info);
+            processing_exception = false;
+            return disposition;
         }
+        processing_exception = false;
     }
     return EXCEPTION_CONTINUE_SEARCH;
 }
@@ -246,19 +253,27 @@ void init_global_error_handlers()
         wchar_t dirPath[MAX_PATH];
         // _snwprintf_s returns -1 on truncation; a truncated path would be unusable.
         if (_snwprintf_s(dirPath, MAX_PATH, _TRUNCATE,
-                         L"%s\\Microsoft\\PowerToys", localAppData) > 0)
+                         L"%s\\Microsoft", localAppData) > 0)
         {
             CreateDirectoryW(dirPath, nullptr); // no-op if the directory already exists
+        }
+        wchar_t ptDirPath[MAX_PATH];
+        if (_snwprintf_s(ptDirPath, MAX_PATH, _TRUNCATE,
+                         L"%s\\Microsoft\\PowerToys", localAppData) > 0)
+        {
+            CreateDirectoryW(ptDirPath, nullptr); // no-op if the directory already exists
             wchar_t crashPath[MAX_PATH];
             if (_snwprintf_s(crashPath, MAX_PATH, _TRUNCATE,
-                             L"%s\\runner-crash.log", dirPath) > 0)
+                             L"%s\\runner-crash.log", ptDirPath) > 0)
             {
                 // FILE_APPEND_DATA ensures each crash is appended rather than overwriting
                 // a prior record, so multiple faults in a session are all preserved.
+                // FILE_SHARE_READ | FILE_SHARE_WRITE lets a restarted replacement runner
+                // process also open this file for appending (e.g. after restart_if_scheduled).
                 g_crash_marker_handle = CreateFileW(
                     crashPath,
                     FILE_APPEND_DATA,
-                    FILE_SHARE_READ,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE,
                     nullptr,
                     OPEN_ALWAYS,
                     FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH,

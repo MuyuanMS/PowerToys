@@ -445,52 +445,29 @@ toast_notification_handler_result toast_notification_handler(const std::wstring_
 
 int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR lpCmdLine, int /*nCmdShow*/)
 {
+    // Register the SEH and SIGABRT crash handlers as the very first operation so that
+    // every subsequent startup path — including ETWTrace, GDI+, winrt::init_apartment,
+    // COM security init, and argument parsing — is covered by the persistent crash-marker
+    // sink.  init_global_error_handlers() opens the crash-marker file before returning so
+    // no allocation or mutex is required from the signal/filter callbacks.
+    init_global_error_handlers();
+
+    // Register the std::terminate handler immediately after the SEH/SIGABRT handlers
+    // so uncaught C++ exceptions from all early startup paths are also captured.
+    // The handler uses only the allocation-free WriteFile crash-marker sink; Logger is
+    // not called here because the terminate handler may fire while a spdlog mutex is
+    // held, which would deadlock before std::abort() is reached.
+    std::set_terminate([]() noexcept {
+        write_crash_marker_message("[PowerToys Runner] CRASH: std::terminate called (uncaught exception or internal error).\n");
+        std::abort();
+    });
+
     Shared::Trace::ETWTrace trace{};
     trace.UpdateState(true);
 
     Gdiplus::GdiplusStartupInput gpStartupInput;
     ULONG_PTR gpToken;
     GdiplusStartup(&gpToken, &gpStartupInput, NULL);
-
-    // Register the SEH and SIGABRT handlers as early as possible so that faults in
-    // winrt::init_apartment, COM security setup, and argument parsing are captured.
-    // init_global_error_handlers() also opens the persistent crash-marker file so the
-    // handlers have an allocation-free on-disk sink from this point onward.
-    init_global_error_handlers();
-
-    // Register the std::terminate handler immediately after the SEH/SIGABRT handlers
-    // so uncaught C++ exceptions from winrt::init_apartment, COM security init,
-    // argument parsing, and special-mode dispatch are also captured.
-    // Uses write_crash_marker_message (allocation-free WriteFile) as the primary sink;
-    // Logger calls are best-effort only since the logger may not be initialised yet.
-    std::set_terminate([]() noexcept {
-        write_crash_marker_message("[PowerToys Runner] CRASH: std::terminate called (uncaught exception or internal error).\n");
-        try
-        {
-            std::exception_ptr ep = std::current_exception();
-            if (ep)
-            {
-                std::rethrow_exception(ep);
-            }
-            Logger::critical(L"Runner is terminating unexpectedly (std::terminate called). Possible uncaught exception or internal error.");
-        }
-        catch (const std::exception& e)
-        {
-            Logger::critical("Runner terminated via std::terminate. Exception: {}", e.what());
-        }
-        catch (...)
-        {
-            Logger::critical(L"Runner terminated via std::terminate. Unknown exception type.");
-        }
-        try
-        {
-            Logger::flush();
-        }
-        catch (...)
-        {
-        }
-        std::abort();
-    });
 
     winrt::init_apartment();
 
