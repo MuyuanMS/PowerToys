@@ -41,7 +41,23 @@ void write_crash_marker_message(const char* msg)
 }
 
 #if _DEBUG && _WIN64
-static volatile LONG s_diag_in_progress = 0;
+static LONG s_diagnostics_in_progress = 0;
+
+struct debug_diagnostics_guard
+{
+    debug_diagnostics_guard() noexcept = default;
+    debug_diagnostics_guard(const debug_diagnostics_guard&) = delete;
+    debug_diagnostics_guard& operator=(const debug_diagnostics_guard&) = delete;
+    debug_diagnostics_guard(debug_diagnostics_guard&&) = delete;
+    debug_diagnostics_guard& operator=(debug_diagnostics_guard&&) = delete;
+
+    // Caller must construct this only after InterlockedCompareExchange has set
+    // s_diagnostics_in_progress from 0 -> 1.
+    ~debug_diagnostics_guard()
+    {
+        InterlockedExchange(&s_diagnostics_in_progress, 0);
+    }
+};
 
 static const WCHAR* exception_description(const DWORD& code)
 {
@@ -195,10 +211,11 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
         write_crash_marker(crashMsg);
 #if _DEBUG && _WIN64
         // DbgHelp/global symbol state is not thread-safe; use a process-wide non-blocking
-        // guard so concurrent faults still get crash markers while only one thread runs
-        // rich debug diagnostics.
-        if (InterlockedCompareExchange(&s_diag_in_progress, 1, 0) == 0)
+        // guard so only one thread runs rich debug diagnostics. Losing threads still write
+        // their crash marker and continue normal handler chaining.
+        if (InterlockedCompareExchange(&s_diagnostics_in_progress, 1, 0) == 0)
         {
+            debug_diagnostics_guard diagnostics_guard;
             try
             {
                 init_symbols();
@@ -207,8 +224,8 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
             }
             catch (...)
             {
+                // Diagnostic failures must not block crash handling/filter chaining.
             }
-            InterlockedExchange(&s_diag_in_progress, 0);
         }
 #endif
         // Keep the recursion guard SET while invoking the previous handler so that a
@@ -236,8 +253,9 @@ extern "C" void AbortHandler(int /*signal_number*/)
     write_crash_marker(k_abort_msg);
     OutputDebugStringW(L"[PowerToys Runner] SIGABRT received (abort/assert failure).\n");
 #if _DEBUG && _WIN64
-    if (InterlockedCompareExchange(&s_diag_in_progress, 1, 0) == 0)
+    if (InterlockedCompareExchange(&s_diagnostics_in_progress, 1, 0) == 0)
     {
+        debug_diagnostics_guard diagnostics_guard;
         try
         {
             init_symbols();
@@ -246,8 +264,8 @@ extern "C" void AbortHandler(int /*signal_number*/)
         }
         catch (...)
         {
+            // Diagnostic failures must not block SIGABRT processing.
         }
-        InterlockedExchange(&s_diag_in_progress, 0);
     }
 #endif
 }
