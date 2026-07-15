@@ -160,6 +160,27 @@ public sealed partial class DisplayChangeWatcher : IDisposable
     {
         // Property-level updates fire frequently and are not actionable here.
         // Added/Removed are the primary device-level triggers.
+        // Rotation changes are detected via WM_DISPLAYCHANGE — see OnWmDisplayChange.
+    }
+
+    /// <summary>
+    /// Handles a <c>WM_DISPLAYCHANGE</c> window message. Windows sends this to every
+    /// top-level window whenever the display configuration changes — including
+    /// orientation (rotation), resolution, or color depth.  Calling this method
+    /// fires <see cref="DisplayChanging"/> synchronously, then schedules the
+    /// debounced <see cref="DisplayChanged"/> so subscribers can re-discover
+    /// hardware with the updated orientation.
+    /// Must be called from the dispatcher thread.
+    /// </summary>
+    public void OnWmDisplayChange()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        Logger.LogInfo("[DisplayChangeWatcher] WM_DISPLAYCHANGE received; scheduling rescan");
+        NotifyAndSchedule();
     }
 
     private void OnEnumerationCompleted(DeviceWatcher sender, object args)

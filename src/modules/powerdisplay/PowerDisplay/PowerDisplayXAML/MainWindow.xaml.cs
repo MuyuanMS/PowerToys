@@ -71,10 +71,14 @@ namespace PowerDisplay
                 _hotkeyService = new HotkeyService(_settingsUtils, ToggleWindow);
                 _hotkeyService.Initialize(hwnd);
 
-                // 6. Subclass WndProc to route WM_HOTKEY messages into HotkeyService.
+                // 6. Subclass WndProc to route WM_HOTKEY messages into HotkeyService
+                //    and WM_DISPLAYCHANGE into the display-change watcher.
                 Logger.LogTrace("MainWindow constructor: Setting up WindowMessageHook");
                 _messageHook = new WindowMessageHook(this, (uMsg, wParam, _) =>
-                    _hotkeyService?.HandleMessage(uMsg, wParam) == true);
+                {
+                    _viewModel?.OnWindowMessage(uMsg);
+                    return _hotkeyService?.HandleMessage(uMsg, wParam) == true;
+                });
                 Logger.LogTrace("MainWindow constructor: HotkeyService initialized");
 
                 Logger.LogTrace("MainWindow constructor: Setting IsShownInSwitchers property");
