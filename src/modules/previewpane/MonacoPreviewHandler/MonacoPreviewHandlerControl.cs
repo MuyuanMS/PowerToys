@@ -174,9 +174,6 @@ namespace Microsoft.PowerToys.PreviewHandler.Monaco
                             catch (COMException e)
                             {
                                 Logger.LogError("COMException caught. WebView2 resource may be in use.", e);
-                                Controls.Remove(_loading);
-                                Controls.Remove(_loadingBar);
-                                Controls.Remove(_loadingBackground);
                                 AddTextBoxControl(Resources.WebView2_Initialization_Error);
                             }
                         }
