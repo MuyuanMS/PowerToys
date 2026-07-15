@@ -320,15 +320,26 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
             _dispatcherQueue.TryEnqueue(() =>
             {
-                foreach (var vm in Monitors)
+                try
                 {
-                    var monitor = _monitorManager.GetMonitor(vm.Id);
-                    if (monitor != null)
+                    foreach (var vm in Monitors)
                     {
-                        vm.UpdateBrightnessDisplay(monitor.CurrentBrightness);
+                        var monitor = _monitorManager.GetMonitor(vm.Id);
+                        if (monitor != null)
+                        {
+                            vm.UpdateBrightnessDisplay(monitor.CurrentBrightness);
+                        }
                     }
                 }
+                catch (Exception dispatcherEx)
+                {
+                    Logger.LogError($"[MainViewModel] RefreshBrightnessAsync dispatcher update failed: {dispatcherEx.Message}");
+                }
             });
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected on shutdown; no action needed.
         }
         catch (Exception ex)
         {

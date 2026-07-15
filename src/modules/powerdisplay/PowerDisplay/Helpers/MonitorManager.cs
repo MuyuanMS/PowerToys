@@ -439,10 +439,31 @@ namespace PowerDisplay.Helpers
         /// Reads current brightness from hardware for every known monitor and updates
         /// <see cref="Monitor.CurrentBrightness"/> in-place. Monitors that do not
         /// support brightness or whose controller is unavailable are silently skipped.
+        /// If discovery is already running (lock busy), the refresh is skipped because
+        /// the upcoming discovery will populate fresh values anyway.
         /// </summary>
         public async Task RefreshAllBrightnessAsync(CancellationToken cancellationToken = default)
         {
-            foreach (var monitor in _monitors)
+            // Acquire the discovery lock (zero-timeout) to snapshot the monitor list safely.
+            // If discovery is already running, skip — discovery will produce fresh values.
+            bool lockAcquired = await _discoveryLock.WaitAsync(0, cancellationToken);
+            if (!lockAcquired)
+            {
+                Logger.LogTrace("[MonitorManager] RefreshAllBrightness: Discovery in progress, skipping refresh.");
+                return;
+            }
+
+            List<Monitor> snapshot;
+            try
+            {
+                snapshot = _monitors.ToList();
+            }
+            finally
+            {
+                _discoveryLock.Release();
+            }
+
+            foreach (var monitor in snapshot)
             {
                 if (!monitor.SupportsBrightness)
                 {
@@ -459,6 +480,10 @@ namespace PowerDisplay.Helpers
                 {
                     var vcpValue = await controller.GetBrightnessAsync(monitor, cancellationToken);
                     monitor.CurrentBrightness = vcpValue.ToPercentage();
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
                 }
                 catch (Exception ex)
                 {
