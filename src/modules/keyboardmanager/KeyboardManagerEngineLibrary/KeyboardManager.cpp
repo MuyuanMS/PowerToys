@@ -161,7 +161,7 @@ void KeyboardManager::StartLowlevelKeyboardHook()
             int savedPriority = GetThreadPriority(realHandle);
             if (savedPriority == THREAD_PRIORITY_ERROR_RETURN)
             {
-                Logger::warn(L"GetThreadPriority() failed; using THREAD_PRIORITY_NORMAL as the restore value.");
+                Logger::warn(L"GetThreadPriority() failed ({}); using THREAD_PRIORITY_NORMAL as the restore value.", GetLastError());
                 savedPriority = THREAD_PRIORITY_NORMAL;
             }
             if (!SetThreadPriority(realHandle, THREAD_PRIORITY_TIME_CRITICAL))
@@ -169,7 +169,7 @@ void KeyboardManager::StartLowlevelKeyboardHook()
                 DWORD errorCode = GetLastError();
                 Logger::warn(L"SetThreadPriority(TIME_CRITICAL) failed ({}); hook may miss events under high CPU load.", errorCode);
             }
-            hookThreadPriorityBeforeElevation.store(savedPriority, std::memory_order_relaxed);
+            hookThreadPriorityBeforeElevation.store(savedPriority, std::memory_order_release);
         }
 
         hookHandle = SetWindowsHookEx(WH_KEYBOARD_LL, HookProc, GetModuleHandle(NULL), NULL);
@@ -183,7 +183,7 @@ void KeyboardManager::StartLowlevelKeyboardHook()
             // StartLowlevelKeyboardHook call starts from the real original value.
             if (realHandle)
             {
-                if (!SetThreadPriority(realHandle, hookThreadPriorityBeforeElevation.load(std::memory_order_relaxed)))
+                if (!SetThreadPriority(realHandle, hookThreadPriorityBeforeElevation.load(std::memory_order_acquire)))
                 {
                     Logger::warn(L"SetThreadPriority() failed while restoring thread priority after hook installation failure (error {}).", GetLastError());
                 }
@@ -219,7 +219,7 @@ void KeyboardManager::StopLowlevelKeyboardHook()
         // Use the stored real handle so this works even when called from another thread.
         if (hookThreadHandle)
         {
-            if (!SetThreadPriority(hookThreadHandle, hookThreadPriorityBeforeElevation.load(std::memory_order_relaxed)))
+            if (!SetThreadPriority(hookThreadHandle, hookThreadPriorityBeforeElevation.load(std::memory_order_acquire)))
             {
                 Logger::warn(L"SetThreadPriority() failed while restoring thread priority after unhooking (error {}).", GetLastError());
             }
