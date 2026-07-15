@@ -340,15 +340,14 @@ int runner(bool isProcessElevated, bool openSettings, std::string settingsWindow
     catch (std::runtime_error& err)
     {
         std::string err_what = err.what();
-        Logger::critical(L"Runner failed with a runtime_error: {}", std::wstring(err_what.begin(), err_what.end()));
+        Logger::critical("Runner failed with a runtime_error: {}", err_what);
         Logger::flush();
         MessageBoxW(nullptr, std::wstring(err_what.begin(), err_what.end()).c_str(), GET_RESOURCE_STRING(IDS_ERROR).c_str(), MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
         result = -1;
     }
     catch (std::exception& err)
     {
-        std::string err_what = err.what();
-        Logger::critical(L"Runner failed with an exception: {}", std::wstring(err_what.begin(), err_what.end()));
+        Logger::critical("Runner failed with an exception: {}", err.what());
         Logger::flush();
         result = -1;
     }
@@ -642,15 +641,14 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
     catch (std::runtime_error& err)
     {
         std::string err_what = err.what();
-        Logger::critical(L"WinMain failed with a runtime_error: {}", std::wstring(err_what.begin(), err_what.end()));
+        Logger::critical("WinMain failed with a runtime_error: {}", err_what);
         Logger::flush();
         MessageBoxW(nullptr, std::wstring(err_what.begin(), err_what.end()).c_str(), GET_RESOURCE_STRING(IDS_ERROR).c_str(), MB_OK | MB_ICONERROR);
         result = -1;
     }
     catch (std::exception& err)
     {
-        std::string err_what = err.what();
-        Logger::critical(L"WinMain failed with an exception: {}", std::wstring(err_what.begin(), err_what.end()));
+        Logger::critical("WinMain failed with an exception: {}", err.what());
         Logger::flush();
         result = -1;
     }
