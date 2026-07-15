@@ -223,6 +223,9 @@ void template_item::rename_and_resolve_variables_on_other_thread(const std::file
     // Default to the original path in case the rename is cancelled or we cannot monitor it
     std::filesystem::path final_path = target_fullpath;
 
+    // Track whether we have already entered rename mode so we enter it exactly once
+    bool entered_rename_mode = false;
+
     // Open the parent directory with overlapped I/O so we can watch for the folder rename.
     // The handle must be opened before entering rename mode to avoid missing the event.
     HANDLE dir_handle = CreateFileW(
@@ -236,14 +239,17 @@ void template_item::rename_and_resolve_variables_on_other_thread(const std::file
 
     if (dir_handle != INVALID_HANDLE_VALUE)
     {
-        // Buffer large enough for a single rename event pair
-        std::vector<BYTE> buffer(65536);
+        // Buffer large enough to capture a single rename event pair (two FILE_NOTIFY_INFORMATION
+        // records). Each record header is 12 bytes plus 2 bytes per UTF-16 filename character;
+        // with MAX_PATH (260 chars) per name, 65 536 bytes is far more than sufficient.
+        constexpr DWORD directory_change_buffer_size = 65536;
+        std::vector<BYTE> buffer(directory_change_buffer_size);
         OVERLAPPED overlapped{};
         overlapped.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
 
         if (overlapped.hEvent != nullptr)
         {
-            ReadDirectoryChangesW(
+            const BOOL read_started = ReadDirectoryChangesW(
                 dir_handle,
                 buffer.data(),
                 static_cast<DWORD>(buffer.size()),
@@ -253,69 +259,76 @@ void template_item::rename_and_resolve_variables_on_other_thread(const std::file
                 &overlapped,
                 nullptr);
 
-            // Enter rename mode so the user can give the folder its final name
-            newplus::utilities::explorer_enter_rename_mode(target_fullpath);
-
-            // Wait up to 30 seconds for the user to complete the rename
-            constexpr DWORD rename_timeout_ms = 30000;
-            const DWORD wait_result = WaitForSingleObject(overlapped.hEvent, rename_timeout_ms);
-
-            if (wait_result == WAIT_OBJECT_0)
+            if (read_started)
             {
-                DWORD bytes_returned = 0;
-                if (GetOverlappedResult(dir_handle, &overlapped, &bytes_returned, FALSE) && bytes_returned > 0)
+                // Enter rename mode so the user can give the folder its final name
+                newplus::utilities::explorer_enter_rename_mode(target_fullpath);
+                entered_rename_mode = true;
+
+                // Wait up to 30 seconds for the user to complete the rename.
+                // 30 s gives ample time to type a folder name while keeping the background
+                // thread alive long enough to capture the event.
+                constexpr DWORD rename_timeout_ms = 30000;
+                const DWORD wait_result = WaitForSingleObject(overlapped.hEvent, rename_timeout_ms);
+
+                if (wait_result == WAIT_OBJECT_0)
                 {
-                    // Walk the FILE_NOTIFY_INFORMATION records to find our folder's rename
-                    const BYTE* ptr = buffer.data();
-                    bool found_old_name = false;
-                    while (ptr < buffer.data() + bytes_returned)
+                    DWORD bytes_returned = 0;
+                    if (GetOverlappedResult(dir_handle, &overlapped, &bytes_returned, FALSE) && bytes_returned > 0)
                     {
-                        const auto* info = reinterpret_cast<const FILE_NOTIFY_INFORMATION*>(ptr);
-
-                        if (info->Action == FILE_ACTION_RENAMED_OLD_NAME && !found_old_name)
+                        // Walk the FILE_NOTIFY_INFORMATION records to find our folder's rename.
+                        // Each rename produces two consecutive records: FILE_ACTION_RENAMED_OLD_NAME
+                        // followed immediately by FILE_ACTION_RENAMED_NEW_NAME.  Reset
+                        // found_old_name on every OLD_NAME record so that interleaved renames
+                        // (unlikely but possible with rapid successive operations) are handled
+                        // correctly.
+                        const BYTE* ptr = buffer.data();
+                        bool found_old_name = false;
+                        while (ptr < buffer.data() + bytes_returned)
                         {
-                            const std::wstring old_name(info->FileName, info->FileNameLength / sizeof(WCHAR));
-                            if (StrCmpIW(old_name.c_str(), original_folder_name.c_str()) == 0)
+                            const auto* info = reinterpret_cast<const FILE_NOTIFY_INFORMATION*>(ptr);
+
+                            if (info->Action == FILE_ACTION_RENAMED_OLD_NAME)
                             {
-                                found_old_name = true;
+                                const std::wstring old_name(info->FileName, info->FileNameLength / sizeof(WCHAR));
+                                // Reassign (not just set) so that a subsequent OLD_NAME record
+                                // resets the flag, correctly handling any interleaved renames
+                                // that may appear in the same buffer.
+                                found_old_name = (StrCmpIW(old_name.c_str(), original_folder_name.c_str()) == 0);
                             }
-                        }
-                        else if (info->Action == FILE_ACTION_RENAMED_NEW_NAME && found_old_name)
-                        {
-                            const std::wstring new_name(info->FileName, info->FileNameLength / sizeof(WCHAR));
-                            final_path = parent_dir / new_name;
-                            break;
-                        }
+                            else if (info->Action == FILE_ACTION_RENAMED_NEW_NAME && found_old_name)
+                            {
+                                const std::wstring new_name(info->FileName, info->FileNameLength / sizeof(WCHAR));
+                                final_path = parent_dir / new_name;
+                                break;
+                            }
 
-                        if (info->NextEntryOffset == 0)
-                        {
-                            break;
+                            if (info->NextEntryOffset == 0)
+                            {
+                                break;
+                            }
+                            ptr += info->NextEntryOffset;
                         }
-                        ptr += info->NextEntryOffset;
                     }
                 }
-            }
-            else
-            {
-                // Timeout or error – cancel the pending I/O and wait for it to finish
-                CancelIoEx(dir_handle, &overlapped);
-                DWORD dummy = 0;
-                GetOverlappedResult(dir_handle, &overlapped, &dummy, TRUE);
+                else
+                {
+                    // Timeout or error – cancel the pending I/O and wait for it to drain
+                    CancelIoEx(dir_handle, &overlapped);
+                    DWORD bytes_transferred = 0;
+                    GetOverlappedResult(dir_handle, &overlapped, &bytes_transferred, TRUE);
+                }
             }
 
             CloseHandle(overlapped.hEvent);
         }
-        else
-        {
-            // Could not create the event; fall back to plain rename mode
-            newplus::utilities::explorer_enter_rename_mode(target_fullpath);
-        }
 
         CloseHandle(dir_handle);
     }
-    else
+
+    if (!entered_rename_mode)
     {
-        // Could not open the directory for monitoring; fall back to plain rename mode
+        // Monitoring could not be set up; fall back to plain rename mode
         newplus::utilities::explorer_enter_rename_mode(target_fullpath);
     }
 
