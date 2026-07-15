@@ -144,11 +144,11 @@ void KeyboardManager::StartLowlevelKeyboardHook()
         // ensures the thread is ready before that deadline expires.
         // NOTE: HookProc must remain strictly non-blocking so it always returns
         // well within the timeout.
-        hookThreadPriorityBeforeElevation = GetThreadPriority(GetCurrentThread());
-        if (hookThreadPriorityBeforeElevation == THREAD_PRIORITY_ERROR_RETURN)
+        int savedPriority = GetThreadPriority(GetCurrentThread());
+        if (savedPriority == THREAD_PRIORITY_ERROR_RETURN)
         {
             Logger::warn(L"GetThreadPriority() failed; using THREAD_PRIORITY_NORMAL as the restore value.");
-            hookThreadPriorityBeforeElevation = THREAD_PRIORITY_NORMAL;
+            savedPriority = THREAD_PRIORITY_NORMAL;
         }
         if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL))
         {
@@ -160,10 +160,19 @@ void KeyboardManager::StartLowlevelKeyboardHook()
         hookHandleCopy = hookHandle;
         if (!hookHandle)
         {
+            // Hook installation failed.  Restore thread priority so a subsequent
+            // StartLowlevelKeyboardHook call starts from the real original value.
+            SetThreadPriority(GetCurrentThread(), savedPriority);
             DWORD errorCode = GetLastError();
             show_last_error_message(L"SetWindowsHookEx", errorCode, L"PowerToys - Keyboard Manager");
             auto errorMessage = get_last_error_message(errorCode);
             Trace::Error(errorCode, errorMessage.has_value() ? errorMessage.value() : L"", L"StartLowlevelKeyboardHook::SetWindowsHookEx");
+        }
+        else
+        {
+            // Hook is active; remember the pre-elevation priority so StopLowlevelKeyboardHook
+            // can restore it exactly.
+            hookThreadPriorityBeforeElevation = savedPriority;
         }
     }
 }
