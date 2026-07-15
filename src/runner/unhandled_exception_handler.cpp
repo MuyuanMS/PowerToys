@@ -202,12 +202,16 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
         }
         // Primary: allocation-free, mutex-free persistent marker.  Works even before
         // Logger is initialised and even if the heap or spdlog internals are corrupted.
-        // _snprintf_s with _TRUNCATE returns -1 on truncation but still fills crashMsg
-        // with a valid null-terminated string, so we write unconditionally.
-        char crashMsg[128];
-        _snprintf_s(crashMsg, sizeof(crashMsg), _TRUNCATE,
-                    "[PowerToys Runner] CRASH: Unhandled exception code=0x%08X\n",
-                    static_cast<unsigned int>(code));
+        static constexpr char kCrashPrefix[] = "[PowerToys Runner] CRASH: Unhandled exception code=0x";
+        char crashMsg[sizeof(kCrashPrefix) + 8 + 2];
+        memcpy(crashMsg, kCrashPrefix, sizeof(kCrashPrefix) - 1);
+        static constexpr char kHexDigits[] = "0123456789ABCDEF";
+        for (int i = 0; i < 8; ++i)
+        {
+            crashMsg[sizeof(kCrashPrefix) - 1 + i] = kHexDigits[(code >> (28 - (4 * i))) & 0xF];
+        }
+        crashMsg[sizeof(kCrashPrefix) - 1 + 8] = '\n';
+        crashMsg[sizeof(kCrashPrefix) - 1 + 9] = '\0';
         write_crash_marker(crashMsg);
 #if _DEBUG && _WIN64
         // DbgHelp/global symbol state is not thread-safe; use a process-wide non-blocking
@@ -251,7 +255,6 @@ extern "C" void AbortHandler(int /*signal_number*/)
     // The pre-opened crash-marker handle gives a persistent, allocation-free on-disk record.
     static const char k_abort_msg[] = "[PowerToys Runner] CRASH: SIGABRT received (abort/assert failure).\n";
     write_crash_marker(k_abort_msg);
-    OutputDebugStringW(L"[PowerToys Runner] SIGABRT received (abort/assert failure).\n");
 #if _DEBUG && _WIN64
     if (InterlockedCompareExchange(&s_diagnostics_in_progress, 1, 0) == 0)
     {
