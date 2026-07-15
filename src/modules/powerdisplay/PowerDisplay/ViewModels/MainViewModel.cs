@@ -301,6 +301,59 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task RefreshAsync() => await RefreshMonitorsAsync();
 
+    /// <summary>
+    /// Reads current brightness from hardware for every known monitor without
+    /// triggering a full re-discovery. Called when the flyout is opened so that the
+    /// brightness sliders reflect any level changes made outside of PowerDisplay
+    /// (e.g. via monitor OSD or Windows Settings).
+    /// </summary>
+    public async Task RefreshBrightnessAsync()
+    {
+        if (IsScanning)
+        {
+            return;
+        }
+
+        try
+        {
+            // Access the token here; if the CTS was disposed (shutdown), we catch
+            // ObjectDisposedException below and bail out silently.
+            var token = _cancellationTokenSource.Token;
+            await _monitorManager.RefreshAllBrightnessAsync(token);
+
+            _dispatcherQueue.TryEnqueue(() =>
+            {
+                try
+                {
+                    foreach (var vm in Monitors)
+                    {
+                        var monitor = _monitorManager.GetMonitor(vm.Id);
+                        if (monitor != null)
+                        {
+                            vm.UpdateBrightnessDisplay(monitor.CurrentBrightness);
+                        }
+                    }
+                }
+                catch (Exception dispatcherEx)
+                {
+                    Logger.LogError($"[MainViewModel] RefreshBrightnessAsync dispatcher update failed: {dispatcherEx.Message}");
+                }
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected on shutdown; no action needed.
+        }
+        catch (ObjectDisposedException)
+        {
+            // CancellationTokenSource was disposed — app is shutting down; no action needed.
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"[MainViewModel] RefreshBrightnessAsync failed: {ex.Message}");
+        }
+    }
+
     [RelayCommand]
     private unsafe void IdentifyMonitors()
     {
