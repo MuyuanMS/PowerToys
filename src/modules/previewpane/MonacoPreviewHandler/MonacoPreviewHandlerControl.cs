@@ -177,7 +177,7 @@ namespace Microsoft.PowerToys.PreviewHandler.Monaco
                                 Controls.Remove(_loading);
                                 Controls.Remove(_loadingBar);
                                 Controls.Remove(_loadingBackground);
-                                AddTextBoxControl(Resources.Exception_Occurred + e.Message);
+                                AddTextBoxControl(Resources.WebView2_Initialization_Error);
                             }
                         }
                         catch (WebView2RuntimeNotFoundException e)
