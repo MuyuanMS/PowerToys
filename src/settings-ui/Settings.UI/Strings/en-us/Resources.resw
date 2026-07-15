@@ -5253,6 +5253,9 @@ The break timer font matches the text font.</value>
   <data name="AlwaysOnTop_Sound.Header" xml:space="preserve">
     <value>Play a sound when pinning a window</value>
   </data>
+  <data name="AlwaysOnTop_OpacitySound.Header" xml:space="preserve">
+    <value>Play a sound when changing window opacity</value>
+  </data>
   <data name="GeneralPage_EnableViewDiagnosticData.Description" xml:space="preserve">
     <value>Stores diagnostic data locally in .xml format; folder may include .etl files as well. May use up 1 GB or more of disk space.</value>
   </data>

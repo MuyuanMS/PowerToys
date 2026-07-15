@@ -6,6 +6,7 @@ enum class SettingId
     IncreaseOpacityHotkey,
     DecreaseOpacityHotkey,
     SoundEnabled,
+    OpacitySoundEnabled,
     ShowInSystemMenu,
     FrameEnabled,
     FrameThickness,

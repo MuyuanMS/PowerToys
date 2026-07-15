@@ -16,6 +16,7 @@ namespace NonLocalizable
     const static wchar_t* IncreaseOpacityHotkeyID = L"increase-opacity-hotkey";
     const static wchar_t* DecreaseOpacityHotkeyID = L"decrease-opacity-hotkey";
     const static wchar_t* SoundEnabledID = L"sound-enabled";
+    const static wchar_t* OpacitySoundEnabledID = L"opacity-sound-enabled";
     const static wchar_t* ShowInSystemMenuID = L"show-in-system-menu";
     const static wchar_t* FrameEnabledID = L"frame-enabled";
     const static wchar_t* FrameThicknessID = L"frame-thickness";
@@ -125,6 +126,16 @@ void AlwaysOnTopSettings::LoadSettings()
             {
                 updatedSettings->enableSound = val;
                 changedSettings.push_back(SettingId::SoundEnabled);
+            }
+        }
+
+        if (const auto jsonVal = values.get_bool_value(NonLocalizable::OpacitySoundEnabledID))
+        {
+            auto val = *jsonVal;
+            if (updatedSettings->enableOpacitySound != val)
+            {
+                updatedSettings->enableOpacitySound = val;
+                changedSettings.push_back(SettingId::OpacitySoundEnabled);
             }
         }
 
