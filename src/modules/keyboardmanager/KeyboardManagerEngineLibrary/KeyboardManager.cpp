@@ -137,6 +137,13 @@ void KeyboardManager::StartLowlevelKeyboardHook()
 
     if (!hookHandle)
     {
+        // Raise the hook thread's priority so that WH_KEYBOARD_LL callbacks are
+        // dispatched promptly even under high CPU load.  Windows imposes a
+        // LowLevelHooksTimeout (default ~300 ms) and silently bypasses the hook
+        // when the owning thread doesn't respond in time; TIME_CRITICAL scheduling
+        // ensures the thread is ready before that deadline expires.
+        SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+
         hookHandle = SetWindowsHookEx(WH_KEYBOARD_LL, HookProc, GetModuleHandle(NULL), NULL);
         hookHandleCopy = hookHandle;
         if (!hookHandle)
@@ -155,6 +162,9 @@ void KeyboardManager::StopLowlevelKeyboardHook()
     {
         UnhookWindowsHookEx(hookHandle);
         hookHandle = nullptr;
+
+        // Restore normal thread priority now that the hook is no longer active.
+        SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
     }
 }
 
