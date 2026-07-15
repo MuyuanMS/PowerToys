@@ -301,6 +301,41 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task RefreshAsync() => await RefreshMonitorsAsync();
 
+    /// <summary>
+    /// Reads current brightness from hardware for every known monitor without
+    /// triggering a full re-discovery. Called when the flyout is opened so that the
+    /// brightness sliders reflect any level changes made outside of PowerDisplay
+    /// (e.g. via monitor OSD or Windows Settings).
+    /// </summary>
+    public async Task RefreshBrightnessAsync()
+    {
+        if (IsScanning)
+        {
+            return;
+        }
+
+        try
+        {
+            await _monitorManager.RefreshAllBrightnessAsync(_cancellationTokenSource.Token);
+
+            _dispatcherQueue.TryEnqueue(() =>
+            {
+                foreach (var vm in Monitors)
+                {
+                    var monitor = _monitorManager.GetMonitor(vm.Id);
+                    if (monitor != null)
+                    {
+                        vm.UpdateBrightnessDisplay(monitor.CurrentBrightness);
+                    }
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"[MainViewModel] RefreshBrightnessAsync failed: {ex.Message}");
+        }
+    }
+
     [RelayCommand]
     private unsafe void IdentifyMonitors()
     {

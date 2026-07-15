@@ -183,6 +183,14 @@ namespace PowerDisplay
                 // showing the value tooltip when the window opens
                 RootGrid.Focus(FocusState.Programmatic);
 
+                // Refresh brightness from hardware so sliders reflect any level changes
+                // made outside PowerDisplay (e.g. via monitor OSD or Windows Settings).
+                // Fire-and-forget: the window shows immediately; sliders update in the background.
+                if (_viewModel != null)
+                {
+                    _ = _viewModel.RefreshBrightnessAsync();
+                }
+
                 Logger.LogInfo($"ShowWindow: Window shown successfully, visibility={IsWindowVisible()}");
             }
             catch (Exception ex)

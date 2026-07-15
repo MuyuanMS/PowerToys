@@ -435,6 +435,38 @@ namespace PowerDisplay.Helpers
             }
         }
 
+        /// <summary>
+        /// Reads current brightness from hardware for every known monitor and updates
+        /// <see cref="Monitor.CurrentBrightness"/> in-place. Monitors that do not
+        /// support brightness or whose controller is unavailable are silently skipped.
+        /// </summary>
+        public async Task RefreshAllBrightnessAsync(CancellationToken cancellationToken = default)
+        {
+            foreach (var monitor in _monitors)
+            {
+                if (!monitor.SupportsBrightness)
+                {
+                    continue;
+                }
+
+                var controller = GetControllerForMonitor(monitor);
+                if (controller == null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var vcpValue = await controller.GetBrightnessAsync(monitor, cancellationToken);
+                    monitor.CurrentBrightness = vcpValue.ToPercentage();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"[MonitorManager] RefreshAllBrightness: Could not read brightness for {monitor.Id}: {ex.Message}");
+                }
+            }
+        }
+
         public void Dispose()
         {
             Dispose(true);
