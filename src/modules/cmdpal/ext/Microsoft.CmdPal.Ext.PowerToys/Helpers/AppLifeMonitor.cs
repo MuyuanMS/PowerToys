@@ -53,7 +53,7 @@ internal sealed class AppLifeMonitor : IDisposable
         _messageLoopThread.SetApartmentState(ApartmentState.STA);
         _messageLoopThread.Start();
 
-        // Wait until the message-loop thread has initialised its window.
+        // Wait until the message-loop thread has initialized its window.
         _threadReadyEvent.WaitOne();
     }
 
@@ -117,17 +117,19 @@ internal sealed class AppLifeMonitor : IDisposable
             x: 0, y: 0, nWidth: 0, nHeight: 0,
             hWndParent: 0, hMenu: 0, hInstance: hInstance, lpParam: 0);
 
+        if (hwnd == 0)
+        {
+            UnregisterClassW(className, hInstance);
+            return;
+        }
+
         while (GetMessageW(out MSG msg, hWnd: 0, wMsgFilterMin: 0, wMsgFilterMax: 0) > 0)
         {
             TranslateMessage(in msg);
             DispatchMessageW(in msg);
         }
 
-        if (hwnd != 0)
-        {
-            DestroyWindow(hwnd);
-        }
-
+        DestroyWindow(hwnd);
         UnregisterClassW(className, hInstance);
     }
 
@@ -140,13 +142,17 @@ internal sealed class AppLifeMonitor : IDisposable
                 // Tell Windows we are ready to quit so it does not report us as
                 // hung (MOAPPLICATION_HANG / HANG_QUIESCE), and signal the main
                 // thread so it can clean up and exit promptly.
-                s_exitEvent?.Set();
+                // Capture the reference into a local to avoid a race between
+                // the null-check and Set() if Dispose() runs concurrently.
+                var queryEvt = s_exitEvent;
+                queryEvt?.Set();
                 return 1; // TRUE: ready to end the session
 
             case WM_ENDSESSION:
                 if (wParam != 0)
                 {
-                    s_exitEvent?.Set();
+                    var endEvt = s_exitEvent;
+                    endEvt?.Set();
                 }
 
                 return 0;

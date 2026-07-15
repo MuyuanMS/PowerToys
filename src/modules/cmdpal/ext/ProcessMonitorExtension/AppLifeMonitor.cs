@@ -47,7 +47,7 @@ internal sealed class AppLifeMonitor : IDisposable
         _messageLoopThread.SetApartmentState(ApartmentState.STA);
         _messageLoopThread.Start();
 
-        // Wait until the message-loop thread has initialised its window.
+        // Wait until the message-loop thread has initialized its window.
         _threadReadyEvent.WaitOne();
     }
 
@@ -109,17 +109,20 @@ internal sealed class AppLifeMonitor : IDisposable
             x: 0, y: 0, nWidth: 0, nHeight: 0,
             hWndParent: 0, hMenu: 0, hInstance: hInstance, lpParam: 0);
 
+        if (hwnd == 0)
+        {
+            NativeMethods.UnregisterClassW(className, hInstance);
+            GC.KeepAlive(wndProcDelegate);
+            return;
+        }
+
         while (NativeMethods.GetMessageW(out NativeMethods.MSG msg, hWnd: 0, wMsgFilterMin: 0, wMsgFilterMax: 0) > 0)
         {
             NativeMethods.TranslateMessage(ref msg);
             NativeMethods.DispatchMessageW(ref msg);
         }
 
-        if (hwnd != 0)
-        {
-            NativeMethods.DestroyWindow(hwnd);
-        }
-
+        NativeMethods.DestroyWindow(hwnd);
         NativeMethods.UnregisterClassW(className, hInstance);
 
         // Keep the delegate alive until after the message loop has fully exited.
