@@ -214,8 +214,8 @@ void template_item::rename_and_resolve_variables_on_other_thread(const std::file
 {
     // Have been unable to have Windows Explorer Shell enter rename mode from the main thread
     // Sleep for a bit to only enter rename mode when icon has been drawn.
-    const std::chrono::milliseconds approx_wait_for_icon_redraw_not_needed{ 50 };
-    std::this_thread::sleep_for(std::chrono::milliseconds(approx_wait_for_icon_redraw_not_needed));
+    const std::chrono::milliseconds icon_redraw_delay_ms{ 50 };
+    std::this_thread::sleep_for(icon_redraw_delay_ms);
 
     const std::filesystem::path parent_dir = target_fullpath.parent_path();
     const std::wstring original_folder_name = target_fullpath.filename().wstring();
@@ -241,8 +241,8 @@ void template_item::rename_and_resolve_variables_on_other_thread(const std::file
     {
         // Buffer large enough to capture a single rename event pair (two FILE_NOTIFY_INFORMATION
         // records). Each record header is 12 bytes plus 2 bytes per UTF-16 filename character;
-        // with MAX_PATH (260 chars) per name, 65 536 bytes is far more than sufficient.
-        constexpr DWORD directory_change_buffer_size = 65536;
+        // with MAX_PATH (260 chars) per name, 64 KB is far more than sufficient.
+        constexpr DWORD directory_change_buffer_size = 64 * 1024;
         std::vector<BYTE> buffer(directory_change_buffer_size);
         OVERLAPPED overlapped{};
         overlapped.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
