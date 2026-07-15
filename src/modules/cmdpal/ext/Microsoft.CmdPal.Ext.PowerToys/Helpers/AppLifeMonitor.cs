@@ -25,7 +25,9 @@ internal sealed class AppLifeMonitor : IDisposable
 {
     // Static reference used by the [UnmanagedCallersOnly] WndProc.
     // Only one AppLifeMonitor is expected per process.
-    private static ManualResetEvent? s_exitEvent;
+    // Marked volatile so the message-loop thread always sees the latest value
+    // written by Start() / Dispose() on the main thread.
+    private static volatile ManualResetEvent? s_exitEvent;
 
     private readonly ManualResetEvent _exitRequestedEvent = new(false);
     private readonly ManualResetEvent _threadReadyEvent = new(false);
