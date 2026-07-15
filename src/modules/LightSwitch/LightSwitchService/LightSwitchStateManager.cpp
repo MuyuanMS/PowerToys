@@ -123,16 +123,29 @@ void LightSwitchStateManager::SyncInitialThemeState()
 
 static std::pair<int, int> update_sun_times(auto& settings)
 {
-    double latitude = std::stod(settings.latitude);
-    double longitude = std::stod(settings.longitude);
+    int newLightTime = 0;
+    int newDarkTime = 0;
 
-    SYSTEMTIME st;
-    GetLocalTime(&st);
+    try
+    {
+        double latitude = std::stod(settings.latitude);
+        double longitude = std::stod(settings.longitude);
 
-    SunTimes newTimes = CalculateSunriseSunset(latitude, longitude, st.wYear, st.wMonth, st.wDay);
+        SYSTEMTIME st;
+        GetLocalTime(&st);
 
-    int newLightTime = newTimes.sunriseHour * 60 + newTimes.sunriseMinute;
-    int newDarkTime = newTimes.sunsetHour * 60 + newTimes.sunsetMinute;
+        SunTimes newTimes = CalculateSunriseSunset(latitude, longitude, st.wYear, st.wMonth, st.wDay);
+
+        newLightTime = newTimes.sunriseHour * 60 + newTimes.sunriseMinute;
+        newDarkTime = newTimes.sunsetHour * 60 + newTimes.sunsetMinute;
+    }
+    catch (const std::exception& e)
+    {
+        std::string msg = e.what();
+        std::wstring wmsg(msg.begin(), msg.end());
+        Logger::error(L"[LightSwitchService] Failed to parse coordinates for sun time calculation: {}", wmsg);
+        return { 0, 0 };
+    }
 
     try
     {
@@ -148,6 +161,10 @@ static std::pair<int, int> update_sun_times(auto& settings)
         std::string msg = e.what();
         std::wstring wmsg(msg.begin(), msg.end());
         Logger::error(L"[LightSwitchService] Exception during sun time update: {}", wmsg);
+    }
+    catch (...)
+    {
+        Logger::error(L"[LightSwitchService] Unknown exception during sun time save.");
     }
 
     return { newLightTime, newDarkTime };
