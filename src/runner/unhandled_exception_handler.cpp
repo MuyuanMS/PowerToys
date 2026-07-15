@@ -203,15 +203,18 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
         // Primary: allocation-free, mutex-free persistent marker.  Works even before
         // Logger is initialised and even if the heap or spdlog internals are corrupted.
         static constexpr char kCrashPrefix[] = "[PowerToys Runner] CRASH: Unhandled exception code=0x";
-        char crashMsg[sizeof(kCrashPrefix) + 8 + 2];
+        static constexpr int kHexDigitCount = 8;
+        static constexpr int kSuffixCharCount = 2; // '\n' + '\0'
+        char crashMsg[sizeof(kCrashPrefix) + kHexDigitCount + kSuffixCharCount];
         memcpy(crashMsg, kCrashPrefix, sizeof(kCrashPrefix) - 1);
         static constexpr char kHexDigits[] = "0123456789ABCDEF";
-        for (int i = 0; i < 8; ++i)
+        for (int i = 0; i < kHexDigitCount; ++i)
         {
+            // Extract each 4-bit nibble from most-significant to least-significant.
             crashMsg[sizeof(kCrashPrefix) - 1 + i] = kHexDigits[(code >> (28 - (4 * i))) & 0xF];
         }
-        crashMsg[sizeof(kCrashPrefix) - 1 + 8] = '\n';
-        crashMsg[sizeof(kCrashPrefix) - 1 + 9] = '\0';
+        crashMsg[sizeof(kCrashPrefix) - 1 + kHexDigitCount] = '\n';
+        crashMsg[sizeof(kCrashPrefix) - 1 + kHexDigitCount + 1] = '\0';
         write_crash_marker(crashMsg);
 #if _DEBUG && _WIN64
         // DbgHelp/global symbol state is not thread-safe; use a process-wide non-blocking
