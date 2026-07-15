@@ -41,6 +41,7 @@ void write_crash_marker_message(const char* msg)
     write_crash_marker(msg);
 }
 
+#if _DEBUG && _WIN64
 static const WCHAR* exception_description(const DWORD& code)
 {
     switch (code)
@@ -89,8 +90,6 @@ static const WCHAR* exception_description(const DWORD& code)
         return L"UNKNOWN EXCEPTION";
     }
 }
-
-#if _DEBUG && _WIN64
 static IMAGEHLP_SYMBOL64* p_symbol = static_cast<IMAGEHLP_SYMBOL64*>(malloc(sizeof(IMAGEHLP_SYMBOL64) + MAX_PATH * sizeof(WCHAR)));
 static IMAGEHLP_LINE64 line;
 static WCHAR module_path[MAX_PATH];
