@@ -186,7 +186,8 @@ void KeyboardManager::StartLowlevelKeyboardHook()
             {
                 if (!SetThreadPriority(realHandle, hookThreadPriorityBeforeElevation.load(std::memory_order_acquire)))
                 {
-                    Logger::warn(L"SetThreadPriority() failed while restoring thread priority after hook installation failure (error {}).", GetLastError());
+                    DWORD restoreErrorCode = GetLastError();
+                    Logger::warn(L"SetThreadPriority() failed while restoring thread priority after hook installation failure (error {}).", restoreErrorCode);
                 }
                 CloseHandle(realHandle);
                 realHandle = nullptr;
@@ -218,7 +219,8 @@ void KeyboardManager::StopLowlevelKeyboardHook()
         {
             if (!SetThreadPriority(hookThreadHandle, hookThreadPriorityBeforeElevation.load(std::memory_order_acquire)))
             {
-                Logger::warn(L"SetThreadPriority() failed while restoring thread priority after unhooking (error {}).", GetLastError());
+                DWORD errorCode = GetLastError();
+                Logger::warn(L"SetThreadPriority() failed while restoring thread priority after unhooking (error {}).", errorCode);
             }
             CloseHandle(hookThreadHandle);
             hookThreadHandle = nullptr;
