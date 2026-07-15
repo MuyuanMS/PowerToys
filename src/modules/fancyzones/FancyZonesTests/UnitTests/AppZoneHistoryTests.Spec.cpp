@@ -2,6 +2,7 @@
 #include <filesystem>
 
 #include <FancyZonesLib/FancyZonesData/AppZoneHistory.h>
+#include <FancyZonesLib/FancyZonesWindowProperties.h>
 
 #include "util.h"
 #include <modules/fancyzones/FancyZonesLib/util.h>
@@ -279,7 +280,49 @@ namespace FancyZonesUnitTests
 
             Assert::IsTrue(AppZoneHistory::instance().SetAppLastZones(window, workAreaId, layoutId, { 1 }));
             Assert::IsTrue(AppZoneHistory::instance().RemoveAppLastZone(window, workAreaId, layoutId));
-            Assert::IsTrue(std::vector<ZoneIndex>{} == AppZoneHistory::instance().GetAppLastZoneIndexSet(window, workAreaId, layoutId));
+            // Zone info is preserved after removal so the next window can open in the same slot.
+            Assert::IsTrue(std::vector<ZoneIndex>{ 1 } == AppZoneHistory::instance().GetAppLastZoneIndexSet(window, workAreaId, layoutId));
+        }
+
+        TEST_METHOD (AppLastZonePreservesClosedSlotForMultipleWindows)
+        {
+            // Regression test for: new window opens where last window was OPENED rather than
+            // where the last window was CLOSED (issue with multi-window apps like Explorer where
+            // all windows share the same process id).
+            //
+            // Scenario: window1 snapped to zone 0, window2 snapped to zone 1 (same process).
+            // window1 closes. UpdateWindowPositions re-confirms window2 at zone 1.
+            // A new window3 should open at zone 0 (the vacated slot), not zone 1.
+
+            const auto layoutId = FancyZonesUtils::GuidFromString(L"{2FEC41DA-3A0B-4E31-9CE1-9473C65D99F2}").value();
+            const FancyZonesDataTypes::WorkAreaId workAreaId{
+                .monitorId = { .deviceId = { .id = L"DELA026", .instanceId = L"5&10a58c63&0&UID16777488" } },
+                .virtualDesktopId = FancyZonesUtils::GuidFromString(L"{39B25DD2-130D-4B5D-8851-4791D66B1539}").value()
+            };
+
+            // All three windows share the same process (the test process).
+            const auto window1 = Mocks::WindowCreate(m_hInst);
+            const auto window2 = Mocks::WindowCreate(m_hInst);
+            const auto window3 = Mocks::WindowCreate(m_hInst);
+
+            // window1 snapped to zone 0 - succeeds (no previous history).
+            Assert::IsTrue(AppZoneHistory::instance().SetAppLastZones(window1, workAreaId, layoutId, { 0 }));
+            Assert::IsTrue(std::vector<ZoneIndex>{ 0 } == AppZoneHistory::instance().GetAppLastZoneIndexSet(window1, workAreaId, layoutId));
+
+            // window2 is physically snapped to zone 1 (stamp set by WorkArea::Snap),
+            // but history registration is blocked because window1 (same process) is registered.
+            FancyZonesWindowProperties::StampZoneIndexProperty(window2, { 1 });
+            Assert::IsFalse(AppZoneHistory::instance().SetAppLastZones(window2, workAreaId, layoutId, { 1 }));
+
+            // window1 closes: zone 0 should be preserved as the "last closed slot".
+            Assert::IsTrue(AppZoneHistory::instance().RemoveAppLastZone(window1, workAreaId, layoutId));
+
+            // UpdateWindowPositions re-confirms window2 at its current zone 1 (same stamp).
+            // This must NOT overwrite the preserved zone 0 history.
+            AppZoneHistory::instance().SetAppLastZones(window2, workAreaId, layoutId, { 1 });
+
+            // New window3 should be directed to zone 0 (the vacated slot), not zone 1.
+            Assert::IsTrue(std::vector<ZoneIndex>{ 0 } == AppZoneHistory::instance().GetAppLastZoneIndexSet(window3, workAreaId, layoutId));
         }
 
         TEST_METHOD (AppLastZoneRemoveUnknownWindow)
