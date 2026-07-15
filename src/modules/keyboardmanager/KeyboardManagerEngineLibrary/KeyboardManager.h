@@ -55,6 +55,10 @@ private:
 
     HANDLE editorIsRunningEvent = nullptr;
 
+    // Thread priority that was active before StartLowlevelKeyboardHook elevated it.
+    // Saved so StopLowlevelKeyboardHook can restore the original value exactly.
+    int hookThreadPriorityBeforeElevation = THREAD_PRIORITY_NORMAL;
+
     // Hook procedure definition
     static LRESULT CALLBACK HookProc(int nCode, WPARAM wParam, LPARAM lParam);
 

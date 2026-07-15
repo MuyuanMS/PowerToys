@@ -142,7 +142,14 @@ void KeyboardManager::StartLowlevelKeyboardHook()
         // LowLevelHooksTimeout (default ~300 ms) and silently bypasses the hook
         // when the owning thread doesn't respond in time; TIME_CRITICAL scheduling
         // ensures the thread is ready before that deadline expires.
-        SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+        // NOTE: HookProc must remain strictly non-blocking so it always returns
+        // well within the timeout.
+        hookThreadPriorityBeforeElevation = GetThreadPriority(GetCurrentThread());
+        if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL))
+        {
+            DWORD errorCode = GetLastError();
+            Logger::warn(L"SetThreadPriority(TIME_CRITICAL) failed ({}); hook may miss events under high CPU load.", errorCode);
+        }
 
         hookHandle = SetWindowsHookEx(WH_KEYBOARD_LL, HookProc, GetModuleHandle(NULL), NULL);
         hookHandleCopy = hookHandle;
@@ -163,8 +170,8 @@ void KeyboardManager::StopLowlevelKeyboardHook()
         UnhookWindowsHookEx(hookHandle);
         hookHandle = nullptr;
 
-        // Restore normal thread priority now that the hook is no longer active.
-        SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
+        // Restore the thread priority that was active before the hook was installed.
+        SetThreadPriority(GetCurrentThread(), hookThreadPriorityBeforeElevation);
     }
 }
 
