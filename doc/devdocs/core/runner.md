@@ -167,7 +167,7 @@ Contains code for loading, saving and applying the general settings.
 Contains helper code for registering and unregistering PowerToys to run when the user logs in.
 
 #### [`unhandled_exception_handler.cpp`](/src/runner/unhandled_exception_handler.cpp)
-Contains helper code to get stack traces in builds. Can be used by adding a call to `init_global_error_handlers` in [`WinMain`](./main.cpp).
+Contains the runner's global crash-diagnostics handlers. `init_global_error_handlers()` is called at the very start of `WinMain` (before any other startup work) and installs a top-level SEH filter, a `SIGABRT` handler, and a `std::terminate` handler. It opens a persistent, allocation-free crash-marker file at `%LOCALAPPDATA%\Microsoft\PowerToys\runner-crash.log` and records unhandled exceptions, aborts, and terminations there so silent crashes are diagnosable in release builds. Rich symbol/stack-trace diagnostics (DbgHelp) remain gated to Debug x64 builds.
 
 #### [`trace.cpp`](/src/runner/trace.cpp)
 Contains code for telemetry.
