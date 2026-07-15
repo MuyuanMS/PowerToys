@@ -4,6 +4,7 @@
 
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 
 using Common;
@@ -169,6 +170,14 @@ namespace Microsoft.PowerToys.PreviewHandler.Monaco
                             catch (NullReferenceException e)
                             {
                                 Logger.LogError("NullReferenceException caught. Skipping exception.", e);
+                            }
+                            catch (COMException e)
+                            {
+                                Logger.LogError("COMException caught. WebView2 resource may be in use.", e);
+                                Controls.Remove(_loading);
+                                Controls.Remove(_loadingBar);
+                                Controls.Remove(_loadingBackground);
+                                AddTextBoxControl(Resources.Exception_Occurred + e.Message);
                             }
                         }
                         catch (WebView2RuntimeNotFoundException e)
