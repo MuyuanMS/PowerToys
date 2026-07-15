@@ -206,14 +206,16 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
         static constexpr char kCrashPrefix[] = "[PowerToys Runner] CRASH: Unhandled exception code=0x";
         static constexpr size_t kPrefixLen = sizeof(kCrashPrefix) - 1;
         static constexpr int kHexDigitCount = 8;
-        static constexpr int kSuffixCharCount = 2; // '\n' + '\0'
-        char crashMsg[kPrefixLen + kHexDigitCount + kSuffixCharCount];
+        static constexpr int kBitsPerNibble = 4;
+        static constexpr int kMsNibbleShift = (kHexDigitCount - 1) * kBitsPerNibble;
+        static constexpr size_t kNewlineAndNullCount = 2;
+        char crashMsg[kPrefixLen + kHexDigitCount + kNewlineAndNullCount];
         memcpy(crashMsg, kCrashPrefix, kPrefixLen);
         static constexpr char kHexDigits[] = "0123456789ABCDEF";
         for (int i = 0; i < kHexDigitCount; ++i)
         {
             // Extract each 4-bit nibble from most-significant to least-significant.
-            crashMsg[kPrefixLen + i] = kHexDigits[(static_cast<uint32_t>(code) >> (28 - (4 * i))) & 0xF];
+            crashMsg[kPrefixLen + i] = kHexDigits[(static_cast<uint32_t>(code) >> (kMsNibbleShift - (kBitsPerNibble * i))) & 0xF];
         }
         crashMsg[kPrefixLen + kHexDigitCount] = '\n';
         crashMsg[kPrefixLen + kHexDigitCount + 1] = '\0';
