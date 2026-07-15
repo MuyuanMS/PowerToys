@@ -581,9 +581,9 @@ public partial class Win32Program : IProgram
             {
                 resolvedDirectory = Directory.ResolveLinkTarget(currentDirectory, returnFinalTarget: true)?.FullName ?? currentDirectory;
             }
-            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is SecurityException)
             {
-                Logger.LogError(e.Message);
+                Logger.LogError($"Failed to resolve link target for '{currentDirectory}': {e.Message}");
                 resolvedDirectory = currentDirectory;
             }
 
