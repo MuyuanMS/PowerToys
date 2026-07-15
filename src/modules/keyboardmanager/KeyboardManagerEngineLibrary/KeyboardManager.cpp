@@ -160,10 +160,16 @@ void KeyboardManager::StartLowlevelKeyboardHook()
         hookHandleCopy = hookHandle;
         if (!hookHandle)
         {
+            // Capture the error immediately before any other Win32 call can overwrite it.
+            DWORD errorCode = GetLastError();
+
             // Hook installation failed.  Restore thread priority so a subsequent
             // StartLowlevelKeyboardHook call starts from the real original value.
-            SetThreadPriority(GetCurrentThread(), savedPriority);
-            DWORD errorCode = GetLastError();
+            if (!SetThreadPriority(GetCurrentThread(), savedPriority))
+            {
+                Logger::warn(L"SetThreadPriority() failed while restoring thread priority after hook installation failure (error {}).", GetLastError());
+            }
+
             show_last_error_message(L"SetWindowsHookEx", errorCode, L"PowerToys - Keyboard Manager");
             auto errorMessage = get_last_error_message(errorCode);
             Trace::Error(errorCode, errorMessage.has_value() ? errorMessage.value() : L"", L"StartLowlevelKeyboardHook::SetWindowsHookEx");
