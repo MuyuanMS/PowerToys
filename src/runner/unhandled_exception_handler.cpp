@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "unhandled_exception_handler.h"
-#include <common/logger/logger.h>
 #include <csignal>
 #include <cstdio>
 #include <string>
@@ -42,6 +41,8 @@ void write_crash_marker_message(const char* msg)
 }
 
 #if _DEBUG && _WIN64
+static volatile LONG s_diag_in_progress = 0;
+
 static const WCHAR* exception_description(const DWORD& code)
 {
     switch (code)
@@ -193,19 +194,21 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
                     static_cast<unsigned int>(code));
         write_crash_marker(crashMsg);
 #if _DEBUG && _WIN64
-        // Best-effort rich logger path — developer builds only.  In release builds the
-        // Logger sink can deadlock if the fault occurs while a spdlog mutex is held, so
-        // we limit the release SEH filter to the allocation-free WriteFile sink above.
-        try
+        // DbgHelp/global symbol state is not thread-safe; use a process-wide non-blocking
+        // guard so concurrent faults still get crash markers while only one thread runs
+        // rich debug diagnostics.
+        if (InterlockedCompareExchange(&s_diag_in_progress, 1, 0) == 0)
         {
-            Logger::critical(L"Runner crashed with unhandled exception: {} (code: 0x{:08X})", exception_description(code), static_cast<unsigned int>(code));
-            Logger::flush();
-            init_symbols();
-            std::wstring ex_description = (info != nullptr && info->ExceptionRecord != nullptr) ? std::wstring{ exception_description(code) } : L"Exception code not available";
-            log_stack_trace(ex_description);
-        }
-        catch (...)
-        {
+            try
+            {
+                init_symbols();
+                std::wstring ex_description = (info != nullptr && info->ExceptionRecord != nullptr) ? std::wstring{ exception_description(code) } : L"Exception code not available";
+                log_stack_trace(ex_description);
+            }
+            catch (...)
+            {
+            }
+            InterlockedExchange(&s_diag_in_progress, 0);
         }
 #endif
         // Keep the recursion guard SET while invoking the previous handler so that a
@@ -233,9 +236,19 @@ extern "C" void AbortHandler(int /*signal_number*/)
     write_crash_marker(k_abort_msg);
     OutputDebugStringW(L"[PowerToys Runner] SIGABRT received (abort/assert failure).\n");
 #if _DEBUG && _WIN64
-    init_symbols();
-    std::wstring ex_description = L"SIGABRT was raised.";
-    log_stack_trace(ex_description);
+    if (InterlockedCompareExchange(&s_diag_in_progress, 1, 0) == 0)
+    {
+        try
+        {
+            init_symbols();
+            std::wstring ex_description = L"SIGABRT was raised.";
+            log_stack_trace(ex_description);
+        }
+        catch (...)
+        {
+        }
+        InterlockedExchange(&s_diag_in_progress, 0);
+    }
 #endif
 }
 
@@ -284,4 +297,3 @@ void init_global_error_handlers()
     default_top_level_exception_handler = SetUnhandledExceptionFilter(unhandled_exception_handler);
     signal(SIGABRT, &AbortHandler);
 }
-
