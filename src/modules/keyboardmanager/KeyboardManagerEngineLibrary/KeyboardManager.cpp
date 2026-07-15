@@ -153,7 +153,8 @@ void KeyboardManager::StartLowlevelKeyboardHook()
                              GetCurrentProcess(), &realHandle,
                              0, FALSE, DUPLICATE_SAME_ACCESS))
         {
-            Logger::warn(L"DuplicateHandle failed ({}); thread priority will not be elevated for the keyboard hook.", GetLastError());
+            DWORD errorCode = GetLastError();
+            Logger::warn(L"DuplicateHandle failed ({}); thread priority will not be elevated for the keyboard hook.", errorCode);
         }
 
         if (realHandle)
