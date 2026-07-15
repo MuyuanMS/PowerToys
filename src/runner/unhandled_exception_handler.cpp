@@ -215,7 +215,8 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
         for (int i = 0; i < kHexDigitCount; ++i)
         {
             // Extract each 4-bit nibble from most-significant to least-significant.
-            crashMsg[kPrefixLen + i] = kHexDigits[(static_cast<uint32_t>(code) >> (kMsNibbleShift - (kBitsPerNibble * i))) & 0xF];
+            const int nibbleShift = kMsNibbleShift - (kBitsPerNibble * i);
+            crashMsg[kPrefixLen + i] = kHexDigits[(static_cast<uint32_t>(code) >> nibbleShift) & 0xF];
         }
         crashMsg[kPrefixLen + kHexDigitCount] = '\n';
         crashMsg[kPrefixLen + kHexDigitCount + 1] = '\0';
