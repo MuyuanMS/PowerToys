@@ -376,11 +376,10 @@ namespace newplus::utilities
             // Finally copy file/folder/subfolders
             std::filesystem::path target_final_fullpath = template_entry->copy_object_to(GetActiveWindow(), target_fullpath);
 
-            // Resolve variables and rename files in newly copied folders and subfolders and files
-            if (utilities::get_newplus_setting_resolve_variables() && helpers::filesystem::is_directory(target_final_fullpath))
-            {
-                helpers::variables::resolve_variables_in_filename_and_rename_files(target_final_fullpath);
-            }
+            // For folder templates: variable resolution in contents is deferred to after the user
+            // gives the folder its final name via rename mode, so that $PARENT_FOLDER_NAME resolves
+            // to the user-provided name rather than the template folder name.
+            const bool should_resolve_folder_contents = utilities::get_newplus_setting_resolve_variables() && helpers::filesystem::is_directory(target_final_fullpath);
 
             // Touch all files and set last modified to "now"
             update_last_write_time(target_final_fullpath);
@@ -395,8 +394,16 @@ namespace newplus::utilities
             // Refresh folder items
             template_entry->refresh_target(target_final_fullpath);
 
-            // Enter rename mode
-            template_entry->enter_rename_mode(target_final_fullpath);
+            // Enter rename mode. For folder templates with variable resolution enabled, monitor the
+            // rename and resolve variables in the folder contents afterwards using the final name.
+            if (should_resolve_folder_contents)
+            {
+                template_entry->enter_rename_mode_and_resolve_variables(target_final_fullpath);
+            }
+            else
+            {
+                template_entry->enter_rename_mode(target_final_fullpath);
+            }
         }
         catch (const std::exception& ex)
         {
