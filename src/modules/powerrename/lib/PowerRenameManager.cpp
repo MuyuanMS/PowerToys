@@ -821,14 +821,16 @@ DWORD WINAPI CPowerRenameManager::s_fileOpWorkerThread(_In_ void* pv)
                                                 spFileOp->RenameItem(spShellItem, newName, nullptr);
                                                 if (!closeUIWindowAfterRenaming)
                                                 {
-                                                    // Collect item data for post-operation update
+                                                    // Collect item data for post-operation update.
+                                                    // Both pointers are initialized to nullptr so
+                                                    // CoTaskMemFree at the end of this block is safe
+                                                    // even when short-circuit evaluation prevents
+                                                    // GetPath from being called (CoTaskMemFree(nullptr)
+                                                    // is a documented no-op).
                                                     PWSTR originalName = nullptr;
                                                     PWSTR path = nullptr;
-                                                    // Both GetOriginalName and GetPath are evaluated
-                                                    // regardless of short-circuit; CoTaskMemFree below
-                                                    // is always reached and handles nullptr safely.
                                                     const bool gotNames = SUCCEEDED(spItem->GetOriginalName(&originalName)) &&
-                                                                         SUCCEEDED(spItem->GetPath(&path));
+                                                                          SUCCEEDED(spItem->GetPath(&path));
                                                     if (gotNames)
                                                     {
                                                         std::wstring originalNameStr{ originalName };
