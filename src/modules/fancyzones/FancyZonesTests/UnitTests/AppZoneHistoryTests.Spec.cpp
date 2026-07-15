@@ -313,13 +313,16 @@ namespace FancyZonesUnitTests
             // but history registration is blocked because window1 (same process) is registered.
             FancyZonesWindowProperties::StampZoneIndexProperty(window2, { 1 });
             Assert::IsFalse(AppZoneHistory::instance().SetAppLastZones(window2, workAreaId, layoutId, { 1 }));
+            // History must still reflect zone 0 (window1's zone) after the blocked attempt.
+            Assert::IsTrue(std::vector<ZoneIndex>{ 0 } == AppZoneHistory::instance().GetAppLastZoneIndexSet(window1, workAreaId, layoutId));
 
             // window1 closes: zone 0 should be preserved as the "last closed slot".
             Assert::IsTrue(AppZoneHistory::instance().RemoveAppLastZone(window1, workAreaId, layoutId));
 
             // UpdateWindowPositions re-confirms window2 at its current zone 1 (same stamp).
             // This must NOT overwrite the preserved zone 0 history.
-            AppZoneHistory::instance().SetAppLastZones(window2, workAreaId, layoutId, { 1 });
+            // Returns true (re-confirmation treated as success) but makes no data change.
+            Assert::IsTrue(AppZoneHistory::instance().SetAppLastZones(window2, workAreaId, layoutId, { 1 }));
 
             // New window3 should be directed to zone 0 (the vacated slot), not zone 1.
             Assert::IsTrue(std::vector<ZoneIndex>{ 0 } == AppZoneHistory::instance().GetAppLastZoneIndexSet(window3, workAreaId, layoutId));

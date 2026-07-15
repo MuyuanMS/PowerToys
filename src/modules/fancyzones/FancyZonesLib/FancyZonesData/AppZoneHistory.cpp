@@ -349,8 +349,8 @@ bool AppZoneHistory::SetAppLastZones(HWND window, const FancyZonesDataTypes::Wor
                 // In that case, preserve the "last-closed slot" zone stored in history so
                 // that the next new window opens in the vacated position rather than being
                 // pushed into a zone that is already occupied.
-                const auto existingStamp = FancyZonesWindowProperties::RetrieveZoneIndexProperty(window);
-                if (!existingStamp.empty() && existingStamp == zoneIndexSet)
+                const auto currentWindowZones = FancyZonesWindowProperties::RetrieveZoneIndexProperty(window);
+                if (!currentWindowZones.empty() && currentWindowZones == zoneIndexSet)
                 {
                     return true;
                 }
@@ -437,6 +437,8 @@ bool AppZoneHistory::RemoveAppLastZone(HWND window, const FancyZonesDataTypes::W
             // Preserve the zone position so the next window can open in the vacated slot
             // ("last closed slot" feature). Only clear the process-to-handle tracking;
             // keep zoneIndexSet intact so GetAppLastZoneIndexSet can return it for new windows.
+            // The entry is bounded per (appPath × workArea) so memory growth is naturally
+            // limited; SyncVirtualDesktops cleans up entries for deleted virtual desktops.
             data->processIdToHandleMap.clear();
             SaveData();
             return true;
