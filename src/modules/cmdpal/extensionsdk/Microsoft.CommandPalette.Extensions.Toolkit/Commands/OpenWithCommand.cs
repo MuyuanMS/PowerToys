@@ -4,6 +4,7 @@
 
 using System.Runtime.InteropServices;
 using ManagedCsWin32;
+using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.CommandPalette.Extensions.Toolkit.Properties;
 using Windows.Win32.UI.WindowsAndMessaging;
