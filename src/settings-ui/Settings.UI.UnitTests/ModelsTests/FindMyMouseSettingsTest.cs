@@ -2,6 +2,8 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.IO.Abstractions.TestingHelpers;
+using System.Text.Json;
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -23,6 +25,33 @@ namespace CommonLibTest
             bool upgraded = settings.UpgradeSettingsConfiguration();
             Assert.IsFalse(upgraded, "New settings should not require an upgrade.");
             Assert.AreEqual("1.2", settings.Version);
+        }
+
+        [TestMethod]
+        public void GetSettingsShouldMigrateLegacyOverlayOpacityAndDropItFromSavedJson()
+        {
+            var mockFileSystem = new MockFileSystem();
+            var settingsUtils = new SettingsUtils(mockFileSystem);
+            string settingsPath = settingsUtils.GetSettingsFilePath(FindMyMouseSettings.ModuleName);
+            const string legacySettingsJson = """
+                {"name":"FindMyMouse","version":"1.1","properties":{"background_color":{"value":"#000000"},"spotlight_color":{"value":"#FFFFFF"},"overlay_opacity":{"value":50}}}
+                """;
+
+            mockFileSystem.AddFile(settingsPath, new MockFileData(legacySettingsJson));
+
+            var settings = settingsUtils.GetSettings<FindMyMouseSettings>(FindMyMouseSettings.ModuleName);
+            string savedJson = mockFileSystem.File.ReadAllText(settingsPath);
+            using JsonDocument savedDocument = JsonDocument.Parse(savedJson);
+            JsonElement properties = savedDocument.RootElement.GetProperty("properties");
+
+            Assert.AreEqual("1.2", settings.Version);
+            Assert.AreEqual("#80000000", settings.Properties.BackgroundColor.Value);
+            Assert.AreEqual("#80FFFFFF", settings.Properties.SpotlightColor.Value);
+            Assert.IsNull(settings.Properties.LegacyOverlayOpacity);
+
+            Assert.AreEqual("#80000000", properties.GetProperty("background_color").GetProperty("value").GetString());
+            Assert.AreEqual("#80FFFFFF", properties.GetProperty("spotlight_color").GetProperty("value").GetString());
+            Assert.IsFalse(properties.TryGetProperty("overlay_opacity", out _));
         }
 
         /// <summary>
