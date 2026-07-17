@@ -87,6 +87,15 @@ public class RunPageTests : CommandPaletteUnitTestBase
         return Directory.EnumerateFileSystemEntries(path, "*", o);
     }
 
+    /// <summary>
+    /// Returns the number of entries in <paramref name="files"/>, capped at
+    /// <see cref="RunListPage.MaxDirectorySuggestions"/>. Enumerates at most
+    /// <c>MaxDirectorySuggestions + 1</c> items so the test stays fast on large
+    /// directories such as <c>C:\Windows\WinSxS</c>.
+    /// </summary>
+    internal static int CappedCount(IEnumerable<string> files)
+        => Math.Min(files.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions);
+
     [TestMethod]
     public async Task TestSimple()
     {
@@ -106,7 +115,7 @@ public class RunPageTests : CommandPaletteUnitTestBase
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = "c:\\Windows\\"; });
 
         var commandList = page.GetItems();
-        Assert.AreEqual(Math.Min(filesInWindows.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions) + ExeItemCount, commandList.Length);
+        Assert.AreEqual(CappedCount(filesInWindows) + ExeItemCount, commandList.Length);
     }
 
     [TestMethod]
@@ -120,7 +129,7 @@ public class RunPageTests : CommandPaletteUnitTestBase
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = "c:\\"; });
 
         var commandList = page.GetItems();
-        Assert.AreEqual(Math.Min(filesInC.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions) + ExeItemCount, commandList.Length);
+        Assert.AreEqual(CappedCount(filesInC) + ExeItemCount, commandList.Length);
 
         // First navigate to c:\Windows. This should match everything that matches "windows" inside of C:\
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = "c:\\Windows"; });
@@ -148,7 +157,7 @@ public class RunPageTests : CommandPaletteUnitTestBase
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = "c:\\"; });
 
         var commandList = page.GetItems();
-        Assert.AreEqual(Math.Min(filesInC.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions) + ExeItemCount, commandList.Length);
+        Assert.AreEqual(CappedCount(filesInC) + ExeItemCount, commandList.Length);
 
         // First navigate to c:\Program Files. This should match everything that matches "Program Files" inside of C:\
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = "c:\\Program Files"; });
@@ -178,7 +187,7 @@ public class RunPageTests : CommandPaletteUnitTestBase
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = "c:\\"; });
 
         var commandList = page.GetItems();
-        Assert.AreEqual(Math.Min(filesInC.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions) + ExeItemCount, commandList.Length);
+        Assert.AreEqual(CappedCount(filesInC) + ExeItemCount, commandList.Length);
 
         // First navigate to c:\Windows. This should match everything that matches "windows" inside of C:\
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = "c:\\Windows"; });
@@ -192,7 +201,7 @@ public class RunPageTests : CommandPaletteUnitTestBase
         // now go to c:\windows\s. This should only have the results with an 'S' in them
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = "c:\\Windows\\s"; });
         var postFilterOnS = page.GetItems();
-        Assert.AreEqual(Math.Min(inWindowsWithS.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions) + ExeItemCount, postFilterOnS.Length);
+        Assert.AreEqual(CappedCount(inWindowsWithS) + ExeItemCount, postFilterOnS.Length);
     }
 
     [TestMethod]
@@ -216,7 +225,7 @@ public class RunPageTests : CommandPaletteUnitTestBase
         using var page = new RunListPage(nativeService, telemetryService: null);
 
         var filesInC = EnumerateFiles("C:\\");
-        var numFilesInC = filesInC.Take(RunListPage.MaxDirectorySuggestions + 1).Count();
+        var numFilesInC = CappedCount(filesInC);
 
         // "c:" alone should NOT list directory contents — only the exe item
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = "c:"; });
@@ -228,7 +237,7 @@ public class RunPageTests : CommandPaletteUnitTestBase
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = "c:\\windows\\"; });
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = "c:\\"; });
         var withSlashCommands = page.GetItems();
-        Assert.AreEqual(Math.Min(numFilesInC, RunListPage.MaxDirectorySuggestions) + ExeItemCount, withSlashCommands.Length);
+        Assert.AreEqual(numFilesInC + ExeItemCount, withSlashCommands.Length);
     }
 
     [TestMethod]
@@ -248,7 +257,7 @@ public class RunPageTests : CommandPaletteUnitTestBase
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = "%SystemRoot%\\"; });
 
         var commandList = page.GetItems();
-        Assert.AreEqual(Math.Min(filesInSystemRoot.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions) + ExeItemCount, commandList.Length);
+        Assert.AreEqual(CappedCount(filesInSystemRoot) + ExeItemCount, commandList.Length);
     }
 
     [TestMethod]
@@ -305,7 +314,7 @@ public class RunPageTests : CommandPaletteUnitTestBase
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = "%userprofile%\\"; });
 
         var commandList = page.GetItems();
-        Assert.AreEqual(Math.Min(filesInUserProfile.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions) + ExeItemCount, commandList.Length);
+        Assert.AreEqual(CappedCount(filesInUserProfile) + ExeItemCount, commandList.Length);
     }
 
     [TestMethod]
@@ -543,7 +552,7 @@ public class RunPageTests : CommandPaletteUnitTestBase
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = @"\\?\c:\Windows\"; });
 
         var commandList = page.GetItems();
-        Assert.AreEqual(Math.Min(filesInWindows.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions) + ExeItemCount, commandList.Length);
+        Assert.AreEqual(CappedCount(filesInWindows) + ExeItemCount, commandList.Length);
 
         // all the items should have "\\?\" at the start of their TextToSuggest
         foreach (var item in commandList)
@@ -566,7 +575,7 @@ public class RunPageTests : CommandPaletteUnitTestBase
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = @"\\?\c:\Windows\s"; });
 
         var commandList = page.GetItems();
-        Assert.AreEqual(Math.Min(inWindowsWithS.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions) + ExeItemCount, commandList.Length);
+        Assert.AreEqual(CappedCount(inWindowsWithS) + ExeItemCount, commandList.Length);
 
         // all the items should have "\\?\" at the start of their TextToSuggest
         foreach (var item in commandList)
@@ -590,7 +599,7 @@ public class RunPageTests : CommandPaletteUnitTestBase
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = "~\\"; });
 
         var commandList = page.GetItems();
-        Assert.AreEqual(Math.Min(filesInUserProfile.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions) + ExeItemCount, commandList.Length);
+        Assert.AreEqual(CappedCount(filesInUserProfile) + ExeItemCount, commandList.Length);
     }
 
     [TestMethod]
@@ -709,7 +718,7 @@ public class RunPageTests : CommandPaletteUnitTestBase
         var secondResult = page.GetItems();
 
         Assert.AreEqual(firstResult.Length, secondResult.Length);
-        Assert.AreEqual(Math.Min(filesInUserProfile.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions) + ExeItemCount, secondResult.Length);
+        Assert.AreEqual(CappedCount(filesInUserProfile) + ExeItemCount, secondResult.Length);
     }
 
     [TestMethod]
@@ -764,7 +773,7 @@ public class RunPageTests : CommandPaletteUnitTestBase
 
         // Assert
         Assert.IsNotNull(results);
-        Assert.AreEqual(Math.Min(files.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions), results.Length);
+        Assert.AreEqual(CappedCount(files), results.Length);
     }
 
     [TestMethod]
@@ -785,7 +794,7 @@ public class RunPageTests : CommandPaletteUnitTestBase
             StringAssert.StartsWith(result, "C:\\Windows", StringComparison.InvariantCultureIgnoreCase);
         }
 
-        Assert.AreEqual(Math.Min(filesInWindows.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions), results.Length);
+        Assert.AreEqual(CappedCount(filesInWindows), results.Length);
     }
 
     [TestMethod]
@@ -801,7 +810,7 @@ public class RunPageTests : CommandPaletteUnitTestBase
 
         // Assert
         Assert.IsNotNull(results);
-        Assert.AreEqual(Math.Min(filesInWindows.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions), results.Length);
+        Assert.AreEqual(CappedCount(filesInWindows), results.Length);
         foreach (var result in results)
         {
             StringAssert.StartsWith(result, "C:\\Windows\\");
@@ -821,7 +830,7 @@ public class RunPageTests : CommandPaletteUnitTestBase
 
         // Assert
         Assert.IsNotNull(results);
-        Assert.AreEqual(Math.Min(filesInWindows.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions), results.Length);
+        Assert.AreEqual(CappedCount(filesInWindows), results.Length);
     }
 
     [TestMethod]
@@ -889,12 +898,12 @@ public class RunPageTests : CommandPaletteUnitTestBase
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = "C:\\Program Files\\"; });
 
         var commandList = page.GetItems();
-        Assert.AreEqual(Math.Min(filesInProgramFiles.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions) + ExeItemCount, commandList.Length);
+        Assert.AreEqual(CappedCount(filesInProgramFiles) + ExeItemCount, commandList.Length);
 
         // now go to c:\Program Files\m. This should only have the results with an 'M' in them
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = "C:\\Program Files\\m"; });
         var postFilterOnM = page.GetItems();
-        Assert.AreEqual(Math.Min(inProgramFilesWithM.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions) + ExeItemCount, postFilterOnM.Length);
-        Assert.AreNotEqual(commandList.Length, postFilterOnM.Length);
+        Assert.AreEqual(CappedCount(inProgramFilesWithM) + ExeItemCount, postFilterOnM.Length);
+        Assert.IsTrue(postFilterOnM.Length < commandList.Length, "Filtering by 'm' should narrow the result count");
     }
 }
