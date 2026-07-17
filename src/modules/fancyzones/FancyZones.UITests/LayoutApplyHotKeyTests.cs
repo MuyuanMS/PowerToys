@@ -4,9 +4,13 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Automation;
+using System.Windows.Forms;
 using FancyZonesEditor.Models;
 using FancyZonesEditorCommon.Data;
 using Microsoft.FancyZonesEditor.UITests;
@@ -375,6 +379,40 @@ namespace UITests_FancyZones
         }
         */
 
+        [TestMethod("FancyZones.Settings.TestQuickLayoutSwitchUsesActiveWindowMonitor")]
+        [TestCategory("FancyZones #10")]
+        public void TestQuickLayoutSwitchUsesActiveWindowMonitor()
+        {
+            var allScreens = Screen.AllScreens;
+            if (allScreens.Length < 2)
+            {
+                Assert.Inconclusive("Test requires at least two monitors.");
+            }
+
+            this.OpenFancyZonesPanel(isMax: false);
+            this.ControlQuickLayoutSwitch(true);
+
+            var activeScreen = Screen.PrimaryScreen!;
+            var cursorScreen = allScreens.First(screen => screen.DeviceName != activeScreen.DeviceName);
+            var activeMonitorNumber = ParseMonitorNumber(activeScreen.DeviceName);
+            Assert.IsTrue(activeMonitorNumber > 0, $"Could not parse monitor number from '{activeScreen.DeviceName}'.");
+
+            var settingsWindow = this.Find<Pane>(By.Name("Non Client Input Sink Window"));
+            UITestBase.NativeMethods.MoveWindow(settingsWindow, activeScreen.Bounds.Left + 100, activeScreen.Bounds.Top + 100);
+            settingsWindow.Click();
+
+            Session.MoveMouseTo(activeScreen.Bounds.Left + (activeScreen.Bounds.Width / 2), activeScreen.Bounds.Top + (activeScreen.Bounds.Height / 2));
+            SendKeys(Key.Win, Key.Ctrl, Key.Alt, Key.Num0);
+            Task.Delay(1000).Wait();
+            Assert.AreEqual("{0D6D2F58-9184-4804-81E4-4E4CC3476DC1}", GetAppliedLayoutIdForMonitor(activeMonitorNumber));
+
+            Session.MoveMouseTo(cursorScreen.Bounds.Left + (cursorScreen.Bounds.Width / 2), cursorScreen.Bounds.Top + (cursorScreen.Bounds.Height / 2));
+            settingsWindow.Click();
+            SendKeys(Key.Win, Key.Ctrl, Key.Alt, Key.Num1);
+            Task.Delay(1000).Wait();
+            Assert.AreEqual("{0EB9BF3E-010E-46D7-8681-1879D1E111E1}", GetAppliedLayoutIdForMonitor(activeMonitorNumber));
+        }
+
         [TestMethod("FancyZones.Settings.HotKeyWindowFlashTest")]
         [TestCategory("FancyZones #3")]
         public void HotKeyWindowFlashTest()
@@ -570,6 +608,32 @@ namespace UITests_FancyZones
             UITestBase.NativeMethods.ChangeDisplayResolution(nowWidth, nowHeight);
 
             Clean();
+        }
+
+        private static int ParseMonitorNumber(string deviceName)
+        {
+            var match = Regex.Match(deviceName, @"DISPLAY(?<number>\d+)$", RegexOptions.IgnoreCase);
+            if (!match.Success)
+            {
+                return -1;
+            }
+
+            return int.Parse(match.Groups["number"].Value, CultureInfo.InvariantCulture);
+        }
+
+        private static string? GetAppliedLayoutIdForMonitor(int monitorNumber)
+        {
+            var appliedLayouts = new AppliedLayouts();
+            var appliedLayoutsData = appliedLayouts.Read(appliedLayouts.File);
+
+            if (appliedLayoutsData.AppliedLayouts == null)
+            {
+                return null;
+            }
+
+            return appliedLayoutsData.AppliedLayouts
+                .FirstOrDefault(layout => layout.Device.MonitorNumber == monitorNumber)
+                .AppliedLayout.Uuid;
         }
 
         private void OpenFancyZonesPanel(bool launchAsAdmin = false, bool isMax = false)

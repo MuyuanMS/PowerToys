@@ -1193,7 +1193,7 @@ void FancyZones::ApplyQuickLayout(int key) noexcept
 
     const auto foregroundWindow = GetForegroundWindow();
     WorkArea* workArea = nullptr;
-    if (foregroundWindow)
+    if (FancyZonesWindowProcessing::IsProcessableManually(foregroundWindow))
     {
         workArea = m_workAreaConfiguration.GetWorkAreaFromWindow(foregroundWindow);
     }
