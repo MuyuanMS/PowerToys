@@ -14,9 +14,12 @@ namespace FileLocksmithUI
 {
     public sealed partial class MainWindow : WindowEx, IDisposable
     {
+        private bool _disposed;
+
         public MainWindow(bool isElevated)
         {
             InitializeComponent();
+            Closed += MainWindow_Closed;
             mainPage.ViewModel.IsElevated = isElevated;
             SetTitleBar(titleBar);
             ExtendsContentIntoTitleBar = true;
@@ -38,8 +41,21 @@ namespace FileLocksmithUI
             titleBar.Title = title;
         }
 
+        private void MainWindow_Closed(object sender, WindowEventArgs args)
+        {
+            Dispose();
+        }
+
         public void Dispose()
         {
+            if (_disposed)
+            {
+                return;
+            }
+
+            Closed -= MainWindow_Closed;
+            mainPage?.ViewModel?.Dispose();
+            _disposed = true;
         }
     }
 }

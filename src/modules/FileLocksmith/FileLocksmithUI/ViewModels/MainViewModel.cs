@@ -97,15 +97,22 @@ namespace PowerToys.FileLocksmithUI.ViewModels
             }
 
             _cancelProcessWatching = new CancellationTokenSource();
+            var processWatching = _cancelProcessWatching;
+            var processWatchingToken = processWatching.Token;
             _watcherTasks.Clear();
 
             var processes_found = await FindProcesses(paths);
+            if (processWatchingToken.IsCancellationRequested || _cancelProcessWatching != processWatching)
+            {
+                return;
+            }
+
             if (processes_found is not null)
             {
                 foreach (ProcessResult p in processes_found)
                 {
                     Processes.Add(p);
-                    _watcherTasks.Add(WatchProcess(p, _cancelProcessWatching.Token));
+                    _watcherTasks.Add(WatchProcess(p, processWatchingToken));
                 }
             }
 
