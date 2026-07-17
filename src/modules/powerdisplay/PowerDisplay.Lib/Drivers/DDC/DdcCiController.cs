@@ -79,12 +79,25 @@ namespace PowerDisplay.Common.Drivers.DDC
             ArgumentNullException.ThrowIfNull(monitor);
             if (!TryScaleContrastToRawWriteValue(contrast, monitor.ContrastVcpMax, out var raw))
             {
-                return Task.FromResult(MonitorOperationResult.Failure($"Invalid contrast VCP range: max={monitor.ContrastVcpMax}"));
+                return Task.FromResult(MonitorOperationResult.Failure($"Monitor reported invalid contrast VCP range: max={monitor.ContrastVcpMax}"));
             }
 
             return SetVcpFeatureAsync(monitor, NativeConstants.VcpCodeContrast, raw, cancellationToken);
         }
 
+        /// <summary>
+        /// Converts contrast percentage to a device-native raw VCP value and enforces a minimum write value of 1.
+        /// </summary>
+        /// <param name="contrastPercent">UI contrast percentage value.</param>
+        /// <param name="contrastVcpMax">Device-reported raw maximum for contrast.</param>
+        /// <param name="rawContrast">Computed raw contrast value for the VCP write when conversion succeeds.</param>
+        /// <returns>
+        /// <see langword="true"/> when conversion succeeds; otherwise <see langword="false"/> when
+        /// <paramref name="contrastVcpMax"/> is less than 1.
+        /// </returns>
+        /// <remarks>
+        /// A minimum raw write value of 1 prevents sending 0 to DDC/CI contrast, which can black out some monitors.
+        /// </remarks>
         internal static bool TryScaleContrastToRawWriteValue(int contrastPercent, int contrastVcpMax, out int rawContrast)
         {
             rawContrast = 0;

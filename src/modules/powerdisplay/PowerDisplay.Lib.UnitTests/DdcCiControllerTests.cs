@@ -11,7 +11,7 @@ namespace PowerDisplay.UnitTests;
 public class DdcCiControllerTests
 {
     [TestMethod]
-    public void TryScaleContrastToRawWriteValue_Max50AtOnePercent_ClampsRawToOne()
+    public void TryScaleContrastToRawWriteValue_OnePercentWithMax50_ClampsToOneNotZero()
     {
         var ok = DdcCiController.TryScaleContrastToRawWriteValue(1, contrastVcpMax: 50, out var raw);
 
@@ -20,7 +20,7 @@ public class DdcCiControllerTests
     }
 
     [TestMethod]
-    public void TryScaleContrastToRawWriteValue_ZeroPercent_StillClampsRawToOne()
+    public void TryScaleContrastToRawWriteValue_ZeroPercentWithMax100_ClampsToOneNotZero()
     {
         var ok = DdcCiController.TryScaleContrastToRawWriteValue(0, contrastVcpMax: 100, out var raw);
 
@@ -29,9 +29,27 @@ public class DdcCiControllerTests
     }
 
     [TestMethod]
+    public void TryScaleContrastToRawWriteValue_HundredPercentWithMax50_ScalesToFifty()
+    {
+        var ok = DdcCiController.TryScaleContrastToRawWriteValue(100, contrastVcpMax: 50, out var raw);
+
+        Assert.IsTrue(ok);
+        Assert.AreEqual(50, raw);
+    }
+
+    [TestMethod]
     public void TryScaleContrastToRawWriteValue_InvalidRange_ReturnsFalse()
     {
         var ok = DdcCiController.TryScaleContrastToRawWriteValue(50, contrastVcpMax: 0, out var raw);
+
+        Assert.IsFalse(ok);
+        Assert.AreEqual(0, raw);
+    }
+
+    [TestMethod]
+    public void TryScaleContrastToRawWriteValue_NegativeRange_ReturnsFalse()
+    {
+        var ok = DdcCiController.TryScaleContrastToRawWriteValue(50, contrastVcpMax: -1, out var raw);
 
         Assert.IsFalse(ok);
         Assert.AreEqual(0, raw);
