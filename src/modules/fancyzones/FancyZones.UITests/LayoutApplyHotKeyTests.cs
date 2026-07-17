@@ -404,13 +404,15 @@ namespace UITests_FancyZones
             Session.MoveMouseTo(activeScreen.Bounds.Left + (activeScreen.Bounds.Width / 2), activeScreen.Bounds.Top + (activeScreen.Bounds.Height / 2));
             SendKeys(Key.Win, Key.Ctrl, Key.Alt, Key.Num0);
             Task.Delay(1000).Wait();
-            Assert.AreEqual("{0D6D2F58-9184-4804-81E4-4E4CC3476DC1}", GetAppliedLayoutIdForMonitor(activeMonitorNumber));
+            Assert.IsTrue(TryGetAppliedLayoutIdForMonitor(activeMonitorNumber, out var baselineLayoutId));
+            Assert.AreEqual("{0D6D2F58-9184-4804-81E4-4E4CC3476DC1}", baselineLayoutId);
 
             Session.MoveMouseTo(cursorScreen.Bounds.Left + (cursorScreen.Bounds.Width / 2), cursorScreen.Bounds.Top + (cursorScreen.Bounds.Height / 2));
             settingsWindow.Click();
             SendKeys(Key.Win, Key.Ctrl, Key.Alt, Key.Num1);
             Task.Delay(1000).Wait();
-            Assert.AreEqual("{0EB9BF3E-010E-46D7-8681-1879D1E111E1}", GetAppliedLayoutIdForMonitor(activeMonitorNumber));
+            Assert.IsTrue(TryGetAppliedLayoutIdForMonitor(activeMonitorNumber, out var appliedLayoutId));
+            Assert.AreEqual("{0EB9BF3E-010E-46D7-8681-1879D1E111E1}", appliedLayoutId);
         }
 
         [TestMethod("FancyZones.Settings.HotKeyWindowFlashTest")]
@@ -621,19 +623,26 @@ namespace UITests_FancyZones
             return int.Parse(match.Groups["number"].Value, CultureInfo.InvariantCulture);
         }
 
-        private static string? GetAppliedLayoutIdForMonitor(int monitorNumber)
+        private static bool TryGetAppliedLayoutIdForMonitor(int monitorNumber, out string layoutId)
         {
+            layoutId = string.Empty;
             var appliedLayouts = new AppliedLayouts();
             var appliedLayoutsData = appliedLayouts.Read(appliedLayouts.File);
 
-            if (appliedLayoutsData.AppliedLayouts == null)
+            if (appliedLayoutsData.AppliedLayouts == null || appliedLayoutsData.AppliedLayouts.Count == 0)
             {
-                return null;
+                return false;
             }
 
-            return appliedLayoutsData.AppliedLayouts
-                .FirstOrDefault(layout => layout.Device.MonitorNumber == monitorNumber)
-                .AppliedLayout.Uuid;
+            var appliedLayout = appliedLayoutsData.AppliedLayouts
+                .FirstOrDefault(layout => layout.Device.MonitorNumber == monitorNumber);
+            if (string.IsNullOrEmpty(appliedLayout.AppliedLayout.Uuid))
+            {
+                return false;
+            }
+
+            layoutId = appliedLayout.AppliedLayout.Uuid;
+            return true;
         }
 
         private void OpenFancyZonesPanel(bool launchAsAdmin = false, bool isMax = false)
