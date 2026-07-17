@@ -2,6 +2,7 @@
 #include <common/hooks/LowlevelKeyboardEvent.h>
 #include <common/utils/EventWaiter.h>
 #include <keyboardmanager/common/Input.h>
+#include <mutex>
 #include "State.h"
 
 class KeyboardManager
@@ -14,6 +15,8 @@ public:
 
     ~KeyboardManager()
     {
+        std::lock_guard<std::mutex> lock(hookLifecycleMutex);
+
         if (editorIsRunningEvent)
         {
             CloseHandle(editorIsRunningEvent);
@@ -58,6 +61,11 @@ private:
     std::atomic_bool loadingSettings = false;
 
     HANDLE editorIsRunningEvent = nullptr;
+
+    // Protects hook/priority lifecycle state (hookHandle and hookThreadHandle) when
+    // StartLowlevelKeyboardHook and StopLowlevelKeyboardHook are called from
+    // different threads.
+    mutable std::mutex hookLifecycleMutex;
 
     // Real handle to the thread that installed the WH_KEYBOARD_LL hook (obtained via
     // DuplicateHandle so it remains valid even when called from another thread).
