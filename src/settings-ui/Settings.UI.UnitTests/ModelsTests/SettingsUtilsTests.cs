@@ -104,6 +104,38 @@ namespace CommonLibTest
             Assert.AreEqual("test", settings.TestString);
         }
 
+        [TestMethod]
+        public void GetSettingsOrDefaultAlwaysOnTopShouldMigrateLegacyOpacitySoundSetting()
+        {
+            // Arrange
+            var mockFileSystem = new MockFileSystem();
+            var settingsUtils = new SettingsUtils(mockFileSystem);
+            const string legacySettings = """
+                {
+                  "name": "AlwaysOnTop",
+                  "version": "0.0.1",
+                  "properties": {
+                    "sound-enabled": {
+                      "value": false
+                    }
+                  }
+                }
+                """;
+
+            settingsUtils.SaveSettings(legacySettings, AlwaysOnTopSettings.ModuleName);
+
+            // Act
+            AlwaysOnTopSettings settings = settingsUtils.GetSettingsOrDefault<AlwaysOnTopSettings>(AlwaysOnTopSettings.ModuleName);
+            string savedSettings = mockFileSystem.File.ReadAllText(new SettingPath(mockFileSystem.Directory, mockFileSystem.Path).GetSettingsPath(AlwaysOnTopSettings.ModuleName));
+
+            // Assert
+            Assert.AreEqual(AlwaysOnTopSettings.CurrentModuleVersion, settings.Version);
+            Assert.IsFalse(settings.Properties.SoundEnabled.Value);
+            Assert.IsFalse(settings.Properties.OpacitySoundEnabled.Value);
+            StringAssert.Contains(savedSettings, "\"version\":\"0.0.2\"");
+            StringAssert.Contains(savedSettings, "\"opacity-sound-enabled\":{\"value\":false}");
+        }
+
         public static string RandomString()
         {
             Random random = new Random();

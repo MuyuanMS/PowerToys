@@ -138,6 +138,15 @@ void AlwaysOnTopSettings::LoadSettings()
                 changedSettings.push_back(SettingId::OpacitySoundEnabled);
             }
         }
+        else
+        {
+            auto val = updatedSettings->enableSound;
+            if (updatedSettings->enableOpacitySound != val)
+            {
+                updatedSettings->enableOpacitySound = val;
+                changedSettings.push_back(SettingId::OpacitySoundEnabled);
+            }
+        }
 
         if (const auto jsonVal = values.get_bool_value(NonLocalizable::ShowInSystemMenuID))
         {
