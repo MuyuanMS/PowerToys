@@ -566,6 +566,53 @@ public class ExtensionGalleryViewModelTests
         await viewModel.RefreshCommand.ExecuteAsync(null);
     }
 
+    [TestMethod]
+    public async Task LoadAsync_ConcurrentDispose_DoesNotThrow()
+    {
+        // Regression test: exercises the concurrent race where Dispose() is called while
+        // FetchCoreAsync is already in progress (after ResetCancellation has run).
+        // With a lock-based guard the CTS handoff and disposal are atomic; neither side
+        // should throw ObjectDisposedException.
+        using var fetchStarted = new SemaphoreSlim(0, 1);
+
+        var galleryService = new Mock<IExtensionGalleryService>();
+        galleryService.Setup(s => s.IsCustomFeed).Returns(false);
+        galleryService.Setup(s => s.GetBaseUrl()).Returns("https://example.com/index.json");
+        galleryService
+            .Setup(s => s.FetchExtensionsAsync(It.IsAny<CancellationToken>()))
+            .Returns<CancellationToken>(async ct =>
+            {
+                // Signal that ResetCancellation has already been called and the fetch is running.
+                fetchStarted.Release();
+
+                // Hold until the token is cancelled by Dispose(), or a generous timeout elapses.
+                await Task.Delay(TimeSpan.FromSeconds(5), ct);
+                return new GalleryFetchResult { Extensions = [] };
+            });
+
+        var extensionService = new Mock<IExtensionService>();
+        extensionService
+            .Setup(s => s.GetInstalledExtensionsAsync(true))
+            .ReturnsAsync(Array.Empty<IExtensionWrapper>());
+
+        var viewModel = new ExtensionGalleryViewModel(
+            galleryService.Object,
+            new[] { extensionService.Object },
+            NullLogger<ExtensionGalleryViewModel>.Instance,
+            CreateGalleryExtensionViewModelFactory());
+
+        var loadTask = viewModel.LoadAsync();
+
+        // Wait until the fetch is actually running (ResetCancellation has completed its swap).
+        await fetchStarted.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Dispose concurrently — must not throw ObjectDisposedException.
+        viewModel.Dispose();
+
+        // LoadAsync catches OperationCanceledException internally, so the task should complete cleanly.
+        await loadTask;
+    }
+
     private static Mock<IExtensionGalleryService> CreateGalleryService(params GalleryExtensionEntry[] entries)
     {
         var galleryService = new Mock<IExtensionGalleryService>();
