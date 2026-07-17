@@ -479,14 +479,14 @@ bool WindowArranger::moveWindow(HWND window, const WorkspacesData::WorkspacesPro
     // Monitor numbers are volatile and change when docking/undocking, so relying on them alone causes
     // windows to be placed on the wrong monitor or minimized when external monitor numbers shift.
     auto currentMonitorIter = m_monitors.end();
-    const auto findUniqueMonitorMatch = [&](const auto& matchMonitor) {
-        auto match = std::find_if(m_monitors.begin(), m_monitors.end(), matchMonitor);
-        if (match == m_monitors.end())
+    const auto findUniqueMonitorMatch = [&](const auto& predicate) {
+        auto firstMatch = std::find_if(m_monitors.begin(), m_monitors.end(), predicate);
+        if (firstMatch == m_monitors.end())
         {
-            return match;
+            return firstMatch;
         }
 
-        return std::find_if(match + 1, m_monitors.end(), matchMonitor) == m_monitors.end() ? match : m_monitors.end();
+        return std::find_if(firstMatch + 1, m_monitors.end(), predicate) == m_monitors.end() ? firstMatch : m_monitors.end();
     };
 
     if (!snapMonitorIter->id.empty() && !snapMonitorIter->instanceId.empty())
