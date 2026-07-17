@@ -60,19 +60,14 @@ KeyboardManager::KeyboardManager()
             return;
 
         const bool newHasRemappings = HasRegisteredRemappingsUnchecked();
-        bool hasActiveHook = false;
+        if (newHasRemappings)
         {
-            std::lock_guard<std::mutex> lock(hookLifecycleMutex);
-            hasActiveHook = hookHandle != nullptr;
-        }
-
-        // We didn't have any bindings before and we have now
-        if (newHasRemappings && !hasActiveHook)
             PostThreadMessageW(mainThreadId, StartHookMessageID, 0, 0);
-
-        // All bindings were removed
-        if (!newHasRemappings && hasActiveHook)
+        }
+        else
+        {
             StopLowlevelKeyboardHook();
+        }
     };
 
     editorIsRunningEvent = CreateEvent(nullptr, true, false, KeyboardManagerConstants::EditorWindowEventName.c_str());
@@ -227,6 +222,24 @@ void KeyboardManager::StopLowlevelKeyboardHook()
     {
         DWORD errorCode = GetLastError();
         Logger::warn(L"UnhookWindowsHookEx() failed ({}); keeping hook lifecycle state so stop can be retried.", errorCode);
+
+        // If the handle is already invalid, local state is stale; clean it up and
+        // restore priority using the last known thread handle.
+        if (errorCode == ERROR_INVALID_HOOK_HANDLE)
+        {
+            hookHandle = nullptr;
+            if (hookThreadHandle)
+            {
+                if (!SetThreadPriority(hookThreadHandle, hookThreadPriorityBeforeElevation.load(std::memory_order_acquire)))
+                {
+                    DWORD restoreErrorCode = GetLastError();
+                    Logger::warn(L"SetThreadPriority() failed while restoring thread priority after stale hook handle cleanup (error {}).", restoreErrorCode);
+                }
+                CloseHandle(hookThreadHandle);
+                hookThreadHandle = nullptr;
+            }
+        }
+
         return;
     }
 

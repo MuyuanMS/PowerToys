@@ -15,8 +15,6 @@ public:
 
     ~KeyboardManager()
     {
-        std::lock_guard<std::mutex> lock(hookLifecycleMutex);
-
         if (editorIsRunningEvent)
         {
             CloseHandle(editorIsRunningEvent);
