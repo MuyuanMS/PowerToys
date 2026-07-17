@@ -88,13 +88,13 @@ public class RunPageTests : CommandPaletteUnitTestBase
     }
 
     /// <summary>
-    /// Returns the number of entries in <paramref name="files"/>, capped at
+    /// Returns the number of entries in <paramref name="entries"/>, capped at
     /// <see cref="RunListPage.MaxDirectorySuggestions"/>. Enumerates at most
     /// <c>MaxDirectorySuggestions + 1</c> items so the test stays fast on large
     /// directories such as <c>C:\Windows\WinSxS</c>.
     /// </summary>
-    internal static int CappedCount(IEnumerable<string> files)
-        => Math.Min(files.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions);
+    internal static int CappedCount(IEnumerable<string> entries)
+        => Math.Min(entries.Take(RunListPage.MaxDirectorySuggestions + 1).Count(), RunListPage.MaxDirectorySuggestions);
 
     [TestMethod]
     public async Task TestSimple()
