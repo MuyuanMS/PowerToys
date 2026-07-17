@@ -87,6 +87,35 @@ public partial class CommandViewModel : ExtensionObjectViewModel
             return;
         }
 
+        // Marshal WinRT event subscription to the UI thread to avoid a deadlock
+        // in the WinRT EventSourceCache (ReaderWriterLockSlim) that can occur when
+        // background threads subscribe while the UI thread concurrently unsubscribes
+        // during theme reapply (via CommunityToolkit DispatcherQueueTimer.Debounce).
+        // Wait for this to complete so we don't miss updates between initialization
+        // and subscription.
+        DoOnUiThreadAndWait(() =>
+        {
+            lock (_propChangedSubscriptionLock)
+            {
+                if (_cleanupStarted || _propChangedSubscribed)
+                {
+                    return;
+                }
+
+                // Model.Unsafe can be reassigned on another thread between capture
+                // and lock acquisition. Avoid attaching to an outdated instance that
+                // is no longer referenced by this view model, which would leak this
+                // event handler without a reliable unsubscribe path.
+                if (!ReferenceEquals(model, Model.Unsafe))
+                {
+                    return;
+                }
+
+                model.PropChanged += Model_PropChanged;
+                _propChangedSubscribed = true;
+            }
+        });
+
         var ico = model.Icon;
         if (ico is not null)
         {
@@ -98,42 +127,6 @@ public partial class CommandViewModel : ExtensionObjectViewModel
         if (model is IExtendedAttributesProvider command2)
         {
             UpdatePropertiesFromExtension(command2);
-        }
-
-        var shouldSubscribe = true;
-        lock (_propChangedSubscriptionLock)
-        {
-            if (_cleanupStarted || _propChangedSubscribed)
-            {
-                shouldSubscribe = false;
-            }
-        }
-
-        if (shouldSubscribe)
-        {
-            // Marshal WinRT event subscription to the UI thread to avoid a deadlock
-            // in the WinRT EventSourceCache (ReaderWriterLockSlim) that can occur when
-            // background threads subscribe while the UI thread concurrently unsubscribes
-            // during theme reapply (via CommunityToolkit DispatcherQueueTimer.Debounce).
-            // Wait for this to complete so we don't miss updates between initialization
-            // and subscription.
-            DoOnUiThreadAndWait(() =>
-            {
-                lock (_propChangedSubscriptionLock)
-                {
-                    if (_cleanupStarted || _propChangedSubscribed)
-                    {
-                        return;
-                    }
-
-                    model.PropChanged += Model_PropChanged;
-                    _propChangedSubscribed = true;
-                }
-            });
-
-            FetchProperty(nameof(Name));
-            FetchProperty(nameof(Icon));
-            FetchProperty(nameof(Properties));
         }
     }
 
@@ -159,6 +152,14 @@ public partial class CommandViewModel : ExtensionObjectViewModel
 
     protected void FetchProperty(string propertyName)
     {
+        lock (_propChangedSubscriptionLock)
+        {
+            if (_cleanupStarted)
+            {
+                return;
+            }
+        }
+
         var model = Model.Unsafe;
         if (model is null)
         {

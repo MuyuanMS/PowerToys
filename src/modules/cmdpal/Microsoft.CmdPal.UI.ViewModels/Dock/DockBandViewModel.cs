@@ -260,8 +260,6 @@ public sealed partial class DockBandViewModel : ExtensionObjectViewModel
         var list = command.Model.Unsafe as IListPage;
         if (list is not null)
         {
-            InitializeFromList(list);
-
             var shouldSubscribe = true;
             lock (_itemsChangedSubscriptionLock)
             {
@@ -292,9 +290,9 @@ public sealed partial class DockBandViewModel : ExtensionObjectViewModel
                         _itemsChangedSubscribed = true;
                     }
                 });
-
-                InitializeFromList(list);
             }
+
+            InitializeFromList(list);
         }
         else
         {

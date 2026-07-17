@@ -273,14 +273,31 @@ public abstract partial class ExtensionObjectViewModel : ObservableObject, IBatc
             return;
         }
 
-        if (TaskScheduler.Current == pageContext.Scheduler)
+        // The TaskScheduler.Current check catches cases where we're already running
+        // on the target scheduler via Task infrastructure. The
+        // SynchronizationContext check covers direct UI-thread callbacks (e.g.,
+        // DispatcherQueue callbacks) where TaskScheduler.Current can still be Default.
+        if (TaskScheduler.Current == pageContext.Scheduler ||
+            (SynchronizationContext.Current is not null &&
+             TaskScheduler.FromCurrentSynchronizationContext() == pageContext.Scheduler))
         {
             action();
             return;
         }
 
         Task.Factory.StartNew(
-            action,
+            () =>
+            {
+                try
+                {
+                    action();
+                }
+                catch (Exception ex)
+                {
+                    CoreLogger.LogError("Failed to run action on UI thread.", ex);
+                    throw;
+                }
+            },
             CancellationToken.None,
             TaskCreationOptions.None,
             pageContext.Scheduler).GetAwaiter().GetResult();
