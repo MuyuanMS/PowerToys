@@ -77,8 +77,25 @@ namespace PowerDisplay.Common.Drivers.DDC
         public Task<MonitorOperationResult> SetContrastAsync(Monitor monitor, int contrast, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(monitor);
-            var raw = VcpFeatureValue.FromPercentage(contrast, monitor.ContrastVcpMax);
+            if (!TryScaleContrastToRawWriteValue(contrast, monitor.ContrastVcpMax, out var raw))
+            {
+                return Task.FromResult(MonitorOperationResult.Failure($"Invalid contrast VCP range: max={monitor.ContrastVcpMax}"));
+            }
+
             return SetVcpFeatureAsync(monitor, NativeConstants.VcpCodeContrast, raw, cancellationToken);
+        }
+
+        internal static bool TryScaleContrastToRawWriteValue(int contrastPercent, int contrastVcpMax, out int rawContrast)
+        {
+            rawContrast = 0;
+            if (contrastVcpMax < 1)
+            {
+                return false;
+            }
+
+            rawContrast = VcpFeatureValue.FromPercentage(contrastPercent, contrastVcpMax);
+            rawContrast = Math.Clamp(rawContrast, 1, contrastVcpMax);
+            return true;
         }
 
         /// <inheritdoc />
