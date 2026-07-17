@@ -392,7 +392,13 @@ namespace UITests_FancyZones
             this.OpenFancyZonesPanel(isMax: false);
             this.ControlQuickLayoutSwitch(true);
 
-            var activeScreen = Screen.PrimaryScreen!;
+            var activeScreen = Screen.PrimaryScreen;
+            if (activeScreen == null)
+            {
+                Assert.Inconclusive("Primary screen is unavailable.");
+                return;
+            }
+
             var cursorScreen = allScreens.First(screen => screen.DeviceName != activeScreen.DeviceName);
             var activeMonitorNumber = ParseMonitorNumber(activeScreen.DeviceName);
             Assert.IsTrue(activeMonitorNumber > 0, $"Could not parse monitor number from '{activeScreen.DeviceName}'.");
@@ -634,15 +640,16 @@ namespace UITests_FancyZones
                 return false;
             }
 
-            var appliedLayout = appliedLayoutsData.AppliedLayouts
-                .FirstOrDefault(layout => layout.Device.MonitorNumber == monitorNumber);
-            if (string.IsNullOrEmpty(appliedLayout.AppliedLayout.Uuid))
+            foreach (var appliedLayout in appliedLayoutsData.AppliedLayouts)
             {
-                return false;
+                if (appliedLayout.Device.MonitorNumber == monitorNumber && !string.IsNullOrEmpty(appliedLayout.AppliedLayout.Uuid))
+                {
+                    layoutId = appliedLayout.AppliedLayout.Uuid;
+                    return true;
+                }
             }
 
-            layoutId = appliedLayout.AppliedLayout.Uuid;
-            return true;
+            return false;
         }
 
         private void OpenFancyZonesPanel(bool launchAsAdmin = false, bool isMax = false)
