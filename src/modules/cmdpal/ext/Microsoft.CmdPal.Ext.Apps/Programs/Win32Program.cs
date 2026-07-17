@@ -579,11 +579,11 @@ public partial class Win32Program : IProgram
             string resolvedDirectory;
             try
             {
-                resolvedDirectory = Directory.ResolveLinkTarget(currentDirectory, returnFinalTarget: true)?.FullName ?? currentDirectory;
+                resolvedDirectory = System.IO.Directory.ResolveLinkTarget(currentDirectory, returnFinalTarget: true)?.FullName ?? currentDirectory;
             }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is SecurityException)
             {
-                Logger.LogError($"Failed to resolve link target for '{currentDirectory}': {e.Message}");
+                Logger.LogError($"Failed to resolve link target for '{currentDirectory}'", e);
                 resolvedDirectory = currentDirectory;
             }
 
