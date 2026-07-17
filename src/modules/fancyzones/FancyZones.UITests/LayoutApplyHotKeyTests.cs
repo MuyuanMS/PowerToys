@@ -648,23 +648,6 @@ namespace UITests_FancyZones
                 return false;
             }
 
-            private static bool WaitForAppliedLayoutIdOnMonitor(int monitorNumber, string expectedLayoutId, int timeoutMs = 3000, int pollIntervalMs = 100)
-            {
-                var endTime = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-                while (DateTime.UtcNow < endTime)
-                {
-                    if (TryGetAppliedLayoutIdForMonitor(monitorNumber, out var appliedLayoutId) &&
-                        string.Equals(appliedLayoutId, expectedLayoutId, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return true;
-                    }
-
-                    Task.Delay(pollIntervalMs).Wait();
-                }
-
-                return false;
-            }
-
             foreach (var appliedLayout in appliedLayoutsData.AppliedLayouts)
             {
                 if (appliedLayout.Device.MonitorNumber == monitorNumber && !string.IsNullOrEmpty(appliedLayout.AppliedLayout.Uuid))
@@ -672,6 +655,23 @@ namespace UITests_FancyZones
                     layoutId = appliedLayout.AppliedLayout.Uuid;
                     return true;
                 }
+            }
+
+            return false;
+        }
+
+        private static bool WaitForAppliedLayoutIdOnMonitor(int monitorNumber, string expectedLayoutId, int timeoutMs = 3000, int pollIntervalMs = 100)
+        {
+            var endTime = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+            while (DateTime.UtcNow < endTime)
+            {
+                if (TryGetAppliedLayoutIdForMonitor(monitorNumber, out var appliedLayoutId) &&
+                    string.Equals(appliedLayoutId, expectedLayoutId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                Task.Delay(pollIntervalMs).Wait();
             }
 
             return false;
