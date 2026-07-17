@@ -93,11 +93,10 @@ internal sealed class AppLifeMonitor : IDisposable
 
         ushort atom = NativeMethods.RegisterClassW(ref wndClass);
 
-        // Signal Start() even on failure so it is never left waiting forever.
-        _threadReadyEvent.Set();
-
         if (atom == 0)
         {
+            // Signal Start() so it is never left waiting forever.
+            _threadReadyEvent.Set();
             return;
         }
 
@@ -113,8 +112,13 @@ internal sealed class AppLifeMonitor : IDisposable
         {
             NativeMethods.UnregisterClassW(className, hInstance);
             GC.KeepAlive(wndProcDelegate);
+            // Signal Start() so it is never left waiting forever.
+            _threadReadyEvent.Set();
             return;
         }
+
+        // Signal Start() only after the window is successfully created.
+        _threadReadyEvent.Set();
 
         while (NativeMethods.GetMessageW(out NativeMethods.MSG msg, hWnd: 0, wMsgFilterMin: 0, wMsgFilterMax: 0) > 0)
         {
@@ -135,9 +139,8 @@ internal sealed class AppLifeMonitor : IDisposable
         {
             case NativeMethods.WM_QUERYENDSESSION:
                 // Tell Windows we are ready to quit so it does not report us as
-                // hung (MOAPPLICATION_HANG / HANG_QUIESCE), and signal the main
-                // thread so it can clean up and exit promptly.
-                _exitRequestedEvent.Set();
+                // hung (MOAPPLICATION_HANG / HANG_QUIESCE). Signal the main
+                // thread only when shutdown is confirmed via WM_ENDSESSION.
                 return 1; // TRUE: ready to end the session
 
             case NativeMethods.WM_ENDSESSION:
