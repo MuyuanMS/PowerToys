@@ -399,7 +399,13 @@ namespace UITests_FancyZones
                 return;
             }
 
-            var cursorScreen = allScreens.First(screen => screen.DeviceName != activeScreen.DeviceName);
+            var cursorScreen = allScreens.FirstOrDefault(screen => screen.DeviceName != activeScreen.DeviceName);
+            if (cursorScreen == null)
+            {
+                Assert.Inconclusive("No secondary monitor was found for cursor placement.");
+                return;
+            }
+
             var activeMonitorNumber = ParseMonitorNumber(activeScreen.DeviceName);
             Assert.IsTrue(activeMonitorNumber > 0, $"Could not parse monitor number from '{activeScreen.DeviceName}'.");
 
@@ -413,8 +419,8 @@ namespace UITests_FancyZones
             Assert.IsTrue(TryGetAppliedLayoutIdForMonitor(activeMonitorNumber, out var baselineLayoutId));
             Assert.AreEqual("{0D6D2F58-9184-4804-81E4-4E4CC3476DC1}", baselineLayoutId);
 
-            Session.MoveMouseTo(cursorScreen.Bounds.Left + (cursorScreen.Bounds.Width / 2), cursorScreen.Bounds.Top + (cursorScreen.Bounds.Height / 2));
             settingsWindow.Click();
+            Session.MoveMouseTo(cursorScreen.Bounds.Left + (cursorScreen.Bounds.Width / 2), cursorScreen.Bounds.Top + (cursorScreen.Bounds.Height / 2));
             SendKeys(Key.Win, Key.Ctrl, Key.Alt, Key.Num1);
             Task.Delay(1000).Wait();
             Assert.IsTrue(TryGetAppliedLayoutIdForMonitor(activeMonitorNumber, out var appliedLayoutId));
