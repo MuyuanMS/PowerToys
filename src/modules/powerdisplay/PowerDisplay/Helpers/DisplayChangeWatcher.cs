@@ -15,13 +15,15 @@ namespace PowerDisplay.Helpers;
 
 /// <summary>
 /// Watches for display/monitor configuration changes and emits coalesced refresh
-/// signals. Two independent sources feed in:
+/// signals. Three independent sources feed in:
 ///
 /// 1. <see cref="DeviceWatcher"/> over <c>DisplayMonitor</c> — picks up device
 ///    enumeration changes (plug, unplug, GPU rebind).
 /// 2. <see cref="PowerSettingsNative.GuidConsoleDisplayState"/> — fires whenever
 ///    the console display transitions on/off/dimmed. Reliable on both S3 and
 ///    S0ix and the only signal that catches idle-blank or lid recovery.
+/// 3. <c>WM_DISPLAYCHANGE</c> from the host window — catches external display
+///    configuration updates (orientation, resolution, color depth).
 ///
 /// Every detected change fires <see cref="DisplayChanging"/> synchronously
 /// (so the ViewModel can lock interactive UI immediately) and then schedules
@@ -56,7 +58,7 @@ public sealed partial class DisplayChangeWatcher : IDisposable
 
     /// <summary>
     /// Event triggered as soon as a display configuration change is detected
-    /// (device added/removed, or console display turning ON). Fires on the
+    /// (device added/removed, <c>WM_DISPLAYCHANGE</c>, or console display turning ON). Fires on the
     /// dispatcher thread, synchronously, BEFORE the debounce delay elapses —
     /// gives subscribers a chance to lock interactive UI so users can't act on
     /// monitors that are about to disappear, change, or be re-enumerated.
@@ -174,7 +176,7 @@ public sealed partial class DisplayChangeWatcher : IDisposable
     /// </summary>
     public void OnWmDisplayChange()
     {
-        if (_disposed)
+        if (_disposed || !_isRunning || !_initialEnumerationComplete)
         {
             return;
         }
