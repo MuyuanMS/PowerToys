@@ -53,8 +53,7 @@ namespace FileLocksmithUI
                 return;
             }
 
-            Closed -= MainWindow_Closed;
-            mainPage?.ViewModel?.Dispose();
+            mainPage.ViewModel.Dispose();
             _disposed = true;
         }
     }
