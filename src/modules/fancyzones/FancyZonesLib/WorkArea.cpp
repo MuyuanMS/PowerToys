@@ -222,14 +222,29 @@ void WorkArea::UpdateWindowPositions()
     {
         if (!Snap(window, zones, true) && layoutSize > 0 && !zones.empty())
         {
-            // The saved zone set doesn't fully fit the new layout (e.g., after switching
-            // to a layout with fewer zones). Fall back to the first valid zone from the set.
+            // Only fall back when the failure is caused by an out-of-range zone index
+            // (e.g. switching to a layout with fewer zones). If all indices are within
+            // bounds, Snap failed for an unrelated reason such as StampZoneIndexProperty
+            // returning false, in which case the window has already been moved and recorded
+            // and we must not overwrite that valid assignment.
+            bool hasOutOfRangeZone = false;
             for (ZoneIndex zone : zones)
             {
-                if (static_cast<size_t>(zone) < layoutSize)
+                if (static_cast<size_t>(zone) >= layoutSize)
                 {
-                    Snap(window, { zone }, true);
+                    hasOutOfRangeZone = true;
                     break;
+                }
+            }
+            if (hasOutOfRangeZone)
+            {
+                for (ZoneIndex zone : zones)
+                {
+                    if (static_cast<size_t>(zone) < layoutSize)
+                    {
+                        Snap(window, { zone }, true);
+                        break;
+                    }
                 }
             }
         }
