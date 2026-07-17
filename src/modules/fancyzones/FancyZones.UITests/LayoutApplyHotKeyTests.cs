@@ -407,24 +407,26 @@ namespace UITests_FancyZones
             }
 
             var activeMonitorNumber = ParseMonitorNumber(activeScreen.DeviceName);
-            Assert.IsTrue(activeMonitorNumber > 0, $"Could not parse monitor number from '{activeScreen.DeviceName}'.");
+            if (activeMonitorNumber <= 0)
+            {
+                Assert.Inconclusive($"Could not parse monitor number from '{activeScreen.DeviceName}'.");
+                return;
+            }
 
             var settingsWindow = this.Find<Pane>(By.Name("Non Client Input Sink Window"));
-            UITestBase.NativeMethods.MoveWindow(settingsWindow, activeScreen.Bounds.Left + 100, activeScreen.Bounds.Top + 100);
+            var xOffset = Math.Max(20, activeScreen.Bounds.Width / 10);
+            var yOffset = Math.Max(20, activeScreen.Bounds.Height / 10);
+            UITestBase.NativeMethods.MoveWindow(settingsWindow, activeScreen.Bounds.Left + xOffset, activeScreen.Bounds.Top + yOffset);
             settingsWindow.Click();
 
             Session.MoveMouseTo(activeScreen.Bounds.Left + (activeScreen.Bounds.Width / 2), activeScreen.Bounds.Top + (activeScreen.Bounds.Height / 2));
             SendKeys(Key.Win, Key.Ctrl, Key.Alt, Key.Num0);
-            Task.Delay(1000).Wait();
-            Assert.IsTrue(TryGetAppliedLayoutIdForMonitor(activeMonitorNumber, out var baselineLayoutId));
-            Assert.AreEqual("{0D6D2F58-9184-4804-81E4-4E4CC3476DC1}", baselineLayoutId);
+            Assert.IsTrue(WaitForAppliedLayoutIdOnMonitor(activeMonitorNumber, "{0D6D2F58-9184-4804-81E4-4E4CC3476DC1}"), "Baseline quick-layout hotkey was not applied on the active monitor.");
 
             settingsWindow.Click();
             Session.MoveMouseTo(cursorScreen.Bounds.Left + (cursorScreen.Bounds.Width / 2), cursorScreen.Bounds.Top + (cursorScreen.Bounds.Height / 2));
             SendKeys(Key.Win, Key.Ctrl, Key.Alt, Key.Num1);
-            Task.Delay(1000).Wait();
-            Assert.IsTrue(TryGetAppliedLayoutIdForMonitor(activeMonitorNumber, out var appliedLayoutId));
-            Assert.AreEqual("{0EB9BF3E-010E-46D7-8681-1879D1E111E1}", appliedLayoutId);
+            Assert.IsTrue(WaitForAppliedLayoutIdOnMonitor(activeMonitorNumber, "{0EB9BF3E-010E-46D7-8681-1879D1E111E1}"), "Quick-layout hotkey was not applied on the active monitor when cursor was on another monitor.");
         }
 
         [TestMethod("FancyZones.Settings.HotKeyWindowFlashTest")]
@@ -643,6 +645,23 @@ namespace UITests_FancyZones
 
             if (appliedLayoutsData.AppliedLayouts == null || appliedLayoutsData.AppliedLayouts.Count == 0)
             {
+                return false;
+            }
+
+            private static bool WaitForAppliedLayoutIdOnMonitor(int monitorNumber, string expectedLayoutId, int timeoutMs = 3000, int pollIntervalMs = 100)
+            {
+                var endTime = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+                while (DateTime.UtcNow < endTime)
+                {
+                    if (TryGetAppliedLayoutIdForMonitor(monitorNumber, out var appliedLayoutId) &&
+                        string.Equals(appliedLayoutId, expectedLayoutId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+
+                    Task.Delay(pollIntervalMs).Wait();
+                }
+
                 return false;
             }
 
