@@ -31,7 +31,56 @@ namespace PowerRenameManagerTests
             int depth;
         };
 
-        void RenameHelper(_In_ rename_pairs * renamePairs, _In_ int numPairs, _In_ std::wstring searchTerm, _In_ std::wstring replaceTerm, SYSTEMTIME fileTime, _In_ DWORD flags)
+        static std::wstring GetItemStringValue(_In_ IPowerRenameItem* item, _In_ HRESULT(__stdcall IPowerRenameItem::* getter)(_Outptr_ PWSTR*))
+        {
+            PWSTR value = nullptr;
+            std::wstring result;
+            if (SUCCEEDED((item->*getter)(&value)) && value != nullptr)
+            {
+                result = value;
+            }
+            CoTaskMemFree(value);
+            return result;
+        }
+
+        static CComPtr<IPowerRenameManager> CreateManagerWithEvents(_Out_ CMockPowerRenameManagerEvents** mockMgrEvents)
+        {
+            CComPtr<IPowerRenameManager> mgr;
+            Assert::AreEqual(S_OK, CPowerRenameManager::s_CreateInstance(&mgr));
+
+            *mockMgrEvents = new CMockPowerRenameManagerEvents();
+            CComPtr<IPowerRenameManagerEvents> mgrEvents;
+            Assert::AreEqual(S_OK, (*mockMgrEvents)->QueryInterface(IID_PPV_ARGS(&mgrEvents)));
+
+            DWORD cookie = 0;
+            Assert::AreEqual(S_OK, mgr->Advise(mgrEvents, &cookie));
+
+            return mgr;
+        }
+
+        static bool RenameWithRetries(_In_ IPowerRenameManager* mgr, bool closeWindow)
+        {
+            for (int step = 0; step < 20; step++)
+            {
+                if (mgr->Rename(0, closeWindow) == S_OK)
+                {
+                    return true;
+                }
+                Sleep(10);
+            }
+            return false;
+        }
+
+        static void ConfigureRenameRegex(_In_ IPowerRenameManager* mgr, _In_ std::wstring searchTerm, _In_ std::wstring replaceTerm, _In_ DWORD flags)
+        {
+            CComPtr<IPowerRenameRegEx> renRegEx;
+            Assert::AreEqual(S_OK, mgr->GetRenameRegEx(&renRegEx));
+            renRegEx->PutFlags(flags);
+            renRegEx->PutSearchTerm(searchTerm.c_str());
+            renRegEx->PutReplaceTerm(replaceTerm.c_str());
+        }
+
+        void RenameHelper(_In_ rename_pairs * renamePairs, _In_ int numPairs, _In_ std::wstring searchTerm, _In_ std::wstring replaceTerm, SYSTEMTIME fileTime, _In_ DWORD flags, bool closeWindow = true)
         {
             // Create a single item (in a temp directory) and verify rename works as expected
             CTestFileHelper testFileHelper;
@@ -47,13 +96,8 @@ namespace PowerRenameManagerTests
                 }
             }
 
-            CComPtr<IPowerRenameManager> mgr;
-            Assert::IsTrue(CPowerRenameManager::s_CreateInstance(&mgr) == S_OK);
-            CMockPowerRenameManagerEvents* mockMgrEvents = new CMockPowerRenameManagerEvents();
-            CComPtr<IPowerRenameManagerEvents> mgrEvents;
-            Assert::IsTrue(mockMgrEvents->QueryInterface(IID_PPV_ARGS(&mgrEvents)) == S_OK);
-            DWORD cookie = 0;
-            Assert::IsTrue(mgr->Advise(mgrEvents, &cookie) == S_OK);
+            CMockPowerRenameManagerEvents* mockMgrEvents = nullptr;
+            CComPtr<IPowerRenameManager> mgr = CreateManagerWithEvents(&mockMgrEvents);
 
             for (int i = 0; i < numPairs; i++)
             {
@@ -66,30 +110,14 @@ namespace PowerRenameManagerTests
                                                      &item);
 
                 int itemId = 0;
-                Assert::IsTrue(item->GetId(&itemId) == S_OK);
+                Assert::AreEqual(S_OK, item->GetId(&itemId));
                 mgr->AddItem(item);
             }
 
-            // TODO: Setup match and replace parameters
-            CComPtr<IPowerRenameRegEx> renRegEx;
-            Assert::IsTrue(mgr->GetRenameRegEx(&renRegEx) == S_OK);
-            renRegEx->PutFlags(flags);
-            renRegEx->PutSearchTerm(searchTerm.c_str());
-            renRegEx->PutReplaceTerm(replaceTerm.c_str());
+            ConfigureRenameRegex(mgr, searchTerm, replaceTerm, flags);
 
             // Perform the rename
-            bool replaceSuccess = false;
-            for (int step = 0; step < 20; step++)
-            {
-                replaceSuccess = mgr->Rename(0, true) == S_OK;
-                if (replaceSuccess)
-                {
-                    break;
-                }
-                Sleep(10);
-            }
-
-            Assert::IsTrue(replaceSuccess);
+            Assert::IsTrue(RenameWithRetries(mgr, closeWindow));
 
             std::vector<std::wstring> shouldRename = { L"not ", L"" };
 
@@ -157,6 +185,134 @@ namespace PowerRenameManagerTests
             };
 
             RenameHelper(renamePairs, ARRAYSIZE(renamePairs), L"foo", L"bar", SYSTEMTIME{ 2020, 7, 3, 22, 15, 6, 42, 453 }, DEFAULT_FLAGS);
+        }
+
+        TEST_METHOD (VerifyKeepUiOpenRenameUpdatesItemStateAndSecondApplyIsStable)
+        {
+            CTestFileHelper testFileHelper;
+            Assert::IsTrue(testFileHelper.AddFile(L"foo.txt"));
+
+            CMockPowerRenameManagerEvents* mockMgrEvents = nullptr;
+            CComPtr<IPowerRenameManager> mgr = CreateManagerWithEvents(&mockMgrEvents);
+            CComPtr<IPowerRenameItem> item;
+            CMockPowerRenameItem::CreateInstance(testFileHelper.GetFullPath(L"foo.txt").c_str(),
+                                                 L"foo.txt",
+                                                 0,
+                                                 false,
+                                                 SYSTEMTIME{ 2020, 7, 3, 22, 15, 6, 42, 453 },
+                                                 &item);
+            mgr->AddItem(item);
+
+            ConfigureRenameRegex(mgr, L"foo", L"bar", DEFAULT_FLAGS);
+
+            Assert::IsTrue(RenameWithRetries(mgr, false));
+
+            CComPtr<IPowerRenameItem> updatedItem;
+            Assert::AreEqual(S_OK, mgr->GetItemByIndex(0, &updatedItem));
+
+            auto pathValue = GetItemStringValue(updatedItem, &IPowerRenameItem::GetPath);
+            auto originalNameValue = GetItemStringValue(updatedItem, &IPowerRenameItem::GetOriginalName);
+            auto newNameValue = GetItemStringValue(updatedItem, &IPowerRenameItem::GetNewName);
+            Assert::AreEqual(testFileHelper.GetFullPath(L"bar.txt").c_str(), pathValue.c_str());
+            Assert::AreEqual(L"bar.txt", originalNameValue.c_str());
+            Assert::AreEqual(L"", newNameValue.c_str());
+            Assert::IsTrue(testFileHelper.PathExistsCaseSensitive(L"bar.txt"));
+            Assert::IsFalse(testFileHelper.PathExistsCaseSensitive(L"foo.txt"));
+
+            Assert::IsTrue(RenameWithRetries(mgr, false));
+
+            pathValue = GetItemStringValue(updatedItem, &IPowerRenameItem::GetPath);
+            originalNameValue = GetItemStringValue(updatedItem, &IPowerRenameItem::GetOriginalName);
+            newNameValue = GetItemStringValue(updatedItem, &IPowerRenameItem::GetNewName);
+            Assert::AreEqual(testFileHelper.GetFullPath(L"bar.txt").c_str(), pathValue.c_str());
+            Assert::AreEqual(L"bar.txt", originalNameValue.c_str());
+            Assert::AreEqual(L"", newNameValue.c_str());
+
+            Assert::AreEqual(S_OK, mgr->Shutdown());
+            mockMgrEvents->Release();
+        }
+
+        TEST_METHOD (VerifyKeepUiOpenRenameDoesNotCommitFailedItemState)
+        {
+            CTestFileHelper testFileHelper;
+            Assert::IsTrue(testFileHelper.AddFile(L"foo1.txt"));
+            Assert::IsTrue(testFileHelper.AddFile(L"foo2.txt"));
+
+            CMockPowerRenameManagerEvents* mockMgrEvents = nullptr;
+            CComPtr<IPowerRenameManager> mgr = CreateManagerWithEvents(&mockMgrEvents);
+
+            CComPtr<IPowerRenameItem> item1;
+            CComPtr<IPowerRenameItem> item2;
+            CMockPowerRenameItem::CreateInstance(testFileHelper.GetFullPath(L"foo1.txt").c_str(), L"foo1.txt", 0, false, SYSTEMTIME{ 2020, 7, 3, 22, 15, 6, 42, 453 }, &item1);
+            CMockPowerRenameItem::CreateInstance(testFileHelper.GetFullPath(L"foo2.txt").c_str(), L"foo2.txt", 0, false, SYSTEMTIME{ 2020, 7, 3, 22, 15, 6, 42, 453 }, &item2);
+            mgr->AddItem(item1);
+            mgr->AddItem(item2);
+
+            ConfigureRenameRegex(mgr, L"foo[0-9]", L"bar", DEFAULT_FLAGS | UseRegularExpressions);
+
+            Assert::IsTrue(RenameWithRetries(mgr, false));
+
+            int committedItems = 0;
+            int notCommittedItems = 0;
+            for (UINT index = 0; index < 2; index++)
+            {
+                CComPtr<IPowerRenameItem> currentItem;
+                Assert::AreEqual(S_OK, mgr->GetItemByIndex(index, &currentItem));
+
+                const auto pathValue = GetItemStringValue(currentItem, &IPowerRenameItem::GetPath);
+                const auto originalNameValue = GetItemStringValue(currentItem, &IPowerRenameItem::GetOriginalName);
+                const auto newNameValue = GetItemStringValue(currentItem, &IPowerRenameItem::GetNewName);
+
+                if (originalNameValue == L"bar.txt")
+                {
+                    committedItems++;
+                    Assert::AreEqual(testFileHelper.GetFullPath(L"bar.txt").c_str(), pathValue.c_str());
+                    Assert::AreEqual(L"", newNameValue.c_str());
+                }
+                else
+                {
+                    notCommittedItems++;
+                    const bool oldNameMatch = (originalNameValue == L"foo1.txt") || (originalNameValue == L"foo2.txt");
+                    const bool oldPathMatch = (pathValue == testFileHelper.GetFullPath(L"foo1.txt")) ||
+                                              (pathValue == testFileHelper.GetFullPath(L"foo2.txt"));
+                    Assert::IsTrue(oldNameMatch);
+                    Assert::IsTrue(oldPathMatch);
+                    Assert::AreEqual(L"bar.txt", newNameValue.c_str());
+                }
+            }
+
+            Assert::AreEqual(1, committedItems);
+            Assert::AreEqual(1, notCommittedItems);
+            Assert::IsTrue(testFileHelper.PathExistsCaseSensitive(L"bar.txt"));
+            Assert::IsTrue(testFileHelper.PathExistsCaseSensitive(L"foo1.txt") || testFileHelper.PathExistsCaseSensitive(L"foo2.txt"));
+
+            Assert::IsTrue(RenameWithRetries(mgr, false));
+
+            committedItems = 0;
+            notCommittedItems = 0;
+            for (UINT index = 0; index < 2; index++)
+            {
+                CComPtr<IPowerRenameItem> currentItem;
+                Assert::AreEqual(S_OK, mgr->GetItemByIndex(index, &currentItem));
+                const auto originalNameValue = GetItemStringValue(currentItem, &IPowerRenameItem::GetOriginalName);
+                const auto newNameValue = GetItemStringValue(currentItem, &IPowerRenameItem::GetNewName);
+                if (originalNameValue == L"bar.txt")
+                {
+                    committedItems++;
+                    Assert::AreEqual(L"", newNameValue.c_str());
+                }
+                else
+                {
+                    notCommittedItems++;
+                    Assert::AreEqual(L"bar.txt", newNameValue.c_str());
+                }
+            }
+
+            Assert::AreEqual(1, committedItems);
+            Assert::AreEqual(1, notCommittedItems);
+
+            Assert::AreEqual(S_OK, mgr->Shutdown());
+            mockMgrEvents->Release();
         }
 
         TEST_METHOD (VerifyMultiRename)

@@ -795,6 +795,7 @@ DWORD WINAPI CPowerRenameManager::s_fileOpWorkerThread(_In_ void* pv)
                             CComPtr<IPowerRenameItem> spItem;
                             std::wstring newName;
                             std::wstring newPath;
+                            std::wstring oldPath;
                             size_t oldPathSize;
                             int id;
                             bool isFolder;
@@ -818,8 +819,8 @@ DWORD WINAPI CPowerRenameManager::s_fileOpWorkerThread(_In_ void* pv)
                                             CComPtr<IShellItem> spShellItem;
                                             if (SUCCEEDED(spItem->GetShellItem(&spShellItem)))
                                             {
-                                                spFileOp->RenameItem(spShellItem, newName, nullptr);
-                                                if (!closeUIWindowAfterRenaming)
+                                                HRESULT renameHr = spFileOp->RenameItem(spShellItem, newName, nullptr);
+                                                if (!closeUIWindowAfterRenaming && SUCCEEDED(renameHr))
                                                 {
                                                     // Collect item data for post-operation update.
                                                     // Both pointers are initialized to nullptr so
@@ -834,8 +835,9 @@ DWORD WINAPI CPowerRenameManager::s_fileOpWorkerThread(_In_ void* pv)
                                                     if (gotNames)
                                                     {
                                                         std::wstring originalNameStr{ originalName };
-                                                        std::wstring pathStr{ path };
-                                                        size_t oldPathSize = pathStr.size();
+                                                        std::wstring oldPathStr{ path };
+                                                        std::wstring pathStr{ oldPathStr };
+                                                        size_t oldPathSize = oldPathStr.size();
 
                                                         auto fileNamePos = pathStr.find_last_of(L"\\");
                                                         pathStr.replace(fileNamePos + 1, originalNameStr.length(), std::wstring{ newName });
@@ -849,7 +851,7 @@ DWORD WINAPI CPowerRenameManager::s_fileOpWorkerThread(_In_ void* pv)
                                                         int id = -1;
                                                         if (SUCCEEDED(spItem->GetId(&id)))
                                                         {
-                                                            pendingUpdates.emplace_back(PendingItemUpdate{ spItem, std::wstring{ newName }, std::move(pathStr), oldPathSize, id, isFolder });
+                                                            pendingUpdates.emplace_back(PendingItemUpdate{ spItem, std::wstring{ newName }, std::move(pathStr), std::move(oldPathStr), oldPathSize, id, isFolder });
                                                         }
                                                     }
                                                     // Free outside the if block; CoTaskMemFree(nullptr) is safe.
@@ -874,26 +876,42 @@ DWORD WINAPI CPowerRenameManager::s_fileOpWorkerThread(_In_ void* pv)
                             }
 
                             // Perform the operation
-                            // We don't care about the return code here. We would rather
-                            // return control back to explorer so the user can cleanly
-                            // undo the operation if it failed halfway through.
-                            spFileOp->PerformOperations();
+                            HRESULT performHr = spFileOp->PerformOperations();
 
-                            // Update item data only after the file operation has been
-                            // submitted to the shell, so abandoned or duplicate applies
-                            // cannot leave items in a stale renamed state.
-                            for (auto& update : pendingUpdates)
+                            // Update item data only after the file operation completed
+                            // without cancellation. This avoids stale in-memory originals
+                            // when the operation fails or is aborted.
+                            BOOL anyOperationsAborted = TRUE;
+                            const bool shouldCommitBatch = SUCCEEDED(performHr) &&
+                                                           SUCCEEDED(spFileOp->GetAnyOperationsAborted(&anyOperationsAborted)) &&
+                                                           !anyOperationsAborted;
+                            if (shouldCommitBatch)
                             {
-                                update.spItem->PutPath(update.newPath.c_str());
-                                update.spItem->PutOriginalName(update.newName.c_str());
-                                update.spItem->PutNewName(nullptr);
-
-                                if (update.isFolder)
+                                for (auto& update : pendingUpdates)
                                 {
-                                    pwtd->spsrm->UpdateChildrenPath(update.id, update.oldPathSize);
-                                }
+                                    std::error_code newPathError;
+                                    std::error_code oldPathError;
+                                    const bool newPathExists = fs::exists(update.newPath, newPathError);
+                                    const bool oldPathExists = fs::exists(update.oldPath, oldPathError);
+                                    const bool samePathIgnoringCase = CompareStringOrdinal(update.oldPath.c_str(), -1, update.newPath.c_str(), -1, TRUE) == CSTR_EQUAL;
 
-                                PostMessage(pwtd->hwndManager, SRM_REGEX_ITEM_RENAMED_KEEP_UI, GetCurrentThreadId(), update.id);
+                                    // Commit only for items that actually moved.
+                                    if (newPathError || oldPathError || !newPathExists || (oldPathExists && !samePathIgnoringCase))
+                                    {
+                                        continue;
+                                    }
+
+                                    update.spItem->PutPath(update.newPath.c_str());
+                                    update.spItem->PutOriginalName(update.newName.c_str());
+                                    update.spItem->PutNewName(nullptr);
+
+                                    if (update.isFolder)
+                                    {
+                                        pwtd->spsrm->UpdateChildrenPath(update.id, update.oldPathSize);
+                                    }
+
+                                    PostMessage(pwtd->hwndManager, SRM_REGEX_ITEM_RENAMED_KEEP_UI, GetCurrentThreadId(), update.id);
+                                }
                             }
                         }
                     }
