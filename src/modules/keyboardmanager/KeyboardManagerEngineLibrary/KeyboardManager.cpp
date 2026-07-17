@@ -201,7 +201,6 @@ void KeyboardManager::StartLowlevelKeyboardHook()
                 Logger::warn(L"SetThreadPriority() failed while restoring thread priority after hook installation failure (error {}).", restoreErrorCode);
             }
             CloseHandle(realHandle);
-            realHandle = nullptr;
         }
 
         show_last_error_message(L"SetWindowsHookEx", errorCode, L"PowerToys - Keyboard Manager");
@@ -232,7 +231,6 @@ void KeyboardManager::StopLowlevelKeyboardHook()
     }
 
     hookHandle = nullptr;
-    hookHandleCopy = nullptr;
 
     // Restore the thread priority that was active before the hook was installed.
     // Use the stored real handle so this works even when called from another thread.
