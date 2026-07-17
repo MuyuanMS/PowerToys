@@ -112,11 +112,11 @@ namespace winrt::CmdPalKeyboardService::implementation
             return CallNextHookEx(NULL, nCode, wParam, lParam);
         }
 
-        // Ignore auto-repeated key-down events (key held down) to prevent flooding
-        // the command callback and freezing CmdPal.
+        // Swallow auto-repeated key-down events for a handled hotkey so the callback
+        // is not re-fired and the keystroke is not forwarded to the foreground app.
         if (vkCodePressed == keyPressInfo.vkCode)
         {
-            return CallNextHookEx(NULL, nCode, wParam, lParam);
+            return 1;
         }
 
         Hotkey hotkey{
