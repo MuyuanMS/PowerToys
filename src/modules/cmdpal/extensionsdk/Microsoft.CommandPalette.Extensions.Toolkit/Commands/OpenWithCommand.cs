@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using ManagedCsWin32;
 using Microsoft.CommandPalette.Extensions;
@@ -17,7 +18,7 @@ public partial class OpenWithCommand : InvokableCommand
 
     private readonly string _path;
 
-    private static unsafe bool OpenWith(string filename)
+    private static unsafe void OpenWith(string filename)
     {
         var filenamePtr = Marshal.StringToHGlobalUni(filename);
         var verbPtr = Marshal.StringToHGlobalUni("openas");
@@ -33,7 +34,10 @@ public partial class OpenWithCommand : InvokableCommand
                 FMask = global::Windows.Win32.PInvoke.SEE_MASK_INVOKEIDLIST,
             };
 
-            return Shell32.ShellExecuteEx(ref info);
+            if (!Shell32.ShellExecuteEx(ref info))
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            }
         }
         finally
         {
