@@ -198,7 +198,7 @@ namespace newplus::utilities
         return false;
     }
 
-    inline void explorer_enter_rename_mode(const std::filesystem::path target_fullpath_of_new_instance)
+    inline HWND explorer_enter_rename_mode_and_get_list_view_window(const std::filesystem::path target_fullpath_of_new_instance)
     {
         const std::filesystem::path path_without_new_file_or_dir = target_fullpath_of_new_instance.parent_path();
         const std::filesystem::path new_file_or_dir_without_path = target_fullpath_of_new_instance.filename();
@@ -208,7 +208,7 @@ namespace newplus::utilities
         HRESULT hr;
         if (FAILED(CoCreateInstance(CLSID_ShellWindows, NULL, CLSCTX_ALL, IID_PPV_ARGS(&shell_windows))))
         {
-            return;
+            return nullptr;
         }
 
         long window_handle;
@@ -222,7 +222,7 @@ namespace newplus::utilities
 
             if (FAILED(shell_windows->FindWindowSW(&empty_yet_needed_incl_init, &empty_yet_needed_incl_init, SWC_DESKTOP, &window_handle, SWFO_NEEDDISPATCH, &shell_window)))
             {
-                return;
+                return nullptr;
             }
         }
         else
@@ -264,7 +264,7 @@ namespace newplus::utilities
 
         if (!shell_window)
         {
-            return;
+            return nullptr;
         }
 
         ComPtr<IServiceProvider> service_provider;
@@ -275,6 +275,14 @@ namespace newplus::utilities
         shell_browser->QueryActiveShellView(&shell_view);
         ComPtr<IFolderView> folder_view;
         shell_view.As(&folder_view);
+        HWND list_view_window = nullptr;
+        HWND shell_view_window = nullptr;
+        if (SUCCEEDED(shell_view->GetWindow(&shell_view_window)) && shell_view_window != nullptr)
+        {
+            // Explorer currently hosts folder items in a SysListView32 child of the shell view.
+            // We use this handle to query whether in-place rename edit is still active.
+            list_view_window = FindWindowExW(shell_view_window, nullptr, L"SysListView32", nullptr);
+        }
 
         // Find the newly created object (file or folder)
         // And put object into edit mode (SVSI_EDIT) and if desktop also reposition
@@ -317,6 +325,13 @@ namespace newplus::utilities
             }
             CoTaskMemFree(shell_item_ids);
         }
+
+        return list_view_window;
+    }
+
+    inline void explorer_enter_rename_mode(const std::filesystem::path target_fullpath_of_new_instance)
+    {
+        explorer_enter_rename_mode_and_get_list_view_window(target_fullpath_of_new_instance);
     }
 
     inline void update_last_write_time(const std::filesystem::path path)
