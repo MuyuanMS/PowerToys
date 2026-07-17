@@ -40,6 +40,12 @@ public partial class MonitorViewModel : ObservableObject, IDisposable
     private int _contrast;
     private int _volume;
 
+    // Tracks the timestamp of the most recent user-driven brightness edit (slider drag /
+    // key press). Used by RefreshBrightnessAsync to skip UpdateBrightnessDisplay for any
+    // monitor the user has touched after the hardware read started, so an in-flight DDC
+    // response cannot overwrite a newer user selection.
+    private DateTimeOffset _lastUserBrightnessEdit = DateTimeOffset.MinValue;
+
     // Debounce timers — each user-driven setter restarts the matching timer so a drag
     // or held arrow key collapses into a single DDC/CI write once the user stops moving.
     // External / programmatic apply paths (SetBrightnessAsync etc.) bypass the setters
@@ -47,6 +53,13 @@ public partial class MonitorViewModel : ObservableObject, IDisposable
     private DispatcherQueueTimer? _brightnessCommitTimer;
     private DispatcherQueueTimer? _contrastCommitTimer;
     private DispatcherQueueTimer? _volumeCommitTimer;
+
+    /// <summary>
+    /// Gets the UTC timestamp of the most recent user-driven brightness change.
+    /// RefreshBrightnessAsync compares this against the refresh start time to decide
+    /// whether to apply a stale hardware read.
+    /// </summary>
+    internal DateTimeOffset LastUserBrightnessEdit => _lastUserBrightnessEdit;
 
     // Visibility settings (controlled by Settings UI)
     [ObservableProperty]
@@ -487,6 +500,7 @@ public partial class MonitorViewModel : ObservableObject, IDisposable
             if (_brightness != value)
             {
                 _brightness = value;
+                _lastUserBrightnessEdit = DateTimeOffset.UtcNow;
                 OnPropertyChanged();
                 ScheduleCommit(ref _brightnessCommitTimer, () => SetBrightnessAsync(_brightness));
             }

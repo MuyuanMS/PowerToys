@@ -441,57 +441,69 @@ namespace PowerDisplay.Helpers
         /// support brightness or whose controller is unavailable are silently skipped.
         /// If discovery is already running (lock busy), the refresh is skipped because
         /// the upcoming discovery will populate fresh values anyway.
+        /// The discovery lock is held for the duration of all hardware reads to prevent
+        /// a concurrent discovery from destroying handles mid-read and to serialize
+        /// concurrent refresh calls (a second zero-timeout attempt will be skipped).
         /// </summary>
         public async Task RefreshAllBrightnessAsync(CancellationToken cancellationToken = default)
         {
-            // Acquire the discovery lock (zero-timeout) to snapshot the monitor list safely.
+            // Acquire the discovery lock (zero-timeout).
             // If discovery is already running, skip — discovery will produce fresh values.
+            // Hold the lock through all hardware reads so that:
+            //   1. A concurrent discovery cannot destroy DDC handles while reads are in flight.
+            //   2. A second concurrent refresh (e.g. two rapid flyout opens) is skipped rather
+            //      than running simultaneous reads on the same controller.
             bool lockAcquired = await _discoveryLock.WaitAsync(0, cancellationToken);
             if (!lockAcquired)
             {
-                Logger.LogInfo("[MonitorManager] RefreshAllBrightness: Discovery in progress; skipping brightness refresh (fresh values will arrive via discovery).");
+                Logger.LogInfo("[MonitorManager] RefreshAllBrightness: Discovery or refresh in progress; skipping (fresh values will arrive shortly).");
                 return;
             }
 
-            List<Monitor> snapshot;
             try
             {
-                snapshot = _monitors.ToList();
+                var snapshot = _monitors.ToList();
+
+                foreach (var monitor in snapshot)
+                {
+                    if (!monitor.SupportsBrightness)
+                    {
+                        continue;
+                    }
+
+                    var controller = GetControllerForMonitor(monitor);
+                    if (controller == null)
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        // GetBrightnessAsync returns a VcpFeatureValue with raw Current/Maximum values.
+                        // ToPercentage() normalises these to a 0-100 range, accounting for monitors
+                        // that report a maximum other than 100 (e.g. some Samsung panels report 50).
+                        // Only update the cached value when the read succeeded; a transient DDC/WMI
+                        // failure returns VcpFeatureValue.Invalid, which ToPercentage() maps to 0 —
+                        // leaving the previous valid brightness in place is safer than zeroing it.
+                        var vcpValue = await controller.GetBrightnessAsync(monitor, cancellationToken);
+                        if (vcpValue.IsValid)
+                        {
+                            monitor.CurrentBrightness = vcpValue.ToPercentage();
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning($"[MonitorManager] RefreshAllBrightness: Could not read brightness for {monitor.Id}: {ex.Message}");
+                    }
+                }
             }
             finally
             {
                 _discoveryLock.Release();
-            }
-
-            foreach (var monitor in snapshot)
-            {
-                if (!monitor.SupportsBrightness)
-                {
-                    continue;
-                }
-
-                var controller = GetControllerForMonitor(monitor);
-                if (controller == null)
-                {
-                    continue;
-                }
-
-                try
-                {
-                    // GetBrightnessAsync returns a VcpFeatureValue with raw Current/Maximum values.
-                    // ToPercentage() normalises these to a 0-100 range, accounting for monitors
-                    // that report a maximum other than 100 (e.g. some Samsung panels report 50).
-                    var vcpValue = await controller.GetBrightnessAsync(monitor, cancellationToken);
-                    monitor.CurrentBrightness = vcpValue.ToPercentage();
-                }
-                catch (OperationCanceledException)
-                {
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning($"[MonitorManager] RefreshAllBrightness: Could not read brightness for {monitor.Id}: {ex.Message}");
-                }
             }
         }
 

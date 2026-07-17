@@ -319,6 +319,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
             // Access the token here; if the CTS was disposed (shutdown), we catch
             // ObjectDisposedException below and bail out silently.
             var token = _cancellationTokenSource.Token;
+
+            // Capture the start time before the hardware reads so we can skip applying
+            // a stale read to any monitor the user has interacted with while it was in flight.
+            var refreshStartedAt = DateTimeOffset.UtcNow;
+
             await _monitorManager.RefreshAllBrightnessAsync(token);
 
             _dispatcherQueue.TryEnqueue(() =>
@@ -327,11 +332,29 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 {
                     foreach (var vm in Monitors)
                     {
+                        // Skip view models the user has edited after the refresh started.
+                        // The user's gesture is already in the debounce queue and will be
+                        // committed to hardware; overwriting it with the stale read would
+                        // discard the user's selection.
+                        if (vm.LastUserBrightnessEdit > refreshStartedAt)
+                        {
+                            continue;
+                        }
+
                         var monitor = _monitorManager.GetMonitor(vm.Id);
                         if (monitor != null)
                         {
                             vm.UpdateBrightnessDisplay(monitor.CurrentBrightness);
                         }
+                    }
+
+                    // Re-seed the master LinkedBrightness slider so it reflects the freshly
+                    // read hardware values. SeedInitialLinkedBrightness is a no-op when
+                    // linked mode is off, and uses the suppress flag internally so it never
+                    // triggers a hardware write.
+                    if (LinkedLevelsActive)
+                    {
+                        SeedInitialLinkedBrightness();
                     }
                 }
                 catch (Exception dispatcherEx)
