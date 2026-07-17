@@ -56,7 +56,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
         public bool UpgradeSettingsConfiguration()
         {
-            if (string.IsNullOrEmpty(Version) || string.Equals(Version, InitialModuleVersion, System.StringComparison.OrdinalIgnoreCase))
+            if (string.IsNullOrWhiteSpace(Version) || string.Equals(Version, InitialModuleVersion, System.StringComparison.OrdinalIgnoreCase))
             {
                 Properties.OpacitySoundEnabled = new BoolProperty(Properties.SoundEnabled.Value);
                 Version = CurrentModuleVersion;
