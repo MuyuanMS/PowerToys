@@ -266,6 +266,26 @@ public abstract partial class ExtensionObjectViewModel : ObservableObject, IBatc
         }
     }
 
+    protected void DoOnUiThreadAndWait(Action action)
+    {
+        if (!PageContext.TryGetTarget(out var pageContext))
+        {
+            return;
+        }
+
+        if (TaskScheduler.Current == pageContext.Scheduler)
+        {
+            action();
+            return;
+        }
+
+        Task.Factory.StartNew(
+            action,
+            CancellationToken.None,
+            TaskCreationOptions.None,
+            pageContext.Scheduler).GetAwaiter().GetResult();
+    }
+
     protected virtual void UnsafeCleanup()
     {
         // base doesn't do anything, but sub-classes should override this.

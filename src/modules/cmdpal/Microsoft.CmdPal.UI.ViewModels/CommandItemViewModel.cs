@@ -22,6 +22,7 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
     private readonly IContextMenuFactory? _contextMenuFactory;
 
     private readonly Lock _moreCommandsLock = new();
+    private readonly Lock _propChangedSubscriptionLock = new();
     private readonly List<IContextItemViewModel> _moreCommands = [];
     private volatile CommandContextItemViewModel? _secondaryMoreCommand;
     private volatile IContextItemViewModel[] _moreCommandsSnapshot = [];
@@ -30,6 +31,8 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
     private ExtensionObject<IExtendedAttributesProvider>? ExtendedAttributesProvider { get; set; }
 
     private readonly ExtensionObject<ICommandItem> _commandItemModel = new(null);
+    private bool _propChangedSubscribed;
+    private bool _cleanupStarted;
     private CommandContextItemViewModel? _defaultCommandContextItemViewModel;
 
     private FuzzyTargetCache _titleCache;
@@ -182,12 +185,47 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
         // TODO: Do these need to go into FastInit?
 
-        // Marshal WinRT event subscription to the UI thread to avoid a deadlock
-        // in the WinRT EventSourceCache (ReaderWriterLockSlim) that can occur when
-        // background threads subscribe while the UI thread concurrently unsubscribes
-        // during theme reapply (via CommunityToolkit DispatcherQueueTimer.Debounce).
-        DoOnUiThread(() => model.PropChanged += Model_PropChanged);
+        var shouldSubscribe = true;
+        lock (_propChangedSubscriptionLock)
+        {
+            if (_cleanupStarted || _propChangedSubscribed)
+            {
+                shouldSubscribe = false;
+            }
+        }
+
+        if (shouldSubscribe)
+        {
+            // Marshal WinRT event subscription to the UI thread to avoid a deadlock
+            // in the WinRT EventSourceCache (ReaderWriterLockSlim) that can occur when
+            // background threads subscribe while the UI thread concurrently unsubscribes
+            // during theme reapply (via CommunityToolkit DispatcherQueueTimer.Debounce).
+            // Wait for this to complete so we don't miss updates between initialization
+            // and subscription.
+            DoOnUiThreadAndWait(() =>
+            {
+                lock (_propChangedSubscriptionLock)
+                {
+                    if (_cleanupStarted || _propChangedSubscribed)
+                    {
+                        return;
+                    }
+
+                    model.PropChanged += Model_PropChanged;
+                    _propChangedSubscribed = true;
+                }
+            });
+        }
+
         Command.PropertyChanged += Command_PropertyChanged;
+
+        if (shouldSubscribe)
+        {
+            FetchProperty(nameof(Command));
+            FetchProperty(nameof(Title));
+            FetchProperty(nameof(Subtitle));
+            FetchProperty(nameof(Icon));
+        }
 
         UpdateProperty(nameof(Name));
         UpdateProperty(nameof(Title));
@@ -308,6 +346,14 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
     private void Model_PropChanged(object sender, IPropChangedEventArgs args)
     {
+        lock (_propChangedSubscriptionLock)
+        {
+            if (_cleanupStarted)
+            {
+                return;
+            }
+        }
+
         try
         {
             FetchProperty(args.PropertyName);
@@ -599,9 +645,26 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
         var model = _commandItemModel.Unsafe;
         if (model is not null)
         {
+            lock (_propChangedSubscriptionLock)
+            {
+                _cleanupStarted = true;
+            }
+
             // Marshal WinRT event unsubscription to the UI thread to match where
             // it was subscribed, avoiding concurrent EventSourceCache lock contention.
-            DoOnUiThread(() => model.PropChanged -= Model_PropChanged);
+            DoOnUiThreadAndWait(() =>
+            {
+                lock (_propChangedSubscriptionLock)
+                {
+                    if (!_propChangedSubscribed)
+                    {
+                        return;
+                    }
+
+                    model.PropChanged -= Model_PropChanged;
+                    _propChangedSubscribed = false;
+                }
+            });
         }
     }
 
