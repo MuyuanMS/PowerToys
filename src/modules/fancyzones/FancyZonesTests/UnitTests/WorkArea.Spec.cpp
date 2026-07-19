@@ -421,7 +421,7 @@ namespace FancyZonesUnitTests
         }
 
         // When ALL zones in a multi-zone set are beyond the new layout's zone count the
-        // window should remain unassigned (no crash, no silent misplacement).
+        // window should retain its stale assignment (no crash, no silent misplacement).
         TEST_METHOD (UpdateWindowPositionsSkipsWindowWhenNoZoneIsValidAfterLayoutSwitch)
         {
             // Start with a 6-zone layout and snap a window to zones {4, 5}.
