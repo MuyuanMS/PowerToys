@@ -584,7 +584,7 @@ public partial class Win32Program : IProgram
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is SecurityException)
             {
                 Logger.LogError($"Failed to resolve link target for '{currentDirectory}'", e);
-                resolvedDirectory = currentDirectory;
+                continue;
             }
 
             if (!alreadyVisited.Add(resolvedDirectory))
