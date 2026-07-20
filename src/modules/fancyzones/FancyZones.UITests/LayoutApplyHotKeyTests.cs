@@ -421,9 +421,37 @@ namespace UITests_FancyZones
             var xOffset = Math.Max(20, activeScreen.Bounds.Width / 10);
             var yOffset = Math.Max(20, activeScreen.Bounds.Height / 10);
             UITestBase.NativeMethods.MoveWindow(settingsWindow, activeScreen.Bounds.Left + xOffset, activeScreen.Bounds.Top + yOffset);
+            var windowRect = settingsWindow.Rect;
+            if (windowRect == null)
+            {
+                Assert.Inconclusive("Could not determine the settings window rectangle.");
+                return;
+            }
+
+            var actualActiveScreen = Screen.FromRectangle(windowRect.Value);
+            if (actualActiveScreen == null)
+            {
+                Assert.Inconclusive("Could not determine the screen containing the settings window.");
+                return;
+            }
+
+            cursorScreen = allScreens.FirstOrDefault(screen => screen.DeviceName != actualActiveScreen.DeviceName);
+            if (cursorScreen == null)
+            {
+                Assert.Inconclusive("No secondary monitor was found for cursor placement.");
+                return;
+            }
+
+            activeMonitorNumber = ParseMonitorNumber(actualActiveScreen.DeviceName);
+            if (activeMonitorNumber <= 0)
+            {
+                Assert.Inconclusive($"Could not parse monitor number from '{actualActiveScreen.DeviceName}'.");
+                return;
+            }
+
             settingsWindow.Click();
 
-            Session.MoveMouseTo(activeScreen.Bounds.Left + (activeScreen.Bounds.Width / 2), activeScreen.Bounds.Top + (activeScreen.Bounds.Height / 2));
+            Session.MoveMouseTo(actualActiveScreen.Bounds.Left + (actualActiveScreen.Bounds.Width / 2), actualActiveScreen.Bounds.Top + (actualActiveScreen.Bounds.Height / 2));
             SendKeys(Key.Win, Key.Ctrl, Key.Alt, Key.Num0);
             Assert.IsTrue(WaitForAppliedLayoutIdOnMonitor(activeMonitorNumber, "{0D6D2F58-9184-4804-81E4-4E4CC3476DC1}"), "Baseline quick-layout hotkey was not applied on the active monitor.");
 
