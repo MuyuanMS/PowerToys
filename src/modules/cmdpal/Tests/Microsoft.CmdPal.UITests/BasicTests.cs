@@ -3,6 +3,8 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.PowerToys.UITest;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -149,5 +151,30 @@ public class BasicTests : CommandPaletteTestBase
 
         autoHideToggle.Toggle(initialState);
         Assert.AreEqual(initialState, autoHideToggle.IsOn);
+    }
+
+    [TestMethod]
+    public void LowLevelGlobalHotkeySummonHideCycleDoesNotCrash()
+    {
+        OpenSettingsWindow();
+
+        var lowLevelHookCheckBox = this.Find<CheckBox>(By.AccessibilityId("CmdPal_GeneralPage_LowLevelHook"));
+        Assert.IsNotNull(lowLevelHookCheckBox);
+        lowLevelHookCheckBox.SetCheck();
+
+        RestartScopeExe();
+        Assert.IsNotNull(this.Find<TextBox>(By.AccessibilityId("MainSearchBox"), 10000));
+
+        SendKeys(Key.Win, Key.Alt, Key.Space);
+        Task.Delay(1000).Wait();
+        Assert.IsTrue(IsCommandPaletteProcessAlive(), "Command Palette exited after the low-level hotkey hide path.");
+
+        SendKeys(Key.Win, Key.Alt, Key.Space);
+        Assert.IsNotNull(this.Find<TextBox>(By.AccessibilityId("MainSearchBox"), 10000));
+    }
+
+    private static bool IsCommandPaletteProcessAlive()
+    {
+        return Process.GetProcessesByName("Microsoft.CmdPal.UI").Any(static process => !process.HasExited);
     }
 }
