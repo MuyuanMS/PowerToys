@@ -401,6 +401,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 {
                     _showThemeAdaptiveSysTrayIcon = value;
                     GeneralSettingsConfig.ShowThemeAdaptiveTrayIcon = value;
+                    ThemeAdaptiveTrayIconFanOut.ApplyToModules(value, SendConfigMSG);
                     NotifyPropertyChanged();
                 }
             }
