@@ -248,6 +248,7 @@ IFACEMETHODIMP CPowerRenameItem::PutStatus(_In_ PowerRenameItemRenameStatus stat
 
 IFACEMETHODIMP CPowerRenameItem::ShouldRenameItem(_In_ DWORD flags, _Out_ bool* shouldRename)
 {
+    CSRWSharedAutoLock lock(&m_lock);
     // Should we perform a rename on this item given its
     // state and the options that were set?
     bool hasChanged = m_newName != nullptr && (lstrcmp(m_originalName, m_newName) != 0) && (lstrcmp(L"", m_newName) != 0);

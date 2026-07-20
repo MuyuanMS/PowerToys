@@ -488,12 +488,10 @@ HRESULT CPowerRenameManager::s_CreateInstance(_Outptr_ IPowerRenameManager** pps
 CPowerRenameManager::CPowerRenameManager() :
     m_refCount(1)
 {
-    InitializeCriticalSection(&m_critsecReentrancy);
 }
 
 CPowerRenameManager::~CPowerRenameManager()
 {
-    DeleteCriticalSection(&m_critsecReentrancy);
 }
 
 HRESULT CPowerRenameManager::_Init()
@@ -655,6 +653,15 @@ HRESULT CPowerRenameManager::_PerformFileOperation()
         return E_FAIL;
     }
 
+    // Guard against same-thread reentry: MsgWaitForMultipleObjects in the pump below dispatches
+    // messages, so a second Apply click (or any message that calls back into Rename()) while we
+    // are already waiting would overwrite m_fileOpWorkerThreadHandle and corrupt the wait.
+    if (m_isPerformingFileOp)
+    {
+        return E_FAIL;
+    }
+    m_isPerformingFileOp = true;
+
     _LogOperationTelemetry();
 
     // Wait for existing regex thread to finish
@@ -667,6 +674,7 @@ HRESULT CPowerRenameManager::_PerformFileOperation()
 
     // Create worker thread which will perform the actual rename
     HRESULT hr = _CreateFileOpWorkerThread();
+    bool threadDone = false;
     if (SUCCEEDED(hr))
     {
         _OnRenameStarted();
@@ -678,13 +686,17 @@ HRESULT CPowerRenameManager::_PerformFileOperation()
         // Use MsgWaitForMultipleObjects so the STA message pump keeps running
         // while we wait for the file-op worker, avoiding COM cross-apartment
         // deadlocks and keeping the UI responsive during rename.
+        // Keep a local copy of the handle so that a reentrant call (rejected above)
+        // cannot overwrite it while we are waiting.
+        HANDLE localHandle = m_fileOpWorkerThreadHandle;
         bool quit = false;
         while (true)
         {
-            DWORD waitResult = MsgWaitForMultipleObjects(1, &m_fileOpWorkerThreadHandle, FALSE, INFINITE, QS_ALLINPUT);
+            DWORD waitResult = MsgWaitForMultipleObjects(1, &localHandle, FALSE, INFINITE, QS_ALLINPUT);
             if (waitResult == WAIT_OBJECT_0)
             {
                 // Worker thread has exited.
+                threadDone = true;
                 break;
             }
             if (waitResult == WAIT_OBJECT_0 + 1)
@@ -715,13 +727,20 @@ HRESULT CPowerRenameManager::_PerformFileOperation()
             }
         }
 
-        CloseHandle(m_fileOpWorkerThreadHandle);
-        m_fileOpWorkerThreadHandle = nullptr;
-
-        _OnRenameCompleted();
+        // Only close the handle and report completion when the thread actually exited.
+        // On WM_QUIT or WAIT_FAILED the worker may still be running; closing the handle
+        // does not stop it, and falsely completing would allow callers to destroy shared
+        // resources while the thread is still using them.
+        if (threadDone)
+        {
+            CloseHandle(m_fileOpWorkerThreadHandle);
+            m_fileOpWorkerThreadHandle = nullptr;
+            _OnRenameCompleted();
+        }
     }
 
-    return S_OK;
+    m_isPerformingFileOp = false;
+    return (SUCCEEDED(hr) && threadDone) ? S_OK : E_FAIL;
 }
 
 HRESULT CPowerRenameManager::_CreateFileOpWorkerThread()
@@ -902,33 +921,36 @@ HRESULT CPowerRenameManager::_PerformRegExRename()
 {
     HRESULT hr = E_FAIL;
 
-    if (!TryEnterCriticalSection(&m_critsecReentrancy))
+    // Guard against same-thread reentry: MsgWaitForMultipleObjects in _WaitForRegExWorkerThread
+    // dispatches messages, which can cause another search/replace change notification to arrive
+    // on the UI thread while we are already in this function. A CRITICAL_SECTION does not help
+    // because it is recursive for the owning thread; a plain bool flag prevents nested entry.
+    if (m_isPerformingRegEx)
     {
-        // Ensure we do not re-enter since we pump messages here.
-        // TODO: If we do, post a message back to ourselves
+        // Reentrant call while pump is running; skip to avoid racing on shared events.
+        return hr;
     }
-    else
+    m_isPerformingRegEx = true;
+
+    // Ensure previous thread is canceled
+    _CancelRegExWorkerThread();
+
+    // Reset both events before creating the new thread so the new thread never
+    // sees a leftover-signaled cancel event (from _CancelRegExWorkerThread) or
+    // a leftover-signaled start event from a prior run.
+    ResetEvent(m_cancelRegExWorkerEvent);
+    ResetEvent(m_startRegExWorkerEvent);
+
+    // Create worker thread which will message us progress and completion.
+    hr = _CreateRegExWorkerThread();
+    if (SUCCEEDED(hr))
     {
-        // Ensure previous thread is canceled
-        _CancelRegExWorkerThread();
-
-        // Reset both events before creating the new thread so the new thread never
-        // sees a leftover-signaled cancel event (from _CancelRegExWorkerThread) or
-        // a leftover-signaled start event from a prior run.
-        ResetEvent(m_cancelRegExWorkerEvent);
-        ResetEvent(m_startRegExWorkerEvent);
-
-        // Create worker thread which will message us progress and completion.
-        hr = _CreateRegExWorkerThread();
-        if (SUCCEEDED(hr))
-        {
-            // Signal the worker thread that they can start working. We needed to wait until we
-            // were ready to process thread messages.
-            SetEvent(m_startRegExWorkerEvent);
-        }
-
-        LeaveCriticalSection(&m_critsecReentrancy);
+        // Signal the worker thread that they can start working. We needed to wait until we
+        // were ready to process thread messages.
+        SetEvent(m_startRegExWorkerEvent);
     }
+
+    m_isPerformingRegEx = false;
 
     return hr;
 }
@@ -1038,6 +1060,7 @@ void CPowerRenameManager::_WaitForRegExWorkerThread()
         // while we wait. Without this a COM STA call from the worker thread back into
         // any object created on the main apartment can deadlock because the main thread
         // is blocked and not dispatching messages.
+        bool threadDone = false;
         bool quit = false;
         while (true)
         {
@@ -1045,6 +1068,7 @@ void CPowerRenameManager::_WaitForRegExWorkerThread()
             if (waitResult == WAIT_OBJECT_0)
             {
                 // Worker thread has exited.
+                threadDone = true;
                 break;
             }
             if (waitResult == WAIT_OBJECT_0 + 1)
@@ -1075,8 +1099,16 @@ void CPowerRenameManager::_WaitForRegExWorkerThread()
                 break;
             }
         }
-        CloseHandle(m_regExWorkerThreadHandle);
-        m_regExWorkerThreadHandle = nullptr;
+
+        // Only close the handle when the thread actually exited (WAIT_OBJECT_0).
+        // On WM_QUIT or WAIT_FAILED the worker may still be running; clearing the handle
+        // while the thread is alive would let callers reset shared events or create a new
+        // thread while the old one continues to execute.
+        if (threadDone)
+        {
+            CloseHandle(m_regExWorkerThreadHandle);
+            m_regExWorkerThreadHandle = nullptr;
+        }
     }
 }
 
