@@ -372,7 +372,7 @@ public sealed partial class RunListPage : AsyncDynamicListPage
         var fuzzyString = GetFuzzyString(searchText, directoryPath);
         if (_currentPathItemsMayBeIncomplete && !string.IsNullOrEmpty(fuzzyString))
         {
-            var filteredDirectoryItems = BuildFilteredItemsForDirectory(
+            var filteredDirectoryItems = await BuildFilteredItemsForDirectory(
                 directoryPath,
                 fuzzyString,
                 withLeadingTilde,
@@ -574,50 +574,55 @@ public sealed partial class RunListPage : AsyncDynamicListPage
         return newPathItems;
     }
 
-    private static Dictionary<string, RunExeItem>? BuildFilteredItemsForDirectory(
+    private static async Task<Dictionary<string, RunExeItem>?> BuildFilteredItemsForDirectory(
         string directoryPath,
         string fuzzyString,
         bool withLeadingTilde,
         CancellationToken cancellationToken)
     {
-        var newPathItems = new Dictionary<string, RunExeItem>(MaxDirectorySuggestions);
-        var expandedDirectoryPath = Environment.ExpandEnvironmentVariables(directoryPath);
-        var options = new EnumerationOptions
-        {
-            AttributesToSkip = FileAttributes.Hidden,
-            ReturnSpecialDirectories = false,
-            IgnoreInaccessible = true,
-        };
-
-        try
-        {
-            foreach (var path in Directory.EnumerateFileSystemEntries(expandedDirectoryPath, "*", options))
+        return await Task.Run(
+            () =>
             {
-                if (cancellationToken.IsCancellationRequested)
+                var newPathItems = new Dictionary<string, RunExeItem>(MaxDirectorySuggestions);
+                var expandedDirectoryPath = Environment.ExpandEnvironmentVariables(directoryPath);
+                var options = new EnumerationOptions
                 {
-                    return null;
+                    AttributesToSkip = FileAttributes.Hidden,
+                    ReturnSpecialDirectories = false,
+                    IgnoreInaccessible = true,
+                };
+
+                try
+                {
+                    foreach (var path in Directory.EnumerateFileSystemEntries(expandedDirectoryPath, fuzzyString + "*", options))
+                    {
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            return null;
+                        }
+
+                        var title = Path.GetFileName(path);
+                        if (!MatchesFilter(fuzzyString, title, path))
+                        {
+                            continue;
+                        }
+
+                        var item = CreatePathItem(path, withLeadingTilde);
+                        newPathItems[item.Title] = item;
+                        if (newPathItems.Count >= MaxDirectorySuggestions)
+                        {
+                            break;
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    return [];
                 }
 
-                var title = Path.GetFileName(path);
-                if (!MatchesFilter(fuzzyString, title, path))
-                {
-                    continue;
-                }
-
-                var item = CreatePathItem(path, withLeadingTilde);
-                newPathItems[item.Title] = item;
-                if (newPathItems.Count >= MaxDirectorySuggestions)
-                {
-                    break;
-                }
-            }
-        }
-        catch (Exception)
-        {
-            return [];
-        }
-
-        return newPathItems;
+                return newPathItems;
+            },
+            CancellationToken.None);
     }
 
     private static RunExeItem CreatePathItem(string path, bool withLeadingTilde)
