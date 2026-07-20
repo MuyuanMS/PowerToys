@@ -63,6 +63,104 @@ namespace
         HRESULT m_result;
     };
 
+    struct file_identity
+    {
+        bool valid = false;
+        DWORD volume_serial_number = 0;
+        DWORD file_index_high = 0;
+        DWORD file_index_low = 0;
+    };
+
+    file_identity get_file_identity(const std::filesystem::path& path)
+    {
+        file_identity identity;
+        HANDLE file_handle = CreateFileW(
+            path.c_str(),
+            0,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            nullptr,
+            OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS,
+            nullptr);
+
+        if (file_handle == INVALID_HANDLE_VALUE)
+        {
+            return identity;
+        }
+
+        BY_HANDLE_FILE_INFORMATION file_information{};
+        if (GetFileInformationByHandle(file_handle, &file_information) == FALSE)
+        {
+            CloseHandle(file_handle);
+            return identity;
+        }
+
+        CloseHandle(file_handle);
+        identity.valid = true;
+        identity.volume_serial_number = file_information.dwVolumeSerialNumber;
+        identity.file_index_high = file_information.nFileIndexHigh;
+        identity.file_index_low = file_information.nFileIndexLow;
+        return identity;
+    }
+
+    bool is_same_file_identity(const file_identity& left, const file_identity& right)
+    {
+        return left.valid && right.valid &&
+               left.volume_serial_number == right.volume_serial_number &&
+               left.file_index_high == right.file_index_high &&
+               left.file_index_low == right.file_index_low;
+    }
+
+    bool try_find_child_by_identity(const std::filesystem::path& parent_dir, const file_identity& target_identity, std::filesystem::path& final_path)
+    {
+        if (!target_identity.valid)
+        {
+            return false;
+        }
+
+        for (const auto& entry : std::filesystem::directory_iterator(parent_dir))
+        {
+            if (is_same_file_identity(get_file_identity(entry.path()), target_identity))
+            {
+                final_path = entry.path();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool is_rename_mode_active(HWND list_view_window);
+
+    bool wait_for_rename_mode_to_finish(HWND list_view_window)
+    {
+        if (list_view_window == nullptr)
+        {
+            return false;
+        }
+
+        bool saw_rename_edit_control = false;
+        const auto monitoring_started = std::chrono::steady_clock::now();
+
+        while (true)
+        {
+            if (is_rename_mode_active(list_view_window))
+            {
+                saw_rename_edit_control = true;
+            }
+            else if (saw_rename_edit_control)
+            {
+                return true;
+            }
+            else if (std::chrono::steady_clock::now() - monitoring_started >= rename_mode_startup_timeout)
+            {
+                return false;
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(rename_monitoring_poll_interval_ms));
+        }
+    }
+
     bool process_directory_notifications_for_target_rename(const BYTE* buffer, DWORD bytes_returned, const std::wstring& original_folder_name, const std::filesystem::path& parent_dir, std::filesystem::path& final_path, bool& found_old_name)
     {
         const BYTE* ptr = buffer;
@@ -369,10 +467,13 @@ void template_item::rename_and_resolve_variables_on_other_thread(std::filesystem
 
         const std::filesystem::path parent_dir = target_fullpath_ptr->parent_path();
         const std::wstring original_folder_name = target_fullpath_ptr->filename().wstring();
+        const file_identity target_identity = get_file_identity(*target_fullpath_ptr);
 
         // Default to the original path in case the rename is cancelled or we cannot monitor it
         std::filesystem::path final_path = *target_fullpath_ptr;
         bool should_resolve_variables = true;
+        bool should_locate_final_path_by_identity = false;
+        HWND list_view_window = nullptr;
 
         // Track whether we have already entered rename mode so we enter it exactly once
         bool entered_rename_mode = false;
@@ -410,7 +511,7 @@ void template_item::rename_and_resolve_variables_on_other_thread(std::filesystem
                 if (read_pending)
                 {
                     // Enter rename mode so the user can give the folder its final name.
-                    const HWND list_view_window = newplus::utilities::explorer_enter_rename_mode_and_get_list_view_window(*target_fullpath_ptr);
+                    list_view_window = newplus::utilities::explorer_enter_rename_mode_and_get_list_view_window(*target_fullpath_ptr);
                     entered_rename_mode = true;
                     if (list_view_window == nullptr)
                     {
@@ -430,6 +531,7 @@ void template_item::rename_and_resolve_variables_on_other_thread(std::filesystem
                             Logger::error(std::system_category().message(GetLastError()));
                             read_pending = false;
                             keep_monitoring = false;
+                            should_locate_final_path_by_identity = true;
                             return false;
                         }
 
@@ -457,6 +559,7 @@ void template_item::rename_and_resolve_variables_on_other_thread(std::filesystem
                             Logger::error(L"ReadDirectoryChangesW rearm failed while monitoring New+ folder rename");
                             Logger::error(std::system_category().message(GetLastError()));
                             keep_monitoring = false;
+                            should_locate_final_path_by_identity = true;
                         }
 
                         return false;
@@ -550,8 +653,21 @@ void template_item::rename_and_resolve_variables_on_other_thread(std::filesystem
         if (!entered_rename_mode)
         {
             // Monitoring could not be set up; fall back to plain rename mode
-            newplus::utilities::explorer_enter_rename_mode(*target_fullpath_ptr);
-            should_resolve_variables = false;
+            list_view_window = newplus::utilities::explorer_enter_rename_mode_and_get_list_view_window(*target_fullpath_ptr);
+            entered_rename_mode = true;
+            should_locate_final_path_by_identity = true;
+        }
+
+        if (should_locate_final_path_by_identity)
+        {
+            if (wait_for_rename_mode_to_finish(list_view_window) && try_find_child_by_identity(parent_dir, target_identity, final_path))
+            {
+                should_resolve_variables = true;
+            }
+            else
+            {
+                should_resolve_variables = false;
+            }
         }
 
         if (should_resolve_variables)
