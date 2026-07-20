@@ -92,7 +92,6 @@ HRESULT GetTrimmedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR source)
 
 HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR source, DWORD flags, bool isFolder)
 {
-    std::locale::global(std::locale(""));
     HRESULT hr = E_INVALIDARG;
 
     auto contractionOrSingleQuotedWordCheck = [](std::wstring stem, size_t i) {
@@ -392,7 +391,6 @@ bool isMetadataUsed(_In_ PCWSTR source, PowerRenameLib::MetadataType metadataTyp
 
 HRESULT GetDatedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR source, SYSTEMTIME fileTime)
 {
-    std::locale::global(std::locale(""));
     HRESULT hr = E_INVALIDARG;
     if (source && wcslen(source) > 0)
     {

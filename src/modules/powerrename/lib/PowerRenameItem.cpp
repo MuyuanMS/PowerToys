@@ -33,7 +33,7 @@ IFACEMETHODIMP CPowerRenameItem::QueryInterface(_In_ REFIID riid, _Outptr_ void*
 
 IFACEMETHODIMP CPowerRenameItem::PutPath(_In_opt_ PCWSTR newPath)
 {
-    CSRWSharedAutoLock lock(&m_lock);
+    CSRWExclusiveAutoLock lock(&m_lock);
     CoTaskMemFree(m_path);
     m_path = nullptr;
     HRESULT hr = S_OK;
@@ -58,7 +58,7 @@ IFACEMETHODIMP CPowerRenameItem::GetPath(_Outptr_ PWSTR* path)
 
 IFACEMETHODIMP CPowerRenameItem::GetTime(_In_ DWORD flags, _Outptr_ SYSTEMTIME* time)
 {
-    CSRWSharedAutoLock lock(&m_lock);
+    CSRWExclusiveAutoLock lock(&m_lock);
     HRESULT hr = E_FAIL;
     PowerRenameFlags parsedTimeType;
 
@@ -141,7 +141,7 @@ IFACEMETHODIMP CPowerRenameItem::GetShellItem(_Outptr_ IShellItem** ppsi)
 
 IFACEMETHODIMP CPowerRenameItem::PutOriginalName(_In_opt_ PCWSTR originalName)
 {
-    CSRWSharedAutoLock lock(&m_lock);
+    CSRWExclusiveAutoLock lock(&m_lock);
     CoTaskMemFree(m_originalName);
     m_originalName = nullptr;
     HRESULT hr = S_OK;
@@ -165,7 +165,7 @@ IFACEMETHODIMP CPowerRenameItem::GetOriginalName(_Outptr_ PWSTR* originalName)
 
 IFACEMETHODIMP CPowerRenameItem::PutNewName(_In_opt_ PCWSTR newName)
 {
-    CSRWSharedAutoLock lock(&m_lock);
+    CSRWExclusiveAutoLock lock(&m_lock);
     CoTaskMemFree(m_newName);
     m_newName = nullptr;
     HRESULT hr = S_OK;
@@ -210,7 +210,7 @@ IFACEMETHODIMP CPowerRenameItem::GetSelected(_Out_ bool* selected)
 
 IFACEMETHODIMP CPowerRenameItem::PutSelected(_In_ bool selected)
 {
-    CSRWSharedAutoLock lock(&m_lock);
+    CSRWExclusiveAutoLock lock(&m_lock);
     m_selected = selected;
     return S_OK;
 }
@@ -283,7 +283,7 @@ IFACEMETHODIMP CPowerRenameItem::IsItemVisible(_In_ DWORD filter, _In_ DWORD fla
 
 IFACEMETHODIMP CPowerRenameItem::Reset()
 {
-    CSRWSharedAutoLock lock(&m_lock);
+    CSRWExclusiveAutoLock lock(&m_lock);
     CoTaskMemFree(m_newName);
     m_newName = nullptr;
     return S_OK;

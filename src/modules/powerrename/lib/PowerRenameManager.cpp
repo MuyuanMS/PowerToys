@@ -660,6 +660,11 @@ HRESULT CPowerRenameManager::_PerformFileOperation()
     // Wait for existing regex thread to finish
     _WaitForRegExWorkerThread();
 
+    // Reset before creating the file-op thread so that if _PerformFileOperation is called
+    // more than once (keep-UI-open scenario) the thread always waits for the explicit
+    // signal below instead of racing past the wait on a leftover-set event.
+    ResetEvent(m_startFileOpWorkerEvent);
+
     // Create worker thread which will perform the actual rename
     HRESULT hr = _CreateFileOpWorkerThread();
     if (SUCCEEDED(hr))
@@ -694,6 +699,9 @@ HRESULT CPowerRenameManager::_PerformFileOperation()
             }
         }
 
+        CloseHandle(m_fileOpWorkerThreadHandle);
+        m_fileOpWorkerThreadHandle = nullptr;
+
         _OnRenameCompleted();
     }
 
@@ -707,7 +715,7 @@ HRESULT CPowerRenameManager::_CreateFileOpWorkerThread()
     if (pwtd)
     {
         pwtd->hwndManager = m_hwndMessage;
-        pwtd->startEvent = m_startRegExWorkerEvent;
+        pwtd->startEvent = m_startFileOpWorkerEvent;
         pwtd->cancelEvent = nullptr;
         pwtd->spsrm = this;
         m_fileOpWorkerThreadHandle = CreateThread(nullptr, 0, s_fileOpWorkerThread, pwtd, 0, nullptr);
@@ -888,16 +896,22 @@ HRESULT CPowerRenameManager::_PerformRegExRename()
         // Ensure previous thread is canceled
         _CancelRegExWorkerThread();
 
+        // Reset both events before creating the new thread so the new thread never
+        // sees a leftover-signaled cancel event (from _CancelRegExWorkerThread) or
+        // a leftover-signaled start event from a prior run.
+        ResetEvent(m_cancelRegExWorkerEvent);
+        ResetEvent(m_startRegExWorkerEvent);
+
         // Create worker thread which will message us progress and completion.
         hr = _CreateRegExWorkerThread();
         if (SUCCEEDED(hr))
         {
-            ResetEvent(m_cancelRegExWorkerEvent);
-
             // Signal the worker thread that they can start working. We needed to wait until we
             // were ready to process thread messages.
             SetEvent(m_startRegExWorkerEvent);
         }
+
+        LeaveCriticalSection(&m_critsecReentrancy);
     }
 
     return hr;
@@ -1004,7 +1018,29 @@ void CPowerRenameManager::_WaitForRegExWorkerThread()
 {
     if (m_regExWorkerThreadHandle)
     {
-        WaitForSingleObject(m_regExWorkerThreadHandle, INFINITE);
+        // Use MsgWaitForMultipleObjects so that the STA message pump keeps running
+        // while we wait. Without this a COM STA call from the worker thread back into
+        // any object created on the main apartment can deadlock because the main thread
+        // is blocked and not dispatching messages.
+        while (true)
+        {
+            DWORD waitResult = MsgWaitForMultipleObjects(1, &m_regExWorkerThreadHandle, FALSE, INFINITE, QS_ALLINPUT);
+            if (waitResult == WAIT_OBJECT_0)
+            {
+                // Worker thread has exited.
+                break;
+            }
+            if (waitResult == WAIT_OBJECT_0 + 1)
+            {
+                // Window messages are available; pump them to keep the STA alive.
+                MSG msg;
+                while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+                {
+                    TranslateMessage(&msg);
+                    DispatchMessage(&msg);
+                }
+            }
+        }
         CloseHandle(m_regExWorkerThreadHandle);
         m_regExWorkerThreadHandle = nullptr;
     }
