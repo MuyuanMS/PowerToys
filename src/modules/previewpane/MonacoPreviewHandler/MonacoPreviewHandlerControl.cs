@@ -174,6 +174,8 @@ namespace Microsoft.PowerToys.PreviewHandler.Monaco
                             catch (COMException e)
                             {
                                 Logger.LogError("COMException caught. WebView2 resource may be in use.", e);
+                                _webView.Dispose();
+                                _webView = null;
                                 AddTextBoxControl(Resources.WebView2_Initialization_Error);
                             }
                         }
@@ -243,6 +245,11 @@ namespace Microsoft.PowerToys.PreviewHandler.Monaco
         /// </summary>
         public void FormResize(object sender, EventArgs e)
         {
+            if (_webView == null)
+            {
+                return;
+            }
+
             _webView.Height = this.Height;
             _webView.Width = this.Width;
             this.Update();
