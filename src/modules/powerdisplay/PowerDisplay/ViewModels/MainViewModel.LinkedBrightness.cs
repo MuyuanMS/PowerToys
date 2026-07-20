@@ -165,14 +165,15 @@ public partial class MainViewModel
             return;
         }
 
-        // Keep linked monitor VMs aligned with the master value without per-VM commits. The row is
-        // usually covered by the linked-mode hint, but the backing value should be correct if the
-        // monitor is later excluded or link mode is disabled.
+        // Keep linked monitor VMs aligned with the current master value without per-VM commits.
+        // The row is usually covered by the linked-mode hint, but the backing value should be
+        // correct if the monitor is later excluded or link mode is disabled.
+        var currentBrightness = LinkedBrightness;
         foreach (var vm in Monitors)
         {
             if (IsLinkedTarget(vm))
             {
-                vm.UpdateBrightnessDisplay(value);
+                vm.UpdateBrightnessDisplay(currentBrightness);
             }
         }
 
@@ -238,7 +239,7 @@ public partial class MainViewModel
         SliderCommitScheduler.Schedule(
             ref _linkedBrightnessCommitTimer,
             _dispatcherQueue,
-            () => BroadcastLinkedBrightnessAsync(LinkedBrightness));
+            BroadcastLinkedBrightnessAsync);
     }
 
     /// <summary>
@@ -251,11 +252,11 @@ public partial class MainViewModel
     }
 
     /// <summary>
-    /// Broadcast the linked brightness value to every linked target via
+    /// Broadcast the current linked brightness value to every linked target via
     /// <see cref="MonitorViewModel.SetBrightnessAsync"/>. Each per-VM call already wraps hardware
     /// errors in its own try/catch, so a single failing monitor does not break the others.
     /// </summary>
-    private async Task BroadcastLinkedBrightnessAsync(int value)
+    private async Task BroadcastLinkedBrightnessAsync()
     {
         if (!LinkedLevelsActive)
         {
@@ -264,9 +265,10 @@ public partial class MainViewModel
 
         try
         {
+            var currentBrightness = LinkedBrightness;
             var writes = Monitors
                 .Where(IsLinkedTarget)
-                .Select(m => m.SetBrightnessAsync(value))
+                .Select(m => m.SetBrightnessAsync(currentBrightness))
                 .ToList();
 
             if (writes.Count > 0)
