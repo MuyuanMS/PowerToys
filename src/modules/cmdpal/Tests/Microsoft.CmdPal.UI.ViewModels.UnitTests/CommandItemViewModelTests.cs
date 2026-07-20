@@ -3,20 +3,32 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CmdPal.Common.Text;
 using Microsoft.CmdPal.UI.ViewModels.Models;
+using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Windows.Foundation;
 
 namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
 
 [TestClass]
-public class CommandItemViewModelTests
+public partial class CommandItemViewModelTests
 {
     private sealed class TestPageContext : IPageContext
     {
-        public TaskScheduler Scheduler => TaskScheduler.Default;
+        private readonly TaskScheduler _scheduler;
+
+        public TestPageContext(TaskScheduler? scheduler = null)
+        {
+            _scheduler = scheduler ?? TaskScheduler.Default;
+        }
+
+        public TaskScheduler Scheduler => _scheduler;
 
         public ICommandProviderContext ProviderContext => CommandProviderContext.Empty;
 
@@ -24,6 +36,118 @@ public class CommandItemViewModelTests
         {
             throw new AssertFailedException($"Unexpected exception from view model: {ex}");
         }
+    }
+
+    private sealed class GatedSingleThreadTaskScheduler : TaskScheduler, IDisposable
+    {
+        private readonly BlockingCollection<Task> _tasks = new();
+        private readonly ManualResetEventSlim _canRun;
+        private readonly Thread _thread;
+        private int _queuedCount;
+
+        public GatedSingleThreadTaskScheduler(bool initiallyOpen = false)
+        {
+            _canRun = new ManualResetEventSlim(initiallyOpen);
+            _thread = new Thread(RunOnSchedulerThread)
+            {
+                IsBackground = true,
+                Name = nameof(GatedSingleThreadTaskScheduler),
+            };
+            _thread.Start();
+        }
+
+        public int SchedulerThreadId { get; private set; }
+
+        protected override IEnumerable<Task>? GetScheduledTasks() => _tasks.ToArray();
+
+        protected override void QueueTask(Task task)
+        {
+            Interlocked.Increment(ref _queuedCount);
+            _tasks.Add(task);
+        }
+
+        protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)
+            => Environment.CurrentManagedThreadId == SchedulerThreadId && _canRun.IsSet && TryExecuteTask(task);
+
+        public void Release() => _canRun.Set();
+
+        public bool WaitForQueuedTaskCount(int expectedCount, TimeSpan timeout)
+        {
+            var deadline = DateTime.UtcNow + timeout;
+            while (DateTime.UtcNow < deadline)
+            {
+                if (Volatile.Read(ref _queuedCount) >= expectedCount)
+                {
+                    return true;
+                }
+
+                Thread.Sleep(10);
+            }
+
+            return false;
+        }
+
+        public void Dispose()
+        {
+            _tasks.CompleteAdding();
+            _canRun.Set();
+            _thread.Join(TimeSpan.FromSeconds(5));
+            _tasks.Dispose();
+            _canRun.Dispose();
+        }
+
+        private void RunOnSchedulerThread()
+        {
+            SchedulerThreadId = Environment.CurrentManagedThreadId;
+            foreach (var task in _tasks.GetConsumingEnumerable())
+            {
+                _canRun.Wait();
+                TryExecuteTask(task);
+            }
+        }
+    }
+
+    private sealed partial class TrackingCommandItem : ICommandItem
+    {
+        private TypedEventHandler<object, IPropChangedEventArgs>? _propChanged;
+
+        public string Title { get; set; } = string.Empty;
+
+        public string Subtitle { get; set; } = string.Empty;
+
+        public ICommand? Command { get; set; } = new NoOpCommand { Name = "Primary" };
+
+        public IIconInfo? Icon { get; set; }
+
+        public IContextItem[] MoreCommands { get; set; } = [];
+
+        public int AddCount { get; private set; }
+
+        public int RemoveCount { get; private set; }
+
+        public int AddThreadId { get; private set; }
+
+        public int RemoveThreadId { get; private set; }
+
+        public event TypedEventHandler<object, IPropChangedEventArgs>? PropChanged
+        {
+            add
+            {
+                AddThreadId = Environment.CurrentManagedThreadId;
+                AddCount++;
+                _propChanged += value;
+            }
+
+            remove
+            {
+                RemoveThreadId = Environment.CurrentManagedThreadId;
+                RemoveCount++;
+                _propChanged -= value;
+            }
+        }
+
+        public void RaisePropertyChanged(string propertyName)
+            => _propChanged?.Invoke(this, new PropChangedEventArgs(propertyName));
     }
 
     [TestMethod]
@@ -155,5 +279,62 @@ public class CommandItemViewModelTests
 
         Assert.AreEqual("after unique", primaryContextItem.Subtitle);
         Assert.AreEqual("after unique", primaryContextItem.GetSubtitleTarget(matcher).Original);
+    }
+
+    [TestMethod]
+    public void InitializeAndCleanup_SubscribeAndRemoveOnProvidedScheduler()
+    {
+        using var scheduler = new GatedSingleThreadTaskScheduler(initiallyOpen: true);
+        var pageContext = new TestPageContext(scheduler);
+        var item = new TrackingCommandItem
+        {
+            Title = "Primary",
+            Subtitle = "before",
+            Command = new NoOpCommand { Name = "Primary" },
+        };
+
+        var viewModel = new CommandItemViewModel(new(item), new(pageContext), DefaultContextMenuFactory.Instance);
+        viewModel.InitializeProperties();
+        viewModel.SafeCleanup();
+
+        Assert.AreEqual(1, item.AddCount);
+        Assert.AreEqual(1, item.RemoveCount);
+        Assert.AreEqual(scheduler.SchedulerThreadId, item.AddThreadId);
+        Assert.AreEqual(scheduler.SchedulerThreadId, item.RemoveThreadId);
+    }
+
+    [TestMethod]
+    public async Task CleanupRacingQueuedInitialize_DoesNotLeaveHandlerAttached()
+    {
+        using var scheduler = new GatedSingleThreadTaskScheduler();
+        var pageContext = new TestPageContext(scheduler);
+        var item = new TrackingCommandItem
+        {
+            Title = "Primary",
+            Subtitle = "before",
+            Command = new NoOpCommand { Name = "Primary" },
+        };
+
+        var viewModel = new CommandItemViewModel(new(item), new(pageContext), DefaultContextMenuFactory.Instance);
+        var initializeTask = Task.Run(viewModel.InitializeProperties);
+
+        Assert.IsTrue(scheduler.WaitForQueuedTaskCount(1, TimeSpan.FromSeconds(5)));
+
+        var cleanupTask = Task.Run(viewModel.SafeCleanup);
+
+        Assert.IsTrue(scheduler.WaitForQueuedTaskCount(2, TimeSpan.FromSeconds(5)));
+
+        scheduler.Release();
+        var initializationAndCleanup = Task.WhenAll(initializeTask, cleanupTask);
+        var completedTask = await Task.WhenAny(initializationAndCleanup, Task.Delay(TimeSpan.FromSeconds(5)));
+
+        Assert.AreSame(initializationAndCleanup, completedTask);
+        Assert.AreEqual(0, item.AddCount);
+        Assert.AreEqual(0, item.RemoveCount);
+
+        item.Subtitle = "after";
+        item.RaisePropertyChanged(nameof(ICommandItem.Subtitle));
+
+        Assert.AreEqual("before", viewModel.Subtitle);
     }
 }

@@ -22,6 +22,7 @@ public sealed partial class DockBandViewModel : ExtensionObjectViewModel
     private readonly IContextMenuFactory _contextMenuFactory;
     private bool _itemsChangedSubscribed;
     private bool _cleanupStarted;
+    private IListPage? _subscribedList;
 
     private DockBandSettings _bandSettings;
 
@@ -296,12 +297,18 @@ public sealed partial class DockBandViewModel : ExtensionObjectViewModel
                             return;
                         }
 
-                        if (_itemsChangedSubscribed)
+                        if (ReferenceEquals(_subscribedList, list))
                         {
                             return;
                         }
 
+                        if (_itemsChangedSubscribed && _subscribedList is not null)
+                        {
+                            _subscribedList.ItemsChanged -= HandleItemsChanged;
+                        }
+
                         list.ItemsChanged += HandleItemsChanged;
+                        _subscribedList = list;
                         _itemsChangedSubscribed = true;
                     }
                 });
@@ -341,9 +348,14 @@ public sealed partial class DockBandViewModel : ExtensionObjectViewModel
             {
                 return;
             }
+
+            if (!ReferenceEquals(sender, _subscribedList))
+            {
+                return;
+            }
         }
 
-        if (_rootItem.Command.Model.Unsafe is IListPage p)
+        if (sender is IListPage p)
         {
             InitializeFromList(p);
         }
@@ -358,25 +370,22 @@ public sealed partial class DockBandViewModel : ExtensionObjectViewModel
             _cleanupStarted = true;
         }
 
-        var command = _rootItem.Command;
-        if (command.Model.Unsafe is IListPage list)
+        // Marshal WinRT event handler removal to the UI thread to match where
+        // it was subscribed, avoiding concurrent EventSourceCache lock contention.
+        DoOnUiThreadAndWait(() =>
         {
-            // Marshal WinRT event handler removal to the UI thread to match where
-            // it was subscribed, avoiding concurrent EventSourceCache lock contention.
-            DoOnUiThreadAndWait(() =>
+            lock (_itemsChangedSubscriptionLock)
             {
-                lock (_itemsChangedSubscriptionLock)
+                if (!_itemsChangedSubscribed || _subscribedList is null)
                 {
-                    if (!_itemsChangedSubscribed)
-                    {
-                        return;
-                    }
-
-                    list.ItemsChanged -= HandleItemsChanged;
-                    _itemsChangedSubscribed = false;
+                    return;
                 }
-            });
-        }
+
+                _subscribedList.ItemsChanged -= HandleItemsChanged;
+                _subscribedList = null;
+                _itemsChangedSubscribed = false;
+            }
+        });
 
         foreach (var item in Items)
         {
