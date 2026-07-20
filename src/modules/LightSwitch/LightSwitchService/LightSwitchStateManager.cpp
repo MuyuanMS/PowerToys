@@ -2,6 +2,7 @@
 #include "LightSwitchStateManager.h"
 #include <logger.h>
 #include <LightSwitchUtils.h>
+#include "SunTimeUpdater.h"
 #include "ThemeScheduler.h"
 #include <ThemeHelper.h>
 #include <common/interop/shared_constants.h>
@@ -123,51 +124,35 @@ void LightSwitchStateManager::SyncInitialThemeState()
 
 static std::optional<std::pair<int, int>> update_sun_times(auto& settings)
 {
-    int newLightTime;
-    int newDarkTime;
+    auto saveSunTimes = [](int newLightTime, int newDarkTime) {
+        try
+        {
+            auto values = PowerToysSettings::PowerToyValues::load_from_settings_file(L"LightSwitch");
+            values.add_property(L"lightTime", newLightTime);
+            values.add_property(L"darkTime", newDarkTime);
+            values.save_to_settings_file();
 
-    try
+            Logger::info(L"[LightSwitchService] Updated sun times and saved to config.");
+        }
+        catch (const std::exception& e)
+        {
+            std::string msg = e.what();
+            std::wstring wmsg(msg.begin(), msg.end());
+            Logger::error(L"[LightSwitchService] Exception during sun time update: {}", wmsg);
+        }
+        catch (...)
+        {
+            Logger::error(L"[LightSwitchService] Unknown exception during sun time save.");
+        }
+    };
+
+    auto newTimes = LightSwitch::TryUpdateSunTimes(settings.latitude, settings.longitude, CalculateSunriseSunset, saveSunTimes);
+    if (!newTimes)
     {
-        double latitude = std::stod(settings.latitude);
-        double longitude = std::stod(settings.longitude);
-
-        SYSTEMTIME st;
-        GetLocalTime(&st);
-
-        SunTimes newTimes = CalculateSunriseSunset(latitude, longitude, st.wYear, st.wMonth, st.wDay);
-
-        newLightTime = newTimes.sunriseHour * 60 + newTimes.sunriseMinute;
-        newDarkTime = newTimes.sunsetHour * 60 + newTimes.sunsetMinute;
-    }
-    catch (const std::exception& e)
-    {
-        std::string msg = e.what();
-        std::wstring wmsg(msg.begin(), msg.end());
-        Logger::error(L"[LightSwitchService] Failed to parse coordinates for sun time calculation: {}", wmsg);
-        return std::nullopt;
-    }
-
-    try
-    {
-        auto values = PowerToysSettings::PowerToyValues::load_from_settings_file(L"LightSwitch");
-        values.add_property(L"lightTime", newLightTime);
-        values.add_property(L"darkTime", newDarkTime);
-        values.save_to_settings_file();
-
-        Logger::info(L"[LightSwitchService] Updated sun times and saved to config.");
-    }
-    catch (const std::exception& e)
-    {
-        std::string msg = e.what();
-        std::wstring wmsg(msg.begin(), msg.end());
-        Logger::error(L"[LightSwitchService] Exception during sun time update: {}", wmsg);
-    }
-    catch (...)
-    {
-        Logger::error(L"[LightSwitchService] Unknown exception during sun time save.");
+        Logger::error(L"[LightSwitchService] Failed to parse coordinates for sun time calculation.");
     }
 
-    return std::make_pair(newLightTime, newDarkTime);
+    return newTimes;
 }
 
 // Internal: decide what should happen now
