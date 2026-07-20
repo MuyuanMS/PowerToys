@@ -76,6 +76,14 @@ public partial class CommandViewModel : ExtensionObjectViewModel
             return;
         }
 
+        lock (_propChangedSubscriptionLock)
+        {
+            if (_cleanupStarted)
+            {
+                return;
+            }
+        }
+
         if (!IsFastInitialized)
         {
             FastInitializeProperties();
@@ -93,11 +101,18 @@ public partial class CommandViewModel : ExtensionObjectViewModel
         // during theme reapply (via CommunityToolkit DispatcherQueueTimer.Debounce).
         // Wait for this to complete so we don't miss updates between initialization
         // and subscription.
+        var shouldContinue = true;
         DoOnUiThreadAndWait(() =>
         {
             lock (_propChangedSubscriptionLock)
             {
-                if (_cleanupStarted || _propChangedSubscribed)
+                if (_cleanupStarted)
+                {
+                    shouldContinue = false;
+                    return;
+                }
+
+                if (_propChangedSubscribed)
                 {
                     return;
                 }
@@ -108,6 +123,7 @@ public partial class CommandViewModel : ExtensionObjectViewModel
                 // event handler without a reliable unsubscribe path.
                 if (!ReferenceEquals(model, Model.Unsafe))
                 {
+                    shouldContinue = false;
                     return;
                 }
 
@@ -115,6 +131,19 @@ public partial class CommandViewModel : ExtensionObjectViewModel
                 _propChangedSubscribed = true;
             }
         });
+
+        if (!shouldContinue)
+        {
+            return;
+        }
+
+        lock (_propChangedSubscriptionLock)
+        {
+            if (_cleanupStarted)
+            {
+                return;
+            }
+        }
 
         var ico = model.Icon;
         if (ico is not null)
@@ -189,16 +218,15 @@ public partial class CommandViewModel : ExtensionObjectViewModel
     {
         base.UnsafeCleanup();
 
-        Icon = new(null); // necessary?
+        lock (_propChangedSubscriptionLock)
+        {
+            _cleanupStarted = true;
+        }
 
+        Icon = new(null); // necessary?
         var model = Model.Unsafe;
         if (model is not null)
         {
-            lock (_propChangedSubscriptionLock)
-            {
-                _cleanupStarted = true;
-            }
-
             // Marshal WinRT event unsubscription to the UI thread to match where
             // it was subscribed, avoiding concurrent EventSourceCache lock contention.
             DoOnUiThreadAndWait(() =>

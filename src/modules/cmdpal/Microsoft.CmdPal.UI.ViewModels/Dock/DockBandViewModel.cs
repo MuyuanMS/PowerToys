@@ -256,6 +256,14 @@ public sealed partial class DockBandViewModel : ExtensionObjectViewModel
 
     public override void InitializeProperties()
     {
+        lock (_itemsChangedSubscriptionLock)
+        {
+            if (_cleanupStarted)
+            {
+                return;
+            }
+        }
+
         var command = _rootItem.Command;
         var list = command.Model.Unsafe as IListPage;
         if (list is not null)
@@ -277,11 +285,18 @@ public sealed partial class DockBandViewModel : ExtensionObjectViewModel
                 // during theme reapply (via CommunityToolkit DispatcherQueueTimer.Debounce).
                 // Wait for this to complete so we don't miss updates between initialization
                 // and subscription.
+                var shouldContinue = true;
                 DoOnUiThreadAndWait(() =>
                 {
                     lock (_itemsChangedSubscriptionLock)
                     {
-                        if (_cleanupStarted || _itemsChangedSubscribed)
+                        if (_cleanupStarted)
+                        {
+                            shouldContinue = false;
+                            return;
+                        }
+
+                        if (_itemsChangedSubscribed)
                         {
                             return;
                         }
@@ -290,6 +305,19 @@ public sealed partial class DockBandViewModel : ExtensionObjectViewModel
                         _itemsChangedSubscribed = true;
                     }
                 });
+
+                if (!shouldContinue)
+                {
+                    return;
+                }
+            }
+
+            lock (_itemsChangedSubscriptionLock)
+            {
+                if (_cleanupStarted)
+                {
+                    return;
+                }
             }
 
             InitializeFromList(list);
@@ -325,14 +353,14 @@ public sealed partial class DockBandViewModel : ExtensionObjectViewModel
     {
         base.UnsafeCleanup();
 
+        lock (_itemsChangedSubscriptionLock)
+        {
+            _cleanupStarted = true;
+        }
+
         var command = _rootItem.Command;
         if (command.Model.Unsafe is IListPage list)
         {
-            lock (_itemsChangedSubscriptionLock)
-            {
-                _cleanupStarted = true;
-            }
-
             // Marshal WinRT event unsubscription to the UI thread to match where
             // it was subscribed, avoiding concurrent EventSourceCache lock contention.
             DoOnUiThreadAndWait(() =>

@@ -163,6 +163,14 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
             return;
         }
 
+        lock (_propChangedSubscriptionLock)
+        {
+            if (_cleanupStarted)
+            {
+                return;
+            }
+        }
+
         if (!IsFastInitialized)
         {
             FastInitializeProperties();
@@ -180,11 +188,18 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
         // during theme reapply (via CommunityToolkit DispatcherQueueTimer.Debounce).
         // Wait for this to complete so we don't miss updates between initialization
         // and subscription.
+        var shouldContinue = true;
         DoOnUiThreadAndWait(() =>
         {
             lock (_propChangedSubscriptionLock)
             {
-                if (_cleanupStarted || _propChangedSubscribed)
+                if (_cleanupStarted)
+                {
+                    shouldContinue = false;
+                    return;
+                }
+
+                if (_propChangedSubscribed)
                 {
                     return;
                 }
@@ -195,6 +210,7 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
                 // _cleanupStarted checks here and in cleanup to block late subscriptions.
                 if (!ReferenceEquals(model, _commandItemModel.Unsafe))
                 {
+                    shouldContinue = false;
                     return;
                 }
 
@@ -202,6 +218,19 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
                 _propChangedSubscribed = true;
             }
         });
+
+        if (!shouldContinue)
+        {
+            return;
+        }
+
+        lock (_propChangedSubscriptionLock)
+        {
+            if (_cleanupStarted)
+            {
+                return;
+            }
+        }
 
         Command.PropertyChanged += Command_PropertyChanged;
 
@@ -215,7 +244,6 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
         }
 
         // TODO: Do these need to go into FastInit?
-
         UpdateProperty(nameof(Name));
         UpdateProperty(nameof(Title));
         UpdateProperty(nameof(Subtitle));
@@ -612,6 +640,11 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
     {
         base.UnsafeCleanup();
 
+        lock (_propChangedSubscriptionLock)
+        {
+            _cleanupStarted = true;
+        }
+
         List<IContextItemViewModel> freedItems;
         CommandContextItemViewModel? freedDefault;
         lock (_moreCommandsLock)
@@ -642,11 +675,6 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
         var model = _commandItemModel.Unsafe;
         if (model is not null)
         {
-            lock (_propChangedSubscriptionLock)
-            {
-                _cleanupStarted = true;
-            }
-
             // Marshal WinRT event unsubscription to the UI thread to match where
             // it was subscribed, avoiding concurrent EventSourceCache lock contention.
             DoOnUiThreadAndWait(() =>

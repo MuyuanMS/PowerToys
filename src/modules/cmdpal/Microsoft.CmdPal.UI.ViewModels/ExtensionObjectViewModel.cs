@@ -6,9 +6,11 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.CmdPal.Common;
 using Microsoft.CmdPal.Common.Helpers;
+using Microsoft.UI.Dispatching;
 
 namespace Microsoft.CmdPal.UI.ViewModels;
 
@@ -273,13 +275,10 @@ public abstract partial class ExtensionObjectViewModel : ObservableObject, IBatc
             return;
         }
 
-        // The TaskScheduler.Current check catches cases where we're already running
-        // on the target scheduler via Task infrastructure. The
-        // SynchronizationContext check covers direct UI-thread callbacks (e.g.,
-        // DispatcherQueue callbacks) where TaskScheduler.Current can still be Default.
-        if (TaskScheduler.Current == pageContext.Scheduler ||
-            (SynchronizationContext.Current is not null &&
-             TaskScheduler.FromCurrentSynchronizationContext() == pageContext.Scheduler))
+        // TaskScheduler.Current catches work already running through the target
+        // scheduler. DispatcherQueue covers direct UI-thread callbacks where
+        // TaskScheduler.Current can still be Default.
+        if (TaskScheduler.Current == pageContext.Scheduler || IsCurrentThreadUiThread())
         {
             action();
             return;
@@ -301,6 +300,18 @@ public abstract partial class ExtensionObjectViewModel : ObservableObject, IBatc
             CancellationToken.None,
             TaskCreationOptions.None,
             pageContext.Scheduler).GetAwaiter().GetResult();
+    }
+
+    private static bool IsCurrentThreadUiThread()
+    {
+        try
+        {
+            return DispatcherQueue.GetForCurrentThread()?.HasThreadAccess == true;
+        }
+        catch (COMException)
+        {
+            return false;
+        }
     }
 
     protected virtual void UnsafeCleanup()
