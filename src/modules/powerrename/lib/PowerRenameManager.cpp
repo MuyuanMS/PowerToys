@@ -836,14 +836,21 @@ void CPowerRenameManager::_LogOperationTelemetry()
 
 HRESULT CPowerRenameManager::_PerformFileOperation()
 {
+    if (!TryEnterCriticalSection(&m_critsecReentrancy))
+    {
+        return E_FAIL;
+    }
+
     // Do we have items to rename?
     UINT renameItemCount = 0;
     if (FAILED(GetRenameItemCount(&renameItemCount)))
     {
+        LeaveCriticalSection(&m_critsecReentrancy);
         return E_FAIL;
     }
     if (renameItemCount == 0)
     {
+        LeaveCriticalSection(&m_critsecReentrancy);
         return S_OK;
     }
 
@@ -889,7 +896,8 @@ HRESULT CPowerRenameManager::_PerformFileOperation()
         _OnRenameCompleted();
     }
 
-    return S_OK;
+    LeaveCriticalSection(&m_critsecReentrancy);
+    return hr;
 }
 
 HRESULT CPowerRenameManager::_CreateFileOpWorkerThread()
@@ -1078,88 +1086,92 @@ DWORD WINAPI CPowerRenameManager::s_fileOpWorkerThread(_In_ void* pv)
                         if (SUCCEEDED(spFileOp->SetOperationFlags(FOF_DEFAULTFLAGS)))
                         {
                             DWORD fileOpAdviseCookie = 0;
-                            if (spRenameProgressSink != nullptr)
+                            bool canTrackRenameResults = closeUIWindowAfterRenaming;
+                            if (!closeUIWindowAfterRenaming && spRenameProgressSink != nullptr)
                             {
-                                spFileOp->Advise(spRenameProgressSink, &fileOpAdviseCookie);
+                                canTrackRenameResults = SUCCEEDED(spFileOp->Advise(spRenameProgressSink, &fileOpAdviseCookie));
                             }
 
-                            // Set the parent window
-                            if (pwtd->hwndParent)
+                            if (canTrackRenameResults)
                             {
-                                spFileOp->SetOwnerWindow(pwtd->hwndParent);
-                            }
-
-                            // Perform the operation
-                            HRESULT performHr = spFileOp->PerformOperations();
-
-                            // Update item data only for operations that the shell reports as
-                            // successfully renamed. This captures collision-resolved names such
-                            // as "bar (2).txt" and avoids stale state for failed items.
-                            UNREFERENCED_PARAMETER(performHr);
-                            if (renameProgressSink != nullptr)
-                            {
-                                for (auto& update : pendingUpdates)
+                                // Set the parent window
+                                if (pwtd->hwndParent)
                                 {
-                                    std::wstring actualNewPath;
-                                    if (!renameProgressSink->TryGetSuccessfulRename(update.operationIndex, actualNewPath))
+                                    spFileOp->SetOwnerWindow(pwtd->hwndParent);
+                                }
+
+                                // Perform the operation
+                                HRESULT performHr = spFileOp->PerformOperations();
+
+                                // Update item data only for operations that the shell reports as
+                                // successfully renamed. This captures collision-resolved names such
+                                // as "bar (2).txt" and avoids stale state for failed items.
+                                UNREFERENCED_PARAMETER(performHr);
+                                if (renameProgressSink != nullptr)
+                                {
+                                    for (auto& update : pendingUpdates)
                                     {
-                                        const bool hasDuplicatePredictedPath = std::count_if(pendingUpdates.begin(), pendingUpdates.end(), [&update](const PendingItemUpdate& other) {
-                                            return CompareStringOrdinal(update.newPath.c_str(), -1, other.newPath.c_str(), -1, TRUE) == CSTR_EQUAL;
-                                        }) > 1;
+                                        std::wstring actualNewPath;
+                                        if (!renameProgressSink->TryGetSuccessfulRename(update.operationIndex, actualNewPath))
+                                        {
+                                            const bool hasDuplicatePredictedPath = std::count_if(pendingUpdates.begin(), pendingUpdates.end(), [&update](const PendingItemUpdate& other) {
+                                                return CompareStringOrdinal(update.newPath.c_str(), -1, other.newPath.c_str(), -1, TRUE) == CSTR_EQUAL;
+                                            }) > 1;
 
-                                        if (!hasDuplicatePredictedPath && fs::exists(update.newPath))
-                                        {
-                                            actualNewPath = update.newPath;
-                                        }
-                                        else if (!hasDuplicatePredictedPath)
-                                        {
-                                            for (auto& parentUpdate : pendingUpdates)
+                                            if (!hasDuplicatePredictedPath && fs::exists(update.newPath))
                                             {
-                                                if (!parentUpdate.isFolder || !StartsWithPathIgnoringCase(update.oldPath, parentUpdate.oldPath))
+                                                actualNewPath = update.newPath;
+                                            }
+                                            else if (!hasDuplicatePredictedPath)
+                                            {
+                                                for (auto& parentUpdate : pendingUpdates)
                                                 {
-                                                    continue;
-                                                }
-
-                                                std::wstring parentNewPath;
-                                                if (!renameProgressSink->TryGetSuccessfulRename(parentUpdate.operationIndex, parentNewPath) && fs::exists(parentUpdate.newPath))
-                                                {
-                                                    parentNewPath = parentUpdate.newPath;
-                                                }
-
-                                                if (!parentNewPath.empty())
-                                                {
-                                                    std::wstring resolvedPath = parentNewPath + update.newPath.substr(parentUpdate.oldPath.size());
-                                                    if (fs::exists(resolvedPath))
+                                                    if (!parentUpdate.isFolder || !StartsWithPathIgnoringCase(update.oldPath, parentUpdate.oldPath))
                                                     {
-                                                        actualNewPath = std::move(resolvedPath);
-                                                        break;
+                                                        continue;
+                                                    }
+
+                                                    std::wstring parentNewPath;
+                                                    if (!renameProgressSink->TryGetSuccessfulRename(parentUpdate.operationIndex, parentNewPath) && fs::exists(parentUpdate.newPath))
+                                                    {
+                                                        parentNewPath = parentUpdate.newPath;
+                                                    }
+
+                                                    if (!parentNewPath.empty())
+                                                    {
+                                                        std::wstring resolvedPath = parentNewPath + update.newPath.substr(parentUpdate.oldPath.size());
+                                                        if (fs::exists(resolvedPath))
+                                                        {
+                                                            actualNewPath = std::move(resolvedPath);
+                                                            break;
+                                                        }
                                                     }
                                                 }
                                             }
+
+                                            if (actualNewPath.empty())
+                                            {
+                                                continue;
+                                            }
                                         }
 
-                                        if (actualNewPath.empty())
+                                        update.spItem->PutPath(actualNewPath.c_str());
+                                        update.spItem->PutOriginalName(fs::path(actualNewPath).filename().c_str());
+                                        update.spItem->PutNewName(nullptr);
+
+                                        if (update.isFolder)
                                         {
-                                            continue;
+                                            pwtd->spsrm->UpdateChildrenPath(update.id, update.oldPathSize);
                                         }
+
+                                        PostMessage(pwtd->hwndManager, SRM_REGEX_ITEM_RENAMED_KEEP_UI, GetCurrentThreadId(), update.id);
                                     }
-
-                                    update.spItem->PutPath(actualNewPath.c_str());
-                                    update.spItem->PutOriginalName(fs::path(actualNewPath).filename().c_str());
-                                    update.spItem->PutNewName(nullptr);
-
-                                    if (update.isFolder)
-                                    {
-                                        pwtd->spsrm->UpdateChildrenPath(update.id, update.oldPathSize);
-                                    }
-
-                                    PostMessage(pwtd->hwndManager, SRM_REGEX_ITEM_RENAMED_KEEP_UI, GetCurrentThreadId(), update.id);
                                 }
-                            }
 
-                            if (fileOpAdviseCookie != 0)
-                            {
-                                spFileOp->Unadvise(fileOpAdviseCookie);
+                                if (fileOpAdviseCookie != 0)
+                                {
+                                    spFileOp->Unadvise(fileOpAdviseCookie);
+                                }
                             }
                         }
                     }
