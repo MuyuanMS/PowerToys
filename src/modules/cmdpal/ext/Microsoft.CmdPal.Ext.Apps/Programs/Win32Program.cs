@@ -579,6 +579,7 @@ public partial class Win32Program : IProgram
             try
             {
                 resolvedDirectory = System.IO.Directory.ResolveLinkTarget(currentDirectory, returnFinalTarget: true)?.FullName ?? currentDirectory;
+                resolvedDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(resolvedDirectory));
             }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is SecurityException)
             {
