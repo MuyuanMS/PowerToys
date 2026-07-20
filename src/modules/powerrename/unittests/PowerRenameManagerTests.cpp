@@ -492,7 +492,7 @@ namespace PowerRenameManagerTests
             std::atomic_bool readSucceeded{ true };
             std::thread reader([&]() {
                 const HRESULT coInit = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-                while (!mockMgrEvents->m_regExStartedSignal.load() && !mockMgrEvents->m_regExCompletedSignal.load())
+                while (keepReading.load() && !mockMgrEvents->m_regExStartedSignal.load() && !mockMgrEvents->m_regExCompletedSignal.load())
                 {
                     Sleep(1);
                 }
