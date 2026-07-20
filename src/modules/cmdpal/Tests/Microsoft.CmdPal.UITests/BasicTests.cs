@@ -4,6 +4,7 @@
 
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.PowerToys.UITest;
@@ -156,21 +157,70 @@ public class BasicTests : CommandPaletteTestBase
     [TestMethod]
     public void LowLevelGlobalHotkeySummonHideCycleDoesNotCrash()
     {
-        OpenSettingsWindow();
+        var settingsPath = GetCommandPaletteSettingsPath();
+        var originalSettings = File.Exists(settingsPath) ? File.ReadAllText(settingsPath) : null;
 
-        var lowLevelHookCheckBox = this.Find<CheckBox>(By.AccessibilityId("CmdPal_GeneralPage_LowLevelHook"));
-        Assert.IsNotNull(lowLevelHookCheckBox);
-        lowLevelHookCheckBox.SetCheck();
+        try
+        {
+            ConfigureLowLevelGlobalHotkey(settingsPath);
+            RestartScopeExe();
+            Assert.IsNotNull(this.Find<TextBox>(By.AccessibilityId("MainSearchBox"), 10000));
 
-        RestartScopeExe();
-        Assert.IsNotNull(this.Find<TextBox>(By.AccessibilityId("MainSearchBox"), 10000));
+            SendConfiguredActivationShortcut();
+            Task.Delay(1000).Wait();
+            Assert.IsTrue(IsCommandPaletteProcessAlive(), "Command Palette exited after the low-level hotkey hide path.");
 
+            SendConfiguredActivationShortcut();
+            Assert.IsNotNull(this.Find<TextBox>(By.AccessibilityId("MainSearchBox"), 10000));
+        }
+        finally
+        {
+            RestoreCommandPaletteSettings(settingsPath, originalSettings);
+            RestartScopeExe();
+        }
+    }
+
+    private static string GetCommandPaletteSettingsPath()
+    {
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Microsoft.CmdPal",
+            "settings.json");
+    }
+
+    private static void ConfigureLowLevelGlobalHotkey(string settingsPath)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
+        const string settingsJson = """
+            {
+              "Hotkey": {
+                "win": true,
+                "ctrl": false,
+                "alt": true,
+                "shift": false,
+                "code": 32,
+                "key": ""
+              },
+              "UseLowLevelGlobalHotkey": true
+            }
+            """;
+        File.WriteAllText(settingsPath, settingsJson);
+    }
+
+    private static void RestoreCommandPaletteSettings(string settingsPath, string? originalSettings)
+    {
+        if (originalSettings is null)
+        {
+            File.Delete(settingsPath);
+            return;
+        }
+
+        File.WriteAllText(settingsPath, originalSettings);
+    }
+
+    private void SendConfiguredActivationShortcut()
+    {
         SendKeys(Key.Win, Key.Alt, Key.Space);
-        Task.Delay(1000).Wait();
-        Assert.IsTrue(IsCommandPaletteProcessAlive(), "Command Palette exited after the low-level hotkey hide path.");
-
-        SendKeys(Key.Win, Key.Alt, Key.Space);
-        Assert.IsNotNull(this.Find<TextBox>(By.AccessibilityId("MainSearchBox"), 10000));
     }
 
     private static bool IsCommandPaletteProcessAlive()
