@@ -110,23 +110,28 @@ namespace CommonLibTest
         [DataTestMethod]
         [DataRow(-1)]
         [DataRow(101)]
-        public void UpgradeShouldDefaultTo50PercentOpacityWhenOverlayOpacityIsOutOfRange(int legacyOverlayOpacity)
+        public void GetSettingsShouldDefaultTo50PercentOpacityWhenLegacyOverlayOpacityIsOutOfRange(int legacyOverlayOpacity)
         {
-            var settings = new FindMyMouseSettings
-            {
-                Version = "1.1",
-            };
-            settings.Properties.BackgroundColor = new StringProperty("#000000");
-            settings.Properties.SpotlightColor = new StringProperty("#FFFFFF");
-            settings.Properties.LegacyOverlayOpacity = new IntProperty(legacyOverlayOpacity);
+            var mockFileSystem = new MockFileSystem();
+            var settingsUtils = new SettingsUtils(mockFileSystem);
+            string settingsPath = settingsUtils.GetSettingsFilePath(FindMyMouseSettings.ModuleName);
+            string legacySettingsJson = "{\"name\":\"FindMyMouse\",\"version\":\"1.1\",\"properties\":{\"background_color\":{\"value\":\"#000000\"},\"spotlight_color\":{\"value\":\"#FFFFFF\"},\"overlay_opacity\":{\"value\":" + legacyOverlayOpacity + "}}}";
 
-            bool upgraded = settings.UpgradeSettingsConfiguration();
+            mockFileSystem.AddFile(settingsPath, new MockFileData(legacySettingsJson));
 
-            Assert.IsTrue(upgraded);
+            var settings = settingsUtils.GetSettings<FindMyMouseSettings>(FindMyMouseSettings.ModuleName);
+            string savedJson = mockFileSystem.File.ReadAllText(settingsPath);
+            using JsonDocument savedDocument = JsonDocument.Parse(savedJson);
+            JsonElement properties = savedDocument.RootElement.GetProperty("properties");
+
             Assert.AreEqual("1.2", settings.Version);
             Assert.AreEqual("#80000000", settings.Properties.BackgroundColor.Value);
             Assert.AreEqual("#80FFFFFF", settings.Properties.SpotlightColor.Value);
             Assert.IsNull(settings.Properties.LegacyOverlayOpacity, "LegacyOverlayOpacity should be cleared after migration.");
+
+            Assert.AreEqual("#80000000", properties.GetProperty("background_color").GetProperty("value").GetString());
+            Assert.AreEqual("#80FFFFFF", properties.GetProperty("spotlight_color").GetProperty("value").GetString());
+            Assert.IsFalse(properties.TryGetProperty("overlay_opacity", out _));
         }
 
         /// <summary>
