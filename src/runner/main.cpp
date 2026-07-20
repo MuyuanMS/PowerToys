@@ -340,11 +340,10 @@ int runner(bool isProcessElevated, bool openSettings, std::string settingsWindow
     catch (std::runtime_error& err)
     {
         std::string err_what = err.what();
-        write_crash_marker_message("[PowerToys Runner] CRASH: runner caught std::runtime_error.\n");
         Logger::critical("Runner failed with a std::runtime_error: {}", err_what);
         Logger::flush();
         MessageBoxW(nullptr, std::wstring(err_what.begin(), err_what.end()).c_str(), GET_RESOURCE_STRING(IDS_ERROR).c_str(), MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
-        throw;
+        result = -1;
     }
     catch (std::exception& err)
     {
@@ -644,11 +643,10 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
     catch (std::runtime_error& err)
     {
         std::string err_what = err.what();
-        write_crash_marker_message("[PowerToys Runner] CRASH: WinMain caught std::runtime_error.\n");
         Logger::critical("WinMain failed with a std::runtime_error: {}", err_what);
         Logger::flush();
         MessageBoxW(nullptr, std::wstring(err_what.begin(), err_what.end()).c_str(), GET_RESOURCE_STRING(IDS_ERROR).c_str(), MB_OK | MB_ICONERROR);
-        std::terminate();
+        result = -1;
     }
     catch (std::exception& err)
     {
