@@ -476,7 +476,7 @@ bool WindowArranger::moveWindow(HWND window, const WorkspacesData::WorkspacesPro
     HMONITOR currentMonitor{};
     UINT currentDpi = DPIAware::DEFAULT_DPI;
 
-    const auto currentMonitorIter = WorkspacesData::FindMatchingMonitor(*snapMonitorIter, m_monitors);
+    const auto currentMonitorIter = WorkspacesData::FindMatchingMonitor(*snapMonitorIter, m_project.monitors, m_monitors);
 
     if (currentMonitorIter != m_monitors.end())
     {

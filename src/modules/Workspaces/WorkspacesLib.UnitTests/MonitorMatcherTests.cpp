@@ -24,7 +24,14 @@ namespace WorkspacesLibUnitTests
 
         static int MatchIndex(const WorkspacesData::WorkspacesProject::Monitor& savedMonitor, const std::vector<WorkspacesData::WorkspacesProject::Monitor>& currentMonitors)
         {
-            const auto match = WorkspacesData::FindMatchingMonitor(savedMonitor, currentMonitors);
+            const std::vector<WorkspacesData::WorkspacesProject::Monitor> savedMonitors{ savedMonitor };
+            const auto match = WorkspacesData::FindMatchingMonitor(savedMonitor, savedMonitors, currentMonitors);
+            return match == currentMonitors.end() ? -1 : static_cast<int>(std::distance(currentMonitors.begin(), match));
+        }
+
+        static int MatchIndex(const WorkspacesData::WorkspacesProject::Monitor& savedMonitor, const std::vector<WorkspacesData::WorkspacesProject::Monitor>& savedMonitors, const std::vector<WorkspacesData::WorkspacesProject::Monitor>& currentMonitors)
+        {
+            const auto match = WorkspacesData::FindMatchingMonitor(savedMonitor, savedMonitors, currentMonitors);
             return match == currentMonitors.end() ? -1 : static_cast<int>(std::distance(currentMonitors.begin(), match));
         }
 
@@ -82,6 +89,21 @@ namespace WorkspacesLibUnitTests
             };
 
             Assert::AreEqual(1, MatchIndex(saved, currentMonitors));
+        }
+
+        TEST_METHOD(FindMatchingMonitor_DoesNotUseUniqueCurrentIdWhenSavedIdIsDuplicated)
+        {
+            const WorkspacesData::WorkspacesProject::Monitor::MonitorRect savedBounds{ 0, 1920, 1920, 1080 };
+            const auto missingSavedMonitor = Monitor(2, L"MONITOR-A", L"DISPLAY\\A\\1", savedBounds);
+            const std::vector<WorkspacesData::WorkspacesProject::Monitor> savedMonitors{
+                Monitor(1, L"MONITOR-A", L"DISPLAY\\A\\2", { 0, 0, 1920, 1080 }),
+                missingSavedMonitor,
+            };
+            const std::vector<WorkspacesData::WorkspacesProject::Monitor> currentMonitors{
+                Monitor(1, L"MONITOR-A", L"DISPLAY\\A\\2", { 0, 0, 1920, 1080 }),
+            };
+
+            Assert::AreEqual(-1, MatchIndex(missingSavedMonitor, savedMonitors, currentMonitors));
         }
     };
 }

@@ -5,7 +5,7 @@
 
 namespace WorkspacesData
 {
-    std::vector<WorkspacesProject::Monitor>::const_iterator FindMatchingMonitor(const WorkspacesProject::Monitor& savedMonitor, const std::vector<WorkspacesProject::Monitor>& currentMonitors)
+    std::vector<WorkspacesProject::Monitor>::const_iterator FindMatchingMonitor(const WorkspacesProject::Monitor& savedMonitor, const std::vector<WorkspacesProject::Monitor>& savedMonitors, const std::vector<WorkspacesProject::Monitor>& currentMonitors)
     {
         const auto end = currentMonitors.end();
         const auto findUniqueMonitorMatch = [&](const auto& predicate) {
@@ -16,6 +16,9 @@ namespace WorkspacesData
             }
 
             return std::find_if(firstMatch + 1, end, predicate) == end ? firstMatch : end;
+        };
+        const auto isKnownMonitorRect = [](const WorkspacesProject::Monitor::MonitorRect& rect) {
+            return rect.top != 0 || rect.left != 0 || rect.width != 0 || rect.height != 0;
         };
 
         if (!savedMonitor.id.empty() && !savedMonitor.instanceId.empty())
@@ -31,28 +34,40 @@ namespace WorkspacesData
 
         if (!savedMonitor.id.empty())
         {
-            const auto monitorByUniqueId = findUniqueMonitorMatch([&](const WorkspacesProject::Monitor& currentMonitor) {
-                return currentMonitor.id == savedMonitor.id;
-            });
-            if (monitorByUniqueId != end)
+            const auto savedMonitorIdIsUnique = std::count_if(savedMonitors.begin(), savedMonitors.end(), [&](const WorkspacesProject::Monitor& monitor) {
+                return monitor.id == savedMonitor.id;
+            }) == 1;
+            if (savedMonitorIdIsUnique)
             {
-                return monitorByUniqueId;
+                const auto monitorByUniqueId = findUniqueMonitorMatch([&](const WorkspacesProject::Monitor& currentMonitor) {
+                    return currentMonitor.id == savedMonitor.id;
+                });
+                if (monitorByUniqueId != end)
+                {
+                    return monitorByUniqueId;
+                }
             }
 
-            const auto monitorByDpiAwareRect = findUniqueMonitorMatch([&](const WorkspacesProject::Monitor& currentMonitor) {
-                return currentMonitor.id == savedMonitor.id && currentMonitor.monitorRectDpiAware == savedMonitor.monitorRectDpiAware;
-            });
-            if (monitorByDpiAwareRect != end)
+            if (isKnownMonitorRect(savedMonitor.monitorRectDpiAware))
             {
-                return monitorByDpiAwareRect;
+                const auto monitorByDpiAwareRect = findUniqueMonitorMatch([&](const WorkspacesProject::Monitor& currentMonitor) {
+                    return currentMonitor.id == savedMonitor.id && currentMonitor.monitorRectDpiAware == savedMonitor.monitorRectDpiAware;
+                });
+                if (monitorByDpiAwareRect != end)
+                {
+                    return monitorByDpiAwareRect;
+                }
             }
 
-            const auto monitorByDpiUnawareRect = findUniqueMonitorMatch([&](const WorkspacesProject::Monitor& currentMonitor) {
-                return currentMonitor.id == savedMonitor.id && currentMonitor.monitorRectDpiUnaware == savedMonitor.monitorRectDpiUnaware;
-            });
-            if (monitorByDpiUnawareRect != end)
+            if (isKnownMonitorRect(savedMonitor.monitorRectDpiUnaware))
             {
-                return monitorByDpiUnawareRect;
+                const auto monitorByDpiUnawareRect = findUniqueMonitorMatch([&](const WorkspacesProject::Monitor& currentMonitor) {
+                    return currentMonitor.id == savedMonitor.id && currentMonitor.monitorRectDpiUnaware == savedMonitor.monitorRectDpiUnaware;
+                });
+                if (monitorByDpiUnawareRect != end)
+                {
+                    return monitorByDpiUnawareRect;
+                }
             }
         }
 
