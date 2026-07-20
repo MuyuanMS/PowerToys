@@ -57,7 +57,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         // Excluded from serialization once migrated (null after migration).
         [JsonPropertyName("overlay_opacity")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public IntProperty? LegacyOverlayOpacity { get; set; }
+        public IntProperty LegacyOverlayOpacity { get; set; }
 
         public FindMyMouseProperties()
         {

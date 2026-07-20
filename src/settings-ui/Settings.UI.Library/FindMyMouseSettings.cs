@@ -74,7 +74,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                 }
 
                 // Round to nearest integer: (percent * 255 + 50) / 100
-                byte alpha = (byte)((opacityPercent * 255 + 50) / 100);
+                byte alpha = (byte)(((opacityPercent * 255) + 50) / 100);
 
                 string bgColor = Properties.BackgroundColor?.Value ?? string.Empty;
                 if (bgColor.Length == 7 && bgColor.StartsWith("#", StringComparison.OrdinalIgnoreCase))

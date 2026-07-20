@@ -104,6 +104,32 @@ namespace CommonLibTest
         }
 
         /// <summary>
+        /// Invalid legacy overlay_opacity values should fall back to 50% opacity
+        /// (alpha = 0x80) during migration.
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(-1)]
+        [DataRow(101)]
+        public void UpgradeShouldDefaultTo50PercentOpacityWhenOverlayOpacityIsOutOfRange(int legacyOverlayOpacity)
+        {
+            var settings = new FindMyMouseSettings
+            {
+                Version = "1.1",
+            };
+            settings.Properties.BackgroundColor = new StringProperty("#000000");
+            settings.Properties.SpotlightColor = new StringProperty("#FFFFFF");
+            settings.Properties.LegacyOverlayOpacity = new IntProperty(legacyOverlayOpacity);
+
+            bool upgraded = settings.UpgradeSettingsConfiguration();
+
+            Assert.IsTrue(upgraded);
+            Assert.AreEqual("1.2", settings.Version);
+            Assert.AreEqual("#80000000", settings.Properties.BackgroundColor.Value);
+            Assert.AreEqual("#80FFFFFF", settings.Properties.SpotlightColor.Value);
+            Assert.IsNull(settings.Properties.LegacyOverlayOpacity, "LegacyOverlayOpacity should be cleared after migration.");
+        }
+
+        /// <summary>
         /// Version "1.1" settings that already have ARGB colors (9-char #AARRGGBB)
         /// should not have their alpha modified during migration.
         /// </summary>
