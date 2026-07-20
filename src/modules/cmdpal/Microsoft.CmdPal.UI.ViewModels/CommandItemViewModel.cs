@@ -184,7 +184,7 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
         // Marshal WinRT event subscription to the UI thread to avoid a deadlock
         // in the WinRT EventSourceCache (ReaderWriterLockSlim) that can occur when
-        // background threads subscribe while the UI thread concurrently unsubscribes
+        // background threads subscribe while the UI thread concurrently removes handlers
         // during theme reapply (via CommunityToolkit DispatcherQueueTimer.Debounce).
         // Wait for this to complete so we don't miss updates between initialization
         // and subscription.
@@ -675,7 +675,7 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
         var model = _commandItemModel.Unsafe;
         if (model is not null)
         {
-            // Marshal WinRT event unsubscription to the UI thread to match where
+            // Marshal WinRT event handler removal to the UI thread to match where
             // it was subscribed, avoiding concurrent EventSourceCache lock contention.
             DoOnUiThreadAndWait(() =>
             {
