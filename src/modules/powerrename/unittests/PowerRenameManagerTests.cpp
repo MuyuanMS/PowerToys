@@ -592,17 +592,35 @@ namespace PowerRenameManagerTests
             Assert::AreEqual(L"\u65b0\u6587\u4ef6.txt", originalName);
             CoTaskMemFree(originalName);
 
-            mockMgrEvents->m_regExCompleted = false;
             renRegEx->PutSearchTerm(L"\u65b0");
             renRegEx->PutReplaceTerm(L"\u6700\u7ec8", true);
 
-            for (int attempt = 0; attempt < 200 && !mockMgrEvents->m_regExCompleted; attempt++)
+            // PutReplaceTerm cancels any in-flight worker (W_a) and starts a new one
+            // (W_b) with the correct terms.  During the cancellation,
+            // _WaitForRegExWorkerThread pumps messages and processes W_a's
+            // SRM_REGEX_COMPLETE, which sets m_regExCompleted even though W_b has not
+            // run DoRename yet.  Waiting on m_regExCompleted therefore exits too early.
+            //
+            // DoRename writes m_newName directly via PutNewName (exclusive lock, no
+            // window-message dispatch required), so poll GetNewName() instead.  This
+            // verifies the production keep-open re-preview path: after PutReplaceTerm
+            // returns, W_b will call DoRename on the already-renamed item
+            // (originalName = "\u65b0\u6587\u4ef6.txt") and set newName to
+            // "\u6700\u7ec8\u6587\u4ef6.txt".
+            PWSTR newName = nullptr;
+            for (int attempt = 0; attempt < 200; attempt++)
             {
+                CoTaskMemFree(newName);
+                newName = nullptr;
+                item->GetNewName(&newName);
+                if (newName != nullptr)
+                {
+                    break;
+                }
                 Sleep(5);
             }
 
-            PWSTR newName = nullptr;
-            Assert::IsTrue(SUCCEEDED(item->GetNewName(&newName)));
+            Assert::IsTrue(newName != nullptr);
             Assert::AreEqual(L"\u6700\u7ec8\u6587\u4ef6.txt", newName);
             CoTaskMemFree(newName);
 
