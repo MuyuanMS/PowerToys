@@ -1377,11 +1377,6 @@ namespace winrt::PowerRenameUI::implementation
             // Close the window
             PostMessage(m_window, WM_CLOSE, static_cast<WPARAM>(0), static_cast<LPARAM>(0));
         }
-        else
-        {
-            // Force renaming work to start so newly renamed items are processed right away
-            SearchReplaceChanged(true);
-        }
 
         InvalidateItemListViewState();
 

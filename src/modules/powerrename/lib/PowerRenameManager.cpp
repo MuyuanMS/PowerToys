@@ -675,27 +675,43 @@ HRESULT CPowerRenameManager::_PerformFileOperation()
         // were ready to process thread messages.
         SetEvent(m_startFileOpWorkerEvent);
 
+        // Use MsgWaitForMultipleObjects so the STA message pump keeps running
+        // while we wait for the file-op worker, avoiding COM cross-apartment
+        // deadlocks and keeping the UI responsive during rename.
+        bool quit = false;
         while (true)
         {
-            // Check if worker thread has exited
-            if (WaitForSingleObject(m_fileOpWorkerThreadHandle, 0) == WAIT_OBJECT_0)
+            DWORD waitResult = MsgWaitForMultipleObjects(1, &m_fileOpWorkerThreadHandle, FALSE, INFINITE, QS_ALLINPUT);
+            if (waitResult == WAIT_OBJECT_0)
             {
+                // Worker thread has exited.
                 break;
             }
-
-            MSG msg;
-            while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+            if (waitResult == WAIT_OBJECT_0 + 1)
             {
-                if (msg.message == SRM_FILEOP_COMPLETE)
+                // Window messages are available; pump them to keep the STA alive.
+                MSG msg;
+                while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
                 {
-                    // Worker thread completed
-                    break;
-                }
-                else
-                {
+                    if (msg.message == WM_QUIT)
+                    {
+                        PostQuitMessage(static_cast<int>(msg.wParam));
+                        quit = true;
+                        break;
+                    }
                     TranslateMessage(&msg);
                     DispatchMessage(&msg);
                 }
+            }
+            else
+            {
+                // WAIT_FAILED or unexpected result; break to avoid an infinite loop.
+                break;
+            }
+
+            if (quit)
+            {
+                break;
             }
         }
 
