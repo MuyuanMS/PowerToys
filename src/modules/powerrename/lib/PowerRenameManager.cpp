@@ -686,13 +686,12 @@ HRESULT CPowerRenameManager::_PerformFileOperation()
         // Use MsgWaitForMultipleObjects so the STA message pump keeps running
         // while we wait for the file-op worker, avoiding COM cross-apartment
         // deadlocks and keeping the UI responsive during rename.
-        // Keep a local copy of the handle so that a reentrant call (rejected above)
-        // cannot overwrite it while we are waiting.
-        HANDLE localHandle = m_fileOpWorkerThreadHandle;
+        // m_fileOpWorkerThreadHandle is safe to read here without a lock because
+        // m_isPerformingFileOp prevents any reentrant UI-thread call from modifying it.
         bool quit = false;
         while (true)
         {
-            DWORD waitResult = MsgWaitForMultipleObjects(1, &localHandle, FALSE, INFINITE, QS_ALLINPUT);
+            DWORD waitResult = MsgWaitForMultipleObjects(1, &m_fileOpWorkerThreadHandle, FALSE, INFINITE, QS_ALLINPUT);
             if (waitResult == WAIT_OBJECT_0)
             {
                 // Worker thread has exited.
