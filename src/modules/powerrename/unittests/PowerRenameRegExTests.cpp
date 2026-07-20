@@ -8,6 +8,16 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 namespace PowerRenameRegExTests
 {
+    namespace
+    {
+        wchar_t UppercaseFirstCharacter(PCWSTR localeName, wchar_t ch)
+        {
+            wchar_t mapped[4] = {};
+            const int written = LCMapStringEx(localeName, LCMAP_UPPERCASE | LCMAP_LINGUISTIC_CASING, &ch, 1, mapped, ARRAYSIZE(mapped), nullptr, nullptr, 0);
+            return written > 0 ? mapped[0] : ch;
+        }
+    }
+
     TEST_CLASS(SimpleTests){
         public:
 TEST_CLASS_INITIALIZE(ClassInitialize)
@@ -140,7 +150,6 @@ TEST_METHOD (VerifyFileAttributesMonthAndDayNames)
     DWORD flags = MatchAllOccurrences | UseRegularExpressions;
     Assert::IsTrue(renameRegEx->PutFlags(flags) == S_OK);
 
-    std::locale::global(std::locale(""));
     SYSTEMTIME fileTime = { 2020, 1, 3, 1, 15, 6, 42, 453 };
     wchar_t localeName[LOCALE_NAME_MAX_LENGTH];
     wchar_t dest[MAX_PATH] = L"bar";
@@ -149,19 +158,19 @@ TEST_METHOD (VerifyFileAttributesMonthAndDayNames)
         StringCchCopy(localeName, LOCALE_NAME_MAX_LENGTH, L"en_US");
 
     GetDateFormatEx(localeName, NULL, &fileTime, L"MMM", formattedDate, MAX_PATH, NULL);
-    formattedDate[0] = towupper(formattedDate[0]);
+    formattedDate[0] = UppercaseFirstCharacter(localeName, formattedDate[0]);
     StringCchPrintf(dest, MAX_PATH, TEXT("%s%s"), dest, formattedDate);
 
     GetDateFormatEx(localeName, NULL, &fileTime, L"MMMM", formattedDate, MAX_PATH, NULL);
-    formattedDate[0] = towupper(formattedDate[0]);
+    formattedDate[0] = UppercaseFirstCharacter(localeName, formattedDate[0]);
     StringCchPrintf(dest, MAX_PATH, TEXT("%s-%s"), dest, formattedDate);
 
     GetDateFormatEx(localeName, NULL, &fileTime, L"ddd", formattedDate, MAX_PATH, NULL);
-    formattedDate[0] = towupper(formattedDate[0]);
+    formattedDate[0] = UppercaseFirstCharacter(localeName, formattedDate[0]);
     StringCchPrintf(dest, MAX_PATH, TEXT("%s-%s"), dest, formattedDate);
 
     GetDateFormatEx(localeName, NULL, &fileTime, L"dddd", formattedDate, MAX_PATH, NULL);
-    formattedDate[0] = towupper(formattedDate[0]);
+    formattedDate[0] = UppercaseFirstCharacter(localeName, formattedDate[0]);
     StringCchPrintf(dest, MAX_PATH, TEXT("%s-%s"), dest, formattedDate);
 
     SearchReplaceExpected sreTable[] = {

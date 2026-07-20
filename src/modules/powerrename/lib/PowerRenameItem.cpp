@@ -236,12 +236,14 @@ IFACEMETHODIMP CPowerRenameItem::PutDepth(_In_ int depth)
 
 IFACEMETHODIMP CPowerRenameItem::GetStatus(_Out_ PowerRenameItemRenameStatus* status)
 {
+    CSRWSharedAutoLock lock(&m_lock);
     *status = m_status;
     return S_OK;
 }
 
 IFACEMETHODIMP CPowerRenameItem::PutStatus(_In_ PowerRenameItemRenameStatus status)
 {
+    CSRWExclusiveAutoLock lock(&m_lock);
     m_status = status;
     return S_OK;
 }

@@ -5,6 +5,7 @@
 #include <ShlGuid.h>
 #include <cstring>
 #include <filesystem>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <algorithm>
@@ -27,74 +28,105 @@ namespace
         return (GetUserDefaultLocaleName(buf, LOCALE_NAME_MAX_LENGTH) > 0) ? buf : nullptr;
     }
 
+    bool MapStringCase(std::wstring_view source, DWORD mapFlags, std::wstring& destination)
+    {
+        destination.clear();
+        if (source.empty())
+        {
+            return true;
+        }
+
+        wchar_t localeName[LOCALE_NAME_MAX_LENGTH];
+        const auto locale = GetUserLocale(localeName);
+        const auto flags = mapFlags | LCMAP_LINGUISTIC_CASING;
+        const auto sourceLength = static_cast<int>(source.size());
+
+        const int requiredLength = LCMapStringEx(locale, flags, source.data(), sourceLength, nullptr, 0, nullptr, nullptr, 0);
+        if (requiredLength <= 0)
+        {
+            return false;
+        }
+
+        destination.resize(static_cast<size_t>(requiredLength));
+        const int writtenLength = LCMapStringEx(locale, flags, source.data(), sourceLength, destination.data(), requiredLength, nullptr, nullptr, 0);
+        if (writtenLength <= 0)
+        {
+            destination.clear();
+            return false;
+        }
+
+        destination.resize(static_cast<size_t>(writtenLength));
+        return true;
+    }
+
     // Convert a single wide character to uppercase using the user default locale.
     wchar_t CharToUpper(wchar_t ch)
     {
-        wchar_t localeName[LOCALE_NAME_MAX_LENGTH];
-        wchar_t out = ch;
-        LCMapStringEx(GetUserLocale(localeName), LCMAP_UPPERCASE | LCMAP_LINGUISTIC_CASING,
-                      &ch, 1, &out, 1, NULL, NULL, 0);
-        return out;
+        std::wstring mapped;
+        if (MapStringCase(std::wstring_view(&ch, 1), LCMAP_UPPERCASE, mapped) && !mapped.empty())
+        {
+            return mapped.front();
+        }
+
+        return ch;
     }
 
     // Convert a single wide character to lowercase using the user default locale.
     wchar_t CharToLower(wchar_t ch)
     {
-        wchar_t localeName[LOCALE_NAME_MAX_LENGTH];
-        wchar_t out = ch;
-        LCMapStringEx(GetUserLocale(localeName), LCMAP_LOWERCASE | LCMAP_LINGUISTIC_CASING,
-                      &ch, 1, &out, 1, NULL, NULL, 0);
-        return out;
+        std::wstring mapped;
+        if (MapStringCase(std::wstring_view(&ch, 1), LCMAP_LOWERCASE, mapped) && !mapped.empty())
+        {
+            return mapped.front();
+        }
+
+        return ch;
     }
 
     // Convert a wstring to uppercase in-place using the user default locale.
     void StringToUpper(std::wstring& str)
     {
-        if (str.empty())
-            return;
-        wchar_t localeName[LOCALE_NAME_MAX_LENGTH];
-        std::wstring out(str.size(), L'\0');
-        int n = LCMapStringEx(GetUserLocale(localeName), LCMAP_UPPERCASE | LCMAP_LINGUISTIC_CASING,
-                              str.c_str(), static_cast<int>(str.size()),
-                              out.data(), static_cast<int>(out.size()),
-                              NULL, NULL, 0);
-        if (n > 0)
-            str.assign(out, 0, static_cast<size_t>(n));
+        std::wstring mapped;
+        if (MapStringCase(str, LCMAP_UPPERCASE, mapped))
+        {
+            str = std::move(mapped);
+        }
     }
 
     // Convert a wstring to lowercase in-place using the user default locale.
     void StringToLower(std::wstring& str)
     {
-        if (str.empty())
-            return;
-        wchar_t localeName[LOCALE_NAME_MAX_LENGTH];
-        std::wstring out(str.size(), L'\0');
-        int n = LCMapStringEx(GetUserLocale(localeName), LCMAP_LOWERCASE | LCMAP_LINGUISTIC_CASING,
-                              str.c_str(), static_cast<int>(str.size()),
-                              out.data(), static_cast<int>(out.size()),
-                              NULL, NULL, 0);
-        if (n > 0)
-            str.assign(out, 0, static_cast<size_t>(n));
+        std::wstring mapped;
+        if (MapStringCase(str, LCMAP_LOWERCASE, mapped))
+        {
+            str = std::move(mapped);
+        }
     }
 
-    // Convert a null-terminated PWSTR buffer to uppercase in-place (via a temp string).
-    void PwstrToUpper(PWSTR str)
+    HRESULT MapBufferCase(_Inout_updates_z_(cchBuffer) PWSTR buffer, size_t cchBuffer, DWORD mapFlags)
     {
-        if (!str || !*str)
-            return;
-        std::wstring ws(str);
-        StringToUpper(ws);
-        std::wmemcpy(str, ws.c_str(), ws.size() + 1);
+        if (!buffer || !*buffer)
+        {
+            return S_OK;
+        }
+
+        std::wstring mapped;
+        if (!MapStringCase(buffer, mapFlags, mapped))
+        {
+            return E_FAIL;
+        }
+
+        return StringCchCopy(buffer, cchBuffer, mapped.c_str());
     }
 
-    // Convert a null-terminated PWSTR buffer to lowercase in-place (via a temp string).
-    void PwstrToLower(PWSTR str)
+    HRESULT PwstrToUpper(_Inout_updates_z_(cchBuffer) PWSTR str, size_t cchBuffer)
     {
-        if (!str || !*str)
-            return;
-        std::wstring ws(str);
-        StringToLower(ws);
-        std::wmemcpy(str, ws.c_str(), ws.size() + 1);
+        return MapBufferCase(str, cchBuffer, LCMAP_UPPERCASE);
+    }
+
+    HRESULT PwstrToLower(_Inout_updates_z_(cchBuffer) PWSTR str, size_t cchBuffer)
+    {
+        return MapBufferCase(str, cchBuffer, LCMAP_LOWERCASE);
     }
 
     // Helper function: Find the longest matching pattern starting at the given position
@@ -187,7 +219,7 @@ HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR sour
                 hr = StringCchCopy(result, cchMax, source);
                 if (SUCCEEDED(hr))
                 {
-                    PwstrToUpper(result);
+                    hr = PwstrToUpper(result, cchMax);
                 }
             }
             else
@@ -211,7 +243,7 @@ HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR sour
                         hr = StringCchCopy(result, cchMax, source);
                         if (SUCCEEDED(hr))
                         {
-                            PwstrToUpper(result);
+                            hr = PwstrToUpper(result, cchMax);
                         }
                     }
                 }
@@ -220,7 +252,7 @@ HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR sour
                     hr = StringCchCopy(result, cchMax, source);
                     if (SUCCEEDED(hr))
                     {
-                        PwstrToUpper(result);
+                        hr = PwstrToUpper(result, cchMax);
                     }
                 }
             }
@@ -232,7 +264,7 @@ HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR sour
                 hr = StringCchCopy(result, cchMax, source);
                 if (SUCCEEDED(hr))
                 {
-                    PwstrToLower(result);
+                    hr = PwstrToLower(result, cchMax);
                 }
             }
             else
@@ -256,7 +288,7 @@ HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR sour
                         hr = StringCchCopy(result, cchMax, source);
                         if (SUCCEEDED(hr))
                         {
-                            PwstrToLower(result);
+                            hr = PwstrToLower(result, cchMax);
                         }
                     }
                 }
@@ -265,7 +297,7 @@ HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR sour
                     hr = StringCchCopy(result, cchMax, source);
                     if (SUCCEEDED(hr))
                     {
-                        PwstrToLower(result);
+                        hr = PwstrToLower(result, cchMax);
                     }
                 }
             }

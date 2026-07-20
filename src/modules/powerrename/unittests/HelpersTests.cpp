@@ -830,4 +830,18 @@ namespace HelpersTests
             Assert::AreEqual(L"file_15EER", result);
         }
     };
+
+    TEST_CLASS(GetTransformedFileNameTests)
+    {
+    public:
+        TEST_METHOD(VerifyLocaleAwareNonAsciiCasing)
+        {
+            wchar_t result[MAX_PATH] = {};
+            Assert::IsTrue(SUCCEEDED(GetTransformedFileName(result, ARRAYSIZE(result), L"école.txt", Uppercase, false)));
+            Assert::AreEqual(L"ÉCOLE.TXT", result);
+
+            Assert::IsTrue(SUCCEEDED(GetTransformedFileName(result, ARRAYSIZE(result), L"ÉCOLE.TXT", Lowercase, false)));
+            Assert::AreEqual(L"école.txt", result);
+        }
+    };
 }
