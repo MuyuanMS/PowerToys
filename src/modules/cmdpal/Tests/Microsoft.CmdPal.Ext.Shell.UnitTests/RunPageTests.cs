@@ -413,6 +413,58 @@ public class RunPageTests : CommandPaletteUnitTestBase
     }
 
     [TestMethod]
+    public void TestFilterCurrentDirectoryFiles_FindsMatchBeyondFirstCapEntries()
+    {
+        var items = new Dictionary<string, RunExeItem>();
+        for (var i = 0; i < RunListPage.MaxDirectorySuggestions; i++)
+        {
+            var title = $"other-{i:D3}.txt";
+            items[title] = new RunExeItem(title, string.Empty, $"C:\\test\\{title}", null, null) { Title = title };
+        }
+
+        const string expectedTitle = "needle-beyond-cap.txt";
+        items[expectedTitle] = new RunExeItem(expectedTitle, string.Empty, $"C:\\test\\{expectedTitle}", null, null) { Title = expectedTitle };
+
+        var result = RunListPage.FilterCurrentDirectoryFiles(
+            fullFilePath: "C:\\test\\needle",
+            directoryPath: "C:\\test",
+            currentSubdir: "C:\\test",
+            currentPathItems: new ReadOnlyDictionary<string, RunExeItem>(items),
+            telemetryService: null);
+
+        Assert.AreEqual(1, result.Count);
+        Assert.AreEqual(expectedTitle, result[0].Title);
+    }
+
+    [TestMethod]
+    public async Task TestPathFilteringFindsMatchBeyondInitialDirectoryCap()
+    {
+        var nativeService = CreateMockHistoryService().Object;
+        using var page = new RunListPage(nativeService, telemetryService: null);
+
+        var testDirectory = Path.Combine(Directory.GetCurrentDirectory(), "RunPageCapTest_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(testDirectory);
+        using var cleanup = new ScopeExit(() => Directory.Delete(testDirectory, recursive: true));
+
+        for (var i = 0; i < RunListPage.MaxDirectorySuggestions; i++)
+        {
+            Directory.CreateDirectory(Path.Combine(testDirectory, $"aaa-{i:D3}"));
+        }
+
+        const string expectedTitle = "zzz-needle-beyond-cap";
+        Directory.CreateDirectory(Path.Combine(testDirectory, expectedTitle));
+
+        await UpdatePageAndWaitForItems(page, () => { page.SearchText = testDirectory + "\\"; });
+        Assert.AreEqual(RunListPage.MaxDirectorySuggestions + ExeItemCount, page.GetItems().Length);
+
+        await UpdatePageAndWaitForItems(page, () => { page.SearchText = testDirectory + "\\zzz-needle"; });
+
+        var filteredItems = page.GetItems().Skip(ExeItemCount).ToArray();
+        Assert.AreEqual(1, filteredItems.Length);
+        Assert.AreEqual(expectedTitle, filteredItems[0].Title);
+    }
+
+    [TestMethod]
     public void TestFilterCurrentDirectoryFiles_PartialMatch()
     {
         // Setup - create mock items
