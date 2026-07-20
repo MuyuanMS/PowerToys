@@ -20,6 +20,9 @@ namespace WorkspacesData
         const auto isKnownMonitorRect = [](const WorkspacesProject::Monitor::MonitorRect& rect) {
             return rect.top != 0 || rect.left != 0 || rect.width != 0 || rect.height != 0;
         };
+        const auto hasIncompleteHardwareIdentity = [](const WorkspacesProject::Monitor& monitor) {
+            return monitor.id.empty() || monitor.instanceId.empty();
+        };
 
         if (!savedMonitor.id.empty() && !savedMonitor.instanceId.empty())
         {
@@ -71,13 +74,15 @@ namespace WorkspacesData
             }
         }
 
-        if (savedMonitor.id.empty() || savedMonitor.instanceId.empty())
+        if (hasIncompleteHardwareIdentity(savedMonitor))
         {
             return std::find_if(currentMonitors.begin(), currentMonitors.end(), [&](const WorkspacesProject::Monitor& currentMonitor) {
-                return currentMonitor.number == savedMonitor.number && (currentMonitor.id.empty() || savedMonitor.id.empty()) && (currentMonitor.instanceId.empty() || savedMonitor.instanceId.empty());
+                return currentMonitor.number == savedMonitor.number;
             });
         }
 
-        return end;
+        return std::find_if(currentMonitors.begin(), currentMonitors.end(), [&](const WorkspacesProject::Monitor& currentMonitor) {
+            return currentMonitor.number == savedMonitor.number && hasIncompleteHardwareIdentity(currentMonitor);
+        });
     }
 }

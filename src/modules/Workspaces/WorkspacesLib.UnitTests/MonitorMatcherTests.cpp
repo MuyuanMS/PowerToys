@@ -80,6 +80,16 @@ namespace WorkspacesLibUnitTests
             Assert::AreEqual(-1, MatchIndex(saved, currentMonitors));
         }
 
+        TEST_METHOD(FindMatchingMonitor_UsesNumberWhenCurrentHardwareIdentityIsIncomplete)
+        {
+            const auto saved = Monitor(2, L"MONITOR-A", L"DISPLAY\\A\\1");
+            const std::vector<WorkspacesData::WorkspacesProject::Monitor> currentMonitors{
+                Monitor(2, L"\\\\.\\DISPLAY2"),
+            };
+
+            Assert::AreEqual(0, MatchIndex(saved, currentMonitors));
+        }
+
         TEST_METHOD(FindMatchingMonitor_UsesNumberForLegacyNumberOnlyData)
         {
             const auto saved = Monitor(2);
