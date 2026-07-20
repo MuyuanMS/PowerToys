@@ -16,8 +16,8 @@ static LPTOP_LEVEL_EXCEPTION_FILTER default_top_level_exception_handler = nullpt
 
 // Pre-opened crash-marker file handle.  Opened once in init_global_error_handlers()
 // before any potentially-throwing startup code.  WriteFile to this handle is
-// allocation-free and mutex-free so it is safe to use from the SEH filter and the
-// SIGABRT handler.
+// allocation-free and mutex-free so it is safe to use from the SEH filter and
+// std::terminate handler.
 static HANDLE g_crash_marker_handle = INVALID_HANDLE_VALUE;
 
 // Write a null-terminated ASCII message to the crash marker file.
@@ -256,37 +256,21 @@ LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
-extern "C" void AbortHandler(int /*signal_number*/)
+extern "C" void AbortHandler(int signal_number)
 {
-    // Logger is NOT called here: its sinks lock mutexes and allocate memory, which can
-    // deadlock or fault again if abort() fires while those resources are held.
-    // The pre-opened crash-marker handle gives a persistent, allocation-free on-disk record.
-    static const char k_abort_msg[] = "[PowerToys Runner] CRASH: SIGABRT received (abort/assert failure).\n";
-    write_crash_marker(k_abort_msg);
-#if _DEBUG && _WIN64
-    if (InterlockedCompareExchange(&s_diagnostics_in_progress, 1, 0) == 0)
-    {
-        debug_diagnostics_guard diagnostics_guard;
-        try
-        {
-            init_symbols();
-            std::wstring ex_description = L"SIGABRT was raised.";
-            log_stack_trace(ex_description);
-        }
-        catch (...)
-        {
-            // Diagnostic failures must not block SIGABRT processing.
-        }
-    }
-#endif
+    // MSVC's signal handler contract permits only very limited work here.
+    // Do not log, allocate, take locks, or call Win32 diagnostics from this context.
+    // std::terminate writes the crash marker before calling abort(); direct abort()
+    // continues through the CRT's normal termination path after this handler returns.
+    signal(signal_number, SIG_DFL);
 }
 
 void init_global_error_handlers()
 {
     // Open a crash-marker file before registering the handlers so the SEH filter and
-    // SIGABRT handler can write an allocation-free diagnostic to disk even before
-    // Logger::init() has been called.  GetEnvironmentVariableW requires no COM and is
-    // safe at the earliest startup point.
+    // std::terminate handler can write an allocation-free diagnostic to disk even
+    // before Logger::init() has been called.  GetEnvironmentVariableW requires no COM
+    // and is safe at the earliest startup point.
     wchar_t localAppData[MAX_PATH];
     DWORD envLen = GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, MAX_PATH);
     if (envLen > 0 && envLen < MAX_PATH)

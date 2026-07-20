@@ -343,19 +343,19 @@ int runner(bool isProcessElevated, bool openSettings, std::string settingsWindow
         Logger::critical("Runner failed with a std::runtime_error: {}", err_what);
         Logger::flush();
         MessageBoxW(nullptr, std::wstring(err_what.begin(), err_what.end()).c_str(), GET_RESOURCE_STRING(IDS_ERROR).c_str(), MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
-        result = -1;
+        throw;
     }
     catch (std::exception& err)
     {
         Logger::critical("Runner failed with an exception: {}", err.what());
         Logger::flush();
-        result = -1;
+        throw;
     }
     catch (...)
     {
         Logger::critical(L"Runner failed with an unknown exception.");
         Logger::flush();
-        result = -1;
+        throw;
     }
     Trace::UnregisterProvider();
     QuickAccessHost::stop();
@@ -644,19 +644,19 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
         Logger::critical("WinMain failed with a std::runtime_error: {}", err_what);
         Logger::flush();
         MessageBoxW(nullptr, std::wstring(err_what.begin(), err_what.end()).c_str(), GET_RESOURCE_STRING(IDS_ERROR).c_str(), MB_OK | MB_ICONERROR);
-        result = -1;
+        std::terminate();
     }
     catch (std::exception& err)
     {
         Logger::critical("WinMain failed with an exception: {}", err.what());
         Logger::flush();
-        result = -1;
+        std::terminate();
     }
     catch (...)
     {
         Logger::critical(L"WinMain failed with an unknown exception.");
         Logger::flush();
-        result = -1;
+        std::terminate();
     }
 
     trace.Flush();
