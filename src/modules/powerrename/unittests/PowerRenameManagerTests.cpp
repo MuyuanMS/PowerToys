@@ -236,6 +236,48 @@ namespace PowerRenameManagerTests
         {
             CTestFileHelper testFileHelper;
             Assert::IsTrue(testFileHelper.AddFile(L"foo1.txt"));
+
+            CMockPowerRenameManagerEvents* mockMgrEvents = nullptr;
+            CComPtr<IPowerRenameManager> mgr = CreateManagerWithEvents(&mockMgrEvents);
+
+            CComPtr<IPowerRenameItem> item1;
+            CComPtr<IPowerRenameItem> item2;
+            CMockPowerRenameItem::CreateInstance(testFileHelper.GetFullPath(L"foo1.txt").c_str(), L"foo1.txt", 0, false, SYSTEMTIME{ 2020, 7, 3, 22, 15, 6, 42, 453 }, &item1);
+            CMockPowerRenameItem::CreateInstance(testFileHelper.GetFullPath(L"foo2.txt").c_str(), L"foo2.txt", 0, false, SYSTEMTIME{ 2020, 7, 3, 22, 15, 6, 42, 453 }, &item2);
+            mgr->AddItem(item1);
+            mgr->AddItem(item2);
+
+            ConfigureRenameRegex(mgr, L"foo", L"bar", DEFAULT_FLAGS);
+
+            Assert::IsTrue(RenameWithRetries(mgr, false));
+
+            Assert::AreEqual(testFileHelper.GetFullPath(L"bar1.txt").c_str(), GetItemStringValue(item1, &IPowerRenameItem::GetPath).c_str());
+            Assert::AreEqual(L"bar1.txt", GetItemStringValue(item1, &IPowerRenameItem::GetOriginalName).c_str());
+            Assert::AreEqual(L"", GetItemStringValue(item1, &IPowerRenameItem::GetNewName).c_str());
+
+            Assert::AreEqual(testFileHelper.GetFullPath(L"foo2.txt").c_str(), GetItemStringValue(item2, &IPowerRenameItem::GetPath).c_str());
+            Assert::AreEqual(L"foo2.txt", GetItemStringValue(item2, &IPowerRenameItem::GetOriginalName).c_str());
+            Assert::AreEqual(L"bar2.txt", GetItemStringValue(item2, &IPowerRenameItem::GetNewName).c_str());
+            Assert::IsTrue(testFileHelper.PathExistsCaseSensitive(L"bar1.txt"));
+            Assert::IsFalse(testFileHelper.PathExistsCaseSensitive(L"foo2.txt"));
+
+            Assert::IsTrue(RenameWithRetries(mgr, false));
+
+            Assert::AreEqual(testFileHelper.GetFullPath(L"bar1.txt").c_str(), GetItemStringValue(item1, &IPowerRenameItem::GetPath).c_str());
+            Assert::AreEqual(L"bar1.txt", GetItemStringValue(item1, &IPowerRenameItem::GetOriginalName).c_str());
+            Assert::AreEqual(L"", GetItemStringValue(item1, &IPowerRenameItem::GetNewName).c_str());
+            Assert::AreEqual(testFileHelper.GetFullPath(L"foo2.txt").c_str(), GetItemStringValue(item2, &IPowerRenameItem::GetPath).c_str());
+            Assert::AreEqual(L"foo2.txt", GetItemStringValue(item2, &IPowerRenameItem::GetOriginalName).c_str());
+            Assert::AreEqual(L"bar2.txt", GetItemStringValue(item2, &IPowerRenameItem::GetNewName).c_str());
+
+            Assert::AreEqual(S_OK, mgr->Shutdown());
+            mockMgrEvents->Release();
+        }
+
+        TEST_METHOD (VerifyKeepUiOpenCollisionRenameCommitsActualShellNames)
+        {
+            CTestFileHelper testFileHelper;
+            Assert::IsTrue(testFileHelper.AddFile(L"foo1.txt"));
             Assert::IsTrue(testFileHelper.AddFile(L"foo2.txt"));
 
             CMockPowerRenameManagerEvents* mockMgrEvents = nullptr;
@@ -252,64 +294,51 @@ namespace PowerRenameManagerTests
 
             Assert::IsTrue(RenameWithRetries(mgr, false));
 
-            int committedItems = 0;
-            int notCommittedItems = 0;
-            for (UINT index = 0; index < 2; index++)
-            {
-                CComPtr<IPowerRenameItem> currentItem;
-                Assert::AreEqual(S_OK, mgr->GetItemByIndex(index, &currentItem));
+            const auto item1Path = GetItemStringValue(item1, &IPowerRenameItem::GetPath);
+            const auto item2Path = GetItemStringValue(item2, &IPowerRenameItem::GetPath);
+            Assert::AreNotEqual(item1Path.c_str(), item2Path.c_str());
+            Assert::AreNotEqual(testFileHelper.GetFullPath(L"foo1.txt").c_str(), item1Path.c_str());
+            Assert::AreNotEqual(testFileHelper.GetFullPath(L"foo2.txt").c_str(), item2Path.c_str());
+            Assert::IsTrue(std::filesystem::exists(item1Path));
+            Assert::IsTrue(std::filesystem::exists(item2Path));
+            Assert::AreEqual(std::filesystem::path(item1Path).filename().c_str(), GetItemStringValue(item1, &IPowerRenameItem::GetOriginalName).c_str());
+            Assert::AreEqual(std::filesystem::path(item2Path).filename().c_str(), GetItemStringValue(item2, &IPowerRenameItem::GetOriginalName).c_str());
+            Assert::AreEqual(L"", GetItemStringValue(item1, &IPowerRenameItem::GetNewName).c_str());
+            Assert::AreEqual(L"", GetItemStringValue(item2, &IPowerRenameItem::GetNewName).c_str());
 
-                const auto pathValue = GetItemStringValue(currentItem, &IPowerRenameItem::GetPath);
-                const auto originalNameValue = GetItemStringValue(currentItem, &IPowerRenameItem::GetOriginalName);
-                const auto newNameValue = GetItemStringValue(currentItem, &IPowerRenameItem::GetNewName);
+            Assert::AreEqual(S_OK, mgr->Shutdown());
+            mockMgrEvents->Release();
+        }
 
-                if (originalNameValue == L"bar.txt")
-                {
-                    committedItems++;
-                    Assert::AreEqual(testFileHelper.GetFullPath(L"bar.txt").c_str(), pathValue.c_str());
-                    Assert::AreEqual(L"", newNameValue.c_str());
-                }
-                else
-                {
-                    notCommittedItems++;
-                    const bool oldNameMatch = (originalNameValue == L"foo1.txt") || (originalNameValue == L"foo2.txt");
-                    const bool oldPathMatch = (pathValue == testFileHelper.GetFullPath(L"foo1.txt")) ||
-                                              (pathValue == testFileHelper.GetFullPath(L"foo2.txt"));
-                    Assert::IsTrue(oldNameMatch);
-                    Assert::IsTrue(oldPathMatch);
-                    Assert::AreEqual(L"bar.txt", newNameValue.c_str());
-                }
-            }
+        TEST_METHOD (VerifyKeepUiOpenParentAndChildRenameCommitsFinalChildPath)
+        {
+            CTestFileHelper testFileHelper;
+            Assert::IsTrue(testFileHelper.AddFolder(L"foo"));
+            Assert::IsTrue(testFileHelper.AddFile(L"foo\\foo.txt"));
 
-            Assert::AreEqual(1, committedItems);
-            Assert::AreEqual(1, notCommittedItems);
-            Assert::IsTrue(testFileHelper.PathExistsCaseSensitive(L"bar.txt"));
-            Assert::IsTrue(testFileHelper.PathExistsCaseSensitive(L"foo1.txt") || testFileHelper.PathExistsCaseSensitive(L"foo2.txt"));
+            CMockPowerRenameManagerEvents* mockMgrEvents = nullptr;
+            CComPtr<IPowerRenameManager> mgr = CreateManagerWithEvents(&mockMgrEvents);
+
+            CComPtr<IPowerRenameItem> parentItem;
+            CComPtr<IPowerRenameItem> childItem;
+            CMockPowerRenameItem::CreateInstance(testFileHelper.GetFullPath(L"foo").c_str(), L"foo", 0, true, SYSTEMTIME{ 2020, 7, 3, 22, 15, 6, 42, 453 }, &parentItem);
+            CMockPowerRenameItem::CreateInstance(testFileHelper.GetFullPath(L"foo\\foo.txt").c_str(), L"foo.txt", 1, false, SYSTEMTIME{ 2020, 7, 3, 22, 15, 6, 42, 453 }, &childItem);
+            mgr->AddItem(parentItem);
+            mgr->AddItem(childItem);
+
+            ConfigureRenameRegex(mgr, L"foo", L"bar", DEFAULT_FLAGS);
 
             Assert::IsTrue(RenameWithRetries(mgr, false));
 
-            committedItems = 0;
-            notCommittedItems = 0;
-            for (UINT index = 0; index < 2; index++)
-            {
-                CComPtr<IPowerRenameItem> currentItem;
-                Assert::AreEqual(S_OK, mgr->GetItemByIndex(index, &currentItem));
-                const auto originalNameValue = GetItemStringValue(currentItem, &IPowerRenameItem::GetOriginalName);
-                const auto newNameValue = GetItemStringValue(currentItem, &IPowerRenameItem::GetNewName);
-                if (originalNameValue == L"bar.txt")
-                {
-                    committedItems++;
-                    Assert::AreEqual(L"", newNameValue.c_str());
-                }
-                else
-                {
-                    notCommittedItems++;
-                    Assert::AreEqual(L"bar.txt", newNameValue.c_str());
-                }
-            }
-
-            Assert::AreEqual(1, committedItems);
-            Assert::AreEqual(1, notCommittedItems);
+            const auto expectedParentPath = testFileHelper.GetFullPath(L"bar").wstring();
+            const auto expectedChildPath = testFileHelper.GetFullPath(L"bar\\bar.txt").wstring();
+            Assert::AreEqual(expectedParentPath.c_str(), GetItemStringValue(parentItem, &IPowerRenameItem::GetPath).c_str());
+            Assert::AreEqual(expectedChildPath.c_str(), GetItemStringValue(childItem, &IPowerRenameItem::GetPath).c_str());
+            Assert::AreEqual(L"bar", GetItemStringValue(parentItem, &IPowerRenameItem::GetOriginalName).c_str());
+            Assert::AreEqual(L"bar.txt", GetItemStringValue(childItem, &IPowerRenameItem::GetOriginalName).c_str());
+            Assert::AreEqual(L"", GetItemStringValue(parentItem, &IPowerRenameItem::GetNewName).c_str());
+            Assert::AreEqual(L"", GetItemStringValue(childItem, &IPowerRenameItem::GetNewName).c_str());
+            Assert::IsTrue(std::filesystem::exists(expectedChildPath));
 
             Assert::AreEqual(S_OK, mgr->Shutdown());
             mockMgrEvents->Release();

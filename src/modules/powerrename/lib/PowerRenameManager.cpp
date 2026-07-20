@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <shlobj.h>
 #include <cstring>
+#include <new>
 #include "helpers.h"
 #include "trace.h"
 #include <Renaming.h>
@@ -14,6 +15,181 @@ extern HINSTANCE g_hostHInst;
 
 // The default FOF flags to use in the rename operations
 #define FOF_DEFAULTFLAGS (FOF_ALLOWUNDO | FOFX_ADDUNDORECORD | FOFX_SHOWELEVATIONPROMPT | FOF_RENAMEONCOLLISION)
+
+namespace
+{
+    std::wstring GetShellItemPath(_In_ IShellItem* shellItem)
+    {
+        PWSTR path = nullptr;
+        std::wstring result;
+        if (shellItem != nullptr && SUCCEEDED(shellItem->GetDisplayName(SIGDN_FILESYSPATH, &path)) && path != nullptr)
+        {
+            result = path;
+        }
+
+        CoTaskMemFree(path);
+        return result;
+    }
+
+    bool StartsWithPathIgnoringCase(_In_ const std::wstring& path, _In_ const std::wstring& prefix)
+    {
+        return path.size() >= prefix.size() &&
+               CompareStringOrdinal(path.c_str(), static_cast<int>(prefix.size()), prefix.c_str(), static_cast<int>(prefix.size()), TRUE) == CSTR_EQUAL &&
+               (path.size() == prefix.size() || path[prefix.size()] == L'\\');
+    }
+
+    class RenameProgressSink :
+        public IFileOperationProgressSink
+    {
+    public:
+        IFACEMETHODIMP QueryInterface(_In_ REFIID riid, _Outptr_ void** ppv) override
+        {
+            if (ppv == nullptr)
+            {
+                return E_POINTER;
+            }
+
+            *ppv = nullptr;
+            if (riid == IID_IUnknown || riid == IID_IFileOperationProgressSink)
+            {
+                *ppv = static_cast<IFileOperationProgressSink*>(this);
+                AddRef();
+                return S_OK;
+            }
+
+            return E_NOINTERFACE;
+        }
+
+        IFACEMETHODIMP_(ULONG) AddRef() override
+        {
+            return InterlockedIncrement(&m_refCount);
+        }
+
+        IFACEMETHODIMP_(ULONG) Release() override
+        {
+            const ULONG refCount = InterlockedDecrement(&m_refCount);
+            if (refCount == 0)
+            {
+                delete this;
+            }
+
+            return refCount;
+        }
+
+        IFACEMETHODIMP StartOperations() override
+        {
+            return S_OK;
+        }
+
+        IFACEMETHODIMP FinishOperations(_In_ HRESULT) override
+        {
+            return S_OK;
+        }
+
+        IFACEMETHODIMP PreRenameItem(_In_ DWORD, _In_ IShellItem*, _In_ LPCWSTR) override
+        {
+            return S_OK;
+        }
+
+        IFACEMETHODIMP PostRenameItem(_In_ DWORD, _In_ IShellItem* item, _In_ LPCWSTR, _In_ HRESULT renameHr, _In_ IShellItem* newlyCreated) override
+        {
+            RenameResult result;
+            result.hr = renameHr;
+            if (SUCCEEDED(renameHr))
+            {
+                result.newPath = GetShellItemPath(newlyCreated);
+                if (result.newPath.empty())
+                {
+                    result.newPath = GetShellItemPath(item);
+                }
+            }
+
+            m_renameResults.push_back(std::move(result));
+            return S_OK;
+        }
+
+        IFACEMETHODIMP PreMoveItem(_In_ DWORD, _In_ IShellItem*, _In_ IShellItem*, _In_ LPCWSTR) override
+        {
+            return S_OK;
+        }
+
+        IFACEMETHODIMP PostMoveItem(_In_ DWORD, _In_ IShellItem*, _In_ IShellItem*, _In_ LPCWSTR, _In_ HRESULT, _In_ IShellItem*) override
+        {
+            return S_OK;
+        }
+
+        IFACEMETHODIMP PreCopyItem(_In_ DWORD, _In_ IShellItem*, _In_ IShellItem*, _In_ LPCWSTR) override
+        {
+            return S_OK;
+        }
+
+        IFACEMETHODIMP PostCopyItem(_In_ DWORD, _In_ IShellItem*, _In_ IShellItem*, _In_ LPCWSTR, _In_ HRESULT, _In_ IShellItem*) override
+        {
+            return S_OK;
+        }
+
+        IFACEMETHODIMP PreDeleteItem(_In_ DWORD, _In_ IShellItem*) override
+        {
+            return S_OK;
+        }
+
+        IFACEMETHODIMP PostDeleteItem(_In_ DWORD, _In_ IShellItem*, _In_ HRESULT, _In_ IShellItem*) override
+        {
+            return S_OK;
+        }
+
+        IFACEMETHODIMP PreNewItem(_In_ DWORD, _In_ IShellItem*, _In_ LPCWSTR) override
+        {
+            return S_OK;
+        }
+
+        IFACEMETHODIMP PostNewItem(_In_ DWORD, _In_ IShellItem*, _In_ LPCWSTR, _In_ LPCWSTR, _In_ DWORD, _In_ HRESULT, _In_ IShellItem*) override
+        {
+            return S_OK;
+        }
+
+        IFACEMETHODIMP UpdateProgress(_In_ UINT, _In_ UINT) override
+        {
+            return S_OK;
+        }
+
+        IFACEMETHODIMP ResetTimer() override
+        {
+            return S_OK;
+        }
+
+        IFACEMETHODIMP PauseTimer() override
+        {
+            return S_OK;
+        }
+
+        IFACEMETHODIMP ResumeTimer() override
+        {
+            return S_OK;
+        }
+
+        bool TryGetSuccessfulRename(_In_ size_t operationIndex, _Out_ std::wstring& newPath) const
+        {
+            if (operationIndex >= m_renameResults.size() || FAILED(m_renameResults[operationIndex].hr) || m_renameResults[operationIndex].newPath.empty())
+            {
+                return false;
+            }
+
+            newPath = m_renameResults[operationIndex].newPath;
+            return true;
+        }
+
+    private:
+        struct RenameResult
+        {
+            HRESULT hr = E_FAIL;
+            std::wstring newPath;
+        };
+
+        long m_refCount = 1;
+        std::vector<RenameResult> m_renameResults;
+    };
+}
 
 IFACEMETHODIMP_(ULONG)
 CPowerRenameManager::AddRef()
@@ -109,6 +285,7 @@ IFACEMETHODIMP CPowerRenameManager::UpdateChildrenPath(_In_ int parentId, _In_ s
         PWSTR renamedPath = nullptr;
         winrt::check_hresult(parentIt->second->GetPath(&renamedPath));
         std::wstring renamedPathStr{ renamedPath };
+        CoTaskMemFree(renamedPath);
 
         for (auto it = ++parentIt; it != m_renameItems.end(); ++it)
         {
@@ -121,9 +298,13 @@ IFACEMETHODIMP CPowerRenameManager::UpdateChildrenPath(_In_ int parentId, _In_ s
                 PWSTR path = nullptr;
                 winrt::check_hresult(it->second->GetPath(&path));
                 std::wstring pathStr{ path };
+                CoTaskMemFree(path);
 
-                std::wstring newPath = pathStr.replace(0, oldParentPathSize, renamedPath);
-                it->second->PutPath(newPath.c_str());
+                if (!StartsWithPathIgnoringCase(pathStr, renamedPathStr) && pathStr.size() >= oldParentPathSize)
+                {
+                    std::wstring newPath = pathStr.replace(0, oldParentPathSize, renamedPathStr);
+                    it->second->PutPath(newPath.c_str());
+                }
             }
             else
             {
@@ -650,9 +831,13 @@ HRESULT CPowerRenameManager::_PerformFileOperation()
 {
     // Do we have items to rename?
     UINT renameItemCount = 0;
-    if (FAILED(GetRenameItemCount(&renameItemCount)) || renameItemCount == 0)
+    if (FAILED(GetRenameItemCount(&renameItemCount)))
     {
         return E_FAIL;
+    }
+    if (renameItemCount == 0)
+    {
+        return S_OK;
     }
 
     _LogOperationTelemetry();
@@ -797,10 +982,20 @@ DWORD WINAPI CPowerRenameManager::s_fileOpWorkerThread(_In_ void* pv)
                             std::wstring newPath;
                             std::wstring oldPath;
                             size_t oldPathSize;
+                            size_t operationIndex;
                             int id;
                             bool isFolder;
                         };
                         std::vector<PendingItemUpdate> pendingUpdates;
+
+                        RenameProgressSink* renameProgressSink = new (std::nothrow) RenameProgressSink();
+                        CComPtr<IFileOperationProgressSink> spRenameProgressSink;
+                        if (renameProgressSink != nullptr)
+                        {
+                            spRenameProgressSink.Attach(renameProgressSink);
+                        }
+
+                        size_t queuedRenameIndex = 0;
 
                         // From the greatest depth first, add all items of that depth to the operation
                         for (LONG v = static_cast<LONG>(maxDepth); v >= 0; v--)
@@ -820,6 +1015,12 @@ DWORD WINAPI CPowerRenameManager::s_fileOpWorkerThread(_In_ void* pv)
                                             if (SUCCEEDED(spItem->GetShellItem(&spShellItem)))
                                             {
                                                 HRESULT renameHr = spFileOp->RenameItem(spShellItem, newName, nullptr);
+                                                const size_t operationIndex = queuedRenameIndex;
+                                                if (SUCCEEDED(renameHr))
+                                                {
+                                                    queuedRenameIndex++;
+                                                }
+
                                                 if (!closeUIWindowAfterRenaming && SUCCEEDED(renameHr))
                                                 {
                                                     // Collect item data for post-operation update.
@@ -851,7 +1052,7 @@ DWORD WINAPI CPowerRenameManager::s_fileOpWorkerThread(_In_ void* pv)
                                                         int id = -1;
                                                         if (SUCCEEDED(spItem->GetId(&id)))
                                                         {
-                                                            pendingUpdates.emplace_back(PendingItemUpdate{ spItem, std::wstring{ newName }, std::move(pathStr), std::move(oldPathStr), oldPathSize, id, isFolder });
+                                                            pendingUpdates.emplace_back(PendingItemUpdate{ spItem, std::wstring{ newName }, std::move(pathStr), std::move(oldPathStr), oldPathSize, operationIndex, id, isFolder });
                                                         }
                                                     }
                                                     // Free outside the if block; CoTaskMemFree(nullptr) is safe.
@@ -869,6 +1070,12 @@ DWORD WINAPI CPowerRenameManager::s_fileOpWorkerThread(_In_ void* pv)
                         // Set the operation flags
                         if (SUCCEEDED(spFileOp->SetOperationFlags(FOF_DEFAULTFLAGS)))
                         {
+                            DWORD fileOpAdviseCookie = 0;
+                            if (spRenameProgressSink != nullptr)
+                            {
+                                spFileOp->Advise(spRenameProgressSink, &fileOpAdviseCookie);
+                            }
+
                             // Set the parent window
                             if (pwtd->hwndParent)
                             {
@@ -878,31 +1085,60 @@ DWORD WINAPI CPowerRenameManager::s_fileOpWorkerThread(_In_ void* pv)
                             // Perform the operation
                             HRESULT performHr = spFileOp->PerformOperations();
 
-                            // Update item data only after the file operation completed
-                            // without cancellation. This avoids stale in-memory originals
-                            // when the operation fails or is aborted.
-                            BOOL anyOperationsAborted = TRUE;
-                            const bool shouldCommitBatch = SUCCEEDED(performHr) &&
-                                                           SUCCEEDED(spFileOp->GetAnyOperationsAborted(&anyOperationsAborted)) &&
-                                                           !anyOperationsAborted;
-                            if (shouldCommitBatch)
+                            // Update item data only for operations that the shell reports as
+                            // successfully renamed. This captures collision-resolved names such
+                            // as "bar (2).txt" and avoids stale state for failed items.
+                            UNREFERENCED_PARAMETER(performHr);
+                            if (renameProgressSink != nullptr)
                             {
                                 for (auto& update : pendingUpdates)
                                 {
-                                    std::error_code newPathError;
-                                    std::error_code oldPathError;
-                                    const bool newPathExists = fs::exists(update.newPath, newPathError);
-                                    const bool oldPathExists = fs::exists(update.oldPath, oldPathError);
-                                    const bool samePathIgnoringCase = CompareStringOrdinal(update.oldPath.c_str(), -1, update.newPath.c_str(), -1, TRUE) == CSTR_EQUAL;
-
-                                    // Commit only for items that actually moved.
-                                    if (newPathError || oldPathError || !newPathExists || (oldPathExists && !samePathIgnoringCase))
+                                    std::wstring actualNewPath;
+                                    if (!renameProgressSink->TryGetSuccessfulRename(update.operationIndex, actualNewPath))
                                     {
-                                        continue;
+                                        const bool hasDuplicatePredictedPath = std::count_if(pendingUpdates.begin(), pendingUpdates.end(), [&update](const PendingItemUpdate& other) {
+                                            return CompareStringOrdinal(update.newPath.c_str(), -1, other.newPath.c_str(), -1, TRUE) == CSTR_EQUAL;
+                                        }) > 1;
+
+                                        if (!hasDuplicatePredictedPath && fs::exists(update.newPath))
+                                        {
+                                            actualNewPath = update.newPath;
+                                        }
+                                        else if (!hasDuplicatePredictedPath)
+                                        {
+                                            for (auto& parentUpdate : pendingUpdates)
+                                            {
+                                                if (!parentUpdate.isFolder || !StartsWithPathIgnoringCase(update.oldPath, parentUpdate.oldPath))
+                                                {
+                                                    continue;
+                                                }
+
+                                                std::wstring parentNewPath;
+                                                if (!renameProgressSink->TryGetSuccessfulRename(parentUpdate.operationIndex, parentNewPath) && fs::exists(parentUpdate.newPath))
+                                                {
+                                                    parentNewPath = parentUpdate.newPath;
+                                                }
+
+                                                if (!parentNewPath.empty())
+                                                {
+                                                    std::wstring resolvedPath = parentNewPath + update.newPath.substr(parentUpdate.oldPath.size());
+                                                    if (fs::exists(resolvedPath))
+                                                    {
+                                                        actualNewPath = std::move(resolvedPath);
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if (actualNewPath.empty())
+                                        {
+                                            continue;
+                                        }
                                     }
 
-                                    update.spItem->PutPath(update.newPath.c_str());
-                                    update.spItem->PutOriginalName(update.newName.c_str());
+                                    update.spItem->PutPath(actualNewPath.c_str());
+                                    update.spItem->PutOriginalName(fs::path(actualNewPath).filename().c_str());
                                     update.spItem->PutNewName(nullptr);
 
                                     if (update.isFolder)
@@ -912,6 +1148,11 @@ DWORD WINAPI CPowerRenameManager::s_fileOpWorkerThread(_In_ void* pv)
 
                                     PostMessage(pwtd->hwndManager, SRM_REGEX_ITEM_RENAMED_KEEP_UI, GetCurrentThreadId(), update.id);
                                 }
+                            }
+
+                            if (fileOpAdviseCookie != 0)
+                            {
+                                spFileOp->Unadvise(fileOpAdviseCookie);
                             }
                         }
                     }
