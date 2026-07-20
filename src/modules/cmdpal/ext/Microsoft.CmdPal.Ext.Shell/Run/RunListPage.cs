@@ -581,6 +581,7 @@ public sealed partial class RunListPage : AsyncDynamicListPage
         CancellationToken cancellationToken)
     {
         var newPathItems = new Dictionary<string, RunExeItem>(MaxDirectorySuggestions);
+        var expandedDirectoryPath = Environment.ExpandEnvironmentVariables(directoryPath);
         var options = new EnumerationOptions
         {
             AttributesToSkip = FileAttributes.Hidden,
@@ -590,7 +591,7 @@ public sealed partial class RunListPage : AsyncDynamicListPage
 
         try
         {
-            foreach (var path in Directory.EnumerateFileSystemEntries(directoryPath, "*", options))
+            foreach (var path in Directory.EnumerateFileSystemEntries(expandedDirectoryPath, "*", options))
             {
                 if (cancellationToken.IsCancellationRequested)
                 {

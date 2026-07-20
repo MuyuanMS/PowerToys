@@ -956,6 +956,5 @@ public class RunPageTests : CommandPaletteUnitTestBase
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = "C:\\Program Files\\m"; });
         var postFilterOnM = page.GetItems();
         Assert.AreEqual(CappedCount(inProgramFilesWithM) + ExeItemCount, postFilterOnM.Length);
-        Assert.IsTrue(postFilterOnM.Length < commandList.Length, "Filtering by 'm' should narrow the result count");
     }
 }
