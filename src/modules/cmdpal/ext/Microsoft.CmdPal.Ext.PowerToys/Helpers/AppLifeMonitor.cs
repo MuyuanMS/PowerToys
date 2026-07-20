@@ -68,18 +68,20 @@ internal sealed class AppLifeMonitor : IDisposable
         }
 
         _disposed = true;
-        s_exitEvent = null;
 
         if (_messageThreadId != 0)
         {
             PostThreadMessageW(_messageThreadId, WM_QUIT, 0, 0);
         }
 
-        _messageLoopThread?.Join(TimeSpan.FromSeconds(5));
-        _messageLoopThread = null;
-
-        _exitRequestedEvent.Dispose();
-        _threadReadyEvent.Dispose();
+        bool messageLoopStopped = _messageLoopThread?.Join(TimeSpan.FromSeconds(5)) != false;
+        if (messageLoopStopped)
+        {
+            s_exitEvent = null;
+            _messageLoopThread = null;
+            _exitRequestedEvent.Dispose();
+            _threadReadyEvent.Dispose();
+        }
     }
 
     private void SignalStartupFailure()

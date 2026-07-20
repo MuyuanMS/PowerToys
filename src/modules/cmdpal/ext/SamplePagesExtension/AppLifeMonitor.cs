@@ -66,11 +66,13 @@ internal sealed class AppLifeMonitor : IDisposable
             NativeMethods.PostThreadMessageW(_messageThreadId, NativeMethods.WM_QUIT, 0, 0);
         }
 
-        _messageLoopThread?.Join(TimeSpan.FromSeconds(5));
-        _messageLoopThread = null;
-
-        _exitRequestedEvent.Dispose();
-        _threadReadyEvent.Dispose();
+        bool messageLoopStopped = _messageLoopThread?.Join(TimeSpan.FromSeconds(5)) != false;
+        if (messageLoopStopped)
+        {
+            _messageLoopThread = null;
+            _exitRequestedEvent.Dispose();
+            _threadReadyEvent.Dispose();
+        }
     }
 
     private void SignalStartupFailure()
