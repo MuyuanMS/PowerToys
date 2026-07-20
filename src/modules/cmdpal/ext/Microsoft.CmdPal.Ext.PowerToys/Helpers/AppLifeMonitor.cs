@@ -82,6 +82,12 @@ internal sealed class AppLifeMonitor : IDisposable
         _threadReadyEvent.Dispose();
     }
 
+    private void SignalStartupFailure()
+    {
+        _exitRequestedEvent.Set();
+        _threadReadyEvent.Set();
+    }
+
     private unsafe void RunMessageLoop()
     {
         _messageThreadId = GetCurrentThreadId();
@@ -103,8 +109,7 @@ internal sealed class AppLifeMonitor : IDisposable
 
         if (atom == 0)
         {
-            // Signal Start() so it is never left waiting forever.
-            _threadReadyEvent.Set();
+            SignalStartupFailure();
             return;
         }
 
@@ -121,8 +126,7 @@ internal sealed class AppLifeMonitor : IDisposable
         if (hwnd == 0)
         {
             UnregisterClassW(className, hInstance);
-            // Signal Start() so it is never left waiting forever.
-            _threadReadyEvent.Set();
+            SignalStartupFailure();
             return;
         }
 
