@@ -258,27 +258,22 @@ public abstract partial class ExtensionObjectViewModel : ObservableObject, IBatc
 
     protected void DoOnUiThread(Action action)
     {
-        if (PageContext.TryGetTarget(out var pageContext))
-        {
-            Task.Factory.StartNew(
-                action,
-                CancellationToken.None,
-                TaskCreationOptions.None,
-                pageContext.Scheduler);
-        }
+        var scheduler = PageContext.TryGetTarget(out var pageContext) ? pageContext.Scheduler : _uiScheduler;
+        Task.Factory.StartNew(
+            action,
+            CancellationToken.None,
+            TaskCreationOptions.None,
+            scheduler);
     }
 
     protected void DoOnUiThreadAndWait(Action action)
     {
-        if (!PageContext.TryGetTarget(out var pageContext))
-        {
-            return;
-        }
+        var scheduler = PageContext.TryGetTarget(out var pageContext) ? pageContext.Scheduler : _uiScheduler;
 
         // TaskScheduler.Current catches work already running through the target
         // scheduler. DispatcherQueue covers direct UI-thread callbacks where
         // TaskScheduler.Current can still be Default.
-        if (TaskScheduler.Current == pageContext.Scheduler || IsCurrentThreadUiThread())
+        if (TaskScheduler.Current == scheduler || IsCurrentThreadUiThread())
         {
             action();
             return;
@@ -299,7 +294,7 @@ public abstract partial class ExtensionObjectViewModel : ObservableObject, IBatc
             },
             CancellationToken.None,
             TaskCreationOptions.None,
-            pageContext.Scheduler).GetAwaiter().GetResult();
+            scheduler).GetAwaiter().GetResult();
     }
 
     private static bool IsCurrentThreadUiThread()
