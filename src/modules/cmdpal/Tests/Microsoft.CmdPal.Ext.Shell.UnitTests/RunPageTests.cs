@@ -451,11 +451,11 @@ public class RunPageTests : CommandPaletteUnitTestBase
             Directory.CreateDirectory(Path.Combine(testDirectory, $"aaa-{i:D3}"));
         }
 
-        const string expectedTitle = "zzz-needle-beyond-cap";
-        Directory.CreateDirectory(Path.Combine(testDirectory, expectedTitle));
-
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = testDirectory + "\\"; });
         Assert.AreEqual(RunListPage.MaxDirectorySuggestions + ExeItemCount, page.GetItems().Length);
+
+        const string expectedTitle = "zzz-needle-beyond-cap";
+        Directory.CreateDirectory(Path.Combine(testDirectory, expectedTitle));
 
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = testDirectory + "\\zzz-needle"; });
 
@@ -929,7 +929,7 @@ public class RunPageTests : CommandPaletteUnitTestBase
         await UpdatePageAndWaitForItems(page, () => { page.SearchText = "~\\."; });
 
         var commandList = page.GetItems();
-        Assert.AreEqual(dotFiles.Count() + ExeItemCount, commandList.Length);
+        Assert.AreEqual(CappedCount(dotFiles) + ExeItemCount, commandList.Length);
 
         // All returned items (except the exe item) should start with '.'
         foreach (var item in commandList.Skip(ExeItemCount))
