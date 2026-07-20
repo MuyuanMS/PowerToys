@@ -377,9 +377,10 @@ public sealed partial class RunListPage : AsyncDynamicListPage
                 fuzzyString,
                 withLeadingTilde,
                 cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             if (filteredDirectoryItems is null)
             {
-                return;
+                throw new OperationCanceledException(cancellationToken);
             }
 
             newMatchedPathItems = FilterCurrentDirectoryFiles(
@@ -390,6 +391,7 @@ public sealed partial class RunListPage : AsyncDynamicListPage
                 _telemetryService);
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         ListHelpers.InPlaceUpdateList(_pathItems, newMatchedPathItems);
     }
 
