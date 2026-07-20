@@ -40,6 +40,8 @@ private:
     // Variable which stores all the state information to be shared between the UI and back-end
     State state;
 
+    mutable std::mutex stateMutex;
+
     // Object of class which implements InputInterface. Required for calling library functions while enabling testing
     KeyboardManagerInput::Input inputHandler;
 

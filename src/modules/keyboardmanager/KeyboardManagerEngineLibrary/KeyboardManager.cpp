@@ -91,6 +91,8 @@ KeyboardManager::~KeyboardManager()
 
 void KeyboardManager::LoadSettings()
 {
+    std::lock_guard<std::mutex> lock(stateMutex);
+
     bool loadedSuccessful = state.LoadSettings();
     if (!loadedSuccessful)
     {
@@ -286,12 +288,20 @@ bool KeyboardManager::HasRegisteredRemappings() const
 
 bool KeyboardManager::HasRegisteredRemappingsUnchecked() const
 {
+    std::lock_guard<std::mutex> lock(stateMutex);
+
     return !(state.appSpecificShortcutReMap.empty() && state.appSpecificShortcutReMapSortedKeys.empty() && state.osLevelShortcutReMap.empty() && state.osLevelShortcutReMapSortedKeys.empty() && state.singleKeyReMap.empty() && state.singleKeyToTextReMap.empty());
 }
 
 intptr_t KeyboardManager::HandleKeyboardHookEvent(LowlevelKeyboardEvent* data) noexcept
 {
     if (loadingSettings)
+    {
+        return 0;
+    }
+
+    std::unique_lock<std::mutex> stateLock(stateMutex, std::try_to_lock);
+    if (!stateLock || loadingSettings)
     {
         return 0;
     }
