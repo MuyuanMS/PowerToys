@@ -23,6 +23,18 @@ namespace WorkspacesData
         const auto hasIncompleteHardwareIdentity = [](const WorkspacesProject::Monitor& monitor) {
             return monitor.id.empty() || monitor.instanceId.empty();
         };
+        const auto isCompleteIdentityOfDifferentSavedMonitor = [&](const WorkspacesProject::Monitor& currentMonitor) {
+            if (hasIncompleteHardwareIdentity(currentMonitor))
+            {
+                return false;
+            }
+
+            return std::any_of(savedMonitors.begin(), savedMonitors.end(), [&](const WorkspacesProject::Monitor& monitor) {
+                return monitor.id == currentMonitor.id &&
+                       monitor.instanceId == currentMonitor.instanceId &&
+                       (monitor.id != savedMonitor.id || monitor.instanceId != savedMonitor.instanceId);
+            });
+        };
 
         if (!savedMonitor.id.empty() && !savedMonitor.instanceId.empty())
         {
@@ -54,7 +66,9 @@ namespace WorkspacesData
             if (isKnownMonitorRect(savedMonitor.monitorRectDpiAware))
             {
                 const auto monitorByDpiAwareRect = findUniqueMonitorMatch([&](const WorkspacesProject::Monitor& currentMonitor) {
-                    return currentMonitor.id == savedMonitor.id && currentMonitor.monitorRectDpiAware == savedMonitor.monitorRectDpiAware;
+                    return currentMonitor.id == savedMonitor.id &&
+                           currentMonitor.monitorRectDpiAware == savedMonitor.monitorRectDpiAware &&
+                           !isCompleteIdentityOfDifferentSavedMonitor(currentMonitor);
                 });
                 if (monitorByDpiAwareRect != end)
                 {
@@ -65,7 +79,9 @@ namespace WorkspacesData
             if (isKnownMonitorRect(savedMonitor.monitorRectDpiUnaware))
             {
                 const auto monitorByDpiUnawareRect = findUniqueMonitorMatch([&](const WorkspacesProject::Monitor& currentMonitor) {
-                    return currentMonitor.id == savedMonitor.id && currentMonitor.monitorRectDpiUnaware == savedMonitor.monitorRectDpiUnaware;
+                    return currentMonitor.id == savedMonitor.id &&
+                           currentMonitor.monitorRectDpiUnaware == savedMonitor.monitorRectDpiUnaware &&
+                           !isCompleteIdentityOfDifferentSavedMonitor(currentMonitor);
                 });
                 if (monitorByDpiUnawareRect != end)
                 {

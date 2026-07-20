@@ -115,5 +115,22 @@ namespace WorkspacesLibUnitTests
 
             Assert::AreEqual(-1, MatchIndex(missingSavedMonitor, savedMonitors, currentMonitors));
         }
+
+        TEST_METHOD(FindMatchingMonitor_DoesNotUseReflowedBoundsFromDifferentSavedMonitor)
+        {
+            const WorkspacesData::WorkspacesProject::Monitor::MonitorRect leftBounds{ 0, 0, 1920, 1080 };
+            const WorkspacesData::WorkspacesProject::Monitor::MonitorRect rightBounds{ 0, 1920, 1920, 1080 };
+            const auto disconnectedSavedMonitor = Monitor(1, L"MONITOR-A", L"DISPLAY\\A\\1", leftBounds);
+            const auto reflowedSavedMonitor = Monitor(2, L"MONITOR-A", L"DISPLAY\\A\\2", rightBounds);
+            const std::vector<WorkspacesData::WorkspacesProject::Monitor> savedMonitors{
+                disconnectedSavedMonitor,
+                reflowedSavedMonitor,
+            };
+            const std::vector<WorkspacesData::WorkspacesProject::Monitor> currentMonitors{
+                Monitor(1, L"MONITOR-A", L"DISPLAY\\A\\2", leftBounds),
+            };
+
+            Assert::AreEqual(-1, MatchIndex(disconnectedSavedMonitor, savedMonitors, currentMonitors));
+        }
     };
 }
