@@ -149,6 +149,47 @@ namespace PowerRenameManagerTests
             mockMgrEvents->Release();
         }
 
+        TEST_METHOD (VerifyRenameCompletesWithoutRegExWorkerSignal)
+        {
+            CTestFileHelper testFileHelper;
+            Assert::IsTrue(testFileHelper.AddFile(L"foo.txt"));
+
+            CComPtr<IPowerRenameManager> mgr;
+            Assert::IsTrue(CPowerRenameManager::s_CreateInstance(&mgr) == S_OK);
+
+            CComPtr<IPowerRenameItem> item;
+            CMockPowerRenameItem::CreateInstance(testFileHelper.GetFullPath(L"foo.txt").c_str(),
+                                                 L"foo.txt",
+                                                 0,
+                                                 false,
+                                                 SYSTEMTIME{ 0 },
+                                                 &item);
+            Assert::IsTrue(item->PutNewName(L"bar.txt") == S_OK);
+            Assert::IsTrue(item->PutStatus(PowerRenameItemRenameStatus::ShouldRename) == S_OK);
+            Assert::IsTrue(mgr->AddItem(item) == S_OK);
+
+            struct RenameThreadData
+            {
+                IPowerRenameManager* Manager;
+                HRESULT Result = E_FAIL;
+            } data{ mgr };
+            data.Manager->AddRef();
+
+            HANDLE renameThread = CreateThread(nullptr, 0, [](LPVOID param) -> DWORD {
+                auto data = static_cast<RenameThreadData*>(param);
+                data->Result = data->Manager->Rename(0, true);
+                data->Manager->Release();
+                return 0;
+            }, &data, 0, nullptr);
+
+            Assert::IsNotNull(renameThread);
+            Assert::AreEqual(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(renameThread, 5000));
+            CloseHandle(renameThread);
+            Assert::IsTrue(data.Result == S_OK);
+
+            Assert::IsTrue(mgr->Shutdown() == S_OK);
+        }
+
         TEST_METHOD (VerifySingleRename)
         {
             // Create a single item and verify rename works as expected
