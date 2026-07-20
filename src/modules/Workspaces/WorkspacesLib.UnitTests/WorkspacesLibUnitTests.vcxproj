@@ -49,6 +49,7 @@
     <ClCompile Include="StringUtilsTests.cpp" />
     <ClCompile Include="JsonUtilsTests.cpp" />
     <ClCompile Include="AppUtilsTests.cpp" />
+    <ClCompile Include="MonitorMatcherTests.cpp" />
     <ClCompile Include="PwaHelperTests.cpp" />
   </ItemGroup>
   <ItemGroup>

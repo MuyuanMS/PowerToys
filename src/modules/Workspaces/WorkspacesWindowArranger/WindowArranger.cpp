@@ -12,6 +12,7 @@
 #include <workspaces-common/WindowUtils.h>
 
 #include <WindowProperties/WorkspacesWindowPropertyUtils.h>
+#include <WorkspacesLib/MonitorMatcher.h>
 #include <WorkspacesLib/PwaHelper.h>
 #include <WorkspacesLib/WindowUtils.h>
 
@@ -475,56 +476,8 @@ bool WindowArranger::moveWindow(HWND window, const WorkspacesData::WorkspacesPro
     HMONITOR currentMonitor{};
     UINT currentDpi = DPIAware::DEFAULT_DPI;
 
-    // Match the saved monitor to a current monitor using stable hardware identifiers (id + instanceId).
-    // Monitor numbers are volatile and change when docking/undocking, so relying on them alone causes
-    // windows to be placed on the wrong monitor or minimized when external monitor numbers shift.
-    auto currentMonitorIter = m_monitors.end();
-    const auto findUniqueMonitorMatch = [&](const auto& predicate) {
-        auto firstMatch = std::find_if(m_monitors.begin(), m_monitors.end(), predicate);
-        if (firstMatch == m_monitors.end())
-        {
-            return firstMatch;
-        }
+    const auto currentMonitorIter = WorkspacesData::FindMatchingMonitor(*snapMonitorIter, m_monitors);
 
-        return std::find_if(firstMatch + 1, m_monitors.end(), predicate) == m_monitors.end() ? firstMatch : m_monitors.end();
-    };
-
-    if (!snapMonitorIter->id.empty() && !snapMonitorIter->instanceId.empty())
-    {
-        // Best match: both EDID id and PnP instanceId agree — same physical monitor, same port.
-        currentMonitorIter = std::find_if(m_monitors.begin(), m_monitors.end(), [&](const WorkspacesData::WorkspacesProject::Monitor& val) {
-            return val.id == snapMonitorIter->id && val.instanceId == snapMonitorIter->instanceId;
-        });
-    }
-    if (currentMonitorIter == m_monitors.end() && !snapMonitorIter->id.empty())
-    {
-        // Second chance: if the EDID id is unique, accept it even when the instanceId changed (e.g., reconnected via a new port).
-        currentMonitorIter = findUniqueMonitorMatch([&](const WorkspacesData::WorkspacesProject::Monitor& val) {
-            return val.id == snapMonitorIter->id;
-        });
-    }
-    if (currentMonitorIter == m_monitors.end() && !snapMonitorIter->id.empty())
-    {
-        // If multiple current monitors share the same EDID id, disambiguate them by the saved monitor bounds.
-        currentMonitorIter = findUniqueMonitorMatch([&](const WorkspacesData::WorkspacesProject::Monitor& val) {
-            return val.id == snapMonitorIter->id && val.monitorRectDpiAware == snapMonitorIter->monitorRectDpiAware;
-        });
-    }
-    if (currentMonitorIter == m_monitors.end() && !snapMonitorIter->id.empty())
-    {
-        currentMonitorIter = findUniqueMonitorMatch([&](const WorkspacesData::WorkspacesProject::Monitor& val) {
-            return val.id == snapMonitorIter->id && val.monitorRectDpiUnaware == snapMonitorIter->monitorRectDpiUnaware;
-        });
-    }
-    if (currentMonitorIter == m_monitors.end())
-    {
-        // Fallback: match by monitor number for backward compatibility with workspaces that lack id/instanceId.
-        currentMonitorIter = std::find_if(m_monitors.begin(), m_monitors.end(), [&](const WorkspacesData::WorkspacesProject::Monitor& val) { return val.number == app.monitor; });
-        if (currentMonitorIter != m_monitors.end())
-        {
-            Logger::info(L"Matched monitor by number for app {} (legacy/fallback)", app.name);
-        }
-    }
     if (currentMonitorIter != m_monitors.end())
     {
         currentMonitor = currentMonitorIter->monitor;
