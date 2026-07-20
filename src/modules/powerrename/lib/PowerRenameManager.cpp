@@ -38,6 +38,13 @@ namespace
                (path.size() == prefix.size() || path[prefix.size()] == L'\\');
     }
 
+    bool StartsWithPathMatchingCase(_In_ const std::wstring& path, _In_ const std::wstring& prefix)
+    {
+        return path.size() >= prefix.size() &&
+               CompareStringOrdinal(path.c_str(), static_cast<int>(prefix.size()), prefix.c_str(), static_cast<int>(prefix.size()), FALSE) == CSTR_EQUAL &&
+               (path.size() == prefix.size() || path[prefix.size()] == L'\\');
+    }
+
     class RenameProgressSink :
         public IFileOperationProgressSink
     {
@@ -300,7 +307,7 @@ IFACEMETHODIMP CPowerRenameManager::UpdateChildrenPath(_In_ int parentId, _In_ s
                 std::wstring pathStr{ path };
                 CoTaskMemFree(path);
 
-                if (!StartsWithPathIgnoringCase(pathStr, renamedPathStr) && pathStr.size() >= oldParentPathSize)
+                if (!StartsWithPathMatchingCase(pathStr, renamedPathStr) && pathStr.size() >= oldParentPathSize)
                 {
                     std::wstring newPath = pathStr.replace(0, oldParentPathSize, renamedPathStr);
                     it->second->PutPath(newPath.c_str());

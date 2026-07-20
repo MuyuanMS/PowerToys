@@ -344,6 +344,29 @@ namespace PowerRenameManagerTests
             mockMgrEvents->Release();
         }
 
+        TEST_METHOD (VerifyUpdateChildrenPathPropagatesCaseOnlyParentRename)
+        {
+            CMockPowerRenameManagerEvents* mockMgrEvents = nullptr;
+            CComPtr<IPowerRenameManager> mgr = CreateManagerWithEvents(&mockMgrEvents);
+
+            CComPtr<IPowerRenameItem> parentItem;
+            CComPtr<IPowerRenameItem> childItem;
+            CMockPowerRenameItem::CreateInstance(L"C:\\Test\\foo", L"foo", 0, true, SYSTEMTIME{ 2020, 7, 3, 22, 15, 6, 42, 453 }, &parentItem);
+            CMockPowerRenameItem::CreateInstance(L"C:\\Test\\foo\\child.txt", L"child.txt", 1, false, SYSTEMTIME{ 2020, 7, 3, 22, 15, 6, 42, 453 }, &childItem);
+            mgr->AddItem(parentItem);
+            mgr->AddItem(childItem);
+
+            int parentId = 0;
+            Assert::AreEqual(S_OK, parentItem->GetId(&parentId));
+            Assert::AreEqual(S_OK, parentItem->PutPath(L"C:\\Test\\FOO"));
+            Assert::AreEqual(S_OK, mgr->UpdateChildrenPath(parentId, std::wstring{ L"C:\\Test\\foo" }.size()));
+
+            Assert::AreEqual(L"C:\\Test\\FOO\\child.txt", GetItemStringValue(childItem, &IPowerRenameItem::GetPath).c_str());
+
+            Assert::AreEqual(S_OK, mgr->Shutdown());
+            mockMgrEvents->Release();
+        }
+
         TEST_METHOD (VerifyMultiRename)
         {
             // Create a single item and verify rename works as expected
