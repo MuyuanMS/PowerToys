@@ -13,17 +13,7 @@ public:
     // Constructor
     KeyboardManager();
 
-    ~KeyboardManager()
-    {
-        if (editorIsRunningEvent)
-        {
-            CloseHandle(editorIsRunningEvent);
-        }
-        if (hookThreadHandle)
-        {
-            CloseHandle(hookThreadHandle);
-        }
-    }
+    ~KeyboardManager();
 
     void StartLowlevelKeyboardHook();
     void StopLowlevelKeyboardHook();
@@ -60,21 +50,9 @@ private:
 
     HANDLE editorIsRunningEvent = nullptr;
 
-    // Protects hook/priority lifecycle state (hookHandle and hookThreadHandle) when
-    // StartLowlevelKeyboardHook and StopLowlevelKeyboardHook are called from
-    // different threads.
+    // Protects hook lifecycle state when StartLowlevelKeyboardHook and
+    // StopLowlevelKeyboardHook are called from different threads.
     mutable std::mutex hookLifecycleMutex;
-
-    // Real handle to the thread that installed the WH_KEYBOARD_LL hook (obtained via
-    // DuplicateHandle so it remains valid even when called from another thread).
-    // Used to set/restore the hook thread's scheduling priority from any thread.
-    HANDLE hookThreadHandle = nullptr;
-
-    // Thread priority that was active on the hook thread before StartLowlevelKeyboardHook
-    // elevated it.  Saved so StopLowlevelKeyboardHook can restore the original value exactly.
-    // Default THREAD_PRIORITY_NORMAL is a safe fallback used if GetThreadPriority() fails
-    // during hook installation.
-    std::atomic<int> hookThreadPriorityBeforeElevation{ THREAD_PRIORITY_NORMAL };
 
     // Hook procedure definition
     static LRESULT CALLBACK HookProc(int nCode, WPARAM wParam, LPARAM lParam);
