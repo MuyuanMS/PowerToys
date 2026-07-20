@@ -475,10 +475,12 @@ void template_item::rename_and_resolve_variables_on_other_thread(std::filesystem
                         else if (wait_result == WAIT_TIMEOUT)
                         {
                             bool should_stop_monitoring = false;
+                            bool stopped_due_to_unknown_rename_state = false;
 
                             if (list_view_window == nullptr)
                             {
                                 should_stop_monitoring = std::chrono::steady_clock::now() - monitoring_started >= rename_mode_startup_timeout;
+                                stopped_due_to_unknown_rename_state = should_stop_monitoring;
                             }
                             else if (is_rename_mode_active(list_view_window))
                             {
@@ -507,6 +509,11 @@ void template_item::rename_and_resolve_variables_on_other_thread(std::filesystem
                                     }
 
                                     continue;
+                                }
+
+                                if (stopped_due_to_unknown_rename_state)
+                                {
+                                    should_resolve_variables = false;
                                 }
 
                                 keep_monitoring = false;
