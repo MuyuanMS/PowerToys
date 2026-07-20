@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,6 +20,9 @@ using Microsoft.PowerToys.UITest;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using static FancyZonesEditorCommon.Data.CustomLayouts;
 using static Microsoft.FancyZonesEditor.UnitTests.Utils.FancyZonesEditorHelper;
+using Button = Microsoft.PowerToys.UITest.Button;
+using CheckBox = Microsoft.PowerToys.UITest.CheckBox;
+using Group = Microsoft.PowerToys.UITest.Group;
 
 namespace UITests_FancyZones
 {
@@ -640,8 +644,16 @@ namespace UITests_FancyZones
         private static bool TryGetAppliedLayoutIdForMonitor(int monitorNumber, out string layoutId)
         {
             layoutId = string.Empty;
-            var appliedLayouts = new AppliedLayouts();
-            var appliedLayoutsData = appliedLayouts.Read(appliedLayouts.File);
+            AppliedLayouts.AppliedLayoutsListWrapper appliedLayoutsData;
+            try
+            {
+                var appliedLayouts = new AppliedLayouts();
+                appliedLayoutsData = appliedLayouts.Read(appliedLayouts.File);
+            }
+            catch (JsonException)
+            {
+                return false;
+            }
 
             if (appliedLayoutsData.AppliedLayouts == null || appliedLayoutsData.AppliedLayouts.Count == 0)
             {
