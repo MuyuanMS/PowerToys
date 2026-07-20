@@ -565,7 +565,26 @@ namespace PowerRenameManagerTests
             renRegEx->PutSearchTerm(L"\u6d4b\u8bd5");
             renRegEx->PutReplaceTerm(L"\u65b0");
 
-            Assert::IsTrue(mgr->Rename(0, false) == S_OK);
+            // Wait for the regex preview to complete before calling Rename; the item count
+            // check in _PerformFileOperation runs before _WaitForRegExWorkerThread, so calling
+            // Rename before the worker has set m_newName returns E_FAIL (0 items to rename).
+            for (int attempt = 0; attempt < 200 && !mockMgrEvents->m_regExCompleted; attempt++)
+            {
+                Sleep(5);
+            }
+            Assert::IsTrue(mockMgrEvents->m_regExCompleted);
+
+            bool renameSuccess = false;
+            for (int step = 0; step < 20; step++)
+            {
+                renameSuccess = mgr->Rename(0, false) == S_OK;
+                if (renameSuccess)
+                {
+                    break;
+                }
+                Sleep(10);
+            }
+            Assert::IsTrue(renameSuccess);
             Assert::IsTrue(testFileHelper.PathExistsCaseSensitive(L"\u65b0\u6587\u4ef6.txt"));
 
             PWSTR originalName = nullptr;
