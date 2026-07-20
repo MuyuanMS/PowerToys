@@ -1022,6 +1022,7 @@ void CPowerRenameManager::_WaitForRegExWorkerThread()
         // while we wait. Without this a COM STA call from the worker thread back into
         // any object created on the main apartment can deadlock because the main thread
         // is blocked and not dispatching messages.
+        bool quit = false;
         while (true)
         {
             DWORD waitResult = MsgWaitForMultipleObjects(1, &m_regExWorkerThreadHandle, FALSE, INFINITE, QS_ALLINPUT);
@@ -1036,9 +1037,26 @@ void CPowerRenameManager::_WaitForRegExWorkerThread()
                 MSG msg;
                 while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
                 {
+                    if (msg.message == WM_QUIT)
+                    {
+                        // Re-post WM_QUIT so the application exits cleanly after we return.
+                        PostQuitMessage(static_cast<int>(msg.wParam));
+                        quit = true;
+                        break;
+                    }
                     TranslateMessage(&msg);
                     DispatchMessage(&msg);
                 }
+            }
+            else
+            {
+                // WAIT_FAILED or unexpected result; break to avoid an infinite loop.
+                break;
+            }
+
+            if (quit)
+            {
+                break;
             }
         }
         CloseHandle(m_regExWorkerThreadHandle);
