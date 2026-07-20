@@ -31,6 +31,49 @@ namespace PowerRenameManagerTests
             int depth;
         };
 
+        class CTestPowerRenameManager : public CPowerRenameManager
+        {
+        public:
+            HRESULT InitForTest()
+            {
+                return _Init();
+            }
+
+            void CleanupForTest()
+            {
+                _Cleanup();
+            }
+
+            HRESULT CreateFileOpWorkerThreadForTest()
+            {
+                return _CreateFileOpWorkerThread();
+            }
+
+            DWORD WaitForFileOpWorkerThread(DWORD timeout)
+            {
+                return WaitForSingleObject(m_fileOpWorkerThreadHandle, timeout);
+            }
+
+            void CloseFileOpWorkerThread()
+            {
+                if (m_fileOpWorkerThreadHandle)
+                {
+                    CloseHandle(m_fileOpWorkerThreadHandle);
+                    m_fileOpWorkerThreadHandle = nullptr;
+                }
+            }
+
+            void StartFileOpWorker()
+            {
+                SetEvent(m_startFileOpWorkerEvent);
+            }
+
+            void StartRegExWorker()
+            {
+                SetEvent(m_startRegExWorkerEvent);
+            }
+        };
+
         void RenameHelper(_In_ rename_pairs * renamePairs, _In_ int numPairs, _In_ std::wstring searchTerm, _In_ std::wstring replaceTerm, SYSTEMTIME fileTime, _In_ DWORD flags)
         {
             // Create a single item (in a temp directory) and verify rename works as expected
@@ -149,13 +192,13 @@ namespace PowerRenameManagerTests
             mockMgrEvents->Release();
         }
 
-        TEST_METHOD (VerifyRenameCompletesWithoutRegExWorkerSignal)
+        TEST_METHOD (VerifyFileOpWorkerStartsWithoutRegExWorkerSignal)
         {
             CTestFileHelper testFileHelper;
             Assert::IsTrue(testFileHelper.AddFile(L"foo.txt"));
 
-            CComPtr<IPowerRenameManager> mgr;
-            Assert::IsTrue(CPowerRenameManager::s_CreateInstance(&mgr) == S_OK);
+            CTestPowerRenameManager mgr;
+            Assert::IsTrue(mgr.InitForTest() == S_OK);
 
             CComPtr<IPowerRenameItem> item;
             CMockPowerRenameItem::CreateInstance(testFileHelper.GetFullPath(L"foo.txt").c_str(),
@@ -166,28 +209,22 @@ namespace PowerRenameManagerTests
                                                  &item);
             Assert::IsTrue(item->PutNewName(L"bar.txt") == S_OK);
             Assert::IsTrue(item->PutStatus(PowerRenameItemRenameStatus::ShouldRename) == S_OK);
-            Assert::IsTrue(mgr->AddItem(item) == S_OK);
+            Assert::IsTrue(mgr.AddItem(item) == S_OK);
+            Assert::IsTrue(mgr.CreateFileOpWorkerThreadForTest() == S_OK);
 
-            struct RenameThreadData
+            Assert::AreEqual(static_cast<DWORD>(WAIT_TIMEOUT), mgr.WaitForFileOpWorkerThread(100));
+
+            mgr.StartFileOpWorker();
+            DWORD waitResult = mgr.WaitForFileOpWorkerThread(5000);
+            if (waitResult != WAIT_OBJECT_0)
             {
-                IPowerRenameManager* Manager;
-                HRESULT Result = E_FAIL;
-            } data{ mgr };
-            data.Manager->AddRef();
+                mgr.StartRegExWorker();
+                Assert::AreEqual(static_cast<DWORD>(WAIT_OBJECT_0), mgr.WaitForFileOpWorkerThread(5000));
+            }
 
-            HANDLE renameThread = CreateThread(nullptr, 0, [](LPVOID param) -> DWORD {
-                auto data = static_cast<RenameThreadData*>(param);
-                data->Result = data->Manager->Rename(0, true);
-                data->Manager->Release();
-                return 0;
-            }, &data, 0, nullptr);
-
-            Assert::IsNotNull(renameThread);
-            Assert::AreEqual(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(renameThread, 5000));
-            CloseHandle(renameThread);
-            Assert::IsTrue(data.Result == S_OK);
-
-            Assert::IsTrue(mgr->Shutdown() == S_OK);
+            mgr.CloseFileOpWorkerThread();
+            mgr.CleanupForTest();
+            Assert::AreEqual(static_cast<DWORD>(WAIT_OBJECT_0), waitResult);
         }
 
         TEST_METHOD (VerifySingleRename)
