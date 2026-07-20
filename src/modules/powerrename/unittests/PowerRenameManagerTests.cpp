@@ -420,7 +420,8 @@ namespace PowerRenameManagerTests
 
             CComPtr<IPowerRenameManager> mgr;
             Assert::IsTrue(CPowerRenameManager::s_CreateInstance(&mgr) == S_OK);
-            CMockPowerRenameManagerEvents* mockMgrEvents = new CMockPowerRenameManagerEvents();
+            CComPtr<CMockPowerRenameManagerEvents> mockMgrEvents;
+            mockMgrEvents.Attach(new CMockPowerRenameManagerEvents());
             CComPtr<IPowerRenameManagerEvents> mgrEvents;
             Assert::IsTrue(mockMgrEvents->QueryInterface(IID_PPV_ARGS(&mgrEvents)) == S_OK);
             DWORD cookie = 0;
@@ -457,7 +458,6 @@ namespace PowerRenameManagerTests
             Assert::IsTrue(testFileHelper.PathExistsCaseSensitive(L"bar.txt"));
 
             Assert::IsTrue(mgr->Shutdown() == S_OK);
-            mockMgrEvents->Release();
         }
 
         TEST_METHOD(VerifyConcurrentPreviewReadsDuringRegEx)
@@ -465,7 +465,8 @@ namespace PowerRenameManagerTests
             CComPtr<IPowerRenameManager> mgr;
             Assert::IsTrue(CPowerRenameManager::s_CreateInstance(&mgr) == S_OK);
 
-            auto* mockMgrEvents = new CConcurrentReadPowerRenameManagerEvents();
+            CComPtr<CConcurrentReadPowerRenameManagerEvents> mockMgrEvents;
+            mockMgrEvents.Attach(new CConcurrentReadPowerRenameManagerEvents());
             CComPtr<IPowerRenameManagerEvents> mgrEvents;
             Assert::IsTrue(mockMgrEvents->QueryInterface(IID_PPV_ARGS(&mgrEvents)) == S_OK);
             DWORD cookie = 0;
@@ -532,7 +533,6 @@ namespace PowerRenameManagerTests
             Assert::IsTrue(readSucceeded.load());
             Assert::IsTrue(mockMgrEvents->m_regExCompletedSignal.load());
             Assert::IsTrue(mgr->Shutdown() == S_OK);
-            mockMgrEvents->Release();
         }
 
         TEST_METHOD(VerifyKeepOpenRenameCanRepreviewNonAsciiItem)
@@ -542,7 +542,8 @@ namespace PowerRenameManagerTests
 
             CComPtr<IPowerRenameManager> mgr;
             Assert::IsTrue(CPowerRenameManager::s_CreateInstance(&mgr) == S_OK);
-            CMockPowerRenameManagerEvents* mockMgrEvents = new CMockPowerRenameManagerEvents();
+            CComPtr<CMockPowerRenameManagerEvents> mockMgrEvents;
+            mockMgrEvents.Attach(new CMockPowerRenameManagerEvents());
             CComPtr<IPowerRenameManagerEvents> mgrEvents;
             Assert::IsTrue(mockMgrEvents->QueryInterface(IID_PPV_ARGS(&mgrEvents)) == S_OK);
             DWORD cookie = 0;
@@ -587,7 +588,6 @@ namespace PowerRenameManagerTests
             CoTaskMemFree(newName);
 
             Assert::IsTrue(mgr->Shutdown() == S_OK);
-            mockMgrEvents->Release();
         }
     };
 }
