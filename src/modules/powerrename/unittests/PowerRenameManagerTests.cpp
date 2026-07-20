@@ -612,8 +612,7 @@ namespace PowerRenameManagerTests
             {
                 CoTaskMemFree(newName);
                 newName = nullptr;
-                item->GetNewName(&newName);
-                if (newName != nullptr)
+                if (SUCCEEDED(item->GetNewName(&newName)) && newName != nullptr)
                 {
                     break;
                 }
