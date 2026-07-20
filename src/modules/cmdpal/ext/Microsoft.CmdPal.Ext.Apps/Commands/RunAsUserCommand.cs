@@ -26,15 +26,17 @@ internal sealed partial class RunAsUserCommand : InvokableCommand
         _parentDir = parentDir;
     }
 
-    internal static async Task RunAsUser(string target, string parentDir)
+    internal static async Task RunAsUser(string target, string parentDir, Func<ProcessStartInfo, Process?>? startProcess = null)
     {
         await Task.Run(() =>
         {
             try
             {
+                startProcess ??= Process.Start;
+
                 var info = ShellCommand.GetProcessStartInfo(target, parentDir, string.Empty, ShellCommand.RunAsType.OtherUser);
 
-                Process.Start(info);
+                startProcess(info);
             }
             catch (Exception ex)
             {

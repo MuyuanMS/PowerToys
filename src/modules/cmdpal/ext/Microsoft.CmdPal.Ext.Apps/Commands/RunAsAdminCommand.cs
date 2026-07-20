@@ -28,12 +28,14 @@ internal sealed partial class RunAsAdminCommand : InvokableCommand
         _packaged = packaged;
     }
 
-    internal static async Task RunAsAdmin(string target, string parentDir, bool packaged)
+    internal static async Task RunAsAdmin(string target, string parentDir, bool packaged, Func<ProcessStartInfo, Process?>? startProcess = null)
     {
         await Task.Run(() =>
         {
             try
             {
+                startProcess ??= Process.Start;
+
                 if (packaged)
                 {
                     var command = "shell:AppsFolder\\" + target;
@@ -42,13 +44,13 @@ internal sealed partial class RunAsAdminCommand : InvokableCommand
                     var info = ShellCommand.SetProcessStartInfo(command, verb: "runas");
                     info.UseShellExecute = true;
                     info.Arguments = string.Empty;
-                    Process.Start(info);
+                    startProcess(info);
                 }
                 else
                 {
                     var info = ShellCommand.GetProcessStartInfo(target, parentDir, string.Empty, ShellCommand.RunAsType.Administrator);
 
-                    Process.Start(info);
+                    startProcess(info);
                 }
             }
             catch (Exception ex)
