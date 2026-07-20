@@ -568,8 +568,7 @@ public partial class Win32Program : IProgram
         folderQueue.Enqueue(directory);
 
         // Keep track of already visited (resolved) directories to avoid cycles.
-        // OrdinalIgnoreCase is used because Windows paths are case-insensitive.
-        var alreadyVisited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var alreadyVisited = new HashSet<string>();
 
         do
         {
