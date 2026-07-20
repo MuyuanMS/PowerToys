@@ -330,13 +330,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
             {
                 try
                 {
+                    var linkedBrightnessEditedDuringRefresh = LinkedLevelsActive && _lastLinkedBrightnessEdit > refreshStartedAt;
                     foreach (var vm in Monitors)
                     {
                         // Skip view models the user has edited after the refresh started.
                         // The user's gesture is already in the debounce queue and will be
                         // committed to hardware; overwriting it with the stale read would
                         // discard the user's selection.
-                        if (vm.LastUserBrightnessEdit > refreshStartedAt)
+                        if (vm.LastUserBrightnessEdit > refreshStartedAt ||
+                            (linkedBrightnessEditedDuringRefresh && IsLinkedTarget(vm)))
                         {
                             continue;
                         }
@@ -352,7 +354,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     // read hardware values. SeedInitialLinkedBrightness is a no-op when
                     // linked mode is off, and uses the suppress flag internally so it never
                     // triggers a hardware write.
-                    if (LinkedLevelsActive)
+                    if (LinkedLevelsActive && !linkedBrightnessEditedDuringRefresh)
                     {
                         SeedInitialLinkedBrightness();
                     }

@@ -32,6 +32,7 @@ public partial class MainViewModel
     private bool _suppressLinkedBrightnessBroadcast;
 
     private DispatcherQueueTimer? _linkedBrightnessCommitTimer;
+    private DateTimeOffset _lastLinkedBrightnessEdit = DateTimeOffset.MinValue;
 
     /// <summary>
     /// Returns true when the monitor is currently driven by linked brightness — it supports
@@ -164,6 +165,8 @@ public partial class MainViewModel
         {
             return;
         }
+
+        _lastLinkedBrightnessEdit = DateTimeOffset.UtcNow;
 
         // Keep linked monitor VMs aligned with the current master value without per-VM commits.
         // The row is usually covered by the linked-mode hint, but the backing value should be
