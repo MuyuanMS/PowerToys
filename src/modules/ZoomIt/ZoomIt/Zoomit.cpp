@@ -105,7 +105,6 @@ COLORREF	g_CustomColors[16];
 #define WEBCAM_TOGGLE_HOTKEY     21
 #define MIRROR_HOTKEY            22
 #define MIRROR_WINDOW_HOTKEY     23
-#define MIRROR_CROP_HOTKEY       24
 
 #define ZOOM_PAGE	  0
 #define LIVE_PAGE	  1
@@ -429,7 +428,6 @@ const wchar_t* HotkeyIdToString( WPARAM hotkeyId )
     case SNIP_PANORAMA_SAVE_HOTKEY: return L"SNIP_PANORAMA_SAVE_HOTKEY";
     case MIRROR_HOTKEY: return L"MIRROR_HOTKEY";
     case MIRROR_WINDOW_HOTKEY: return L"MIRROR_WINDOW_HOTKEY";
-    case MIRROR_CROP_HOTKEY: return L"MIRROR_CROP_HOTKEY";
     default: return L"UNKNOWN_HOTKEY";
     }
 }
@@ -3573,7 +3571,6 @@ void UnregisterAllHotkeys( HWND hWnd )
     unregisterHotkey( COPY_CROP_HOTKEY );
     unregisterHotkey( MIRROR_HOTKEY );
     unregisterHotkey( MIRROR_WINDOW_HOTKEY );
-    unregisterHotkey( MIRROR_CROP_HOTKEY );
 }
 
 //----------------------------------------------------------------------------
@@ -3629,11 +3626,7 @@ void RegisterAllHotkeys(HWND hWnd)
     }
     if (g_MirrorToggleKey) {
         registerHotkey( MIRROR_HOTKEY, g_MirrorToggleMod | MOD_NOREPEAT, g_MirrorToggleKey & 0xFF );
-        UINT mirrorCropMod = g_MirrorToggleMod ^ MOD_SHIFT;
         UINT mirrorWindowMod = g_MirrorToggleMod ^ MOD_ALT;
-        if ( mirrorCropMod != 0 ) {
-            registerHotkey( MIRROR_CROP_HOTKEY, mirrorCropMod | MOD_NOREPEAT, g_MirrorToggleKey & 0xFF );
-        }
         if ( mirrorWindowMod != 0 ) {
             registerHotkey( MIRROR_WINDOW_HOTKEY, mirrorWindowMod | MOD_NOREPEAT, g_MirrorToggleKey & 0xFF );
         }
@@ -5093,8 +5086,6 @@ INT_PTR CALLBACK OptionsProc( HWND hDlg, UINT message,
         if( g_SnipPanoramaSaveToggleKey) SendMessage( GetDlgItem( g_OptionsTabs[PANORAMA_PAGE].hPage, IDC_SNIP_PANORAMA_SAVE_HOTKEY), HKM_SETHOTKEY, g_SnipPanoramaSaveToggleKey, 0 );
         if( g_SnipOcrToggleKey) SendMessage( GetDlgItem( g_OptionsTabs[SNIP_PAGE].hPage, IDC_SNIP_OCR_HOTKEY), HKM_SETHOTKEY, g_SnipOcrToggleKey, 0 );
         if( g_MirrorToggleKey) SendMessage( GetDlgItem( g_OptionsTabs[MIRROR_PAGE].hPage, IDC_MIRROR_HOTKEY), HKM_SETHOTKEY, g_MirrorToggleKey, 0 );
-        CheckDlgButton( g_OptionsTabs[MIRROR_PAGE].hPage, IDC_MIRROR_TRACK_WINDOW,
-            g_MirrorTrackWindow ? BST_CHECKED: BST_UNCHECKED );
         CheckDlgButton( hDlg, IDC_SHOW_TRAY_ICON,
             g_ShowTrayIcon ? BST_CHECKED: BST_UNCHECKED );
         CheckDlgButton( hDlg, IDC_AUTOSTART,
@@ -5584,7 +5575,6 @@ INT_PTR CALLBACK OptionsProc( HWND hDlg, UINT message,
             g_MicMonoMix = IsDlgButtonChecked(g_OptionsTabs[RECORD_PAGE].hPage, IDC_MIC_MONO_MIX) == BST_CHECKED;
             g_NoiseCancellation = IsDlgButtonChecked(g_OptionsTabs[RECORD_PAGE].hPage, IDC_NOISE_CANCELLATION) == BST_CHECKED;
             g_RecordAspectRatio = IsDlgButtonChecked(g_OptionsTabs[RECORD_PAGE].hPage, IDC_RECORD_ASPECT_RATIO) == BST_CHECKED;
-            g_MirrorTrackWindow = IsDlgButtonChecked(g_OptionsTabs[MIRROR_PAGE].hPage, IDC_MIRROR_TRACK_WINDOW) == BST_CHECKED;
             GetDlgItemText( g_OptionsTabs[BREAK_PAGE].hPage, IDC_TIMER, text, 3 );
             text[2] = 0;
             newTimeout = _tstoi( text );
@@ -5696,9 +5686,8 @@ INT_PTR CALLBACK OptionsProc( HWND hDlg, UINT message,
                 UnregisterAllHotkeys(GetParent(hDlg));
                 break;
             }
-            else if( UINT mirrorCropMod = newMirrorToggleMod ^ MOD_SHIFT, mirrorWindowMod = newMirrorToggleMod ^ MOD_ALT; newMirrorToggleKey &&
+            else if( UINT mirrorWindowMod = newMirrorToggleMod ^ MOD_ALT; newMirrorToggleKey &&
                 (!RegisterHotKey(GetParent(hDlg), MIRROR_HOTKEY, newMirrorToggleMod | MOD_NOREPEAT, newMirrorToggleKey & 0xFF) ||
-                (mirrorCropMod != 0 && !RegisterHotKey(GetParent(hDlg), MIRROR_CROP_HOTKEY, mirrorCropMod | MOD_NOREPEAT, newMirrorToggleKey & 0xFF)) ||
                 (mirrorWindowMod != 0 && !RegisterHotKey(GetParent(hDlg), MIRROR_WINDOW_HOTKEY, mirrorWindowMod | MOD_NOREPEAT, newMirrorToggleKey & 0xFF)))) {
 
                 MessageBox(hDlg, L"The specified mirror hotkey is already in use.\nSelect a different mirror hotkey.",
@@ -7051,6 +7040,21 @@ HMONITOR FindMirrorTargetMonitor( HMONITOR sourceMonitor )
 //----------------------------------------------------------------------------
 winrt::fire_and_forget StartRecordingAsync( HWND hWnd, LPRECT rcCrop, HWND hWndRecord ) try
 {
+    // ---- Recording startup timing diagnostics ----
+    LARGE_INTEGER _diagFreq, _diagT0, _diagT1;
+    QueryPerformanceFrequency( &_diagFreq );
+    QueryPerformanceCounter( &_diagT0 );
+    auto _diagMs = [&]() -> double {
+        QueryPerformanceCounter( &_diagT1 );
+        return static_cast<double>( _diagT1.QuadPart - _diagT0.QuadPart ) * 1000.0 / _diagFreq.QuadPart;
+    };
+    auto _diagLog = [&]( const wchar_t* label ) {
+        wchar_t buf[256];
+        swprintf_s( buf, L"[RecStartup +%.1fms] %s\n", _diagMs(), label );
+        OutputDebugStringW( buf );
+    };
+    _diagLog( L"entry" );
+
     // Capture the UI thread context so we can resume on it for the save dialog
     winrt::apartment_context uiThread;
 
@@ -7067,6 +7071,7 @@ winrt::fire_and_forget StartRecordingAsync( HWND hWnd, LPRECT rcCrop, HWND hWndR
         audioGenerator = std::make_unique<AudioSampleGenerator>(
             g_CaptureAudio, g_CaptureSystemAudio, g_MicMonoMix, g_NoiseCancellation );
         audioInitAction = audioGenerator->InitializeAsync();
+        _diagLog( L"audio InitializeAsync started (background)" );
     }
 
     auto tempFolderPath = std::filesystem::temp_directory_path().wstring();
@@ -7076,11 +7081,13 @@ winrt::fire_and_forget StartRecordingAsync( HWND hWnd, LPRECT rcCrop, HWND hWndR
     // Choose temp file extension based on format
     const wchar_t* tempFileName = (g_RecordingFormat == RecordingFormat::GIF) ? L"zoomit.gif" : L"zoomit.mp4";
     auto file = co_await appFolder.CreateFileAsync( tempFileName, winrt::CreationCollisionOption::ReplaceExisting );
+    _diagLog( L"temp file created" );
 
     // Get the device
     auto d3dDevice = util::CreateD3D11Device();
     auto dxgiDevice = d3dDevice.as<IDXGIDevice>();
     g_RecordDevice = CreateDirect3DDevice( dxgiDevice.get() );
+    _diagLog( L"D3D device created" );
 
     // Get the active MONITOR capture device
     HMONITOR hMon = NULL;
@@ -7096,8 +7103,10 @@ winrt::fire_and_forget StartRecordingAsync( HWND hWnd, LPRECT rcCrop, HWND hWndR
         item = util::CreateCaptureItemForWindow( hWndRecord );
     else
         item = util::CreateCaptureItemForMonitor( hMon );
+    _diagLog( L"capture item created" );
 
     auto stream = co_await file.OpenAsync( winrt::FileAccessMode::ReadWrite );
+    _diagLog( L"file stream opened" );
 
     // Create the appropriate recording session based on format
     OutputDebugStringW((L"Starting recording session. Framerate:  " + std::to_wstring(g_RecordFrameRate) + L" scaling: " + std::to_wstring(g_RecordScaling) + L" Format: " + (g_RecordingFormat == RecordingFormat::GIF ? L"GIF" : L"MP4") + L"\n").c_str());
@@ -7147,6 +7156,7 @@ winrt::fire_and_forget StartRecordingAsync( HWND hWnd, LPRECT rcCrop, HWND hWndR
     }
     else
     {
+        _diagLog( L"calling VideoRecordingSession::Create (constructor)" );
         g_RecordingSession = VideoRecordingSession::Create(
                                         g_RecordDevice,
                                         item,
@@ -7155,6 +7165,7 @@ winrt::fire_and_forget StartRecordingAsync( HWND hWnd, LPRECT rcCrop, HWND hWndR
                                         std::move(audioGenerator),
                                         audioInitAction,
                                         stream );
+        _diagLog( L"VideoRecordingSession::Create returned" );
 
         recordingStarted = (g_RecordingSession != nullptr);
 
@@ -7193,7 +7204,9 @@ winrt::fire_and_forget StartRecordingAsync( HWND hWnd, LPRECT rcCrop, HWND hWndR
         {
             try
             {
+                _diagLog( L"calling co_await StartAsync()" );
                 co_await g_RecordingSession->StartAsync();
+                _diagLog( L"StartAsync returned" );
             }
             catch (const winrt::hresult_error& error)
             {
@@ -7916,10 +7929,8 @@ LRESULT APIENTRY MainWndProc(
                 }
             }
             if (showOptions == FALSE && g_MirrorToggleKey) {
-                UINT mirrorCropMod = g_MirrorToggleMod ^ MOD_SHIFT;
                 UINT mirrorWindowMod = g_MirrorToggleMod ^ MOD_ALT;
                 if (!RegisterHotKey(hWnd, MIRROR_HOTKEY, g_MirrorToggleMod | MOD_NOREPEAT, g_MirrorToggleKey & 0xFF) ||
-                    (mirrorCropMod != 0 && !RegisterHotKey(hWnd, MIRROR_CROP_HOTKEY, mirrorCropMod | MOD_NOREPEAT, g_MirrorToggleKey & 0xFF)) ||
                     (mirrorWindowMod != 0 && !RegisterHotKey(hWnd, MIRROR_WINDOW_HOTKEY, mirrorWindowMod | MOD_NOREPEAT, g_MirrorToggleKey & 0xFF))) {
 
                     MessageBox(hWnd, L"The specified mirror hotkey is already in use.\nSelect a different mirror hotkey.",
@@ -8686,15 +8697,14 @@ LRESULT APIENTRY MainWndProc(
             break;
 
         case MIRROR_HOTKEY:
-        case MIRROR_CROP_HOTKEY:
         case MIRROR_WINDOW_HOTKEY: {
 
             //
-            // DemoMirror: mirror the screen, a region (Shift), or a window
-            // (Alt), including the mouse cursor, onto a second monitor on
-            // top of a slide show so the audience can follow a demo without
-            // the presenter leaving the presentation. Entered once to start
-            // mirroring and again to stop.
+            // DemoMirror: mirror a region or window, including the mouse
+            // cursor, onto a second monitor on top of a slide show so the
+            // audience can follow a demo without the presenter leaving the
+            // presentation. Entered once to start mirroring and again to
+            // stop.
             //
             if( g_MirrorWindow.IsActive() ) {
 
@@ -8740,16 +8750,15 @@ LRESULT APIENTRY MainWndProc(
                     break;
                 }
                 mirrorSourceMonitor = MonitorFromWindow( hWndMirrorSource, MONITOR_DEFAULTTONEAREST );
-                mirrorSourceRect = MirrorWindow::GetWindowFrameRect( hWndMirrorSource );
+                GetWindowRect( hWndMirrorSource, &mirrorSourceRect );
 
-            } else if( wParam == MIRROR_CROP_HOTKEY ) {
+            } else {
 
                 // Select the region to mirror. The selection border stays up
                 // to show what's being mirrored; it is excluded from capture.
                 g_RecordCropping = TRUE;
-                g_MirrorSelectRectangle.BorderColor( MIRROR_BORDER_COLOR );
                 g_MirrorSelectRectangle.AspectRatio( 0.0 );
-                bool mirrorCanceled = !g_MirrorSelectRectangle.Start( nullptr, false, MIRROR_BORDER_COLOR );
+                bool mirrorCanceled = !g_MirrorSelectRectangle.Start( nullptr );
                 g_RecordCropping = FALSE;
                 if( mirrorCanceled ) {
 
@@ -8757,26 +8766,6 @@ LRESULT APIENTRY MainWndProc(
                 }
                 mirrorSourceRect = g_MirrorSelectRectangle.SelectedRect();
                 mirrorSourceMonitor = MonitorFromRect( &mirrorSourceRect, MONITOR_DEFAULTTONEAREST );
-
-                // The selection border defaults to translucent; make the
-                // mirror border fully opaque so it reads bright green.
-                SetLayeredWindowAttributes( g_MirrorSelectRectangle.Window(), 0, 255, LWA_ALPHA );
-
-            } else {
-
-                // Mirror the entire monitor under the cursor, with a
-                // full-monitor border showing that mirroring is active.
-                POINT mirrorPoint;
-                GetCursorPos( &mirrorPoint );
-                mirrorSourceMonitor = MonitorFromPoint( mirrorPoint, MONITOR_DEFAULTTONEAREST );
-                MONITORINFO mirrorMonitorInfo = { sizeof( mirrorMonitorInfo ) };
-                GetMonitorInfo( mirrorSourceMonitor, &mirrorMonitorInfo );
-                mirrorSourceRect = mirrorMonitorInfo.rcMonitor;
-
-                g_MirrorSelectRectangle.BorderColor( MIRROR_BORDER_COLOR );
-                g_MirrorSelectRectangle.AspectRatio( 0.0 );
-                g_MirrorSelectRectangle.Start( nullptr, true, MIRROR_BORDER_COLOR );
-                SetLayeredWindowAttributes( g_MirrorSelectRectangle.Window(), 0, 255, LWA_ALPHA );
             }
 
             HMONITOR mirrorTargetMonitor = FindMirrorTargetMonitor( mirrorSourceMonitor );
@@ -8787,38 +8776,19 @@ LRESULT APIENTRY MainWndProc(
                 break;
             }
 
-            // With window tracking, mirror the monitor region under the
-            // window instead of the window's own surface so ZoomIt zoom and
-            // draw annotations show in place.
-            bool mirrorTrackWindow = ( hWndMirrorSource != NULL && g_MirrorTrackWindow );
-
             winrt::Windows::Graphics::Capture::GraphicsCaptureItem mirrorItem{ nullptr };
             try {
 
-                if( hWndMirrorSource != NULL && !mirrorTrackWindow )
+                if( hWndMirrorSource != NULL )
                     mirrorItem = util::CreateCaptureItemForWindow( hWndMirrorSource );
                 else
                     mirrorItem = util::CreateCaptureItemForMonitor( mirrorSourceMonitor );
             }
             catch( const winrt::hresult_error& ) {}
 
-            // Reports when a zoom/draw/live-zoom mode is active so a window
-            // mirror can temporarily capture the monitor instead - those
-            // modes render in overlay windows a window capture can't see.
-            auto mirrorAnnotationQuery = []() {
-                if( g_hWndLiveZoom != NULL && IsWindowVisible( g_hWndLiveZoom ))
-                    return MirrorWindow::AnnotationState::AnnotatingLiveZoom;
-                if( g_Zoomed )
-                    return MirrorWindow::AnnotationState::Annotating;
-                return MirrorWindow::AnnotationState::None;
-            };
-
-            HWND mirrorBorderWindow = hWndMirrorSource == NULL ? g_MirrorSelectRectangle.Window() : NULL;
             if( mirrorItem == nullptr ||
                 !g_MirrorWindow.Start( mirrorItem, mirrorSourceRect, hWndMirrorSource,
-                                       mirrorSourceMonitor, mirrorTargetMonitor, hWnd,
-                                       mirrorAnnotationQuery, mirrorTrackWindow,
-                                       mirrorBorderWindow )) {
+                                       mirrorSourceMonitor, mirrorTargetMonitor, hWnd )) {
 
                 g_MirrorSelectRectangle.Stop();
                 MessageBox( hWnd, L"Unable to start screen mirroring.", APPNAME, MB_OK );
@@ -10528,21 +10498,6 @@ LRESULT APIENTRY MainWndProc(
         g_SelectRectangle.SetRecordingActive();
         break;
 
-    case WM_USER_RECORDING_NO_FRAMES:
-        // The capture pipeline started but never delivered a single frame,
-        // so recording was aborted.  This is typical on headless / GPU-less
-        // virtual machines, cloud PCs, or remote sessions where
-        // Windows.Graphics.Capture cannot capture the display.  Tear down the
-        // recording border / state and tell the user why nothing was saved.
-        OutputDebugStringW( L"[RecBorder] WM_USER_RECORDING_NO_FRAMES received\n" );
-        StopRecording();
-        MessageBox( g_hWndMain,
-            L"ZoomIt could not capture any video from the display, so recording was cancelled.\n\n"
-            L"Screen recording uses Windows Graphics Capture, which needs a GPU-backed (WDDM) display. "
-            L"This is often unavailable on virtual machines, cloud PCs, or remote sessions that lack a virtual GPU.",
-            APPNAME, MB_OK | MB_ICONWARNING );
-        break;
-
     case WM_USER_SAVE_CURSOR:
         if( g_Zoomed == TRUE )
         {
@@ -10791,10 +10746,8 @@ LRESULT APIENTRY MainWndProc(
         }
         if (g_MirrorToggleKey)
         {
-            UINT mirrorCropMod = g_MirrorToggleMod ^ MOD_SHIFT;
             UINT mirrorWindowMod = g_MirrorToggleMod ^ MOD_ALT;
             if (!RegisterHotKey(hWnd, MIRROR_HOTKEY, g_MirrorToggleMod | MOD_NOREPEAT, g_MirrorToggleKey & 0xFF) ||
-                (mirrorCropMod != 0 && !RegisterHotKey(hWnd, MIRROR_CROP_HOTKEY, mirrorCropMod | MOD_NOREPEAT, g_MirrorToggleKey & 0xFF)) ||
                 (mirrorWindowMod != 0 && !RegisterHotKey(hWnd, MIRROR_WINDOW_HOTKEY, mirrorWindowMod | MOD_NOREPEAT, g_MirrorToggleKey & 0xFF)))
             {
                 if(!g_StartedByPowerToys)
@@ -10931,21 +10884,14 @@ LRESULT APIENTRY MainWndProc(
             saveDialog->SetFileName( suggestedName.c_str() );
             saveDialog->SetTitle( L"ZoomIt: Save Zoomed Screen..." );
 
-            // Set default folder to the configured/last save location if available.
-            // The stored value may be a directory (a user-configured default folder)
-            // or a full file path (the last saved screenshot); handle both.
+            // Set default folder to the last save location if available
             if( !g_ScreenshotSaveLocation.empty() )
             {
                 std::filesystem::path lastPath( g_ScreenshotSaveLocation );
-                std::error_code ec;
-                std::filesystem::path folderPath =
-                    std::filesystem::is_directory( lastPath, ec )
-                        ? lastPath
-                        : lastPath.parent_path();
-                if( !folderPath.empty() )
+                if( lastPath.has_parent_path() )
                 {
                     wil::com_ptr<IShellItem> folderItem;
-                    if( SUCCEEDED( SHCreateItemFromParsingName( folderPath.c_str(),
+                    if( SUCCEEDED( SHCreateItemFromParsingName( lastPath.parent_path().c_str(),
                         nullptr, IID_PPV_ARGS( &folderItem ) ) ) )
                     {
                         saveDialog->SetFolder( folderItem.get() );
@@ -11043,49 +10989,6 @@ LRESULT APIENTRY MainWndProc(
                 g_ScreenshotSaveLocation = targetFilePath;
                 wcsncpy_s(g_ScreenshotSaveLocationBuffer, g_ScreenshotSaveLocation.c_str(), _TRUNCATE);
                 reg.WriteRegSettings(RegSettings);
-
-                // When enabled, also place the captured (actual-size) image on the
-                // clipboard so the snip is immediately available to paste. CF_BITMAP
-                // takes ownership of the handle, so hand it a dedicated copy.
-                if( g_SnipCopyToClipboard )
-                {
-                    wil::unique_hdc hdcClipboard( CreateCompatibleDC( hdcScreen ) );
-                    HBITMAP hbmClipboard =
-                        CreateCompatibleBitmap( hdcScreen, saveWidth, saveHeight );
-                    if( hdcClipboard && hbmClipboard )
-                    {
-                        HGDIOBJ hOldClip = SelectObject( hdcClipboard.get(), hbmClipboard );
-                        BitBlt( hdcClipboard.get(),
-                                0, 0,
-                                saveWidth, saveHeight,
-                                hdcActualSize.get(),
-                                0, 0,
-                                SRCCOPY );
-                        SelectObject( hdcClipboard.get(), hOldClip );
-
-                        bool ownershipTransferred = false;
-                        if( OpenClipboard( hWnd ) )
-                        {
-                            EmptyClipboard();
-                            // SetClipboardData only transfers ownership on success;
-                            // on failure the handle is still ours and must be freed.
-                            if( SetClipboardData( CF_BITMAP, hbmClipboard ) != nullptr )
-                            {
-                                ownershipTransferred = true;
-                            }
-                            CloseClipboard();
-                        }
-
-                        if( !ownershipTransferred )
-                        {
-                            DeleteObject( hbmClipboard );
-                        }
-                    }
-                    else if( hbmClipboard )
-                    {
-                        DeleteObject( hbmClipboard );
-                    }
-                }
             }
             g_bSaveInProgress = false;
 
