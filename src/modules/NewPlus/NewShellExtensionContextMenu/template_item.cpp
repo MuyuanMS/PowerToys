@@ -19,10 +19,28 @@ namespace
     class background_worker_lifetime_guard
     {
     public:
+        explicit background_worker_lifetime_guard(HMODULE module_reference) :
+            m_module_reference(module_reference)
+        {
+        }
+
         ~background_worker_lifetime_guard()
         {
-            decrement_background_worker_count();
+            if (m_module_reference != nullptr)
+            {
+                release_background_worker_module_reference(m_module_reference);
+            }
         }
+
+        [[noreturn]] void release_and_exit_thread()
+        {
+            const HMODULE module_reference = m_module_reference;
+            m_module_reference = nullptr;
+            release_background_worker_module_reference_and_exit_thread(module_reference);
+        }
+
+    private:
+        HMODULE m_module_reference;
     };
 
     class com_initialize_guard
@@ -45,10 +63,9 @@ namespace
         HRESULT m_result;
     };
 
-    bool process_directory_notifications_for_target_rename(const BYTE* buffer, DWORD bytes_returned, const std::wstring& original_folder_name, const std::filesystem::path& parent_dir, std::filesystem::path& final_path)
+    bool process_directory_notifications_for_target_rename(const BYTE* buffer, DWORD bytes_returned, const std::wstring& original_folder_name, const std::filesystem::path& parent_dir, std::filesystem::path& final_path, bool& found_old_name)
     {
         const BYTE* ptr = buffer;
-        bool found_old_name = false;
         while (ptr < buffer + bytes_returned)
         {
             const auto* info = reinterpret_cast<const FILE_NOTIFY_INFORMATION*>(ptr);
@@ -56,7 +73,10 @@ namespace
             if (info->Action == FILE_ACTION_RENAMED_OLD_NAME)
             {
                 const std::wstring old_name(info->FileName, info->FileNameLength / sizeof(WCHAR));
-                found_old_name = (StrCmpIW(old_name.c_str(), original_folder_name.c_str()) == 0);
+                if (StrCmpIW(old_name.c_str(), original_folder_name.c_str()) == 0)
+                {
+                    found_old_name = true;
+                }
             }
             else if (info->Action == FILE_ACTION_RENAMED_NEW_NAME && found_old_name)
             {
@@ -278,37 +298,42 @@ void template_item::refresh_target(const std::filesystem::path target_final_full
 
 void template_item::enter_rename_mode(const std::filesystem::path target_fullpath) const
 {
-    increment_background_worker_count();
+    auto target_fullpath_copy = std::make_unique<std::filesystem::path>(target_fullpath);
+    const HMODULE module_reference = acquire_background_worker_module_reference();
     try
     {
-        std::thread thread_for_renaming_workaround(rename_on_other_thread_workaround, target_fullpath);
+        std::thread thread_for_renaming_workaround(rename_on_other_thread_workaround, target_fullpath_copy.get(), module_reference);
+        target_fullpath_copy.release();
         thread_for_renaming_workaround.detach();
     }
     catch (...)
     {
-        decrement_background_worker_count();
+        release_background_worker_module_reference(module_reference);
         throw;
     }
 }
 
 void template_item::enter_rename_mode_and_resolve_variables(const std::filesystem::path target_fullpath) const
 {
-    increment_background_worker_count();
+    auto target_fullpath_copy = std::make_unique<std::filesystem::path>(target_fullpath);
+    const HMODULE module_reference = acquire_background_worker_module_reference();
     try
     {
-        std::thread thread(rename_and_resolve_variables_on_other_thread, target_fullpath);
+        std::thread thread(rename_and_resolve_variables_on_other_thread, target_fullpath_copy.get(), module_reference);
+        target_fullpath_copy.release();
         thread.detach();
     }
     catch (...)
     {
-        decrement_background_worker_count();
+        release_background_worker_module_reference(module_reference);
         throw;
     }
 }
 
-void template_item::rename_on_other_thread_workaround(const std::filesystem::path target_fullpath)
+void template_item::rename_on_other_thread_workaround(std::filesystem::path* target_fullpath, HMODULE module_reference)
 {
-    background_worker_lifetime_guard worker_guard;
+    background_worker_lifetime_guard worker_guard(module_reference);
+    std::unique_ptr<std::filesystem::path> target_fullpath_ptr(target_fullpath);
 
     try
     {
@@ -317,17 +342,21 @@ void template_item::rename_on_other_thread_workaround(const std::filesystem::pat
         const std::chrono::milliseconds approx_wait_for_icon_redraw_not_needed{ 50 };
         std::this_thread::sleep_for(std::chrono::milliseconds(approx_wait_for_icon_redraw_not_needed));
 
-        newplus::utilities::explorer_enter_rename_mode(target_fullpath);
+        newplus::utilities::explorer_enter_rename_mode(*target_fullpath_ptr);
     }
     catch (const std::exception& ex)
     {
         Logger::error(ex.what());
     }
+
+    target_fullpath_ptr.reset();
+    worker_guard.release_and_exit_thread();
 }
 
-void template_item::rename_and_resolve_variables_on_other_thread(const std::filesystem::path target_fullpath)
+void template_item::rename_and_resolve_variables_on_other_thread(std::filesystem::path* target_fullpath, HMODULE module_reference)
 {
-    background_worker_lifetime_guard worker_guard;
+    background_worker_lifetime_guard worker_guard(module_reference);
+    std::unique_ptr<std::filesystem::path> target_fullpath_ptr(target_fullpath);
 
     try
     {
@@ -338,11 +367,12 @@ void template_item::rename_and_resolve_variables_on_other_thread(const std::file
         const std::chrono::milliseconds icon_redraw_delay_ms{ 50 };
         std::this_thread::sleep_for(icon_redraw_delay_ms);
 
-        const std::filesystem::path parent_dir = target_fullpath.parent_path();
-        const std::wstring original_folder_name = target_fullpath.filename().wstring();
+        const std::filesystem::path parent_dir = target_fullpath_ptr->parent_path();
+        const std::wstring original_folder_name = target_fullpath_ptr->filename().wstring();
 
         // Default to the original path in case the rename is cancelled or we cannot monitor it
-        std::filesystem::path final_path = target_fullpath;
+        std::filesystem::path final_path = *target_fullpath_ptr;
+        bool should_resolve_variables = true;
 
         // Track whether we have already entered rename mode so we enter it exactly once
         bool entered_rename_mode = false;
@@ -380,7 +410,7 @@ void template_item::rename_and_resolve_variables_on_other_thread(const std::file
                 if (read_pending)
                 {
                     // Enter rename mode so the user can give the folder its final name.
-                    const HWND list_view_window = newplus::utilities::explorer_enter_rename_mode_and_get_list_view_window(target_fullpath);
+                    const HWND list_view_window = newplus::utilities::explorer_enter_rename_mode_and_get_list_view_window(*target_fullpath_ptr);
                     entered_rename_mode = true;
                     if (list_view_window == nullptr)
                     {
@@ -390,53 +420,67 @@ void template_item::rename_and_resolve_variables_on_other_thread(const std::file
                     bool saw_rename_edit_control = false;
                     const auto monitoring_started = std::chrono::steady_clock::now();
                     bool keep_monitoring = true;
+                    bool found_old_name = false;
+
+                    const auto consume_completed_notification = [&]() -> bool {
+                        DWORD bytes_returned = 0;
+                        if (!GetOverlappedResult(dir_handle, &overlapped, &bytes_returned, FALSE))
+                        {
+                            Logger::error(L"GetOverlappedResult failed while monitoring New+ folder rename");
+                            Logger::error(std::system_category().message(GetLastError()));
+                            read_pending = false;
+                            keep_monitoring = false;
+                            return false;
+                        }
+
+                        read_pending = false;
+
+                        if (bytes_returned > 0 && process_directory_notifications_for_target_rename(buffer.data(), bytes_returned, original_folder_name, parent_dir, final_path, found_old_name))
+                        {
+                            keep_monitoring = false;
+                            return true;
+                        }
+
+                        ResetEvent(overlapped.hEvent);
+                        read_pending = ReadDirectoryChangesW(
+                            dir_handle,
+                            buffer.data(),
+                            static_cast<DWORD>(buffer.size()),
+                            FALSE,
+                            FILE_NOTIFY_CHANGE_DIR_NAME,
+                            nullptr,
+                            &overlapped,
+                            nullptr) != FALSE;
+
+                        if (!read_pending)
+                        {
+                            Logger::error(L"ReadDirectoryChangesW rearm failed while monitoring New+ folder rename");
+                            Logger::error(std::system_category().message(GetLastError()));
+                            keep_monitoring = false;
+                        }
+
+                        return false;
+                    };
 
                     while (keep_monitoring)
                     {
                         const DWORD wait_result = WaitForSingleObject(overlapped.hEvent, rename_monitoring_poll_interval_ms);
                         if (wait_result == WAIT_OBJECT_0)
                         {
-                            DWORD bytes_returned = 0;
-                            if (!GetOverlappedResult(dir_handle, &overlapped, &bytes_returned, FALSE))
+                            if (consume_completed_notification())
                             {
-                                Logger::error(L"GetOverlappedResult failed while monitoring New+ folder rename");
-                                Logger::error(std::system_category().message(GetLastError()));
-                                read_pending = false;
-                                break;
-                            }
-
-                            read_pending = false;
-
-                            if (bytes_returned > 0 && process_directory_notifications_for_target_rename(buffer.data(), bytes_returned, original_folder_name, parent_dir, final_path))
-                            {
-                                keep_monitoring = false;
-                                break;
-                            }
-
-                            read_pending = ReadDirectoryChangesW(
-                                dir_handle,
-                                buffer.data(),
-                                static_cast<DWORD>(buffer.size()),
-                                FALSE,
-                                FILE_NOTIFY_CHANGE_DIR_NAME,
-                                nullptr,
-                                &overlapped,
-                                nullptr) != FALSE;
-
-                            if (read_pending)
-                            {
-                                ResetEvent(overlapped.hEvent);
-                            }
-                            else
-                            {
-                                Logger::error(L"ReadDirectoryChangesW rearm failed while monitoring New+ folder rename");
-                                Logger::error(std::system_category().message(GetLastError()));
                                 break;
                             }
                         }
                         else if (wait_result == WAIT_TIMEOUT)
                         {
-                            if (is_rename_mode_active(list_view_window))
+                            bool should_stop_monitoring = false;
+
+                            if (list_view_window == nullptr)
+                            {
+                                should_stop_monitoring = std::chrono::steady_clock::now() - monitoring_started >= rename_mode_startup_timeout;
+                            }
+                            else if (is_rename_mode_active(list_view_window))
                             {
                                 saw_rename_edit_control = true;
                             }
@@ -444,12 +488,27 @@ void template_item::rename_and_resolve_variables_on_other_thread(const std::file
                             {
                                 // Rename mode ended (commit/cancel) or failed to enter; either way,
                                 // stop monitoring and fall back to the current final_path value.
-                                keep_monitoring = false;
+                                should_stop_monitoring = true;
                             }
                             else if (std::chrono::steady_clock::now() - monitoring_started >= rename_mode_startup_timeout)
                             {
                                 // Rename mode did not appear in time, so stop monitoring and fall
                                 // back to the current final_path value.
+                                should_stop_monitoring = true;
+                            }
+
+                            if (should_stop_monitoring)
+                            {
+                                if (read_pending && WaitForSingleObject(overlapped.hEvent, 0) == WAIT_OBJECT_0)
+                                {
+                                    if (consume_completed_notification())
+                                    {
+                                        break;
+                                    }
+
+                                    continue;
+                                }
+
                                 keep_monitoring = false;
                             }
                         }
@@ -484,29 +543,36 @@ void template_item::rename_and_resolve_variables_on_other_thread(const std::file
         if (!entered_rename_mode)
         {
             // Monitoring could not be set up; fall back to plain rename mode
-            newplus::utilities::explorer_enter_rename_mode(target_fullpath);
+            newplus::utilities::explorer_enter_rename_mode(*target_fullpath_ptr);
+            should_resolve_variables = false;
         }
 
-        // Resolve variables in the folder's contents using the final (user-provided) folder name.
-        // If rename was cancelled or not observed, final_path remains target_fullpath.
-        newplus::helpers::variables::resolve_variables_in_filename_and_rename_files(final_path);
+        if (should_resolve_variables)
+        {
+            // Resolve variables in the folder's contents using the final (user-provided) folder name.
+            // If rename was cancelled or not observed, final_path remains target_fullpath.
+            newplus::helpers::variables::resolve_variables_in_filename_and_rename_files(final_path);
+        }
 
     }
     catch (const std::filesystem::filesystem_error& ex)
     {
         Logger::error(L"Filesystem exception while monitoring rename");
-        Logger::error(target_fullpath.wstring().c_str());
+        Logger::error(target_fullpath_ptr->wstring().c_str());
         Logger::error(ex.what());
     }
     catch (const std::exception& ex)
     {
         Logger::error(L"Exception while monitoring rename");
-        Logger::error(target_fullpath.wstring().c_str());
+        Logger::error(target_fullpath_ptr->wstring().c_str());
         Logger::error(ex.what());
     }
     catch (...)
     {
         Logger::error(L"Unhandled exception while monitoring rename");
-        Logger::error(target_fullpath.wstring().c_str());
+        Logger::error(target_fullpath_ptr->wstring().c_str());
     }
+
+    target_fullpath_ptr.reset();
+    worker_guard.release_and_exit_thread();
 }

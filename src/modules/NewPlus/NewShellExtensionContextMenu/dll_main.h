@@ -5,5 +5,6 @@
 extern HMODULE module_instance_handle;
 extern Shared::Trace::ETWTrace trace;
 
-void increment_background_worker_count();
-void decrement_background_worker_count();
+HMODULE acquire_background_worker_module_reference();
+void release_background_worker_module_reference(HMODULE module_reference);
+[[noreturn]] void release_background_worker_module_reference_and_exit_thread(HMODULE module_reference);

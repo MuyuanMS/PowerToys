@@ -6,6 +6,7 @@
 
 #include <common/Telemetry/EtwTrace/EtwTrace.h>
 #include <atomic>
+#include <stdexcept>
 
 HMODULE module_instance_handle = 0;
 Shared::Trace::ETWTrace trace(L"NewPlusShellExtension");
@@ -57,12 +58,29 @@ STDAPI DllGetClassObject(_In_ REFCLSID rclsid, _In_ REFIID riid, _Outptr_ LPVOID
 
 CoCreatableClass(shell_context_menu)
 
-void increment_background_worker_count()
+HMODULE acquire_background_worker_module_reference()
 {
+    HMODULE module_reference = nullptr;
+    if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, reinterpret_cast<LPCWSTR>(&module_instance_handle), &module_reference) == FALSE)
+    {
+        throw std::runtime_error("Failed to acquire New+ shell extension module reference");
+    }
+
     active_background_workers.fetch_add(1, std::memory_order_acq_rel);
+    return module_reference;
 }
 
-void decrement_background_worker_count()
+void release_background_worker_module_reference(HMODULE module_reference)
 {
     active_background_workers.fetch_sub(1, std::memory_order_acq_rel);
+    if (module_reference != nullptr)
+    {
+        FreeLibrary(module_reference);
+    }
+}
+
+[[noreturn]] void release_background_worker_module_reference_and_exit_thread(HMODULE module_reference)
+{
+    active_background_workers.fetch_sub(1, std::memory_order_acq_rel);
+    FreeLibraryAndExitThread(module_reference, 0);
 }

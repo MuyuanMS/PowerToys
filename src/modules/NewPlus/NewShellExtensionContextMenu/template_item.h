@@ -34,9 +34,9 @@ namespace newplus
         std::filesystem::path path;
 
     private:
-        static void rename_on_other_thread_workaround(const std::filesystem::path target_fullpath);
+        static void rename_on_other_thread_workaround(std::filesystem::path* target_fullpath, HMODULE module_reference);
 
-        static void rename_and_resolve_variables_on_other_thread(const std::filesystem::path target_fullpath);
+        static void rename_and_resolve_variables_on_other_thread(std::filesystem::path* target_fullpath, HMODULE module_reference);
 
         std::wstring remove_starting_digits_from_filename(std::wstring filename) const;
     };
