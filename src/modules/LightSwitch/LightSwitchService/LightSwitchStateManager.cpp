@@ -121,10 +121,10 @@ void LightSwitchStateManager::SyncInitialThemeState()
     EvaluateAndApplyIfNeeded();
 }
 
-static std::pair<int, int> update_sun_times(auto& settings)
+static std::optional<std::pair<int, int>> update_sun_times(auto& settings)
 {
-    int newLightTime = 0;
-    int newDarkTime = 0;
+    int newLightTime;
+    int newDarkTime;
 
     try
     {
@@ -144,7 +144,7 @@ static std::pair<int, int> update_sun_times(auto& settings)
         std::string msg = e.what();
         std::wstring wmsg(msg.begin(), msg.end());
         Logger::error(L"[LightSwitchService] Failed to parse coordinates for sun time calculation: {}", wmsg);
-        return { 0, 0 };
+        return std::nullopt;
     }
 
     try
@@ -167,7 +167,7 @@ static std::pair<int, int> update_sun_times(auto& settings)
         Logger::error(L"[LightSwitchService] Unknown exception during sun time save.");
     }
 
-    return { newLightTime, newDarkTime };
+    return std::make_pair(newLightTime, newDarkTime);
 }
 
 // Internal: decide what should happen now
@@ -197,10 +197,17 @@ void LightSwitchStateManager::EvaluateAndApplyIfNeeded()
 
         if (newDay || modeChangedToSun)
         {
-            auto [newLightTime, newDarkTime] = update_sun_times(_currentSettings);
-            _state.lastEvaluatedDay = st.wDay;
-            _state.effectiveLightMinutes = newLightTime + _currentSettings.sunrise_offset;
-            _state.effectiveDarkMinutes = newDarkTime + _currentSettings.sunset_offset;
+            if (auto newTimes = update_sun_times(_currentSettings))
+            {
+                _state.lastEvaluatedDay = st.wDay;
+                _state.effectiveLightMinutes = newTimes->first + _currentSettings.sunrise_offset;
+                _state.effectiveDarkMinutes = newTimes->second + _currentSettings.sunset_offset;
+            }
+            else
+            {
+                _state.effectiveLightMinutes = _currentSettings.lightTime + _currentSettings.sunrise_offset;
+                _state.effectiveDarkMinutes = _currentSettings.darkTime + _currentSettings.sunset_offset;
+            }
         }
         else
         {
