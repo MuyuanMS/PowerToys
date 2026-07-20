@@ -184,6 +184,8 @@ public class BasicTests : CommandPaletteTestBase
     {
         return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Microsoft",
+            "PowerToys",
             "Microsoft.CmdPal",
             "settings.json");
     }
