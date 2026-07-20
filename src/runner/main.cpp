@@ -340,6 +340,7 @@ int runner(bool isProcessElevated, bool openSettings, std::string settingsWindow
     catch (std::runtime_error& err)
     {
         std::string err_what = err.what();
+        write_crash_marker_message("[PowerToys Runner] CRASH: runner caught std::runtime_error.\n");
         Logger::critical("Runner failed with a std::runtime_error: {}", err_what);
         Logger::flush();
         MessageBoxW(nullptr, std::wstring(err_what.begin(), err_what.end()).c_str(), GET_RESOURCE_STRING(IDS_ERROR).c_str(), MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
@@ -347,12 +348,14 @@ int runner(bool isProcessElevated, bool openSettings, std::string settingsWindow
     }
     catch (std::exception& err)
     {
+        write_crash_marker_message("[PowerToys Runner] CRASH: runner caught std::exception.\n");
         Logger::critical("Runner failed with an exception: {}", err.what());
         Logger::flush();
         throw;
     }
     catch (...)
     {
+        write_crash_marker_message("[PowerToys Runner] CRASH: runner caught unknown exception.\n");
         Logger::critical(L"Runner failed with an unknown exception.");
         Logger::flush();
         throw;
@@ -641,6 +644,7 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
     catch (std::runtime_error& err)
     {
         std::string err_what = err.what();
+        write_crash_marker_message("[PowerToys Runner] CRASH: WinMain caught std::runtime_error.\n");
         Logger::critical("WinMain failed with a std::runtime_error: {}", err_what);
         Logger::flush();
         MessageBoxW(nullptr, std::wstring(err_what.begin(), err_what.end()).c_str(), GET_RESOURCE_STRING(IDS_ERROR).c_str(), MB_OK | MB_ICONERROR);
@@ -648,12 +652,14 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
     }
     catch (std::exception& err)
     {
+        write_crash_marker_message("[PowerToys Runner] CRASH: WinMain caught std::exception.\n");
         Logger::critical("WinMain failed with an exception: {}", err.what());
         Logger::flush();
         std::terminate();
     }
     catch (...)
     {
+        write_crash_marker_message("[PowerToys Runner] CRASH: WinMain caught unknown exception.\n");
         Logger::critical(L"WinMain failed with an unknown exception.");
         Logger::flush();
         std::terminate();
