@@ -54,6 +54,13 @@ private:
     // StopLowlevelKeyboardHook are called from different threads.
     mutable std::mutex hookLifecycleMutex;
 
+    // Real handle to the thread that installed the WH_KEYBOARD_LL hook (obtained via
+    // DuplicateHandle so it remains valid even when called from another thread).
+    // Used to restore the hook thread's scheduling priority from any thread.
+    HANDLE hookThreadHandle = nullptr;
+
+    int hookThreadPriorityBeforeElevation = THREAD_PRIORITY_NORMAL;
+
     // Hook procedure definition
     static LRESULT CALLBACK HookProc(int nCode, WPARAM wParam, LPARAM lParam);
 
