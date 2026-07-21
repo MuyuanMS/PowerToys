@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
@@ -104,15 +105,36 @@ namespace ThreeMfThumbnailProviderUnitTests
         [TestMethod]
         public void GetThumbnailUsesConfiguredFallbackColorForMeshRendering()
         {
-            // The configured material color feeds the mesh render path; ensure resolving it does not
-            // throw and a thumbnail is still produced when only mesh data is available.
+            // The configured material color feeds the mesh render path. Verify resolving it does not
+            // throw and that the mesh is actually rendered with an opaque material (the exporter uses a
+            // transparent background, so any non-transparent pixel must come from the colored geometry).
             using var stream = CreateMeshOnlyThreeMf();
 
             var color = ThreeMfThumbnailProvider.DefaultMaterialColor;
-            Bitmap thumbnail = ThreeMfThumbnailProvider.GetThumbnail(stream, 256);
+            using Bitmap thumbnail = ThreeMfThumbnailProvider.GetThumbnail(stream, 256);
 
-            Assert.IsTrue(color.A > 0);
+            Assert.IsTrue(color.A > 0, "The configured material color must be opaque.");
             Assert.IsNotNull(thumbnail);
+            Assert.IsTrue(HasOpaquePixel(thumbnail), "Rendered mesh thumbnail should contain colored (non-transparent) geometry pixels.");
+        }
+
+        private static bool HasOpaquePixel(Bitmap bitmap)
+        {
+            // Sample a coarse grid to keep the test fast while still covering the rendered geometry.
+            int stepX = Math.Max(1, bitmap.Width / 64);
+            int stepY = Math.Max(1, bitmap.Height / 64);
+            for (int y = 0; y < bitmap.Height; y += stepY)
+            {
+                for (int x = 0; x < bitmap.Width; x += stepX)
+                {
+                    if (bitmap.GetPixel(x, y).A > 0)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         private static MemoryStream CreateMeshOnlyThreeMf()

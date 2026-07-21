@@ -22,7 +22,19 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
         private const long MaxUncompressedModelBytes = 128L * 1024 * 1024; // 128 MB
         private const int MaxThumbnailDimension = 10000;
         private const int MaxTotalTriangles = 2_000_000;
+        private const int MaxTotalVertices = 4_000_000;
         private const int MaxComponentDepth = 16;
+
+        // Mutable budgets shared across the whole package so a single 3MF cannot exhaust memory/CPU
+        // through large vertex lists, triangle counts, or repeated component references.
+        private sealed class GeometryBudget
+        {
+            public int Triangles { get; set; }
+
+            public int Vertices { get; set; }
+
+            public bool Exhausted => Triangles <= 0 || Vertices <= 0;
+        }
 
         public static System.Drawing.Bitmap TryLoadEmbeddedThumbnail(Stream stream, uint maxSize)
         {
@@ -99,7 +111,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 var modelGroup = new Model3DGroup();
                 var material = new DiffuseMaterial(new SolidColorBrush(materialColor));
 
-                var triangleBudget = MaxTotalTriangles;
+                var triangleBudget = new GeometryBudget { Triangles = MaxTotalTriangles, Vertices = MaxTotalVertices };
 
                 foreach (var modelEntry in modelEntries)
                 {
@@ -110,9 +122,9 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
                     using var modelStream = modelEntry.Open();
                     var document = LoadXmlSafe(modelStream);
-                    AppendModelMeshes(document, modelGroup, material, ref triangleBudget);
+                    AppendModelMeshes(document, modelGroup, material, triangleBudget);
 
-                    if (triangleBudget <= 0)
+                    if (triangleBudget.Exhausted)
                     {
                         break;
                     }
@@ -264,7 +276,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             return targets;
         }
 
-        private static void AppendModelMeshes(XDocument document, Model3DGroup modelGroup, Material material, ref int triangleBudget)
+        private static void AppendModelMeshes(XDocument document, Model3DGroup modelGroup, Material material, GeometryBudget budget)
         {
             // Index every object by id so build items and <components> references can be resolved,
             // including objects that are composed purely from other objects.
@@ -278,16 +290,23 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 }
             }
 
-            var buildItems = document.Descendants().Where(element => element.Name.LocalName == "item").ToList();
+            // Only core-namespace <item> children of the <build> element are build items; ignore
+            // <item> elements introduced by unrelated extension namespaces.
+            var buildElement = document.Root?.Elements().FirstOrDefault(element => element.Name.LocalName == "build");
+            var buildItems = buildElement?
+                .Elements()
+                .Where(element => element.Name.LocalName == "item" && element.Name.Namespace == buildElement.Name.Namespace)
+                .ToList() ?? new List<XElement>();
+
             if (buildItems.Count > 0)
             {
                 foreach (var buildItem in buildItems)
                 {
                     var objectId = buildItem.Attribute("objectid")?.Value;
                     var transform = ParseTransform(buildItem.Attribute("transform")?.Value) ?? Matrix3D.Identity;
-                    ResolveObject(objectId, transform, objectsById, modelGroup, material, new HashSet<string>(StringComparer.Ordinal), 0, ref triangleBudget);
+                    ResolveObject(objectId, transform, objectsById, modelGroup, material, new HashSet<string>(StringComparer.Ordinal), 0, budget);
 
-                    if (triangleBudget <= 0)
+                    if (budget.Exhausted)
                     {
                         break;
                     }
@@ -298,9 +317,9 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 // No build section: render every object that directly contains a mesh.
                 foreach (var objectId in objectsById.Keys)
                 {
-                    ResolveObject(objectId, Matrix3D.Identity, objectsById, modelGroup, material, new HashSet<string>(StringComparer.Ordinal), 0, ref triangleBudget);
+                    ResolveObject(objectId, Matrix3D.Identity, objectsById, modelGroup, material, new HashSet<string>(StringComparer.Ordinal), 0, budget);
 
-                    if (triangleBudget <= 0)
+                    if (budget.Exhausted)
                     {
                         break;
                     }
@@ -316,9 +335,9 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             Material material,
             HashSet<string> visiting,
             int depth,
-            ref int triangleBudget)
+            GeometryBudget budget)
         {
-            if (depth > MaxComponentDepth || triangleBudget <= 0)
+            if (depth > MaxComponentDepth || budget.Exhausted)
             {
                 return;
             }
@@ -339,7 +358,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 var meshElement = objectElement.Elements().FirstOrDefault(element => element.Name.LocalName == "mesh");
                 if (meshElement != null)
                 {
-                    var geometry = CreateMeshGeometry(meshElement, ref triangleBudget);
+                    var geometry = CreateMeshGeometry(meshElement, budget);
                     if (geometry.TriangleIndices.Count > 0)
                     {
                         var transformedGeometry = transform.IsIdentity ? geometry : ApplyTransform(geometry, transform);
@@ -349,7 +368,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
                 foreach (var component in objectElement.Descendants().Where(element => element.Name.LocalName == "component"))
                 {
-                    if (triangleBudget <= 0)
+                    if (budget.Exhausted)
                     {
                         break;
                     }
@@ -359,7 +378,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
                     // Component transform is applied first, then the parent transform (row-vector convention).
                     var combined = childTransform.HasValue ? childTransform.Value * transform : transform;
-                    ResolveObject(childId, combined, objectsById, modelGroup, material, visiting, depth + 1, ref triangleBudget);
+                    ResolveObject(childId, combined, objectsById, modelGroup, material, visiting, depth + 1, budget);
                 }
             }
             finally
@@ -368,22 +387,31 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             }
         }
 
-        private static MeshGeometry3D CreateMeshGeometry(XElement meshElement, ref int triangleBudget)
+        private static MeshGeometry3D CreateMeshGeometry(XElement meshElement, GeometryBudget budget)
         {
-            var vertices = meshElement.Descendants()
-                .Where(element => element.Name.LocalName == "vertex")
-                .Select(element => new Point3D(
+            // Materialize vertices under the shared vertex budget so a mesh with a huge vertex list
+            // (even with few/no triangles) cannot cause an unbounded allocation.
+            var vertices = new List<Point3D>();
+            foreach (var element in meshElement.Descendants().Where(e => e.Name.LocalName == "vertex"))
+            {
+                if (budget.Vertices <= 0)
+                {
+                    break;
+                }
+
+                budget.Vertices--;
+                vertices.Add(new Point3D(
                     ParseDouble(element.Attribute("x")?.Value),
                     ParseDouble(element.Attribute("y")?.Value),
-                    ParseDouble(element.Attribute("z")?.Value)))
-                .ToList();
+                    ParseDouble(element.Attribute("z")?.Value)));
+            }
 
             var positions = new Point3DCollection();
             var triangleIndices = new Int32Collection();
 
             foreach (var triangle in meshElement.Descendants().Where(element => element.Name.LocalName == "triangle"))
             {
-                if (triangleBudget <= 0)
+                if (budget.Triangles <= 0)
                 {
                     break;
                 }
@@ -398,7 +426,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                     continue;
                 }
 
-                triangleBudget--;
+                budget.Triangles--;
 
                 triangleIndices.Add(positions.Count);
                 positions.Add(vertices[v1]);
