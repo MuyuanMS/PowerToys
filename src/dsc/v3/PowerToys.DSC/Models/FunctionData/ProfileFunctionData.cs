@@ -64,7 +64,19 @@ public sealed class ProfileFunctionData : BaseFunctionData
     public ProfileFunctionData(string? input = null)
     {
         Output = new();
-        Input = string.IsNullOrEmpty(input) ? new() : JsonSerializer.Deserialize<ProfileResourceObject>(input, _inputDeserializerOptions) ?? new();
+
+        if (string.IsNullOrEmpty(input))
+        {
+            Input = new();
+        }
+        else
+        {
+            // A literal `null` document deserializes to a null object; treat it
+            // as invalid rather than defaulting to an empty profile, which would
+            // otherwise let `set --input null` silently clear every remapping.
+            Input = JsonSerializer.Deserialize<ProfileResourceObject>(input, _inputDeserializerOptions)
+                ?? throw new JsonException("The input document must not be null.");
+        }
     }
 
     /// <summary>
