@@ -256,29 +256,67 @@ public sealed class ProfileFunctionData : BaseFunctionData
     private static string EnsureActiveConfigurationAndGetFileName()
     {
         KeyboardManagerSettings settings;
+        var settingsExist = _settingsUtils.SettingsExists(KeyboardManagerSettings.ModuleName);
 
         try
         {
-            settings = _settingsUtils.SettingsExists(KeyboardManagerSettings.ModuleName)
+            settings = settingsExist
                 ? _settingsUtils.GetSettings<KeyboardManagerSettings>(KeyboardManagerSettings.ModuleName)
                 : new KeyboardManagerSettings();
         }
         catch (Exception)
         {
+            // Treat an unreadable settings file as missing so we write a valid
+            // one below rather than leaving the engine unable to load.
             settings = new KeyboardManagerSettings();
+            settingsExist = false;
         }
 
         settings.Properties ??= new KeyboardManagerProperties();
 
         var activeConfiguration = settings.Properties.ActiveConfiguration?.Value;
+        var normalized = false;
         if (string.IsNullOrEmpty(activeConfiguration))
         {
             activeConfiguration = "default";
             settings.Properties.ActiveConfiguration = new GenericProperty<string>(activeConfiguration);
+            normalized = true;
         }
 
-        _settingsUtils.SaveSettings(settings.ToJsonString(), KeyboardManagerSettings.ModuleName);
+        // Persist when the settings file is missing (so the engine can resolve
+        // the active configuration at all) or when we normalized an empty value
+        // (so it loads the same profile we write). SaveSettings swallows IO
+        // failures and returns void, so verify the write actually landed.
+        if (!settingsExist || normalized)
+        {
+            var settingsJson = settings.ToJsonString();
+            _settingsUtils.SaveSettings(settingsJson, KeyboardManagerSettings.ModuleName);
+            if (!SettingsWriteSucceeded(settingsJson))
+            {
+                throw new IOException("Failed to persist the Keyboard Manager active configuration.");
+            }
+        }
+
         return $"{activeConfiguration}.json";
+    }
+
+    /// <summary>
+    /// Verifies that the module settings file on disk matches the content that
+    /// was just written, compensating for the exception-swallowing write API.
+    /// </summary>
+    /// <param name="expectedJson">The JSON that was written.</param>
+    /// <returns>True if the file matches the expected content; otherwise false.</returns>
+    private static bool SettingsWriteSucceeded(string expectedJson)
+    {
+        try
+        {
+            var path = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName);
+            return File.Exists(path) && File.ReadAllText(path) == expectedJson;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     /// <summary>
