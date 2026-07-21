@@ -852,16 +852,13 @@ namespace PowerLauncher
                 string fileName = isOpening ? "open.wav" : "close.wav";
                 string soundPath = Path.Combine(AppContext.BaseDirectory, "Sounds", fileName);
 
-                Log.Info($"Attempting to play sound: {soundPath}, Exists: {File.Exists(soundPath)}", GetType());
-
                 if (File.Exists(soundPath))
                 {
                     PlaySound(soundPath, IntPtr.Zero, SndFilename | SndAsync);
-                    Log.Info($"Playing sound: {soundPath}", GetType());
                 }
                 else
                 {
-                    Log.Info($"Sound file not found: {soundPath}", GetType());
+                    Log.Warn($"Audible feedback sound file not found: {soundPath}", GetType());
                 }
             }
             catch (Exception ex)

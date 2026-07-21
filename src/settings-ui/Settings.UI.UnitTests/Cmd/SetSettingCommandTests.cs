@@ -50,7 +50,7 @@ public class SetSettingCommandTests
     [DataRow(typeof(PowerLauncherSettings), nameof(PowerLauncherProperties.MaximumNumberOfResults), "322")]
     [DataRow(typeof(PowerLauncherSettings), nameof(PowerLauncherProperties.EnableAudibleFeedback), "true")]
     [DataRow(typeof(PowerLauncherSettings), nameof(PowerLauncherProperties.EnableOpeningSound), "true")]
-    [DataRow(typeof(PowerLauncherSettings), nameof(PowerLauncherProperties.EnableClosingSound), "false")]
+    [DataRow(typeof(PowerLauncherSettings), nameof(PowerLauncherProperties.EnableClosingSound), "true")]
 
     [DataRow(typeof(ColorPickerSettings), nameof(ColorPickerProperties.CopiedColorRepresentation), "RGB")]
     public void SetModuleSetting(Type moduleSettingsType, string settingName, string newValueStr)
