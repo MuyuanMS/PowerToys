@@ -69,7 +69,7 @@ public static class KbmKeyNames
         // "VK<decimal>" literal, e.g. VK44
         if (name.StartsWith("VK", StringComparison.OrdinalIgnoreCase) &&
             uint.TryParse(name.AsSpan(2), NumberStyles.None, CultureInfo.InvariantCulture, out code) &&
-            code > 0)
+            IsStorableCode(code))
         {
             return true;
         }
@@ -77,13 +77,28 @@ public static class KbmKeyNames
         // "0x<hex>" literal, e.g. 0x2C
         if (name.StartsWith("0x", StringComparison.OrdinalIgnoreCase) &&
             uint.TryParse(name.AsSpan(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out code) &&
-            code > 0)
+            IsStorableCode(code))
         {
             return true;
         }
 
         code = 0;
         return false;
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether a virtual-key code is one Keyboard
+    /// Manager can store: a standard VK in the range 1-255, or one of the
+    /// defined special/numpad-origin codes. Codes outside this set (e.g. a
+    /// 32-bit literal that maps to a negative <c>int32_t</c>) are ignored by the
+    /// engine and must be rejected so DSC does not report a mapping that can
+    /// never trigger.
+    /// </summary>
+    /// <param name="code">The virtual-key code.</param>
+    /// <returns>True if the code is storable; otherwise false.</returns>
+    public static bool IsStorableCode(uint code)
+    {
+        return (code >= 1 && code <= 255) || _namesByCode.ContainsKey(code);
     }
 
     /// <summary>
