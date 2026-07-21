@@ -44,10 +44,24 @@ public static class KbmProfileConverter
         var seenKeys = new HashSet<uint>();
         var seenShortcuts = new HashSet<(string App, string From)>();
 
-        for (var i = 0; i < model.Keys.Count; i++)
+        // JSON such as {"keys":null} or {"keys":[null]} deserializes without
+        // error; guard the collections and their elements so malformed input
+        // produces a validation error rather than a NullReferenceException.
+        if (model.Keys == null)
+        {
+            errors.Add("keys must not be null");
+        }
+
+        for (var i = 0; model.Keys != null && i < model.Keys.Count; i++)
         {
             var entry = model.Keys[i];
             var context = $"keys[{i.ToString(CultureInfo.InvariantCulture)}]";
+
+            if (entry == null)
+            {
+                errors.Add($"{context} must not be null");
+                continue;
+            }
 
             var targetCount = (entry.To != null ? 1 : 0) + (entry.ToText != null ? 1 : 0);
             if (targetCount != 1)
@@ -79,10 +93,21 @@ public static class KbmProfileConverter
             }
         }
 
-        for (var i = 0; i < model.Shortcuts.Count; i++)
+        if (model.Shortcuts == null)
+        {
+            errors.Add("shortcuts must not be null");
+        }
+
+        for (var i = 0; model.Shortcuts != null && i < model.Shortcuts.Count; i++)
         {
             var entry = model.Shortcuts[i];
             var context = $"shortcuts[{i.ToString(CultureInfo.InvariantCulture)}]";
+
+            if (entry == null)
+            {
+                errors.Add($"{context} must not be null");
+                continue;
+            }
 
             var targetCount = (entry.To != null ? 1 : 0) + (entry.ToText != null ? 1 : 0) +
                 (entry.RunProgram != null ? 1 : 0) + (entry.OpenUri != null ? 1 : 0);

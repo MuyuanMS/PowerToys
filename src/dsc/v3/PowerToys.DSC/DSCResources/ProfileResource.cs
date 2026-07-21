@@ -63,12 +63,23 @@ public sealed class ProfileResource : BaseResource
         // Capture the diff before updating the output
         var diff = data.GetDiffJson();
 
-        // Only call Set if the desired state is different from the current state
-        if (!data.TestState())
+        // Only call Set if the desired state differs from the current state, or
+        // if the current profile contains malformed entries that need cleaning.
+        if (data.NeedsUpdate())
         {
-            if (!data.SetState())
+            try
             {
-                WriteMessageOutputLine(DscMessageLevel.Info, Resources.FailedToSignalSettingsEvent);
+                if (!data.SetState())
+                {
+                    WriteMessageOutputLine(DscMessageLevel.Info, Resources.FailedToSignalSettingsEvent);
+                }
+            }
+            catch (IOException ex)
+            {
+                // The profile file could not be written; report the failure
+                // instead of claiming the desired profile was applied.
+                WriteMessageOutputLine(DscMessageLevel.Error, string.Format(CultureInfo.InvariantCulture, InvalidProfileError, ex.Message));
+                return false;
             }
 
             // Report the canonical form of the applied profile as the new state
@@ -91,7 +102,7 @@ public sealed class ProfileResource : BaseResource
         }
 
         data.GetState();
-        data.Output.InDesiredState = data.TestState();
+        data.Output.InDesiredState = !data.NeedsUpdate();
 
         WriteWarnings(data);
         WriteJsonOutputLine(data.Output.ToJson());
