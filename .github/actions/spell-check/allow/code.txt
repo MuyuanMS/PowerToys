@@ -173,6 +173,7 @@ VKTAB
 wcautil
 winkey
 wininet
+winmm
 WMKEYDOWN
 WMKEYUP
 WMSYSKEYDOWN
