@@ -83,7 +83,7 @@ add a chord second key after a comma (`"Win+O, K"`).
 | `args`        | string | no       | Command-line arguments.                                                                     |
 | `startInDir`  | string | no       | Working directory.                                                                          |
 | `elevation`   | string | no       | `normal` (default), `elevated`, or `differentUser`.                                         |
-| `ifRunning`   | string | no       | `showWindow` (default), `startAnother`, `doNothing`, `close`, `endTask`, `closeAndEndTask`. |
+| `ifRunning`   | string | no       | `showWindow` (default), `startAnother`, `doNothing`, `close`, `endTask`. |
 | `windowStyle` | string | no       | `normal` (default), `hidden`, `minimized`, `maximized`.                                     |
 
 ## Key names
