@@ -5,6 +5,7 @@
 
 #include "FancyZonesData/AppliedLayouts.h"
 #include "FancyZonesData/AppZoneHistory.h"
+#include "FancyZonesData/CustomLayouts.h"
 #include "ZonesOverlay.h"
 #include "Settings.h"
 #include <FancyZonesLib/FancyZonesWindowProperties.h>
@@ -303,11 +304,35 @@ void WorkArea::InitSnappedWindows()
 
 void WorkArea::CalculateZoneSet()
 {
-    const auto appliedLayout = AppliedLayouts::instance().GetDeviceLayout(m_uniqueId);
+    auto appliedLayout = AppliedLayouts::instance().GetDeviceLayout(m_uniqueId);
     if (!appliedLayout.has_value())
     {
         Logger::error(L"Layout wasn't applied. Can't init layout on work area {}x{}", m_workAreaRect.width(), m_workAreaRect.height());
         return;
+    }
+
+    // For custom layouts the spacing, sensitivity radius and zone count live in the custom
+    // layout definition (custom-layouts.json), while the applied-layouts.json snapshot keeps a
+    // copy taken at apply time. Editing those properties only rewrites custom-layouts.json, so
+    // without this sync the snapshot stays stale and the edits don't take effect until the layout
+    // is re-applied (see GH #44058). Refresh them from the current custom layout here.
+    if (appliedLayout->type == FancyZonesDataTypes::ZoneSetLayoutType::Custom)
+    {
+        const auto customData = CustomLayouts::instance().GetCustomLayoutData(appliedLayout->uuid);
+        if (customData.has_value())
+        {
+            if (const auto* gridInfo = std::get_if<FancyZonesDataTypes::GridLayoutInfo>(&customData->info))
+            {
+                appliedLayout->showSpacing = gridInfo->showSpacing();
+                appliedLayout->spacing = gridInfo->spacing();
+                appliedLayout->sensitivityRadius = gridInfo->sensitivityRadius();
+                appliedLayout->zoneCount = gridInfo->zoneCount();
+            }
+            else if (const auto* canvasInfo = std::get_if<FancyZonesDataTypes::CanvasLayoutInfo>(&customData->info))
+            {
+                appliedLayout->sensitivityRadius = canvasInfo->sensitivityRadius;
+            }
+        }
     }
 
     m_layout = std::make_unique<Layout>(appliedLayout.value());
