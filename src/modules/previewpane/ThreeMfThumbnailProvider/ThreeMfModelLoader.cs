@@ -319,10 +319,16 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
         private static void AppendModelMeshes(XDocument document, Model3DGroup modelGroup, Material material, GeometryBudget budget)
         {
-            // Index every object by id so build items and <components> references can be resolved,
-            // including objects that are composed purely from other objects.
+            // Everything we traverse must live in the model root's core namespace. 3MF packages may
+            // carry extension-namespace elements (<ext:object>, <ext:build>, ...) that must not shadow
+            // core resources or be rendered; restricting by namespace keeps object/mesh/component/
+            // vertex/triangle traversal consistent with the build-item traversal below.
+            var coreNamespace = document.Root?.Name.Namespace;
+
+            // Index every core-namespace object by id so build items and <components> references can be
+            // resolved, including objects that are composed purely from other objects.
             var objectsById = new Dictionary<string, XElement>(StringComparer.Ordinal);
-            foreach (var objectElement in document.Descendants().Where(element => element.Name.LocalName == "object"))
+            foreach (var objectElement in document.Descendants().Where(element => element.Name.LocalName == "object" && element.Name.Namespace == coreNamespace))
             {
                 var id = objectElement.Attribute("id")?.Value;
                 if (!string.IsNullOrWhiteSpace(id) && !objectsById.ContainsKey(id))
@@ -334,10 +340,9 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             // Only a <build> in the model root's core namespace counts; an extension-namespace
             // <ext:build> must not suppress the no-build fallback. Its core-namespace <item> children
             // are the build items; ignore <item> elements introduced by unrelated extensions.
-            var rootNamespace = document.Root?.Name.Namespace;
             var buildElement = document.Root?
                 .Elements()
-                .FirstOrDefault(element => element.Name.LocalName == "build" && element.Name.Namespace == rootNamespace);
+                .FirstOrDefault(element => element.Name.LocalName == "build" && element.Name.Namespace == coreNamespace);
             var buildItems = buildElement?
                 .Elements()
                 .Where(element => element.Name.LocalName == "item" && element.Name.Namespace == buildElement.Name.Namespace)
@@ -349,7 +354,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 {
                     var objectId = buildItem.Attribute("objectid")?.Value;
                     var transform = ParseTransform(buildItem.Attribute("transform")?.Value) ?? Matrix3D.Identity;
-                    ResolveObject(objectId, transform, objectsById, modelGroup, material, new HashSet<string>(StringComparer.Ordinal), 0, budget);
+                    ResolveObject(objectId, transform, objectsById, coreNamespace, modelGroup, material, new HashSet<string>(StringComparer.Ordinal), 0, budget);
 
                     if (budget.Exhausted)
                     {
@@ -362,7 +367,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 // No build section: render every object that directly contains a mesh.
                 foreach (var objectId in objectsById.Keys)
                 {
-                    ResolveObject(objectId, Matrix3D.Identity, objectsById, modelGroup, material, new HashSet<string>(StringComparer.Ordinal), 0, budget);
+                    ResolveObject(objectId, Matrix3D.Identity, objectsById, coreNamespace, modelGroup, material, new HashSet<string>(StringComparer.Ordinal), 0, budget);
 
                     if (budget.Exhausted)
                     {
@@ -376,6 +381,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             string objectId,
             Matrix3D transform,
             Dictionary<string, XElement> objectsById,
+            XNamespace coreNamespace,
             Model3DGroup modelGroup,
             Material material,
             HashSet<string> visiting,
@@ -400,7 +406,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
             try
             {
-                var meshElement = objectElement.Elements().FirstOrDefault(element => element.Name.LocalName == "mesh");
+                var meshElement = objectElement.Elements().FirstOrDefault(element => element.Name.LocalName == "mesh" && element.Name.Namespace == coreNamespace);
                 if (meshElement != null)
                 {
                     var geometry = CreateMeshGeometry(meshElement, budget);
@@ -411,7 +417,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                     }
                 }
 
-                foreach (var component in objectElement.Descendants().Where(element => element.Name.LocalName == "component"))
+                foreach (var component in objectElement.Descendants().Where(element => element.Name.LocalName == "component" && element.Name.Namespace == coreNamespace))
                 {
                     if (budget.Exhausted)
                     {
@@ -423,7 +429,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
                     // Component transform is applied first, then the parent transform (row-vector convention).
                     var combined = childTransform.HasValue ? childTransform.Value * transform : transform;
-                    ResolveObject(childId, combined, objectsById, modelGroup, material, visiting, depth + 1, budget);
+                    ResolveObject(childId, combined, objectsById, coreNamespace, modelGroup, material, visiting, depth + 1, budget);
                 }
             }
             finally
@@ -434,10 +440,14 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
         private static MeshGeometry3D CreateMeshGeometry(XElement meshElement, GeometryBudget budget)
         {
+            // Vertices/triangles must share the mesh's (core) namespace; extension-namespace elements
+            // with the same local name are not valid core mesh geometry and are ignored.
+            var meshNamespace = meshElement.Name.Namespace;
+
             // Materialize vertices under the shared vertex budget so a mesh with a huge vertex list
             // (even with few/no triangles) cannot cause an unbounded allocation.
             var vertices = new List<Point3D>();
-            foreach (var element in meshElement.Descendants().Where(e => e.Name.LocalName == "vertex"))
+            foreach (var element in meshElement.Descendants().Where(e => e.Name.LocalName == "vertex" && e.Name.Namespace == meshNamespace))
             {
                 if (budget.Vertices <= 0)
                 {
@@ -454,7 +464,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             var positions = new Point3DCollection();
             var triangleIndices = new Int32Collection();
 
-            foreach (var triangle in meshElement.Descendants().Where(element => element.Name.LocalName == "triangle"))
+            foreach (var triangle in meshElement.Descendants().Where(element => element.Name.LocalName == "triangle" && element.Name.Namespace == meshNamespace))
             {
                 if (budget.Triangles <= 0)
                 {

@@ -207,6 +207,10 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
 
                 std::wstring appPath = get_module_folderpath(g_hInst) + L"\\PowerToys.ThreeMfThumbnailProvider.exe";
 
+                // The worker writes its output next to the input using the same guid; compute it up
+                // front so every failure path can also remove a partially written BMP.
+                std::wstring fileNameBmp = filePath + guid + L".bmp";
+
                 SHELLEXECUTEINFO sei{ sizeof(sei) };
                 sei.fMask = { SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI };
                 sei.lpFile = appPath.c_str();
@@ -236,6 +240,10 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
                     CloseHandle(m_process);
                     m_process = NULL;
                     std::filesystem::remove(fileName, ec);
+
+                    // The worker may have already created or partially written the output BMP before
+                    // being terminated; remove it too so stale files cannot accumulate in LocalLow.
+                    std::filesystem::remove(fileNameBmp, ec);
                     return E_FAIL;
                 }
 
@@ -244,7 +252,6 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
 
                 std::filesystem::remove(fileName, ec);
 
-                std::wstring fileNameBmp = filePath + guid + L".bmp";
                 if (std::filesystem::exists(fileNameBmp))
                 {
                     HBITMAP hbmp = static_cast<HBITMAP>(LoadImage(NULL, fileNameBmp.c_str(), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE));
