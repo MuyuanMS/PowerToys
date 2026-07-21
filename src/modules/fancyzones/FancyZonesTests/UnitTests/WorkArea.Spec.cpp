@@ -1,10 +1,13 @@
 #include "pch.h"
 
+#include <algorithm>
 #include <filesystem>
+#include <vector>
 
 #include <FancyZonesLib/WorkArea.h>
 #include <FancyZonesLib/FancyZonesData/AppliedLayouts.h>
 #include <FancyZonesLib/FancyZonesData/AppZoneHistory.h>
+#include <FancyZonesLib/FancyZonesData/CustomLayouts.h>
 #include <FancyZonesLib/FancyZonesData/DefaultLayouts.h>
 #include <FancyZonesLib/FancyZonesWindowProperties.h>
 #include <FancyZonesLib/LayoutAssignedWindows.h>
@@ -44,6 +47,7 @@ namespace FancyZonesUnitTests
         {
             std::filesystem::remove(AppliedLayouts::AppliedLayoutsFileName());
             std::filesystem::remove(AppZoneHistory::AppZoneHistoryFileName());
+            std::filesystem::remove(CustomLayouts::CustomLayoutsFileName());
             std::filesystem::remove(DefaultLayouts::DefaultLayoutsFileName());
         }
 
@@ -172,6 +176,91 @@ namespace FancyZonesUnitTests
             Assert::AreEqual(static_cast<int>(FancyZonesDataTypes::ZoneSetLayoutType::Grid), static_cast<int>(actualLayout->Type()));
             Assert::AreEqual(static_cast<size_t>(4), actualLayout->Zones().size());
             Assert::IsTrue(GUID_NULL == actualLayout->Id());
+        }
+
+        // Saves a 1x2 custom grid layout to custom-layouts.json so it can be resolved by uuid.
+        void SaveCustomGridLayout(const GUID& uuid, bool showSpacing, int spacing, int sensitivityRadius)
+        {
+            json::JsonObject root{};
+            json::JsonArray layoutsArray{};
+
+            json::JsonObject gridLayoutJson{};
+            gridLayoutJson.SetNamedValue(NonLocalizable::CustomLayoutsIds::UuidID, json::value(FancyZonesUtils::GuidToString(uuid).value()));
+            gridLayoutJson.SetNamedValue(NonLocalizable::CustomLayoutsIds::NameID, json::value(L"Custom grid layout"));
+            gridLayoutJson.SetNamedValue(NonLocalizable::CustomLayoutsIds::TypeID, json::value(NonLocalizable::CustomLayoutsIds::GridID));
+
+            json::JsonArray rowsPercentage{};
+            rowsPercentage.Append(json::value(10000));
+
+            json::JsonArray columnsPercentage{};
+            columnsPercentage.Append(json::value(5000));
+            columnsPercentage.Append(json::value(5000));
+
+            json::JsonArray cells{};
+            {
+                json::JsonArray cellsRow{};
+                cellsRow.Append(json::value(0));
+                cellsRow.Append(json::value(1));
+                cells.Append(cellsRow);
+            }
+
+            json::JsonObject info{};
+            info.SetNamedValue(NonLocalizable::CustomLayoutsIds::RowsID, json::value(1));
+            info.SetNamedValue(NonLocalizable::CustomLayoutsIds::ColumnsID, json::value(2));
+            info.SetNamedValue(NonLocalizable::CustomLayoutsIds::RowsPercentageID, rowsPercentage);
+            info.SetNamedValue(NonLocalizable::CustomLayoutsIds::ColumnsPercentageID, columnsPercentage);
+            info.SetNamedValue(NonLocalizable::CustomLayoutsIds::CellChildMapID, cells);
+            info.SetNamedValue(NonLocalizable::CustomLayoutsIds::ShowSpacingID, json::value(showSpacing));
+            info.SetNamedValue(NonLocalizable::CustomLayoutsIds::SpacingID, json::value(spacing));
+            info.SetNamedValue(NonLocalizable::CustomLayoutsIds::SensitivityRadiusID, json::value(sensitivityRadius));
+
+            gridLayoutJson.SetNamedValue(NonLocalizable::CustomLayoutsIds::InfoID, info);
+            layoutsArray.Append(gridLayoutJson);
+            root.SetNamedValue(NonLocalizable::CustomLayoutsIds::CustomLayoutsArrayID, layoutsArray);
+
+            json::to_file(CustomLayouts::CustomLayoutsFileName(), root);
+            CustomLayouts::instance().LoadData();
+        }
+
+        // Regression test for GH #44058: editing a custom layout's spacing only rewrites
+        // custom-layouts.json, while applied-layouts.json keeps a snapshot taken at apply time.
+        // WorkArea::CalculateZoneSet must re-derive the spacing (and the other scalar properties)
+        // from the current custom layout, otherwise the stale snapshot is used and the edit has no
+        // effect until the layout is re-applied.
+        TEST_METHOD (CustomLayoutSpacingRefreshedFromCustomLayoutData)
+        {
+            const auto uuid = FancyZonesUtils::GuidFromString(L"{5A9D6A0F-4C6E-4C0C-8B1B-9F3E7C2D1A11}").value();
+
+            // Custom layout on disk was edited to show a large spacing.
+            SaveCustomGridLayout(uuid, /*showSpacing*/ true, /*spacing*/ 100, /*sensitivityRadius*/ 30);
+
+            // The applied-layouts snapshot is stale: it was captured before the edit with no spacing.
+            LayoutData staleSnapshot{
+                .uuid = uuid,
+                .type = FancyZonesDataTypes::ZoneSetLayoutType::Custom,
+                .showSpacing = false,
+                .spacing = 0,
+                .zoneCount = 2,
+                .sensitivityRadius = 5,
+            };
+            AppliedLayouts::instance().ApplyLayout(m_workAreaId, staleSnapshot);
+
+            auto workArea = WorkArea::Create({}, m_workAreaId, m_emptyUniqueId, m_workAreaRect);
+            Assert::IsFalse(workArea == nullptr);
+
+            const auto& layout = workArea->GetLayout();
+            Assert::IsNotNull(layout.get());
+            Assert::AreEqual(static_cast<size_t>(2), layout->Zones().size());
+
+            // Order the two zones left-to-right and verify a gap exists between them. Without the
+            // refresh the stale snapshot (showSpacing=false) yields adjacent zones (gap == 0).
+            std::vector<RECT> rects;
+            for (const auto& [id, zone] : layout->Zones())
+            {
+                rects.push_back(zone.GetZoneRect());
+            }
+            std::sort(rects.begin(), rects.end(), [](const RECT& a, const RECT& b) { return a.left < b.left; });
+            Assert::IsTrue(rects[1].left - rects[0].right > 20, L"Edited spacing was not applied to the active layout");
         }
     };
 

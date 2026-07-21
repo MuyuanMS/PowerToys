@@ -315,23 +315,14 @@ void WorkArea::CalculateZoneSet()
     // layout definition (custom-layouts.json), while the applied-layouts.json snapshot keeps a
     // copy taken at apply time. Editing those properties only rewrites custom-layouts.json, so
     // without this sync the snapshot stays stale and the edits don't take effect until the layout
-    // is re-applied (see GH #44058). Refresh them from the current custom layout here.
+    // is re-applied (see GH #44058). Re-derive the scalar properties from the current custom
+    // layout using the same logic the apply path uses (CustomLayouts::GetLayout also derives the
+    // canvas zone count from the zone list, keeping it consistent with Layout::Init validation).
     if (appliedLayout->type == FancyZonesDataTypes::ZoneSetLayoutType::Custom)
     {
-        const auto customData = CustomLayouts::instance().GetCustomLayoutData(appliedLayout->uuid);
-        if (customData.has_value())
+        if (const auto refreshed = CustomLayouts::instance().GetLayout(appliedLayout->uuid))
         {
-            if (const auto* gridInfo = std::get_if<FancyZonesDataTypes::GridLayoutInfo>(&customData->info))
-            {
-                appliedLayout->showSpacing = gridInfo->showSpacing();
-                appliedLayout->spacing = gridInfo->spacing();
-                appliedLayout->sensitivityRadius = gridInfo->sensitivityRadius();
-                appliedLayout->zoneCount = gridInfo->zoneCount();
-            }
-            else if (const auto* canvasInfo = std::get_if<FancyZonesDataTypes::CanvasLayoutInfo>(&customData->info))
-            {
-                appliedLayout->sensitivityRadius = canvasInfo->sensitivityRadius;
-            }
+            appliedLayout = refreshed;
         }
     }
 
