@@ -531,6 +531,17 @@ public static class KbmProfileConverter
             return null;
         }
 
+        // An app-specific entry (app is non-null) whose target process name is
+        // blank/whitespace is malformed: the engine keeps it in app-specific
+        // scope under an empty process name, so normalizing it to a global
+        // remap (NormalizeTargetApp -> null) would silently widen its scope and
+        // let 'test' match a desired global mapping. Skip it instead.
+        if (app != null && NormalizeTargetApp(app) == null)
+        {
+            warnings?.Add($"Skipping app-specific shortcut remap entry '{stored.OriginalKeys}' with a blank target application");
+            return null;
+        }
+
         return new KbmShortcutRemapEntry
         {
             From = KbmShortcutParser.Format(KbmShortcutParser.Canonicalize(from)),

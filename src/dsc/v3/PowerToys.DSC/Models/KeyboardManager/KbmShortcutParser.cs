@@ -208,7 +208,13 @@ public static class KbmShortcutParser
         var keys = new List<uint>();
         foreach (var part in vkString.Split(VkSeparator))
         {
-            if (!uint.TryParse(part.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var code) || code == 0)
+            // Reject codes the C++ engine cannot store: it persists key codes
+            // as int32_t, so a value outside the storable set (VK 1-255 plus the
+            // defined special/numpad-origin codes) would be coerced to a
+            // different value or -1 and silently ignored. Skipping the entry via
+            // the caller's warning path avoids exporting a phantom mapping.
+            if (!uint.TryParse(part.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var code) ||
+                code == 0 || !KbmKeyNames.IsStorableCode(code))
             {
                 return false;
             }
