@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Microsoft.PowerToys.Settings.UI.Library;
 
 namespace PowerToys.DSC.Models.KeyboardManager;
@@ -29,7 +30,7 @@ public static class KbmProfileConverter
 
     // Friendly names for the Shortcut.h enums, indexed by their numeric value.
     private static readonly string[] _elevationNames = ["normal", "elevated", "differentUser"];
-    private static readonly string[] _ifRunningNames = ["showWindow", "startAnother", "doNothing", "close", "endTask", "closeAndEndTask"];
+    private static readonly string[] _ifRunningNames = ["showWindow", "startAnother", "doNothing", "close", "endTask"];
     private static readonly string[] _windowStyleNames = ["normal", "hidden", "minimized", "maximized"];
 
     /// <summary>
@@ -457,7 +458,7 @@ public static class KbmProfileConverter
             shortcuts.Add(entry);
         }
 
-        return new KbmProfileModel
+        var result = new KbmProfileModel
         {
             Keys = keys.OrderBy(k => k.Code).Select(k => k.Entry).ToList(),
             Shortcuts = shortcuts
@@ -465,6 +466,78 @@ public static class KbmProfileConverter
                 .ThenBy(s => s.From, StringComparer.Ordinal)
                 .ToList(),
         };
+
+        // Each entry above is individually parseable, but the C++ engine also
+        // tolerates cross-entry combinations this resource's Validate rejects
+        // (a self-mapping such as CapsLock -> CapsLock, an OS-reserved source
+        // like Win+L, a repeated modifier class, or two overlapping sources in
+        // the same scope). Drop those so the exported state stays importable by
+        // a subsequent set.
+        RemoveNonImportableEntries(result, warnings);
+        return result;
+    }
+
+    private static readonly Regex EntryContextRegex = new(@"^(keys|shortcuts)\[(\d+)\]", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Removes entries from an assembled export model that would fail this
+    /// resource's own <see cref="Validate"/>, reusing its self-mapping,
+    /// overlap, reserved-shortcut, and repeated-modifier rules rather than
+    /// duplicating them. Validate reports errors keyed by "keys[i]" and
+    /// "shortcuts[i]" context; the offending entries are dropped (highest
+    /// index first so lower indices stay valid) and the model is re-validated
+    /// until it is clean. Overlap and duplicate errors reference the later,
+    /// conflicting entry, so the first occurrence of each source is preserved.
+    /// </summary>
+    private static void RemoveNonImportableEntries(KbmProfileModel model, IList<string>? warnings)
+    {
+        while (true)
+        {
+            var errors = Validate(model);
+            if (errors.Count == 0)
+            {
+                return;
+            }
+
+            var keyIndices = new SortedSet<int>();
+            var shortcutIndices = new SortedSet<int>();
+            foreach (var error in errors)
+            {
+                var match = EntryContextRegex.Match(error);
+                if (!match.Success)
+                {
+                    continue;
+                }
+
+                var index = int.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture);
+                if (match.Groups[1].Value == "keys")
+                {
+                    keyIndices.Add(index);
+                }
+                else
+                {
+                    shortcutIndices.Add(index);
+                }
+            }
+
+            if (keyIndices.Count == 0 && shortcutIndices.Count == 0)
+            {
+                // No entry-scoped error we can act on; stop to avoid looping.
+                return;
+            }
+
+            foreach (var index in keyIndices.Reverse())
+            {
+                warnings?.Add($"Skipping key remap entry '{model.Keys[index].From}' that is not importable");
+                model.Keys.RemoveAt(index);
+            }
+
+            foreach (var index in shortcutIndices.Reverse())
+            {
+                warnings?.Add($"Skipping shortcut remap entry '{model.Shortcuts[index].From}' that is not importable");
+                model.Shortcuts.RemoveAt(index);
+            }
+        }
     }
 
     /// <summary>

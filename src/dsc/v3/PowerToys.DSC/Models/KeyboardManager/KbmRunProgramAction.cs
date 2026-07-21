@@ -48,12 +48,11 @@ public sealed class KbmRunProgramAction
 
     /// <summary>
     /// Gets or sets what happens when the program is already running:
-    /// "showWindow", "startAnother", "doNothing", "close", "endTask", or
-    /// "closeAndEndTask".
+    /// "showWindow", "startAnother", "doNothing", "close", or "endTask".
     /// </summary>
     [JsonPropertyName("ifRunning")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [Description("What happens when the program is already running: \"showWindow\" (default), \"startAnother\", \"doNothing\", \"close\", \"endTask\", or \"closeAndEndTask\".")]
+    [Description("What happens when the program is already running: \"showWindow\" (default), \"startAnother\", \"doNothing\", \"close\", or \"endTask\".")]
     public string? IfRunning { get; set; }
 
     /// <summary>
