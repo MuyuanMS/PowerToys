@@ -302,7 +302,6 @@ public sealed class ProfileFunctionData : BaseFunctionData
     }
 
     /// <summary>
-    /// <summary>
     /// Determines whether the raw settings file actually carries an engine-
     /// readable <c>properties.activeConfiguration.value</c> string. The
     /// deserialized <see cref="KeyboardManagerProperties"/> cannot answer this:

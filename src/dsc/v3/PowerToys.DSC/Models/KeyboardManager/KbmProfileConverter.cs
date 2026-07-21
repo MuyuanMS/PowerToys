@@ -377,7 +377,7 @@ public static class KbmProfileConverter
             }));
         }
 
-        foreach (var (stored, app) in EnumerateShortcuts(profile.RemapShortcuts))
+        foreach (var (stored, app) in EnumerateShortcuts(profile.RemapShortcuts, warnings))
         {
             var entry = CreateShortcutEntry(stored, app, warnings);
             if (entry == null)
@@ -440,7 +440,7 @@ public static class KbmProfileConverter
             shortcuts.Add(entry);
         }
 
-        foreach (var (stored, app) in EnumerateShortcuts(profile.RemapShortcutsToText))
+        foreach (var (stored, app) in EnumerateShortcuts(profile.RemapShortcutsToText, warnings))
         {
             var entry = CreateShortcutEntry(stored, app, warnings);
             if (entry == null)
@@ -554,7 +554,7 @@ public static class KbmProfileConverter
         return FromProfile(ToProfile(model));
     }
 
-    private static IEnumerable<(KeysDataModel Stored, string? App)> EnumerateShortcuts(ShortcutsKeyDataModel? section)
+    private static IEnumerable<(KeysDataModel Stored, string? App)> EnumerateShortcuts(ShortcutsKeyDataModel? section, IList<string>? warnings)
     {
         foreach (var stored in section?.GlobalRemapShortcuts ?? [])
         {
@@ -566,10 +566,23 @@ public static class KbmProfileConverter
 
         foreach (var stored in section?.AppSpecificRemapShortcuts ?? [])
         {
-            if (stored != null)
+            if (stored == null)
             {
-                yield return (stored, stored.TargetApp);
+                continue;
             }
+
+            // An app-specific entry must carry a non-blank target process name.
+            // The engine rejects one whose targetApp is missing/blank (its
+            // GetNamedString("targetApp") fails); yielding it as (app == null)
+            // would silently widen it to a global remap - including a
+            // run-program action - so skip it with a warning instead.
+            if (string.IsNullOrWhiteSpace(stored.TargetApp))
+            {
+                warnings?.Add($"Skipping app-specific shortcut remap entry '{stored.OriginalKeys}' with a blank target application");
+                continue;
+            }
+
+            yield return (stored, stored.TargetApp);
         }
     }
 
