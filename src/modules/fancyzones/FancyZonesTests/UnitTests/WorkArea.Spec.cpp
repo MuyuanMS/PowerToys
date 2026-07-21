@@ -40,6 +40,7 @@ namespace FancyZonesUnitTests
 
             AppZoneHistory::instance().LoadData();
             AppliedLayouts::instance().LoadData();
+            CustomLayouts::instance().LoadData();
             DefaultLayouts::instance().LoadData();
         }
 
