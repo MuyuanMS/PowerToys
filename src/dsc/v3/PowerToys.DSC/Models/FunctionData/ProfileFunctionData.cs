@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -249,7 +250,55 @@ public sealed class ProfileFunctionData : BaseFunctionData
             }
         }
 
-        return $"{(string.IsNullOrEmpty(activeConfiguration) ? "default" : activeConfiguration)}.json";
+        return BuildProfileFileName(activeConfiguration);
+    }
+
+    /// <summary>
+    /// Builds a profile file name from an active configuration value, falling
+    /// back to "default" when the value is empty or not a safe file name. This
+    /// prevents a user-writable settings value such as <c>..\\..\\target</c>
+    /// from escaping the module directory (a privileged arbitrary-write risk
+    /// when the resource runs elevated).
+    /// </summary>
+    /// <param name="activeConfiguration">The stored active configuration.</param>
+    /// <returns>The profile file name, e.g. "default.json".</returns>
+    private static string BuildProfileFileName(string? activeConfiguration)
+    {
+        return IsSafeConfigurationName(activeConfiguration)
+            ? $"{activeConfiguration}.json"
+            : "default.json";
+    }
+
+    /// <summary>
+    /// Determines whether an active configuration value is a safe, single-
+    /// segment file name (no rooting, path separators, "."/"..", or invalid
+    /// file name characters).
+    /// </summary>
+    /// <param name="name">The candidate configuration name.</param>
+    /// <returns>True if the value is safe to use as a file name; otherwise false.</returns>
+    private static bool IsSafeConfigurationName([NotNullWhen(true)] string? name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            return false;
+        }
+
+        if (name is "." or "..")
+        {
+            return false;
+        }
+
+        if (name.Contains('/', StringComparison.Ordinal) || name.Contains('\\', StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (Path.IsPathRooted(name) || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -268,9 +317,23 @@ public sealed class ProfileFunctionData : BaseFunctionData
 
         try
         {
-            settings = settingsExist
-                ? _settingsUtils.GetSettings<KeyboardManagerSettings>(KeyboardManagerSettings.ModuleName)
-                : new KeyboardManagerSettings();
+            if (settingsExist)
+            {
+                settings = _settingsUtils.GetSettings<KeyboardManagerSettings>(KeyboardManagerSettings.ModuleName);
+
+                // A settings file that is the JSON literal `null` deserializes
+                // to null without throwing; treat it as unreadable so it is
+                // reported via the structured DSC error below instead of
+                // throwing a NullReferenceException.
+                if (settings == null)
+                {
+                    throw new JsonException("The Keyboard Manager settings file contains a null document.");
+                }
+            }
+            else
+            {
+                settings = new KeyboardManagerSettings();
+            }
         }
         catch (Exception ex)
         {
@@ -289,6 +352,13 @@ public sealed class ProfileFunctionData : BaseFunctionData
             activeConfiguration = "default";
             settings.Properties.ActiveConfiguration = new GenericProperty<string>(activeConfiguration);
             normalized = true;
+        }
+        else if (!IsSafeConfigurationName(activeConfiguration))
+        {
+            // Refuse to use an unsafe configuration name as a path segment; this
+            // would let a user-writable value redirect the write outside the
+            // module directory (a privileged arbitrary-write risk when elevated).
+            throw new IOException($"The Keyboard Manager active configuration '{activeConfiguration}' is not a valid profile name.");
         }
 
         // Persist when the settings file is missing (so the engine can resolve
