@@ -483,8 +483,21 @@ public sealed class ProfileFunctionData : BaseFunctionData
     {
         try
         {
-            using var settingsEvent = new EventWaitHandle(false, EventResetMode.AutoReset, SettingsEventName);
+            // The engine creates this event while it is running (EventWaiter::
+            // start -> CreateEventW). Open the existing event rather than
+            // creating it, so that a missing event correctly reports that no
+            // running instance received the signal; the caller then surfaces
+            // FailedToSignalSettingsEvent ("applied on the next PowerToys
+            // start"). Creating the event here would make Set() always succeed
+            // and leave that message and this method's false result unused.
+            using var settingsEvent = EventWaitHandle.OpenExisting(SettingsEventName);
             return settingsEvent.Set();
+        }
+        catch (WaitHandleCannotBeOpenedException)
+        {
+            // No running Keyboard Manager engine has created the event; the new
+            // profile will be loaded the next time PowerToys starts.
+            return false;
         }
         catch (Exception)
         {
