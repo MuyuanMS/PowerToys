@@ -25,6 +25,7 @@ public sealed class ProfileResource : BaseResource
 {
     private static readonly CompositeFormat FailedToWriteManifests = CompositeFormat.Parse(Resources.FailedToWriteManifests);
     private static readonly CompositeFormat InvalidProfileError = CompositeFormat.Parse(Resources.InvalidProfileError);
+    private static readonly CompositeFormat ApplyProfileError = CompositeFormat.Parse(Resources.ApplyProfileError);
 
     public const string ResourceName = "profile";
 
@@ -76,9 +77,10 @@ public sealed class ProfileResource : BaseResource
             }
             catch (IOException ex)
             {
-                // The profile file could not be written; report the failure
-                // instead of claiming the desired profile was applied.
-                WriteMessageOutputLine(DscMessageLevel.Error, string.Format(CultureInfo.InvariantCulture, InvalidProfileError, ex.Message));
+                // The profile file could not be written; report an apply/write
+                // failure rather than the validation-error prefix, which would
+                // misdiagnose a valid desired profile as invalid.
+                WriteMessageOutputLine(DscMessageLevel.Error, string.Format(CultureInfo.InvariantCulture, ApplyProfileError, ex.Message));
                 return false;
             }
 
