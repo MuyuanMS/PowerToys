@@ -30,6 +30,10 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
         private const int MaxTotalVertices = 4_000_000;
         private const int MaxComponentDepth = 16;
 
+        // Bound the number of distinct .model parts loaded while resolving Production Extension
+        // cross-part component references, so a package cannot force loading an unbounded number of parts.
+        private const int MaxModelParts = 64;
+
         // Relationship (.rels) parts are small by spec; cap them so a highly compressed relationship
         // XML entry cannot consume unbounded memory before the worker timeout fires.
         private const long MaxUncompressedRelationshipBytes = 1L * 1024 * 1024; // 1 MB
@@ -139,16 +143,20 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
                 var triangleBudget = new GeometryBudget { Triangles = MaxTotalTriangles, Vertices = MaxTotalVertices };
 
+                // A single package context is shared across every root model part so that Production
+                // Extension components referencing objects in other .model parts (via p:path) can be
+                // resolved, while a per-part cache keeps the model-part load count bounded.
+                var package = new ModelPackage(archive);
+
                 foreach (var modelEntry in modelEntries)
                 {
-                    if (modelEntry.Length <= 0 || modelEntry.Length > MaxUncompressedModelBytes)
+                    var part = package.GetPart(NormalizePartName(modelEntry.FullName));
+                    if (part == null)
                     {
                         continue;
                     }
 
-                    using var modelStream = modelEntry.Open();
-                    var document = LoadXmlSafe(modelStream);
-                    AppendModelMeshes(document, modelGroup, material, triangleBudget);
+                    AppendModelMeshes(package, part, modelGroup, material, triangleBudget);
 
                     if (triangleBudget.Exhausted)
                     {
@@ -364,32 +372,90 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             return targets;
         }
 
-        private static void AppendModelMeshes(XDocument document, Model3DGroup modelGroup, Material material, GeometryBudget budget)
+        // A lazily-populated, size- and count-bounded view over the model parts of a 3MF package,
+        // used to resolve Production Extension cross-part component references.
+        private sealed class ModelPart
         {
-            // Everything we traverse must live in the model root's core namespace. 3MF packages may
-            // carry extension-namespace elements (<ext:object>, <ext:build>, ...) that must not shadow
-            // core resources or be rendered; restricting by namespace keeps object/mesh/component/
-            // vertex/triangle traversal consistent with the build-item traversal below.
-            var coreNamespace = document.Root?.Name.Namespace;
+            public string Name { get; init; }
 
-            // Index every core-namespace object by id so build items and <components> references can be
-            // resolved, including objects that are composed purely from other objects.
-            var objectsById = new Dictionary<string, XElement>(StringComparer.Ordinal);
-            foreach (var objectElement in document.Descendants().Where(element => element.Name.LocalName == "object" && element.Name.Namespace == coreNamespace))
+            public XNamespace CoreNamespace { get; init; }
+
+            public XElement Root { get; init; }
+
+            public Dictionary<string, XElement> ObjectsById { get; init; }
+        }
+
+        private sealed class ModelPackage
+        {
+            private readonly ZipArchive _archive;
+            private readonly Dictionary<string, ModelPart> _parts = new(StringComparer.OrdinalIgnoreCase);
+
+            public ModelPackage(ZipArchive archive)
             {
-                var id = objectElement.Attribute("id")?.Value;
-                if (!string.IsNullOrWhiteSpace(id) && !objectsById.ContainsKey(id))
-                {
-                    objectsById[id] = objectElement;
-                }
+                _archive = archive;
             }
 
+            public ModelPart GetPart(string partName)
+            {
+                if (string.IsNullOrEmpty(partName))
+                {
+                    return null;
+                }
+
+                if (_parts.TryGetValue(partName, out var cached))
+                {
+                    return cached;
+                }
+
+                // Cache both hits and misses; both count toward the model-part budget so a package
+                // cannot force loading (or repeatedly probing) an unbounded number of parts.
+                if (_parts.Count >= MaxModelParts)
+                {
+                    return null;
+                }
+
+                ModelPart part = null;
+                var entry = _archive.GetEntry(partName) ??
+                            _archive.Entries.FirstOrDefault(e => string.Equals(NormalizePartName(e.FullName), partName, StringComparison.OrdinalIgnoreCase));
+                if (entry != null && entry.Length > 0 && entry.Length <= MaxUncompressedModelBytes)
+                {
+                    try
+                    {
+                        using var partStream = entry.Open();
+                        var document = LoadXmlSafe(partStream);
+                        var core = document.Root?.Name.Namespace;
+
+                        var objects = new Dictionary<string, XElement>(StringComparer.Ordinal);
+                        foreach (var objectElement in document.Descendants().Where(element => element.Name.LocalName == "object" && element.Name.Namespace == core))
+                        {
+                            var id = objectElement.Attribute("id")?.Value;
+                            if (!string.IsNullOrWhiteSpace(id) && !objects.ContainsKey(id))
+                            {
+                                objects[id] = objectElement;
+                            }
+                        }
+
+                        part = new ModelPart { Name = partName, CoreNamespace = core, Root = document.Root, ObjectsById = objects };
+                    }
+                    catch (Exception)
+                    {
+                        part = null;
+                    }
+                }
+
+                _parts[partName] = part;
+                return part;
+            }
+        }
+
+        private static void AppendModelMeshes(ModelPackage package, ModelPart part, Model3DGroup modelGroup, Material material, GeometryBudget budget)
+        {
             // Only a <build> in the model root's core namespace counts; an extension-namespace
             // <ext:build> must not suppress the no-build fallback. Its core-namespace <item> children
             // are the build items; ignore <item> elements introduced by unrelated extensions.
-            var buildElement = document.Root?
+            var buildElement = part.Root?
                 .Elements()
-                .FirstOrDefault(element => element.Name.LocalName == "build" && element.Name.Namespace == coreNamespace);
+                .FirstOrDefault(element => element.Name.LocalName == "build" && element.Name.Namespace == part.CoreNamespace);
             var buildItems = buildElement?
                 .Elements()
                 .Where(element => element.Name.LocalName == "item" && element.Name.Namespace == buildElement.Name.Namespace)
@@ -401,7 +467,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 {
                     var objectId = buildItem.Attribute("objectid")?.Value;
                     var transform = ParseTransform(buildItem.Attribute("transform")?.Value) ?? Matrix3D.Identity;
-                    ResolveObject(objectId, transform, objectsById, coreNamespace, modelGroup, material, new HashSet<string>(StringComparer.Ordinal), 0, budget);
+                    ResolveObject(package, part, objectId, transform, modelGroup, material, new HashSet<string>(StringComparer.Ordinal), 0, budget);
 
                     if (budget.Exhausted)
                     {
@@ -411,10 +477,10 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             }
             else
             {
-                // No build section: render every object that directly contains a mesh.
-                foreach (var objectId in objectsById.Keys)
+                // No build section: render every object in this part that directly contains a mesh.
+                foreach (var objectId in part.ObjectsById.Keys)
                 {
-                    ResolveObject(objectId, Matrix3D.Identity, objectsById, coreNamespace, modelGroup, material, new HashSet<string>(StringComparer.Ordinal), 0, budget);
+                    ResolveObject(package, part, objectId, Matrix3D.Identity, modelGroup, material, new HashSet<string>(StringComparer.Ordinal), 0, budget);
 
                     if (budget.Exhausted)
                     {
@@ -425,35 +491,37 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
         }
 
         private static void ResolveObject(
+            ModelPackage package,
+            ModelPart part,
             string objectId,
             Matrix3D transform,
-            Dictionary<string, XElement> objectsById,
-            XNamespace coreNamespace,
             Model3DGroup modelGroup,
             Material material,
             HashSet<string> visiting,
             int depth,
             GeometryBudget budget)
         {
-            if (depth > MaxComponentDepth || budget.Exhausted)
+            if (depth > MaxComponentDepth || budget.Exhausted || part == null)
             {
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(objectId) || !objectsById.TryGetValue(objectId, out var objectElement))
+            if (string.IsNullOrWhiteSpace(objectId) || !part.ObjectsById.TryGetValue(objectId, out var objectElement))
             {
                 return;
             }
 
-            // Guard against reference cycles between component objects.
-            if (!visiting.Add(objectId))
+            // Guard against reference cycles between component objects, keyed by part + id so the same
+            // object id in different parts is not conflated.
+            var visitKey = part.Name + "\0" + objectId;
+            if (!visiting.Add(visitKey))
             {
                 return;
             }
 
             try
             {
-                var meshElement = objectElement.Elements().FirstOrDefault(element => element.Name.LocalName == "mesh" && element.Name.Namespace == coreNamespace);
+                var meshElement = objectElement.Elements().FirstOrDefault(element => element.Name.LocalName == "mesh" && element.Name.Namespace == part.CoreNamespace);
                 if (meshElement != null)
                 {
                     var geometry = CreateMeshGeometry(meshElement, budget);
@@ -464,7 +532,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                     }
                 }
 
-                foreach (var component in objectElement.Descendants().Where(element => element.Name.LocalName == "component" && element.Name.Namespace == coreNamespace))
+                foreach (var component in objectElement.Descendants().Where(element => element.Name.LocalName == "component" && element.Name.Namespace == part.CoreNamespace))
                 {
                     if (budget.Exhausted)
                     {
@@ -476,12 +544,26 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
                     // Component transform is applied first, then the parent transform (row-vector convention).
                     var combined = childTransform.HasValue ? childTransform.Value * transform : transform;
-                    ResolveObject(childId, combined, objectsById, coreNamespace, modelGroup, material, visiting, depth + 1, budget);
+
+                    // 3MF Production Extension: a component may carry a p:path attribute referencing an
+                    // object in another .model part (matched by local name + non-core namespace so we do
+                    // not depend on the exact production namespace version). Resolve into that part;
+                    // otherwise the reference is same-part.
+                    var pathValue = component.Attributes()
+                        .FirstOrDefault(attribute => attribute.Name.LocalName == "path" &&
+                                                     attribute.Name.Namespace != XNamespace.None &&
+                                                     attribute.Name.Namespace != part.CoreNamespace)?.Value;
+
+                    var targetPart = string.IsNullOrWhiteSpace(pathValue)
+                        ? part
+                        : package.GetPart(NormalizePartName(pathValue));
+
+                    ResolveObject(package, targetPart, childId, combined, modelGroup, material, visiting, depth + 1, budget);
                 }
             }
             finally
             {
-                visiting.Remove(objectId);
+                visiting.Remove(visitKey);
             }
         }
 
