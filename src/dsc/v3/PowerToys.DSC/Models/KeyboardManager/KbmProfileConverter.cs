@@ -519,9 +519,31 @@ public static class KbmProfileConverter
 
     private static (List<uint> Modifiers, uint Action, uint Chord) DecomposeShortcut(KbmShortcutParser.ParsedKeys s)
     {
-        var modifiers = s.Keys.Where(KbmKeyNames.IsModifier).ToList();
-        var action = s.Keys.FirstOrDefault(k => !KbmKeyNames.IsModifier(k) && k != s.SecondKeyOfChord);
-        return (modifiers, action, s.SecondKeyOfChord);
+        var modifiers = new List<uint>();
+        var action = 0u;
+        var chord = s.SecondKeyOfChord;
+        var lastIndex = s.Keys.Count - 1;
+
+        for (var i = 0; i < s.Keys.Count; i++)
+        {
+            var key = s.Keys[i];
+            if (KbmKeyNames.IsModifier(key))
+            {
+                modifiers.Add(key);
+            }
+            else if (chord != 0 && i == lastIndex)
+            {
+                // The trailing element is the chord's second key; exclude it by
+                // position so a chord that repeats the action key (e.g.
+                // 'Ctrl+A, A') still resolves the correct first-stage action.
+            }
+            else
+            {
+                action = key;
+            }
+        }
+
+        return (modifiers, action, chord);
     }
 
     private static bool ShortcutKeysEqual(KbmShortcutParser.ParsedKeys a, KbmShortcutParser.ParsedKeys b)
@@ -546,15 +568,17 @@ public static class KbmProfileConverter
 
     /// <summary>
     /// Determines whether two shortcuts overlap, mirroring the editor's
-    /// DoShortcutsOverlap: they must share the same action key, chord, and set
-    /// of modifier classes, and within each class the specific keys must be
-    /// compatible (equal or one of them a generic modifier).
+    /// DoShortcutsOverlap: they must share the same action key and set of
+    /// modifier classes, and within each class the specific keys must be
+    /// compatible (equal or one of them a generic modifier). Differing chords
+    /// normally distinguish two shortcuts, but when a generic modifier makes
+    /// the first stage ambiguous both mappings still compete, so they overlap.
     /// </summary>
     private static bool ShortcutsOverlap(KbmShortcutParser.ParsedKeys a, KbmShortcutParser.ParsedKeys b)
     {
         var (modsA, actionA, chordA) = DecomposeShortcut(a);
         var (modsB, actionB, chordB) = DecomposeShortcut(b);
-        if (actionA != actionB || chordA != chordB)
+        if (actionA != actionB)
         {
             return false;
         }
@@ -566,17 +590,26 @@ public static class KbmProfileConverter
             return false;
         }
 
+        var anyGenericMismatch = false;
         foreach (var cls in classesA)
         {
             var keyA = modsA.First(k => KbmKeyNames.GetModifierClass(k) == cls);
             var keyB = modsB.First(k => KbmKeyNames.GetModifierClass(k) == cls);
-            if (keyA != keyB && !IsGenericModifier(keyA) && !IsGenericModifier(keyB))
+            if (keyA != keyB)
             {
-                return false;
+                if (!IsGenericModifier(keyA) && !IsGenericModifier(keyB))
+                {
+                    return false;
+                }
+
+                anyGenericMismatch = true;
             }
         }
 
-        return true;
+        // Identical (sided) first stages are distinct chord shortcuts, so their
+        // differing chords do not conflict; a generic modifier makes the first
+        // stage ambiguous, so differing chords still conflict in that case.
+        return chordA == chordB || anyGenericMismatch;
     }
 
     /// <summary>
@@ -587,12 +620,11 @@ public static class KbmProfileConverter
     private static bool IsIllegalSourceShortcut(KbmShortcutParser.ParsedKeys from, out string? name)
     {
         name = null;
-        var (modifiers, action, chord) = DecomposeShortcut(from);
-        if (chord != 0)
-        {
-            return false;
-        }
 
+        // Evaluate the first-stage shortcut (modifiers + action); the chord's
+        // second key is ignored because the OS intercepts the first stage
+        // (e.g. 'Win+L, X' is still blocked at 'Win+L').
+        var (modifiers, action, _) = DecomposeShortcut(from);
         var classes = modifiers.Select(KbmKeyNames.GetModifierClass).ToHashSet();
 
         // Win+L (lock workstation)
@@ -614,11 +646,19 @@ public static class KbmProfileConverter
 
     private static bool TryParseTarget(string input, out KbmShortcutParser.ParsedKeys result, out string error)
     {
-        // A remap target may be a single key (including a lone modifier, e.g.
-        // remapping CapsLock to LCtrl) or a shortcut; chords are origin-only.
+        // A remap target may be a single key (including punctuation aliases such
+        // as "," and lone modifiers) or a shortcut; chords are origin-only. Try
+        // the single-key parse first so a key whose name contains a separator
+        // (e.g. ",") is not misrouted to the shortcut parser.
+        if (KbmShortcutParser.TryParseKey(input, out result, out error))
+        {
+            return true;
+        }
+
         if (!input.Contains('+', StringComparison.Ordinal) && !input.Contains(',', StringComparison.Ordinal))
         {
-            return KbmShortcutParser.TryParseKey(input, out result, out error);
+            // No separators: the single-key parse failure is the real error.
+            return false;
         }
 
         if (!KbmShortcutParser.TryParseKeyOrShortcut(input, out result, out error))
