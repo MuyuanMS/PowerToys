@@ -409,7 +409,20 @@ public static class KbmProfileConverter
                     continue;
                 }
 
-                entry.To = KbmShortcutParser.Format(KbmShortcutParser.Canonicalize(to));
+                var target = KbmShortcutParser.Format(KbmShortcutParser.Canonicalize(to));
+
+                // Ensure the exported target is one that Validate accepts on a
+                // subsequent set (e.g. a numeric-only stored value like '17;18'
+                // would render as a modifier-only 'Ctrl+Alt', which is not a
+                // supported target); skip it with a warning otherwise so the
+                // exported state stays importable.
+                if (!TryParseTarget(target, out _, out _))
+                {
+                    warnings?.Add($"Skipping shortcut remap entry '{stored.OriginalKeys}' with an unsupported target '{target}'");
+                    continue;
+                }
+
+                entry.To = target;
             }
 
             shortcuts.Add(entry);
@@ -684,7 +697,7 @@ public static class KbmProfileConverter
         // A remap target may be a single key (including punctuation aliases such
         // as "," and lone modifiers) or a shortcut; chords are origin-only. Try
         // the single-key parse first so a key whose name contains a separator
-        // (e.g. ",") is not misrouted to the shortcut parser.
+        // (e.g. ",") is not sent to the shortcut parser by mistake.
         if (KbmShortcutParser.TryParseKey(input, out result, out error))
         {
             return true;
