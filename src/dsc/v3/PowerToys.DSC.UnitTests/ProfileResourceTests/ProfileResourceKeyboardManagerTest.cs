@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -27,6 +28,11 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
     private const string WorkProfileFileName = "work.json";
 
     private static readonly SettingsUtils _settingsUtils = SettingsUtils.Default;
+
+    private static readonly JsonSerializerOptions _profileSerializerOptions = new()
+    {
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+    };
 
     private readonly Dictionary<string, string> _originalFiles = [];
 
@@ -60,6 +66,25 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
             {
                 File.Delete(path);
             }
+        }
+
+        // The `set` tests signal the real Keyboard Manager engine to load the
+        // temporary test profile. Now that the original files are restored,
+        // signal it again so a running engine reloads the user's real profile
+        // instead of keeping the test remappings in memory.
+        SignalSettingsChangedEvent();
+    }
+
+    private static void SignalSettingsChangedEvent()
+    {
+        try
+        {
+            using var settingsEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ProfileFunctionData.SettingsEventName);
+            settingsEvent.Set();
+        }
+        catch (Exception)
+        {
+            // Best-effort: nothing to reload when no engine is running.
         }
     }
 
@@ -214,6 +239,16 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
     [TestMethod]
     public void Set_SignalsSettingsChangedEvent()
     {
+        // The settings event is a machine-wide auto-reset event. If the real
+        // Keyboard Manager engine is running it competes for the single signal
+        // and can consume it before this test observes it, so skip rather than
+        // fail nondeterministically. A proper fix injects the signaling
+        // mechanism so the test can observe it in isolation.
+        if (Process.GetProcessesByName("PowerToys.KeyboardManagerEngine").Length > 0)
+        {
+            Assert.Inconclusive("Keyboard Manager engine is running; skipping to avoid competing for the shared settings signal.");
+        }
+
         // Arrange
         using var settingsEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ProfileFunctionData.SettingsEventName);
         settingsEvent.Reset();
@@ -256,8 +291,7 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
 
     private static void SaveProfile(KeyboardManagerProfile profile, string fileName)
     {
-        var options = new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
-        _settingsUtils.SaveSettings(JsonSerializer.Serialize(profile, options), KeyboardManagerSettings.ModuleName, fileName);
+        _settingsUtils.SaveSettings(JsonSerializer.Serialize(profile, _profileSerializerOptions), KeyboardManagerSettings.ModuleName, fileName);
     }
 
     private static void AssertProfilesAreEqual(KbmProfileModel expected, KbmProfileModel actual)

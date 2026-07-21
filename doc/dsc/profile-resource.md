@@ -191,7 +191,7 @@ resources:
         keys:
           - { from: CapsLock, to: LCtrl }
         shortcuts:
-          - { from: "Ctrl+Shift+V", toText: "Best regards,`nContoso IT" }
+          - { from: "Ctrl+Shift+V", toText: "Best regards,\nContoso IT" }
 ```
 
 ### Example 3 - Capture existing remappings

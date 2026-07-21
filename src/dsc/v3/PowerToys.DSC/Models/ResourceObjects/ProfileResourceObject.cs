@@ -20,6 +20,7 @@ public sealed class ProfileResourceObject : BaseResourceObject
     /// Gets or sets the Keyboard Manager remapping profile.
     /// </summary>
     [JsonPropertyName(ProfileJsonPropertyName)]
+    [JsonRequired]
     [Required]
     [Description("The Keyboard Manager remapping profile.")]
     public KbmProfileModel Profile { get; set; } = new();
