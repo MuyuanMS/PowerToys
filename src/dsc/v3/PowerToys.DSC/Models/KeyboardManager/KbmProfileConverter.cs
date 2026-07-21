@@ -41,8 +41,8 @@ public static class KbmProfileConverter
     public static IList<string> Validate(KbmProfileModel model)
     {
         var errors = new List<string>();
-        var seenKeys = new HashSet<uint>();
-        var seenShortcuts = new HashSet<(string App, string From)>();
+        var seenKeys = new List<uint>();
+        var seenShortcuts = new List<(string App, KbmShortcutParser.ParsedKeys From)>();
 
         // JSON such as {"keys":null} or {"keys":[null]} deserializes without
         // error; guard the collections and their elements so malformed input
@@ -77,9 +77,18 @@ public static class KbmProfileConverter
             {
                 errors.Add($"{context}.from: 'Disable' cannot be remapped");
             }
-            else if (!seenKeys.Add(from.Keys[0]))
+            else if (seenKeys.Find(k => KeysOverlap(k, from.Keys[0])) is var existing && existing != 0)
             {
-                errors.Add($"{context}.from: key '{KbmKeyNames.GetName(from.Keys[0])}' is remapped more than once");
+                // Matches the editor's DoKeysOverlap: a generic modifier (e.g.
+                // Ctrl) overlaps its sided variants (LCtrl/RCtrl), so both
+                // cannot be remapped independently in the same profile.
+                errors.Add(existing == from.Keys[0]
+                    ? $"{context}.from: key '{KbmKeyNames.GetName(from.Keys[0])}' is remapped more than once"
+                    : $"{context}.from: key '{KbmKeyNames.GetName(from.Keys[0])}' overlaps '{KbmKeyNames.GetName(existing)}', which is already remapped");
+            }
+            else
+            {
+                seenKeys.Add(from.Keys[0]);
             }
 
             if (entry.To != null && !TryParseTarget(entry.To, out _, out error))
@@ -128,13 +137,29 @@ public static class KbmProfileConverter
             {
                 errors.Add($"{context}.from: 'Disable' cannot be part of a shortcut");
             }
+            else if (IsIllegalSourceShortcut(from, out var illegalName))
+            {
+                // Matches the editor's EditorHelpers::IsShortcutIllegal: the OS
+                // handles these specially, so they cannot be used as a source.
+                errors.Add($"{context}.from: shortcut '{illegalName}' is reserved by the OS and cannot be remapped");
+            }
             else
             {
                 var app = NormalizeTargetApp(entry.TargetApp) ?? string.Empty;
-                if (!seenShortcuts.Add((app, KbmShortcutParser.Format(from))))
+                var conflict = seenShortcuts.Find(s => s.App == app && ShortcutsOverlap(s.From, from));
+                if (conflict.From != null)
                 {
+                    // Matches the editor's DoShortcutsOverlap: a generic modifier
+                    // overlaps its sided variant, so 'Ctrl+A' and 'LCtrl+A'
+                    // conflict in the same scope.
                     var scope = app.Length == 0 ? "globally" : $"for app '{app}'";
-                    errors.Add($"{context}.from: shortcut '{KbmShortcutParser.Format(from)}' is remapped more than once {scope}");
+                    errors.Add(ShortcutKeysEqual(conflict.From, from)
+                        ? $"{context}.from: shortcut '{KbmShortcutParser.Format(from)}' is remapped more than once {scope}"
+                        : $"{context}.from: shortcut '{KbmShortcutParser.Format(from)}' overlaps '{KbmShortcutParser.Format(conflict.From)}', which is already remapped {scope}");
+                }
+                else
+                {
+                    seenShortcuts.Add((app, from));
                 }
             }
 
@@ -324,9 +349,9 @@ public static class KbmProfileConverter
                     FilePath = stored.RunProgramFilePath,
                     Args = NullIfEmpty(stored.RunProgramArgs),
                     StartInDir = NullIfEmpty(stored.RunProgramStartInDir),
-                    Elevation = FormatEnumValue(stored.RunProgramElevationLevel, _elevationNames),
-                    IfRunning = FormatEnumValue(stored.RunProgramAlreadyRunningAction, _ifRunningNames),
-                    WindowStyle = FormatEnumValue(stored.RunProgramStartWindowType, _windowStyleNames),
+                    Elevation = FormatEnumValue(stored.RunProgramElevationLevel, _elevationNames, $"runProgram.elevation for '{stored.OriginalKeys}'", warnings),
+                    IfRunning = FormatEnumValue(stored.RunProgramAlreadyRunningAction, _ifRunningNames, $"runProgram.ifRunning for '{stored.OriginalKeys}'", warnings),
+                    WindowStyle = FormatEnumValue(stored.RunProgramStartWindowType, _windowStyleNames, $"runProgram.windowStyle for '{stored.OriginalKeys}'", warnings),
                 };
             }
             else if (stored.OperationType == OperationTypeOpenUri)
@@ -433,6 +458,120 @@ public static class KbmProfileConverter
         };
     }
 
+    // Virtual-key codes of the generic (side-agnostic) modifiers.
+    private const uint VkCtrl = 17;
+    private const uint VkAlt = 18;
+    private const uint VkShift = 16;
+    private const uint VkL = 76;
+    private const uint VkDelete = 46;
+
+    private static bool IsGenericModifier(uint code)
+    {
+        return code is VkCtrl or VkAlt or VkShift or KbmKeyNames.VkWinBoth;
+    }
+
+    /// <summary>
+    /// Determines whether two single keys overlap, mirroring the editor's
+    /// DoKeysOverlap: a generic modifier (e.g. Ctrl) overlaps its sided
+    /// variants (LCtrl/RCtrl); two different sided variants do not overlap.
+    /// </summary>
+    private static bool KeysOverlap(uint a, uint b)
+    {
+        if (a == b)
+        {
+            return true;
+        }
+
+        var classA = KbmKeyNames.GetModifierClass(a);
+        var classB = KbmKeyNames.GetModifierClass(b);
+        if (classA == KbmKeyNames.ModifierClass.None || classA != classB)
+        {
+            return false;
+        }
+
+        return IsGenericModifier(a) || IsGenericModifier(b);
+    }
+
+    private static (List<uint> Modifiers, uint Action, uint Chord) DecomposeShortcut(KbmShortcutParser.ParsedKeys s)
+    {
+        var modifiers = s.Keys.Where(KbmKeyNames.IsModifier).ToList();
+        var action = s.Keys.FirstOrDefault(k => !KbmKeyNames.IsModifier(k) && k != s.SecondKeyOfChord);
+        return (modifiers, action, s.SecondKeyOfChord);
+    }
+
+    private static bool ShortcutKeysEqual(KbmShortcutParser.ParsedKeys a, KbmShortcutParser.ParsedKeys b)
+    {
+        return a.SecondKeyOfChord == b.SecondKeyOfChord && a.Keys.SequenceEqual(b.Keys);
+    }
+
+    /// <summary>
+    /// Determines whether two shortcuts overlap, mirroring the editor's
+    /// DoShortcutsOverlap: they must share the same action key, chord, and set
+    /// of modifier classes, and within each class the specific keys must be
+    /// compatible (equal or one of them a generic modifier).
+    /// </summary>
+    private static bool ShortcutsOverlap(KbmShortcutParser.ParsedKeys a, KbmShortcutParser.ParsedKeys b)
+    {
+        var (modsA, actionA, chordA) = DecomposeShortcut(a);
+        var (modsB, actionB, chordB) = DecomposeShortcut(b);
+        if (actionA != actionB || chordA != chordB)
+        {
+            return false;
+        }
+
+        var classesA = modsA.Select(KbmKeyNames.GetModifierClass).ToHashSet();
+        var classesB = modsB.Select(KbmKeyNames.GetModifierClass).ToHashSet();
+        if (!classesA.SetEquals(classesB))
+        {
+            return false;
+        }
+
+        foreach (var cls in classesA)
+        {
+            var keyA = modsA.First(k => KbmKeyNames.GetModifierClass(k) == cls);
+            var keyB = modsB.First(k => KbmKeyNames.GetModifierClass(k) == cls);
+            if (keyA != keyB && !IsGenericModifier(keyA) && !IsGenericModifier(keyB))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Determines whether a source shortcut is one the OS reserves and the
+    /// editor rejects (EditorHelpers::IsShortcutIllegal), such as Win+L or
+    /// Ctrl+Alt+Delete, which cannot be intercepted as a remap source.
+    /// </summary>
+    private static bool IsIllegalSourceShortcut(KbmShortcutParser.ParsedKeys from, out string? name)
+    {
+        name = null;
+        var (modifiers, action, chord) = DecomposeShortcut(from);
+        if (chord != 0)
+        {
+            return false;
+        }
+
+        var classes = modifiers.Select(KbmKeyNames.GetModifierClass).ToHashSet();
+
+        // Win+L (lock workstation)
+        if (action == VkL && classes.SetEquals(new[] { KbmKeyNames.ModifierClass.Win }))
+        {
+            name = "Win+L";
+            return true;
+        }
+
+        // Ctrl+Alt+Delete (secure attention sequence)
+        if (action == VkDelete && classes.SetEquals(new[] { KbmKeyNames.ModifierClass.Ctrl, KbmKeyNames.ModifierClass.Alt }))
+        {
+            name = "Ctrl+Alt+Delete";
+            return true;
+        }
+
+        return false;
+    }
+
     private static bool TryParseTarget(string input, out KbmShortcutParser.ParsedKeys result, out string error)
     {
         // A remap target may be a single key (including a lone modifier, e.g.
@@ -485,10 +624,24 @@ public static class KbmProfileConverter
         return index >= 0 ? index : throw new InvalidOperationException($"Invalid value '{name}'");
     }
 
-    private static string? FormatEnumValue(int? value, string[] names)
+    private static string? FormatEnumValue(int? value, string[] names, string context, IList<string>? warnings)
     {
-        // Default (0) values are omitted from the canonical form
-        return value is > 0 && value < names.Length ? names[value.Value] : null;
+        // Default (0) values are omitted from the canonical form.
+        if (value is null or 0)
+        {
+            return null;
+        }
+
+        if (value < 0 || value >= names.Length)
+        {
+            // The stored value is outside the range this resource understands
+            // (e.g. written by a newer engine). Surface it instead of silently
+            // normalizing to the default, which would hide configuration drift.
+            warnings?.Add($"{context}: stored value '{value}' is out of range and was omitted from the exported state");
+            return null;
+        }
+
+        return names[value.Value];
     }
 
     private static string? NormalizeTargetApp(string? app)
