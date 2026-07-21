@@ -558,16 +558,23 @@ public static class KbmProfileConverter
     {
         foreach (var stored in section?.GlobalRemapShortcuts ?? [])
         {
-            if (stored != null)
+            if (stored == null)
             {
-                yield return (stored, null);
+                // A null element (e.g. "global":[null]) is a load failure for
+                // the C++ engine; warn so NeedsUpdate() forces a rewrite rather
+                // than silently comparing equal to an empty desired profile.
+                warnings?.Add("Skipping a null global shortcut remap entry");
+                continue;
             }
+
+            yield return (stored, null);
         }
 
         foreach (var stored in section?.AppSpecificRemapShortcuts ?? [])
         {
             if (stored == null)
             {
+                warnings?.Add("Skipping a null app-specific shortcut remap entry");
                 continue;
             }
 
