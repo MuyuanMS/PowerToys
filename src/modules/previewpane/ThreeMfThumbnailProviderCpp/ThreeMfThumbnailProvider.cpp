@@ -135,6 +135,11 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
                 return E_FAIL;
             }
 
+            // Cap the amount copied from the (untrusted) source stream so browsing a very large or
+            // attacker-supplied .3mf cannot fill the disk or block this loop indefinitely.
+            constexpr unsigned long long MaxPackageBytes = 256ULL * 1024 * 1024; // 256 MB
+            unsigned long long totalCopied = 0;
+
             while (true)
             {
                 HRESULT result = m_pStream->Read(buffer, sizeof(buffer), &cbRead);
@@ -153,6 +158,18 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
 
                 if (cbRead > 0)
                 {
+                    totalCopied += cbRead;
+                    if (totalCopied > MaxPackageBytes)
+                    {
+                        Logger::error(L"3MF package exceeds the maximum supported size; aborting.");
+                        file.close();
+                        std::error_code removeEc;
+                        std::filesystem::remove(fileName, removeEc);
+                        m_pStream->Release();
+                        m_pStream = NULL;
+                        return E_FAIL;
+                    }
+
                     file.write(buffer, cbRead);
                 }
 
@@ -228,6 +245,9 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
 
                     *phbmp = hbmp;
                     *pdwAlpha = WTS_ALPHATYPE::WTSAT_ARGB;
+
+                    // Only report success once both COM output parameters have been assigned.
+                    return S_OK;
                 }
                 else
                 {
@@ -250,7 +270,9 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
         m_pStream = NULL;
     }
 
-    return S_OK;
+    // Default to failure: control only reaches here through GUID/CLSID failures or the
+    // exception path, none of which assigned the output parameters.
+    return E_FAIL;
 }
 
 #pragma endregion
