@@ -275,8 +275,13 @@ public sealed class ProfileFunctionData : BaseFunctionData
         }
 
         // Normalization is needed when the settings are missing/unreadable, the
-        // active configuration is empty, or it is not a safe file name.
-        needsNormalization = !settingsReadable || !IsSafeConfigurationName(activeConfiguration);
+        // active configuration is empty, or it is not a safe file name. The
+        // deserialized model defaults the value to "default", so also treat a
+        // raw file that omits the property as needing normalization: the engine
+        // reads the raw file and would not load any remaps in that case.
+        needsNormalization = !settingsReadable
+            || !IsSafeConfigurationName(activeConfiguration)
+            || !RawSettingsHasActiveConfiguration();
         return BuildProfileFileName(activeConfiguration);
     }
 
@@ -294,6 +299,42 @@ public sealed class ProfileFunctionData : BaseFunctionData
         return IsSafeConfigurationName(activeConfiguration)
             ? $"{activeConfiguration}.json"
             : "default.json";
+    }
+
+    /// <summary>
+    /// <summary>
+    /// Determines whether the raw settings file actually carries an engine-
+    /// readable <c>properties.activeConfiguration.value</c> string. The
+    /// deserialized <see cref="KeyboardManagerProperties"/> cannot answer this:
+    /// its constructor defaults the value to "default", so a file that omits
+    /// <c>properties</c> or <c>activeConfiguration</c> still deserializes to a
+    /// non-empty value. The C++ engine reads the raw file directly and its
+    /// <c>MappingConfiguration::LoadSettings</c> returns before loading any
+    /// remaps when the property is absent, so we must inspect the raw JSON to
+    /// keep the two paths in agreement.
+    /// </summary>
+    /// <returns>True when the raw file contains a non-empty active configuration value.</returns>
+    private static bool RawSettingsHasActiveConfiguration()
+    {
+        try
+        {
+            var path = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName);
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            return document.RootElement.ValueKind == JsonValueKind.Object
+                && document.RootElement.TryGetProperty("properties", out var properties)
+                && properties.ValueKind == JsonValueKind.Object
+                && properties.TryGetProperty("activeConfiguration", out var activeConfiguration)
+                && activeConfiguration.ValueKind == JsonValueKind.Object
+                && activeConfiguration.TryGetProperty("value", out var value)
+                && value.ValueKind == JsonValueKind.String
+                && !string.IsNullOrEmpty(value.GetString());
+        }
+        catch (Exception)
+        {
+            // An unreadable/corrupt settings file is handled by the callers,
+            // which fall back to normalization rather than trusting the model.
+            return false;
+        }
     }
 
     /// <summary>
@@ -386,6 +427,15 @@ public sealed class ProfileFunctionData : BaseFunctionData
             // would let a user-writable value redirect the write outside the
             // module directory (a privileged arbitrary-write risk when elevated).
             throw new IOException($"The Keyboard Manager active configuration '{activeConfiguration}' is not a valid profile name.");
+        }
+        else if (settingsExist && !RawSettingsHasActiveConfiguration())
+        {
+            // The model defaulted the value to "default" because the raw file
+            // omits properties.activeConfiguration. The engine reads the raw
+            // file and would return before loading any remaps, so persist the
+            // property to keep the write and the engine's load in agreement.
+            settings.Properties.ActiveConfiguration = new GenericProperty<string>(activeConfiguration);
+            normalized = true;
         }
 
         // Persist when the settings file is missing (so the engine can resolve
