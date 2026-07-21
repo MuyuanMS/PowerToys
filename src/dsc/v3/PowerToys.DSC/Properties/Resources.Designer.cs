@@ -142,6 +142,15 @@ namespace PowerToys.DSC.Properties {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Failed to apply Keyboard Manager profile: {0}.
+        /// </summary>
+        internal static string ApplyProfileError {
+            get {
+                return ResourceManager.GetString("ApplyProfileError", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Invalid resource name. Valid resource names are: {0}.
         /// </summary>
         internal static string InvalidResourceNameError {
