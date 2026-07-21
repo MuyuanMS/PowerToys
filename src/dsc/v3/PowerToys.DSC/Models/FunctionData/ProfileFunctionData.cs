@@ -100,6 +100,14 @@ public sealed class ProfileFunctionData : BaseFunctionData
             {
                 profile = _settingsUtils.GetSettings<KeyboardManagerProfile>(
                     KeyboardManagerSettings.ModuleName, fileName);
+
+                // A profile file that is the JSON literal `null` deserializes
+                // without throwing; treat it as unreadable so it is reported as
+                // a warning rather than crashing the conversion below.
+                if (profile == null)
+                {
+                    throw new JsonException("The profile file contains a null document.");
+                }
             }
             catch (Exception ex)
             {
@@ -264,12 +272,12 @@ public sealed class ProfileFunctionData : BaseFunctionData
                 ? _settingsUtils.GetSettings<KeyboardManagerSettings>(KeyboardManagerSettings.ModuleName)
                 : new KeyboardManagerSettings();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Treat an unreadable settings file as missing so we write a valid
-            // one below rather than leaving the engine unable to load.
-            settings = new KeyboardManagerSettings();
-            settingsExist = false;
+            // An existing settings file that cannot be read holds editor options
+            // and other module metadata; fail the set rather than overwriting it
+            // with defaults, which would erase that state.
+            throw new IOException("The Keyboard Manager settings file could not be read; aborting to avoid overwriting it.", ex);
         }
 
         settings.Properties ??= new KeyboardManagerProperties();

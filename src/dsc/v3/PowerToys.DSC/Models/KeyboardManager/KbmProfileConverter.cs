@@ -323,6 +323,12 @@ public static class KbmProfileConverter
 
         foreach (var stored in profile.RemapKeys?.InProcessRemapKeys ?? [])
         {
+            if (stored == null)
+            {
+                warnings?.Add("Skipping a null key remap entry");
+                continue;
+            }
+
             if (!KbmShortcutParser.TryParseVkString(stored.OriginalKeys, 0, out var from) || !from.IsSingleKey ||
                 !KbmShortcutParser.TryParseVkString(stored.NewRemapKeys, 0, out var to))
             {
@@ -339,6 +345,12 @@ public static class KbmProfileConverter
 
         foreach (var stored in profile.RemapKeysToText?.InProcessRemapKeys ?? [])
         {
+            if (stored == null)
+            {
+                warnings?.Add("Skipping a null key-to-text remap entry");
+                continue;
+            }
+
             if (!KbmShortcutParser.TryParseVkString(stored.OriginalKeys, 0, out var from) || !from.IsSingleKey ||
                 string.IsNullOrEmpty(stored.NewRemapString))
             {
@@ -381,7 +393,7 @@ public static class KbmProfileConverter
             }
             else if (stored.OperationType == OperationTypeOpenUri)
             {
-                if (string.IsNullOrEmpty(stored.OpenUri))
+                if (string.IsNullOrWhiteSpace(stored.OpenUri))
                 {
                     warnings?.Add($"Skipping open-URI remap entry '{stored.OriginalKeys}' without a URI");
                     continue;
@@ -449,12 +461,18 @@ public static class KbmProfileConverter
     {
         foreach (var stored in section?.GlobalRemapShortcuts ?? [])
         {
-            yield return (stored, null);
+            if (stored != null)
+            {
+                yield return (stored, null);
+            }
         }
 
         foreach (var stored in section?.AppSpecificRemapShortcuts ?? [])
         {
-            yield return (stored, stored.TargetApp);
+            if (stored != null)
+            {
+                yield return (stored, stored.TargetApp);
+            }
         }
     }
 
@@ -473,6 +491,17 @@ public static class KbmProfileConverter
             !KbmKeyNames.IsModifier(from.Keys[^1]) && !KbmKeyNames.IsModifier(from.Keys[^2]))
         {
             from = new KbmShortcutParser.ParsedKeys(from.Keys, from.Keys[^1]);
+        }
+
+        // A stored key list of the right length is not necessarily a valid
+        // shortcut: a modifier-only source ('Ctrl+Alt') or a modifier-less one
+        // ('A, B') would be exported but rejected by Validate on re-import. Skip
+        // such entries so exported state remains importable.
+        var (modifiers, action, _) = DecomposeShortcut(from);
+        if (modifiers.Count == 0 || action == 0 || from.Keys.Contains(KbmKeyNames.VkDisabled))
+        {
+            warnings?.Add($"Skipping shortcut remap entry '{stored.OriginalKeys}' that is not a valid shortcut");
+            return null;
         }
 
         return new KbmShortcutRemapEntry
@@ -590,7 +619,7 @@ public static class KbmProfileConverter
             return false;
         }
 
-        var anyGenericMismatch = false;
+        var firstStageAmbiguous = false;
         foreach (var cls in classesA)
         {
             var keyA = modsA.First(k => KbmKeyNames.GetModifierClass(k) == cls);
@@ -602,14 +631,20 @@ public static class KbmProfileConverter
                     return false;
                 }
 
-                anyGenericMismatch = true;
+                firstStageAmbiguous = true;
+            }
+            else if (IsGenericModifier(keyA))
+            {
+                // A generic modifier (ModifierKey::Both) matches either side, so
+                // it makes the first stage ambiguous even when the codes match.
+                firstStageAmbiguous = true;
             }
         }
 
         // Identical (sided) first stages are distinct chord shortcuts, so their
-        // differing chords do not conflict; a generic modifier makes the first
-        // stage ambiguous, so differing chords still conflict in that case.
-        return chordA == chordB || anyGenericMismatch;
+        // differing chords do not conflict; an ambiguous first stage (any
+        // generic modifier) makes differing chords conflict as well.
+        return chordA == chordB || firstStageAmbiguous;
     }
 
     /// <summary>
@@ -669,6 +704,14 @@ public static class KbmProfileConverter
         if (result.SecondKeyOfChord != 0)
         {
             error = $"Chords are not supported in remap targets ('{input.Trim()}')";
+            return false;
+        }
+
+        // 'Disable' is only meaningful as a lone target; the engine does not
+        // treat VK_DISABLED as the disable action when combined with other keys.
+        if (result.Keys.Count > 1 && result.Keys.Contains(KbmKeyNames.VkDisabled))
+        {
+            error = $"'Disable' can only be used as a single-key target ('{input.Trim()}')";
             return false;
         }
 
