@@ -29,6 +29,14 @@ ThreeMfThumbnailProvider::ThreeMfThumbnailProvider() :
 
 ThreeMfThumbnailProvider::~ThreeMfThumbnailProvider()
 {
+    // Release the stream retained in Initialize in case the object is destroyed
+    // without GetThumbnail ever being called.
+    if (m_pStream)
+    {
+        m_pStream->Release();
+        m_pStream = NULL;
+    }
+
     InterlockedDecrement(&g_cDllRef);
 }
 
@@ -103,7 +111,7 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
         wil::unique_cotaskmem_string guidString;
         if (SUCCEEDED(StringFromCLSID(guid, &guidString)))
         {
-            Logger::info(L"Read stream and save to tmp file.");
+            Logger::trace(L"Read stream and save to tmp file.");
             
             // {CLSID} -> CLSID
             std::wstring guid = std::wstring(guidString.get()).substr(1, std::wstring(guidString.get()).size() - 2);
@@ -121,14 +129,33 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
 
             if (!file.is_open())
             {
-                return 0;
+                Logger::error(L"Failed to create temporary file for thumbnail generation.");
+                m_pStream->Release();
+                m_pStream = NULL;
+                return E_FAIL;
             }
 
             while (true)
             {
-                auto result = m_pStream->Read(buffer, 4096, &cbRead);
+                HRESULT result = m_pStream->Read(buffer, sizeof(buffer), &cbRead);
+                if (FAILED(result))
+                {
+                    // On a failed read cbRead is not valid and the loop would otherwise
+                    // spin writing stale data. Clean up and propagate the failure.
+                    Logger::error(L"Failed to read from source stream.");
+                    file.close();
+                    std::error_code removeEc;
+                    std::filesystem::remove(fileName, removeEc);
+                    m_pStream->Release();
+                    m_pStream = NULL;
+                    return result;
+                }
 
-                file.write(buffer, cbRead);
+                if (cbRead > 0)
+                {
+                    file.write(buffer, cbRead);
+                }
+
                 if (result == S_FALSE)
                 {
                     break;
@@ -141,7 +168,7 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
 
             try
             {
-                Logger::info(L"Start ThreeMfThumbnailProvider.exe");
+                Logger::trace(L"Start ThreeMfThumbnailProvider.exe");
                 
                 STARTUPINFO info = { sizeof(info) };
                 std::wstring cmdLine{ L"\"" + fileName + L"\"" };
@@ -155,21 +182,56 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
                 sei.lpFile = appPath.c_str();
                 sei.lpParameters = cmdLine.c_str();
                 sei.nShow = SW_SHOWDEFAULT;
-                ShellExecuteEx(&sei);
+
+                std::error_code ec;
+
+                if (!ShellExecuteEx(&sei) || sei.hProcess == NULL)
+                {
+                    Logger::error(L"Failed to start PowerToys.ThreeMfThumbnailProvider.exe.");
+                    std::filesystem::remove(fileName, ec);
+                    return E_FAIL;
+                }
+
                 m_process = sei.hProcess;
-                WaitForSingleObject(m_process, INFINITE);
-                std::filesystem::remove(fileName);
+
+                // Bound the wait so a malformed or expensive 3MF cannot block the Explorer
+                // thumbnail host indefinitely, and always close the worker process handle.
+                constexpr DWORD ThumbnailTimeoutMs = 30000;
+                DWORD waitResult = WaitForSingleObject(m_process, ThumbnailTimeoutMs);
+                if (waitResult != WAIT_OBJECT_0)
+                {
+                    Logger::error(L"Thumbnail generation timed out; terminating worker process.");
+                    TerminateProcess(m_process, 1);
+                    WaitForSingleObject(m_process, 5000);
+                    CloseHandle(m_process);
+                    m_process = NULL;
+                    std::filesystem::remove(fileName, ec);
+                    return E_FAIL;
+                }
+
+                CloseHandle(m_process);
+                m_process = NULL;
+
+                std::filesystem::remove(fileName, ec);
 
                 std::wstring fileNameBmp = filePath + guid + L".bmp";
                 if (std::filesystem::exists(fileNameBmp))
                 {
-                    *phbmp = static_cast<HBITMAP>(LoadImage(NULL, fileNameBmp.c_str(), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE));
+                    HBITMAP hbmp = static_cast<HBITMAP>(LoadImage(NULL, fileNameBmp.c_str(), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE));
+                    std::filesystem::remove(fileNameBmp, ec);
+
+                    if (hbmp == NULL)
+                    {
+                        Logger::error(L"Failed to load generated bitmap.");
+                        return E_FAIL;
+                    }
+
+                    *phbmp = hbmp;
                     *pdwAlpha = WTS_ALPHATYPE::WTSAT_ARGB;
-                    std::filesystem::remove(fileNameBmp);
                 }
                 else
                 {
-                    Logger::info(L"Bmp file not generated.");
+                    Logger::warn(L"Bmp file not generated.");
                     return E_FAIL;
                 }
             }
