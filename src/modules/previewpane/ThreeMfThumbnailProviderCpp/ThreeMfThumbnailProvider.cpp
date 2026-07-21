@@ -116,9 +116,22 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
             // {CLSID} -> CLSID
             std::wstring guid = std::wstring(guidString.get()).substr(1, std::wstring(guidString.get()).size() - 2);
             std::wstring filePath = PTSettingsHelper::get_local_low_folder_location() + L"\\ThreeMfThumbnail-Temp\\";
-            if (!std::filesystem::exists(filePath))
+
+            // Use the error_code overloads: these run outside the try/catch below, so a throwing
+            // filesystem_error (e.g. inaccessible LocalLow) would otherwise escape the COM boundary
+            // into Explorer and leak the retained stream. Fail cleanly with an HRESULT instead.
+            std::error_code createEc;
+            if (!std::filesystem::exists(filePath, createEc))
             {
-                std::filesystem::create_directories(filePath);
+                std::filesystem::create_directories(filePath, createEc);
+            }
+
+            if (createEc)
+            {
+                Logger::error(L"Failed to create temporary directory for thumbnail generation.");
+                m_pStream->Release();
+                m_pStream = NULL;
+                return E_FAIL;
             }
 
             std::wstring fileName = filePath + guid + L".3mf";

@@ -25,6 +25,24 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
         private const int MaxTotalVertices = 4_000_000;
         private const int MaxComponentDepth = 16;
 
+        // Relationship (.rels) parts are small by spec; cap them so a highly compressed relationship
+        // XML entry cannot consume unbounded memory before the worker timeout fires.
+        private const long MaxUncompressedRelationshipBytes = 1L * 1024 * 1024; // 1 MB
+        private const long MaxXmlCharacters = 64L * 1024 * 1024; // parser guard for all XML parts
+
+        // Standardized OPC/3MF relationship type URIs. Relationship types are URI identifiers, so we
+        // match them exactly (case-insensitively) rather than by substring to avoid classifying
+        // unrelated vendor relationships (e.g. a "thumbnail-settings" type) as the real thumbnail/model.
+        private static readonly string[] ThumbnailRelationshipTypes =
+        {
+            "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail",
+        };
+
+        private static readonly string[] ModelRelationshipTypes =
+        {
+            "http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel",
+        };
+
         // Mutable budgets shared across the whole package so a single 3MF cannot exhaust memory/CPU
         // through large vertex lists, triangle counts, or repeated component references.
         private sealed class GeometryBudget
@@ -188,7 +206,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
         private static List<ZipArchiveEntry> ResolveModelEntries(ZipArchive archive)
         {
             var resolved = new List<ZipArchiveEntry>();
-            foreach (var target in GetTargetsFromRelationships(archive, "3dmodel"))
+            foreach (var target in GetTargetsFromRelationships(archive, ModelRelationshipTypes))
             {
                 var entry = ResolveEntry(archive, target);
                 if (entry != null && !resolved.Contains(entry))
@@ -216,6 +234,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 DtdProcessing = DtdProcessing.Prohibit,
                 XmlResolver = null,
                 MaxCharactersFromEntities = 0,
+                MaxCharactersInDocument = MaxXmlCharacters,
             };
 
             using var reader = XmlReader.Create(stream, settings);
@@ -241,10 +260,10 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
         private static IEnumerable<string> GetThumbnailTargetsFromRelationships(ZipArchive archive)
         {
-            return GetTargetsFromRelationships(archive, "thumbnail");
+            return GetTargetsFromRelationships(archive, ThumbnailRelationshipTypes);
         }
 
-        private static IEnumerable<string> GetTargetsFromRelationships(ZipArchive archive, string typeKeyword)
+        private static IEnumerable<string> GetTargetsFromRelationships(ZipArchive archive, string[] relationshipTypes)
         {
             var targets = new List<string>();
             foreach (var entry in archive.Entries)
@@ -255,12 +274,34 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                     continue;
                 }
 
-                using var relStream = entry.Open();
-                var document = LoadXmlSafe(relStream);
+                // Bound relationship parts before parsing: reject an oversized declared length and
+                // copy through a size-limited buffer so a compressed .rels bomb cannot exhaust memory.
+                if (entry.Length > MaxUncompressedRelationshipBytes)
+                {
+                    continue;
+                }
+
+                XDocument document;
+                using (var relStream = entry.Open())
+                using (var boundedStream = new MemoryStream())
+                {
+                    CopyWithLimit(relStream, boundedStream, MaxUncompressedRelationshipBytes);
+                    boundedStream.Position = 0;
+                    document = LoadXmlSafe(boundedStream);
+                }
+
                 foreach (var relationship in document.Descendants().Where(element => element.Name.LocalName == "Relationship"))
                 {
                     var type = relationship.Attribute("Type")?.Value ?? string.Empty;
-                    if (!type.Contains(typeKeyword, StringComparison.OrdinalIgnoreCase))
+                    if (!relationshipTypes.Any(known => string.Equals(type, known, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        continue;
+                    }
+
+                    // Ignore relationships that point outside the package; those parts are not present
+                    // in the archive and must never be dereferenced by the provider.
+                    var targetMode = relationship.Attribute("TargetMode")?.Value;
+                    if (string.Equals(targetMode, "External", StringComparison.OrdinalIgnoreCase))
                     {
                         continue;
                     }
@@ -290,9 +331,13 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 }
             }
 
-            // Only core-namespace <item> children of the <build> element are build items; ignore
-            // <item> elements introduced by unrelated extension namespaces.
-            var buildElement = document.Root?.Elements().FirstOrDefault(element => element.Name.LocalName == "build");
+            // Only a <build> in the model root's core namespace counts; an extension-namespace
+            // <ext:build> must not suppress the no-build fallback. Its core-namespace <item> children
+            // are the build items; ignore <item> elements introduced by unrelated extensions.
+            var rootNamespace = document.Root?.Name.Namespace;
+            var buildElement = document.Root?
+                .Elements()
+                .FirstOrDefault(element => element.Name.LocalName == "build" && element.Name.Namespace == rootNamespace);
             var buildItems = buildElement?
                 .Elements()
                 .Where(element => element.Name.LocalName == "item" && element.Name.Namespace == buildElement.Name.Namespace)

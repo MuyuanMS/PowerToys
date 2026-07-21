@@ -192,7 +192,7 @@ namespace ViewModelTests
             Func<string, int> sendMockIPCConfigMSG = msg =>
             {
                 SndModuleSettings<SndPowerPreviewSettings> snd = JsonSerializer.Deserialize<SndModuleSettings<SndPowerPreviewSettings>>(msg);
-                Assert.IsTrue(snd.PowertoysSetting.FileExplorerPreviewSettings.Properties.EnableThreeMfThumbnail);
+                Assert.IsFalse(snd.PowertoysSetting.FileExplorerPreviewSettings.Properties.EnableThreeMfThumbnail);
                 return 0;
             };
 
@@ -200,7 +200,9 @@ namespace ViewModelTests
             PowerPreviewViewModel viewModel = new PowerPreviewViewModel(SettingsRepository<PowerPreviewSettings>.GetInstance(mockPowerPreviewSettingsUtils.Object), SettingsRepository<GeneralSettings>.GetInstance(mockGeneralSettingsUtils.Object), sendMockIPCConfigMSG, PowerPreviewSettings.ModuleName);
 
             // act
-            viewModel.ThreeMfThumbnailIsEnabled = true;
+            // The 3MF thumbnail toggle defaults to enabled, so toggle to false to actually enter the
+            // setter and exercise the IPC callback (assigning the default value would be a no-op).
+            viewModel.ThreeMfThumbnailIsEnabled = false;
         }
 
         [TestMethod]
