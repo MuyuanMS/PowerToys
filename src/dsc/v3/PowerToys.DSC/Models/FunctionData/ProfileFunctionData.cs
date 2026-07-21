@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -63,16 +64,48 @@ public sealed class ProfileFunctionData : BaseFunctionData
     /// <returns>The list of validation errors; empty when the input is valid.</returns>
     public IList<string> ValidateInput()
     {
+        // A `{"profile":null}` payload deserializes to a null model; reject it
+        // as a validation error instead of dereferencing it during conversion.
+        if (Input.Profile == null)
+        {
+            return new List<string> { "The 'profile' property must not be null." };
+        }
+
         return KbmProfileConverter.Validate(Input.Profile);
     }
 
     /// <summary>
-    /// Reads the current profile file into the output state.
+    /// Reads the current profile file into the output state. The read is
+    /// non-mutating: a missing or unreadable profile is reported as empty (and,
+    /// when unreadable, surfaced as a warning) instead of being overwritten
+    /// with defaults, which <see cref="SettingsUtils.GetSettingsOrDefault{T}"/>
+    /// would do on a missing or corrupt file.
     /// </summary>
     public void GetState()
     {
-        var profile = _settingsUtils.GetSettingsOrDefault<KeyboardManagerProfile>(
-            KeyboardManagerSettings.ModuleName, GetProfileFileName());
+        var fileName = GetProfileFileName();
+        KeyboardManagerProfile profile;
+
+        if (_settingsUtils.SettingsExists(KeyboardManagerSettings.ModuleName, fileName))
+        {
+            try
+            {
+                profile = _settingsUtils.GetSettings<KeyboardManagerProfile>(
+                    KeyboardManagerSettings.ModuleName, fileName);
+            }
+            catch (Exception ex)
+            {
+                // Do not replace a profile we failed to parse; report it and
+                // treat the current state as empty in memory only.
+                Warnings.Add($"Could not read the current profile '{fileName}': {ex.Message}");
+                profile = new KeyboardManagerProfile();
+            }
+        }
+        else
+        {
+            profile = new KeyboardManagerProfile();
+        }
+
         Output.Profile = KbmProfileConverter.FromProfile(profile, Warnings);
     }
 
@@ -82,6 +115,7 @@ public sealed class ProfileFunctionData : BaseFunctionData
     /// the profile is loaded on the next PowerToys start.
     /// </summary>
     /// <returns>True when the running engine was signaled; otherwise false.</returns>
+    /// <exception cref="IOException">Thrown when the profile file could not be written.</exception>
     public bool SetState()
     {
         // Ensure the module settings exist so the engine can resolve the
@@ -94,9 +128,38 @@ public sealed class ProfileFunctionData : BaseFunctionData
 
         var profile = KbmProfileConverter.ToProfile(Input.Profile);
         var profileJson = JsonSerializer.Serialize(profile, _profileSerializerOptions);
-        _settingsUtils.SaveSettings(profileJson, KeyboardManagerSettings.ModuleName, GetProfileFileName());
+        var fileName = GetProfileFileName();
+        _settingsUtils.SaveSettings(profileJson, KeyboardManagerSettings.ModuleName, fileName);
+
+        // SettingsUtils.SaveSettings swallows IO exceptions and returns void, so
+        // verify the write actually landed before reporting the profile as
+        // applied or signaling a reload.
+        if (!WriteSucceeded(profileJson, fileName))
+        {
+            throw new IOException($"Failed to write the profile file '{fileName}'.");
+        }
 
         return SignalSettingsChangedEvent();
+    }
+
+    /// <summary>
+    /// Verifies that the profile file on disk matches the content that was
+    /// just written, compensating for the exception-swallowing write API.
+    /// </summary>
+    /// <param name="expectedJson">The JSON that was written.</param>
+    /// <param name="fileName">The profile file name.</param>
+    /// <returns>True if the file matches the expected content; otherwise false.</returns>
+    private static bool WriteSucceeded(string expectedJson, string fileName)
+    {
+        try
+        {
+            var path = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName, fileName);
+            return File.Exists(path) && File.ReadAllText(path) == expectedJson;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -112,13 +175,27 @@ public sealed class ProfileFunctionData : BaseFunctionData
     }
 
     /// <summary>
+    /// Gets whether the current profile needs to be rewritten to reach the
+    /// desired state. This is true when the desired and current profiles
+    /// differ, or when the current profile contains malformed entries that
+    /// were skipped while reading (surfaced as warnings): rewriting the whole
+    /// profile is what removes those undeclared entries, honoring the
+    /// replace-whole-profile semantics.
+    /// </summary>
+    /// <returns>True when a rewrite is required; otherwise false.</returns>
+    public bool NeedsUpdate()
+    {
+        return !TestState() || Warnings.Count > 0;
+    }
+
+    /// <summary>
     /// Gets the difference between the desired and the current state.
     /// </summary>
     /// <returns>A JSON array with the differing property names.</returns>
     public JsonArray GetDiffJson()
     {
         var diff = new JsonArray();
-        if (!TestState())
+        if (NeedsUpdate())
         {
             diff.Add(ProfileResourceObject.ProfileJsonPropertyName);
         }
