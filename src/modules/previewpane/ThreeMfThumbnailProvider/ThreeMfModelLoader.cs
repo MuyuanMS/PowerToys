@@ -21,6 +21,11 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
         private const long MaxUncompressedThumbnailBytes = 32L * 1024 * 1024; // 32 MB
         private const long MaxUncompressedModelBytes = 128L * 1024 * 1024; // 128 MB
         private const int MaxThumbnailDimension = 10000;
+
+        // Bound the total decoded raster too: per-axis caps alone still allow a ~10000x10000 image
+        // (~400 MB when materialized) to be decoded from a small compressed PNG. Reject anything whose
+        // total pixel count would allocate more than this before it is resized.
+        private const long MaxThumbnailPixels = 24L * 1024 * 1024; // ~24 megapixels (~96 MB at 32bpp)
         private const int MaxTotalTriangles = 2_000_000;
         private const int MaxTotalVertices = 4_000_000;
         private const int MaxComponentDepth = 16;
@@ -87,9 +92,12 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 CopyWithLimit(thumbnailStream, memoryStream, MaxUncompressedThumbnailBytes);
                 memoryStream.Position = 0;
 
+                // Inspect the header dimensions before forcing a full raster with new Bitmap(image);
+                // reject both oversized axes and an oversized total pixel count.
                 using var image = System.Drawing.Image.FromStream(memoryStream);
                 if (image.Width <= 0 || image.Height <= 0 ||
-                    image.Width > MaxThumbnailDimension || image.Height > MaxThumbnailDimension)
+                    image.Width > MaxThumbnailDimension || image.Height > MaxThumbnailDimension ||
+                    (long)image.Width * image.Height > MaxThumbnailPixels)
                 {
                     return null;
                 }
@@ -196,11 +204,46 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 return null;
             }
 
-            var normalized = target.Replace('\\', '/');
-            return archive.GetEntry(normalized.TrimStart('/')) ??
-                   archive.GetEntry(normalized) ??
+            // Package-level relationship targets are resolved relative to the package root. Normalize
+            // the path (handle a leading '/', './' and '../' segments) and require an exact, complete
+            // part-name match. A loose EndsWith would let a missing "/Metadata/thumbnail.png" target
+            // silently bind to an unrelated "vendor/Metadata/thumbnail.png" part.
+            var normalized = NormalizePartName(target);
+            if (normalized.Length == 0)
+            {
+                return null;
+            }
+
+            return archive.GetEntry(normalized) ??
                    archive.Entries.FirstOrDefault(e =>
-                       e.FullName.Replace('\\', '/').EndsWith(normalized.TrimStart('/'), StringComparison.OrdinalIgnoreCase));
+                       string.Equals(e.FullName.Replace('\\', '/'), normalized, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static string NormalizePartName(string target)
+        {
+            var path = target.Replace('\\', '/').TrimStart('/');
+            var segments = new List<string>();
+            foreach (var segment in path.Split('/'))
+            {
+                if (segment.Length == 0 || segment == ".")
+                {
+                    continue;
+                }
+
+                if (segment == "..")
+                {
+                    if (segments.Count > 0)
+                    {
+                        segments.RemoveAt(segments.Count - 1);
+                    }
+
+                    continue;
+                }
+
+                segments.Add(segment);
+            }
+
+            return string.Join("/", segments);
         }
 
         private static List<ZipArchiveEntry> ResolveModelEntries(ZipArchive archive)
@@ -268,8 +311,12 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             var targets = new List<string>();
             foreach (var entry in archive.Entries)
             {
+                // Package thumbnail / root-model discovery must read only the package relationship part
+                // (_rels/.rels). Part-level .rels are scoped to their own source part and would require
+                // source-relative resolution; merging them here could select a part-level thumbnail or
+                // a non-root model as if it were package-level.
                 var name = entry.FullName.Replace('\\', '/');
-                if (!name.EndsWith(".rels", StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(name.TrimStart('/'), "_rels/.rels", StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
