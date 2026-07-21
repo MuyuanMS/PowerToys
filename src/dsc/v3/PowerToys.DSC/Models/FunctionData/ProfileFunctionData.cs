@@ -92,7 +92,17 @@ public sealed class ProfileFunctionData : BaseFunctionData
     /// </summary>
     public void GetState()
     {
-        var fileName = GetProfileFileName();
+        var fileName = GetProfileFileName(out var configurationNeedsNormalization);
+
+        // When the active configuration is missing, empty, or unsafe, the engine
+        // would not actually load the file we read here, so a matching profile is
+        // an illusion. Surface it as a warning (which makes NeedsUpdate() true)
+        // so a set operation runs to normalize the value or reject an unsafe one.
+        if (configurationNeedsNormalization)
+        {
+            Warnings.Add("The Keyboard Manager active configuration is missing or invalid; a set operation is required to normalize it.");
+        }
+
         KeyboardManagerProfile profile;
 
         if (_settingsUtils.SettingsExists(KeyboardManagerSettings.ModuleName, fileName))
@@ -232,16 +242,18 @@ public sealed class ProfileFunctionData : BaseFunctionData
     /// would do.
     /// </summary>
     /// <returns>The profile file name.</returns>
-    private static string GetProfileFileName()
+    private static string GetProfileFileName(out bool needsNormalization)
     {
         string? activeConfiguration = null;
+        var settingsReadable = false;
 
         if (_settingsUtils.SettingsExists(KeyboardManagerSettings.ModuleName))
         {
             try
             {
                 var settings = _settingsUtils.GetSettings<KeyboardManagerSettings>(KeyboardManagerSettings.ModuleName);
-                activeConfiguration = settings.Properties?.ActiveConfiguration?.Value;
+                activeConfiguration = settings?.Properties?.ActiveConfiguration?.Value;
+                settingsReadable = settings != null;
             }
             catch (Exception)
             {
@@ -250,6 +262,9 @@ public sealed class ProfileFunctionData : BaseFunctionData
             }
         }
 
+        // Normalization is needed when the settings are missing/unreadable, the
+        // active configuration is empty, or it is not a safe file name.
+        needsNormalization = !settingsReadable || !IsSafeConfigurationName(activeConfiguration);
         return BuildProfileFileName(activeConfiguration);
     }
 

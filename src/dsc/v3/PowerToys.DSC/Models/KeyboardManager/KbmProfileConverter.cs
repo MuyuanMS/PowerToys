@@ -336,10 +336,21 @@ public static class KbmProfileConverter
                 continue;
             }
 
+            var keyTarget = KbmShortcutParser.Format(KbmShortcutParser.Canonicalize(to));
+
+            // Ensure the exported target is one Validate accepts on a subsequent
+            // set (e.g. a modifier-only stored value would render as 'Ctrl+Alt',
+            // which is not a supported target); skip it with a warning otherwise.
+            if (!TryParseTarget(keyTarget, out _, out _))
+            {
+                warnings?.Add($"Skipping key remap entry '{stored.OriginalKeys}' with an unsupported target '{keyTarget}'");
+                continue;
+            }
+
             keys.Add((from.Keys[0], new KbmKeyRemapEntry
             {
                 From = KbmKeyNames.GetName(from.Keys[0]),
-                To = KbmShortcutParser.Format(KbmShortcutParser.Canonicalize(to)),
+                To = keyTarget,
             }));
         }
 
@@ -507,11 +518,14 @@ public static class KbmProfileConverter
         }
 
         // A stored key list of the right length is not necessarily a valid
-        // shortcut: a modifier-only source ('Ctrl+Alt') or a modifier-less one
-        // ('A, B') would be exported but rejected by Validate on re-import. Skip
-        // such entries so exported state remains importable.
-        var (modifiers, action, _) = DecomposeShortcut(from);
-        if (modifiers.Count == 0 || action == 0 || from.Keys.Contains(KbmKeyNames.VkDisabled))
+        // shortcut: a modifier-only source ('Ctrl+Alt'), a modifier-less one
+        // ('A, B'), or one with more than one first-stage action ('Ctrl+A+B, C')
+        // would be exported but rejected by Validate on re-import. Require at
+        // least one modifier and exactly one first-stage action, and no disabled
+        // key, so exported state remains importable.
+        var (modifiers, _, chord) = DecomposeShortcut(from);
+        var firstStageActions = from.Keys.Count(k => !KbmKeyNames.IsModifier(k)) - (chord != 0 ? 1 : 0);
+        if (modifiers.Count == 0 || firstStageActions != 1 || from.Keys.Contains(KbmKeyNames.VkDisabled))
         {
             warnings?.Add($"Skipping shortcut remap entry '{stored.OriginalKeys}' that is not a valid shortcut");
             return null;
@@ -605,7 +619,11 @@ public static class KbmProfileConverter
             return KeysOverlap(from.Keys[0], to.Keys[0]);
         }
 
-        return ShortcutsOverlap(from, to);
+        // A shortcut self-mapping requires exact equality (sided modifiers and
+        // chord included), matching the editor's Shortcut::operator==; the
+        // looser overlap rule used for duplicate detection would wrongly reject
+        // mappings like 'LCtrl+A -> Ctrl+A' that the editor accepts.
+        return ShortcutKeysEqual(KbmShortcutParser.Canonicalize(from), KbmShortcutParser.Canonicalize(to));
     }
 
     /// <summary>
