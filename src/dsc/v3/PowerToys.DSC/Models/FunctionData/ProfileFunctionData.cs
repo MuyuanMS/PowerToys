@@ -37,6 +37,14 @@ public sealed class ProfileFunctionData : BaseFunctionData
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
+    // This resource replaces the whole profile, so an unrecognized member in
+    // the input (e.g. a typo like "key" for "keys") must fail loudly rather
+    // than being ignored, which would otherwise clear the user's remappings.
+    private static readonly JsonSerializerOptions _inputDeserializerOptions = new()
+    {
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+    };
+
     /// <summary>
     /// Gets the desired state provided as input, if any.
     /// </summary>
@@ -55,7 +63,7 @@ public sealed class ProfileFunctionData : BaseFunctionData
     public ProfileFunctionData(string? input = null)
     {
         Output = new();
-        Input = string.IsNullOrEmpty(input) ? new() : JsonSerializer.Deserialize<ProfileResourceObject>(input) ?? new();
+        Input = string.IsNullOrEmpty(input) ? new() : JsonSerializer.Deserialize<ProfileResourceObject>(input, _inputDeserializerOptions) ?? new();
     }
 
     /// <summary>
@@ -118,17 +126,12 @@ public sealed class ProfileFunctionData : BaseFunctionData
     /// <exception cref="IOException">Thrown when the profile file could not be written.</exception>
     public bool SetState()
     {
-        // Ensure the module settings exist so the engine can resolve the
-        // active configuration; without it LoadSettings() bails out early.
-        if (!_settingsUtils.SettingsExists(KeyboardManagerSettings.ModuleName))
-        {
-            var settings = new KeyboardManagerSettings();
-            _settingsUtils.SaveSettings(settings.ToJsonString(), KeyboardManagerSettings.ModuleName);
-        }
+        // Normalize and persist the active configuration so the file we write
+        // is exactly the one the engine will load, then write the profile.
+        var fileName = EnsureActiveConfigurationAndGetFileName();
 
         var profile = KbmProfileConverter.ToProfile(Input.Profile);
         var profileJson = JsonSerializer.Serialize(profile, _profileSerializerOptions);
-        var fileName = GetProfileFileName();
         _settingsUtils.SaveSettings(profileJson, KeyboardManagerSettings.ModuleName, fileName);
 
         // SettingsUtils.SaveSettings swallows IO exceptions and returns void, so
@@ -214,14 +217,68 @@ public sealed class ProfileFunctionData : BaseFunctionData
 
     /// <summary>
     /// Gets the profile file name selected by the module's active
-    /// configuration, e.g. "default.json".
+    /// configuration, e.g. "default.json". The read is non-mutating: an
+    /// unreadable settings file falls back to the default profile instead of
+    /// being overwritten, which <see cref="SettingsUtils.GetSettingsOrDefault{T}"/>
+    /// would do.
     /// </summary>
     /// <returns>The profile file name.</returns>
     private static string GetProfileFileName()
     {
-        var settings = _settingsUtils.GetSettingsOrDefault<KeyboardManagerSettings>(KeyboardManagerSettings.ModuleName);
-        var activeConfiguration = settings.Properties?.ActiveConfiguration?.Value;
+        string? activeConfiguration = null;
+
+        if (_settingsUtils.SettingsExists(KeyboardManagerSettings.ModuleName))
+        {
+            try
+            {
+                var settings = _settingsUtils.GetSettings<KeyboardManagerSettings>(KeyboardManagerSettings.ModuleName);
+                activeConfiguration = settings.Properties?.ActiveConfiguration?.Value;
+            }
+            catch (Exception)
+            {
+                // Fall back to the default profile rather than overwriting an
+                // unreadable settings file.
+            }
+        }
+
         return $"{(string.IsNullOrEmpty(activeConfiguration) ? "default" : activeConfiguration)}.json";
+    }
+
+    /// <summary>
+    /// Ensures the module settings exist and carry a non-empty active
+    /// configuration, persisting the normalized value, and returns the
+    /// corresponding profile file name. This keeps the written profile and the
+    /// engine's <c>MappingConfiguration::LoadSettings</c> in agreement: the
+    /// engine reads <c>activeConfiguration</c> verbatim, so an empty value
+    /// would make it open ".json" rather than the file we write here.
+    /// </summary>
+    /// <returns>The profile file name to write, e.g. "default.json".</returns>
+    private static string EnsureActiveConfigurationAndGetFileName()
+    {
+        KeyboardManagerSettings settings;
+
+        try
+        {
+            settings = _settingsUtils.SettingsExists(KeyboardManagerSettings.ModuleName)
+                ? _settingsUtils.GetSettings<KeyboardManagerSettings>(KeyboardManagerSettings.ModuleName)
+                : new KeyboardManagerSettings();
+        }
+        catch (Exception)
+        {
+            settings = new KeyboardManagerSettings();
+        }
+
+        settings.Properties ??= new KeyboardManagerProperties();
+
+        var activeConfiguration = settings.Properties.ActiveConfiguration?.Value;
+        if (string.IsNullOrEmpty(activeConfiguration))
+        {
+            activeConfiguration = "default";
+            settings.Properties.ActiveConfiguration = new GenericProperty<string>(activeConfiguration);
+        }
+
+        _settingsUtils.SaveSettings(settings.ToJsonString(), KeyboardManagerSettings.ModuleName);
+        return $"{activeConfiguration}.json";
     }
 
     /// <summary>

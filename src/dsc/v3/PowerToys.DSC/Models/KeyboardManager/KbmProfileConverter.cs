@@ -91,9 +91,18 @@ public static class KbmProfileConverter
                 seenKeys.Add(from.Keys[0]);
             }
 
-            if (entry.To != null && !TryParseTarget(entry.To, out _, out error))
+            if (entry.To != null)
             {
-                errors.Add($"{context}.to: {error}");
+                if (!TryParseTarget(entry.To, out var target, out error))
+                {
+                    errors.Add($"{context}.to: {error}");
+                }
+                else if (from != null && IsSelfMapping(from, target))
+                {
+                    // Keyboard Manager rejects self-mappings, including
+                    // generic/sided equivalents (e.g. CapsLock -> CapsLock).
+                    errors.Add($"{context}: '{entry.From}' cannot be remapped to itself");
+                }
             }
 
             if (entry.ToText != null && entry.ToText.Length == 0)
@@ -123,6 +132,13 @@ public static class KbmProfileConverter
             if (targetCount != 1)
             {
                 errors.Add($"{context} must set exactly one of 'to', 'toText', 'runProgram', or 'openUri'");
+            }
+
+            // A supplied but blank targetApp would silently become a global
+            // remap; the editor rejects blank app names, so mirror that here.
+            if (entry.TargetApp != null && string.IsNullOrWhiteSpace(entry.TargetApp))
+            {
+                errors.Add($"{context}.targetApp must not be blank");
             }
 
             if (!KbmShortcutParser.TryParseKeyOrShortcut(entry.From, out var from, out var error))
@@ -163,9 +179,18 @@ public static class KbmProfileConverter
                 }
             }
 
-            if (entry.To != null && !TryParseTarget(entry.To, out _, out error))
+            if (entry.To != null)
             {
-                errors.Add($"{context}.to: {error}");
+                if (!TryParseTarget(entry.To, out var target, out error))
+                {
+                    errors.Add($"{context}.to: {error}");
+                }
+                else if (from != null && IsSelfMapping(from, target))
+                {
+                    // The editor rejects shortcut self-mappings (e.g. Ctrl+A ->
+                    // Ctrl+A), including generic/sided equivalents.
+                    errors.Add($"{context}: '{entry.From}' cannot be remapped to itself");
+                }
             }
 
             if (entry.ToText != null && entry.ToText.Length == 0)
@@ -173,9 +198,9 @@ public static class KbmProfileConverter
                 errors.Add($"{context}.toText must not be empty");
             }
 
-            if (entry.OpenUri != null && entry.OpenUri.Length == 0)
+            if (entry.OpenUri != null && string.IsNullOrWhiteSpace(entry.OpenUri))
             {
-                errors.Add($"{context}.openUri must not be empty");
+                errors.Add($"{context}.openUri must not be empty or whitespace");
             }
 
             if (entry.RunProgram != null)
@@ -502,6 +527,21 @@ public static class KbmProfileConverter
     private static bool ShortcutKeysEqual(KbmShortcutParser.ParsedKeys a, KbmShortcutParser.ParsedKeys b)
     {
         return a.SecondKeyOfChord == b.SecondKeyOfChord && a.Keys.SequenceEqual(b.Keys);
+    }
+
+    /// <summary>
+    /// Determines whether a remap maps a source onto itself, which the editor
+    /// rejects (ValidationHelper.IsSelfMapping). Single keys are compared with
+    /// the generic/sided overlap rule; shortcuts with the shortcut overlap rule.
+    /// </summary>
+    private static bool IsSelfMapping(KbmShortcutParser.ParsedKeys from, KbmShortcutParser.ParsedKeys to)
+    {
+        if (from.Keys.Count == 1 && to.Keys.Count == 1)
+        {
+            return KeysOverlap(from.Keys[0], to.Keys[0]);
+        }
+
+        return ShortcutsOverlap(from, to);
     }
 
     /// <summary>
