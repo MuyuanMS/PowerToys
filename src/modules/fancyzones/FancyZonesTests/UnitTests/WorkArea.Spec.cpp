@@ -224,18 +224,27 @@ namespace FancyZonesUnitTests
 
         // Regression test for GH #44058: editing a custom layout's spacing only rewrites
         // custom-layouts.json, while applied-layouts.json keeps a snapshot taken at apply time.
-        // WorkArea::CalculateZoneSet must re-derive the spacing (and the other scalar properties)
-        // from the current custom layout, otherwise the stale snapshot is used and the edit has no
-        // effect until the layout is re-applied.
-        TEST_METHOD (CustomLayoutSpacingRefreshedFromCustomLayoutData)
+        // An already-created WorkArea must pick up the edited spacing when it is refreshed
+        // (WorkArea::InitLayout, which is what the custom-layouts file-update handler calls via
+        // RefreshLayouts). Without re-deriving the scalar properties from the current custom
+        // layout the stale snapshot is used and the edit has no effect until re-apply.
+        TEST_METHOD (EditedCustomLayoutSpacingRefreshesExistingWorkArea)
         {
             const auto uuid = FancyZonesUtils::GuidFromString(L"{5A9D6A0F-4C6E-4C0C-8B1B-9F3E7C2D1A11}").value();
 
-            // Custom layout on disk was edited to show a large spacing.
-            SaveCustomGridLayout(uuid, /*showSpacing*/ true, /*spacing*/ 100, /*sensitivityRadius*/ 30);
+            auto zoneGap = [](const auto& zones) -> LONG {
+                std::vector<RECT> rects;
+                for (const auto& [id, zone] : zones)
+                {
+                    rects.push_back(zone.GetZoneRect());
+                }
+                std::sort(rects.begin(), rects.end(), [](const RECT& a, const RECT& b) { return a.left < b.left; });
+                return rects[1].left - rects[0].right;
+            };
 
-            // The applied-layouts snapshot is stale: it was captured before the edit with no spacing.
-            LayoutData staleSnapshot{
+            // The layout and its applied snapshot initially have no spacing.
+            SaveCustomGridLayout(uuid, /*showSpacing*/ false, /*spacing*/ 0, /*sensitivityRadius*/ 5);
+            LayoutData snapshot{
                 .uuid = uuid,
                 .type = FancyZonesDataTypes::ZoneSetLayoutType::Custom,
                 .showSpacing = false,
@@ -243,24 +252,23 @@ namespace FancyZonesUnitTests
                 .zoneCount = 2,
                 .sensitivityRadius = 5,
             };
-            AppliedLayouts::instance().ApplyLayout(m_workAreaId, staleSnapshot);
+            AppliedLayouts::instance().ApplyLayout(m_workAreaId, snapshot);
 
             auto workArea = WorkArea::Create({}, m_workAreaId, m_emptyUniqueId, m_workAreaRect);
             Assert::IsFalse(workArea == nullptr);
+            Assert::IsNotNull(workArea->GetLayout().get());
+            Assert::AreEqual(static_cast<size_t>(2), workArea->GetLayout()->Zones().size());
+            Assert::AreEqual(0L, zoneGap(workArea->GetLayout()->Zones()), L"Zones should be adjacent before the edit");
 
-            const auto& layout = workArea->GetLayout();
-            Assert::IsNotNull(layout.get());
-            Assert::AreEqual(static_cast<size_t>(2), layout->Zones().size());
+            // User edits the layout to add spacing; only custom-layouts.json is rewritten, the
+            // applied-layouts snapshot stays stale.
+            SaveCustomGridLayout(uuid, /*showSpacing*/ true, /*spacing*/ 100, /*sensitivityRadius*/ 30);
 
-            // Order the two zones left-to-right and verify a gap exists between them. Without the
-            // refresh the stale snapshot (showSpacing=false) yields adjacent zones (gap == 0).
-            std::vector<RECT> rects;
-            for (const auto& [id, zone] : layout->Zones())
-            {
-                rects.push_back(zone.GetZoneRect());
-            }
-            std::sort(rects.begin(), rects.end(), [](const RECT& a, const RECT& b) { return a.left < b.left; });
-            Assert::IsTrue(rects[1].left - rects[0].right > 20, L"Edited spacing was not applied to the active layout");
+            // The custom-layouts file-update handler refreshes active work areas via InitLayout.
+            workArea->InitLayout();
+
+            Assert::AreEqual(static_cast<size_t>(2), workArea->GetLayout()->Zones().size());
+            Assert::IsTrue(zoneGap(workArea->GetLayout()->Zones()) > 20, L"Edited spacing was not applied to the existing work area");
         }
     };
 
