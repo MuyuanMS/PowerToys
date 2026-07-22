@@ -39,7 +39,6 @@ public sealed class ProfileResource : BaseResource
     {
         var data = new ProfileFunctionData();
         data.GetState();
-        WriteWarnings(data);
         WriteJsonOutputLine(data.Output.ToJson());
         return true;
     }
@@ -89,7 +88,6 @@ public sealed class ProfileResource : BaseResource
             data.Warnings.Clear();
         }
 
-        WriteWarnings(data);
         WriteJsonOutputLine(data.Output.ToJson());
         WriteJsonOutputLine(diff);
         return true;
@@ -107,7 +105,6 @@ public sealed class ProfileResource : BaseResource
         data.GetState();
         data.Output.InDesiredState = !data.NeedsUpdate();
 
-        WriteWarnings(data);
         WriteJsonOutputLine(data.Output.ToJson());
         WriteJsonOutputLine(data.GetDiffJson());
         return true;
@@ -195,18 +192,6 @@ public sealed class ProfileResource : BaseResource
         }
 
         return data;
-    }
-
-    /// <summary>
-    /// Writes the warnings collected while reading the current profile.
-    /// </summary>
-    /// <param name="data">The function data.</param>
-    private void WriteWarnings(ProfileFunctionData data)
-    {
-        foreach (var warning in data.Warnings)
-        {
-            WriteMessageOutputLine(DscMessageLevel.Warning, warning);
-        }
     }
 
     /// <summary>
