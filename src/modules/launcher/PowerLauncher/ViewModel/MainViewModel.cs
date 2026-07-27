@@ -826,7 +826,6 @@ namespace PowerLauncher.ViewModel
                 }
 
                 UpdateResultView(results, queryText, cancellationToken);
-                noInitialResults = Results.Results.Count == 0;
                 if (!doFinalSort)
                 {
                     Results.Sort(queryTuning);
@@ -854,6 +853,11 @@ namespace PowerLauncher.ViewModel
                             return;
                         }
 
+                        // Evaluate "did the whole first phase yield nothing" at delayed-apply time, under the
+                        // lock, so it reflects every plugin's non-delayed results rather than a per-plugin
+                        // snapshot captured while other plugins were still running (which could reset the
+                        // user's selection spuriously). Checked before removing this plugin's initial rows.
+                        noInitialResults = Results.Results.Count == 0;
                         Results.Results.RemoveAll(r => r.Result.PluginID == plugin.Metadata.ID);
                         UpdateResultView(results, queryText, cancellationToken);
                         if (!doFinalSort)
