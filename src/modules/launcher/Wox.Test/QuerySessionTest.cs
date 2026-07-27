@@ -92,7 +92,7 @@ namespace Wox.Test
         [TestMethod]
         public void SuspendedSessionDoesNotRunPipelineBeforeResume()
         {
-            // Query state must be published before its worker can produce results, otherwise a fast query can discard valid results as stale.
+            // Query state must be published before its worker can produce results; otherwise a fast query can discard valid results as stale.
             var pipelineStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             using var session = QuerySession.StartSuspended(_ =>
             {

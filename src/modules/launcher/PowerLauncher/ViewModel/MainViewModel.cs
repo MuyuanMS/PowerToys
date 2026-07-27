@@ -216,8 +216,20 @@ namespace PowerLauncher.ViewModel
 
         internal static bool IsCurrentQuery(Query currentQuery, Query eventQuery)
         {
-            return currentQuery?.QueryGeneration == eventQuery?.QueryGeneration &&
-                   AreEquivalentQueries(currentQuery, eventQuery);
+            if (!AreEquivalentQueries(currentQuery, eventQuery))
+            {
+                return false;
+            }
+
+            // Legacy compatibility: binary IResultUpdated plugins compiled before QueryGeneration existed
+            // reconstruct a Query with the default generation (0). For those, fall back to content-only
+            // matching (its prior stale-update behavior) so their async updates are not silently discarded.
+            if (eventQuery.QueryGeneration == 0)
+            {
+                return true;
+            }
+
+            return currentQuery.QueryGeneration == eventQuery.QueryGeneration;
         }
 
         private void OpenResultsEvent(object index, bool isMouseClick)
@@ -675,10 +687,17 @@ namespace PowerLauncher.ViewModel
                             lock (_addResultsLock)
                             {
                                 updateToken.ThrowIfCancellationRequested();
-                                if (queryGeneration == _queryGeneration)
+
+                                // A superseding query bumps _queryGeneration before it cancels this session.
+                                // If we won the lock in that gap, abort now so stale plugin tasks are never
+                                // scheduled (they could otherwise enter the per-plugin gate and block the
+                                // current query behind a slow or hung plugin).
+                                if (queryGeneration != _queryGeneration)
                                 {
-                                    Results.Clear();
+                                    return;
                                 }
+
+                                Results.Clear();
                             }
 
                             var pluginTasks = pluginQueryPairs.Select(
@@ -818,7 +837,11 @@ namespace PowerLauncher.ViewModel
 
             if (!delayedExecution.HasValue || delayedExecution.Value)
             {
-                results = await QueryPluginAsync(plugin, query, delayedExecution: true, queryConcurrencyGate, cancellationToken).ConfigureAwait(false);
+                // The delayed (slow) phase historically always ran in parallel, even when
+                // PTRunNonDelayedSearchInParallel is false (that setting only gates the non-delayed phase).
+                // Pass null so the global concurrency gate is not applied here; the per-plugin gate inside
+                // QueryPluginAsync still prevents overlapping calls to the same plugin.
+                results = await QueryPluginAsync(plugin, query, delayedExecution: true, queryConcurrencyGate: null, cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
                 if ((results?.Count ?? 0) != 0)
                 {
