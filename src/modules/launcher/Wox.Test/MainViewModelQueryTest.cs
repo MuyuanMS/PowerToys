@@ -35,6 +35,28 @@ namespace Wox.Test
         }
 
         [TestMethod]
+        public void LegacyGenerationZeroEventMatchesOnRawQueryOnly()
+        {
+            // Binary plugins compiled before QueryGeneration reconstruct new Query(RawQuery) (generation 0,
+            // no ActionKeyword/Search). They must still be correlated on RawQuery so their async updates are kept.
+            var currentQuery = new Query("search text", ">") { QueryGeneration = 42 };
+            var legacyQuery = new Query(currentQuery.RawQuery);
+
+            Assert.AreEqual(0, legacyQuery.QueryGeneration);
+            Assert.IsTrue(MainViewModel.IsCurrentQuery(currentQuery, legacyQuery));
+        }
+
+        [TestMethod]
+        public void LegacyGenerationZeroEventFromDifferentQueryDoesNotMatch()
+        {
+            // The legacy fallback must still reject events whose RawQuery differs from the current query.
+            var currentQuery = new Query("search text", ">") { QueryGeneration = 42 };
+            var legacyQuery = new Query("different text");
+
+            Assert.IsFalse(MainViewModel.IsCurrentQuery(currentQuery, legacyQuery));
+        }
+
+        [TestMethod]
         public void BusyPluginDoesNotBlockAnotherPlugin()
         {
             // A non-returning plugin must consume only its own slot so unrelated plugins remain searchable.

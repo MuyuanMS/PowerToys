@@ -216,20 +216,23 @@ namespace PowerLauncher.ViewModel
 
         internal static bool IsCurrentQuery(Query currentQuery, Query eventQuery)
         {
-            if (!AreEquivalentQueries(currentQuery, eventQuery))
+            if (currentQuery == null || eventQuery == null)
             {
                 return false;
             }
 
             // Legacy compatibility: binary IResultUpdated plugins compiled before QueryGeneration existed
-            // reconstruct a Query with the default generation (0). For those, fall back to content-only
-            // matching (its prior stale-update behavior) so their async updates are not silently discarded.
+            // report generation 0 and may reconstruct their Query as new Query(RawQuery), leaving
+            // ActionKeyword/Search unset. The pre-generation handler effectively correlated these events on
+            // RawQuery alone (via UpdateResultView), so match the same way here — accepting the prior
+            // stale-update limitation — instead of discarding their asynchronous updates.
             if (eventQuery.QueryGeneration == 0)
             {
-                return true;
+                return string.Equals(currentQuery.RawQuery, eventQuery.RawQuery, StringComparison.CurrentCultureIgnoreCase);
             }
 
-            return currentQuery.QueryGeneration == eventQuery.QueryGeneration;
+            return currentQuery.QueryGeneration == eventQuery.QueryGeneration &&
+                   AreEquivalentQueries(currentQuery, eventQuery);
         }
 
         private void OpenResultsEvent(object index, bool isMouseClick)
