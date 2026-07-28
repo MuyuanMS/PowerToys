@@ -1402,6 +1402,35 @@ static void ClearExitedUIThread()
     }
 }
 
+// Joins the UI thread and resets all thread-owned globals. Loops re-posting WM_QUIT
+// until the worker has actually terminated. The DLL may be unloaded immediately after
+// this returns (from destroy()), and a later enable() could otherwise spin up a second
+// thread that shares the process-wide g_switcher, so we must never leave the worker
+// running. The worker only ever blocks on bounded, abort-if-hung operations, so this
+// join cannot hang indefinitely. Callers should set g_shutdownRequested first so a
+// worker still between Init() and its message loop also self-exits.
+static void JoinAndResetUIThread()
+{
+    if (!g_uiThread)
+        return;
+
+    for (;;)
+    {
+        PostThreadMessageW(g_uiThreadId, WM_QUIT, 0, 0);
+        if (WaitForSingleObject(g_uiThread, 5000) == WAIT_OBJECT_0)
+        {
+            break;
+        }
+        Logger::error("AltWindowCycle UI thread has not exited 5s after WM_QUIT; retrying to avoid unloading the DLL while it runs");
+    }
+
+    CloseHandle(g_uiThread);
+    g_uiThread = nullptr;
+    g_uiThreadId = 0;
+    g_initOk.store(false);
+    g_switcherActive.store(false);
+}
+
 static bool PostHotkeyToUIThread(bool forward, unsigned int holdModifiers)
 {
     return g_uiThreadId &&
@@ -1510,32 +1539,19 @@ bool InitializeAltWindowCycle(HINSTANCE hinst)
         // The worker may still be initializing. Tear it down and reset the globals
         // so a later enable() can retry from a clean state instead of returning this
         // orphaned thread (which would otherwise keep its overlay windows alive while
-        // the module reports itself disabled). g_shutdownRequested is honored by the
-        // worker between Init() and its message loop; WM_QUIT covers the in-loop case.
+        // the module reports itself disabled). Guarantee the join so we never close
+        // the only handle / clear state while the worker is still executing DLL code.
         g_shutdownRequested.store(true);
-        PostThreadMessageW(g_uiThreadId, WM_QUIT, 0, 0);
-        WaitForSingleObject(g_uiThread, 5000);
-        CloseHandle(g_uiThread);
-        g_uiThread = nullptr;
-        g_uiThreadId = 0;
-        g_initOk.store(false);
-        g_switcherActive.store(false);
+        JoinAndResetUIThread();
         return false;
     }
 
     if (!g_initOk.load())
     {
-        if (WaitForSingleObject(g_uiThread, 2000) == WAIT_OBJECT_0)
-        {
-            CloseHandle(g_uiThread);
-            g_uiThread = nullptr;
-            g_uiThreadId = 0;
-            g_initOk.store(false);
-        }
-        else
-        {
-            Logger::error("Timed out waiting for failed AltWindowCycle UI thread initialization to exit");
-        }
+        // Init() failed; the worker self-exits without entering its message loop.
+        // Join it and reset the globals so the thread handle is not leaked and a
+        // later enable() can retry from a clean state.
+        JoinAndResetUIThread();
         return false;
     }
 
@@ -1549,27 +1565,11 @@ void ShutdownAltWindowCycle()
 
     g_shutdownRequested.store(true);
 
-    // Ask the UI thread's GetMessage loop to exit, then wait until it has actually
-    // terminated before returning. destroy() unloads this DLL immediately after
-    // this call, so returning while the worker is still running would leave it
-    // executing unmapped code (a hard crash on the next scheduled instruction).
-    // The worker only ever blocks on bounded, abort-if-hung operations, so joining
-    // is safe. Re-post WM_QUIT on each iteration in case the queue was not ready
-    // when the first message was sent.
-    for (;;)
-    {
-        PostThreadMessageW(g_uiThreadId, WM_QUIT, 0, 0);
-        if (WaitForSingleObject(g_uiThread, 5000) == WAIT_OBJECT_0)
-        {
-            break;
-        }
-        Logger::error("AltWindowCycle UI thread has not exited 5s after WM_QUIT; retrying to avoid unloading the DLL while it runs");
-    }
-
-    CloseHandle(g_uiThread);
-    g_uiThread = nullptr;
-    g_uiThreadId = 0;
-    g_switcherActive.store(false);
+    // Ask the UI thread's GetMessage loop to exit and wait until it has actually
+    // terminated before returning. destroy() unloads this DLL immediately after this
+    // call, so returning while the worker is still running would leave it executing
+    // unmapped code (a hard crash on the next scheduled instruction).
+    JoinAndResetUIThread();
 }
 
 bool HandleAltWindowCycleHotkey(bool forward, unsigned int holdModifiers)

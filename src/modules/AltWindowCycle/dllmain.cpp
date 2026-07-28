@@ -186,6 +186,16 @@ public:
         return m_enabled;
     }
 
+    // Window Hopper ships disabled by default. The base interface returns true, but
+    // EnabledModules.cs (AltWindowCycle) defaults to off. Without this override the
+    // runner's start_enabled_powertoys() would start the module - spinning up the UI
+    // thread and reserving Alt+` - for any user whose general settings do not yet
+    // contain the AltWindowCycle key, while Settings still shows the module as off.
+    virtual bool is_enabled_by_default() const override
+    {
+        return false;
+    }
+
     virtual size_t get_hotkeys(Hotkey* hotkeys, size_t buffer_size) override
     {
         if (hotkeys && buffer_size >= 2)
