@@ -126,6 +126,22 @@ namespace AltWindowCycleLogic
         layout.panelX = work.left + (workW - layout.panelW) / 2;
         layout.panelY = work.top + (workH - layout.panelH) / 2;
 
+        // ComputeOverlayLayout only caps the number of columns, so a large window
+        // count (or a high DPI scale) can produce a panel taller/wider than the work
+        // area. Centering then pushes panelY/panelX negative, placing the top rows
+        // (including the header and the selectable tiles) above/left of the monitor
+        // where they can never be reached. Clamp the origin so the first rows always
+        // stay on-screen. (Full overflow handling - paging/scrolling - is left as a
+        // follow-up; this only guarantees the panel is never anchored off-screen.)
+        if (layout.panelX < work.left)
+        {
+            layout.panelX = work.left;
+        }
+        if (layout.panelY < work.top)
+        {
+            layout.panelY = work.top;
+        }
+
         return layout;
     }
 

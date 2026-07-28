@@ -316,6 +316,19 @@ namespace AltWindowCycleUnitTests
             Assert::AreEqual(4, layout.rows); // ceil(10 / 3)
         }
 
+        TEST_METHOD(ComputeOverlayLayoutKeepsPanelOriginOnScreenWhenOverflowing)
+        {
+            // Many windows at a high DPI scale overflow the work area. The panel
+            // origin must never be anchored above/left of the work area, otherwise
+            // the top rows (header + selectable tiles) would be off-screen.
+            const RECT work = { 0, 0, 1920, 1080 };
+
+            const auto layout = AltWindowCycleLogic::ComputeOverlayLayout(work, 40, 2.0);
+
+            Assert::IsTrue(layout.panelY >= work.top, L"panel top must not be above the work area");
+            Assert::IsTrue(layout.panelX >= work.left, L"panel left must not be left of the work area");
+        }
+
         TEST_METHOD(ComputeOverlayLayoutClampsColumnsToNarrowWorkArea)
         {
             const RECT work = { 0, 0, 640, 480 };

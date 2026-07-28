@@ -1507,6 +1507,19 @@ bool InitializeAltWindowCycle(HINSTANCE hinst)
     if (waitResult != WAIT_OBJECT_0)
     {
         Logger::error("Timed out waiting for AltWindowCycle UI thread initialization");
+        // The worker may still be initializing. Tear it down and reset the globals
+        // so a later enable() can retry from a clean state instead of returning this
+        // orphaned thread (which would otherwise keep its overlay windows alive while
+        // the module reports itself disabled). g_shutdownRequested is honored by the
+        // worker between Init() and its message loop; WM_QUIT covers the in-loop case.
+        g_shutdownRequested.store(true);
+        PostThreadMessageW(g_uiThreadId, WM_QUIT, 0, 0);
+        WaitForSingleObject(g_uiThread, 5000);
+        CloseHandle(g_uiThread);
+        g_uiThread = nullptr;
+        g_uiThreadId = 0;
+        g_initOk.store(false);
+        g_switcherActive.store(false);
         return false;
     }
 
@@ -1536,13 +1549,23 @@ void ShutdownAltWindowCycle()
 
     g_shutdownRequested.store(true);
 
-    // Ask the UI thread's GetMessage loop to exit.
-    PostThreadMessageW(g_uiThreadId, WM_QUIT, 0, 0);
-    if (WaitForSingleObject(g_uiThread, 5000) != WAIT_OBJECT_0)
+    // Ask the UI thread's GetMessage loop to exit, then wait until it has actually
+    // terminated before returning. destroy() unloads this DLL immediately after
+    // this call, so returning while the worker is still running would leave it
+    // executing unmapped code (a hard crash on the next scheduled instruction).
+    // The worker only ever blocks on bounded, abort-if-hung operations, so joining
+    // is safe. Re-post WM_QUIT on each iteration in case the queue was not ready
+    // when the first message was sent.
+    for (;;)
     {
-        g_switcherActive.store(false);
-        return;
+        PostThreadMessageW(g_uiThreadId, WM_QUIT, 0, 0);
+        if (WaitForSingleObject(g_uiThread, 5000) == WAIT_OBJECT_0)
+        {
+            break;
+        }
+        Logger::error("AltWindowCycle UI thread has not exited 5s after WM_QUIT; retrying to avoid unloading the DLL while it runs");
     }
+
     CloseHandle(g_uiThread);
     g_uiThread = nullptr;
     g_uiThreadId = 0;
