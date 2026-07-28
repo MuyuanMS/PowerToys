@@ -224,7 +224,7 @@ namespace winrt::PowerToys::PowerAccentKeyboardService::implementation
             !IsSuppressedByGameMode() &&
             !IsForegroundAppExcluded())
         {
-            Logger::debug(L"Show toolbar (press-and-hold). Letter: {}", letterPressed);
+            Logger::debug(L"Show toolbar (press-and-hold). Letter: {}", letterPressed.load());
             m_triggeredWithSpace = false;
             m_triggeredWithLeftArrow = false;
             m_triggeredWithRightArrow = false;
