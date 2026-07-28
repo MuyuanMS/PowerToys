@@ -319,7 +319,7 @@ namespace AltWindowCycleUnitTests
         TEST_METHOD(ComputeOverlayLayoutKeepsPanelOriginOnScreenWhenOverflowing)
         {
             // Many windows at a high DPI scale overflow the work area. The panel
-            // origin must never be anchored above/left of the work area, otherwise
+            // origin must never be anchored above/left of the work area; otherwise
             // the top rows (header + selectable tiles) would be off-screen.
             const RECT work = { 0, 0, 1920, 1080 };
 
