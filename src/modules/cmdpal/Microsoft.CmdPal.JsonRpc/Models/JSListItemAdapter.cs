@@ -19,6 +19,19 @@ namespace Microsoft.CmdPal.JsonRpc.Models;
 /// </summary>
 internal sealed partial class JSListItemAdapter : JSObservableProxyBase, IListItem
 {
+    private static readonly string[] RefreshableProperties =
+    [
+        "command",
+        "moreCommands",
+        "icon",
+        "title",
+        "subtitle",
+        "tags",
+        "details",
+        "section",
+        "textToSuggest",
+    ];
+
     private Lazy<ICommand?> _command;
 
     public JSListItemAdapter(JsonElement data, JsonRpcConnection connection)
@@ -62,6 +75,31 @@ internal sealed partial class JSListItemAdapter : JSObservableProxyBase, IListIt
             {
                 Volatile.Write(ref _command, CreateCommand());
                 break;
+            }
+
+            internal static string ComputeKey(JsonElement data)
+            {
+                var id = JSModelMapper.GetString(data, "id");
+                if (!string.IsNullOrEmpty(id))
+                {
+                    return "id:" + id;
+                }
+
+                if (JSModelMapper.TryGetCommandData(data, out var commandData))
+                {
+                    var commandId = JSModelMapper.GetString(commandData, "id");
+                    if (!string.IsNullOrEmpty(commandId))
+                    {
+                        return "cmd:" + commandId;
+                    }
+                }
+
+                return "title:" + (JSModelMapper.GetString(data, "title") ?? string.Empty);
+            }
+
+            internal void UpdateData(JsonElement data)
+            {
+                ReplaceData(data, RefreshableProperties);
             }
         }
     }
