@@ -192,6 +192,14 @@ public sealed partial class DockWindowManager : IDisposable
 
         var window = new DockWindow(viewModel, monitor, sideOverride);
         _docks[monitorDeviceId] = (window, viewModel);
+
+        // Self-heal: if the dock ever closes through an unexpected path, remove the
+        // stale entry so the next SyncDocksToSettings can recreate it cleanly.
+        window.Closed += (_, _) =>
+        {
+            _docks.Remove(monitorDeviceId);
+        };
+
         window.Show();
 
         viewModel.InitializeBands();

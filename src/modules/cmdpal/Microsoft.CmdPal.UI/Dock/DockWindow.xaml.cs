@@ -1362,6 +1362,14 @@ public sealed partial class DockWindow : WindowEx,
                 // Block minimize and maximize commands
                 return new LRESULT(0);
             }
+
+            if (command == PInvoke.SC_CLOSE)
+            {
+                // Swallow ALT+F4 / SC_CLOSE so the Dock survives, matching taskbar behavior.
+                // Intentional close paths (settings toggle, monitor removal, quit) call
+                // Window.Close() directly and are unaffected by this intercept.
+                return new LRESULT(0);
+            }
         }
 
         // Stop min/max on WM_WINDOWPOSCHANGING too
