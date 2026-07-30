@@ -48,7 +48,7 @@ public:
     void UpdateWindowPositions();
 
     bool Snap(HWND window, const ZoneIndexSet& zones, bool updatePosition = true);
-    bool Unsnap(HWND window);
+    bool Unsnap(HWND window, bool preserveHistory = false);
 
     void ShowZones(const ZoneIndexSet& highlight, HWND draggedWindow = nullptr);
     void HideZones();

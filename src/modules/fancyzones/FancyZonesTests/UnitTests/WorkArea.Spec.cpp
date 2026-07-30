@@ -364,6 +364,21 @@ namespace FancyZonesUnitTests
             Assert::IsFalse(history.has_value());
         }
 
+        TEST_METHOD (UnsnapPreservesAppZoneHistoryForWindowDestroyTest)
+        {
+            const auto workArea = WorkArea::Create(m_hInst, m_workAreaId, m_parentUniqueId, m_workAreaRect);
+            const auto window = Mocks::WindowCreate(m_hInst);
+
+            Assert::IsTrue(workArea->Snap(window, { 1, 2 }));
+            Assert::IsTrue(workArea->Unsnap(window, true));
+
+            const auto processPath = get_process_path(window);
+            const auto history = AppZoneHistory::instance().GetZoneHistory(processPath, m_workAreaId);
+
+            Assert::IsTrue(history.has_value());
+            Assert::IsTrue(std::vector<ZoneIndex>{ 1, 2 } == history->zoneIndexSet);
+        }
+
         TEST_METHOD (UnsnapLayoutAssignedWindowsTest)
         {
             const auto workArea = WorkArea::Create(m_hInst, m_workAreaId, m_parentUniqueId, m_workAreaRect);

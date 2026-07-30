@@ -152,7 +152,7 @@ bool WorkArea::Snap(HWND window, const ZoneIndexSet& zones, bool updatePosition)
     return FancyZonesWindowProperties::StampZoneIndexProperty(window, zones);
 }
 
-bool WorkArea::Unsnap(HWND window)
+bool WorkArea::Unsnap(HWND window, bool preserveHistory)
 {
     if (!m_layout)
     {
@@ -160,7 +160,7 @@ bool WorkArea::Unsnap(HWND window)
     }
     
     m_layoutWindows.Dismiss(window);
-    AppZoneHistory::instance().RemoveAppLastZone(window, m_uniqueId, m_layout->Id());
+    AppZoneHistory::instance().RemoveAppLastZone(window, m_uniqueId, m_layout->Id(), preserveHistory);
     FancyZonesWindowProperties::RemoveZoneIndexProperty(window);
 
     return true;
