@@ -1543,7 +1543,7 @@ internal sealed partial class SystemTemperatureWidgetPage : WidgetPage, IDisposa
 
             if (!stats.IsAvailable)
             {
-                ContentData["cpuTemperature"] = Resources.GetResource("Temperature_Usage_Unknown");
+                ContentData["thermalZoneTemperature"] = Resources.GetResource("Temperature_Usage_Unknown");
                 ContentData["temperatureSource"] = Resources.GetResource("Temperature_Usage_Unavailable");
                 return;
             }
@@ -1552,11 +1552,11 @@ internal sealed partial class SystemTemperatureWidgetPage : WidgetPage, IDisposa
 
             if (stats.CpuTemperatureCelsius < 0)
             {
-                ContentData["cpuTemperature"] = Resources.GetResource("Temperature_Usage_Unknown");
+                ContentData["thermalZoneTemperature"] = Resources.GetResource("Temperature_Usage_Unknown");
                 return;
             }
 
-            ContentData["cpuTemperature"] = $"{stats.CpuTemperatureCelsius:F1} \u00b0C";
+            ContentData["thermalZoneTemperature"] = $"{stats.CpuTemperatureCelsius:F1} \u00b0C";
         }
         catch (Exception e)
         {
@@ -1577,7 +1577,7 @@ internal sealed partial class SystemTemperatureWidgetPage : WidgetPage, IDisposa
 
     public string GetItemTitle(bool isBandPage)
     {
-        if (!ContentData.TryGetValue("cpuTemperature", out var temp)
+        if (!ContentData.TryGetValue("thermalZoneTemperature", out var temp)
             || temp == Resources.GetResource("Temperature_Usage_Unknown"))
         {
             return isBandPage
