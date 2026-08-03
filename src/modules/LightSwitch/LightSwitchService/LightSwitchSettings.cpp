@@ -257,7 +257,7 @@ void LightSwitchSettings::LoadSettings()
         // BrightnessThreshold
         if (const auto jsonVal = values.get_int_value(L"brightnessThreshold"))
         {
-            auto val = std::max(0, std::min(100, *jsonVal));
+            auto val = (std::max)(0, (std::min)(100, *jsonVal));
             if (m_settings.brightnessThreshold != val)
             {
                 m_settings.brightnessThreshold = val;
