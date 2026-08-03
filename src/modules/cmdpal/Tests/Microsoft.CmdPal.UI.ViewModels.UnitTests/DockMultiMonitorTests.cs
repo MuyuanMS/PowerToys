@@ -354,6 +354,29 @@ public class DockMultiMonitorTests
     }
 
     [TestMethod]
+    public void Reconciler_PrimaryEmptyCustomizedConfig_DoesNotMigrate()
+    {
+        var configs = ImmutableList.Create(
+            new DockMonitorConfig
+            {
+                MonitorDeviceId = PrimaryMonitor.StableId,
+                Enabled = true,
+                IsPrimary = true,
+                IsCustomized = true,
+                StartBands = ImmutableList<DockBandSettings>.Empty,
+                CenterBands = ImmutableList<DockBandSettings>.Empty,
+                EndBands = ImmutableList<DockBandSettings>.Empty,
+            });
+        var monitors = new List<MonitorInfo> { PrimaryMonitor };
+        var globalStartBands = ImmutableList.Create(new DockBandSettings { ProviderId = "global", CommandId = "start" });
+
+        var result = MonitorConfigReconciler.Reconcile(configs, monitors);
+
+        Assert.IsTrue(result[0].IsCustomized, "Legacy empty migration should only target secondary-monitor configs.");
+        Assert.AreEqual(0, result[0].ResolveStartBands(globalStartBands).Count, "Primary empty StartBands should remain empty.");
+    }
+
+    [TestMethod]
     public void Reconciler_FuzzyMatch_UpdatesPrimaryFlag()
     {
         // Config has old stable ID but marked as primary

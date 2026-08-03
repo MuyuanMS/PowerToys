@@ -214,7 +214,7 @@ public static class MonitorConfigReconciler
 
     private static DockMonitorConfig NormalizeEmptyCustomizedConfig(DockMonitorConfig config)
     {
-        if (!config.IsCustomized)
+        if (!config.IsCustomized || config.IsPrimary)
         {
             return config;
         }
