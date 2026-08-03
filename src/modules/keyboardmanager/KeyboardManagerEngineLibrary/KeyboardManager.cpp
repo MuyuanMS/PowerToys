@@ -179,6 +179,10 @@ void KeyboardManager::HandleMouseHookEvent() noexcept
     // HandleKeyboardHookEvent.
     if (editorIsRunningEvent != nullptr && WaitForSingleObject(editorIsRunningEvent, 0) == WAIT_OBJECT_0)
     {
+        // The editor is capturing input, so we won't promote held alone keys here. Drop any alone
+        // runtime state: a key held across the editor opening must not leave a stale pending/
+        // combination entry that would mis-handle the next press once the editor closes.
+        state.ClearAllAloneKeyState();
         return;
     }
 
@@ -308,6 +312,10 @@ intptr_t KeyboardManager::HandleKeyboardHookEvent(LowlevelKeyboardEvent* data) n
     // Suspend remapping if remap key/shortcut window is opened
     if (editorIsRunningEvent != nullptr && WaitForSingleObject(editorIsRunningEvent, 0) == WAIT_OBJECT_0)
     {
+        // The stateful alone handler below is skipped while suspended, so releasing an alone key here
+        // would otherwise leave stale pending/combination state that survives closing the editor and
+        // corrupts the next press. Clear it before passing the event through.
+        state.ClearAllAloneKeyState();
         return 0;
     }
 

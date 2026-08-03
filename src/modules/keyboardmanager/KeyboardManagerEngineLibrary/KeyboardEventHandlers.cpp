@@ -189,9 +189,16 @@ namespace KeyboardEventHandlers
 
             if (isKeyDown)
             {
-                // Suppress the physical key-down. Become a tap candidate on the first down; while already
-                // in a combination (real key-down injected), just keep suppressing auto-repeats.
-                if (!state.IsAloneCombination(vk))
+                // Already promoted to a real key-down in a combination: subsequent physical key-downs
+                // are auto-repeat of the original source key. Let them through so a non-modifier alone
+                // key (e.g. a letter used in a chord) still auto-repeats like a normal held key; the
+                // injected real key-up is still balanced on the alone key's release.
+                if (state.IsAloneCombination(vk))
+                {
+                    return 0;
+                }
+
+                // Suppress the physical key-down. Become a tap candidate on the first down.
                 {
                     if (pressedInCombination)
                     {
@@ -270,7 +277,15 @@ namespace KeyboardEventHandlers
                     // its numpad origin, so a numpad-originated key is released as the same key we pressed).
                     std::vector<INPUT> keyEventList;
                     AppendAloneSourceKeyEvent(keyEventList, vk, /*keyUp*/ true);
-                    ii.SendVirtualInput(keyEventList);
+                    if (!ii.SendVirtualInput(keyEventList))
+                    {
+                        // Injection was blocked (e.g. focus moved to an elevated window) after the
+                        // real key-down succeeded. Let the physical key-up through so it balances the
+                        // injected key-down instead of leaving the real key/modifier stuck down.
+                        // Mirrors the injection-failure handling on the key-down path.
+                        state.ClearAloneKeyState(vk);
+                        return 0;
+                    }
 
                     state.ClearAloneKeyState(vk);
                     return 1;
