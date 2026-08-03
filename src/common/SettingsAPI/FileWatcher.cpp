@@ -22,8 +22,8 @@ std::optional<FILETIME> FileWatcher::MyFileTime()
 
 FileWatcher::FileWatcher(const std::wstring& path, std::function<void()> callback) :
     m_path(path),
-    m_callback(callback),
-    m_lastWrite(MyFileTime())
+    m_lastWrite(MyFileTime()),
+    m_callback(callback)
 {
     std::filesystem::path fsPath(path);
     m_file_name = fsPath.filename();
@@ -39,9 +39,10 @@ FileWatcher::FileWatcher(const std::wstring& path, std::function<void()> callbac
             if (m_file_name.compare(fileName) == 0)
             {
                 auto lastWrite = MyFileTime();
-                if (!m_lastWrite.has_value())
+                if (lastWrite.has_value() && !m_lastWrite.has_value())
                 {
                     m_lastWrite = lastWrite;
+                    m_callback();
                 }
                 else if (lastWrite.has_value())
                 {
