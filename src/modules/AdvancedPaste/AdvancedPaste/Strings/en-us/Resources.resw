@@ -238,6 +238,9 @@
   <data name="CoachingExplanationTitle.Text" xml:space="preserve">
     <value>What was changed and why</value>
   </data>
+  <data name="PasteAsSingleLine" xml:space="preserve">
+    <value>Paste as single line</value>
+  </data>
   <data name="ImageToText" xml:space="preserve">
     <value>Image to text</value>
   </data>
