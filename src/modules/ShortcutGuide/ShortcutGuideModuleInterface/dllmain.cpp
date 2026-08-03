@@ -319,7 +319,22 @@ private:
         auto settingsObject = settings.get_raw_json();
         if (settingsObject.GetView().Size())
         {
-            auto propertiesObject = settingsObject.GetNamedObject(L"properties");
+            // Keep the properties lookup defensive: a non-empty settings root that is missing or has a
+            // malformed "properties" object must not throw out of ParseSettings, otherwise the default
+            // hotkey fallback below is skipped and Shortcut Guide is left with no activation shortcut.
+            json::JsonObject propertiesObject;
+            try
+            {
+                if (settingsObject.HasKey(L"properties"))
+                {
+                    propertiesObject = settingsObject.GetNamedObject(L"properties");
+                }
+            }
+            catch (...)
+            {
+                Logger::warn("Failed to read Shortcut Guide properties object");
+            }
+
             try
             {
                 // Parse HotKey
