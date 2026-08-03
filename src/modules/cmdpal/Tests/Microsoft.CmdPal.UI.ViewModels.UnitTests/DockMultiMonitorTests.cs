@@ -414,6 +414,7 @@ public class DockMultiMonitorTests
             Side = DockSide.Left,
             IsPrimary = true,
             IsCustomized = true,
+            HasExplicitBandCustomization = true,
             StartBands = ImmutableList.Create(new DockBandSettings { ProviderId = "p1", CommandId = "c1" }),
             CenterBands = ImmutableList<DockBandSettings>.Empty,
             EndBands = ImmutableList<DockBandSettings>.Empty,
@@ -428,6 +429,7 @@ public class DockMultiMonitorTests
         Assert.AreEqual(config.Side, deserialized.Side);
         Assert.AreEqual(config.IsPrimary, deserialized.IsPrimary);
         Assert.AreEqual(config.IsCustomized, deserialized.IsCustomized);
+        Assert.AreEqual(config.HasExplicitBandCustomization, deserialized.HasExplicitBandCustomization);
         Assert.IsNotNull(deserialized.StartBands);
         Assert.AreEqual(1, deserialized.StartBands!.Count);
         Assert.AreEqual("c1", deserialized.StartBands![0].CommandId);
