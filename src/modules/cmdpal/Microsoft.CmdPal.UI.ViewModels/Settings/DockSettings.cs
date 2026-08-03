@@ -195,6 +195,12 @@ public sealed record DockMonitorConfig
     /// </summary>
     public bool IsCustomized { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether customized band lists came from an explicit
+    /// user edit instead of an older automatically-created empty default.
+    /// </summary>
+    public bool HasExplicitBandCustomization { get; init; }
+
     // Nullable EquatableList backing fields give the synthesized record equality structural
     // comparison of the per-monitor bands while preserving null ("inherit global") vs. an
     // explicit (possibly empty) list. See EquatableList<T>.
@@ -272,6 +278,7 @@ public sealed record DockMonitorConfig
     public DockMonitorConfig ForkFromGlobal(DockSettings globalSettings) => this with
     {
         IsCustomized = true,
+        HasExplicitBandCustomization = true,
 
         // Create independent copies by rebuilding the immutable lists
         StartBands = ImmutableList.CreateRange(globalSettings.StartBands ?? ImmutableList<DockBandSettings>.Empty),

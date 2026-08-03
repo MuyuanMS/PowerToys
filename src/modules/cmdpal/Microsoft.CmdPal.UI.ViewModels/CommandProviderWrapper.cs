@@ -599,9 +599,9 @@ public sealed class CommandProviderWrapper : ICommandProviderContext
                 // Add band to the appropriate section
                 target = side switch
                 {
-                    Dock.DockPinSide.Center => target with { CenterBands = (target.CenterBands ?? System.Collections.Immutable.ImmutableList<DockBandSettings>.Empty).Add(bandSettings) },
-                    Dock.DockPinSide.End => target with { EndBands = (target.EndBands ?? System.Collections.Immutable.ImmutableList<DockBandSettings>.Empty).Add(bandSettings) },
-                    _ => target with { StartBands = (target.StartBands ?? System.Collections.Immutable.ImmutableList<DockBandSettings>.Empty).Add(bandSettings) },
+                    Dock.DockPinSide.Center => target with { HasExplicitBandCustomization = true, CenterBands = (target.CenterBands ?? System.Collections.Immutable.ImmutableList<DockBandSettings>.Empty).Add(bandSettings) },
+                    Dock.DockPinSide.End => target with { HasExplicitBandCustomization = true, EndBands = (target.EndBands ?? System.Collections.Immutable.ImmutableList<DockBandSettings>.Empty).Add(bandSettings) },
+                    _ => target with { HasExplicitBandCustomization = true, StartBands = (target.StartBands ?? System.Collections.Immutable.ImmutableList<DockBandSettings>.Empty).Add(bandSettings) },
                 };
 
                 configs = configs.SetItem(targetIndex, target);

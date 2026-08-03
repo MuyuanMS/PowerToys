@@ -219,7 +219,7 @@ public static class MonitorConfigReconciler
             return config;
         }
 
-        if (HasBands(config.StartBands) || HasBands(config.CenterBands) || HasBands(config.EndBands))
+        if (config.HasExplicitBandCustomization || HasBands(config.StartBands) || HasBands(config.CenterBands) || HasBands(config.EndBands))
         {
             return config;
         }
@@ -227,6 +227,7 @@ public static class MonitorConfigReconciler
         return config with
         {
             IsCustomized = false,
+            HasExplicitBandCustomization = false,
             StartBands = null,
             CenterBands = null,
             EndBands = null,

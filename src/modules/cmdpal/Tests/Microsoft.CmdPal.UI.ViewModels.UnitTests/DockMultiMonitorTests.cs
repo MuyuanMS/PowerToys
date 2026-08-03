@@ -291,6 +291,34 @@ public class DockMultiMonitorTests
     }
 
     [TestMethod]
+    public void Reconciler_ExplicitEmptyCustomizedConfig_PreservesEmptyBands()
+    {
+        var configs = ImmutableList.Create(
+            new DockMonitorConfig { MonitorDeviceId = PrimaryMonitor.StableId, Enabled = true, IsPrimary = true },
+            new DockMonitorConfig
+            {
+                MonitorDeviceId = SecondaryMonitor.StableId,
+                Enabled = true,
+                IsPrimary = false,
+                IsCustomized = true,
+                HasExplicitBandCustomization = true,
+                StartBands = ImmutableList<DockBandSettings>.Empty,
+                CenterBands = ImmutableList<DockBandSettings>.Empty,
+                EndBands = ImmutableList<DockBandSettings>.Empty,
+            });
+        var monitors = new List<MonitorInfo> { PrimaryMonitor, SecondaryMonitor };
+        var globalStartBands = ImmutableList.Create(new DockBandSettings { ProviderId = "global", CommandId = "start" });
+
+        var result = MonitorConfigReconciler.Reconcile(configs, monitors);
+
+        var secondary = result.Find(c => string.Equals(c.MonitorDeviceId, SecondaryMonitor.StableId, StringComparison.OrdinalIgnoreCase));
+        Assert.IsNotNull(secondary, "Secondary monitor config should be found.");
+        Assert.IsTrue(secondary!.IsCustomized, "Explicit empty customizations should not be treated as legacy defaults.");
+        Assert.IsTrue(secondary.HasExplicitBandCustomization, "Explicit customization marker should be preserved.");
+        Assert.AreEqual(0, secondary.ResolveStartBands(globalStartBands).Count, "Explicit empty StartBands should remain empty.");
+    }
+
+    [TestMethod]
     public void Reconciler_FuzzyMatch_UpdatesPrimaryFlag()
     {
         // Config has old stable ID but marked as primary
