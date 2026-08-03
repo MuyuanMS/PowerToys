@@ -219,7 +219,10 @@ public static class MonitorConfigReconciler
             return config;
         }
 
-        if (config.HasExplicitBandCustomization || HasBands(config.StartBands) || HasBands(config.CenterBands) || HasBands(config.EndBands))
+        if (config.HasExplicitBandCustomization ||
+            config.StartBands is not { Count: 0 } ||
+            config.CenterBands is not { Count: 0 } ||
+            config.EndBands is not { Count: 0 })
         {
             return config;
         }
@@ -233,6 +236,4 @@ public static class MonitorConfigReconciler
             EndBands = null,
         };
     }
-
-    private static bool HasBands(ImmutableList<DockBandSettings>? bands) => bands is { Count: > 0 };
 }

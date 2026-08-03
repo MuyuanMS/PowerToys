@@ -200,7 +200,16 @@ public class DockMultiMonitorTests
     {
         var configs = ImmutableList.Create(
             new DockMonitorConfig { MonitorDeviceId = PrimaryMonitor.StableId, Enabled = true, LastSeen = DateTime.UtcNow },
-            new DockMonitorConfig { MonitorDeviceId = @"\\?\DISPLAY#GONE#4&ccc&0&UID999#{guid99}", Enabled = true, IsCustomized = true, LastSeen = DateTime.UtcNow });
+            new DockMonitorConfig
+            {
+                MonitorDeviceId = @"\\?\DISPLAY#GONE#4&ccc&0&UID999#{guid99}",
+                Enabled = true,
+                IsCustomized = true,
+                StartBands = ImmutableList<DockBandSettings>.Empty,
+                CenterBands = ImmutableList<DockBandSettings>.Empty,
+                EndBands = ImmutableList<DockBandSettings>.Empty,
+                LastSeen = DateTime.UtcNow,
+            });
 
         var monitors = new List<MonitorInfo> { PrimaryMonitor };
 
@@ -319,6 +328,32 @@ public class DockMultiMonitorTests
     }
 
     [TestMethod]
+    public void Reconciler_CustomizedConfigWithNullBandList_DoesNotMigrate()
+    {
+        var configs = ImmutableList.Create(
+            new DockMonitorConfig { MonitorDeviceId = PrimaryMonitor.StableId, Enabled = true, IsPrimary = true },
+            new DockMonitorConfig
+            {
+                MonitorDeviceId = SecondaryMonitor.StableId,
+                Enabled = true,
+                IsPrimary = false,
+                IsCustomized = true,
+                StartBands = ImmutableList<DockBandSettings>.Empty,
+                CenterBands = null,
+                EndBands = ImmutableList<DockBandSettings>.Empty,
+            });
+        var monitors = new List<MonitorInfo> { PrimaryMonitor, SecondaryMonitor };
+        var globalStartBands = ImmutableList.Create(new DockBandSettings { ProviderId = "global", CommandId = "start" });
+
+        var result = MonitorConfigReconciler.Reconcile(configs, monitors);
+
+        var secondary = result.Find(c => string.Equals(c.MonitorDeviceId, SecondaryMonitor.StableId, StringComparison.OrdinalIgnoreCase));
+        Assert.IsNotNull(secondary, "Secondary monitor config should be found.");
+        Assert.IsTrue(secondary!.IsCustomized, "Only the exact legacy three-empty-list shape should migrate.");
+        Assert.AreEqual(0, secondary.ResolveStartBands(globalStartBands).Count, "Explicit empty StartBands should remain empty.");
+    }
+
+    [TestMethod]
     public void Reconciler_FuzzyMatch_UpdatesPrimaryFlag()
     {
         // Config has old stable ID but marked as primary
@@ -340,7 +375,17 @@ public class DockMultiMonitorTests
         // Config has stale stable ID for a non-primary monitor
         var configs = ImmutableList.Create(
             new DockMonitorConfig { MonitorDeviceId = PrimaryMonitor.StableId, Enabled = true, IsPrimary = true },
-            new DockMonitorConfig { MonitorDeviceId = @"\\?\DISPLAY#STALE#4&eee&0&UID333#{guidStale}", Enabled = true, IsPrimary = false, IsCustomized = true, LastSeen = DateTime.UtcNow });
+            new DockMonitorConfig
+            {
+                MonitorDeviceId = @"\\?\DISPLAY#STALE#4&eee&0&UID333#{guidStale}",
+                Enabled = true,
+                IsPrimary = false,
+                IsCustomized = true,
+                StartBands = ImmutableList<DockBandSettings>.Empty,
+                CenterBands = ImmutableList<DockBandSettings>.Empty,
+                EndBands = ImmutableList<DockBandSettings>.Empty,
+                LastSeen = DateTime.UtcNow,
+            });
 
         // Current monitors have primary + a different secondary
         var monitors = new List<MonitorInfo> { PrimaryMonitor, SecondaryMonitor };
@@ -823,7 +868,16 @@ public class DockMultiMonitorTests
         // Simulate upgrade from pre-stable-ID settings: configs use GDI device names
         var configs = ImmutableList.Create(
             new DockMonitorConfig { MonitorDeviceId = @"\\.\DISPLAY1", Enabled = true, IsPrimary = true, Side = DockSide.Left },
-            new DockMonitorConfig { MonitorDeviceId = @"\\.\DISPLAY2", Enabled = true, IsPrimary = false, IsCustomized = true });
+            new DockMonitorConfig
+            {
+                MonitorDeviceId = @"\\.\DISPLAY2",
+                Enabled = true,
+                IsPrimary = false,
+                IsCustomized = true,
+                StartBands = ImmutableList<DockBandSettings>.Empty,
+                CenterBands = ImmutableList<DockBandSettings>.Empty,
+                EndBands = ImmutableList<DockBandSettings>.Empty,
+            });
 
         var monitors = new List<MonitorInfo> { PrimaryMonitor, SecondaryMonitor };
 
