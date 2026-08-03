@@ -102,6 +102,11 @@ public:
             values.save_to_settings_file();
             // Otherwise call a custom function to process the settings before saving them to disk:
             // save_settings();
+
+            // Notify the running Always On Top daemon to reload its settings immediately.
+            // This uses the same registered window message GUID as WinHookEventIDs.cpp.
+            const UINT settingsChangedMsg = RegisterWindowMessage(L"{11978F7B-221A-4E65-B8A8-693F7D6E4B25}");
+            PostMessageW(HWND_BROADCAST, settingsChangedMsg, NULL, NULL);
         }
         catch (std::exception&)
         {

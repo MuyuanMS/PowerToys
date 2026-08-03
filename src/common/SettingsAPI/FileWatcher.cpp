@@ -22,7 +22,8 @@ std::optional<FILETIME> FileWatcher::MyFileTime()
 
 FileWatcher::FileWatcher(const std::wstring& path, std::function<void()> callback) :
     m_path(path),
-    m_callback(callback)
+    m_callback(callback),
+    m_lastWrite(MyFileTime())
 {
     std::filesystem::path fsPath(path);
     m_file_name = fsPath.filename();
