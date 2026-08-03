@@ -42,6 +42,10 @@ public:
     // Called when display brightness changes (via BrightnessObserver)
     void OnBrightnessChange(int brightness);
 
+    // Invalidate the cached brightness sample (e.g. when the BrightnessObserver is stopped),
+    // so a later mode switch back to Follow Brightness does not act on a stale value.
+    void InvalidateBrightness();
+
     // Initial sync at startup to align internal state with system theme
     void SyncInitialThemeState();
 

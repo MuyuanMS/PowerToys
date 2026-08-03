@@ -45,6 +45,41 @@ public class LightSwitch
         Assert.AreEqual(0, messages.Count);
     }
 
+    [TestMethod]
+    public void BrightnessThreshold_ClampsBelowZeroToZero()
+    {
+        var settings = new LightSwitchSettings();
+        var viewModel = CreateViewModel(settings, _ => 0);
+
+        viewModel.BrightnessThreshold = -20;
+
+        Assert.AreEqual(0, viewModel.BrightnessThreshold);
+        Assert.AreEqual(0, settings.Properties.BrightnessThreshold.Value);
+    }
+
+    [TestMethod]
+    public void BrightnessThreshold_ClampsAboveHundredToHundred()
+    {
+        var settings = new LightSwitchSettings();
+        var viewModel = CreateViewModel(settings, _ => 0);
+
+        viewModel.BrightnessThreshold = 250;
+
+        Assert.AreEqual(100, viewModel.BrightnessThreshold);
+        Assert.AreEqual(100, settings.Properties.BrightnessThreshold.Value);
+    }
+
+    [TestMethod]
+    public void Clone_PreservesNonDefaultBrightnessThreshold()
+    {
+        var settings = new LightSwitchSettings();
+        settings.Properties.BrightnessThreshold.Value = 42;
+
+        var clone = (LightSwitchSettings)settings.Clone();
+
+        Assert.AreEqual(42, clone.Properties.BrightnessThreshold.Value);
+    }
+
     private static LightSwitchViewModel CreateViewModel(
         LightSwitchSettings settings,
         System.Func<string, int> sendConfigMessage)
