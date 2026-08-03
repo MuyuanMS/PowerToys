@@ -214,9 +214,14 @@ public static class MonitorConfigReconciler
 
     private static DockMonitorConfig NormalizeEmptyCustomizedConfig(DockMonitorConfig config)
     {
-        if (!config.IsCustomized || config.IsPrimary)
+        if (!config.IsCustomized)
         {
             return config;
+        }
+
+        if (config.IsPrimary)
+        {
+            return config with { HasExplicitBandCustomization = true };
         }
 
         if (config.HasExplicitBandCustomization ||

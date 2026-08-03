@@ -373,7 +373,42 @@ public class DockMultiMonitorTests
         var result = MonitorConfigReconciler.Reconcile(configs, monitors);
 
         Assert.IsTrue(result[0].IsCustomized, "Legacy empty migration should only target secondary-monitor configs.");
+        Assert.IsTrue(result[0].HasExplicitBandCustomization, "Legacy primary empty configs should be marked explicit before primary status can change.");
         Assert.AreEqual(0, result[0].ResolveStartBands(globalStartBands).Count, "Primary empty StartBands should remain empty.");
+    }
+
+    [TestMethod]
+    public void Reconciler_PrimaryEmptyCustomizedConfig_PreservedAfterPrimaryRoleChanges()
+    {
+        var oldPrimary = new MonitorInfo
+        {
+            DeviceId = @"\\.\DISPLAY3",
+            StableId = @"\\?\DISPLAY#OLDPRI#4&ccc&0&UID333#{guid3}",
+            DisplayName = "Display 3",
+            Bounds = new ScreenRect(3840, 0, 5760, 1080),
+            WorkArea = new ScreenRect(3840, 0, 5760, 1040),
+            Dpi = 96,
+            IsPrimary = false,
+        };
+        var configs = ImmutableList.Create(
+            new DockMonitorConfig
+            {
+                MonitorDeviceId = oldPrimary.StableId,
+                Enabled = true,
+                IsPrimary = true,
+                IsCustomized = true,
+                StartBands = ImmutableList<DockBandSettings>.Empty,
+                CenterBands = ImmutableList<DockBandSettings>.Empty,
+                EndBands = ImmutableList<DockBandSettings>.Empty,
+            });
+        var monitors = new List<MonitorInfo> { oldPrimary };
+
+        var afterRoleChange = MonitorConfigReconciler.Reconcile(configs, monitors);
+        var afterSecondReconcile = MonitorConfigReconciler.Reconcile(afterRoleChange, monitors);
+
+        Assert.IsFalse(afterSecondReconcile[0].IsPrimary, "Monitor should keep its current non-primary role.");
+        Assert.IsTrue(afterSecondReconcile[0].IsCustomized, "Old primary empty customization should not be migrated after the primary role changes.");
+        Assert.IsTrue(afterSecondReconcile[0].HasExplicitBandCustomization, "Explicit marker should survive follow-up reconciliations.");
     }
 
     [TestMethod]
