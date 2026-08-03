@@ -72,7 +72,7 @@ public static class MonitorConfigReconciler
             var monitor = currentMonitors[mi];
             if (configIndexById.TryGetValue(monitor.StableId, out var ci) && !matchedConfigIndices.Contains(ci))
             {
-                result.Add(existingConfigs[ci] with { IsPrimary = monitor.IsPrimary, LastSeen = utcNow });
+                result.Add(NormalizeEmptyCustomizedConfig(existingConfigs[ci]) with { IsPrimary = monitor.IsPrimary, LastSeen = utcNow });
                 matchedMonitorStableIds.Add(monitor.StableId);
                 matchedConfigIndices.Add(ci);
             }
@@ -92,7 +92,7 @@ public static class MonitorConfigReconciler
             if (configIndexById.TryGetValue(monitor.DeviceId, out var ci) && !matchedConfigIndices.Contains(ci))
             {
                 // Migrate: rewrite from GDI name to stable path
-                result.Add(existingConfigs[ci] with
+                result.Add(NormalizeEmptyCustomizedConfig(existingConfigs[ci]) with
                 {
                     MonitorDeviceId = monitor.StableId,
                     IsPrimary = monitor.IsPrimary,
@@ -125,7 +125,7 @@ public static class MonitorConfigReconciler
 
                 if (existingConfigs[ci].IsPrimary)
                 {
-                    result.Add(existingConfigs[ci] with
+                    result.Add(NormalizeEmptyCustomizedConfig(existingConfigs[ci]) with
                     {
                         MonitorDeviceId = monitor.StableId,
                         IsPrimary = monitor.IsPrimary,
@@ -167,10 +167,6 @@ public static class MonitorConfigReconciler
                     MonitorDeviceId = monitor.StableId,
                     Enabled = false,
                     IsPrimary = false,
-                    IsCustomized = true,
-                    StartBands = ImmutableList<DockBandSettings>.Empty,
-                    CenterBands = ImmutableList<DockBandSettings>.Empty,
-                    EndBands = ImmutableList<DockBandSettings>.Empty,
                     LastSeen = utcNow,
                 });
             }
@@ -189,7 +185,7 @@ public static class MonitorConfigReconciler
             var lastSeen = config.LastSeen ?? utcNow; // Treat legacy entries (no LastSeen) as fresh
             if ((utcNow - lastSeen) < StaleThreshold)
             {
-                result.Add(config);
+                result.Add(NormalizeEmptyCustomizedConfig(config));
             }
         }
 
@@ -215,4 +211,27 @@ public static class MonitorConfigReconciler
 
         return ImmutableList.CreateRange(result);
     }
+
+    private static DockMonitorConfig NormalizeEmptyCustomizedConfig(DockMonitorConfig config)
+    {
+        if (!config.IsCustomized)
+        {
+            return config;
+        }
+
+        if (HasBands(config.StartBands) || HasBands(config.CenterBands) || HasBands(config.EndBands))
+        {
+            return config;
+        }
+
+        return config with
+        {
+            IsCustomized = false,
+            StartBands = null,
+            CenterBands = null,
+            EndBands = null,
+        };
+    }
+
+    private static bool HasBands(ImmutableList<DockBandSettings>? bands) => bands is { Count: > 0 };
 }
