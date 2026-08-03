@@ -267,6 +267,7 @@ DWORD WINAPI ServiceWorkerThread(LPVOID lpParam)
         Logger::info(L"[LightSwitchService] Stopping Brightness watcher...");
         g_brightnessWatcher->Stop();
         g_brightnessWatcher.reset();
+        stateManager.InvalidateBrightness();
     }
 
     SYSTEMTIME st;
@@ -374,6 +375,7 @@ DWORD WINAPI ServiceWorkerThread(LPVOID lpParam)
                 Logger::info(L"[LightSwitchService] Stopping Brightness watcher...");
                 g_brightnessWatcher->Stop();
                 g_brightnessWatcher.reset();
+                stateManager.InvalidateBrightness();
             }
 
             continue;

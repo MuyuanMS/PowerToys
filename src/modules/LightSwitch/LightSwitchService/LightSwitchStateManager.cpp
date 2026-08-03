@@ -123,6 +123,13 @@ void LightSwitchStateManager::OnBrightnessChange(int brightness)
     EvaluateAndApplyIfNeeded();
 }
 
+// Called when the BrightnessObserver is stopped so the cached sample is not reused later.
+void LightSwitchStateManager::InvalidateBrightness()
+{
+    std::lock_guard<std::mutex> lock(_stateMutex);
+    _state.lastBrightness = -1;
+}
+
 // Helpers
 bool LightSwitchStateManager::CoordinatesAreValid(const std::wstring& lat, const std::wstring& lon)
 {
