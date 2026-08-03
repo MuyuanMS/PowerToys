@@ -78,6 +78,10 @@ private:
 
         int lastBrightness = -1;
 
+        // Bounded wait so a stalled WMI provider cannot block Next() indefinitely;
+        // this keeps Stop()/join() responsive to _stop between polls.
+        constexpr long kNextTimeoutMs = 1000;
+
         while (!_stop)
         {
             IEnumWbemClassObject* pEnum = nullptr;
@@ -91,7 +95,7 @@ private:
             {
                 IWbemClassObject* pObj = nullptr;
                 ULONG returned = 0;
-                if (pEnum->Next(WBEM_INFINITE, 1, &pObj, &returned) == WBEM_S_NO_ERROR && returned)
+                if (pEnum->Next(kNextTimeoutMs, 1, &pObj, &returned) == WBEM_S_NO_ERROR && returned)
                 {
                     VARIANT vt;
                     VariantInit(&vt);
