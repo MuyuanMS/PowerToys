@@ -244,6 +244,14 @@ public sealed partial class MainWindow : TransparentWindow, IDisposable
     // Starts the fallback deadline for the reveal, tagged with the summon that armed it.
     private void ArmRevealTimeout(int generation)
     {
+        // Detach any handler still subscribed from a previous summon before retagging the shared
+        // counter/generation below. This runs synchronously at summon time, ahead of the low-
+        // priority callback that re-arms the reveal in WaitForFirstFrameThenReveal; without it, an
+        // old handler would keep firing against the freshly reset _renderedFrames and the new
+        // _revealGeneration, so it could reach Reveal() before this summon's layout pass has run and
+        // expose the stale/un-laid-out frame this change exists to prevent.
+        CompositionTarget.Rendering -= OnRenderingBeforeReveal;
+
         _revealGeneration = generation;
         _renderedFrames = 0;
 
