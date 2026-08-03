@@ -9,6 +9,7 @@
 #include <logger/logger.h>
 
 #pragma comment(lib, "wbemuuid.lib")
+#pragma comment(lib, "comsuppw.lib") // _bstr_t / _com_util COM support
 
 // Polls the WMI WmiMonitorBrightness class every few seconds and fires a callback
 // when the brightness value changes. Works for laptop/tablet integrated displays
