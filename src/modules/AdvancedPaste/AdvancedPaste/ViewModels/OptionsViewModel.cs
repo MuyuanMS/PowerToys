@@ -417,12 +417,21 @@ namespace AdvancedPaste.ViewModels
 
             UpdateFormats(StandardPasteFormats, Enum.GetValues<PasteFormats>()
                                                     .Where(format => PasteFormat.MetadataDict[format].IsCoreAction || _userSettings.AdditionalActions.Contains(format))
+                                                    .OrderBy(GetPasteFormatDisplayOrder)
                                                     .Select(CreateStandardPasteFormat));
 
             UpdateFormats(
                 CustomActionPasteFormats,
                 IsCustomAIServiceEnabled ? _userSettings.CustomActions.Select(customAction => CreateCustomAIPasteFormat(customAction.Name, customAction.Prompt, isSavedQuery: true)) : []);
         }
+
+        private static int GetPasteFormatDisplayOrder(PasteFormats format) =>
+            format switch
+            {
+                PasteFormats.RichText => 2,
+                PasteFormats.Json => 3,
+                _ => (int)format < (int)PasteFormats.Json ? (int)format : (int)format + 1,
+            };
 
         public void Dispose()
         {
