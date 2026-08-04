@@ -359,11 +359,16 @@ bool AppZoneHistory::SetAppLastZones(HWND window, const FancyZonesDataTypes::Wor
     const auto legacyProcessPath = GetProcessPathWithoutAUMID(processPath);
     if (legacyProcessPath != processPath && !m_history.contains(processPath))
     {
-        auto legacyHistory = m_history.extract(legacyProcessPath);
-        if (!legacyHistory.empty())
+        auto legacyHistory = m_history.find(legacyProcessPath);
+        if (legacyHistory != m_history.end())
         {
-            legacyHistory.key() = processPath;
-            m_history.insert(std::move(legacyHistory));
+            auto qualifiedHistory = legacyHistory->second;
+            for (auto& data : qualifiedHistory)
+            {
+                data.processIdToHandleMap.clear();
+            }
+
+            m_history.emplace(processPath, std::move(qualifiedHistory));
         }
     }
 
