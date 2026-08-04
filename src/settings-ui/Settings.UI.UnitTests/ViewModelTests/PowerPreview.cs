@@ -95,6 +95,26 @@ namespace ViewModelTests
         }
 
         [TestMethod]
+        public void IsCopyAsUNCEnabledShouldSendGeneralSettingsWhenSuccessful()
+        {
+            var ipcInvoked = false;
+            Func<string, int> sendMockIPCConfigMSG = msg =>
+            {
+                OutGoingGeneralSettings outgoing = JsonSerializer.Deserialize<OutGoingGeneralSettings>(msg);
+                Assert.IsFalse(outgoing.GeneralSettings.Enabled.CopyAsUNC);
+                ipcInvoked = true;
+                return 0;
+            };
+
+            PowerPreviewViewModel viewModel = new PowerPreviewViewModel(SettingsRepository<PowerPreviewSettings>.GetInstance(mockPowerPreviewSettingsUtils.Object), SettingsRepository<GeneralSettings>.GetInstance(mockGeneralSettingsUtils.Object), sendMockIPCConfigMSG, PowerPreviewSettings.ModuleName);
+
+            viewModel.IsCopyAsUNCEnabled = false;
+
+            Assert.IsTrue(ipcInvoked);
+            Assert.IsFalse(viewModel.IsCopyAsUNCEnabled);
+        }
+
+        [TestMethod]
         public void SVGThumbnailIsEnabledShouldPrevHandlerWhenSuccessful()
         {
             // Assert

@@ -82,9 +82,12 @@ public:
 
         std::wstring path = get_module_folderpath(globals::instance);
         std::wstring packageUri = path + L"\\CopyAsUNCContextMenuPackage.msix";
-        if (!package::IsPackageRegisteredWithPowerToysVersion(constants::nonlocalizable::ContextMenuPackageName))
+        const bool packageRegistered = package::IsPackageRegisteredWithPowerToysVersion(constants::nonlocalizable::ContextMenuPackageName) ||
+                                       package::RegisterSparsePackage(path, packageUri);
+        if (!packageRegistered)
         {
-            package::RegisterSparsePackage(path, packageUri);
+            m_enabled = false;
+            return;
         }
 
         m_enabled = true;

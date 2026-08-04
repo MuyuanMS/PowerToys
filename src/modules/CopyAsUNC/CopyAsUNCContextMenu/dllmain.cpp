@@ -11,6 +11,7 @@
 #include <winnetwk.h>
 #include <string>
 #include <vector>
+#include <wil/resource.h>
 #include <wrl/module.h>
 
 #include "Generated Files/resource.h"
@@ -104,6 +105,7 @@ public:
     }
 
     IFACEMETHODIMP Invoke(_In_opt_ IShellItemArray* selection, _In_opt_ IBindCtx*) noexcept
+    try
     {
         if (!selection)
             return S_OK;
@@ -144,30 +146,49 @@ public:
 
             if (!uncPath.empty())
             {
-                if (OpenClipboard(nullptr))
+                size_t byteLen = (uncPath.size() + 1) * sizeof(wchar_t);
+                wil::unique_hglobal clipboardData{ GlobalAlloc(GMEM_MOVEABLE, byteLen) };
+                if (!clipboardData)
                 {
-                    EmptyClipboard();
-                    size_t byteLen = (uncPath.size() + 1) * sizeof(wchar_t);
-                    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, byteLen);
-                    if (hMem)
-                    {
-                        void* locked = GlobalLock(hMem);
-                        if (locked)
-                        {
-                            memcpy(locked, uncPath.c_str(), byteLen);
-                            GlobalUnlock(hMem);
-                            if (!SetClipboardData(CF_UNICODETEXT, hMem))
-                            {
-                                GlobalFree(hMem);
-                            }
-                        }
-                        else
-                        {
-                            GlobalFree(hMem);
-                        }
-                    }
-                    CloseClipboard();
+                    return HRESULT_FROM_WIN32(GetLastError());
                 }
+
+                void* locked = GlobalLock(clipboardData.get());
+                if (!locked)
+                {
+                    return HRESULT_FROM_WIN32(GetLastError());
+                }
+
+                memcpy(locked, uncPath.c_str(), byteLen);
+                GlobalUnlock(clipboardData.get());
+
+                HWND clipboardOwner = nullptr;
+                if (!m_site || FAILED(IUnknown_GetWindow(m_site.Get(), &clipboardOwner)) || !clipboardOwner)
+                {
+                    return E_FAIL;
+                }
+
+                if (!OpenClipboard(clipboardOwner))
+                {
+                    return HRESULT_FROM_WIN32(GetLastError());
+                }
+
+                if (!EmptyClipboard())
+                {
+                    const HRESULT result = HRESULT_FROM_WIN32(GetLastError());
+                    CloseClipboard();
+                    return result;
+                }
+
+                if (!SetClipboardData(CF_UNICODETEXT, clipboardData.get()))
+                {
+                    const HRESULT result = HRESULT_FROM_WIN32(GetLastError());
+                    CloseClipboard();
+                    return result;
+                }
+
+                clipboardData.release();
+                CloseClipboard();
             }
 
             CoTaskMemFree(filePath);
@@ -176,6 +197,7 @@ public:
         item->Release();
         return S_OK;
     }
+    CATCH_RETURN();
 
     IFACEMETHODIMP GetFlags(_Out_ EXPCMDFLAGS* flags)
     {
