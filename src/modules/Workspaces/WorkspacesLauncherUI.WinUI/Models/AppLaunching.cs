@@ -61,6 +61,7 @@ namespace WorkspacesLauncherUI.Models
             {
                 LaunchingState.LaunchedAndMoved => ResourceLoaderInstance.ResourceLoader?.GetString("LaunchSucceededAutomationName") ?? "Launch succeeded",
                 LaunchingState.Failed => ResourceLoaderInstance.ResourceLoader?.GetString("LaunchFailedAutomationName") ?? "Launch failed",
+                LaunchingState.Canceled => ResourceLoaderInstance.ResourceLoader?.GetString("LaunchCanceledAutomationName") ?? "Launch canceled",
                 _ => ResourceLoaderInstance.ResourceLoader?.GetString("LaunchInProgressAutomationName") ?? "Launching",
             };
         }

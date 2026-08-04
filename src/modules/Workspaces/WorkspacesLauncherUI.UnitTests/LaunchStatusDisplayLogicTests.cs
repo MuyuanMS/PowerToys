@@ -81,6 +81,14 @@ namespace WorkspacesLauncherUI.UnitTests
 
         [TestMethod]
         [TestCategory("Model")]
+        public void AutomationName_WhenCanceled_AnnouncesCanceledState()
+        {
+            var app = new AppLaunching { LaunchState = LaunchingState.Canceled };
+            Assert.AreEqual("Launch canceled", app.StateAutomationName);
+        }
+
+        [TestMethod]
+        [TestCategory("Model")]
         public void StatusColor_WhenSuccessful_IsGreenRgb0_128_0()
         {
             var app = new AppLaunching { LaunchState = LaunchingState.LaunchedAndMoved };

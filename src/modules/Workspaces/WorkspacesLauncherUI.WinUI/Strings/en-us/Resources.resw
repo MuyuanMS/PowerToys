@@ -60,6 +60,9 @@
   <data name="LaunchFailedAutomationName" xml:space="preserve">
     <value>Launch failed</value>
   </data>
+  <data name="LaunchCanceledAutomationName" xml:space="preserve">
+    <value>Launch canceled</value>
+  </data>
   <data name="LaunchInProgressAutomationName" xml:space="preserve">
     <value>Launching</value>
   </data>

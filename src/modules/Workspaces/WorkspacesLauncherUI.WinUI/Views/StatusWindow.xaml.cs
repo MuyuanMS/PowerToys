@@ -57,6 +57,7 @@ namespace WorkspacesLauncherUI
         {
             StatusPageView.ViewModel?.Dispose();
             (Application.Current as IDisposable)?.Dispose();
+            Application.Current.Exit();
         }
     }
 }

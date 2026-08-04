@@ -56,7 +56,6 @@ vstest.console.exe <dll-path> /TestCaseFilter:"TestCategory=ViewModel"
 vstest.console.exe <dll-path> /TestCaseFilter:"TestCategory=Model"
 vstest.console.exe <dll-path> /TestCaseFilter:"TestCategory=Serialization"
 vstest.console.exe <dll-path> /TestCaseFilter:"TestCategory=DataModel"
-vstest.console.exe <dll-path> /TestCaseFilter:"TestCategory=Converter"
 ```
 
 ### Generate TRX Report
@@ -79,7 +78,6 @@ Report saved to `TestResults/TestResults.trx`.
 | `DataModel` | `WindowPositionDataTests.cs` | Window coordinates and equality |
 | `DataModel` | `ApplicationDataModelTests.cs` | All application fields |
 | `DataModel` | `LaunchStateEnumContractTests.cs` | Enum integers match `LaunchingStateEnum.h` |
-| `Converter` | `StatusIndicatorVisibilityTests.cs` | Loading → Visibility toggle |
 
 ## When to Run
 
