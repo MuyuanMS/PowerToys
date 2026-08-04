@@ -21,7 +21,7 @@ public class ListSettingTests
     private static readonly KeyValuePair<string, string>[] _keyValueItems =
     [
         new("key=part", "C:\\Tools=value\nnext"),
-        new("plain", string.Empty),
+        new("key=part", string.Empty),
     ];
 
     private static readonly KeyValuePair<string, string>[] _loadedKeyValueItems =

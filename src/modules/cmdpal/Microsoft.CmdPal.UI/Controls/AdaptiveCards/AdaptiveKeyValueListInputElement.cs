@@ -296,7 +296,7 @@ internal sealed partial class AdaptiveKeyValueListInputControl : AdaptiveListInp
         Grid.SetColumn(valueText, 2);
         row.Children.Add(valueText);
 
-        var removeLabel = GetRemoveItemLabel($"{item.Key} = {item.Value}");
+        var removeLabel = GetRemoveItemLabel($"{keyText.Text} = {item.Value}");
         var removeButton = new Button
         {
             Style = (Style)Application.Current.Resources["SubtleButtonStyle"],

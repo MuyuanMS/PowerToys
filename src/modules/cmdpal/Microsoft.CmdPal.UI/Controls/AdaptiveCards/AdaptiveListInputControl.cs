@@ -19,6 +19,7 @@ internal sealed partial class AdaptiveListInputControl : AdaptiveListInputContro
 {
     private const string FileGlyph = "\uE8A5";
     private const string FolderGlyph = "\uE8B7";
+    private const string PathGlyph = "\uE71B";
 
     private readonly AdaptiveListInputElement _element;
     private readonly AdaptiveFilePathListInputElement? _pathElement;
@@ -78,6 +79,9 @@ internal sealed partial class AdaptiveListInputControl : AdaptiveListInputContro
                 : _element.Placeholder,
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
+        AutomationProperties.SetName(
+            _newItemTextBox,
+            string.IsNullOrEmpty(_element.Header) ? _newItemTextBox.PlaceholderText : _element.Header);
         _newItemTextBox.KeyDown += NewItemTextBox_KeyDown;
 
         _addButton = CreateTextButton(RS_.GetString("AdaptiveListInput_Add"), AddGlyph);
@@ -252,7 +256,7 @@ internal sealed partial class AdaptiveListInputControl : AdaptiveListInputContro
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
             var icon = new FontIcon
             {
-                Glyph = IsFolderPath(item) ? FolderGlyph : FileGlyph,
+                Glyph = GetPathGlyph(item),
                 FontSize = 16,
                 VerticalAlignment = VerticalAlignment.Center,
             };
@@ -299,31 +303,29 @@ internal sealed partial class AdaptiveListInputControl : AdaptiveListInputContro
         return row;
     }
 
-    private bool IsFolderPath(AdaptiveListItem item)
+    private string GetPathGlyph(AdaptiveListItem item)
     {
         if (_pathElement?.AllowFolders == true && _pathElement.AllowFiles == false)
         {
-            return true;
+            return FolderGlyph;
         }
 
         if (_pathElement?.AllowFiles == true && _pathElement.AllowFolders == false)
         {
-            return false;
+            return FileGlyph;
         }
 
         if (item.PathKind is AdaptivePathItemKind.Folder)
         {
-            return true;
+            return FolderGlyph;
         }
 
         if (item.PathKind is AdaptivePathItemKind.File)
         {
-            return false;
+            return FileGlyph;
         }
 
-        return item.Value.EndsWith(Path.DirectorySeparatorChar) ||
-            item.Value.EndsWith(Path.AltDirectorySeparatorChar) ||
-            !Path.HasExtension(item.Value);
+        return PathGlyph;
     }
 
     protected override bool UpdateValidation()

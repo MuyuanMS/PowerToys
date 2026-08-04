@@ -57,7 +57,7 @@ internal static class AdaptiveInputValidation
         }
         catch (RegexMatchTimeoutException ex)
         {
-            Logger.LogWarning($"Adaptive-card list input validation timed out: {ex.Message}");
+            Logger.LogWarning($"Adaptive-card input validation timed out: {ex.Message}");
             return false;
         }
     }
