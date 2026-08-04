@@ -126,13 +126,16 @@ public sealed class KbmProfileConverterTests
         // Assert
         Assert.AreEqual("20", profile.RemapKeys.InProcessRemapKeys[0].OriginalKeys);
         Assert.AreEqual("27", profile.RemapKeys.InProcessRemapKeys[0].NewRemapKeys);
+        Assert.IsNull(profile.RemapKeys.InProcessRemapKeys[0].OperationType);
         Assert.AreEqual("113", profile.RemapKeysToText.InProcessRemapKeys[0].OriginalKeys);
         Assert.AreEqual("hello", profile.RemapKeysToText.InProcessRemapKeys[0].NewRemapString);
+        Assert.IsNull(profile.RemapKeysToText.InProcessRemapKeys[0].OperationType);
 
         var global = profile.RemapShortcuts.GlobalRemapShortcuts;
         Assert.AreEqual(3, global.Count);
         Assert.AreEqual("17;16;65", global[0].OriginalKeys);
         Assert.AreEqual("17;86", global[0].NewRemapKeys);
+        Assert.AreEqual(0, global[0].OperationType);
         Assert.AreEqual(false, global[0].ExactMatch);
 
         Assert.AreEqual("260;79;75", global[1].OriginalKeys);

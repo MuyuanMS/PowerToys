@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Security.Principal;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -157,6 +158,11 @@ public sealed class ProfileFunctionData : BaseFunctionData
     /// <exception cref="IOException">Thrown when the profile file could not be written.</exception>
     public bool SetState()
     {
+        if (IsProcessElevated())
+        {
+            throw new UnauthorizedAccessException("Keyboard Manager profiles must be applied from a non-elevated process.");
+        }
+
         // Normalize and persist the active configuration so the file we write
         // is exactly the one the engine will load, then write the profile.
         var fileName = EnsureActiveConfigurationAndGetFileName();
@@ -174,6 +180,12 @@ public sealed class ProfileFunctionData : BaseFunctionData
         }
 
         return SignalSettingsChangedEvent();
+    }
+
+    private static bool IsProcessElevated()
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
     }
 
     /// <summary>
