@@ -240,7 +240,7 @@ public:
             PostMessageW(m_window, WM_PRIV_LOCATIONCHANGE, NULL, NULL);
         },
         [this](bool up) {
-            if (WheelCycleLayoutIds().size() < 2)
+            if (!CanCycleLayoutByWheel(up))
             {
                 return false;
             }
@@ -355,6 +355,7 @@ private:
     void RefreshLayouts() noexcept;
     bool ShouldProcessSnapHotkey(DWORD vkCode) noexcept;
     void ApplyQuickLayout(int key) noexcept;
+    bool CanCycleLayoutByWheel(bool reverse) noexcept;
     void CycleLayoutByWheel(bool reverse) noexcept;
     void FlashZones() noexcept;
 
@@ -1736,6 +1737,13 @@ void FancyZones::CycleLayoutByWheel(bool reverse) noexcept
     if (AppliedLayouts::instance().ApplyLayout(workArea->UniqueId(), layout.value()))
     {
         RefreshLayouts();
+
+        POINT cursorPosition{};
+        if (GetCursorPos(&cursorPosition))
+        {
+            MoveSizeUpdate(MonitorFromPoint(cursorPosition, MONITOR_DEFAULTTONULL), cursorPosition);
+        }
+
         FlashZones();
         AppliedLayouts::instance().SaveData();
 
@@ -1744,6 +1752,30 @@ void FancyZones::CycleLayoutByWheel(bool reverse) noexcept
             workArea->ShowLayoutNameLabel(layoutData->name);
         }
     }
+}
+
+bool FancyZones::CanCycleLayoutByWheel(bool reverse) noexcept
+{
+    const auto workArea = m_workAreaConfiguration.GetWorkAreaFromCursor();
+    if (!workArea)
+    {
+        return false;
+    }
+
+    std::optional<GUID> currentId{};
+    if (const auto current = AppliedLayouts::instance().GetDeviceLayout(workArea->UniqueId()); current.has_value())
+    {
+        currentId = current->uuid;
+    }
+
+    const auto ids = WheelCycleLayoutIds();
+    if (ids.size() < 2)
+    {
+        return false;
+    }
+
+    const auto nextId = FancyZonesUtils::PickNextLayoutId(ids, currentId, reverse);
+    return nextId.has_value() && CustomLayouts::instance().GetLayout(nextId.value()).has_value();
 }
 
 void FancyZones::FlashZones() noexcept
