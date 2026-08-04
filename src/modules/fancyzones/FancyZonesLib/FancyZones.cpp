@@ -24,6 +24,7 @@
 #include <FancyZonesLib/FancyZonesWinHookEventIDs.h>
 #include <FancyZonesLib/KeyboardInput.h>
 #include <FancyZonesLib/MonitorUtils.h>
+#include <FancyZonesLib/MonitorRotation.h>
 #include <FancyZonesLib/on_thread_executor.h>
 #include <FancyZonesLib/Settings.h>
 #include <FancyZonesLib/SettingsObserver.h>
@@ -66,6 +67,41 @@ namespace NonLocalizable
     const wchar_t FZEditorExecutablePath[] = L"PowerToys.FancyZonesEditor.exe";
 }
 
+LONG MonitorRotation::ScaleCoordinate(LONG value, LONG sourceStart, LONG sourceSize, LONG targetStart, LONG targetSize) noexcept
+{
+    if (sourceSize == 0)
+    {
+        return targetStart;
+    }
+
+    return targetStart + MulDiv(value - sourceStart, targetSize, sourceSize);
+}
+
+RECT MonitorRotation::MapRectBetweenMonitorWorkAreas(const RECT& windowRect, const RECT& sourceWorkArea, const RECT& targetWorkArea) noexcept
+{
+    const LONG sourceWidth = sourceWorkArea.right - sourceWorkArea.left;
+    const LONG sourceHeight = sourceWorkArea.bottom - sourceWorkArea.top;
+    const LONG targetWidth = targetWorkArea.right - targetWorkArea.left;
+    const LONG targetHeight = targetWorkArea.bottom - targetWorkArea.top;
+
+    return RECT{
+        .left = ScaleCoordinate(windowRect.left, sourceWorkArea.left, sourceWidth, targetWorkArea.left, targetWidth),
+        .top = ScaleCoordinate(windowRect.top, sourceWorkArea.top, sourceHeight, targetWorkArea.top, targetHeight),
+        .right = ScaleCoordinate(windowRect.right, sourceWorkArea.left, sourceWidth, targetWorkArea.left, targetWidth),
+        .bottom = ScaleCoordinate(windowRect.bottom, sourceWorkArea.top, sourceHeight, targetWorkArea.top, targetHeight),
+    };
+}
+
+size_t MonitorRotation::GetRotatedMonitorIndex(size_t sourceIndex, size_t monitorCount, bool reverse) noexcept
+{
+    if (reverse)
+    {
+        return sourceIndex == 0 ? monitorCount - 1 : sourceIndex - 1;
+    }
+
+    return (sourceIndex + 1) % monitorCount;
+}
+
 namespace
 {
     constexpr UINT_PTR MonitorRotationCommitTimerId = 0x4D525443;
@@ -77,31 +113,6 @@ namespace
         HMONITOR sourceMonitor{};
         RECT sourceRect{};
     };
-
-    LONG ScaleCoordinate(LONG value, LONG sourceStart, LONG sourceSize, LONG targetStart, LONG targetSize) noexcept
-    {
-        if (sourceSize == 0)
-        {
-            return targetStart;
-        }
-
-        return targetStart + MulDiv(value - sourceStart, targetSize, sourceSize);
-    }
-
-    RECT MapRectBetweenMonitorWorkAreas(const RECT& windowRect, const RECT& sourceWorkArea, const RECT& targetWorkArea) noexcept
-    {
-        const LONG sourceWidth = sourceWorkArea.right - sourceWorkArea.left;
-        const LONG sourceHeight = sourceWorkArea.bottom - sourceWorkArea.top;
-        const LONG targetWidth = targetWorkArea.right - targetWorkArea.left;
-        const LONG targetHeight = targetWorkArea.bottom - targetWorkArea.top;
-
-        return RECT{
-            .left = ScaleCoordinate(windowRect.left, sourceWorkArea.left, sourceWidth, targetWorkArea.left, targetWidth),
-            .top = ScaleCoordinate(windowRect.top, sourceWorkArea.top, sourceHeight, targetWorkArea.top, targetHeight),
-            .right = ScaleCoordinate(windowRect.right, sourceWorkArea.left, sourceWidth, targetWorkArea.left, targetWidth),
-            .bottom = ScaleCoordinate(windowRect.bottom, sourceWorkArea.top, sourceHeight, targetWorkArea.top, targetHeight),
-        };
-    }
 
     std::optional<size_t> FindMonitorIndex(HMONITOR monitor, const std::vector<std::pair<HMONITOR, RECT>>& monitors) noexcept
     {
@@ -115,16 +126,6 @@ namespace
         }
 
         return static_cast<size_t>(std::distance(monitors.begin(), iter));
-    }
-
-    size_t GetRotatedMonitorIndex(size_t sourceIndex, size_t monitorCount, bool reverse) noexcept
-    {
-        if (reverse)
-        {
-            return sourceIndex == 0 ? monitorCount - 1 : sourceIndex - 1;
-        }
-
-        return (sourceIndex + 1) % monitorCount;
     }
 
     std::vector<WindowRotationSnapshot> CollectWindowRotationSnapshots()
@@ -314,7 +315,6 @@ private:
     void HideMonitorRotationPreview() noexcept;
     void EnsureMonitorRotationContentNumbers(const std::vector<std::pair<HMONITOR, RECT>>& monitors) noexcept;
     void RotateMonitorRotationContentNumbers(bool reverse) noexcept;
-    void UpdateMonitorRotationModifierState(DWORD vkCode, bool isDown) noexcept;
     bool IsMonitorRotationActivatorKey(DWORD vkCode) const noexcept;
     bool IsMonitorRotationChordDown() const noexcept;
 
@@ -341,11 +341,7 @@ private:
     WorkAreaConfiguration m_workAreaConfiguration;
     DraggingState m_draggingState;
     bool m_monitorRotationPreviewActive = false;
-    bool m_monitorRotationWinDown = false;
-    bool m_monitorRotationCtrlDown = false;
-    bool m_monitorRotationAltDown = false;
-    bool m_monitorRotationShiftDown = false;
-    bool m_monitorRotationActivatorDown = false;
+    MonitorRotation::KeyState m_monitorRotationKeyState;
     std::optional<bool> m_pendingMonitorRotationReverse;
     std::unordered_map<HMONITOR, size_t> m_monitorRotationContentNumbers;
 
@@ -644,7 +640,7 @@ void FancyZones::WindowCreated(HWND window) noexcept
 IFACEMETHODIMP_(bool)
 FancyZones::OnKeyDown(PKBDLLHOOKSTRUCT info) noexcept
 {
-    UpdateMonitorRotationModifierState(info->vkCode, true);
+    m_monitorRotationKeyState.Update(info->vkCode, true);
 
     // Return true to swallow the keyboard event
     bool const shift = GetAsyncKeyState(VK_SHIFT) & 0x8000;
@@ -665,6 +661,8 @@ FancyZones::OnKeyDown(PKBDLLHOOKSTRUCT info) noexcept
                 const bool reverse = info->vkCode == VK_LEFT;
                 PostMessageW(m_window, WM_PRIV_MONITOR_ROTATION_PREVIEW_ROTATE, static_cast<WPARAM>(reverse), 0);
             }
+
+            m_monitorRotationKeyState.Consume(info->vkCode);
             return true;
         }
 
@@ -738,39 +736,16 @@ FancyZones::OnKeyUp(PKBDLLHOOKSTRUCT info) noexcept
 {
     const bool wasMonitorRotationPreviewActive = m_monitorRotationPreviewActive;
     const bool isActivatorKey = IsMonitorRotationActivatorKey(info->vkCode);
-    UpdateMonitorRotationModifierState(info->vkCode, false);
+    const bool wasConsumed = m_monitorRotationKeyState.ReleaseWasConsumed(info->vkCode);
+    m_monitorRotationKeyState.Update(info->vkCode, false);
 
     if (wasMonitorRotationPreviewActive && !IsMonitorRotationChordDown())
     {
         PostMessageW(m_window, WM_PRIV_MONITOR_ROTATION_PREVIEW_HIDE, 0, 0);
-        return isActivatorKey;
+        return isActivatorKey || wasConsumed;
     }
 
-    return false;
-}
-
-void FancyZones::UpdateMonitorRotationModifierState(DWORD vkCode, bool isDown) noexcept
-{
-    if (IsWinKey(vkCode))
-    {
-        m_monitorRotationWinDown = isDown;
-    }
-    else if (IsCtrlKey(vkCode))
-    {
-        m_monitorRotationCtrlDown = isDown;
-    }
-    else if (IsAltKey(vkCode))
-    {
-        m_monitorRotationAltDown = isDown;
-    }
-    else if (IsShiftKey(vkCode))
-    {
-        m_monitorRotationShiftDown = isDown;
-    }
-    else if (IsMonitorRotationActivatorKey(vkCode))
-    {
-        m_monitorRotationActivatorDown = isDown;
-    }
+    return wasConsumed;
 }
 
 bool FancyZones::IsMonitorRotationChordDown() const noexcept
@@ -781,11 +756,15 @@ bool FancyZones::IsMonitorRotationChordDown() const noexcept
     }
 
     const auto& hotkey = FancyZonesSettings::settings().monitorRotationHotkey;
-    return hotkey.win_pressed() == m_monitorRotationWinDown &&
-           hotkey.ctrl_pressed() == m_monitorRotationCtrlDown &&
-           hotkey.alt_pressed() == m_monitorRotationAltDown &&
-           hotkey.shift_pressed() == m_monitorRotationShiftDown &&
-           m_monitorRotationActivatorDown;
+    const bool winDown = m_monitorRotationKeyState.IsAnyDown({ VK_LWIN, VK_RWIN });
+    const bool ctrlDown = m_monitorRotationKeyState.IsAnyDown({ VK_CONTROL, VK_LCONTROL, VK_RCONTROL });
+    const bool altDown = m_monitorRotationKeyState.IsAnyDown({ VK_MENU, VK_LMENU, VK_RMENU });
+    const bool shiftDown = m_monitorRotationKeyState.IsAnyDown({ VK_SHIFT, VK_LSHIFT, VK_RSHIFT });
+    return hotkey.win_pressed() == winDown &&
+           hotkey.ctrl_pressed() == ctrlDown &&
+           hotkey.alt_pressed() == altDown &&
+           hotkey.shift_pressed() == shiftDown &&
+           m_monitorRotationKeyState.IsDown(hotkey.get_code());
 }
 
 bool FancyZones::IsMonitorRotationActivatorKey(DWORD vkCode) const noexcept
@@ -1341,6 +1320,25 @@ void FancyZones::ShowMonitorRotationPreview(std::optional<bool> reverse, bool an
     FancyZonesUtils::OrderMonitors(monitors);
     EnsureMonitorRotationContentNumbers(monitors);
 
+    if (FancyZonesSettings::settings().spanZonesAcrossMonitors)
+    {
+        auto workArea = m_workAreaConfiguration.GetWorkArea(nullptr);
+        if (workArea)
+        {
+            std::vector<RECT> allWindowRects;
+            allWindowRects.reserve(windows.size());
+            for (const auto& window : windows)
+            {
+                allWindowRects.push_back(window.sourceRect);
+            }
+
+            workArea->ShowMonitorRotationPreview(allWindowRects, 1, reverse, animateRotation);
+        }
+
+        m_monitorRotationPreviewActive = true;
+        return;
+    }
+
     for (const auto& [monitor, workArea] : m_workAreaConfiguration.GetAllWorkAreas())
     {
         if (!workArea)
@@ -1405,7 +1403,7 @@ void FancyZones::RotateMonitorRotationContentNumbers(bool reverse) noexcept
     std::unordered_map<HMONITOR, size_t> rotatedContentNumbers;
     for (size_t sourceIndex = 0; sourceIndex < monitors.size(); sourceIndex++)
     {
-        const size_t targetIndex = GetRotatedMonitorIndex(sourceIndex, monitors.size(), reverse);
+        const size_t targetIndex = MonitorRotation::GetRotatedMonitorIndex(sourceIndex, monitors.size(), reverse);
         rotatedContentNumbers[monitors[targetIndex].first] = m_monitorRotationContentNumbers[monitors[sourceIndex].first];
     }
 
@@ -1455,8 +1453,8 @@ void FancyZones::RotateWindowsAcrossMonitors(bool reverse) noexcept
             continue;
         }
 
-        const size_t targetIndex = GetRotatedMonitorIndex(*sourceIndex, monitors.size(), reverse);
-        const RECT targetRect = MapRectBetweenMonitorWorkAreas(
+        const size_t targetIndex = MonitorRotation::GetRotatedMonitorIndex(*sourceIndex, monitors.size(), reverse);
+        const RECT targetRect = MonitorRotation::MapRectBetweenMonitorWorkAreas(
             window.sourceRect,
             monitors[*sourceIndex].second,
             monitors[targetIndex].second);
