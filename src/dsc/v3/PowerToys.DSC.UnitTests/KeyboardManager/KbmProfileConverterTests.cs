@@ -171,6 +171,21 @@ public sealed class KbmProfileConverterTests
     }
 
     [TestMethod]
+    public void ToProfile_SingleKeyShortcutTargetOmitsOperationType()
+    {
+        var model = new KbmProfileModel
+        {
+            Shortcuts = [new() { From = "Ctrl+A", To = "Esc" }],
+        };
+
+        var profile = KbmProfileConverter.ToProfile(model);
+
+        var stored = profile.RemapShortcuts.GlobalRemapShortcuts[0];
+        Assert.AreEqual("27", stored.NewRemapKeys);
+        Assert.IsNull(stored.OperationType);
+    }
+
+    [TestMethod]
     public void Canonicalize_RoundTripsEditorProfile()
     {
         // Converting the editor profile to the friendly model and back to a

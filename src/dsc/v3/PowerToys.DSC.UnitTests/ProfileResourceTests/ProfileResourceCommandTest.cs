@@ -2,12 +2,14 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.Text.Json.Nodes;
 using ManagedCommon;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using PowerToys.DSC.Commands;
 using PowerToys.DSC.DSCResources;
 using PowerToys.DSC.Models;
+using PowerToys.DSC.Models.FunctionData;
 
 namespace PowerToys.DSC.UnitTests.ProfileResourceTests;
 
@@ -83,5 +85,22 @@ public sealed class ProfileResourceCommandTest : BaseDscTest
         Assert.AreEqual(1, messages.Count);
         Assert.AreEqual(DscMessageLevel.Error, messages[0].Level);
         Assert.AreEqual(GetResourceString("InputEmptyOrNullError"), messages[0].Message);
+    }
+
+    [TestMethod]
+    public void SetState_ElevatedProcess_Throws()
+    {
+        var data = new ProfileFunctionData(
+            """{"profile":{"keys":[],"shortcuts":[]}}""",
+            () => true);
+
+        try
+        {
+            data.SetState();
+            Assert.Fail("An elevated profile write must be rejected.");
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 }
