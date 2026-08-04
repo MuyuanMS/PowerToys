@@ -295,8 +295,12 @@ public static class KbmProfileConverter
             }
             else
             {
-                stored.OperationType = OperationTypeRemapShortcut;
-                stored.NewRemapKeys = ParseTargetOrThrow(entry.To!).ToVkString();
+                var target = ParseTargetOrThrow(entry.To!);
+                stored.NewRemapKeys = target.ToVkString();
+                if (!target.IsSingleKey)
+                {
+                    stored.OperationType = OperationTypeRemapShortcut;
+                }
             }
 
             var section = isText ? profile.RemapShortcutsToText : profile.RemapShortcuts;

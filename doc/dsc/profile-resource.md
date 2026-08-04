@@ -44,6 +44,9 @@ When the profile is applied while PowerToys is running, the Keyboard Manager
 engine reloads it immediately; otherwise the profile takes effect the next
 time PowerToys starts. Note that the remappings are only active when the
 Keyboard Manager utility is enabled (see the [KeyboardManager module][02]).
+Run profile `set` operations from a non-administrator terminal. Elevated
+profile writes are rejected because the per-user settings directory is not a
+trusted destination for privileged file operations.
 
 ## Profile schema
 
