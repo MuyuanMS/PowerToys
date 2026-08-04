@@ -71,8 +71,19 @@ namespace AdvancedPaste.Settings
         public PasteAIConfiguration PasteAIConfiguration { get; private set; }
 
         public UserSettings(IFileSystem fileSystem)
+            : this(fileSystem, TaskScheduler.FromCurrentSynchronizationContext(), createWatcher: true)
+        {
+        }
+
+        internal UserSettings(IFileSystem fileSystem, TaskScheduler taskScheduler)
+            : this(fileSystem, taskScheduler, createWatcher: false)
+        {
+        }
+
+        private UserSettings(IFileSystem fileSystem, TaskScheduler taskScheduler, bool createWatcher)
         {
             _settingsUtils = new SettingsUtils(fileSystem);
+            _taskScheduler = taskScheduler ?? throw new ArgumentNullException(nameof(taskScheduler));
 
             IsAIEnabled = false;
             ShowCustomPreview = true;
@@ -84,11 +95,10 @@ namespace AdvancedPaste.Settings
             PasteAIConfiguration = new PasteAIConfiguration();
             _additionalActions = [];
             _customActions = [];
-            _taskScheduler = TaskScheduler.FromCurrentSynchronizationContext();
 
             LoadSettingsFromJson();
 
-            _watcher = Helper.GetFileWatcher(AdvancedPasteModuleName, "settings.json", OnSettingsFileChanged, fileSystem);
+            _watcher = createWatcher ? Helper.GetFileWatcher(AdvancedPasteModuleName, "settings.json", OnSettingsFileChanged, fileSystem) : null;
         }
 
         private void OnSettingsFileChanged()
