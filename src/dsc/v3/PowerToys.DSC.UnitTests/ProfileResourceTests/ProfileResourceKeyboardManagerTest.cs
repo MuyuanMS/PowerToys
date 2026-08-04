@@ -203,7 +203,7 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
     public void Set_InvalidProfile_FailsAndLeavesFileUntouched()
     {
         // Arrange
-        var input = /*lang=json,strict*/ """{"profile":{"keys":[{"from":"CapsLok","to":"Esc"}]}}""";
+        var input = /*lang=json,strict*/ """{"profile":{"keys":[{"from":"InvalidKeyName","to":"Esc"}]}}""";
 
         // Act
         var result = ExecuteDscCommand<SetCommand>("--resource", ProfileResource.ResourceName, "--module", Module, "--input", input);
@@ -213,7 +213,7 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
         Assert.IsFalse(result.Success);
         Assert.AreEqual(1, messages.Count);
         Assert.AreEqual(DscMessageLevel.Error, messages[0].Level);
-        StringAssert.Contains(messages[0].Message, "Invalid key name 'CapsLok'");
+        StringAssert.Contains(messages[0].Message, "Invalid key name 'InvalidKeyName'");
         Assert.AreEqual(0, GetProfile(DefaultProfileFileName).RemapKeys.InProcessRemapKeys.Count);
     }
 

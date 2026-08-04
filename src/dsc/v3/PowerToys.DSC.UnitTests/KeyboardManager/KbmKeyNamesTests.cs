@@ -107,7 +107,7 @@ public sealed class KbmKeyNamesTests
     [TestMethod]
     public void TryGetCode_UnknownName_Fails()
     {
-        Assert.IsFalse(KbmKeyNames.TryGetCode("CapsLok", out _));
+        Assert.IsFalse(KbmKeyNames.TryGetCode("InvalidKeyName", out _));
         Assert.IsFalse(KbmKeyNames.TryGetCode(string.Empty, out _));
         Assert.IsFalse(KbmKeyNames.TryGetCode(null, out _));
         Assert.IsFalse(KbmKeyNames.TryGetCode("VK", out _));

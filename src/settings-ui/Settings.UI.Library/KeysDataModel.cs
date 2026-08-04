@@ -26,6 +26,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         public string OriginalKeys { get; set; }
 
         [JsonPropertyName("secondKeyOfChord")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public uint SecondKeyOfChord { get; set; }
 
         [JsonPropertyName("newRemapKeys")]

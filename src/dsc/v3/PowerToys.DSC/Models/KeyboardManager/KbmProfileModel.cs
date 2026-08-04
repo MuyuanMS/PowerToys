@@ -9,7 +9,7 @@ using System.Text.Json.Serialization;
 namespace PowerToys.DSC.Models.KeyboardManager;
 
 /// <summary>
-/// Friendly, hand-authorable representation of the Keyboard Manager remapping
+/// Friendly representation for authoring the Keyboard Manager remapping
 /// profile used by the DSC profile resource. Keys are expressed with friendly
 /// names (e.g. "CapsLock", "Ctrl+Shift+A", or "Win+O, K" for a chord) instead
 /// of the virtual-key code strings stored in the profile file.

@@ -86,6 +86,7 @@ public sealed class ProfileResource : BaseResource
 
             // Report the canonical form of the applied profile as the new state
             data.Output.Profile = KbmProfileConverter.Canonicalize(data.Input.Profile);
+            data.Warnings.Clear();
         }
 
         WriteWarnings(data);
