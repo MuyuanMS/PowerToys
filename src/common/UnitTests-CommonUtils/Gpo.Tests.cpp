@@ -178,6 +178,12 @@ namespace UnitTestsCommonUtils
             Assert::IsTrue(IsValidGpoResult(result));
         }
 
+        TEST_METHOD(GetConfiguredCopyAsUNCEnabledValue_ReturnsValidState)
+        {
+            auto result = getConfiguredCopyAsUNCEnabledValue();
+            Assert::IsTrue(IsValidGpoResult(result));
+        }
+
         TEST_METHOD(GetConfiguredEnvironmentVariablesEnabledValue_ReturnsValidState)
         {
             auto result = getConfiguredEnvironmentVariablesEnabledValue();
@@ -210,6 +216,7 @@ namespace UnitTestsCommonUtils
             getConfiguredRegistryPreviewEnabledValue();
             getConfiguredScreenRulerEnabledValue();
             getConfiguredCropAndLockEnabledValue();
+            getConfiguredCopyAsUNCEnabledValue();
             getConfiguredEnvironmentVariablesEnabledValue();
 
             Assert::IsTrue(true);
