@@ -4008,6 +4008,9 @@ Activate by holding the key for the character you want to add an accent to, then
   <data name="Oobe_AdvancedPasteMarkdown_HowToUse.Text" xml:space="preserve">
     <value>to paste your clipboard data as Markdown. Note: Clipboard content type has to be HTML.</value>
   </data>
+  <data name="Oobe_AdvancedPasteRichText_HowToUse.Text" xml:space="preserve">
+    <value>to paste Markdown clipboard text as formatted rich text.</value>
+  </data>
   <data name="Oobe_AdvancedPasteJson_HowToUse.Text" xml:space="preserve">
     <value>to paste your clipboard data as JSON. Note: Clipboard content data has to contain XML or CSV text.</value>
   </data>

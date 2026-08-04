@@ -63,6 +63,10 @@ namespace winrt::PowerToys::Interop::implementation
     {
         return CommonSharedConstants::ADVANCED_PASTE_MARKDOWN_MESSAGE;
     }
+    hstring Constants::AdvancedPasteRichTextMessage()
+    {
+        return CommonSharedConstants::ADVANCED_PASTE_RICH_TEXT_MESSAGE;
+    }
     hstring Constants::AdvancedPasteJsonMessage()
     {
         return CommonSharedConstants::ADVANCED_PASTE_JSON_MESSAGE;
@@ -313,4 +317,3 @@ namespace winrt::PowerToys::Interop::implementation
         return CommonSharedConstants::KEYBOARD_MANAGER_ENGINE_INSTANCE_MUTEX;
     }
 }
-
