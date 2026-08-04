@@ -21,6 +21,11 @@ namespace
         }
 
         placement.showCmd = showCommand;
+        if (GetWindowThreadProcessId(window, nullptr) != GetCurrentThreadId())
+        {
+            placement.flags |= WPF_ASYNCWINDOWPLACEMENT;
+        }
+
         return SetWindowPlacement(window, &placement);
     }
 }
@@ -161,7 +166,7 @@ bool WindowKeyboardSnap::SnapHotkeyBasedOnZoneNumber(HWND window, DWORD vkCode, 
             const auto& workArea = activeWorkAreas.at(current);
             bool moved = MoveByDirectionAndIndex(window, vkCode, cycle, workArea.get());
 
-            if (FancyZonesSettings::settings().restoreSize && !moved)
+            if (FancyZonesSettings::settings().restoreSize && !moved && cycle)
             {
                 FancyZonesWindowUtils::RestoreWindowOrigin(window);
                 FancyZonesWindowUtils::RestoreWindowSize(window);
