@@ -224,8 +224,11 @@ namespace ShortcutGuide.Pages
                 this.NoResultsTextBlock.Visibility = Visibility.Visible;
                 this.NoResultsTextBlock.Text = ResourceLoaderInstance.ResourceLoader.GetString("SearchBlank");
                 var peer = FrameworkElementAutomationPeer.FromElement(this.NoResultsTextBlock) ??
-                           new FrameworkElementAutomationPeer(this.NoResultsTextBlock);
-                peer.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+                           FrameworkElementAutomationPeer.CreatePeerForElement(this.NoResultsTextBlock);
+                if (peer is not null && AutomationPeer.ListenerExists(AutomationEvents.LiveRegionChanged))
+                {
+                    peer.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+                }
             }
             else
             {
