@@ -45,7 +45,7 @@ Shortcuts:
             Shift: true
             Alt: false
             Keys:
-              - ','
+              - ","
       - Name: Open Claude from anywhere
         Recommended: true
         Shortcut:
