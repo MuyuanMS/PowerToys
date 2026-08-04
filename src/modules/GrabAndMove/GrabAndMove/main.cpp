@@ -45,6 +45,7 @@ static bool g_dragFirstMove = false; // true until first WM_MOUSEMOVE of a drag
 static HWND g_dragTarget = nullptr;
 static POINT g_dragStart = {};    // cursor pos at drag start
 static RECT g_dragWndRect = {};   // window rect at drag start
+static bool g_dragWasMaximized = false;
 static HWND g_hOverlay = nullptr; // semi-transparent overlay during drag
 
 // Current target window rect for overlay info display
@@ -514,17 +515,6 @@ static void UpdatePendingScreenEdgeSnap(POINT pt)
     g_pendingSnapRect = GetScreenEdgeSnapRect(target, workArea);
 }
 
-static bool ToggleWindowMaximized(HWND hwnd)
-{
-    if (!hwnd || !IsWindowMaximizable(hwnd))
-    {
-        return false;
-    }
-
-    ShowWindow(hwnd, IsZoomed(hwnd) ? SW_RESTORE : SW_MAXIMIZE);
-    return true;
-}
-
 static bool ApplyPendingScreenEdgeSnap()
 {
     if (!g_dragTarget || !IsScreenEdgeSnapTargetAllowed(g_dragTarget, g_pendingSnapTarget))
@@ -534,15 +524,21 @@ static bool ApplyPendingScreenEdgeSnap()
 
     if (g_pendingSnapTarget == ScreenEdgeSnapTarget::Maximize)
     {
-        return ToggleWindowMaximized(g_dragTarget);
+        if (g_dragWasMaximized)
+        {
+            return ShowWindowAsync(g_dragTarget, SW_RESTORE) != FALSE;
+        }
+
+        const bool positioned = SetWindowVisibleFrameToRect(g_dragTarget, g_pendingSnapRect, SWP_ASYNCWINDOWPOS);
+        return positioned && ShowWindowAsync(g_dragTarget, SW_MAXIMIZE) != FALSE;
     }
 
     if (IsZoomed(g_dragTarget))
     {
-        ShowWindow(g_dragTarget, SW_RESTORE);
+        ShowWindowAsync(g_dragTarget, SW_RESTORE);
     }
 
-    return SetWindowVisibleFrameToRect(g_dragTarget, g_pendingSnapRect);
+    return SetWindowVisibleFrameToRect(g_dragTarget, g_pendingSnapRect, SWP_ASYNCWINDOWPOS);
 }
 
 // ---------------------------------------------------------------------------
@@ -1084,6 +1080,7 @@ static void BeginDrag(HWND hwnd, POINT pt)
     g_dragConsumedAlt = true;
     g_activatedDuringHold = true;
     g_dragTarget = hwnd;
+    g_dragWasMaximized = IsZoomed(hwnd);
     g_dragStart = pt;
     GetWindowRect(hwnd, &g_dragWndRect);
     g_pendingSnapTarget = ScreenEdgeSnapTarget::None;
@@ -1882,11 +1879,12 @@ static void HandleDragMove(POINT pt)
     UpdatePendingScreenEdgeSnap(pt);
     if (g_pendingSnapTarget != ScreenEdgeSnapTarget::None)
     {
+        const RECT previewRect = GetWindowRectForVisibleFrame(g_dragTarget, g_pendingSnapRect);
         RepositionOverlay(
-            g_pendingSnapRect.left,
-            g_pendingSnapRect.top,
-            g_pendingSnapRect.right - g_pendingSnapRect.left,
-            g_pendingSnapRect.bottom - g_pendingSnapRect.top);
+            previewRect.left,
+            previewRect.top,
+            previewRect.right - previewRect.left,
+            previewRect.bottom - previewRect.top);
         return;
     }
 
