@@ -50,6 +50,7 @@ namespace ShortcutGuide.Helpers
                 content.Append(HotkeySettingsToYaml(advancedPasteProperties.PasteAsPlainTextShortcut, SettingsResourceLoader.GetString("AdvancedPaste/ModuleTitle"), SettingsResourceLoader.GetString("PasteAsPlainText_Shortcut/Header")));
                 content.Append(HotkeySettingsToYaml(advancedPasteProperties.PasteAsMarkdownShortcut, SettingsResourceLoader.GetString("AdvancedPaste/ModuleTitle"), SettingsResourceLoader.GetString("PasteAsMarkdown_Shortcut/Header")));
                 content.Append(HotkeySettingsToYaml(advancedPasteProperties.PasteAsJsonShortcut, SettingsResourceLoader.GetString("AdvancedPaste/ModuleTitle"), SettingsResourceLoader.GetString("PasteAsJson_Shortcut/Header")));
+                content.Append(HotkeySettingsToYaml(advancedPasteProperties.PasteAsKeystrokeShortcut, SettingsResourceLoader.GetString("AdvancedPaste/ModuleTitle"), SettingsResourceLoader.GetString("PasteAsKeystrokes_Shortcut/Header")));
                 if (advancedPasteProperties.AdditionalActions.ImageToText.IsShown)
                 {
                     content.Append(HotkeySettingsToYaml(advancedPasteProperties.AdditionalActions.ImageToText.Shortcut, SettingsResourceLoader.GetString("AdvancedPaste/ModuleTitle"), SettingsResourceLoader.GetString("ImageToText/Header")));

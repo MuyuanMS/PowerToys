@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using AdvancedPaste.Helpers;
 using AdvancedPaste.Models;
 using AdvancedPaste.Services;
 using AdvancedPaste.Settings;
@@ -140,6 +141,35 @@ public sealed class KeystrokeServiceTests
         service.SendTextAsKeystrokes("abc");
 
         Assert.AreEqual(0, sendCount);
+    }
+
+    [TestMethod]
+    public void SendTextAsKeystrokes_MultilineTextUsesReturnKey()
+    {
+        var userSettings = new TestUserSettings
+        {
+            KeystrokeDelayMs = 50,
+            KeystrokeBatchSize = 10,
+        };
+        var sentBatches = new List<NativeMethods.INPUT[]>();
+        var service = new KeystrokeService(
+            userSettings,
+            () => new IntPtr(1),
+            inputs =>
+            {
+                sentBatches.Add(inputs);
+                return (uint)inputs.Length;
+            },
+            _ => { });
+
+        service.SendTextAsKeystrokes("a\r\nb\nc");
+
+        Assert.AreEqual(1, sentBatches.Count);
+        Assert.AreEqual(10, sentBatches[0].Length);
+        Assert.AreEqual((short)0x0D, sentBatches[0][2].data.ki.wVk);
+        Assert.AreEqual((uint)NativeMethods.KeyEventF.KeyUp, sentBatches[0][3].data.ki.dwFlags);
+        Assert.AreEqual((short)0x0D, sentBatches[0][6].data.ki.wVk);
+        Assert.AreEqual((uint)NativeMethods.KeyEventF.KeyUp, sentBatches[0][7].data.ki.dwFlags);
     }
 
     [TestMethod]
