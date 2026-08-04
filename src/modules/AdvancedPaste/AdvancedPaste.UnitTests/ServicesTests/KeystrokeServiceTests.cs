@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using AdvancedPaste.Helpers;
 using AdvancedPaste.Models;
 using AdvancedPaste.Services;
@@ -67,8 +68,9 @@ public sealed class KeystrokeServiceTests
         var delays = new List<int>();
         var service = CreateService(userSettings, inputCounts, delays);
 
-        service.SendTextAsKeystrokes("abcde");
+        var completed = service.SendTextAsKeystrokes("abcde");
 
+        Assert.IsTrue(completed);
         Assert.AreEqual(5, inputCounts.Count);
         Assert.IsTrue(inputCounts.TrueForAll(inputCount => inputCount == 2));
         Assert.AreEqual(3, delays.Count);
@@ -89,8 +91,9 @@ public sealed class KeystrokeServiceTests
         userSettings.KeystrokeDelayMs = 20;
         userSettings.KeystrokeBatchSize = 3;
 
-        service.SendTextAsKeystrokes("abc");
+        var completed = service.SendTextAsKeystrokes("abc");
 
+        Assert.IsTrue(completed);
         Assert.AreEqual(3, inputCounts.Count);
         Assert.IsTrue(inputCounts.TrueForAll(inputCount => inputCount == 2));
         Assert.AreEqual(1, delays.Count);
@@ -109,8 +112,9 @@ public sealed class KeystrokeServiceTests
         var delays = new List<int>();
         var service = CreateService(userSettings, inputCounts, delays);
 
-        service.SendTextAsKeystrokes("ab");
+        var completed = service.SendTextAsKeystrokes("ab");
 
+        Assert.IsTrue(completed);
         Assert.AreEqual(2, inputCounts.Count);
         Assert.IsTrue(inputCounts.TrueForAll(inputCount => inputCount == 2));
         Assert.AreEqual(2, delays.Count);
@@ -136,8 +140,9 @@ public sealed class KeystrokeServiceTests
             },
             _ => { });
 
-        service.SendTextAsKeystrokes("abc");
+        var completed = service.SendTextAsKeystrokes("abc");
 
+        Assert.IsFalse(completed);
         Assert.AreEqual(0, sendCount);
     }
 
@@ -160,14 +165,16 @@ public sealed class KeystrokeServiceTests
             },
             _ => { });
 
-        service.SendTextAsKeystrokes("a\r\nb\nc");
+        var completed = service.SendTextAsKeystrokes("a\r\nb\nc");
 
+        Assert.IsTrue(completed);
         Assert.AreEqual(5, sentBatches.Count);
         Assert.AreEqual(4, sentBatches[1].Length);
         Assert.AreEqual((short)0x10, sentBatches[1][0].data.ki.wVk);
         Assert.AreEqual((short)0x0D, sentBatches[1][1].data.ki.wVk);
         Assert.AreEqual((uint)NativeMethods.KeyEventF.KeyUp, sentBatches[1][2].data.ki.dwFlags);
         Assert.AreEqual((uint)NativeMethods.KeyEventF.KeyUp, sentBatches[1][3].data.ki.dwFlags);
+        Assert.IsTrue(sentBatches[1].All(input => input.data.ki.dwExtraInfo == (UIntPtr)0x110));
         Assert.AreEqual(4, sentBatches[3].Length);
     }
 
@@ -191,12 +198,40 @@ public sealed class KeystrokeServiceTests
             },
             _ => { });
 
-        service.SendTextAsKeystrokes("a");
+        var completed = service.SendTextAsKeystrokes("a");
 
+        Assert.IsTrue(completed);
         Assert.AreEqual(2, sentBatches.Count);
         Assert.AreEqual((short)0xA2, sentBatches[0][0].data.ki.wVk);
         Assert.AreEqual((uint)NativeMethods.KeyEventF.KeyUp, sentBatches[0][0].data.ki.dwFlags);
+        Assert.AreEqual((UIntPtr)0x110, sentBatches[0][0].data.ki.dwExtraInfo);
         Assert.AreEqual((short)'a', sentBatches[1][0].data.ki.wScan);
+    }
+
+    [TestMethod]
+    public void SendTextAsKeystrokes_ForegroundWindowChangeReturnsFalse()
+    {
+        var userSettings = new TestUserSettings
+        {
+            KeystrokeDelayMs = 50,
+            KeystrokeBatchSize = 1,
+        };
+        var foregroundChecks = 0;
+        var sendCount = 0;
+        var service = new KeystrokeService(
+            userSettings,
+            () => ++foregroundChecks < 3 ? new IntPtr(1) : new IntPtr(2),
+            inputs =>
+            {
+                sendCount++;
+                return (uint)inputs.Length;
+            },
+            _ => { });
+
+        var completed = service.SendTextAsKeystrokes("ab");
+
+        Assert.IsFalse(completed);
+        Assert.AreEqual(1, sendCount);
     }
 
     [TestMethod]

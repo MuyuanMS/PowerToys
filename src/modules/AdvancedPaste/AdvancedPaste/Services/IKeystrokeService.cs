@@ -15,8 +15,9 @@ public interface IKeystrokeService
     /// Sends the specified text to the active application as a sequence of keystrokes.
     /// </summary>
     /// <param name="text">The text to send as simulated keystrokes.</param>
+    /// <returns><see langword="true"/> when all text was sent; otherwise, <see langword="false"/>.</returns>
     /// <exception cref="ArgumentNullException">
     /// Thrown when <paramref name="text"/> is <see langword="null"/>.
     /// </exception>
-    void SendTextAsKeystrokes(string text);
+    bool SendTextAsKeystrokes(string text);
 }
