@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -126,10 +127,15 @@ namespace Peek.FilePreviewer.Previewers.SqlitePreviewer
 
                 using (var cmd = connection.CreateCommand())
                 {
-                    cmd.CommandText = $"PRAGMA table_info({SqliteHelpers.QuoteIdentifier(tableName)});";
+                    cmd.CommandText = $"PRAGMA table_xinfo({SqliteHelpers.QuoteIdentifier(tableName)});";
                     using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
                     while (await reader.ReadAsync(cancellationToken))
                     {
+                        if (reader.GetInt32(6) == 1)
+                        {
+                            continue;
+                        }
+
                         tableInfo.Columns.Add(new SqliteColumnInfo
                         {
                             Name = reader.GetString(1),
@@ -149,7 +155,7 @@ namespace Peek.FilePreviewer.Previewers.SqlitePreviewer
 
         public async Task LoadTableDataAsync(SqliteTableInfo tableInfo, CancellationToken cancellationToken)
         {
-            if (tableInfo.Rows.Count > 0)
+            if (tableInfo.IsLoaded)
             {
                 return;
             }
@@ -171,36 +177,48 @@ namespace Peek.FilePreviewer.Previewers.SqlitePreviewer
 
             using (var cmd = connection.CreateCommand())
             {
-                cmd.CommandText = $"SELECT * FROM {SqliteHelpers.QuoteIdentifier(tableInfo.Name)} LIMIT 200;";
+                string projections = string.Join(
+                    ", ",
+                    tableInfo.Columns.Select(col =>
+                    {
+                        string identifier = SqliteHelpers.QuoteIdentifier(col.Name);
+                        return $"{identifier}, typeof({identifier}), length({identifier})";
+                    }));
+                cmd.CommandText = $"SELECT {projections} FROM {SqliteHelpers.QuoteIdentifier(tableInfo.Name)} LIMIT 200;";
                 using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+                var rows = new List<Dictionary<string, string?>>();
                 while (await reader.ReadAsync(cancellationToken))
                 {
-                    var ordinalByName = new Dictionary<string, int>(reader.FieldCount, StringComparer.Ordinal);
-                    for (int i = 0; i < reader.FieldCount; i++)
-                    {
-                        ordinalByName[reader.GetName(i)] = i;
-                    }
-
                     var row = new Dictionary<string, string?>(tableInfo.Columns.Count, StringComparer.Ordinal);
-                    foreach (var col in tableInfo.Columns)
+                    for (int columnIndex = 0; columnIndex < tableInfo.Columns.Count; columnIndex++)
                     {
-                        if (!ordinalByName.TryGetValue(col.Name, out int i) || reader.IsDBNull(i))
+                        var col = tableInfo.Columns[columnIndex];
+                        int valueOrdinal = columnIndex * 3;
+                        int typeOrdinal = valueOrdinal + 1;
+                        int lengthOrdinal = valueOrdinal + 2;
+
+                        if (reader.IsDBNull(valueOrdinal))
                         {
                             row[col.BindingKey] = null;
                         }
-                        else if (reader.GetFieldType(i) == typeof(byte[]))
+                        else if (reader.GetString(typeOrdinal) == "blob")
                         {
-                            using var blobStream = reader.GetStream(i);
-                            row[col.BindingKey] = string.Format(CultureInfo.CurrentCulture, ResourceLoaderInstance.ResourceLoader.GetString("Sqlite_Blob_Value"), blobStream.Length);
+                            row[col.BindingKey] = string.Format(
+                                CultureInfo.CurrentCulture,
+                                ResourceLoaderInstance.ResourceLoader.GetString("Sqlite_Blob_Value"),
+                                reader.GetInt64(lengthOrdinal));
                         }
                         else
                         {
-                            row[col.BindingKey] = reader.GetValue(i)?.ToString();
+                            row[col.BindingKey] = reader.GetValue(valueOrdinal)?.ToString();
                         }
                     }
 
-                    tableInfo.Rows.Add(row);
+                    rows.Add(row);
                 }
+
+                tableInfo.Rows = rows;
+                tableInfo.IsLoaded = true;
             }
         }
 

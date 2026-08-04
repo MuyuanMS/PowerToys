@@ -391,7 +391,7 @@
     <value>Search in Microsoft Store</value>
   </data>
   <data name="Sqlite_Table_Count" xml:space="preserve">
-    <value>{0} tables</value>
+    <value>Tables: {0}</value>
     <comment>{0} is the number of tables in the Sqlite database</comment>
   </data>
   <data name="Sqlite_Row_Count" xml:space="preserve">

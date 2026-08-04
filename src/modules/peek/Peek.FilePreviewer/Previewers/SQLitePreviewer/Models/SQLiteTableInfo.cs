@@ -16,6 +16,8 @@ namespace Peek.FilePreviewer.Previewers.SqlitePreviewer.Models
 
         public List<Dictionary<string, string?>> Rows { get; set; } = new();
 
+        public bool IsLoaded { get; set; }
+
         public override string ToString() => Name;
     }
 }
