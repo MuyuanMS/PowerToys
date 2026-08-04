@@ -1998,9 +1998,6 @@ Made with 💗 by Microsoft and the PowerToys community.</value>
   <data name="PasteAsKeystrokes_Shortcut.Header" xml:space="preserve">
     <value>Paste as keystrokes directly</value>
   </data>
-  <data name="PasteAsCustom_Shortcut.Header" xml:space="preserve">
-    <value>Paste as Custom with AI directly</value>
-  </data>
   <data name="ImageToText.Header" xml:space="preserve">
     <value>Image to text</value>
   </data>

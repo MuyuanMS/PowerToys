@@ -26,7 +26,7 @@ public sealed class UserSettingsKeystrokeTests
     public void Constructor_InitializesWithDefaultKeystrokeValues()
     {
         // Act
-        var userSettings = new UserSettings(_fileSystem);
+        using var userSettings = new UserSettings(_fileSystem, TaskScheduler.Default);
 
         // Assert
         Assert.AreEqual(AdvancedPasteProperties.DefaultKeystrokeDelayMs, userSettings.KeystrokeDelayMs);

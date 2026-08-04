@@ -16,6 +16,8 @@ namespace AdvancedPaste.Services;
 /// </summary>
 public sealed class KeystrokeService : IKeystrokeService
 {
+    private const short ReturnVirtualKey = 0x0D;
+
     private readonly IUserSettings _userSettings;
     private readonly Func<IntPtr> _getForegroundWindow;
     private readonly Func<Helpers.NativeMethods.INPUT[], uint> _sendInput;
@@ -68,6 +70,7 @@ public sealed class KeystrokeService : IKeystrokeService
 
         var delayMs = _userSettings.KeystrokeDelayMs > 0 ? _userSettings.KeystrokeDelayMs : AdvancedPasteProperties.DefaultKeystrokeDelayMs;
         var batchSize = _userSettings.KeystrokeBatchSize > 0 ? _userSettings.KeystrokeBatchSize : AdvancedPasteProperties.DefaultKeystrokeBatchSize;
+        var normalizedText = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
         var targetWindow = _getForegroundWindow();
         if (targetWindow == IntPtr.Zero)
         {
@@ -75,7 +78,7 @@ public sealed class KeystrokeService : IKeystrokeService
             return;
         }
 
-        for (int i = 0; i < text.Length; i += batchSize)
+        for (int i = 0; i < normalizedText.Length; i += batchSize)
         {
             var currentForeground = _getForegroundWindow();
             if (currentForeground != targetWindow)
@@ -84,11 +87,11 @@ public sealed class KeystrokeService : IKeystrokeService
                 break;
             }
 
-            int currentChunkLength = Math.Min(batchSize, text.Length - i);
+            int currentChunkLength = Math.Min(batchSize, normalizedText.Length - i);
 
             if (currentChunkLength > 0)
             {
-                var inputs = CreateInputSequence(text.AsSpan(i, currentChunkLength));
+                var inputs = CreateInputSequence(normalizedText.AsSpan(i, currentChunkLength));
                 SendInputEvents(inputs, delayMs);
             }
         }
@@ -114,15 +117,41 @@ public sealed class KeystrokeService : IKeystrokeService
         };
     }
 
+    private static Helpers.NativeMethods.INPUT CreateVirtualKeyInput(short virtualKey, bool isKeyUp)
+    {
+        return new Helpers.NativeMethods.INPUT
+        {
+            type = Helpers.NativeMethods.INPUTTYPE.INPUT_KEYBOARD,
+            data = new Helpers.NativeMethods.InputUnion
+            {
+                ki = new Helpers.NativeMethods.KEYBDINPUT
+                {
+                    wVk = virtualKey,
+                    wScan = 0,
+                    dwFlags = isKeyUp ? (uint)Helpers.NativeMethods.KeyEventF.KeyUp : 0,
+                    time = 0,
+                    dwExtraInfo = UIntPtr.Zero,
+                },
+            },
+        };
+    }
+
     private List<Helpers.NativeMethods.INPUT> CreateInputSequence(ReadOnlySpan<char> text)
     {
         var inputs = new List<Helpers.NativeMethods.INPUT>(text.Length * 2);
 
         foreach (char c in text)
         {
-            inputs.Add(CreateUnicodeInput(c, isKeyUp: false));
-
-            inputs.Add(CreateUnicodeInput(c, isKeyUp: true));
+            if (c == '\n')
+            {
+                inputs.Add(CreateVirtualKeyInput(ReturnVirtualKey, isKeyUp: false));
+                inputs.Add(CreateVirtualKeyInput(ReturnVirtualKey, isKeyUp: true));
+            }
+            else
+            {
+                inputs.Add(CreateUnicodeInput(c, isKeyUp: false));
+                inputs.Add(CreateUnicodeInput(c, isKeyUp: true));
+            }
         }
 
         return inputs;
