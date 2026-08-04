@@ -59,6 +59,8 @@ namespace WorkspacesLauncherUI
         {
             DispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
 
+            _mainWindow = new StatusWindow();
+
             _ipcManager = new TwoWayPipeMessageIPCManaged(
                 "\\\\.\\pipe\\powertoys_workspaces_ui_",
                 "\\\\.\\pipe\\powertoys_workspaces_launcher_ui_",
@@ -80,7 +82,6 @@ namespace WorkspacesLauncherUI
                 });
             _ipcManager.Start();
 
-            _mainWindow = new StatusWindow();
             _mainWindow.Activate();
         }
 

@@ -33,7 +33,14 @@ namespace WorkspacesLauncherUI.Helpers
 
             try
             {
-                return new PackageManager().FindPackageForUser(string.Empty, packageFullName)?.Logo?.LocalPath;
+                var package = new PackageManager().FindPackageForUser(string.Empty, packageFullName);
+                string logoPath = package?.Logo?.LocalPath;
+                if (package == null || string.IsNullOrEmpty(logoPath))
+                {
+                    return null;
+                }
+
+                return Path.Combine(package.InstalledLocation.Path, logoPath.TrimStart('/', '\\'));
             }
             catch (Exception)
             {
