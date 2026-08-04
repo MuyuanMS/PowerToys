@@ -802,7 +802,12 @@ namespace AdvancedPaste.ViewModels
                 await Task.Delay(100);
 
                 // Send the text as keystrokes on a background thread
-                await Task.Run(() => _keystrokeService.SendTextAsKeystrokes(text));
+                var completed = await Task.Run(() => _keystrokeService.SendTextAsKeystrokes(text));
+                if (!completed)
+                {
+                    PasteActionError = PasteActionError.FromResourceId("PasteActionCanceled");
+                    return;
+                }
 
                 Logger.LogDebug($"Completed executing PasteAsKeystrokes in {elapsedWatch.ElapsedMilliseconds}ms");
 
