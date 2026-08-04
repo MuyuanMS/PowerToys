@@ -432,7 +432,7 @@ bool AppZoneHistory::RemoveAppLastZone(HWND window, const FancyZonesDataTypes::W
     {
         if (data->workAreaId == workAreaId && data->layoutId == layoutId)
         {
-            if (!IsAnotherWindowOfApplicationInstanceZoned(window, workAreaId))
+            if (!IsAnotherWindowOfApplicationInstanceZoned(processPath, window, workAreaId))
             {
                 DWORD processId = 0;
                 GetWindowThreadProcessId(window, &processId);
