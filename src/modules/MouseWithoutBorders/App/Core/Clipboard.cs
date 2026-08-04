@@ -792,9 +792,9 @@ internal static class Clipboard
             }
             while (rv > 0);
 
-            if (receivedCount != dataSize)
+            if (m.Length != dataSize)
             {
-                Logger.Log($"Received incomplete file: expected {dataSize} bytes, received {receivedCount} bytes.");
+                Logger.Log($"Received incomplete file: expected {dataSize} bytes, wrote {m.Length} bytes.");
                 CloseDestinationFile();
                 Common.SetToggleIcon(new int[Common.TOGGLE_ICONS_SIZE] { Common.ICON_ERROR, -1, Common.ICON_ERROR, -1 });
                 Common.ShowToolTip("Could not receive the complete destination file.", 1000, ToolTipIcon.Warning, Setting.Values.ShowClipNetStatus);

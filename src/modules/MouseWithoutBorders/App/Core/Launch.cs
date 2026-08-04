@@ -74,7 +74,11 @@ internal static class Launch
                 impersonating = true;
                 ExecuteImpersonatedAction(targetFunc, () =>
                 {
-                    _ = NativeMethods.RevertToSelf();
+                    if (!NativeMethods.RevertToSelf())
+                    {
+                        throw new Win32Exception(Marshal.GetLastWin32Error(), $"{nameof(NativeMethods.RevertToSelf)} failed.");
+                    }
+
                     impersonating = false;
                 });
                 return true;
@@ -88,7 +92,14 @@ internal static class Launch
             {
                 if (impersonating)
                 {
-                    _ = NativeMethods.RevertToSelf();
+                    if (!NativeMethods.RevertToSelf())
+                    {
+                        Environment.FailFast(
+                            $"{nameof(NativeMethods.RevertToSelf)} failed; terminating to avoid continuing under the impersonated token.",
+                            new Win32Exception(Marshal.GetLastWin32Error()));
+                    }
+
+                    impersonating = false;
                 }
 
                 if (hUserToken != IntPtr.Zero)
