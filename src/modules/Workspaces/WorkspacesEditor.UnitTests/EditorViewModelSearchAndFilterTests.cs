@@ -40,7 +40,7 @@ namespace WorkspacesEditor.UnitTests
             var vm = TestHelpers.CreateViewModel();
             vm.Workspaces = new ObservableCollection<Project>
             {
-                TestHelpers.CreateProject("DevSetup", 0, 0, "VS Code"),
+                TestHelpers.CreateProject("Dev setup", 0, 0, "VS Code"),
                 TestHelpers.CreateProject("Browsing", 0, 0, "Edge"),
             };
 
@@ -97,7 +97,7 @@ namespace WorkspacesEditor.UnitTests
                 TestHelpers.CreateProject("Browsing", 0, 0, "Edge"),
             };
 
-            vm.SearchTerm = "devsetup";
+            vm.SearchTerm = "dev setup";
             Assert.AreEqual(1, vm.WorkspacesView.Count);
         }
 

@@ -104,8 +104,8 @@ namespace WorkspacesEditor.Views
             }
 
             // Disable DWM shadow/gradient and window chrome completely
-            int ncrpDisabled = 2; // DWMNCRP_DISABLED
-            _ = DwmSetWindowAttribute(hwnd, 2, ref ncrpDisabled, sizeof(int)); // DWMWA_NCRENDERING_POLICY
+            int nonClientRenderingPolicyDisabled = 2;
+            _ = DwmSetWindowAttribute(hwnd, 2, ref nonClientRenderingPolicyDisabled, sizeof(int));
 
             // Remove rounded corners (Windows 11)
             int cornerPref = 1; // DWMWCP_DONOTROUND
@@ -121,7 +121,7 @@ namespace WorkspacesEditor.Views
 
             // Remove WS_OVERLAPPEDWINDOW style, set WS_POPUP for minimal chrome
             int style = GetWindowLong(hwnd, GwlStyle);
-            style &= ~WsOverlappedwindow;
+            style &= ~WsOverlappedWindow;
             style |= WsPopup;
             _ = SetWindowLong(hwnd, GwlStyle, style);
 
@@ -130,7 +130,7 @@ namespace WorkspacesEditor.Views
             _ = SetWindowLong(hwnd, GwlExstyle, exStyle | WsExTransparent | WsExToolwindow | WsExTopmost);
 
             // Position and size via SetWindowPos (bypasses AppWindow min-size constraints)
-            _ = SetWindowPos(hwnd, HwndTopmost, x, y, width, height, SwpNoactivate | SwpShowwindow);
+            _ = SetWindowPos(hwnd, HwndTopmost, x, y, width, height, SwpNoActivate | SwpShowWindow);
 
             // Show
             window.Activate();
@@ -157,13 +157,13 @@ namespace WorkspacesEditor.Views
         // Win32 interop
         private const int GwlStyle = -16;
         private const int GwlExstyle = -20;
-        private const int WsOverlappedwindow = 0x00CF0000;
+        private const int WsOverlappedWindow = 0x00CF0000;
         private const int WsPopup = unchecked((int)0x80000000);
         private const int WsExTransparent = 0x00000020;
         private const int WsExToolwindow = 0x00000080;
         private const int WsExTopmost = 0x00000008;
-        private const int SwpNoactivate = 0x0010;
-        private const int SwpShowwindow = 0x0040;
+        private const int SwpNoActivate = 0x0010;
+        private const int SwpShowWindow = 0x0040;
         private static readonly IntPtr HwndTopmost = new IntPtr(-1);
 
         [DllImport("user32.dll")]

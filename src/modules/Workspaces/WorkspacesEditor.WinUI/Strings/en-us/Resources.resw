@@ -192,6 +192,9 @@
   <data name="Workspaces" xml:space="preserve">
     <value>Workspaces</value>
   </data>
+  <data name="WorkspacesHeaderBlock.Text" xml:space="preserve">
+    <value>Workspaces</value>
+  </data>
   <data name="Recently" xml:space="preserve">
     <value>recently</value>
   </data>
@@ -247,6 +250,9 @@
     <value>Snapshot Creator</value>
   </data>
   <data name="SortBy" xml:space="preserve">
+    <value>Sort by</value>
+  </data>
+  <data name="SortByLabel.Text" xml:space="preserve">
     <value>Sort by</value>
   </data>
   <data name="Top" xml:space="preserve">

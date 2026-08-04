@@ -7,10 +7,21 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     Title="Workspaces"
     mc:Ignorable="d">
-    <Grid Margin="0,16,0,0">
-        <Frame x:Name="ContentFrame" />
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <TitleBar
+            x:Name="AppTitleBar"
+            IsTabStop="False"
+            BackRequested="AppTitleBar_BackRequested" />
+        <Frame
+            x:Name="ContentFrame"
+            Grid.Row="1" />
         <ProgressRing
             x:Name="LoadingRing"
+            Grid.Row="1"
             Width="48"
             Height="48"
             HorizontalAlignment="Center"
