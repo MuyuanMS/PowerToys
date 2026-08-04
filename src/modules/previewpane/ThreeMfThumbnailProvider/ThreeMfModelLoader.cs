@@ -15,6 +15,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
     internal static class ThreeMfModelLoader
     {
         private static readonly string[] ThumbnailExtensions = { ".png", ".jpg", ".jpeg" };
+        private static readonly char[] TransformSeparators = { ' ' };
 
         // Because Explorer invokes this provider on untrusted files, cap the amount of work a
         // single 3MF (a ZIP of XML) can trigger to avoid decompression/geometry bombs.
@@ -174,7 +175,37 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
         private static ZipArchiveEntry FindThumbnailEntry(ZipArchive archive)
         {
-            // 1. Prefer the thumbnail declared through the OPC relationship (authoritative).
+            // Prefer files actually named thumbnail* (e.g. Auxiliaries/.thumbnails/thumbnail_3mf.png).
+            // Slicer packages often also ship dark Metadata/plate_*.png previews and relationships that
+            // point at those plates; those are a last resort only.
+            ZipArchiveEntry namedThumbnail = null;
+            ZipArchiveEntry metadataFallback = null;
+
+            foreach (var entry in archive.Entries)
+            {
+                var name = entry.FullName.Replace('\\', '/');
+                var fileName = name.Contains('/') ? name[(name.LastIndexOf('/') + 1)..] : name;
+
+                if (ThumbnailExtensions.Any(ext => name.EndsWith(ext, StringComparison.OrdinalIgnoreCase)) &&
+                    fileName.Contains("thumbnail", StringComparison.OrdinalIgnoreCase))
+                {
+                    namedThumbnail ??= entry;
+                    continue;
+                }
+
+                if (metadataFallback == null &&
+                    name.Contains("Metadata/", StringComparison.OrdinalIgnoreCase) &&
+                    ThumbnailExtensions.Any(ext => name.EndsWith(ext, StringComparison.OrdinalIgnoreCase)))
+                {
+                    metadataFallback = entry;
+                }
+            }
+
+            if (namedThumbnail != null)
+            {
+                return namedThumbnail;
+            }
+
             foreach (var target in GetThumbnailTargetsFromRelationships(archive))
             {
                 var entry = ResolveEntry(archive, target);
@@ -184,25 +215,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 }
             }
 
-            // 2. Fall back to filename/location heuristics only if no relationship is declared.
-            foreach (var entry in archive.Entries)
-            {
-                var name = entry.FullName.Replace('\\', '/');
-                if (name.Contains("Metadata/", StringComparison.OrdinalIgnoreCase) &&
-                    ThumbnailExtensions.Any(ext => name.EndsWith(ext, StringComparison.OrdinalIgnoreCase)))
-                {
-                    return entry;
-                }
-
-                if (name.EndsWith("thumbnail.png", StringComparison.OrdinalIgnoreCase) ||
-                    name.EndsWith("thumbnail.jpg", StringComparison.OrdinalIgnoreCase) ||
-                    name.EndsWith("thumbnail.jpeg", StringComparison.OrdinalIgnoreCase))
-                {
-                    return entry;
-                }
-            }
-
-            return null;
+            return metadataFallback;
         }
 
         private static ZipArchiveEntry ResolveEntry(ZipArchive archive, string target)
@@ -651,7 +664,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             }
 
             var values = transformValue
-                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Split(TransformSeparators, StringSplitOptions.RemoveEmptyEntries)
                 .Select(ParseDouble)
                 .ToArray();
 
