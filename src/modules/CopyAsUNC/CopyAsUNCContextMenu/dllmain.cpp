@@ -77,9 +77,6 @@ public:
         if (!CopyAsUNCSettingsInstance().GetEnabled())
             return S_OK;
 
-        if (CopyAsUNCSettingsInstance().GetShowInExtendedContextMenu())
-            return S_OK;
-
         // Only show for items on mapped network drives
         if (selection)
         {
