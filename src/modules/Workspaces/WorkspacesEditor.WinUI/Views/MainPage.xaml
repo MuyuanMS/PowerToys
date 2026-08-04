@@ -29,6 +29,7 @@
         <!--  header + create button  -->
         <TextBlock
             x:Name="WorkspacesHeaderBlock"
+            x:Uid="WorkspacesHeaderBlock"
             Grid.Row="0"
             Margin="24,0,48,16"
             AutomationProperties.HeadingLevel="Level1"
@@ -53,6 +54,7 @@
                     Text="&#xE710;" />
                 <TextBlock
                     x:Name="CreateWorkspaceText"
+                    x:Uid="CreateWorkspaceLabel"
                     Margin="8,0,0,0"
                     Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
             </StackPanel>
@@ -80,6 +82,7 @@
             Orientation="Horizontal">
             <TextBlock
                 x:Name="SortByLabel"
+                x:Uid="SortByLabel"
                 Margin="12,0,8,0"
                 VerticalAlignment="Center"
                 Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
@@ -184,11 +187,17 @@
                                 <Button.Flyout>
                                     <MenuFlyout>
                                         <MenuFlyoutItem x:Uid="EditFlyoutItem" Click="EditButtonClicked">
+                                            <MenuFlyoutItem.Tag>
+                                                <Binding />
+                                            </MenuFlyoutItem.Tag>
                                             <MenuFlyoutItem.Icon>
                                                 <FontIcon Glyph="&#xE70F;" />
                                             </MenuFlyoutItem.Icon>
                                         </MenuFlyoutItem>
                                         <MenuFlyoutItem x:Uid="RemoveFlyoutItem" Click="DeleteButtonClicked">
+                                            <MenuFlyoutItem.Tag>
+                                                <Binding />
+                                            </MenuFlyoutItem.Tag>
                                             <MenuFlyoutItem.Icon>
                                                 <FontIcon Glyph="&#xE74D;" />
                                             </MenuFlyoutItem.Icon>

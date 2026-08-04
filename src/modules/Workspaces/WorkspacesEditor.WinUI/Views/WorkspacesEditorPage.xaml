@@ -29,7 +29,6 @@
                     HorizontalContentAlignment="Stretch"
                     AutomationProperties.AutomationId="{Binding AppName}"
                     AutomationProperties.Name="{Binding AppName}"
-                    IsEnabled="{Binding IsIncluded, Mode=OneWay}"
                     IsExpanded="{Binding IsExpanded, Mode=TwoWay}">
                     <Expander.Header>
                         <Grid HorizontalAlignment="Stretch">
@@ -80,7 +79,10 @@
                                 IsEnabled="True" />
                         </Grid>
                     </Expander.Header>
-                    <Grid Margin="52,8,48,8" HorizontalAlignment="Stretch">
+                    <Grid
+                        Margin="52,8,48,8"
+                        HorizontalAlignment="Stretch"
+                        IsEnabled="{Binding IsIncluded, Mode=OneWay}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -298,5 +300,4 @@
         </ScrollViewer>
     </Grid>
 </Page>
-
 

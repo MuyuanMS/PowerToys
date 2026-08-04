@@ -54,6 +54,14 @@ namespace WorkspacesEditor.ViewModels
         [ObservableProperty]
         private string _emptyWorkspacesViewMessage;
 
+        [ObservableProperty]
+        private string _searchTerm = string.Empty;
+
+        partial void OnSearchTermChanged(string value)
+        {
+            RefreshWorkspacesView();
+        }
+
         public void RefreshWorkspacesView()
         {
             IEnumerable<Project> workspaces = GetFilteredWorkspaces();
@@ -92,7 +100,14 @@ namespace WorkspacesEditor.ViewModels
 
         private IEnumerable<Project> GetFilteredWorkspaces()
         {
-            return Workspaces;
+            if (string.IsNullOrWhiteSpace(SearchTerm))
+            {
+                return Workspaces;
+            }
+
+            return Workspaces.Where(project =>
+                project.Name.Contains(SearchTerm, StringComparison.InvariantCultureIgnoreCase) ||
+                project.Applications.Any(app => app.AppName.Contains(SearchTerm, StringComparison.InvariantCultureIgnoreCase)));
         }
 
         /// <summary>

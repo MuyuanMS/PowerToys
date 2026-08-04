@@ -3,14 +3,17 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Threading;
 using CommunityToolkit.Mvvm.Messaging;
 using ManagedCommon;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.Graphics;
 using WinRT.Interop;
 using WinUIEx;
 using WorkspacesEditor.Helpers;
@@ -22,15 +25,24 @@ namespace WorkspacesEditor
 {
     public sealed partial class MainWindow : WindowEx, IDisposable
     {
+        public const double MinWindowWidth = 750;
+        public const double MinWindowHeight = 680;
+
         private readonly CancellationTokenSource _cancellationToken = new();
+        private RectInt32 _lastNormalBounds;
+
+        private static string WindowPlacementPath => Path.Combine(WorkspacesCsharpLibrary.Utils.FolderUtils.DataFolder(), "editor-window-placement.json");
 
         public MainWindow()
         {
             this.InitializeComponent();
+            MinWidth = MinWindowWidth;
+            MinHeight = MinWindowHeight;
 
             var hwnd = WindowNative.GetWindowHandle(this);
 
-            this.CenterOnScreen();
+            RestoreWindowPlacement();
+            AppWindow.Changed += AppWindow_Changed;
 
             AppWindow.SetIcon("Assets/Workspaces/Workspaces.ico");
 
@@ -61,7 +73,6 @@ namespace WorkspacesEditor
             StrongReferenceMessenger.Default.Register<NavigateToEditorMessage>(this, (r, m) =>
             {
                 ContentFrame.Navigate(typeof(Views.WorkspacesEditorPage), (vm, m.Project));
-                SearchBox.Visibility = Visibility.Collapsed;
                 AppTitleBar.IsBackButtonVisible = true;
                 AppTitleBar.Title = m.Project.EditorWindowTitle;
             });
@@ -72,8 +83,6 @@ namespace WorkspacesEditor
                     ContentFrame.GoBack();
                 }
 
-                SearchBox.Text = string.Empty;
-                SearchBox.Visibility = Visibility.Visible;
                 AppTitleBar.IsBackButtonVisible = false;
                 AppTitleBar.Title = this.Title;
             });
@@ -121,40 +130,6 @@ namespace WorkspacesEditor
             Microsoft.PowerToys.Telemetry.PowerToysTelemetry.Log.WriteEvent(new Telemetry.WorkspacesEditorStartFinishEvent() { TimeStamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() });
         }
 
-        private void SearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
-        {
-            if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput)
-            {
-                return;
-            }
-
-            sender.ItemsSource = App.MainViewModel.SearchWorkspaces(sender.Text).ToList();
-        }
-
-        private void SearchBox_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs args)
-        {
-            if (args.SelectedItem is Project project)
-            {
-                sender.Text = project.Name;
-            }
-        }
-
-        private void SearchBox_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
-        {
-            var vm = App.MainViewModel;
-            var project = args.ChosenSuggestion as Project
-                ?? vm.SearchWorkspaces(args.QueryText).FirstOrDefault();
-
-            if (project == null)
-            {
-                return;
-            }
-
-            sender.Text = string.Empty;
-            vm.CloseAllPopups();
-            vm.EditProject(project);
-        }
-
         private void AppTitleBar_BackRequested(Microsoft.UI.Xaml.Controls.TitleBar sender, object args)
         {
             // Discard any in-progress edits (same behavior as the editor's Cancel), then return to the overview.
@@ -194,9 +169,75 @@ namespace WorkspacesEditor
 
         private void OnClosed(object sender, WindowEventArgs args)
         {
+            SaveWindowPlacement();
             _cancellationToken.Dispose();
             (Microsoft.UI.Xaml.Application.Current as IDisposable)?.Dispose();
         }
+
+        private void AppWindow_Changed(AppWindow sender, AppWindowChangedEventArgs args)
+        {
+            if (sender.Presenter is OverlappedPresenter presenter && presenter.State == OverlappedPresenterState.Restored)
+            {
+                _lastNormalBounds = new RectInt32(sender.Position.X, sender.Position.Y, sender.Size.Width, sender.Size.Height);
+            }
+        }
+
+        private void RestoreWindowPlacement()
+        {
+            try
+            {
+                if (File.Exists(WindowPlacementPath))
+                {
+                    WindowPlacement placement = JsonSerializer.Deserialize<WindowPlacement>(File.ReadAllText(WindowPlacementPath));
+                    if (placement != null && placement.Width >= MinWindowWidth && placement.Height >= MinWindowHeight)
+                    {
+                        var center = new PointInt32(placement.X + (placement.Width / 2), placement.Y + (placement.Height / 2));
+                        DisplayArea display = DisplayArea.GetFromPoint(center, DisplayAreaFallback.Nearest);
+                        RectInt32 workArea = display.WorkArea;
+                        var bounds = new RectInt32(placement.X, placement.Y, placement.Width, placement.Height);
+                        bool intersects = bounds.X < workArea.X + workArea.Width &&
+                                          bounds.X + bounds.Width > workArea.X &&
+                                          bounds.Y < workArea.Y + workArea.Height &&
+                                          bounds.Y + bounds.Height > workArea.Y;
+                        if (intersects)
+                        {
+                            AppWindow.MoveAndResize(bounds);
+                            _lastNormalBounds = bounds;
+                            if (placement.Maximized && AppWindow.Presenter is OverlappedPresenter presenter)
+                            {
+                                presenter.Maximize();
+                            }
+
+                            return;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning($"Failed to restore Workspaces Editor window placement: {ex.Message}");
+            }
+
+            this.CenterOnScreen();
+            _lastNormalBounds = new RectInt32(AppWindow.Position.X, AppWindow.Position.Y, AppWindow.Size.Width, AppWindow.Size.Height);
+        }
+
+        private void SaveWindowPlacement()
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(WindowPlacementPath));
+                bool maximized = AppWindow.Presenter is OverlappedPresenter presenter && presenter.State == OverlappedPresenterState.Maximized;
+                RectInt32 bounds = _lastNormalBounds.Width > 0 ? _lastNormalBounds : new RectInt32(AppWindow.Position.X, AppWindow.Position.Y, AppWindow.Size.Width, AppWindow.Size.Height);
+                File.WriteAllText(WindowPlacementPath, JsonSerializer.Serialize(new WindowPlacement(bounds.X, bounds.Y, bounds.Width, bounds.Height, maximized)));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning($"Failed to save Workspaces Editor window placement: {ex.Message}");
+            }
+        }
+
+        private sealed record WindowPlacement(int X, int Y, int Width, int Height, bool Maximized);
 
         private static bool ApplicationIsInFocus()
         {

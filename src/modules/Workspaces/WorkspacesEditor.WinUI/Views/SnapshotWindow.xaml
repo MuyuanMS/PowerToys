@@ -9,6 +9,7 @@
     mc:Ignorable="d">
     <Grid Margin="4">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -17,8 +18,12 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
+        <TitleBar
+            x:Name="AppTitleBar"
+            Grid.ColumnSpan="2"
+            IsTabStop="False" />
         <ContentControl
-            Grid.Row="0"
+            Grid.Row="1"
             Grid.ColumnSpan="2"
             Margin="8"
             VerticalAlignment="Center"
@@ -26,20 +31,23 @@
             IsTabStop="True">
             <TextBlock
                 x:Name="DescriptionText"
+                x:Uid="SnapshotDescription"
                 AutomationProperties.AccessibilityView="Raw"
                 HorizontalTextAlignment="Center"
                 TextWrapping="Wrap" />
         </ContentControl>
         <Button
             x:Name="SnapshotButton"
-            Grid.Row="1"
+            x:Uid="SnapshotButton"
+            Grid.Row="2"
             Margin="8,8,4,8"
             HorizontalAlignment="Stretch"
             Click="SnapshotButtonClicked"
             Style="{ThemeResource AccentButtonStyle}" />
         <Button
             x:Name="CancelButton"
-            Grid.Row="1"
+            x:Uid="SnapshotCancelButton"
+            Grid.Row="2"
             Grid.Column="1"
             Margin="4,8,8,8"
             HorizontalAlignment="Stretch"

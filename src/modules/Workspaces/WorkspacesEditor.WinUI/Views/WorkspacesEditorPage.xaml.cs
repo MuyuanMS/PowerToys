@@ -72,6 +72,12 @@ namespace WorkspacesEditor.Views
             }
         }
 
+        private void CancelButtonClicked(object sender, RoutedEventArgs e)
+        {
+            TempProjectData.DeleteTempFile();
+            _mainViewModel?.SwitchToMainView();
+        }
+
         private void DeleteButtonClicked(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement element && element.DataContext is Application app)
