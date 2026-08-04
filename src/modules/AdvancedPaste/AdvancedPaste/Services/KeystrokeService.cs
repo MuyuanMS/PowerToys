@@ -16,14 +16,35 @@ namespace AdvancedPaste.Services;
 /// </summary>
 public sealed class KeystrokeService : IKeystrokeService
 {
-    private readonly int _delayMs;
-    private readonly int _batchSize;
+    private readonly IUserSettings _userSettings;
+    private readonly Func<IntPtr> _getForegroundWindow;
+    private readonly Func<Helpers.NativeMethods.INPUT[], uint> _sendInput;
+    private readonly Action<int> _delay;
 
     public KeystrokeService(IUserSettings userSettings)
+        : this(
+            userSettings,
+            Helpers.NativeMethods.GetForegroundWindow,
+            inputs => Helpers.NativeMethods.SendInput((uint)inputs.Length, inputs, Helpers.NativeMethods.INPUT.Size),
+            System.Threading.Thread.Sleep)
+    {
+    }
+
+    internal KeystrokeService(
+        IUserSettings userSettings,
+        Func<IntPtr> getForegroundWindow,
+        Func<Helpers.NativeMethods.INPUT[], uint> sendInput,
+        Action<int> delay)
     {
         ArgumentNullException.ThrowIfNull(userSettings);
-        _delayMs = userSettings.KeystrokeDelayMs > 0 ? userSettings.KeystrokeDelayMs : AdvancedPasteProperties.DefaultKeystrokeDelayMs;
-        _batchSize = userSettings.KeystrokeBatchSize > 0 ? userSettings.KeystrokeBatchSize : AdvancedPasteProperties.DefaultKeystrokeBatchSize;
+        ArgumentNullException.ThrowIfNull(getForegroundWindow);
+        ArgumentNullException.ThrowIfNull(sendInput);
+        ArgumentNullException.ThrowIfNull(delay);
+
+        _userSettings = userSettings;
+        _getForegroundWindow = getForegroundWindow;
+        _sendInput = sendInput;
+        _delay = delay;
     }
 
     /// <summary>
@@ -45,26 +66,25 @@ public sealed class KeystrokeService : IKeystrokeService
             return;
         }
 
-        var targetWindow = Helpers.NativeMethods.GetForegroundWindow();
+        var delayMs = _userSettings.KeystrokeDelayMs > 0 ? _userSettings.KeystrokeDelayMs : AdvancedPasteProperties.DefaultKeystrokeDelayMs;
+        var batchSize = _userSettings.KeystrokeBatchSize > 0 ? _userSettings.KeystrokeBatchSize : AdvancedPasteProperties.DefaultKeystrokeBatchSize;
+        var targetWindow = _getForegroundWindow();
 
-        for (int i = 0; i < text.Length; i += _batchSize)
+        for (int i = 0; i < text.Length; i += batchSize)
         {
-            var currentForeground = Helpers.NativeMethods.GetForegroundWindow();
+            var currentForeground = _getForegroundWindow();
             if (targetWindow != IntPtr.Zero && currentForeground != targetWindow)
             {
                 Logger.LogWarning("Keystroke paste cancelled because the foreground window changed");
                 break;
             }
 
-            int currentChunkLength = Math.Min(_batchSize, text.Length - i);
-
-            Logger.LogDebug(
-                $"Sending keystroke chunk starting at index {i} with length {currentChunkLength}");
+            int currentChunkLength = Math.Min(batchSize, text.Length - i);
 
             if (currentChunkLength > 0)
             {
                 var inputs = CreateInputSequence(text.AsSpan(i, currentChunkLength));
-                SendInputEvents(inputs);
+                SendInputEvents(inputs, delayMs);
             }
         }
     }
@@ -103,9 +123,9 @@ public sealed class KeystrokeService : IKeystrokeService
         return inputs;
     }
 
-    private void SendInputEvents(List<Helpers.NativeMethods.INPUT> inputs)
+    private void SendInputEvents(List<Helpers.NativeMethods.INPUT> inputs, int delayMs)
     {
-        uint sent = Helpers.NativeMethods.SendInput((uint)inputs.Count, inputs.ToArray(), Helpers.NativeMethods.INPUT.Size);
+        uint sent = _sendInput(inputs.ToArray());
 
         if (sent != inputs.Count)
         {
@@ -115,8 +135,6 @@ public sealed class KeystrokeService : IKeystrokeService
         }
 
         // SendInput cannot handle rapid sequences of inputs. Delay is configurable.
-        System.Threading.Thread.Sleep(_delayMs);
-
-        Logger.LogDebug($"Successfully sent {inputs.Count} keystrokes");
+        _delay(delayMs);
     }
 }

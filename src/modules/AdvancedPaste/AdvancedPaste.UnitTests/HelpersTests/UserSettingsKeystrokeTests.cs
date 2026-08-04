@@ -44,7 +44,7 @@ public sealed class UserSettingsKeystrokeTests
             }
         }";
 
-        var settingsPath = MockPathHelper.BuildPath(@"C:\Users\TestUser\AppData\Local\Microsoft\PowerToys\AdvancedPaste\settings.json");
+        const string settingsPath = @"C:\Users\TestUser\AppData\Local\Microsoft\PowerToys\AdvancedPaste\settings.json";
         _fileSystem.AddFile(settingsPath, new MockFileData(settingsJson));
 
         // Arrange mock to return the settings path
@@ -112,16 +112,5 @@ public sealed class UserSettingsKeystrokeTests
     {
         // Assert
         Assert.AreEqual(1, AdvancedPasteProperties.DefaultKeystrokeBatchSize);
-    }
-}
-
-/// <summary>
-/// Helper class to build mock file paths compatible with MockFileSystem.
-/// </summary>
-internal static class MockPathHelper
-{
-    public static string BuildPath(string path)
-    {
-        return path;
     }
 }
