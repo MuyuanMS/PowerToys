@@ -254,13 +254,20 @@
                         </Grid.ColumnDefinitions>
 
                         <Grid
+                            x:Name="Preview"
                             Width="160"
                             Height="120"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Top"
+                            AutomationProperties.AutomationId="Preview"
+                            AutomationProperties.Name="Preview"
                             Background="{ThemeResource ControlAltFillColorTertiaryBrush}"
                             CornerRadius="8">
-                            <!--  THIS IS JUST A PLACEHOLDER.. SNAPSHOT IMAGE GOES HERE  -->
+                            <Image
+                                x:Name="WorkspacePreviewImage"
+                                AutomationProperties.AutomationId="WorkspacePreviewImage"
+                                Source="{x:Bind EditedProject.PreviewImage, Mode=OneWay}"
+                                Stretch="Uniform" />
                         </Grid>
                         <StackPanel
                             Grid.Column="1"
@@ -297,4 +304,3 @@
         </ScrollViewer>
     </Grid>
 </Page>
-
