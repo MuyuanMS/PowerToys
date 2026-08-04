@@ -61,7 +61,7 @@ public class EditorMainWindowDesignTests : WorkspacesUiAutomationBase
     {
         // The workspaces list container should exist even when empty
         Assert.IsTrue(
-            Has<Element>(By.AccessibilityId("WorkspacesItemsControl")) || Has<Custom>("WorkspacesList"),
+            Has<Element>(By.AccessibilityId("WorkspacesList")),
             "Should have workspace list container");
     }
 

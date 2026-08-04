@@ -36,7 +36,7 @@ namespace WorkspacesLauncherUI.Models
                         }
 
                         using var memory = new MemoryStream();
-                        WorkspacesCsharpLibrary.Utils.DrawHelper.SaveBitmap(previewBitmap, memory);
+                        WorkspacesCsharpLibrary.DrawHelper.SaveBitmap(previewBitmap, memory);
                         memory.Position = 0;
 
                         var bitmapImage = new BitmapImage();
