@@ -4,6 +4,7 @@
 
 #include <FancyZonesLib/Settings.h>
 #include <FancyZonesLib/FancyZones.h>
+#include <FancyZonesLib/MonitorRotation.h>
 #include <FancyZonesLib/ModuleConstants.h>
 #include <common/SettingsAPI/settings_helpers.h>
 
@@ -165,6 +166,45 @@ namespace FancyZonesUnitTests
             FancyZonesSettings::instance().LoadSettings();
             auto actual = FancyZonesSettings::settings();
             compareSettings(m_defaultSettings, actual);
+        }
+    };
+
+    TEST_CLASS (MonitorRotationUnitTest)
+    {
+        TEST_METHOD (RotatedMonitorIndexWrapsInBothDirections)
+        {
+            Assert::AreEqual<size_t>(1, MonitorRotation::GetRotatedMonitorIndex(0, 3, false));
+            Assert::AreEqual<size_t>(0, MonitorRotation::GetRotatedMonitorIndex(2, 3, false));
+            Assert::AreEqual<size_t>(2, MonitorRotation::GetRotatedMonitorIndex(0, 3, true));
+            Assert::AreEqual<size_t>(1, MonitorRotation::GetRotatedMonitorIndex(2, 3, true));
+        }
+
+        TEST_METHOD (MapsRectBetweenDifferentAndNegativeWorkAreas)
+        {
+            const RECT sourceWorkArea{ -1920, 0, 0, 1080 };
+            const RECT targetWorkArea{ 0, -200, 2560, 1240 };
+            const RECT sourceRect{ -1440, 270, -480, 810 };
+
+            const auto mapped = MonitorRotation::MapRectBetweenMonitorWorkAreas(sourceRect, sourceWorkArea, targetWorkArea);
+
+            Assert::AreEqual<LONG>(640, mapped.left);
+            Assert::AreEqual<LONG>(160, mapped.top);
+            Assert::AreEqual<LONG>(1920, mapped.right);
+            Assert::AreEqual<LONG>(880, mapped.bottom);
+        }
+
+        TEST_METHOD (ModifierStateKeepsOtherSidePressedAndConsumesArrowRelease)
+        {
+            MonitorRotation::KeyState state;
+            state.Update(VK_LWIN, true);
+            state.Update(VK_RWIN, true);
+            state.Update(VK_LWIN, false);
+
+            Assert::IsTrue(state.IsAnyDown({ VK_LWIN, VK_RWIN }));
+
+            state.Consume(VK_LEFT);
+            Assert::IsTrue(state.ReleaseWasConsumed(VK_LEFT));
+            Assert::IsFalse(state.ReleaseWasConsumed(VK_LEFT));
         }
     };
 }
