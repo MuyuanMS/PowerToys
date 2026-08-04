@@ -135,6 +135,9 @@ public:
     IFACEMETHODIMP Invoke(_In_opt_ IShellItemArray* selection, _In_opt_ IBindCtx*) noexcept
     try
     {
+        if (!CopyAsUNCSettingsInstance().GetEnabled())
+            return S_OK;
+
         if (!selection)
             return S_OK;
 
