@@ -16,6 +16,7 @@ public sealed class KbmShortcutParserTests
     [DataRow("Win+Ctrl+Alt+Shift+Delete", "260;17;18;16;46")]
     [DataRow("Esc", "27")]
     [DataRow("Ctrl+Alt+VK255", "17;18;255")]
+    [DataRow("Ctrl+,", "17;188")]
     public void ParseKeyOrShortcut_ProducesStoredVkString(string input, string expected)
     {
         Assert.IsTrue(KbmShortcutParser.TryParseKeyOrShortcut(input, out var result, out var error), error);
@@ -39,6 +40,10 @@ public sealed class KbmShortcutParserTests
     {
         Assert.IsTrue(KbmShortcutParser.TryParseKeyOrShortcut("Win+O, K", out var result, out var error), error);
         Assert.AreEqual("260;79;75", result.ToVkString());
+        Assert.AreEqual(75u, result.SecondKeyOfChord);
+
+        Assert.IsTrue(KbmShortcutParser.TryParseKeyOrShortcut("Ctrl+,, K", out result, out error), error);
+        Assert.AreEqual("17;188;75", result.ToVkString());
         Assert.AreEqual(75u, result.SecondKeyOfChord);
     }
 

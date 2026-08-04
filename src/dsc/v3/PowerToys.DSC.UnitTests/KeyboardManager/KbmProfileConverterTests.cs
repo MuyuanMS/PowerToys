@@ -226,6 +226,24 @@ public sealed class KbmProfileConverterTests
     }
 
     [TestMethod]
+    public void FromProfile_SkipsWhitespacePaddedTargetApp()
+    {
+        var profile = new KeyboardManagerProfile();
+        profile.RemapShortcuts.AppSpecificRemapShortcuts.Add(new AppSpecificKeysDataModel
+        {
+            OriginalKeys = "17;65",
+            NewRemapKeys = "17;86",
+            TargetApp = " notepad.exe ",
+        });
+        var warnings = new System.Collections.Generic.List<string>();
+
+        var model = KbmProfileConverter.FromProfile(profile, warnings);
+
+        Assert.AreEqual(0, model.Shortcuts.Count);
+        Assert.IsTrue(warnings.Any(w => w.Contains("surrounding whitespace", System.StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
     public void Validate_ValidModel_NoErrors()
     {
         var model = new KbmProfileModel
