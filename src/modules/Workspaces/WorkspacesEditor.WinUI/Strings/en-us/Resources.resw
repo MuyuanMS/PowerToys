@@ -318,10 +318,10 @@
   <data name="LaunchAsAdminLabel.Content" xml:space="preserve">
     <value>Launch as Admin</value>
   </data>
-	<data name="PositionHeader.Header" xml:space="preserve">
+  <data name="PositionHeader.Header" xml:space="preserve">
     <value>Position</value>
-  </data>	
-<data name="LaunchBtn.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+  </data>
+  <data name="LaunchBtn.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
     <value>Launch</value>
   </data>
   <data name="LaunchLabel.Text" xml:space="preserve">
