@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using ShortcutGuide.Controls;
@@ -222,6 +223,9 @@ namespace ShortcutGuide.Pages
 
                 this.NoResultsTextBlock.Visibility = Visibility.Visible;
                 this.NoResultsTextBlock.Text = ResourceLoaderInstance.ResourceLoader.GetString("SearchBlank");
+                var peer = FrameworkElementAutomationPeer.FromElement(this.NoResultsTextBlock) ??
+                           new FrameworkElementAutomationPeer(this.NoResultsTextBlock);
+                peer.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
             }
             else
             {

@@ -56,6 +56,16 @@ public sealed class ShortcutSearchMatcherTests
     }
 
     [TestMethod]
+    public void Matches_DisplayedChord_ReturnsTrue()
+    {
+        var shortcut = CreateShortcut(
+            name: "Open Snipping Tool",
+            shortcutDescriptions: [new ShortcutDescription(false, true, false, true, ["S"])]);
+
+        Assert.IsTrue(ShortcutSearchMatcher.Matches(shortcut, "Win Shift S"));
+    }
+
+    [TestMethod]
     [DataRow("K", "K")]
     [DataRow("F1", "112")]
     [DataRow("Esc", "<Escape>")]

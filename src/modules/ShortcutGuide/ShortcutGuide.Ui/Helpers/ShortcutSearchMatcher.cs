@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Common.Search.FuzzSearch;
 using ShortcutGuide.Models;
 
@@ -28,6 +29,11 @@ namespace ShortcutGuide.Helpers
 
             foreach (var description in shortcut.Shortcut ?? [])
             {
+                if (MatchesText(GetChordSearchLabel(description), searchText))
+                {
+                    return true;
+                }
+
                 foreach (string label in GetSearchLabels(description))
                 {
                     if (MatchesText(label, searchText))
@@ -38,6 +44,33 @@ namespace ShortcutGuide.Helpers
             }
 
             return false;
+        }
+
+        private static string GetChordSearchLabel(ShortcutDescription description)
+        {
+            var labels = new List<string>();
+            if (description.Win)
+            {
+                labels.Add("Win");
+            }
+
+            if (description.Ctrl)
+            {
+                labels.Add("Ctrl");
+            }
+
+            if (description.Alt)
+            {
+                labels.Add("Alt");
+            }
+
+            if (description.Shift)
+            {
+                labels.Add("Shift");
+            }
+
+            labels.AddRange((description.Keys ?? []).Select(GetKeySearchLabel));
+            return string.Join(' ', labels);
         }
 
         private static IEnumerable<string> GetSearchLabels(ShortcutDescription description)
