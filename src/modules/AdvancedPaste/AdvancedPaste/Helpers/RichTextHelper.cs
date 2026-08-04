@@ -3,9 +3,10 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Threading.Tasks;
+
+using ManagedCommon;
 using Markdig;
 using Windows.ApplicationModel.DataTransfer;
-using ManagedCommon;
 
 namespace AdvancedPaste.Helpers
 {
