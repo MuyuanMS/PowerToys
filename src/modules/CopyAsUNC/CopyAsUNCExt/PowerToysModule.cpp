@@ -95,7 +95,11 @@ private:
 
     void init_settings()
     {
-        m_enabled = package::IsWin11OrGreater() && CopyAsUNCSettingsInstance().GetEnabled();
+        m_enabled = false;
+        if (CopyAsUNCSettingsInstance().GetEnabled())
+        {
+            enable();
+        }
     }
 };
 
