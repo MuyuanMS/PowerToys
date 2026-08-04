@@ -30,8 +30,9 @@ public sealed class RichTextHelperTests
             new NoOpProgress());
 
         var html = await output.GetView().GetHtmlFormatAsync();
+        var fragment = HtmlFormatHelper.GetStaticFragment(html);
 
-        StringAssert.Contains(html, "Heading</h1>");
-        StringAssert.Contains(html, "<strong>bold</strong>");
+        StringAssert.Contains(fragment, "Heading</h1>");
+        StringAssert.Contains(fragment, "<strong>bold</strong>");
     }
 }
