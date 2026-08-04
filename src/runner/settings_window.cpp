@@ -827,7 +827,7 @@ std::string ESettingsWindowNames_to_string(ESettingsWindowNames value)
     case ESettingsWindowNames::GrabAndMove:
         return "GrabAndMove";
     case ESettingsWindowNames::CopyAsUNC:
-        return "CopyAsUNC";
+        return "FileExplorer";
     default:
     {
         Logger::error(L"Can't convert ESettingsWindowNames value={} to string", static_cast<int>(value));

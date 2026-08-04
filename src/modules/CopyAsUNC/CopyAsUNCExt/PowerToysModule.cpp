@@ -74,14 +74,17 @@ public:
     {
         Logger::info(L"Copy as UNC enabled");
 
-        if (package::IsWin11OrGreater())
+        if (!package::IsWin11OrGreater())
         {
-            std::wstring path = get_module_folderpath(globals::instance);
-            std::wstring packageUri = path + L"\\CopyAsUNCContextMenuPackage.msix";
-            if (!package::IsPackageRegisteredWithPowerToysVersion(constants::nonlocalizable::ContextMenuPackageName))
-            {
-                package::RegisterSparsePackage(path, packageUri);
-            }
+            m_enabled = false;
+            return;
+        }
+
+        std::wstring path = get_module_folderpath(globals::instance);
+        std::wstring packageUri = path + L"\\CopyAsUNCContextMenuPackage.msix";
+        if (!package::IsPackageRegisteredWithPowerToysVersion(constants::nonlocalizable::ContextMenuPackageName))
+        {
+            package::RegisterSparsePackage(path, packageUri);
         }
 
         m_enabled = true;
@@ -108,7 +111,7 @@ private:
 
     void init_settings()
     {
-        m_enabled = CopyAsUNCSettingsInstance().GetEnabled();
+        m_enabled = package::IsWin11OrGreater() && CopyAsUNCSettingsInstance().GetEnabled();
     }
 };
 

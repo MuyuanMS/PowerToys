@@ -1142,6 +1142,8 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             get => _copyAsUNCEnabledStateIsGPOConfigured;
         }
 
+        public bool IsWindows11 => OSVersionHelper.IsWindows11();
+
         private void RaisePropertyChanged([CallerMemberName] string propertyName = null)
         {
             // Notify UI of property change
