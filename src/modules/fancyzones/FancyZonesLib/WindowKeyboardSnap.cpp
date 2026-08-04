@@ -10,9 +10,31 @@
 #include <common/logger/logger.h>
 #include <common/utils/winapi_error.h>
 
+namespace
+{
+    bool SetWindowState(HWND window, UINT showCommand)
+    {
+        WINDOWPLACEMENT placement{ .length = sizeof(WINDOWPLACEMENT) };
+        if (!GetWindowPlacement(window, &placement))
+        {
+            return false;
+        }
+
+        placement.showCmd = showCommand;
+        return SetWindowPlacement(window, &placement);
+    }
+}
+
 bool WindowKeyboardSnap::Snap(HWND window, HMONITOR monitor, DWORD vkCode, const std::unordered_map<HMONITOR, std::unique_ptr<WorkArea>>& activeWorkAreas, const std::vector<HMONITOR>& monitors)
 {
-    return (vkCode == VK_LEFT || vkCode == VK_RIGHT) && SnapHotkeyBasedOnZoneNumber(window, vkCode, monitor, activeWorkAreas, monitors);
+    const bool cycle = FancyZonesSettings::settings().cycleThroughAllZones;
+    const bool success = (vkCode == VK_LEFT || vkCode == VK_RIGHT) && SnapHotkeyBasedOnZoneNumber(window, vkCode, monitor, activeWorkAreas, monitors);
+    if (!success && !cycle && (vkCode == VK_UP || vkCode == VK_DOWN))
+    {
+        return SetWindowState(window, vkCode == VK_UP ? SW_SHOWMAXIMIZED : SW_SHOWMINIMIZED);
+    }
+
+    return success;
 }
 
 bool WindowKeyboardSnap::Snap(HWND window, RECT windowRect, HMONITOR monitor, DWORD vkCode, const std::unordered_map<HMONITOR, std::unique_ptr<WorkArea>>& activeWorkAreas, const std::vector<std::pair<HMONITOR, RECT>>& monitors)
@@ -53,15 +75,9 @@ bool WindowKeyboardSnap::Snap(HWND window, RECT windowRect, HMONITOR monitor, DW
         success = MoveByDirectionAndPosition(window, windowRect, vkCode, cycle, currentWorkArea.get());        
     }
 
-    if (!success && (vkCode == VK_UP || vkCode == VK_DOWN))
+    if (!success && !cycle && (vkCode == VK_UP || vkCode == VK_DOWN))
     {
-        WINDOWPLACEMENT placement{};
-        GetWindowPlacement(window, &placement);
-        if (vkCode == VK_UP)
-            placement.showCmd = SW_SHOWMAXIMIZED;
-        else if (vkCode == VK_DOWN)
-            placement.showCmd = SW_SHOWMINIMIZED;
-        success = SetWindowPlacement(window, &placement);
+        success = SetWindowState(window, vkCode == VK_UP ? SW_SHOWMAXIMIZED : SW_SHOWMINIMIZED);
     }
 
     return success;
@@ -83,6 +99,7 @@ bool WindowKeyboardSnap::SnapHotkeyBasedOnZoneNumber(HWND window, DWORD vkCode, 
 {
     // clean previous extension data
     m_extendData.Reset();
+    const bool cycle = FancyZonesSettings::settings().cycleThroughAllZones;
 
     if (current && monitors.size() > 1 && FancyZonesSettings::settings().moveWindowAcrossMonitors)
     {
@@ -113,6 +130,11 @@ bool WindowKeyboardSnap::SnapHotkeyBasedOnZoneNumber(HWND window, DWORD vkCode, 
                     currMonitor = std::next(currMonitor);
                     if (currMonitor == std::end(monitors))
                     {
+                        if (!cycle)
+                        {
+                            return false;
+                        }
+
                         currMonitor = std::begin(monitors);
                     }
                 }
@@ -120,6 +142,11 @@ bool WindowKeyboardSnap::SnapHotkeyBasedOnZoneNumber(HWND window, DWORD vkCode, 
                 {
                     if (currMonitor == std::begin(monitors))
                     {
+                        if (!cycle)
+                        {
+                            return false;
+                        }
+
                         currMonitor = std::end(monitors);
                     }
                     currMonitor = std::prev(currMonitor);
@@ -132,7 +159,7 @@ bool WindowKeyboardSnap::SnapHotkeyBasedOnZoneNumber(HWND window, DWORD vkCode, 
         if (activeWorkAreas.contains(current))
         {
             const auto& workArea = activeWorkAreas.at(current);
-            bool moved = MoveByDirectionAndIndex(window, vkCode, true /* cycle through zones */, workArea.get());
+            bool moved = MoveByDirectionAndIndex(window, vkCode, cycle, workArea.get());
 
             if (FancyZonesSettings::settings().restoreSize && !moved)
             {

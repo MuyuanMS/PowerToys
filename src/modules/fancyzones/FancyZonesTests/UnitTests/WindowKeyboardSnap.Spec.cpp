@@ -213,6 +213,66 @@ namespace FancyZonesUnitTests
             Assert::IsTrue(ZoneIndexSet{ 3 } == layoutWindows.GetZoneIndexSetFromWindow(window));
             Assert::IsTrue(ZoneIndexSet{ 3 } == AppZoneHistory::instance().GetAppLastZoneIndexSet(window, m_workAreaId, layoutId()));
         }
+
+        TEST_METHOD (MoveNext_CyclingDisabled)
+        {
+            WindowKeyboardSnap windowKeyboardSnap;
+            const auto window = Mocks::WindowCreate(m_hInst);
+            m_workAreaMap.at(m_monitor)->Snap(window, { 3 }, true);
+
+            auto settings = FancyZonesSettings::settings();
+            settings.cycleThroughAllZones = false;
+            FancyZonesSettings::instance().SetSettings(settings);
+
+            Assert::IsFalse(windowKeyboardSnap.Snap(window, m_monitor, VK_RIGHT, m_workAreaMap, { m_monitor }));
+            Assert::IsTrue(ZoneIndexSet{ 3 } == m_workAreaMap.at(m_monitor)->GetLayoutWindows().GetZoneIndexSetFromWindow(window));
+        }
+
+        TEST_METHOD (MovePrev_CyclingDisabled)
+        {
+            WindowKeyboardSnap windowKeyboardSnap;
+            const auto window = Mocks::WindowCreate(m_hInst);
+            m_workAreaMap.at(m_monitor)->Snap(window, { 0 }, true);
+
+            auto settings = FancyZonesSettings::settings();
+            settings.cycleThroughAllZones = false;
+            FancyZonesSettings::instance().SetSettings(settings);
+
+            Assert::IsFalse(windowKeyboardSnap.Snap(window, m_monitor, VK_LEFT, m_workAreaMap, { m_monitor }));
+            Assert::IsTrue(ZoneIndexSet{ 0 } == m_workAreaMap.at(m_monitor)->GetLayoutWindows().GetZoneIndexSetFromWindow(window));
+        }
+
+        TEST_METHOD (WinUp_MaximizesWhenCyclingDisabled)
+        {
+            WindowKeyboardSnap windowKeyboardSnap;
+            const auto window = Mocks::WindowCreate(m_hInst);
+
+            auto settings = FancyZonesSettings::settings();
+            settings.cycleThroughAllZones = false;
+            FancyZonesSettings::instance().SetSettings(settings);
+
+            Assert::IsTrue(windowKeyboardSnap.Snap(window, m_monitor, VK_UP, m_workAreaMap, { m_monitor }));
+
+            WINDOWPLACEMENT placement{ .length = sizeof(WINDOWPLACEMENT) };
+            Assert::IsTrue(GetWindowPlacement(window, &placement));
+            Assert::AreEqual(static_cast<UINT>(SW_SHOWMAXIMIZED), placement.showCmd);
+        }
+
+        TEST_METHOD (WinDown_MinimizesWhenCyclingDisabled)
+        {
+            WindowKeyboardSnap windowKeyboardSnap;
+            const auto window = Mocks::WindowCreate(m_hInst);
+
+            auto settings = FancyZonesSettings::settings();
+            settings.cycleThroughAllZones = false;
+            FancyZonesSettings::instance().SetSettings(settings);
+
+            Assert::IsTrue(windowKeyboardSnap.Snap(window, m_monitor, VK_DOWN, m_workAreaMap, { m_monitor }));
+
+            WINDOWPLACEMENT placement{ .length = sizeof(WINDOWPLACEMENT) };
+            Assert::IsTrue(GetWindowPlacement(window, &placement));
+            Assert::AreEqual(static_cast<UINT>(SW_SHOWMINIMIZED), placement.showCmd);
+        }
     };
 
     TEST_CLASS (WindowKeyboardSnap_MoveAcrossMonitors_ByIndex_UnitTests)
