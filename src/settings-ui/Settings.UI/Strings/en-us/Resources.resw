@@ -3883,10 +3883,6 @@ Activate by holding the key for the character you want to add an accent to, then
   <data name="EnvironmentVariables_Toggle_LaunchAdministrator.Header" xml:space="preserve">
     <value>Open as administrator</value>
   </data>
-  <data name="ShortcutGuide_PressTimeForTaskbarIconShortcuts.Header" xml:space="preserve">
-    <value>Press duration before showing taskbar icon shortcuts (ms)</value>
-    <comment>ms = milliseconds</comment>
-  </data>
   <data name="FileExplorerPreview_ShellIntegration.Header" xml:space="preserve">
     <value>Shell integration</value>
     <comment>This refers to directly integrating in with the Windows shell</comment>

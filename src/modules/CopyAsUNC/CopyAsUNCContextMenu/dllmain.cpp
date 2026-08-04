@@ -110,13 +110,21 @@ public:
         if (!selection)
             return S_OK;
 
-        ComPtr<IShellItem> item;
-        if (FAILED(selection->GetItemAt(0, item.GetAddressOf())))
+        DWORD itemCount = 0;
+        if (FAILED(selection->GetCount(&itemCount)))
             return S_OK;
 
-        wil::unique_cotaskmem_string filePath;
-        if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &filePath)))
+        std::wstring clipboardText;
+        for (DWORD itemIndex = 0; itemIndex < itemCount; ++itemIndex)
         {
+            ComPtr<IShellItem> item;
+            if (FAILED(selection->GetItemAt(itemIndex, item.GetAddressOf())))
+                continue;
+
+            wil::unique_cotaskmem_string filePath;
+            if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &filePath)))
+                continue;
+
             std::wstring uncPath;
 
             // If already a UNC path, use it directly
@@ -146,52 +154,51 @@ public:
 
             if (!uncPath.empty())
             {
-                size_t byteLen = (uncPath.size() + 1) * sizeof(wchar_t);
-                wil::unique_hglobal clipboardData{ GlobalAlloc(GMEM_MOVEABLE, byteLen) };
-                if (!clipboardData)
-                {
-                    return HRESULT_FROM_WIN32(GetLastError());
-                }
+                if (!clipboardText.empty())
+                    clipboardText += L"\r\n";
 
-                void* locked = GlobalLock(clipboardData.get());
-                if (!locked)
-                {
-                    return HRESULT_FROM_WIN32(GetLastError());
-                }
-
-                memcpy(locked, uncPath.c_str(), byteLen);
-                GlobalUnlock(clipboardData.get());
-
-                HWND clipboardOwner = nullptr;
-                if (!m_site || FAILED(IUnknown_GetWindow(m_site.Get(), &clipboardOwner)) || !clipboardOwner)
-                {
-                    return E_FAIL;
-                }
-
-                if (!OpenClipboard(clipboardOwner))
-                {
-                    return HRESULT_FROM_WIN32(GetLastError());
-                }
-
-                if (!EmptyClipboard())
-                {
-                    const HRESULT result = HRESULT_FROM_WIN32(GetLastError());
-                    CloseClipboard();
-                    return result;
-                }
-
-                if (!SetClipboardData(CF_UNICODETEXT, clipboardData.get()))
-                {
-                    const HRESULT result = HRESULT_FROM_WIN32(GetLastError());
-                    CloseClipboard();
-                    return result;
-                }
-
-                clipboardData.release();
-                CloseClipboard();
+                clipboardText += uncPath;
             }
         }
 
+        if (clipboardText.empty())
+            return S_OK;
+
+        size_t byteLen = (clipboardText.size() + 1) * sizeof(wchar_t);
+        wil::unique_hglobal clipboardData{ GlobalAlloc(GMEM_MOVEABLE, byteLen) };
+        if (!clipboardData)
+            return HRESULT_FROM_WIN32(GetLastError());
+
+        void* locked = GlobalLock(clipboardData.get());
+        if (!locked)
+            return HRESULT_FROM_WIN32(GetLastError());
+
+        memcpy(locked, clipboardText.c_str(), byteLen);
+        GlobalUnlock(clipboardData.get());
+
+        HWND clipboardOwner = nullptr;
+        if (!m_site || FAILED(IUnknown_GetWindow(m_site.Get(), &clipboardOwner)) || !clipboardOwner)
+            return E_FAIL;
+
+        if (!OpenClipboard(clipboardOwner))
+            return HRESULT_FROM_WIN32(GetLastError());
+
+        if (!EmptyClipboard())
+        {
+            const HRESULT result = HRESULT_FROM_WIN32(GetLastError());
+            CloseClipboard();
+            return result;
+        }
+
+        if (!SetClipboardData(CF_UNICODETEXT, clipboardData.get()))
+        {
+            const HRESULT result = HRESULT_FROM_WIN32(GetLastError());
+            CloseClipboard();
+            return result;
+        }
+
+        clipboardData.release();
+        CloseClipboard();
         return S_OK;
     }
     CATCH_RETURN();
