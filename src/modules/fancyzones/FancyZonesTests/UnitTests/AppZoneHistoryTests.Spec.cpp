@@ -317,26 +317,23 @@ namespace FancyZonesUnitTests
                 .monitorId = { .deviceId = { .id = L"DELA026", .instanceId = L"5&10a58c63&0&UID16777488" } },
                 .virtualDesktopId = FancyZonesUtils::GuidFromString(L"{39B25DD2-130D-4B5D-8851-4791D66B1539}").value()
             };
+            const auto legacyWindow = Mocks::WindowCreate(m_hInst);
             const auto window = Mocks::WindowCreate(m_hInst);
-            const auto processPath = get_process_path_waiting_uwp(window);
+            const auto processPath = get_process_path_waiting_uwp(legacyWindow);
             const auto qualifiedProcessPath = processPath + L"?Test.App.Legacy";
             SetWindowAUMID(window, L"Test.App.Legacy");
 
-            FancyZonesDataTypes::AppZoneHistoryData legacyData{
-                .layoutId = layoutId,
-                .workAreaId = workAreaId,
-                .zoneIndexSet = { 1 }
-            };
-            AppZoneHistory::instance().SetAppZoneHistory({ { processPath, { legacyData } } });
-
+            Assert::IsTrue(AppZoneHistory::instance().SetAppLastZones(legacyWindow, workAreaId, layoutId, { 1 }));
             Assert::IsTrue(std::vector<ZoneIndex>{ 1 } == AppZoneHistory::instance().GetAppLastZoneIndexSet(window, workAreaId, layoutId));
             Assert::IsTrue(AppZoneHistory::instance().SetAppLastZones(window, workAreaId, layoutId, { 2 }));
-            Assert::IsFalse(AppZoneHistory::instance().GetFullAppZoneHistory().contains(processPath));
+            Assert::IsTrue(AppZoneHistory::instance().GetFullAppZoneHistory().contains(processPath));
             Assert::IsTrue(AppZoneHistory::instance().GetFullAppZoneHistory().contains(qualifiedProcessPath));
+            Assert::IsTrue(std::vector<ZoneIndex>{ 1 } == AppZoneHistory::instance().GetAppLastZoneIndexSet(legacyWindow, workAreaId, layoutId));
             Assert::IsTrue(std::vector<ZoneIndex>{ 2 } == AppZoneHistory::instance().GetAppLastZoneIndexSet(window, workAreaId, layoutId));
 
             Assert::IsTrue(AppZoneHistory::instance().RemoveAppLastZone(window, workAreaId, layoutId));
             Assert::IsFalse(AppZoneHistory::instance().GetFullAppZoneHistory().contains(qualifiedProcessPath));
+            Assert::IsTrue(std::vector<ZoneIndex>{ 1 } == AppZoneHistory::instance().GetAppLastZoneIndexSet(legacyWindow, workAreaId, layoutId));
         }
 
         TEST_METHOD (AppLastZoneRemoveWindow)
