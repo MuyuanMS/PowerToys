@@ -242,7 +242,7 @@ namespace Microsoft.AdvancedPaste.UITests
             }
 
             // Copy some text(same as in the previous step or different.If nothing is coppied between steps, previously pasted JSON text will be picked up from clipboard and converted again to nested JSON).
-            // Open Advanced Paste window using hotkey, press Ctrl + 3 and confirm that pasted text is converted to markdown
+            // Open Advanced Paste window using hotkey, press Ctrl + 4 and confirm that pasted text is converted to JSON
             DeleteAndCopyFile(pasteAsJsonFileName, tempTxtFileName);
             ContentCopyAndPasteAsJsonCase3(tempTxtFileName);
             var result = FileReader.CompareRtfFiles(
@@ -855,7 +855,7 @@ namespace Microsoft.AdvancedPaste.UITests
             this.SendKeys(Key.Win, Key.Shift, Key.V);
             Thread.Sleep(15000);
 
-            this.SendKeys(Key.LCtrl, Key.Num3);
+            this.SendKeys(Key.LCtrl, Key.Num4);
             Thread.Sleep(1000);
 
             this.SendKeys(Key.LCtrl, Key.S);
