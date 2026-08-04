@@ -71,5 +71,7 @@ private:
     AppZoneHistory();
     ~AppZoneHistory() = default;
 
+    static std::wstring GetProcessPathWithoutAUMID(const std::wstring& processPath);
+
     TAppZoneHistoryMap m_history;
 };
