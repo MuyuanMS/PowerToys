@@ -342,12 +342,29 @@ std::wstring AppZoneHistory::GetProcessPathWithAUMID(HWND window) noexcept
     return processPath;
 }
 
+std::wstring AppZoneHistory::GetProcessPathWithoutAUMID(const std::wstring& processPath)
+{
+    const auto separator = processPath.find(L'?');
+    return separator == std::wstring::npos ? processPath : processPath.substr(0, separator);
+}
+
 bool AppZoneHistory::SetAppLastZones(HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId, const GUID& layoutId, const ZoneIndexSet& zoneIndexSet)
 {
     auto processPath = GetProcessPathWithAUMID(window);
     if (processPath.empty())
     {
         return false;
+    }
+
+    const auto legacyProcessPath = GetProcessPathWithoutAUMID(processPath);
+    if (legacyProcessPath != processPath && !m_history.contains(processPath))
+    {
+        auto legacyHistory = m_history.extract(legacyProcessPath);
+        if (!legacyHistory.empty())
+        {
+            legacyHistory.key() = processPath;
+            m_history.insert(std::move(legacyHistory));
+        }
     }
 
     if (IsAnotherWindowOfApplicationInstanceZoned(processPath, window, workAreaId))
@@ -415,7 +432,11 @@ bool AppZoneHistory::RemoveAppLastZone(HWND window, const FancyZonesDataTypes::W
     auto history = m_history.find(processPath);
     if (history == std::end(m_history))
     {
-        return false;
+        history = m_history.find(GetProcessPathWithoutAUMID(processPath));
+        if (history == std::end(m_history))
+        {
+            return false;
+        }
     }
 
     auto layoutIdStrOpt = FancyZonesUtils::GuidToString(layoutId);
@@ -454,7 +475,7 @@ bool AppZoneHistory::RemoveAppLastZone(HWND window, const FancyZonesDataTypes::W
             data = perDesktopData.erase(data);
             if (perDesktopData.empty())
             {
-                m_history.erase(processPath);
+                m_history.erase(history);
             }
             SaveData();
             return true;
@@ -531,6 +552,11 @@ bool AppZoneHistory::IsAnotherWindowOfApplicationInstanceZoned(const std::wstrin
     if (!processPath.empty())
     {
         auto history = m_history.find(processPath);
+        if (history == std::end(m_history))
+        {
+            history = m_history.find(GetProcessPathWithoutAUMID(processPath));
+        }
+
         if (history != std::end(m_history))
         {
             auto& perDesktopData = history->second;
@@ -580,7 +606,11 @@ ZoneIndexSet AppZoneHistory::GetAppLastZoneIndexSet(HWND window, const FancyZone
     auto history = m_history.find(processPath);
     if (history == std::end(m_history))
     {
-        return {};
+        history = m_history.find(GetProcessPathWithoutAUMID(processPath));
+        if (history == std::end(m_history))
+        {
+            return {};
+        }
     }
 
     const auto& perDesktopData = history->second;
