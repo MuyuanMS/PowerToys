@@ -902,9 +902,19 @@ namespace AdvancedPaste.ViewModels
 
             IsBusy = true;
             PasteActionError = PasteActionError.None;
+            var restoreWindowOnFailure = Visible;
 
             try
             {
+                if (source == PasteActionSource.ContextMenu)
+                {
+                    PowerToysTelemetry.Log.WriteEvent(new Telemetry.AdvancedPasteFormatClickedEvent(PasteFormats.PasteAsKeystrokes));
+                }
+                else if (source == PasteActionSource.InAppKeyboardShortcut)
+                {
+                    PowerToysTelemetry.Log.WriteEvent(new Telemetry.AdvancedPasteInAppKeyboardShortcutEvent(PasteFormats.PasteAsKeystrokes));
+                }
+
                 var text = ClipboardData != null ? await ClipboardData.GetTextOrEmptyAsync() : string.Empty;
 
                 if (string.IsNullOrEmpty(text))
@@ -924,29 +934,40 @@ namespace AdvancedPaste.ViewModels
                 if (!completed)
                 {
                     PasteActionError = PasteActionError.FromResourceId("PasteActionCanceled");
+                    if (restoreWindowOnFailure)
+                    {
+                        ShowWindow();
+                    }
+
                     return;
                 }
 
                 Logger.LogDebug($"Completed executing PasteAsKeystrokes in {elapsedWatch.ElapsedMilliseconds}ms");
-
-                // Write telemetry
-                if (source == PasteActionSource.ContextMenu)
-                {
-                    PowerToysTelemetry.Log.WriteEvent(new Telemetry.AdvancedPasteFormatClickedEvent(PasteFormats.PasteAsKeystrokes));
-                }
-                else if (source == PasteActionSource.InAppKeyboardShortcut)
-                {
-                    PowerToysTelemetry.Log.WriteEvent(new Telemetry.AdvancedPasteInAppKeyboardShortcutEvent(PasteFormats.PasteAsKeystrokes));
-                }
             }
             catch (Exception ex)
             {
                 Logger.LogError("Error executing paste as keystrokes", ex);
                 PasteActionError = PasteActionError.FromException(ex);
+                if (restoreWindowOnFailure)
+                {
+                    ShowWindow();
+                }
             }
             finally
             {
                 IsBusy = false;
+            }
+        }
+
+        private void ShowWindow()
+        {
+            var mainWindow = GetMainWindow();
+
+            if (mainWindow != null)
+            {
+                var windowHandle = mainWindow.GetWindowHandle();
+                Windows.Win32.PInvoke.ShowWindow((Windows.Win32.Foundation.HWND)windowHandle, Windows.Win32.UI.WindowsAndMessaging.SHOW_WINDOW_CMD.SW_SHOW);
+                WindowHelpers.BringToForeground(windowHandle);
             }
         }
 

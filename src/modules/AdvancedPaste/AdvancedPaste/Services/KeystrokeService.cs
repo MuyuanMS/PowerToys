@@ -204,9 +204,59 @@ public sealed class KeystrokeService : IKeystrokeService
 
         if (sent != inputs.Count)
         {
+            ReleasePartiallyPressedKeys(inputs, sent);
+
             var errorMessage = $"SendInput failed: only {sent} of {inputs.Count} inputs were sent";
             Logger.LogError(errorMessage);
             throw new InvalidOperationException(errorMessage);
+        }
+    }
+
+    private void ReleasePartiallyPressedKeys(List<Helpers.NativeMethods.INPUT> inputs, uint sent)
+    {
+        var pressedKeys = new List<Helpers.NativeMethods.INPUT>();
+        var acceptedCount = Math.Min((int)sent, inputs.Count);
+
+        for (int i = 0; i < acceptedCount; i++)
+        {
+            var input = inputs[i];
+            if ((input.data.ki.dwFlags & (uint)Helpers.NativeMethods.KeyEventF.KeyUp) == 0)
+            {
+                pressedKeys.Add(input);
+                continue;
+            }
+
+            var matchingKeyDown = pressedKeys.FindLastIndex(keyDown =>
+                keyDown.data.ki.wVk == input.data.ki.wVk &&
+                keyDown.data.ki.wScan == input.data.ki.wScan &&
+                (keyDown.data.ki.dwFlags & (uint)Helpers.NativeMethods.KeyEventF.Unicode) ==
+                (input.data.ki.dwFlags & (uint)Helpers.NativeMethods.KeyEventF.Unicode));
+
+            if (matchingKeyDown >= 0)
+            {
+                pressedKeys.RemoveAt(matchingKeyDown);
+            }
+        }
+
+        if (pressedKeys.Count == 0)
+        {
+            return;
+        }
+
+        pressedKeys.Reverse();
+        for (int i = 0; i < pressedKeys.Count; i++)
+        {
+            var cleanupInput = pressedKeys[i];
+            var keyboardInput = cleanupInput.data.ki;
+            keyboardInput.dwFlags |= (uint)Helpers.NativeMethods.KeyEventF.KeyUp;
+            cleanupInput.data.ki = keyboardInput;
+            pressedKeys[i] = cleanupInput;
+        }
+
+        var cleanupSent = _sendInput(pressedKeys.ToArray());
+        if (cleanupSent != pressedKeys.Count)
+        {
+            Logger.LogError($"SendInput cleanup failed: only {cleanupSent} of {pressedKeys.Count} key-up inputs were sent");
         }
     }
 }
