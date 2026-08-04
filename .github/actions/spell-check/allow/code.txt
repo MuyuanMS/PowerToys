@@ -64,6 +64,11 @@ CODEOWNERS
 VNext
 vnext
 
+# KEYBOARD IDENTIFIERS
+
+capslock
+NUMPADENTER
+
 # FONTS
 
 Consolas

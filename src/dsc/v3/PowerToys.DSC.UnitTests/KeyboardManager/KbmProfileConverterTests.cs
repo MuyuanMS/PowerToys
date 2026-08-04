@@ -136,7 +136,7 @@ public sealed class KbmProfileConverterTests
         Assert.AreEqual(false, global[0].ExactMatch);
 
         Assert.AreEqual("260;79;75", global[1].OriginalKeys);
-        Assert.AreEqual(75u, global[1].SecondKeyOfChord);
+        Assert.AreEqual(0u, global[1].SecondKeyOfChord);
         Assert.AreEqual(1, global[1].OperationType);
         Assert.AreEqual("cmd.exe", global[1].RunProgramFilePath);
         Assert.AreEqual(string.Empty, global[1].RunProgramArgs);
@@ -162,6 +162,9 @@ public sealed class KbmProfileConverterTests
         Assert.AreEqual(1, globalText.Count);
         Assert.AreEqual("17;18;84", globalText[0].OriginalKeys);
         Assert.AreEqual("typed", globalText[0].NewRemapString);
+
+        var serialized = JsonSerializer.Serialize(profile);
+        Assert.IsFalse(serialized.Contains("secondKeyOfChord", System.StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -250,13 +253,14 @@ public sealed class KbmProfileConverterTests
         {
             Keys =
             [
-                new() { From = "CapsLok", To = "Esc" },
+                new() { From = "InvalidKeyName", To = "Esc" },
                 new() { From = "Insert" },
                 new() { From = "Home", To = "Esc", ToText = "both" },
                 new() { From = "Disable", To = "Esc" },
                 new() { From = "Tab", To = "Win+O, K" },
                 new() { From = "F3", To = "Esc" },
                 new() { From = "F3", To = "Tab" },
+                new() { From = "Win", To = "Esc" },
             ],
             Shortcuts =
             [
@@ -271,12 +275,13 @@ public sealed class KbmProfileConverterTests
 
         var errors = KbmProfileConverter.Validate(model);
 
-        AssertHasError(errors, "keys[0].from: Invalid key name 'CapsLok'");
+        AssertHasError(errors, "keys[0].from: Invalid key name 'InvalidKeyName'");
         AssertHasError(errors, "keys[1] must set exactly one of");
         AssertHasError(errors, "keys[2] must set exactly one of");
         AssertHasError(errors, "keys[3].from: 'Disable' cannot be remapped");
         AssertHasError(errors, "keys[4].to: Chords are not supported in remap targets");
         AssertHasError(errors, "keys[6].from: key 'F3' is remapped more than once");
+        AssertHasError(errors, "keys[7].from: generic modifiers must use a left or right variant");
         AssertHasError(errors, "shortcuts[0].from: a shortcut requires at least one modifier");
         AssertHasError(errors, "shortcuts[2].from: shortcut 'Ctrl+Shift+A' is remapped more than once globally");
         AssertHasError(errors, "shortcuts[3].runProgram.filePath must not be empty");

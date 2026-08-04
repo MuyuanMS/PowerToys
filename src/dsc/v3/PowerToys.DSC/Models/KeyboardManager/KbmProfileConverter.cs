@@ -78,6 +78,10 @@ public static class KbmProfileConverter
             {
                 errors.Add($"{context}.from: 'Disable' cannot be remapped");
             }
+            else if (IsGenericModifier(from.Keys[0]))
+            {
+                errors.Add($"{context}.from: generic modifiers must use a left or right variant");
+            }
             else if (seenKeys.Find(k => KeysOverlap(k, from.Keys[0])) is var existing && existing != 0)
             {
                 // Matches the editor's DoKeysOverlap: a generic modifier (e.g.
@@ -263,7 +267,6 @@ public static class KbmProfileConverter
             var app = NormalizeTargetApp(entry.TargetApp);
             var stored = app != null ? new AppSpecificKeysDataModel { TargetApp = app } : new KeysDataModel();
             stored.OriginalKeys = from.ToVkString();
-            stored.SecondKeyOfChord = from.SecondKeyOfChord;
             stored.ExactMatch = entry.ExactMatch ?? false;
 
             var isText = false;
