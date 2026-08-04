@@ -110,31 +110,31 @@ public:
         if (!selection)
             return S_OK;
 
-        IShellItem* item = nullptr;
-        if (FAILED(selection->GetItemAt(0, &item)))
+        ComPtr<IShellItem> item;
+        if (FAILED(selection->GetItemAt(0, item.GetAddressOf())))
             return S_OK;
 
-        LPWSTR filePath = nullptr;
+        wil::unique_cotaskmem_string filePath;
         if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &filePath)))
         {
             std::wstring uncPath;
 
             // If already a UNC path, use it directly
-            if (wcslen(filePath) >= 2 && filePath[0] == L'\\' && filePath[1] == L'\\')
+            if (wcslen(filePath.get()) >= 2 && filePath.get()[0] == L'\\' && filePath.get()[1] == L'\\')
             {
-                uncPath = filePath;
+                uncPath = filePath.get();
             }
             else
             {
                 // Resolve mapped drive letter to UNC via WNetGetUniversalName
                 DWORD bufSize = MAX_PATH * 2;
                 std::vector<BYTE> buf(bufSize);
-                DWORD result = WNetGetUniversalNameW(filePath, UNIVERSAL_NAME_INFO_LEVEL, buf.data(), &bufSize);
+                DWORD result = WNetGetUniversalNameW(filePath.get(), UNIVERSAL_NAME_INFO_LEVEL, buf.data(), &bufSize);
 
                 if (result == ERROR_MORE_DATA)
                 {
                     buf.resize(bufSize);
-                    result = WNetGetUniversalNameW(filePath, UNIVERSAL_NAME_INFO_LEVEL, buf.data(), &bufSize);
+                    result = WNetGetUniversalNameW(filePath.get(), UNIVERSAL_NAME_INFO_LEVEL, buf.data(), &bufSize);
                 }
 
                 if (result == NO_ERROR)
@@ -190,11 +190,8 @@ public:
                 clipboardData.release();
                 CloseClipboard();
             }
-
-            CoTaskMemFree(filePath);
         }
 
-        item->Release();
         return S_OK;
     }
     CATCH_RETURN();
