@@ -115,8 +115,9 @@ public sealed partial class MainWindow : WindowEx,
 
     // While a modal dialog (e.g. a confirmation) is showing, the card is forced to fill the
     // whole window so the dialog — which renders in the window's popup layer and is clipped to
-    // the card's HWND region — isn't cut off. Cleared when the dialog closes.
-    private bool _dialogFullExpandActive;
+    // the card's HWND region — isn't cut off. Counted so overlapping requests cannot restore
+    // compact mode while an earlier dialog is still open.
+    private int _dialogFullExpandRequestCount;
 
     // The most recent expand/collapse request, remembered so the correct compact layout can be
     // restored once a dialog-driven full expansion ends.
@@ -1916,7 +1917,9 @@ public sealed partial class MainWindow : WindowEx,
     {
         this.DispatcherQueue.TryEnqueue(() =>
         {
-            _dialogFullExpandActive = message.Maximize;
+            _dialogFullExpandRequestCount = message.Maximize
+                ? _dialogFullExpandRequestCount + 1
+                : Math.Max(0, _dialogFullExpandRequestCount - 1);
 
             // Re-run with the last requested state: when maximizing this fills the window; when
             // the dialog closes it restores the normal compact/expanded layout.
@@ -1932,7 +1935,7 @@ public sealed partial class MainWindow : WindowEx,
 
         var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
 
-        var preventCompactMode = _dialogFullExpandActive || !settings.CompactMode;
+        var preventCompactMode = _dialogFullExpandRequestCount > 0 || !settings.CompactMode;
         if (preventCompactMode)
         {
             // When compact mode is off, or a dialog is active, the card is
