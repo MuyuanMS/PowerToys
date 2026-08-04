@@ -171,6 +171,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -278,9 +279,30 @@
             </StackPanel>
         </StackPanel>
 
+        <!--  preview  -->
+        <Border
+            x:Name="Preview"
+            Grid.Row="2"
+            Margin="24,16,24,0"
+            Padding="16"
+            AutomationProperties.AutomationId="Preview"
+            AutomationProperties.Name="Preview"
+            Background="{ThemeResource LayerFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="8">
+            <Image
+                x:Name="WorkspacePreviewImage"
+                Width="{Binding PreviewImageWidth, Mode=OneWay}"
+                Height="200"
+                AutomationProperties.AutomationId="WorkspacePreviewImage"
+                Source="{Binding PreviewImage, Mode=OneWay}"
+                Stretch="Uniform" />
+        </Border>
+
         <!--  Launch&Edit / Revert  -->
         <StackPanel
-            Grid.Row="2"
+            Grid.Row="3"
             Margin="24,16,24,0"
             HorizontalAlignment="Right"
             Orientation="Horizontal"
@@ -302,7 +324,7 @@
 
         <!--  app list  -->
         <ScrollViewer
-            Grid.Row="3"
+            Grid.Row="4"
             Margin="0,24,0,0"
             VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="24,0,24,24" Orientation="Vertical">
