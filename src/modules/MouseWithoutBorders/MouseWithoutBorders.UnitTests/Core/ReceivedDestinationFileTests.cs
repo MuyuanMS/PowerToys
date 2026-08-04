@@ -104,6 +104,28 @@ public sealed class ReceivedDestinationFileTests
         }
     }
 
+    [TestMethod]
+    public void MaximumLengthDestinationNameCanBeStaged()
+    {
+        var directory = CreateTestDirectory();
+        var path = Path.Combine(directory, new string('a', 255));
+
+        try
+        {
+            using (var destination = CreateDestinationFile(path))
+            {
+                destination.Stream.WriteByte(1);
+                destination.Complete();
+            }
+
+            CollectionAssert.AreEqual(new byte[] { 1 }, File.ReadAllBytes(path));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static ReceivedDestinationFile CreateDestinationFile(string path)
     {
         return new ReceivedDestinationFile(path, File.Delete, (source, destination) => File.Move(source, destination, overwrite: true));

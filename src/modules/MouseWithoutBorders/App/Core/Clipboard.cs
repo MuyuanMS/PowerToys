@@ -662,9 +662,10 @@ internal static class Clipboard
 
                         if (!success || m == null)
                         {
+                            CloseDestinationFile();
                             Logger.Log(string.Format(
                                 CultureInfo.CurrentCulture,
-                                "Could not create destination file while impersonating the logged-on user: {0}",
+                                "Could not create destination file: {0}",
                                 path));
                         }
                     }

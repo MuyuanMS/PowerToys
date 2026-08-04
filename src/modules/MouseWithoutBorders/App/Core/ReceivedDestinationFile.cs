@@ -23,7 +23,7 @@ internal sealed class ReceivedDestinationFile : IDisposable
 
         stagingPath = Path.Combine(
             Path.GetDirectoryName(destinationPath) ?? ".",
-            $".{Path.GetFileName(destinationPath)}.{Guid.NewGuid():N}.partial");
+            $".{Guid.NewGuid():N}.partial");
         Stream = new FileStream(stagingPath, FileMode.CreateNew);
     }
 
