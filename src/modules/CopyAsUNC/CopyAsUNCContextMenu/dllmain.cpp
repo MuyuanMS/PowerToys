@@ -107,13 +107,16 @@ public:
         return S_OK;
     }
 
-    IFACEMETHODIMP GetState(_In_opt_ IShellItemArray* selection, _In_ BOOL /*okToBeSlow*/, _Out_ EXPCMDSTATE* cmdState)
+    IFACEMETHODIMP GetState(_In_opt_ IShellItemArray* selection, _In_ BOOL okToBeSlow, _Out_ EXPCMDSTATE* cmdState)
     try
     {
         *cmdState = ECS_HIDDEN;
 
         if (!CopyAsUNCSettingsInstance().GetEnabled())
             return S_OK;
+
+        if (!okToBeSlow)
+            return E_PENDING;
 
         if (!copy_as_unc::BuildClipboardText(GetSelectedPaths(selection)).empty())
         {

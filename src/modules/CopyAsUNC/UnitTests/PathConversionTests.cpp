@@ -55,6 +55,28 @@ namespace CopyAsUNCUnitTests
             Assert::AreEqual(L"\\\\server\\share\\folder\\file.txt", result->c_str());
         }
 
+        TEST_METHOD(ResolvePathNormalizesExtendedUNCPath)
+        {
+            const auto result = copy_as_unc::ResolvePath(L"\\\\?\\unc\\server\\share\\file.txt", [](PCWSTR, DWORD, LPVOID, LPDWORD) -> DWORD {
+                return ERROR_NOT_CONNECTED;
+            });
+
+            Assert::IsTrue(result.has_value());
+            Assert::AreEqual(L"\\\\server\\share\\file.txt", result->c_str());
+        }
+
+        TEST_METHOD(ResolvePathDoesNotTreatDevicePathAsUNC)
+        {
+            bool resolverCalled = false;
+            const auto result = copy_as_unc::ResolvePath(L"\\\\?\\C:\\local.txt", [&](PCWSTR, DWORD, LPVOID, LPDWORD) -> DWORD {
+                resolverCalled = true;
+                return ERROR_NOT_CONNECTED;
+            });
+
+            Assert::IsFalse(result.has_value());
+            Assert::IsTrue(resolverCalled);
+        }
+
         TEST_METHOD(ResolvePathRetriesAfterErrorMoreData)
         {
             int calls = 0;

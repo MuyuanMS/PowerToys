@@ -3,6 +3,7 @@
 #include <Windows.h>
 #include <winnetwk.h>
 
+#include <cwctype>
 #include <functional>
 #include <optional>
 #include <string>
@@ -13,9 +14,33 @@ namespace copy_as_unc
 {
     using UniversalNameResolver = std::function<DWORD(PCWSTR, DWORD, LPVOID, LPDWORD)>;
 
+    inline bool StartsWithInsensitive(std::wstring_view value, std::wstring_view prefix)
+    {
+        if (value.size() < prefix.size())
+        {
+            return false;
+        }
+
+        for (size_t index = 0; index < prefix.size(); ++index)
+        {
+            if (std::towlower(value[index]) != std::towlower(prefix[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     inline std::optional<std::wstring> ResolvePath(std::wstring_view path, const UniversalNameResolver& resolver)
     {
-        if (path.starts_with(L"\\\\"))
+        constexpr std::wstring_view extendedUncPrefix = L"\\\\?\\UNC\\";
+        if (StartsWithInsensitive(path, extendedUncPrefix))
+        {
+            return L"\\\\" + std::wstring{ path.substr(extendedUncPrefix.size()) };
+        }
+
+        if (path.starts_with(L"\\\\") && !path.starts_with(L"\\\\?\\") && !path.starts_with(L"\\\\.\\"))
         {
             return std::wstring{ path };
         }
