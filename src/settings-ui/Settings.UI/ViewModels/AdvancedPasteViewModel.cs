@@ -1760,6 +1760,11 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
 
             target.PythonScripts = source.PythonScripts ?? new AdvancedPastePythonScriptSettings();
+            if (_pythonScriptsDisallowedByGPO)
+            {
+                target.PythonScripts.Mode = "disabled";
+            }
+
             OnPropertyChanged(nameof(PythonScriptsModeIndex));
             OnPropertyChanged(nameof(IsPythonScriptsEnabled));
             OnPropertyChanged(nameof(IsWindowsMode));
