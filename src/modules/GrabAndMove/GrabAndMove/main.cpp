@@ -522,6 +522,26 @@ static void UpdatePendingScreenEdgeSnap(POINT pt)
 
     g_pendingSnapTarget = target;
     g_pendingSnapRect = GetScreenEdgeSnapRect(target, workArea);
+
+    if (target == ScreenEdgeSnapTarget::Maximize && g_dragWasMaximized)
+    {
+        RECT restoreRect = g_dragInitialPlacement.rcNormalPosition;
+        HMONITOR restoreMonitor = MonitorFromRect(&restoreRect, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO monitorInfo = { sizeof(MONITORINFO) };
+        if (GetMonitorInfoW(restoreMonitor, &monitorInfo))
+        {
+            const int xOffset = monitorInfo.rcWork.left - monitorInfo.rcMonitor.left;
+            const int yOffset = monitorInfo.rcWork.top - monitorInfo.rcMonitor.top;
+            OffsetRect(&restoreRect, xOffset, yOffset);
+        }
+
+        g_pendingSnapRect = {
+            restoreRect.left + g_overlayMarginL,
+            restoreRect.top + g_overlayMarginT,
+            restoreRect.right - g_overlayMarginR,
+            restoreRect.bottom - g_overlayMarginB,
+        };
+    }
 }
 
 static bool ApplyPendingScreenEdgeSnap()
@@ -2024,6 +2044,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         std::unique_ptr<WindowPlacementRequest> request(reinterpret_cast<WindowPlacementRequest*>(lParam));
         if (request && IsWindow(request->hwnd))
         {
+            request->placement.flags |= WPF_ASYNCWINDOWPLACEMENT;
             SetWindowPlacement(request->hwnd, &request->placement);
         }
         return 0;
