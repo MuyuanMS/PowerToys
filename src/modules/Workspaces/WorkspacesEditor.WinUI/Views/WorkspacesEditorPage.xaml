@@ -187,7 +187,9 @@
                     AutomationProperties.Name="Back to Workspaces"
                     Click="CancelButtonClicked"
                     FontSize="24">
-                    <TextBlock x:Name="WorkspacesBackText" Text="Workspaces" />
+                    <TextBlock
+                        x:Name="WorkspacesBackText"
+                        x:Uid="WorkspacesBackText" />
                 </Button>
                 <TextBlock
                     Margin="8,0,0,0"
@@ -222,17 +224,20 @@
                             Text="&#xE74E;" />
                         <TextBlock
                             x:Name="SaveText"
+                            x:Uid="SaveLabel"
                             Margin="8,0,0,0"
                             VerticalAlignment="Center"
                             Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
-                            Text="Save" />
+                            />
                     </StackPanel>
                 </Button>
                 <Button
                     x:Name="CancelButton"
                     Margin="8,0,0,0"
                     Click="CancelButtonClicked">
-                    <TextBlock x:Name="CancelText" Text="Cancel" />
+                    <TextBlock
+                        x:Name="CancelText"
+                        x:Uid="CancelText" />
                 </Button>
             </StackPanel>
         </Grid>
@@ -246,7 +251,9 @@
                 Margin="0,0,0,8"
                 FontWeight="SemiBold"
                 Foreground="{ThemeResource TextFillColorPrimaryBrush}">
-                <Run x:Name="WorkspaceNameLabel" Text="Workspace name" />
+                <Run
+                    x:Name="WorkspaceNameLabel"
+                    x:Uid="WorkspaceNameLabel" />
             </TextBlock>
             <StackPanel Orientation="Horizontal" Spacing="24">
                 <TextBox
@@ -259,10 +266,14 @@
                     Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                     TextChanged="EditNameTextBox_TextChanged" />
                 <CheckBox VerticalAlignment="Bottom" IsChecked="{Binding IsShortcutNeeded, Mode=TwoWay}">
-                    <TextBlock x:Name="CreateShortcutLabel" Text="Create desktop shortcut" />
+                    <TextBlock
+                        x:Name="CreateShortcutLabel"
+                        x:Uid="CreateShortcutLabel" />
                 </CheckBox>
                 <CheckBox VerticalAlignment="Bottom" IsChecked="{Binding MoveExistingWindows, Mode=TwoWay}">
-                    <TextBlock x:Name="MoveIfExistLabel" Text="Move existing windows" />
+                    <TextBlock
+                        x:Name="MoveIfExistLabel"
+                        x:Uid="MoveIfExistLabel" />
                 </CheckBox>
             </StackPanel>
         </StackPanel>
@@ -275,13 +286,17 @@
             Orientation="Horizontal"
             Spacing="8">
             <Button x:Name="LaunchEditButton" Click="LaunchEditButtonClicked">
-                <TextBlock x:Name="LaunchEditText" Text="Launch &amp; edit" />
+                <TextBlock
+                    x:Name="LaunchEditText"
+                    x:Uid="LaunchEditLabel" />
             </Button>
             <Button
                 x:Name="RevertButton"
                 Click="RevertButtonClicked"
                 IsEnabled="{Binding IsRevertEnabled, Mode=OneWay}">
-                <TextBlock x:Name="RevertText" Text="Revert" />
+                <TextBlock
+                    x:Name="RevertText"
+                    x:Uid="RevertText" />
             </Button>
         </StackPanel>
 
@@ -300,4 +315,3 @@
         </ScrollViewer>
     </Grid>
 </Page>
-

@@ -161,18 +161,24 @@ namespace WorkspacesEditor.Utils
 
         private static bool SetWorkspaces(MainViewModel mainViewModel, WorkspacesData.WorkspacesListWrapper workspaces)
         {
-            mainViewModel.Workspaces.Clear();
+            var parsedWorkspaces = new List<Project>();
             foreach (ProjectWrapper project in workspaces.Workspaces)
             {
                 try
                 {
-                    Project newProject = new(project);
-                    mainViewModel.Workspaces.Add(newProject);
+                    parsedWorkspaces.Add(new Project(project));
                 }
                 catch (Exception e)
                 {
                     Logger.LogError($"Exception while adding workspace {project.Name}: {e.Message}");
+                    return false;
                 }
+            }
+
+            mainViewModel.Workspaces.Clear();
+            foreach (Project project in parsedWorkspaces)
+            {
+                mainViewModel.Workspaces.Add(project);
             }
 
             return true;
