@@ -47,6 +47,7 @@ static HWND g_dragTarget = nullptr;
 static POINT g_dragStart = {};    // cursor pos at drag start
 static RECT g_dragWndRect = {};   // window rect at drag start
 static bool g_dragWasMaximized = false;
+static WINDOWPLACEMENT g_dragInitialPlacement = { sizeof(WINDOWPLACEMENT) };
 static HWND g_hOverlay = nullptr; // semi-transparent overlay during drag
 
 // Current target window rect for overlay info display
@@ -88,8 +89,8 @@ static bool g_showGeometry = false;            // true if we want to draw the X,
 static bool g_doNotActivateOnGameMode = true; // true if GrabAndMove is suppressed when Windows Game Mode is active
 
 static bool g_useAltResize = true;                  // This can be toggled from the settings. If false, Alt + right click does nothing.
-static bool g_useScreenEdgeMaximize = true;         // If true, dragging to the top screen edge maximizes/restores the window.
-static bool g_useScreenEdgeSnap = true;             // If true, dragging to side/corner screen edges snaps the window.
+static std::atomic_bool g_useScreenEdgeMaximize = true; // If true, dragging to the top screen edge maximizes/restores the window.
+static std::atomic_bool g_useScreenEdgeSnap = true;     // If true, dragging to side/corner screen edges snaps the window.
 
 // Count of non-modifier keys currently held. Used to suppress GrabAndMove when the
 // modifier key is pressed while another key is already down (e.g. Q held, then modifier pressed).
@@ -193,6 +194,13 @@ static std::unordered_map<HWND, bool> g_excludedCache;
 // Custom message: posted from the settings thread to invalidate g_excludedCache
 // on the main thread (where all other accesses occur), avoiding a data race.
 static constexpr UINT WM_INVALIDATE_EXCLUDED_CACHE = WM_APP + 1;
+static constexpr UINT WM_APPLY_WINDOW_PLACEMENT = WM_APP + 2;
+
+struct WindowPlacementRequest
+{
+    HWND hwnd;
+    WINDOWPLACEMENT placement;
+};
 
 static const wchar_t* const CLASS_NAME = L"GrabAndMove_MsgWnd";
 static const wchar_t* const OVERLAY_CLASS_NAME = L"GrabAndMove_Overlay";
@@ -484,10 +492,10 @@ static bool IsScreenEdgeSnapTargetEnabled(ScreenEdgeSnapTarget target)
 {
     if (target == ScreenEdgeSnapTarget::Maximize)
     {
-        return g_useScreenEdgeMaximize;
+        return g_useScreenEdgeMaximize.load();
     }
 
-    return target != ScreenEdgeSnapTarget::None && g_useScreenEdgeSnap;
+    return target != ScreenEdgeSnapTarget::None && g_useScreenEdgeSnap.load();
 }
 
 static void UpdatePendingScreenEdgeSnap(POINT pt)
@@ -525,13 +533,24 @@ static bool ApplyPendingScreenEdgeSnap()
 
     if (g_pendingSnapTarget == ScreenEdgeSnapTarget::Maximize)
     {
-        if (g_dragWasMaximized)
+        auto request = std::make_unique<WindowPlacementRequest>(WindowPlacementRequest{
+            g_dragTarget,
+            g_dragInitialPlacement,
+        });
+
+        request->placement.showCmd = g_dragWasMaximized ? SW_SHOWNORMAL : SW_SHOWMAXIMIZED;
+        if (!g_dragWasMaximized)
         {
-            return ShowWindowAsync(g_dragTarget, SW_RESTORE) != FALSE;
+            request->placement.ptMaxPosition = { g_pendingSnapRect.left, g_pendingSnapRect.top };
         }
 
-        const bool positioned = SetWindowVisibleFrameToRect(g_dragTarget, g_pendingSnapRect, SWP_ASYNCWINDOWPOS);
-        return positioned && ShowWindowAsync(g_dragTarget, SW_MAXIMIZE) != FALSE;
+        if (!PostMessageW(g_hMsgWnd, WM_APPLY_WINDOW_PLACEMENT, 0, reinterpret_cast<LPARAM>(request.get())))
+        {
+            return false;
+        }
+
+        request.release();
+        return true;
     }
 
     if (IsZoomed(g_dragTarget))
@@ -573,12 +592,12 @@ static void LoadSettingsFromFile()
 
         if (auto v = values.get_bool_value(L"useScreenEdgeMaximize"))
         {
-            g_useScreenEdgeMaximize = *v;
+            g_useScreenEdgeMaximize.store(*v);
         }
 
         if (auto v = values.get_bool_value(L"useScreenEdgeSnap"))
         {
-            g_useScreenEdgeSnap = *v;
+            g_useScreenEdgeSnap.store(*v);
         }
 
         if (auto v = values.get_int_value(L"modifierKey"))
@@ -1082,6 +1101,8 @@ static void BeginDrag(HWND hwnd, POINT pt)
     g_activatedDuringHold = true;
     g_dragTarget = hwnd;
     g_dragWasMaximized = IsZoomed(hwnd);
+    g_dragInitialPlacement = { sizeof(WINDOWPLACEMENT) };
+    GetWindowPlacement(hwnd, &g_dragInitialPlacement);
     g_dragStart = pt;
     GetWindowRect(hwnd, &g_dragWndRect);
     g_pendingSnapTarget = ScreenEdgeSnapTarget::None;
@@ -1997,6 +2018,16 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
     case WM_INVALIDATE_EXCLUDED_CACHE:
         g_excludedCache.clear();
         return 0;
+
+    case WM_APPLY_WINDOW_PLACEMENT:
+    {
+        std::unique_ptr<WindowPlacementRequest> request(reinterpret_cast<WindowPlacementRequest*>(lParam));
+        if (request && IsWindow(request->hwnd))
+        {
+            SetWindowPlacement(request->hwnd, &request->placement);
+        }
+        return 0;
+    }
 
     case WM_TRAY_ICON:
         if (LOWORD(lParam) == WM_RBUTTONUP)

@@ -38,10 +38,13 @@ namespace ViewModelTests
                 });
 
             viewModel.UseScreenEdgeMaximize = false;
-            viewModel.UseScreenEdgeSnap = false;
 
             var outgoingSettings = JsonSerializer.Deserialize<SndModuleSettings<SndGrabAndMoveSettings>>(serializedSettings);
             Assert.IsFalse(outgoingSettings!.PowertoysSetting.Settings.Properties.UseScreenEdgeMaximize.Value);
+
+            viewModel.UseScreenEdgeSnap = false;
+
+            outgoingSettings = JsonSerializer.Deserialize<SndModuleSettings<SndGrabAndMoveSettings>>(serializedSettings);
             Assert.IsFalse(outgoingSettings!.PowertoysSetting.Settings.Properties.UseScreenEdgeSnap.Value);
         }
     }
