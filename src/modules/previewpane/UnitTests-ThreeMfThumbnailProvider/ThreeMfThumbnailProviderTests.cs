@@ -105,20 +105,23 @@ namespace ThreeMfThumbnailProviderUnitTests
         [TestMethod]
         public void GetThumbnailUsesConfiguredFallbackColorForMeshRendering()
         {
-            // The configured material color feeds the mesh render path. GetThumbnail returns null
-            // unless the model parsed, has non-empty 3D bounds, and rendered successfully, so a
-            // non-null bitmap here deterministically proves the configured color fed a working mesh
-            // render. (A pixel-level opacity scan is intentionally avoided: WPF 3D rasterization is
-            // environment-dependent and makes such assertions flaky.)
             using var stream = CreateMeshOnlyThreeMf();
+            var expectedColor = System.Windows.Media.Color.FromRgb(0x12, 0x34, 0x56);
 
-            var color = ThreeMfThumbnailProvider.DefaultMaterialColor;
-            using Bitmap thumbnail = ThreeMfThumbnailProvider.GetThumbnail(stream, 256);
+            var loaderType = typeof(ThreeMfThumbnailProvider).Assembly.GetType("Microsoft.PowerToys.ThumbnailHandler.ThreeMf.ThreeMfModelLoader");
+            var loadModel = loaderType.GetMethod("LoadModel", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
+            var model = loadModel.Invoke(null, new object[] { stream, expectedColor }) as System.Windows.Media.Media3D.Model3DGroup;
+            Assert.IsNotNull(model);
 
-            Assert.IsTrue(color.A > 0, "The configured material color must be opaque.");
-            Assert.IsNotNull(thumbnail, "The configured color should feed a successful mesh render producing a thumbnail.");
-            Assert.IsTrue(thumbnail.Width > 0 && thumbnail.Height > 0);
-            Assert.IsTrue(thumbnail.Width <= 256 && thumbnail.Height <= 256);
+            var geometry = model.Children[0] as System.Windows.Media.Media3D.GeometryModel3D;
+            Assert.IsNotNull(geometry);
+
+            var material = geometry.Material as System.Windows.Media.Media3D.DiffuseMaterial;
+            Assert.IsNotNull(material);
+
+            var brush = material.Brush as System.Windows.Media.SolidColorBrush;
+            Assert.IsNotNull(brush);
+            Assert.AreEqual(expectedColor, brush.Color);
         }
 
         [TestMethod]
@@ -135,16 +138,28 @@ namespace ThreeMfThumbnailProviderUnitTests
             Assert.IsTrue(thumbnail.Width > 0 && thumbnail.Height > 0);
         }
 
-        private static MemoryStream CreateCrossPartThreeMf()
+        [TestMethod]
+        public void GetThumbnailRendersProductionExtensionCrossPartBuildItem()
         {
-            const string rootModel =
+            using var stream = CreateCrossPartThreeMf(directBuildReference: true);
+
+            Bitmap thumbnail = ThreeMfThumbnailProvider.GetThumbnail(stream, 256);
+
+            Assert.IsNotNull(thumbnail, "A build item with p:path should resolve its object from the referenced model part.");
+            Assert.IsTrue(thumbnail.Width > 0 && thumbnail.Height > 0);
+        }
+
+        private static MemoryStream CreateCrossPartThreeMf(bool directBuildReference = false)
+        {
+            var rootModel =
                 "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
                 "<model unit=\"millimeter\" xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\" " +
                 "xmlns:p=\"http://schemas.microsoft.com/3dmanufacturing/production/2015/06\">" +
-                "<resources><object id=\"1\" type=\"model\"><components>" +
-                "<component objectid=\"10\" p:path=\"/3D/parts/part1.model\"/>" +
-                "</components></object></resources>" +
-                "<build><item objectid=\"1\"/></build></model>";
+                (directBuildReference
+                    ? "<resources/><build><item objectid=\"10\" p:path=\"/3D/parts/part1.model\"/></build></model>"
+                    : "<resources><object id=\"1\" type=\"model\"><components>" +
+                      "<component objectid=\"10\" p:path=\"/3D/parts/part1.model\"/>" +
+                      "</components></object></resources><build><item objectid=\"1\"/></build></model>");
 
             const string partModel =
                 "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
@@ -241,7 +256,7 @@ namespace ThreeMfThumbnailProviderUnitTests
 
                 if (thumbnailPng != null)
                 {
-                    rels.Append("<Relationship Id=\"rel1\" Type=\"http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail\" Target=\"/Metadata/thumbnail.png\"/>");
+                    rels.Append("<Relationship Id=\"rel1\" Type=\"http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail\" Target=\"/Auxiliaries/preview.png\"/>");
                 }
 
                 rels.Append("</Relationships>");
@@ -249,7 +264,7 @@ namespace ThreeMfThumbnailProviderUnitTests
 
                 if (thumbnailPng != null)
                 {
-                    WriteEntry(archive, "Metadata/thumbnail.png", thumbnailPng);
+                    WriteEntry(archive, "Auxiliaries/preview.png", thumbnailPng);
                 }
             }
 

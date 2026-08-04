@@ -46,9 +46,11 @@
         "PowerToys.PreviewHandlerCommon.dll",
         "PowerToys.GPOWrapper.dll",
         "PowerToys.ManagedCommon.dll",
+        "PowerToys.ManagedTelemetry.dll",
         "PowerToys.Interop.dll",
         "HelixToolkit.dll",
         "HelixToolkit.Core.Wpf.dll",
+        "Microsoft.Extensions.Logging.Abstractions.dll",
         "Microsoft.Windows.SDK.NET.dll",
         "WinRT.Runtime.dll"
       ]

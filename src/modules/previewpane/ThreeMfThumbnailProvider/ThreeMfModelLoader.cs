@@ -402,6 +402,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
         {
             private readonly ZipArchive _archive;
             private readonly Dictionary<string, ModelPart> _parts = new(StringComparer.OrdinalIgnoreCase);
+            private long _remainingModelBytes = MaxUncompressedModelBytes;
 
             public ModelPackage(ZipArchive archive)
             {
@@ -430,8 +431,10 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 ModelPart part = null;
                 var entry = _archive.GetEntry(partName) ??
                             _archive.Entries.FirstOrDefault(e => string.Equals(NormalizePartName(e.FullName), partName, StringComparison.OrdinalIgnoreCase));
-                if (entry != null && entry.Length > 0 && entry.Length <= MaxUncompressedModelBytes)
+                if (entry != null && entry.Length > 0 && entry.Length <= _remainingModelBytes)
                 {
+                    _remainingModelBytes -= entry.Length;
+
                     try
                     {
                         using var partStream = entry.Open();
@@ -480,7 +483,12 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 {
                     var objectId = buildItem.Attribute("objectid")?.Value;
                     var transform = ParseTransform(buildItem.Attribute("transform")?.Value) ?? Matrix3D.Identity;
-                    ResolveObject(package, part, objectId, transform, modelGroup, material, new HashSet<string>(StringComparer.Ordinal), 0, budget);
+                    var pathValue = GetExternalPartPath(buildItem, part.CoreNamespace);
+                    var targetPart = string.IsNullOrWhiteSpace(pathValue)
+                        ? part
+                        : package.GetPart(NormalizePartName(pathValue));
+
+                    ResolveObject(package, targetPart, objectId, transform, modelGroup, material, new HashSet<string>(StringComparer.Ordinal), 0, budget);
 
                     if (budget.Exhausted)
                     {
@@ -562,10 +570,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                     // object in another .model part (matched by local name + non-core namespace so we do
                     // not depend on the exact production namespace version). Resolve into that part;
                     // otherwise the reference is same-part.
-                    var pathValue = component.Attributes()
-                        .FirstOrDefault(attribute => attribute.Name.LocalName == "path" &&
-                                                     attribute.Name.Namespace != XNamespace.None &&
-                                                     attribute.Name.Namespace != part.CoreNamespace)?.Value;
+                    var pathValue = GetExternalPartPath(component, part.CoreNamespace);
 
                     var targetPart = string.IsNullOrWhiteSpace(pathValue)
                         ? part
@@ -578,6 +583,14 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             {
                 visiting.Remove(visitKey);
             }
+        }
+
+        private static string GetExternalPartPath(XElement element, XNamespace coreNamespace)
+        {
+            return element.Attributes()
+                .FirstOrDefault(attribute => attribute.Name.LocalName == "path" &&
+                                             attribute.Name.Namespace != XNamespace.None &&
+                                             attribute.Name.Namespace != coreNamespace)?.Value;
         }
 
         private static MeshGeometry3D CreateMeshGeometry(XElement meshElement, GeometryBudget budget)
