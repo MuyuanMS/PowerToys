@@ -69,11 +69,16 @@ public sealed class KeystrokeService : IKeystrokeService
         var delayMs = _userSettings.KeystrokeDelayMs > 0 ? _userSettings.KeystrokeDelayMs : AdvancedPasteProperties.DefaultKeystrokeDelayMs;
         var batchSize = _userSettings.KeystrokeBatchSize > 0 ? _userSettings.KeystrokeBatchSize : AdvancedPasteProperties.DefaultKeystrokeBatchSize;
         var targetWindow = _getForegroundWindow();
+        if (targetWindow == IntPtr.Zero)
+        {
+            Logger.LogWarning("Keystroke paste cancelled because there is no foreground window");
+            return;
+        }
 
         for (int i = 0; i < text.Length; i += batchSize)
         {
             var currentForeground = _getForegroundWindow();
-            if (targetWindow != IntPtr.Zero && currentForeground != targetWindow)
+            if (currentForeground != targetWindow)
             {
                 Logger.LogWarning("Keystroke paste cancelled because the foreground window changed");
                 break;

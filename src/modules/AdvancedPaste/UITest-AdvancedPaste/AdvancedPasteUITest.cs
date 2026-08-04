@@ -1072,6 +1072,7 @@ namespace Microsoft.AdvancedPaste.UITests
             Thread.Sleep(1000);
 
             process.Kill(true);
+            process.WaitForExit();
 
             // Read the file and verify
             var fileContent = File.ReadAllText(tempFile);
