@@ -58,6 +58,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Constants.h" />
+    <ClInclude Include="PathConversion.h" />
     <ClInclude Include="Settings.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="pch.h" />

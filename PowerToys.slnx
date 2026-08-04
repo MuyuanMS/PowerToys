@@ -410,6 +410,7 @@
     <Project Path="src/modules/CopyAsUNC/CopyAsUNCContextMenu/CopyAsUNCContextMenu.vcxproj" Id="caa90eba-0776-4e3a-9d71-7e2c95a3c221" />
     <Project Path="src/modules/CopyAsUNC/CopyAsUNCExt/CopyAsUNCExt.vcxproj" Id="7d462a53-6ec3-44eb-ae6f-b86ac892c9e3" />
     <Project Path="src/modules/CopyAsUNC/CopyAsUNCLib/CopyAsUNCLib.vcxproj" Id="ddb485b8-e771-4b9e-a9b5-bff587daf5ab" />
+    <Project Path="src/modules/CopyAsUNC/UnitTests/CopyAsUNCUnitTests.vcxproj" Id="67b4193a-39f6-40d7-913f-538de750bdf5" />
   </Folder>
   <Folder Name="/modules/CropAndLock/">
     <Project Path="src/modules/CropAndLock/CropAndLock/CropAndLock.vcxproj" Id="f5e1146e-b7b3-4e11-85fd-270a500bd78c" />

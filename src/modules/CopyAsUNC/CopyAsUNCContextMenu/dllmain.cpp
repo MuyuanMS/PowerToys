@@ -4,6 +4,7 @@
 #include <common/utils/process_path.h>
 #include <common/utils/resources.h>
 
+#include "CopyAsUNCLib/PathConversion.h"
 #include "CopyAsUNCLib/Settings.h"
 
 #include <Shlwapi.h>
@@ -21,6 +22,42 @@
 using namespace Microsoft::WRL;
 
 HINSTANCE g_hInst = 0;
+
+namespace
+{
+    std::vector<std::wstring> GetSelectedPaths(IShellItemArray* selection)
+    {
+        std::vector<std::wstring> paths;
+        if (!selection)
+        {
+            return paths;
+        }
+
+        DWORD itemCount = 0;
+        if (FAILED(selection->GetCount(&itemCount)))
+        {
+            return paths;
+        }
+
+        paths.reserve(itemCount);
+        for (DWORD itemIndex = 0; itemIndex < itemCount; ++itemIndex)
+        {
+            ComPtr<IShellItem> item;
+            if (FAILED(selection->GetItemAt(itemIndex, item.GetAddressOf())))
+            {
+                continue;
+            }
+
+            wil::unique_cotaskmem_string filePath;
+            if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &filePath)))
+            {
+                paths.emplace_back(filePath.get());
+            }
+        }
+
+        return paths;
+    }
+}
 
 BOOL APIENTRY DllMain(HMODULE hModule,
                       DWORD ul_reason_for_call,
@@ -71,35 +108,21 @@ public:
     }
 
     IFACEMETHODIMP GetState(_In_opt_ IShellItemArray* selection, _In_ BOOL /*okToBeSlow*/, _Out_ EXPCMDSTATE* cmdState)
+    try
     {
         *cmdState = ECS_HIDDEN;
 
         if (!CopyAsUNCSettingsInstance().GetEnabled())
             return S_OK;
 
-        // Only show for items on mapped network drives
-        if (selection)
+        if (!copy_as_unc::BuildClipboardText(GetSelectedPaths(selection)).empty())
         {
-            IShellItem* item = nullptr;
-            if (SUCCEEDED(selection->GetItemAt(0, &item)))
-            {
-                LPWSTR filePath = nullptr;
-                if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &filePath)))
-                {
-                    // Check first 3 chars for drive root (e.g. "Z:\")
-                    std::wstring root(filePath, min((size_t)3, wcslen(filePath)));
-                    if (GetDriveTypeW(root.c_str()) == DRIVE_REMOTE)
-                    {
-                        *cmdState = ECS_ENABLED;
-                    }
-                    CoTaskMemFree(filePath);
-                }
-                item->Release();
-            }
+            *cmdState = ECS_ENABLED;
         }
 
         return S_OK;
     }
+    CATCH_RETURN();
 
     IFACEMETHODIMP Invoke(_In_opt_ IShellItemArray* selection, _In_opt_ IBindCtx*) noexcept
     try
@@ -107,56 +130,7 @@ public:
         if (!selection)
             return S_OK;
 
-        DWORD itemCount = 0;
-        if (FAILED(selection->GetCount(&itemCount)))
-            return S_OK;
-
-        std::wstring clipboardText;
-        for (DWORD itemIndex = 0; itemIndex < itemCount; ++itemIndex)
-        {
-            ComPtr<IShellItem> item;
-            if (FAILED(selection->GetItemAt(itemIndex, item.GetAddressOf())))
-                continue;
-
-            wil::unique_cotaskmem_string filePath;
-            if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &filePath)))
-                continue;
-
-            std::wstring uncPath;
-
-            // If already a UNC path, use it directly
-            if (wcslen(filePath.get()) >= 2 && filePath.get()[0] == L'\\' && filePath.get()[1] == L'\\')
-            {
-                uncPath = filePath.get();
-            }
-            else
-            {
-                // Resolve mapped drive letter to UNC via WNetGetUniversalName
-                DWORD bufSize = MAX_PATH * 2;
-                std::vector<BYTE> buf(bufSize);
-                DWORD result = WNetGetUniversalNameW(filePath.get(), UNIVERSAL_NAME_INFO_LEVEL, buf.data(), &bufSize);
-
-                if (result == ERROR_MORE_DATA)
-                {
-                    buf.resize(bufSize);
-                    result = WNetGetUniversalNameW(filePath.get(), UNIVERSAL_NAME_INFO_LEVEL, buf.data(), &bufSize);
-                }
-
-                if (result == NO_ERROR)
-                {
-                    auto info = reinterpret_cast<UNIVERSAL_NAME_INFOW*>(buf.data());
-                    uncPath = info->lpUniversalName;
-                }
-            }
-
-            if (!uncPath.empty())
-            {
-                if (!clipboardText.empty())
-                    clipboardText += L"\r\n";
-
-                clipboardText += uncPath;
-            }
-        }
+        const std::wstring clipboardText = copy_as_unc::BuildClipboardText(GetSelectedPaths(selection));
 
         if (clipboardText.empty())
             return S_OK;
