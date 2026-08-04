@@ -29,7 +29,7 @@ Shortcuts:
             Shift: false
             Alt: false
             Keys:
-              - .
+              - "."
       - Name: Keyboard shortcuts
         Shortcut:
           - Win: false
