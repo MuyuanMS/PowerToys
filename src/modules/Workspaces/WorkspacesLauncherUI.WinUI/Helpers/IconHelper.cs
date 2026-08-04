@@ -3,17 +3,56 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
-using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Windows.Management.Deployment;
+using WorkspacesCsharpLibrary;
 
 namespace WorkspacesLauncherUI.Helpers
 {
     internal static class IconHelper
     {
-        public static BitmapImage TryGetExecutableIcon(string path)
+        public static BitmapImage GetApplicationIcon(string path, string packageFullName, string pwaAppId)
+        {
+            string iconPath = TryGetPackageIconPath(packageFullName)
+                ?? TryGetPwaIconPath(pwaAppId)
+                ?? (File.Exists(path) ? path : null)
+                ?? Path.Combine(AppContext.BaseDirectory, "Assets", "Workspaces", "DefaultIcon.ico");
+
+            return LoadIcon(iconPath) ?? LoadIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "Workspaces", "DefaultIcon.ico"));
+        }
+
+        private static string TryGetPackageIconPath(string packageFullName)
+        {
+            if (string.IsNullOrEmpty(packageFullName))
+            {
+                return null;
+            }
+
+            try
+            {
+                return new PackageManager().FindPackageForUser(string.Empty, packageFullName)?.Logo?.LocalPath;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        private static string TryGetPwaIconPath(string pwaAppId)
+        {
+            if (string.IsNullOrEmpty(pwaAppId))
+            {
+                return null;
+            }
+
+            string path = PwaHelper.GetPwaIconFilename(pwaAppId);
+            return File.Exists(path) ? path : null;
+        }
+
+        private static BitmapImage LoadIcon(string path)
         {
             if (string.IsNullOrEmpty(path) || !File.Exists(path))
             {
@@ -22,26 +61,23 @@ namespace WorkspacesLauncherUI.Helpers
 
             try
             {
-                using Icon icon = Icon.ExtractAssociatedIcon(path);
-                if (icon is null)
+                using Image image = Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase)
+                    ? Icon.ExtractAssociatedIcon(path)?.ToBitmap()
+                    : Image.FromFile(path);
+                if (image is null)
                 {
                     return null;
                 }
 
-                using Bitmap bitmap = icon.ToBitmap();
                 using MemoryStream stream = new();
-                bitmap.Save(stream, ImageFormat.Png);
+                image.Save(stream, ImageFormat.Png);
                 stream.Position = 0;
 
                 BitmapImage bitmapImage = new();
                 bitmapImage.SetSource(stream.AsRandomAccessStream());
                 return bitmapImage;
             }
-            catch (Exception ex) when (ex is FileNotFoundException
-                                    or UnauthorizedAccessException
-                                    or Win32Exception
-                                    or ArgumentException
-                                    or IOException)
+            catch (Exception)
             {
                 return null;
             }

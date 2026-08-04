@@ -37,6 +37,7 @@ namespace WorkspacesLauncherUI.Models
         [NotifyPropertyChangedFor(nameof(StateGlyph))]
         [NotifyPropertyChangedFor(nameof(StateColor))]
         [NotifyPropertyChangedFor(nameof(StateColorValue))]
+        [NotifyPropertyChangedFor(nameof(StateAutomationName))]
         private LaunchingState _launchState;
 
         partial void OnLaunchStateChanged(LaunchingState value)
@@ -51,6 +52,16 @@ namespace WorkspacesLauncherUI.Models
                 LaunchingState.LaunchedAndMoved => "\U0000F78C",
                 LaunchingState.Failed => "\U0000EF2C",
                 _ => "\U0000EF2C",
+            };
+        }
+
+        public string StateAutomationName
+        {
+            get => LaunchState switch
+            {
+                LaunchingState.LaunchedAndMoved => ResourceLoaderInstance.ResourceLoader?.GetString("LaunchSucceededAutomationName") ?? "Launch succeeded",
+                LaunchingState.Failed => ResourceLoaderInstance.ResourceLoader?.GetString("LaunchFailedAutomationName") ?? "Launch failed",
+                _ => ResourceLoaderInstance.ResourceLoader?.GetString("LaunchInProgressAutomationName") ?? "Launching",
             };
         }
 

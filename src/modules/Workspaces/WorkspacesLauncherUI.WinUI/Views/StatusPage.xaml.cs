@@ -34,6 +34,7 @@ namespace WorkspacesLauncherUI.Views
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)
         {
+            ViewModel.CancelLaunchCommand.Execute(null);
             CloseRequested?.Invoke(this, EventArgs.Empty);
         }
 

@@ -53,7 +53,10 @@ namespace WorkspacesLauncherUI.ViewModels
                 {
                     Name = app.Application.Application,
                     AppPath = app.Application.ApplicationPath,
-                    IconImage = IconHelper.TryGetExecutableIcon(app.Application.ApplicationPath),
+                    IconImage = IconHelper.GetApplicationIcon(
+                        app.Application.ApplicationPath,
+                        app.Application.PackageFullName,
+                        app.Application.PwaAppId),
                     PackagedName = app.Application.PackageFullName,
                     Aumid = app.Application.AppUserModelId,
                     PwaAppId = app.Application.PwaAppId,

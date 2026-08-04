@@ -53,6 +53,7 @@
                                     Margin="8"
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
+                                    AutomationProperties.Name="{x:Bind StateAutomationName, Mode=OneWay}"
                                     TargetType="x:Boolean"
                                     Value="{x:Bind Loading, Mode=OneWay}">
                                     <tkcontrols:Case Value="True">
@@ -100,7 +101,6 @@
             Margin="4,16,0,0"
             HorizontalAlignment="Stretch"
             Click="CancelButton_Click"
-            Command="{x:Bind ViewModel.CancelLaunchCommand}"
             TabIndex="2" />
     </Grid>
 </Page>
