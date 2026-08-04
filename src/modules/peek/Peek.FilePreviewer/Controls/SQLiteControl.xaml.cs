@@ -85,6 +85,7 @@ namespace Peek.FilePreviewer.Controls
                 oldCollection.CollectionChanged -= control.OnTablesCollectionChanged;
             }
 
+            control.CancelTableDataLoad();
             control.TableTreeView.RootNodes.Clear();
             control.ClearDataView();
 
@@ -156,6 +157,7 @@ namespace Peek.FilePreviewer.Controls
                     catch (Microsoft.Data.Sqlite.SqliteException)
                     {
                         // A malformed / locked / unsupported table would otherwise crash Peek from this async void handler.
+                        ClearDataView();
                         return;
                     }
                 }
@@ -251,9 +253,16 @@ namespace Peek.FilePreviewer.Controls
             NoSelectionText.Visibility = Visibility.Visible;
         }
 
+        private void CancelTableDataLoad()
+        {
+            _loadTableDataCts?.Cancel();
+            _loadTableDataCts?.Dispose();
+            _loadTableDataCts = null;
+        }
+
         public void Dispose()
         {
-            _loadTableDataCts?.Dispose();
+            CancelTableDataLoad();
         }
 
         public sealed class SqliteTreeNode

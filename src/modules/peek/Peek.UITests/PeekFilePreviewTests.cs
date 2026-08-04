@@ -12,6 +12,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Data.Sqlite;
 using Microsoft.PowerToys.UITest;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -231,6 +232,59 @@ public class PeekFilePreviewTests : UITestBase
     {
         string pngPath = Path.GetFullPath(@".\TestAssets\8.png");
         TestSingleFilePreview(pngPath, "8");
+    }
+
+    [TestMethod("Peek.FilePreview.SQLite")]
+    [TestCategory("Preview files")]
+    public void PeekSQLitePreview()
+    {
+        string databasePath = Path.GetFullPath(@".\TestAssets\sqlite-preview-test.sqlite");
+
+        try
+        {
+            using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = "CREATE TABLE people (id INTEGER PRIMARY KEY, name TEXT); INSERT INTO people (name) VALUES ('Alice');";
+                command.ExecuteNonQuery();
+            }
+
+            var peekWindow = OpenPeekWindow(databasePath);
+            Assert.IsNotNull(peekWindow.Find<TextBlock>("Tables: 1", 5000), "SQLite table count should be displayed");
+
+            var tableNode = peekWindow.Find<TextBlock>("people", 5000);
+            Assert.IsNotNull(tableNode, "SQLite table should be listed");
+            tableNode.Click();
+
+            Assert.IsNotNull(peekWindow.Find<TextBlock>("Alice", 5000), "SQLite row data should be displayed");
+        }
+        finally
+        {
+            ClosePeekAndExplorer();
+            File.Delete(databasePath);
+        }
+    }
+
+    [TestMethod("Peek.FilePreview.MalformedSQLite")]
+    [TestCategory("Preview files")]
+    public void PeekMalformedSQLiteFallsBack()
+    {
+        string databasePath = Path.GetFullPath(@".\TestAssets\malformed-preview-test.sqlite");
+
+        try
+        {
+            File.WriteAllText(databasePath, "not a SQLite database");
+            var peekWindow = OpenPeekWindow(databasePath);
+
+            Assert.IsNull(peekWindow.Find<TextBlock>("Tables: 1", 1000), "Malformed SQLite files should not use the SQLite previewer");
+            Assert.IsNotNull(peekWindow.Find<TextBlock>("malformed-preview-test.sqlite", 5000), "Malformed SQLite files should use the fallback preview");
+        }
+        finally
+        {
+            ClosePeekAndExplorer();
+            File.Delete(databasePath);
+        }
     }
 
     /// <summary>

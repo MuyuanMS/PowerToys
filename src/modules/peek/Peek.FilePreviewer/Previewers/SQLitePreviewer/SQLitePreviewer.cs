@@ -81,6 +81,22 @@ namespace Peek.FilePreviewer.Previewers.SqlitePreviewer
         {
             State = PreviewState.Loading;
 
+            var tables = await Task.Run(() => LoadTablesAsync(cancellationToken), cancellationToken);
+            foreach (var table in tables)
+            {
+                await Dispatcher.RunOnUiThread(() => Tables.Add(table));
+            }
+
+            TableCountText = string.Format(
+                CultureInfo.CurrentCulture,
+                ResourceLoaderInstance.ResourceLoader.GetString("Sqlite_Table_Count"),
+                tables.Count);
+
+            State = PreviewState.Loaded;
+        }
+
+        private async Task<List<SqliteTableInfo>> LoadTablesAsync(CancellationToken cancellationToken)
+        {
             var connectionString = new SqliteConnectionStringBuilder
             {
                 DataSource = Item.Path,
@@ -101,6 +117,7 @@ namespace Peek.FilePreviewer.Previewers.SqlitePreviewer
                 }
             }
 
+            var tables = new List<SqliteTableInfo>(tableNames.Count);
             foreach (var tableName in tableNames)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -123,20 +140,11 @@ namespace Peek.FilePreviewer.Previewers.SqlitePreviewer
                     }
                 }
 
-                using (var cmd = connection.CreateCommand())
-                {
-                    SqliteHelpers.AssignBindingKeys(tableInfo.Columns);
-                }
-
-                await Dispatcher.RunOnUiThread(() => Tables.Add(tableInfo));
+                SqliteHelpers.AssignBindingKeys(tableInfo.Columns);
+                tables.Add(tableInfo);
             }
 
-            TableCountText = string.Format(
-                CultureInfo.CurrentCulture,
-                ResourceLoaderInstance.ResourceLoader.GetString("Sqlite_Table_Count"),
-                tableNames.Count);
-
-            State = PreviewState.Loaded;
+            return tables;
         }
 
         public async Task LoadTableDataAsync(SqliteTableInfo tableInfo, CancellationToken cancellationToken)
