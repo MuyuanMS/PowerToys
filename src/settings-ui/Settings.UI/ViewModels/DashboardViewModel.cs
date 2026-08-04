@@ -727,6 +727,11 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 list.Add(new DashboardModuleShortcutItem() { Label = resourceLoader.GetString("PasteAsJson_Shortcut/Header"), Shortcut = moduleSettingsRepository.SettingsConfig.Properties.PasteAsJsonShortcut.GetKeysList() });
             }
 
+            if (moduleSettingsRepository.SettingsConfig.Properties.PasteAsKeystrokeShortcut.GetKeysList().Count > 0)
+            {
+                list.Add(new DashboardModuleShortcutItem() { Label = resourceLoader.GetString("PasteAsKeystrokes_Shortcut/Header"), Shortcut = moduleSettingsRepository.SettingsConfig.Properties.PasteAsKeystrokeShortcut.GetKeysList() });
+            }
+
             return new ObservableCollection<DashboardModuleItem>(list);
         }
 
