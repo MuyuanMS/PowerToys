@@ -90,9 +90,9 @@
                 x:Uid="SortByComboBox"
                 MinWidth="140"
                 SelectedIndex="{x:Bind ViewModel.OrderByIndex, Mode=TwoWay}">
-                <ComboBoxItem x:Uid="LastLaunchedItem" />
-                <ComboBoxItem x:Uid="CreatedItem" />
-                <ComboBoxItem x:Uid="NameItem" />
+                <ComboBoxItem x:Uid="SortLastLaunchedItem" />
+                <ComboBoxItem x:Uid="SortCreatedItem" />
+                <ComboBoxItem x:Uid="SortNameItem" />
             </ComboBox>
         </StackPanel>
 

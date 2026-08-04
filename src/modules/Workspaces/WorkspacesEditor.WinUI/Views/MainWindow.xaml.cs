@@ -170,6 +170,7 @@ namespace WorkspacesEditor
         private void OnClosed(object sender, WindowEventArgs args)
         {
             SaveWindowPlacement();
+            _cancellationToken.Cancel();
             _cancellationToken.Dispose();
             (Microsoft.UI.Xaml.Application.Current as IDisposable)?.Dispose();
         }
