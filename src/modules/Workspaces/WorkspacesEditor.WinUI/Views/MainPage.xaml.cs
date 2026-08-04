@@ -14,11 +14,14 @@ namespace WorkspacesEditor.Views
 {
     public sealed partial class MainPage : Page
     {
+        private MainViewModel _subscribedViewModel;
+
         public MainViewModel ViewModel { get; private set; }
 
         public MainPage()
         {
             this.InitializeComponent();
+            ThemeHelper.TrackActualTheme(this);
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -30,14 +33,28 @@ namespace WorkspacesEditor.Views
                 this.DataContext = vm;
                 Bindings.Update();
 
-                vm.PropertyChanged += (s, args) =>
-                {
-                    if (args.PropertyName == nameof(vm.IsWorkspacesViewEmpty) && vm.IsWorkspacesViewEmpty)
-                    {
-                        var peer = Microsoft.UI.Xaml.Automation.Peers.FrameworkElementAutomationPeer.CreatePeerForElement(EmptyStateText);
-                        peer?.RaiseAutomationEvent(Microsoft.UI.Xaml.Automation.Peers.AutomationEvents.LiveRegionChanged);
-                    }
-                };
+                _subscribedViewModel = vm;
+                vm.PropertyChanged += ViewModel_PropertyChanged;
+            }
+        }
+
+        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        {
+            if (_subscribedViewModel != null)
+            {
+                _subscribedViewModel.PropertyChanged -= ViewModel_PropertyChanged;
+                _subscribedViewModel = null;
+            }
+
+            base.OnNavigatedFrom(e);
+        }
+
+        private void ViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs args)
+        {
+            if (args.PropertyName == nameof(ViewModel.IsWorkspacesViewEmpty) && ViewModel.IsWorkspacesViewEmpty)
+            {
+                var peer = Microsoft.UI.Xaml.Automation.Peers.FrameworkElementAutomationPeer.CreatePeerForElement(EmptyStateText);
+                peer?.RaiseAutomationEvent(Microsoft.UI.Xaml.Automation.Peers.AutomationEvents.LiveRegionChanged);
             }
         }
 

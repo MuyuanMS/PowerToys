@@ -58,7 +58,7 @@ public class WorkspaceItemDesignTests : WorkspacesUiAutomationBase
         }
 
         var item = GetFirstWorkspaceItem();
-        var launchButton = item.Find<Button>(By.Name("Launch"));
+        var launchButton = item.Find<Button>(By.AccessibilityId("LaunchButton"));
         Assert.IsNotNull(launchButton, "Workspace item should have a Launch button");
     }
 
@@ -73,8 +73,10 @@ public class WorkspaceItemDesignTests : WorkspacesUiAutomationBase
         }
 
         var item = GetFirstWorkspaceItem();
-        var editButton = item.Find<Button>(By.Name("Edit"));
-        Assert.IsNotNull(editButton, "Workspace item should have an Edit button");
+        var moreButton = item.Find<Button>(By.AccessibilityId("MoreButton"));
+        moreButton.Click();
+        var editButton = Find<Element>(By.AccessibilityId("EditButton"));
+        Assert.IsNotNull(editButton, "Workspace item should have an Edit menu item");
     }
 
     [TestMethod("WorkspaceItem.HasMoreOptionsButton")]
