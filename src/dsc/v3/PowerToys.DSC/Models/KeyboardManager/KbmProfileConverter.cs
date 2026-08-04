@@ -295,6 +295,7 @@ public static class KbmProfileConverter
             }
             else
             {
+                stored.OperationType = OperationTypeRemapShortcut;
                 stored.NewRemapKeys = ParseTargetOrThrow(entry.To!).ToVkString();
             }
 

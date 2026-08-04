@@ -75,7 +75,7 @@ public sealed class ProfileResource : BaseResource
                     WriteMessageOutputLine(DscMessageLevel.Info, Resources.FailedToSignalSettingsEvent);
                 }
             }
-            catch (IOException ex)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 // The profile file could not be written; report an apply/write
                 // failure rather than the validation-error prefix, which would

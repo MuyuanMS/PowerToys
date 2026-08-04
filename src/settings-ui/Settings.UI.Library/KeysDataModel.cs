@@ -65,7 +65,8 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         public string OpenUri { get; set; }
 
         [JsonPropertyName("operationType")]
-        public int OperationType { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? OperationType { get; set; }
 
         private enum KeyboardManagerEditorType
         {
