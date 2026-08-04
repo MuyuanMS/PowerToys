@@ -399,8 +399,6 @@ internal static class Clipboard
         }
     }
 
-    private static Stream m;
-
     private static void ConnectAndGetData(object postAction)
     {
         if (Common.Sk == null)
@@ -496,14 +494,11 @@ internal static class Clipboard
                 && clipboardThreadOld.ThreadState != System.Threading.ThreadState.Aborted && clipboardThreadOld.IsAlive
                 && clipboardThreadOld.ManagedThreadId != Thread.CurrentThread.ManagedThreadId)
             {
-                if (clipboardThreadOld.Join(3000))
+                if (!clipboardThreadOld.Join(3000))
                 {
-                    if (m != null)
-                    {
-                        m.Flush();
-                        m.Close();
-                        m = null;
-                    }
+                    Logger.Log("Rejecting clipboard transfer because the previous transfer is still active.");
+                    s.Close();
+                    return;
                 }
             }
 
@@ -511,6 +506,7 @@ internal static class Clipboard
         }
 
         ReceivedDestinationFile destinationFile = null;
+        Stream m = null;
 
         void CloseDestinationFile()
         {
@@ -1043,12 +1039,6 @@ internal static class Clipboard
             });
             Common.MainForm.UpdateNotifyIcon();
             Common.ShowToolTip(e.Message + "\r\n\r\nMake sure you run the same version in all machines.", 1000, ToolTipIcon.Warning, Setting.Values.ShowClipNetStatus);
-
-            if (m != null)
-            {
-                m.Close();
-                m = null;
-            }
         }
 
         return handShaken;
