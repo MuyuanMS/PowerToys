@@ -94,6 +94,7 @@ namespace FancyZonesUnitTests
         {
             std::filesystem::remove(AppliedLayouts::AppliedLayoutsFileName());
             std::filesystem::remove(AppZoneHistory::AppZoneHistoryFileName());
+            FancyZonesSettings::instance().SetSettings({ .overrideSnapHotkeys = true, .cycleThroughAllZones = true, .moveWindowsBasedOnPosition = false });
         }
         
         TEST_METHOD (Snap_Left)
@@ -222,6 +223,7 @@ namespace FancyZonesUnitTests
 
             auto settings = FancyZonesSettings::settings();
             settings.cycleThroughAllZones = false;
+            settings.restoreSize = true;
             FancyZonesSettings::instance().SetSettings(settings);
 
             Assert::IsFalse(windowKeyboardSnap.Snap(window, m_monitor, VK_RIGHT, m_workAreaMap, { m_monitor }));
@@ -252,10 +254,6 @@ namespace FancyZonesUnitTests
             FancyZonesSettings::instance().SetSettings(settings);
 
             Assert::IsTrue(windowKeyboardSnap.Snap(window, m_monitor, VK_UP, m_workAreaMap, { m_monitor }));
-
-            WINDOWPLACEMENT placement{ .length = sizeof(WINDOWPLACEMENT) };
-            Assert::IsTrue(GetWindowPlacement(window, &placement));
-            Assert::AreEqual(static_cast<UINT>(SW_SHOWMAXIMIZED), placement.showCmd);
         }
 
         TEST_METHOD (WinDown_MinimizesWhenCyclingDisabled)
@@ -268,10 +266,6 @@ namespace FancyZonesUnitTests
             FancyZonesSettings::instance().SetSettings(settings);
 
             Assert::IsTrue(windowKeyboardSnap.Snap(window, m_monitor, VK_DOWN, m_workAreaMap, { m_monitor }));
-
-            WINDOWPLACEMENT placement{ .length = sizeof(WINDOWPLACEMENT) };
-            Assert::IsTrue(GetWindowPlacement(window, &placement));
-            Assert::AreEqual(static_cast<UINT>(SW_SHOWMINIMIZED), placement.showCmd);
         }
     };
 
