@@ -27,7 +27,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             FancyzonesMouseSwitch = new BoolProperty();
             FancyzonesMouseMiddleClickSpanningMultipleZones = new BoolProperty();
             FancyzonesMoveWindowsAcrossMonitors = new BoolProperty();
-            FancyzonesCycleThroughAllZones = new BoolProperty();
+            FancyzonesCycleThroughAllZones = new BoolProperty(ConfigDefaults.DefaultFancyzonesCycleThroughAllZones);
             FancyzonesMoveWindowsBasedOnPosition = new BoolProperty();
             FancyzonesOverlappingZonesAlgorithm = new IntProperty();
             FancyzonesDisplayOrWorkAreaChangeMoveWindows = new BoolProperty(ConfigDefaults.DefaultFancyzonesDisplayOrWorkAreaChangeMoveWindows);
