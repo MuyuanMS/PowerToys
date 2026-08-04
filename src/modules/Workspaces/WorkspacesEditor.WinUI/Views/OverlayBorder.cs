@@ -24,6 +24,7 @@ namespace WorkspacesEditor.Views
     {
         private const int BorderThickness = 6;
         private readonly List<Window> _windows = new();
+        private readonly List<(IntPtr Hwnd, SubclassProc Proc)> _subclasses = new();
 
         /// <summary>
         /// Gets the bounds of all monitors via Win32 EnumDisplayMonitors.
@@ -92,6 +93,11 @@ namespace WorkspacesEditor.Views
             var hwnd = WindowNative.GetWindowHandle(window);
             var windowId = Win32Interop.GetWindowIdFromWindow(hwnd);
             var appWindow = AppWindow.GetFromWindowId(windowId);
+            SubclassProc subclassProc = OverlaySubclassProc;
+            if (SetWindowSubclass(hwnd, subclassProc, UIntPtr.Zero, UIntPtr.Zero))
+            {
+                _subclasses.Add((hwnd, subclassProc));
+            }
 
             // Remove title bar and borders
             if (appWindow.Presenter is OverlappedPresenter presenter)
@@ -140,6 +146,13 @@ namespace WorkspacesEditor.Views
 
         public void Dispose()
         {
+            foreach (var subclass in _subclasses)
+            {
+                _ = RemoveWindowSubclass(subclass.Hwnd, subclass.Proc, UIntPtr.Zero);
+            }
+
+            _subclasses.Clear();
+
             foreach (var window in _windows)
             {
                 try
@@ -164,7 +177,32 @@ namespace WorkspacesEditor.Views
         private const int WsExTopmost = 0x00000008;
         private const int SwpNoActivate = 0x0010;
         private const int SwpShowWindow = 0x0040;
+        private const uint WmNcHitTest = 0x0084;
+        private static readonly IntPtr HtTransparent = new(-1);
         private static readonly IntPtr HwndTopmost = new IntPtr(-1);
+
+        private static IntPtr OverlaySubclassProc(IntPtr hwnd, uint message, UIntPtr wParam, IntPtr lParam, UIntPtr subclassId, UIntPtr referenceData)
+        {
+            if (message == WmNcHitTest)
+            {
+                return HtTransparent;
+            }
+
+            return DefSubclassProc(hwnd, message, wParam, lParam);
+        }
+
+        private delegate IntPtr SubclassProc(IntPtr hwnd, uint message, UIntPtr wParam, IntPtr lParam, UIntPtr subclassId, UIntPtr referenceData);
+
+        [DllImport("comctl32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetWindowSubclass(IntPtr hwnd, SubclassProc subclassProc, UIntPtr subclassId, UIntPtr referenceData);
+
+        [DllImport("comctl32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool RemoveWindowSubclass(IntPtr hwnd, SubclassProc subclassProc, UIntPtr subclassId);
+
+        [DllImport("comctl32.dll")]
+        private static extern IntPtr DefSubclassProc(IntPtr hwnd, uint message, UIntPtr wParam, IntPtr lParam);
 
         [DllImport("user32.dll")]
         private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
