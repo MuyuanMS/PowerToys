@@ -17,9 +17,12 @@ namespace AdvancedPaste.Services;
 public sealed class KeystrokeService : IKeystrokeService
 {
     private const short ReturnVirtualKey = 0x0D;
+    private const short ShiftVirtualKey = 0x10;
+    private static readonly short[] ModifierVirtualKeys = [0xA2, 0xA3, 0x5B, 0x5C, 0xA0, 0xA1, 0xA4, 0xA5];
 
     private readonly IUserSettings _userSettings;
     private readonly Func<IntPtr> _getForegroundWindow;
+    private readonly Func<int, short> _getAsyncKeyState;
     private readonly Func<Helpers.NativeMethods.INPUT[], uint> _sendInput;
     private readonly Action<int> _delay;
 
@@ -27,6 +30,7 @@ public sealed class KeystrokeService : IKeystrokeService
         : this(
             userSettings,
             Helpers.NativeMethods.GetForegroundWindow,
+            Helpers.NativeMethods.GetAsyncKeyState,
             inputs => Helpers.NativeMethods.SendInput((uint)inputs.Length, inputs, Helpers.NativeMethods.INPUT.Size),
             System.Threading.Thread.Sleep)
     {
@@ -37,14 +41,26 @@ public sealed class KeystrokeService : IKeystrokeService
         Func<IntPtr> getForegroundWindow,
         Func<Helpers.NativeMethods.INPUT[], uint> sendInput,
         Action<int> delay)
+        : this(userSettings, getForegroundWindow, _ => 0, sendInput, delay)
+    {
+    }
+
+    internal KeystrokeService(
+        IUserSettings userSettings,
+        Func<IntPtr> getForegroundWindow,
+        Func<int, short> getAsyncKeyState,
+        Func<Helpers.NativeMethods.INPUT[], uint> sendInput,
+        Action<int> delay)
     {
         ArgumentNullException.ThrowIfNull(userSettings);
         ArgumentNullException.ThrowIfNull(getForegroundWindow);
+        ArgumentNullException.ThrowIfNull(getAsyncKeyState);
         ArgumentNullException.ThrowIfNull(sendInput);
         ArgumentNullException.ThrowIfNull(delay);
 
         _userSettings = userSettings;
         _getForegroundWindow = getForegroundWindow;
+        _getAsyncKeyState = getAsyncKeyState;
         _sendInput = sendInput;
         _delay = delay;
     }
@@ -78,7 +94,9 @@ public sealed class KeystrokeService : IKeystrokeService
             return;
         }
 
-        for (int i = 0; i < normalizedText.Length; i += batchSize)
+        ReleasePressedModifiers();
+
+        for (int i = 0; i < normalizedText.Length; i++)
         {
             var currentForeground = _getForegroundWindow();
             if (currentForeground != targetWindow)
@@ -87,12 +105,12 @@ public sealed class KeystrokeService : IKeystrokeService
                 break;
             }
 
-            int currentChunkLength = Math.Min(batchSize, normalizedText.Length - i);
+            var inputs = CreateInputSequence(normalizedText[i]);
+            SendInputEvents(inputs);
 
-            if (currentChunkLength > 0)
+            if ((i + 1) % batchSize == 0 || i == normalizedText.Length - 1)
             {
-                var inputs = CreateInputSequence(normalizedText.AsSpan(i, currentChunkLength));
-                SendInputEvents(inputs, delayMs);
+                _delay(delayMs);
             }
         }
     }
@@ -136,28 +154,47 @@ public sealed class KeystrokeService : IKeystrokeService
         };
     }
 
-    private List<Helpers.NativeMethods.INPUT> CreateInputSequence(ReadOnlySpan<char> text)
+    private void ReleasePressedModifiers()
     {
-        var inputs = new List<Helpers.NativeMethods.INPUT>(text.Length * 2);
+        var inputs = new List<Helpers.NativeMethods.INPUT>(ModifierVirtualKeys.Length);
 
-        foreach (char c in text)
+        foreach (short modifierVirtualKey in ModifierVirtualKeys)
         {
-            if (c == '\n')
+            if ((_getAsyncKeyState(modifierVirtualKey) & 0x8000) != 0)
             {
-                inputs.Add(CreateVirtualKeyInput(ReturnVirtualKey, isKeyUp: false));
-                inputs.Add(CreateVirtualKeyInput(ReturnVirtualKey, isKeyUp: true));
-            }
-            else
-            {
-                inputs.Add(CreateUnicodeInput(c, isKeyUp: false));
-                inputs.Add(CreateUnicodeInput(c, isKeyUp: true));
+                inputs.Add(CreateVirtualKeyInput(modifierVirtualKey, isKeyUp: true));
             }
         }
+
+        if (inputs.Count > 0)
+        {
+            SendInputEvents(inputs);
+        }
+    }
+
+    private List<Helpers.NativeMethods.INPUT> CreateInputSequence(char character)
+    {
+        if (character == '\n')
+        {
+            return
+            [
+                CreateVirtualKeyInput(ShiftVirtualKey, isKeyUp: false),
+                CreateVirtualKeyInput(ReturnVirtualKey, isKeyUp: false),
+                CreateVirtualKeyInput(ReturnVirtualKey, isKeyUp: true),
+                CreateVirtualKeyInput(ShiftVirtualKey, isKeyUp: true),
+            ];
+        }
+
+        var inputs = new List<Helpers.NativeMethods.INPUT>(2)
+        {
+            CreateUnicodeInput(character, isKeyUp: false),
+            CreateUnicodeInput(character, isKeyUp: true),
+        };
 
         return inputs;
     }
 
-    private void SendInputEvents(List<Helpers.NativeMethods.INPUT> inputs, int delayMs)
+    private void SendInputEvents(List<Helpers.NativeMethods.INPUT> inputs)
     {
         uint sent = _sendInput(inputs.ToArray());
 
@@ -167,8 +204,5 @@ public sealed class KeystrokeService : IKeystrokeService
             Logger.LogError(errorMessage);
             throw new InvalidOperationException(errorMessage);
         }
-
-        // SendInput cannot handle rapid sequences of inputs. Delay is configurable.
-        _delay(delayMs);
     }
 }
