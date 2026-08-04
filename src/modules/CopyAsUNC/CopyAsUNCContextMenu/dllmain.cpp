@@ -118,9 +118,13 @@ public:
         if (!okToBeSlow)
             return E_PENDING;
 
-        if (!copy_as_unc::BuildClipboardText(GetSelectedPaths(selection)).empty())
+        for (const auto& path : GetSelectedPaths(selection))
         {
-            *cmdState = ECS_ENABLED;
+            if (copy_as_unc::ResolvePath(path))
+            {
+                *cmdState = ECS_ENABLED;
+                break;
+            }
         }
 
         return S_OK;
