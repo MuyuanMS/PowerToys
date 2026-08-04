@@ -1632,7 +1632,8 @@ bool FancyZones::ShouldProcessSnapHotkey(DWORD vkCode) noexcept
     {
         if (vkCode == VK_UP || vkCode == VK_DOWN)
         {
-            return FancyZonesSettings::settings().moveWindowsBasedOnPosition;
+            return FancyZonesSettings::settings().moveWindowsBasedOnPosition ||
+                   !FancyZonesSettings::settings().cycleThroughAllZones;
         }
         else
         {
