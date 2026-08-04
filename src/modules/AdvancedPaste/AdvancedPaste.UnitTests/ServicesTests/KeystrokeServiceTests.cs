@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using AdvancedPaste.Models;
 using AdvancedPaste.Services;
 using AdvancedPaste.Settings;
 using Microsoft.PowerToys.Settings.UI.Library;
@@ -24,6 +25,8 @@ public sealed class KeystrokeServiceTests
 
         public bool EnableClipboardPreview { get; set; }
 
+        public bool ShowAIPaste { get; set; }
+
         public int KeystrokeDelayMs { get; set; }
 
         public int KeystrokeBatchSize { get; set; }
@@ -34,7 +37,16 @@ public sealed class KeystrokeServiceTests
 
         public PasteAIConfiguration PasteAIConfiguration { get; set; } = new();
 
-        public event EventHandler Changed;
+        public event EventHandler Changed
+        {
+            add
+            {
+            }
+
+            remove
+            {
+            }
+        }
 
         public System.Threading.Tasks.Task SetActiveAIProviderAsync(string providerId)
         {
@@ -43,112 +55,67 @@ public sealed class KeystrokeServiceTests
     }
 
     [TestMethod]
-    public void Constructor_WithValidSettings_UsesConfiguredValues()
+    public void SendTextAsKeystrokes_UsesConfiguredBatchSizeAndDelay()
     {
-        // Arrange
         var userSettings = new TestUserSettings
         {
             KeystrokeDelayMs = 50,
-            KeystrokeBatchSize = 5,
+            KeystrokeBatchSize = 2,
         };
+        var inputCounts = new List<int>();
+        var delays = new List<int>();
+        var service = CreateService(userSettings, inputCounts, delays);
 
-        // Act
-        var service = new KeystrokeService(userSettings);
+        service.SendTextAsKeystrokes("abcde");
 
-        // Assert
-        // Verify that the service was created successfully with the provided values
-        // We can't directly access private fields, but we can verify behavior through SendTextAsKeystrokes
-        // This test primarily verifies that the constructor accepts valid values
-        Assert.IsNotNull(service);
+        Assert.AreEqual(3, inputCounts.Count);
+        Assert.AreEqual(4, inputCounts[0]);
+        Assert.AreEqual(4, inputCounts[1]);
+        Assert.AreEqual(2, inputCounts[2]);
+        Assert.AreEqual(3, delays.Count);
+        Assert.IsTrue(delays.TrueForAll(delay => delay == 50));
     }
 
     [TestMethod]
-    public void Constructor_WithZeroDelay_FallsBackToDefault()
+    public void SendTextAsKeystrokes_UsesUpdatedSettings()
     {
-        // Arrange
+        var userSettings = new TestUserSettings
+        {
+            KeystrokeDelayMs = 10,
+            KeystrokeBatchSize = 1,
+        };
+        var inputCounts = new List<int>();
+        var delays = new List<int>();
+        var service = CreateService(userSettings, inputCounts, delays);
+        userSettings.KeystrokeDelayMs = 20;
+        userSettings.KeystrokeBatchSize = 3;
+
+        service.SendTextAsKeystrokes("abc");
+
+        Assert.AreEqual(1, inputCounts.Count);
+        Assert.AreEqual(6, inputCounts[0]);
+        Assert.AreEqual(1, delays.Count);
+        Assert.AreEqual(20, delays[0]);
+    }
+
+    [TestMethod]
+    public void SendTextAsKeystrokes_InvalidSettingsUseDefaults()
+    {
         var userSettings = new TestUserSettings
         {
             KeystrokeDelayMs = 0,
-            KeystrokeBatchSize = 2,
+            KeystrokeBatchSize = -1,
         };
+        var inputCounts = new List<int>();
+        var delays = new List<int>();
+        var service = CreateService(userSettings, inputCounts, delays);
 
-        // Act
-        var service = new KeystrokeService(userSettings);
+        service.SendTextAsKeystrokes("ab");
 
-        // Assert
-        Assert.IsNotNull(service);
-        // The service should use the default delay (30ms) instead of 0
-    }
-
-    [TestMethod]
-    public void Constructor_WithNegativeDelay_FallsBackToDefault()
-    {
-        // Arrange
-        var userSettings = new TestUserSettings
-        {
-            KeystrokeDelayMs = -10,
-            KeystrokeBatchSize = 3,
-        };
-
-        // Act
-        var service = new KeystrokeService(userSettings);
-
-        // Assert
-        Assert.IsNotNull(service);
-        // The service should use the default delay (30ms) instead of negative value
-    }
-
-    [TestMethod]
-    public void Constructor_WithZeroBatchSize_FallsBackToDefault()
-    {
-        // Arrange
-        var userSettings = new TestUserSettings
-        {
-            KeystrokeDelayMs = 25,
-            KeystrokeBatchSize = 0,
-        };
-
-        // Act
-        var service = new KeystrokeService(userSettings);
-
-        // Assert
-        Assert.IsNotNull(service);
-        // The service should use the default batch size (1) instead of 0
-    }
-
-    [TestMethod]
-    public void Constructor_WithNegativeBatchSize_FallsBackToDefault()
-    {
-        // Arrange
-        var userSettings = new TestUserSettings
-        {
-            KeystrokeDelayMs = 25,
-            KeystrokeBatchSize = -5,
-        };
-
-        // Act
-        var service = new KeystrokeService(userSettings);
-
-        // Assert
-        Assert.IsNotNull(service);
-        // The service should use the default batch size (1) instead of negative value
-    }
-
-    [TestMethod]
-    public void Constructor_WithDefaultValues_CreatesService()
-    {
-        // Arrange
-        var userSettings = new TestUserSettings
-        {
-            KeystrokeDelayMs = AdvancedPasteProperties.DefaultKeystrokeDelayMs,
-            KeystrokeBatchSize = AdvancedPasteProperties.DefaultKeystrokeBatchSize,
-        };
-
-        // Act
-        var service = new KeystrokeService(userSettings);
-
-        // Assert
-        Assert.IsNotNull(service);
+        Assert.AreEqual(2, inputCounts.Count);
+        Assert.IsTrue(inputCounts.TrueForAll(inputCount => inputCount == 2));
+        Assert.AreEqual(2, delays.Count);
+        Assert.IsTrue(delays.TrueForAll(delay => delay == AdvancedPasteProperties.DefaultKeystrokeDelayMs));
     }
 
     [TestMethod]
@@ -161,37 +128,16 @@ public sealed class KeystrokeServiceTests
         // Assert - Exception should be thrown
     }
 
-    [TestMethod]
-    public void Constructor_WithLargeDelay_UsesProvidedValue()
+    private static KeystrokeService CreateService(TestUserSettings userSettings, List<int> inputCounts, List<int> delays)
     {
-        // Arrange
-        var userSettings = new TestUserSettings
-        {
-            KeystrokeDelayMs = 1000,
-            KeystrokeBatchSize = 1,
-        };
-
-        // Act
-        var service = new KeystrokeService(userSettings);
-
-        // Assert
-        Assert.IsNotNull(service);
-    }
-
-    [TestMethod]
-    public void Constructor_WithLargeBatchSize_UsesProvidedValue()
-    {
-        // Arrange
-        var userSettings = new TestUserSettings
-        {
-            KeystrokeDelayMs = 30,
-            KeystrokeBatchSize = 100,
-        };
-
-        // Act
-        var service = new KeystrokeService(userSettings);
-
-        // Assert
-        Assert.IsNotNull(service);
+        return new KeystrokeService(
+            userSettings,
+            () => new IntPtr(1),
+            inputs =>
+            {
+                inputCounts.Add(inputs.Length);
+                return (uint)inputs.Length;
+            },
+            delays.Add);
     }
 }
