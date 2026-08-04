@@ -235,6 +235,42 @@ public sealed class KeystrokeServiceTests
     }
 
     [TestMethod]
+    public void SendTextAsKeystrokes_PartialNewlineInputReleasesPressedKeys()
+    {
+        var userSettings = new TestUserSettings
+        {
+            KeystrokeDelayMs = 50,
+            KeystrokeBatchSize = 1,
+        };
+        var sentBatches = new List<NativeMethods.INPUT[]>();
+        var service = new KeystrokeService(
+            userSettings,
+            () => new IntPtr(1),
+            inputs =>
+            {
+                sentBatches.Add(inputs);
+                return sentBatches.Count == 1 ? 2U : (uint)inputs.Length;
+            },
+            _ => { });
+
+        try
+        {
+            service.SendTextAsKeystrokes("\n");
+            Assert.Fail("Expected a partial SendInput result to throw.");
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        Assert.AreEqual(2, sentBatches.Count);
+        Assert.AreEqual(2, sentBatches[1].Length);
+        Assert.AreEqual((short)0x0D, sentBatches[1][0].data.ki.wVk);
+        Assert.AreEqual((uint)NativeMethods.KeyEventF.KeyUp, sentBatches[1][0].data.ki.dwFlags);
+        Assert.AreEqual((short)0x10, sentBatches[1][1].data.ki.wVk);
+        Assert.AreEqual((uint)NativeMethods.KeyEventF.KeyUp, sentBatches[1][1].data.ki.dwFlags);
+    }
+
+    [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void Constructor_WithNullSettings_ThrowsArgumentNullException()
     {
