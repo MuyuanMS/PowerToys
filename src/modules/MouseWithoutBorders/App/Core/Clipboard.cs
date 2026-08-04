@@ -510,6 +510,48 @@ internal static class Clipboard
             clipboardThreadOld = Thread.CurrentThread;
         }
 
+        ReceivedDestinationFile destinationFile = null;
+
+        void CloseDestinationFile()
+        {
+            destinationFile?.Dispose();
+            destinationFile = null;
+            m?.Close();
+            m = null;
+        }
+
+        void DeleteDestinationFile(string path)
+        {
+            try
+            {
+                bool success;
+                if (Common.RunOnLogonDesktop || Common.RunOnScrSaverDesktop)
+                {
+                    File.Delete(path);
+                    success = true;
+                }
+                else
+                {
+                    success = Launch.ImpersonateLoggedOnUserAndDoSomething(() => File.Delete(path));
+                }
+
+                if (!success)
+                {
+                    Logger.Log($"Could not delete incomplete destination file: {path}");
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Log(e);
+            }
+        }
+
+        void CreateDestinationFile(string path)
+        {
+            destinationFile = new ReceivedDestinationFile(path, DeleteDestinationFile);
+            m = destinationFile.Stream;
+        }
+
         try
         {
             byte[] header = new byte[1024];
@@ -579,12 +621,6 @@ internal static class Clipboard
                 // the file ends up owned by that user and inherits the folder's permissions. On the
                 // logon/screen-saver desktop the storage lives under Program Files where there is no
                 // interactive user to impersonate, so create the file directly.
-                void CloseDestinationFile()
-                {
-                    m?.Close();
-                    m = null;
-                }
-
                 bool TryCreateDestinationFile(string path)
                 {
                     CloseDestinationFile();
@@ -594,14 +630,14 @@ internal static class Clipboard
                     {
                         if (Common.RunOnLogonDesktop || Common.RunOnScrSaverDesktop)
                         {
-                            m = new FileStream(path, FileMode.Create);
+                            CreateDestinationFile(path);
                             success = true;
                         }
                         else
                         {
                             success = Launch.ImpersonateLoggedOnUserAndDoSomething(() =>
                             {
-                                m = new FileStream(path, FileMode.Create);
+                                CreateDestinationFile(path);
                             });
                         }
 
@@ -640,7 +676,7 @@ internal static class Clipboard
                                 _ = Directory.CreateDirectory(savingFolder);
                             }
 
-                            m = new FileStream(tempFile, FileMode.Create);
+                            CreateDestinationFile(tempFile);
                         });
                     }
                     catch (Exception e)
@@ -737,9 +773,27 @@ internal static class Clipboard
             }
             while (rv > 0);
 
+            if (receivedCount != dataSize)
+            {
+                Logger.Log($"Received incomplete file: expected {dataSize} bytes, received {receivedCount} bytes.");
+                CloseDestinationFile();
+                Common.SetToggleIcon(new int[Common.TOGGLE_ICONS_SIZE] { Common.ICON_ERROR, -1, Common.ICON_ERROR, -1 });
+                Common.ShowToolTip("Could not receive the complete destination file.", 1000, ToolTipIcon.Warning, Setting.Values.ShowClipNetStatus);
+                s.Close();
+                return;
+            }
+
             if (m != null && fileName != null)
             {
-                m.Flush();
+                if (destinationFile != null)
+                {
+                    destinationFile.Complete();
+                }
+                else
+                {
+                    m.Flush();
+                }
+
                 Logger.LogDebug(m.Length.ToString(CultureInfo.CurrentCulture) + " bytes received.");
                 Clipboard.LastClipboardEventTime = Common.GetTick();
                 string toolTipText = null;
@@ -829,20 +883,14 @@ internal static class Clipboard
                     Common.MainForm.UpdateNotifyIcon();
                 });
 
-                m?.Close();
-                m = null;
+                CloseDestinationFile();
             }
         }
         catch (ThreadAbortException)
         {
             Logger.Log("The current thread is being aborted (3).");
             s.Close();
-
-            if (m != null)
-            {
-                m.Close();
-                m = null;
-            }
+            CloseDestinationFile();
 
             return;
         }
@@ -864,12 +912,7 @@ internal static class Clipboard
                 -1, Common.ICON_BIG_CLIPBOARD, -1,
             });
             Common.ShowToolTip(e.Message, 1000, ToolTipIcon.Info, Setting.Values.ShowClipNetStatus);
-
-            if (m != null)
-            {
-                m.Close();
-                m = null;
-            }
+            CloseDestinationFile();
 
             return;
         }

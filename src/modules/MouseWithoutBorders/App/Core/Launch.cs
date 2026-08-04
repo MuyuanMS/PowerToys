@@ -72,7 +72,11 @@ internal static class Launch
                 }
 
                 impersonating = true;
-                targetFunc();
+                ExecuteImpersonatedAction(targetFunc, () =>
+                {
+                    _ = NativeMethods.RevertToSelf();
+                    impersonating = false;
+                });
                 return true;
             }
             catch (Exception e)
@@ -97,6 +101,18 @@ internal static class Launch
                     _ = NativeMethods.CloseHandle(hUserTokenDup);
                 }
             }
+        }
+    }
+
+    internal static void ExecuteImpersonatedAction(Action targetFunc, Action revertToSelf)
+    {
+        try
+        {
+            targetFunc();
+        }
+        finally
+        {
+            revertToSelf();
         }
     }
 
