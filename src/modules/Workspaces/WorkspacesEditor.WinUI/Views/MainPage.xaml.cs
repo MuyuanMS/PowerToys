@@ -145,39 +145,39 @@ namespace WorkspacesEditor.Views
                     ManagedCommon.Logger.LogError($"LaunchProject failed: {ex.Message}");
                 }
             }
+        }
 
-            private void EditButtonClicked(object sender, RoutedEventArgs e)
+        private void EditButtonClicked(object sender, RoutedEventArgs e)
+        {
+            Project project = GetProjectFromSender(sender);
+            if (project != null)
             {
-                Project project = GetProjectFromSender(sender);
-                if (project != null)
-                {
-                    ViewModel.CloseAllPopups();
-                    ViewModel.EditProject(project);
-                }
+                ViewModel.CloseAllPopups();
+                ViewModel.EditProject(project);
+            }
+        }
+
+        private async void DeleteButtonClicked(object sender, RoutedEventArgs e)
+        {
+            Project project = GetProjectFromSender(sender);
+            if (project == null)
+            {
+                return;
             }
 
-            private async void DeleteButtonClicked(object sender, RoutedEventArgs e)
+            var dialog = new ContentDialog
             {
-                Project project = GetProjectFromSender(sender);
-                if (project == null)
-                {
-                    return;
-                }
+                Title = ResourceLoaderInstance.ResourceLoader?.GetString("Are_You_Sure") ?? "Are you sure?",
+                Content = ResourceLoaderInstance.ResourceLoader?.GetString("Are_You_Sure_Description") ?? "Are you sure you want to delete this Workspace?",
+                PrimaryButtonText = ResourceLoaderInstance.ResourceLoader?.GetString("Delete") ?? "Remove",
+                CloseButtonText = ResourceLoaderInstance.ResourceLoader?.GetString("Cancel") ?? "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = XamlRoot,
+            };
 
-                var dialog = new ContentDialog
-                {
-                    Title = ResourceLoaderInstance.ResourceLoader?.GetString("Are_You_Sure") ?? "Are you sure?",
-                    Content = ResourceLoaderInstance.ResourceLoader?.GetString("Are_You_Sure_Description") ?? "Are you sure you want to delete this Workspace?",
-                    PrimaryButtonText = ResourceLoaderInstance.ResourceLoader?.GetString("Delete") ?? "Remove",
-                    CloseButtonText = ResourceLoaderInstance.ResourceLoader?.GetString("Cancel") ?? "Cancel",
-                    DefaultButton = ContentDialogButton.Primary,
-                    XamlRoot = XamlRoot,
-                };
-
-                if (await dialog.ShowAsync() == ContentDialogResult.Primary)
-                {
-                    ViewModel.DeleteProject(project);
-                }
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            {
+                ViewModel.DeleteProject(project);
             }
         }
     }

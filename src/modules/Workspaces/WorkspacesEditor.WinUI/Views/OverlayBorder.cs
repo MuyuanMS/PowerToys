@@ -104,7 +104,7 @@ namespace WorkspacesEditor.Views
             }
 
             // Disable DWM shadow/gradient and window chrome completely
-            int nonClientRenderingPolicyDisabled = 2;
+            int nonClientRenderingPolicyDisabled = 1;
             _ = DwmSetWindowAttribute(hwnd, 2, ref nonClientRenderingPolicyDisabled, sizeof(int));
 
             // Remove rounded corners (Windows 11)
