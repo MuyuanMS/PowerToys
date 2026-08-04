@@ -119,6 +119,30 @@ public sealed class KeystrokeServiceTests
     }
 
     [TestMethod]
+    public void SendTextAsKeystrokes_WithoutForegroundWindowDoesNotSendInput()
+    {
+        var userSettings = new TestUserSettings
+        {
+            KeystrokeDelayMs = 50,
+            KeystrokeBatchSize = 2,
+        };
+        var sendCount = 0;
+        var service = new KeystrokeService(
+            userSettings,
+            () => IntPtr.Zero,
+            inputs =>
+            {
+                sendCount++;
+                return (uint)inputs.Length;
+            },
+            _ => { });
+
+        service.SendTextAsKeystrokes("abc");
+
+        Assert.AreEqual(0, sendCount);
+    }
+
+    [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void Constructor_WithNullSettings_ThrowsArgumentNullException()
     {

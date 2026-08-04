@@ -3,8 +3,10 @@
 // See the LICENSE file in the project root for more information.
 
 using System.IO.Abstractions.TestingHelpers;
+using System.Threading.Tasks;
 using AdvancedPaste.Settings;
 using Microsoft.PowerToys.Settings.UI.Library;
+using Microsoft.PowerToys.Settings.UI.Library.Utilities;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace AdvancedPaste.UnitTests.HelpersTests;
@@ -34,41 +36,17 @@ public sealed class UserSettingsKeystrokeTests
     [TestMethod]
     public void LoadSettings_WithValidKeystrokeValues()
     {
-        // Arrange
-        const string settingsJson = @"{
-            ""AdvancedPaste"": {
-                ""properties"": {
-                    ""keystroke-delay-ms"": 50,
-                    ""keystroke-batch-size"": 5
-                }
-            }
-        }";
+        using var userSettings = CreateUserSettings(50, 5);
 
-        const string settingsPath = @"C:\Users\TestUser\AppData\Local\Microsoft\PowerToys\AdvancedPaste\settings.json";
-        _fileSystem.AddFile(settingsPath, new MockFileData(settingsJson));
-
-        // Arrange mock to return the settings path
-        // Note: This is a simplified test. In a real scenario, you would mock SettingsUtils
-        // For now, we're testing that the constructor doesn't fail with valid settings
-
-        // Act
-        var userSettings = new UserSettings(_fileSystem);
-
-        // Assert - Constructor should complete without error
-        Assert.IsNotNull(userSettings);
+        Assert.AreEqual(50, userSettings.KeystrokeDelayMs);
+        Assert.AreEqual(5, userSettings.KeystrokeBatchSize);
     }
 
     [TestMethod]
     public void LoadSettings_WithZeroKeystrokeValues_UseDefaults()
     {
-        // Arrange
-        // When keystroke values are 0, they should fall back to defaults
+        using var userSettings = CreateUserSettings(0, 0);
 
-        // Act
-        var userSettings = new UserSettings(_fileSystem);
-
-        // Assert
-        // Since the settings file doesn't exist, defaults should be used
         Assert.AreEqual(AdvancedPasteProperties.DefaultKeystrokeDelayMs, userSettings.KeystrokeDelayMs);
         Assert.AreEqual(AdvancedPasteProperties.DefaultKeystrokeBatchSize, userSettings.KeystrokeBatchSize);
     }
@@ -76,13 +54,8 @@ public sealed class UserSettingsKeystrokeTests
     [TestMethod]
     public void LoadSettings_WithNegativeKeystrokeValues_UseDefaults()
     {
-        // Arrange
-        // Negative values should not be used; defaults should apply
+        using var userSettings = CreateUserSettings(-10, -5);
 
-        // Act
-        var userSettings = new UserSettings(_fileSystem);
-
-        // Assert
         Assert.AreEqual(AdvancedPasteProperties.DefaultKeystrokeDelayMs, userSettings.KeystrokeDelayMs);
         Assert.AreEqual(AdvancedPasteProperties.DefaultKeystrokeBatchSize, userSettings.KeystrokeBatchSize);
     }
@@ -90,14 +63,10 @@ public sealed class UserSettingsKeystrokeTests
     [TestMethod]
     public void Constructor_WithLargeKeystrokeValues()
     {
-        // Act
-        var userSettings = new UserSettings(_fileSystem);
+        using var userSettings = CreateUserSettings(1000, 100);
 
-        // Assert
-        // Constructor should accept any positive keystroke values
-        Assert.IsNotNull(userSettings);
-        Assert.IsTrue(userSettings.KeystrokeDelayMs > 0);
-        Assert.IsTrue(userSettings.KeystrokeBatchSize > 0);
+        Assert.AreEqual(1000, userSettings.KeystrokeDelayMs);
+        Assert.AreEqual(100, userSettings.KeystrokeBatchSize);
     }
 
     [TestMethod]
@@ -112,5 +81,18 @@ public sealed class UserSettingsKeystrokeTests
     {
         // Assert
         Assert.AreEqual(1, AdvancedPasteProperties.DefaultKeystrokeBatchSize);
+    }
+
+    private UserSettings CreateUserSettings(int delayMs, int batchSize)
+    {
+        var settings = new AdvancedPasteSettings();
+        settings.Properties.KeystrokeDelayMs = delayMs;
+        settings.Properties.KeystrokeBatchSize = batchSize;
+
+        var settingsPath = _fileSystem.Path.Combine(
+            Helper.LocalApplicationDataFolder(),
+            @"Microsoft\PowerToys\AdvancedPaste\settings.json");
+        _fileSystem.AddFile(settingsPath, new MockFileData(settings.ToJsonString()));
+        return new UserSettings(_fileSystem, TaskScheduler.Default);
     }
 }
