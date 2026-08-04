@@ -50,7 +50,7 @@ namespace WorkspacesEditorUITest
             {
                 try
                 {
-                    var root = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
+                    var root = Find<Element>(By.AccessibilityId("WorkspacesList"));
                     var buttons = root.FindAll<Button>(By.AccessibilityId("MoreButton"));
 
                     Debug.WriteLine($"Found {buttons.Count} button");
