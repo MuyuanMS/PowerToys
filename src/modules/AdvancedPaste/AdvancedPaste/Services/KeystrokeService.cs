@@ -18,6 +18,7 @@ public sealed class KeystrokeService : IKeystrokeService
 {
     private const short ReturnVirtualKey = 0x0D;
     private const short ShiftVirtualKey = 0x10;
+    private static readonly UIntPtr PowerToysInjectedTag = (UIntPtr)0x110;
     private static readonly short[] ModifierVirtualKeys = [0xA2, 0xA3, 0x5B, 0x5C, 0xA0, 0xA1, 0xA4, 0xA5];
 
     private readonly IUserSettings _userSettings;
@@ -70,9 +71,10 @@ public sealed class KeystrokeService : IKeystrokeService
     /// This is useful for applications that don't support standard clipboard paste operations.
     /// </summary>
     /// <param name="text">The text to send as keystrokes.</param>
+    /// <returns><see langword="true"/> when all text was sent; otherwise, <see langword="false"/>.</returns>
     /// <exception cref="ArgumentNullException">Thrown when text is null.</exception>
     /// <exception cref="InvalidOperationException">Thrown when SendInput fails to send all inputs.</exception>
-    public void SendTextAsKeystrokes(string text)
+    public bool SendTextAsKeystrokes(string text)
     {
         Logger.LogTrace();
 
@@ -81,7 +83,7 @@ public sealed class KeystrokeService : IKeystrokeService
         if (string.IsNullOrEmpty(text))
         {
             Logger.LogWarning("Attempted to send empty text as keystrokes");
-            return;
+            return false;
         }
 
         var delayMs = _userSettings.KeystrokeDelayMs > 0 ? _userSettings.KeystrokeDelayMs : AdvancedPasteProperties.DefaultKeystrokeDelayMs;
@@ -91,7 +93,7 @@ public sealed class KeystrokeService : IKeystrokeService
         if (targetWindow == IntPtr.Zero)
         {
             Logger.LogWarning("Keystroke paste cancelled because there is no foreground window");
-            return;
+            return false;
         }
 
         ReleasePressedModifiers();
@@ -102,7 +104,7 @@ public sealed class KeystrokeService : IKeystrokeService
             if (currentForeground != targetWindow)
             {
                 Logger.LogWarning("Keystroke paste cancelled because the foreground window changed");
-                break;
+                return false;
             }
 
             var inputs = CreateInputSequence(normalizedText[i]);
@@ -113,6 +115,8 @@ public sealed class KeystrokeService : IKeystrokeService
                 _delay(delayMs);
             }
         }
+
+        return true;
     }
 
     private static Helpers.NativeMethods.INPUT CreateUnicodeInput(char character, bool isKeyUp)
@@ -129,7 +133,7 @@ public sealed class KeystrokeService : IKeystrokeService
                     dwFlags = (uint)Helpers.NativeMethods.KeyEventF.Unicode |
                               (isKeyUp ? (uint)Helpers.NativeMethods.KeyEventF.KeyUp : 0),
                     time = 0,
-                    dwExtraInfo = UIntPtr.Zero,
+                    dwExtraInfo = PowerToysInjectedTag,
                 },
             },
         };
@@ -148,7 +152,7 @@ public sealed class KeystrokeService : IKeystrokeService
                     wScan = 0,
                     dwFlags = isKeyUp ? (uint)Helpers.NativeMethods.KeyEventF.KeyUp : 0,
                     time = 0,
-                    dwExtraInfo = UIntPtr.Zero,
+                    dwExtraInfo = PowerToysInjectedTag,
                 },
             },
         };
