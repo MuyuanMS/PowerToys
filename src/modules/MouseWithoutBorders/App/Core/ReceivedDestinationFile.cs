@@ -9,33 +9,31 @@ namespace MouseWithoutBorders.Core;
 
 internal sealed class ReceivedDestinationFile : IDisposable
 {
+    private readonly Action<string, string> commitFile;
     private readonly Action<string> deleteFile;
-    private readonly string path;
+    private readonly string destinationPath;
+    private readonly string stagingPath;
     private bool completed;
 
-    internal ReceivedDestinationFile(string path, Action<string> deleteFile)
+    internal ReceivedDestinationFile(string destinationPath, Action<string> deleteFile, Action<string, string> commitFile)
     {
-        this.path = path;
+        this.destinationPath = destinationPath;
         this.deleteFile = deleteFile;
+        this.commitFile = commitFile;
 
-        try
-        {
-            Stream = new FileStream(path, FileMode.CreateNew);
-            DeleteOnFailure = true;
-        }
-        catch (IOException)
-        {
-            Stream = new FileStream(path, FileMode.Create);
-        }
+        stagingPath = Path.Combine(
+            Path.GetDirectoryName(destinationPath) ?? ".",
+            $".{Path.GetFileName(destinationPath)}.{Guid.NewGuid():N}.partial");
+        Stream = new FileStream(stagingPath, FileMode.CreateNew);
     }
 
     internal FileStream Stream { get; }
 
-    internal bool DeleteOnFailure { get; }
-
     internal void Complete()
     {
         Stream.Flush();
+        Stream.Dispose();
+        commitFile(stagingPath, destinationPath);
         completed = true;
     }
 
@@ -43,9 +41,9 @@ internal sealed class ReceivedDestinationFile : IDisposable
     {
         Stream.Dispose();
 
-        if (DeleteOnFailure && !completed)
+        if (!completed)
         {
-            deleteFile(path);
+            deleteFile(stagingPath);
         }
     }
 }

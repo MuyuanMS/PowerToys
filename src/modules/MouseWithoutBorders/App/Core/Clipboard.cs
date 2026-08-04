@@ -546,9 +546,28 @@ internal static class Clipboard
             }
         }
 
+        void CommitDestinationFile(string sourcePath, string destinationPath)
+        {
+            bool success;
+            if (Common.RunOnLogonDesktop || Common.RunOnScrSaverDesktop)
+            {
+                File.Move(sourcePath, destinationPath, overwrite: true);
+                success = true;
+            }
+            else
+            {
+                success = Launch.ImpersonateLoggedOnUserAndDoSomething(() => File.Move(sourcePath, destinationPath, overwrite: true));
+            }
+
+            if (!success)
+            {
+                throw new IOException($"Could not replace destination file: {destinationPath}");
+            }
+        }
+
         void CreateDestinationFile(string path)
         {
-            destinationFile = new ReceivedDestinationFile(path, DeleteDestinationFile);
+            destinationFile = new ReceivedDestinationFile(path, DeleteDestinationFile, CommitDestinationFile);
             m = destinationFile.Stream;
         }
 
@@ -785,6 +804,7 @@ internal static class Clipboard
 
             if (m != null && fileName != null)
             {
+                long receivedLength = m.Length;
                 if (destinationFile != null)
                 {
                     destinationFile.Complete();
@@ -794,12 +814,12 @@ internal static class Clipboard
                     m.Flush();
                 }
 
-                Logger.LogDebug(m.Length.ToString(CultureInfo.CurrentCulture) + " bytes received.");
+                Logger.LogDebug(receivedLength.ToString(CultureInfo.CurrentCulture) + " bytes received.");
                 Clipboard.LastClipboardEventTime = Common.GetTick();
                 string toolTipText = null;
-                string sizeText = m.Length >= 1024
-                    ? (m.Length / 1024).ToString(CultureInfo.CurrentCulture) + "KB"
-                    : m.Length.ToString(CultureInfo.CurrentCulture) + "Bytes";
+                string sizeText = receivedLength >= 1024
+                    ? (receivedLength / 1024).ToString(CultureInfo.CurrentCulture) + "KB"
+                    : receivedLength.ToString(CultureInfo.CurrentCulture) + "Bytes";
 
                 PowerToysTelemetry.Log.WriteEvent(new MouseWithoutBorders.Telemetry.MouseWithoutBordersClipboardFileTransferEvent());
 

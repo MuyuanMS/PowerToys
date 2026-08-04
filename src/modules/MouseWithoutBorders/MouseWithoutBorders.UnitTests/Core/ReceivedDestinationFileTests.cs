@@ -34,7 +34,7 @@ public sealed class ReceivedDestinationFileTests
         {
             try
             {
-                using var destination = new ReceivedDestinationFile(path, File.Delete);
+                using var destination = CreateDestinationFile(path);
                 destination.Stream.WriteByte(1);
                 throw new IOException("Simulated write failure.");
             }
@@ -43,6 +43,7 @@ public sealed class ReceivedDestinationFileTests
             }
 
             Assert.IsFalse(File.Exists(path));
+            Assert.AreEqual(0, Directory.GetFiles(directory).Length);
         }
         finally
         {
@@ -51,7 +52,7 @@ public sealed class ReceivedDestinationFileTests
     }
 
     [TestMethod]
-    public void IncompleteExistingDestinationIsNotDeletedAfterWriteFailure()
+    public void IncompleteExistingDestinationPreservesOriginalContents()
     {
         var directory = CreateTestDirectory();
         var path = Path.Combine(directory, "received.txt");
@@ -61,7 +62,7 @@ public sealed class ReceivedDestinationFileTests
         {
             try
             {
-                using var destination = new ReceivedDestinationFile(path, File.Delete);
+                using var destination = CreateDestinationFile(path);
                 destination.Stream.WriteByte(1);
                 throw new IOException("Simulated write failure.");
             }
@@ -70,12 +71,42 @@ public sealed class ReceivedDestinationFileTests
             }
 
             Assert.IsTrue(File.Exists(path));
-            Assert.AreEqual(1L, new FileInfo(path).Length);
+            Assert.AreEqual("existing", File.ReadAllText(path));
+            Assert.AreEqual(1, Directory.GetFiles(directory).Length);
         }
         finally
         {
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [TestMethod]
+    public void CompleteExistingDestinationReplacesOriginalContents()
+    {
+        var directory = CreateTestDirectory();
+        var path = Path.Combine(directory, "received.txt");
+        File.WriteAllText(path, "existing");
+
+        try
+        {
+            using (var destination = CreateDestinationFile(path))
+            {
+                destination.Stream.WriteByte(1);
+                destination.Complete();
+            }
+
+            CollectionAssert.AreEqual(new byte[] { 1 }, File.ReadAllBytes(path));
+            Assert.AreEqual(1, Directory.GetFiles(directory).Length);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static ReceivedDestinationFile CreateDestinationFile(string path)
+    {
+        return new ReceivedDestinationFile(path, File.Delete, (source, destination) => File.Move(source, destination, overwrite: true));
     }
 
     private static string CreateTestDirectory()
