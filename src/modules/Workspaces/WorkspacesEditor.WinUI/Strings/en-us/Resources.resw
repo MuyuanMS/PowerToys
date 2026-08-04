@@ -39,6 +39,9 @@
   <data name="Cancel" xml:space="preserve">
     <value>Cancel</value>
   </data>
+  <data name="CancelText.Text" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
   <data name="CliArguments" xml:space="preserve">
     <value>CLI arguments</value>
   </data>
@@ -49,6 +52,9 @@
     <value>Create Workspace</value>
   </data>
   <data name="CreateShortcut" xml:space="preserve">
+    <value>Create desktop shortcut</value>
+  </data>
+  <data name="CreateShortcutLabel.Text" xml:space="preserve">
     <value>Create desktop shortcut</value>
   </data>
   <data name="CreateShortcutCheckBox.Content" xml:space="preserve">
@@ -150,6 +156,9 @@
   <data name="MoveIfExist" xml:space="preserve">
     <value>Move existing windows</value>
   </data>
+  <data name="MoveIfExistLabel.Text" xml:space="preserve">
+    <value>Move existing windows</value>
+  </data>
   <data name="Name" xml:space="preserve">
     <value>Name</value>
   </data>
@@ -189,7 +198,13 @@
   <data name="WorkspaceName" xml:space="preserve">
     <value>Workspace name</value>
   </data>
+  <data name="WorkspaceNameLabel.Text" xml:space="preserve">
+    <value>Workspace name</value>
+  </data>
   <data name="Workspaces" xml:space="preserve">
+    <value>Workspaces</value>
+  </data>
+  <data name="WorkspacesBackText.Text" xml:space="preserve">
     <value>Workspaces</value>
   </data>
   <data name="WorkspacesHeaderBlock.Text" xml:space="preserve">
@@ -199,6 +214,9 @@
     <value>recently</value>
   </data>
   <data name="Revert" xml:space="preserve">
+    <value>Revert</value>
+  </data>
+  <data name="RevertText.Text" xml:space="preserve">
     <value>Revert</value>
   </data>
   <data name="RevertButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
