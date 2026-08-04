@@ -11,15 +11,17 @@ if errorlevel 1 exit /b 0
 @REM (taskkill without /F), which is caught by the message loops in PowerToys.exe, closing its windows
 @REM one by one. We re-check with tasklist each iteration rather than trusting taskkill's exit code,
 @REM so a transient failure (e.g. "Access is denied") is not mistaken for "process not found".
-for /l %%x in (1, 1, 100) do (
+for /l %%x in (1, 1, 10) do (
     tasklist /FI "IMAGENAME eq PowerToys.exe" 2>NUL | find /I "PowerToys.exe" >NUL
     if errorlevel 1 exit /b 0
     taskkill /IM PowerToys.exe 1>NUL 2>NUL
+    if errorlevel 1 goto force_kill
     @REM ping -n 2 waits about one second, giving the app time to shut down.
     ping -n 2 127.0.0.1 >NUL 2>NUL
 )
 
 @REM Force kill if graceful close failed after all attempts, then report the actual outcome.
+:force_kill
 taskkill /F /IM PowerToys.exe 1>NUL 2>NUL
 tasklist /FI "IMAGENAME eq PowerToys.exe" 2>NUL | find /I "PowerToys.exe" >NUL
 if errorlevel 1 exit /b 0
