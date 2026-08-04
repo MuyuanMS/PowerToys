@@ -19,6 +19,7 @@ namespace WorkspacesEditor.Views
         public MainPage()
         {
             this.InitializeComponent();
+            ThemeHelper.TrackActualTheme(this);
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
