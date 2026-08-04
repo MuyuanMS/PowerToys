@@ -304,9 +304,15 @@ namespace ShortcutGuide
                 return;
             }
 
-            _activeWindowsKey = pressedWindowsKey;
             _closeOnWindowsKeyRelease = action == ShortcutGuideWindowsKeyAction.TaskbarIndicators ||
                                         settings.Properties?.CloseOnWindowsKeyRelease?.Value != false;
+            _activeWindowsKey = pressedWindowsKey;
+
+            if ((NativeMethods.GetAsyncKeyState(pressedWindowsKey) & 0x8000) == 0)
+            {
+                _activeWindowsKey = 0;
+                return;
+            }
 
             if (action == ShortcutGuideWindowsKeyAction.OpenShortcutGuide)
             {
@@ -316,6 +322,12 @@ namespace ShortcutGuide
             OverlayWindow.MainPaneControl.Visibility = Visibility.Collapsed;
             OverlayWindow.ShowOverlay();
 
+            if (_closeOnWindowsKeyRelease && _activeWindowsKey == 0)
+            {
+                OverlayWindow.CloseAnimated();
+                return;
+            }
+
             if (action == ShortcutGuideWindowsKeyAction.TaskbarIndicators)
             {
                 OverlayWindow.UpdateTaskbarPaneLayout();
@@ -324,6 +336,12 @@ namespace ShortcutGuide
             }
 
             await OverlayWindow.MainPaneControl.Open();
+            if (_closeOnWindowsKeyRelease && _activeWindowsKey == 0)
+            {
+                OverlayWindow.CloseAnimated();
+                return;
+            }
+
             OverlayWindow.UpdateTaskbarPaneLayout();
             OverlayWindow.MainPaneControl.Visibility = Visibility.Visible;
         }
