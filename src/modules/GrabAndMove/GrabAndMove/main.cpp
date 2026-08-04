@@ -199,6 +199,8 @@ struct WindowPlacementRequest
 {
     HWND hwnd;
     WINDOWPLACEMENT placement;
+    RECT targetRect;
+    bool maximize;
 };
 
 static const wchar_t* const CLASS_NAME = L"GrabAndMove_MsgWnd";
@@ -364,6 +366,41 @@ static bool TryGetVisibleFrameBounds(HWND hwnd, RECT& frameRect)
     return SUCCEEDED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &frameRect, sizeof(frameRect))) && !IsRectEmpty(&frameRect);
 }
 
+static bool UsesWorkspaceCoordinates(HWND hwnd)
+{
+    return (GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOOLWINDOW) == 0;
+}
+
+static void ConvertWorkspaceRectToScreen(HWND hwnd, RECT& rect)
+{
+    if (!UsesWorkspaceCoordinates(hwnd))
+    {
+        return;
+    }
+
+    HMONITOR monitor = MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO monitorInfo = { sizeof(MONITORINFO) };
+    if (GetMonitorInfoW(monitor, &monitorInfo))
+    {
+        OffsetRect(&rect, monitorInfo.rcWork.left - monitorInfo.rcMonitor.left, monitorInfo.rcWork.top - monitorInfo.rcMonitor.top);
+    }
+}
+
+static void ConvertScreenRectToWorkspace(HWND hwnd, RECT& rect)
+{
+    if (!UsesWorkspaceCoordinates(hwnd))
+    {
+        return;
+    }
+
+    HMONITOR monitor = MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO monitorInfo = { sizeof(MONITORINFO) };
+    if (GetMonitorInfoW(monitor, &monitorInfo))
+    {
+        OffsetRect(&rect, monitorInfo.rcMonitor.left - monitorInfo.rcWork.left, monitorInfo.rcMonitor.top - monitorInfo.rcWork.top);
+    }
+}
+
 static RECT GetWindowRectForVisibleFrame(HWND hwnd, const RECT& desiredFrameRect)
 {
     RECT windowRect = {};
@@ -525,14 +562,7 @@ static void UpdatePendingScreenEdgeSnap(POINT pt)
     if (target == ScreenEdgeSnapTarget::Maximize && g_dragWasMaximized)
     {
         RECT restoreRect = g_dragInitialPlacement.rcNormalPosition;
-        HMONITOR restoreMonitor = MonitorFromRect(&restoreRect, MONITOR_DEFAULTTONEAREST);
-        MONITORINFO monitorInfo = { sizeof(MONITORINFO) };
-        if (GetMonitorInfoW(restoreMonitor, &monitorInfo))
-        {
-            const int xOffset = monitorInfo.rcWork.left - monitorInfo.rcMonitor.left;
-            const int yOffset = monitorInfo.rcWork.top - monitorInfo.rcMonitor.top;
-            OffsetRect(&restoreRect, xOffset, yOffset);
-        }
+        ConvertWorkspaceRectToScreen(g_dragTarget, restoreRect);
 
         g_pendingSnapRect = {
             restoreRect.left + g_overlayMarginL,
@@ -555,13 +585,9 @@ static bool ApplyPendingScreenEdgeSnap()
         auto request = std::make_unique<WindowPlacementRequest>(WindowPlacementRequest{
             g_dragTarget,
             g_dragInitialPlacement,
+            GetWindowRectForVisibleFrame(g_dragTarget, g_pendingSnapRect),
+            !g_dragWasMaximized,
         });
-
-        request->placement.showCmd = g_dragWasMaximized ? SW_SHOWNORMAL : SW_SHOWMAXIMIZED;
-        if (!g_dragWasMaximized)
-        {
-            request->placement.ptMaxPosition = { g_pendingSnapRect.left, g_pendingSnapRect.top };
-        }
 
         if (!PostMessageW(g_hMsgWnd, WM_APPLY_WINDOW_PLACEMENT, 0, reinterpret_cast<LPARAM>(request.get())))
         {
@@ -2043,6 +2069,29 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         std::unique_ptr<WindowPlacementRequest> request(reinterpret_cast<WindowPlacementRequest*>(lParam));
         if (request && IsWindow(request->hwnd))
         {
+            if (request->maximize)
+            {
+                WINDOWPLACEMENT targetPlacement = request->placement;
+                ConvertScreenRectToWorkspace(request->hwnd, request->targetRect);
+                targetPlacement.rcNormalPosition = request->targetRect;
+                targetPlacement.showCmd = SW_SHOWNORMAL;
+                targetPlacement.flags |= WPF_ASYNCWINDOWPLACEMENT;
+                SetWindowPlacement(request->hwnd, &targetPlacement);
+
+                targetPlacement.showCmd = SW_SHOWMAXIMIZED;
+                SetWindowPlacement(request->hwnd, &targetPlacement);
+
+                request->placement.showCmd = SW_SHOWMAXIMIZED;
+                request->placement.ptMaxPosition = {
+                    targetPlacement.rcNormalPosition.left,
+                    targetPlacement.rcNormalPosition.top,
+                };
+            }
+            else
+            {
+                request->placement.showCmd = SW_SHOWNORMAL;
+            }
+
             request->placement.flags |= WPF_ASYNCWINDOWPLACEMENT;
             SetWindowPlacement(request->hwnd, &request->placement);
         }
