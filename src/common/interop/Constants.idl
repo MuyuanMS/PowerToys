@@ -16,6 +16,7 @@ namespace PowerToys
             static String TerminateColorPickerSharedEvent();
             static String AdvancedPasteShowUIMessage();
             static String AdvancedPasteMarkdownMessage();
+            static String AdvancedPasteRichTextMessage();
             static String AdvancedPasteJsonMessage();
             static String AdvancedPasteAdditionalActionMessage();
             static String AdvancedPasteCustomActionMessage();

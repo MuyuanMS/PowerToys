@@ -19,6 +19,7 @@ namespace winrt::PowerToys::Interop::implementation
         static hstring TerminateColorPickerSharedEvent();
         static hstring AdvancedPasteShowUIMessage();
         static hstring AdvancedPasteMarkdownMessage();
+        static hstring AdvancedPasteRichTextMessage();
         static hstring AdvancedPasteJsonMessage();
         static hstring AdvancedPasteAdditionalActionMessage();
         static hstring AdvancedPasteCustomActionMessage();

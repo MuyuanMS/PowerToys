@@ -252,33 +252,6 @@ namespace Microsoft.AdvancedPaste.UITests
             Assert.IsTrue(result.IsConsistent, "Paste as Json using shortcut failed.");
         }
 
-        [TestMethod]
-        [TestCategory("AdvancedPasteUITest")]
-        [TestCategory("PasteAsRichText")]
-        [Ignore("Needs baseline RTF file to be generated locally by running the test once")]
-        public void TestCasePasteAsRichText()
-        {
-            if (_notepadSettingsChanged == false)
-            {
-                ChangeNotePadSettings();
-            }
-
-            string pasteAsRichTextSrcFile = "PasteAsRichTextFile.txt";
-            string pasteAsRichTextResultFile = "PasteAsRichTextResultFile.rtf";
-
-            // Copy markdown text
-            // Open Advanced Paste window using hotkey, click Paste as Rich Text button and confirm it is converted to formatted RTF
-            DeleteAndCopyFile(pasteAsRichTextSrcFile, tempTxtFileName);
-            ContentCopyAndPasteAsRichText(tempTxtFileName);
-            
-            // Compare the resulting RTF (which WordPad saves) with the baseline RTF
-            var result = FileReader.CompareRtfFiles(
-                Path.Combine(testFilesFolderPath, tempTxtFileName),
-                Path.Combine(testFilesFolderPath, pasteAsRichTextResultFile),
-                compareFormatting: true);
-            Assert.IsTrue(result.IsConsistent, "Paste as Rich Text failed.");
-        }
-
         /*
          * Clipboard History
            - [x] Open Settings and Enable clipboard history (if not enabled already). Open Advanced Paste window with hotkey, click Clipboard history and try deleting some entry. Check OS clipboard history (Win+V), and confirm that the same entry no longer exist.
@@ -887,68 +860,6 @@ namespace Microsoft.AdvancedPaste.UITests
 
             this.SendKeys(Key.LCtrl, Key.S);
             Thread.Sleep(1000);
-
-            window.Close();
-        }
-
-        private T WaitUntil<T>(Func<T> action, int timeoutMs = 15000)
-        {
-            var stopwatch = Stopwatch.StartNew();
-            while (stopwatch.ElapsedMilliseconds < timeoutMs)
-            {
-                try
-                {
-                    T result = action();
-                    if (result != null) return result;
-                }
-                catch (Exception)
-                {
-                    // Ignore exceptions during polling
-                }
-                Thread.Sleep(200);
-            }
-            throw new TimeoutException("WaitUntil timed out.");
-        }
-
-        private void ContentCopyAndPasteAsRichText(string fileName)
-        {
-            // Open the txt file with notepad
-            string tempFile = Path.Combine(testFilesFolderPath, fileName);
-
-            Process process = Process.Start("notepad.exe", tempFile);
-            if (process == null)
-            {
-                throw new InvalidOperationException("Failed to start Notepad.");
-            }
-
-            // Wait for Notepad to appear
-            var window = WaitUntil(() => FindWindowWithFlexibleTitle(Path.GetFileName(tempFile), false));
-
-            window.Click();
-            Thread.Sleep(200);
-
-            this.SendKeys(Key.LCtrl, Key.A);
-            Thread.Sleep(200);
-            this.SendKeys(Key.LCtrl, Key.C);
-            Thread.Sleep(200);
-            
-            // Delete content so we can paste over it
-            this.SendKeys(Key.Delete);
-            Thread.Sleep(200);
-
-            // Open Advanced Paste window using hotkey
-            this.SendKeys(Key.Win, Key.Shift, Key.V);
-
-            // Wait for Advanced Paste window to appear
-            var apWind = WaitUntil(() => this.Find<Window>("Advanced Paste", global: true));
-            
-            // click Paste as Rich Text button
-            var pasteBtn = WaitUntil(() => apWind.Find<TextBlock>("Paste as Rich Text"));
-            pasteBtn.Click();
-
-            Thread.Sleep(500);
-            this.SendKeys(Key.LCtrl, Key.S);
-            Thread.Sleep(500);
 
             window.Close();
         }
