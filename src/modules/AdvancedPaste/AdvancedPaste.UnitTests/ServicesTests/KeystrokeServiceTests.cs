@@ -69,10 +69,8 @@ public sealed class KeystrokeServiceTests
 
         service.SendTextAsKeystrokes("abcde");
 
-        Assert.AreEqual(3, inputCounts.Count);
-        Assert.AreEqual(4, inputCounts[0]);
-        Assert.AreEqual(4, inputCounts[1]);
-        Assert.AreEqual(2, inputCounts[2]);
+        Assert.AreEqual(5, inputCounts.Count);
+        Assert.IsTrue(inputCounts.TrueForAll(inputCount => inputCount == 2));
         Assert.AreEqual(3, delays.Count);
         Assert.IsTrue(delays.TrueForAll(delay => delay == 50));
     }
@@ -93,8 +91,8 @@ public sealed class KeystrokeServiceTests
 
         service.SendTextAsKeystrokes("abc");
 
-        Assert.AreEqual(1, inputCounts.Count);
-        Assert.AreEqual(6, inputCounts[0]);
+        Assert.AreEqual(3, inputCounts.Count);
+        Assert.IsTrue(inputCounts.TrueForAll(inputCount => inputCount == 2));
         Assert.AreEqual(1, delays.Count);
         Assert.AreEqual(20, delays[0]);
     }
@@ -164,12 +162,41 @@ public sealed class KeystrokeServiceTests
 
         service.SendTextAsKeystrokes("a\r\nb\nc");
 
-        Assert.AreEqual(1, sentBatches.Count);
-        Assert.AreEqual(10, sentBatches[0].Length);
-        Assert.AreEqual((short)0x0D, sentBatches[0][2].data.ki.wVk);
-        Assert.AreEqual((uint)NativeMethods.KeyEventF.KeyUp, sentBatches[0][3].data.ki.dwFlags);
-        Assert.AreEqual((short)0x0D, sentBatches[0][6].data.ki.wVk);
-        Assert.AreEqual((uint)NativeMethods.KeyEventF.KeyUp, sentBatches[0][7].data.ki.dwFlags);
+        Assert.AreEqual(5, sentBatches.Count);
+        Assert.AreEqual(4, sentBatches[1].Length);
+        Assert.AreEqual((short)0x10, sentBatches[1][0].data.ki.wVk);
+        Assert.AreEqual((short)0x0D, sentBatches[1][1].data.ki.wVk);
+        Assert.AreEqual((uint)NativeMethods.KeyEventF.KeyUp, sentBatches[1][2].data.ki.dwFlags);
+        Assert.AreEqual((uint)NativeMethods.KeyEventF.KeyUp, sentBatches[1][3].data.ki.dwFlags);
+        Assert.AreEqual(4, sentBatches[3].Length);
+    }
+
+    [TestMethod]
+    public void SendTextAsKeystrokes_ReleasesPressedModifiersBeforeTyping()
+    {
+        var userSettings = new TestUserSettings
+        {
+            KeystrokeDelayMs = 50,
+            KeystrokeBatchSize = 1,
+        };
+        var sentBatches = new List<NativeMethods.INPUT[]>();
+        var service = new KeystrokeService(
+            userSettings,
+            () => new IntPtr(1),
+            virtualKey => virtualKey == 0xA2 ? unchecked((short)0x8000) : (short)0,
+            inputs =>
+            {
+                sentBatches.Add(inputs);
+                return (uint)inputs.Length;
+            },
+            _ => { });
+
+        service.SendTextAsKeystrokes("a");
+
+        Assert.AreEqual(2, sentBatches.Count);
+        Assert.AreEqual((short)0xA2, sentBatches[0][0].data.ki.wVk);
+        Assert.AreEqual((uint)NativeMethods.KeyEventF.KeyUp, sentBatches[0][0].data.ki.dwFlags);
+        Assert.AreEqual((short)'a', sentBatches[1][0].data.ki.wScan);
     }
 
     [TestMethod]
