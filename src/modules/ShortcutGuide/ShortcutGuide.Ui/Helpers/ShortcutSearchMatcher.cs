@@ -4,12 +4,15 @@
 
 using System;
 using System.Collections.Generic;
+using Common.Search.FuzzSearch;
 using ShortcutGuide.Models;
 
 namespace ShortcutGuide.Helpers
 {
     public static class ShortcutSearchMatcher
     {
+        private const int FuzzyMatchThreshold = (int)SearchPrecisionScore.Regular;
+
         public static bool Matches(ShortcutEntry shortcut, string? query)
         {
             string searchText = query?.Trim() ?? string.Empty;
@@ -18,7 +21,7 @@ namespace ShortcutGuide.Helpers
                 return true;
             }
 
-            if (Contains(shortcut.Name, searchText) || Contains(shortcut.Description, searchText))
+            if (MatchesText(shortcut.Name, searchText) || MatchesText(shortcut.Description, searchText))
             {
                 return true;
             }
@@ -27,7 +30,7 @@ namespace ShortcutGuide.Helpers
             {
                 foreach (string label in GetSearchLabels(description))
                 {
-                    if (Contains(label, searchText))
+                    if (MatchesText(label, searchText))
                     {
                         return true;
                     }
@@ -99,9 +102,11 @@ namespace ShortcutGuide.Helpers
             };
         }
 
-        private static bool Contains(string? value, string searchText)
+        private static bool MatchesText(string? value, string searchText)
         {
-            return value?.Contains(searchText, StringComparison.OrdinalIgnoreCase) == true;
+            return value is not null &&
+                   (value.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                    StringMatcher.FuzzyMatch(searchText, value).RawScore >= FuzzyMatchThreshold);
         }
     }
 }

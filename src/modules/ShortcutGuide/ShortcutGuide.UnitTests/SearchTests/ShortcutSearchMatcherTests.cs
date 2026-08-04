@@ -33,6 +33,16 @@ public sealed class ShortcutSearchMatcherTests
     }
 
     [TestMethod]
+    [DataRow("tgl dsk")]
+    [DataRow("mng vrtl")]
+    public void Matches_NonContiguousFuzzyQuery_ReturnsTrue(string query)
+    {
+        var shortcut = CreateShortcut(name: "Toggle desktop", description: "Manage Virtual Desktops");
+
+        Assert.IsTrue(ShortcutSearchMatcher.Matches(shortcut, query));
+    }
+
+    [TestMethod]
     [DataRow("windows", true, false, false, false)]
     [DataRow("control", false, true, false, false)]
     [DataRow("alt", false, false, true, false)]
