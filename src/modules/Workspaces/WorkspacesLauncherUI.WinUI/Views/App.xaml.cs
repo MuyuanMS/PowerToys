@@ -24,6 +24,8 @@ namespace WorkspacesLauncherUI
 
         public static Action<string> IPCMessageReceivedCallback { get; set; }
 
+        public static Action CancelAcknowledgedCallback { get; set; }
+
         public static DispatcherQueue DispatcherQueue { get; private set; }
 
         public App()
@@ -62,6 +64,12 @@ namespace WorkspacesLauncherUI
                 "\\\\.\\pipe\\powertoys_workspaces_launcher_ui_",
                 (string message) =>
                 {
+                    if (message == "cancel_ack")
+                    {
+                        DispatcherQueue.TryEnqueue(() => CancelAcknowledgedCallback?.Invoke());
+                        return;
+                    }
+
                     if (IPCMessageReceivedCallback != null && message.Length > 0)
                     {
                         DispatcherQueue.TryEnqueue(() =>
