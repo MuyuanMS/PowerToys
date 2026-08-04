@@ -579,68 +579,115 @@ internal static class Clipboard
                 // the file ends up owned by that user and inherits the folder's permissions. On the
                 // logon/screen-saver desktop the storage lives under Program Files where there is no
                 // interactive user to impersonate, so create the file directly.
-                void CreateDestinationFile(string path)
+                void CloseDestinationFile()
                 {
-                    if (Common.RunOnLogonDesktop || Common.RunOnScrSaverDesktop)
+                    m?.Close();
+                    m = null;
+                }
+
+                bool TryCreateDestinationFile(string path)
+                {
+                    CloseDestinationFile();
+
+                    bool success = false;
+                    try
                     {
-                        m = new FileStream(path, FileMode.Create);
-                    }
-                    else
-                    {
-                        bool success = Launch.ImpersonateLoggedOnUserAndDoSomething(() =>
+                        if (Common.RunOnLogonDesktop || Common.RunOnScrSaverDesktop)
                         {
                             m = new FileStream(path, FileMode.Create);
-                        });
+                            success = true;
+                        }
+                        else
+                        {
+                            success = Launch.ImpersonateLoggedOnUserAndDoSomething(() =>
+                            {
+                                m = new FileStream(path, FileMode.Create);
+                            });
+                        }
 
                         if (!success || m == null)
                         {
-                            Logger.Log("Impersonation failed for file creation, falling back to direct creation.");
-                            m = new FileStream(path, FileMode.Create);
+                            Logger.Log(string.Format(
+                                CultureInfo.CurrentCulture,
+                                "Could not create destination file while impersonating the logged-on user: {0}",
+                                path));
                         }
                     }
+                    catch (Exception e)
+                    {
+                        Logger.Log(e);
+                        CloseDestinationFile();
+                    }
+
+                    return success && m != null;
                 }
 
                 if (postAct.Equals("desktop", StringComparison.OrdinalIgnoreCase))
                 {
                     // Create the folder and open the file in a single impersonated scope so both
                     // are owned by the logged-on user. This branch always targets the user's Desktop.
-                    bool success = Launch.ImpersonateLoggedOnUserAndDoSomething(() =>
+                    CloseDestinationFile();
+                    bool success = false;
+                    try
                     {
-                        savingFolder = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\MouseWithoutBorders\\";
-
-                        if (!Directory.Exists(savingFolder))
+                        success = Launch.ImpersonateLoggedOnUserAndDoSomething(() =>
                         {
-                            _ = Directory.CreateDirectory(savingFolder);
-                        }
+                            savingFolder = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\MouseWithoutBorders\\";
+                            tempFile = savingFolder + Path.GetFileName(fileName);
 
-                        tempFile = savingFolder + Path.GetFileName(fileName);
-                        m = new FileStream(tempFile, FileMode.Create);
-                    });
+                            if (!Directory.Exists(savingFolder))
+                            {
+                                _ = Directory.CreateDirectory(savingFolder);
+                            }
+
+                            m = new FileStream(tempFile, FileMode.Create);
+                        });
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Log(e);
+                        CloseDestinationFile();
+                    }
 
                     if (!success || m == null)
                     {
-                        Logger.Log("Impersonation failed for desktop file creation, falling back to direct creation.");
-                        savingFolder = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\MouseWithoutBorders\\";
-                        if (!Directory.Exists(savingFolder))
-                        {
-                            _ = Directory.CreateDirectory(savingFolder);
-                        }
-
-                        tempFile = savingFolder + Path.GetFileName(fileName);
-                        m = new FileStream(tempFile, FileMode.Create);
+                        CloseDestinationFile();
+                        string destinationPath = tempFile.Equals("data", StringComparison.Ordinal)
+                            ? Path.GetFileName(fileName)
+                            : tempFile;
+                        Logger.Log(string.Format(
+                            CultureInfo.CurrentCulture,
+                            "Could not create desktop destination file while impersonating the logged-on user: {0}",
+                            destinationPath));
+                        Common.SetToggleIcon(new int[Common.TOGGLE_ICONS_SIZE] { Common.ICON_ERROR, -1, Common.ICON_ERROR, -1 });
+                        Common.ShowToolTip("Could not create the destination file.", 1000, ToolTipIcon.Warning, Setting.Values.ShowClipNetStatus);
+                        s.Close();
+                        return;
                     }
                 }
                 else if (postAct.Contains("mspaint"))
                 {
                     tempFile = Common.GetMyStorageDir() + @"ScreenCapture-" +
                         remoteMachine + ".png";
-                    CreateDestinationFile(tempFile);
+                    if (!TryCreateDestinationFile(tempFile))
+                    {
+                        Common.SetToggleIcon(new int[Common.TOGGLE_ICONS_SIZE] { Common.ICON_ERROR, -1, Common.ICON_ERROR, -1 });
+                        Common.ShowToolTip("Could not create the destination file.", 1000, ToolTipIcon.Warning, Setting.Values.ShowClipNetStatus);
+                        s.Close();
+                        return;
+                    }
                 }
                 else
                 {
                     tempFile = Common.GetMyStorageDir();
                     tempFile += Path.GetFileName(fileName);
-                    CreateDestinationFile(tempFile);
+                    if (!TryCreateDestinationFile(tempFile))
+                    {
+                        Common.SetToggleIcon(new int[Common.TOGGLE_ICONS_SIZE] { Common.ICON_ERROR, -1, Common.ICON_ERROR, -1 });
+                        Common.ShowToolTip("Could not create the destination file.", 1000, ToolTipIcon.Warning, Setting.Values.ShowClipNetStatus);
+                        s.Close();
+                        return;
+                    }
                 }
 
                 Logger.Log("==> " + tempFile);
