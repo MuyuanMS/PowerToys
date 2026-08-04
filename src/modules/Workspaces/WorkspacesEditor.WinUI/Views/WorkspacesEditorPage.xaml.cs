@@ -67,6 +67,12 @@ namespace WorkspacesEditor.Views
             _mainViewModel.SaveOrAddProject(EditedProject);
         }
 
+        private void CancelButtonClicked(object sender, RoutedEventArgs e)
+        {
+            TempProjectData.DeleteTempFile();
+            _mainViewModel?.SwitchToMainView();
+        }
+
         private void DeleteButtonClicked(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement element && element.Tag is Application app)

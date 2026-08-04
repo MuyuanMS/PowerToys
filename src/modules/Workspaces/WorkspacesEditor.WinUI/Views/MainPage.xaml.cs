@@ -6,6 +6,7 @@ using System;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
+using WorkspacesEditor.Helpers;
 using WorkspacesEditor.Models;
 using WorkspacesEditor.ViewModels;
 
@@ -90,10 +91,24 @@ namespace WorkspacesEditor.Views
             }
         }
 
+        private void WorkspaceItemClicked(object sender, ItemClickEventArgs e)
+        {
+            if (e.ClickedItem is Project project)
+            {
+                ViewModel.CloseAllPopups();
+                ViewModel.EditProject(project);
+            }
+        }
+
         private static Project GetProjectFromSender(object sender)
         {
             if (sender is FrameworkElement element)
             {
+                if (element.Tag is Project taggedProject)
+                {
+                    return taggedProject;
+                }
+
                 // Direct DataContext (works for card button with DataContext="{x:Bind}")
                 if (element.DataContext is Project project)
                 {
@@ -128,6 +143,40 @@ namespace WorkspacesEditor.Views
                 catch (System.Exception ex)
                 {
                     ManagedCommon.Logger.LogError($"LaunchProject failed: {ex.Message}");
+                }
+            }
+
+            private void EditButtonClicked(object sender, RoutedEventArgs e)
+            {
+                Project project = GetProjectFromSender(sender);
+                if (project != null)
+                {
+                    ViewModel.CloseAllPopups();
+                    ViewModel.EditProject(project);
+                }
+            }
+
+            private async void DeleteButtonClicked(object sender, RoutedEventArgs e)
+            {
+                Project project = GetProjectFromSender(sender);
+                if (project == null)
+                {
+                    return;
+                }
+
+                var dialog = new ContentDialog
+                {
+                    Title = ResourceLoaderInstance.ResourceLoader?.GetString("Are_You_Sure") ?? "Are you sure?",
+                    Content = ResourceLoaderInstance.ResourceLoader?.GetString("Are_You_Sure_Description") ?? "Are you sure you want to delete this Workspace?",
+                    PrimaryButtonText = ResourceLoaderInstance.ResourceLoader?.GetString("Delete") ?? "Remove",
+                    CloseButtonText = ResourceLoaderInstance.ResourceLoader?.GetString("Cancel") ?? "Cancel",
+                    DefaultButton = ContentDialogButton.Primary,
+                    XamlRoot = XamlRoot,
+                };
+
+                if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+                {
+                    ViewModel.DeleteProject(project);
                 }
             }
         }

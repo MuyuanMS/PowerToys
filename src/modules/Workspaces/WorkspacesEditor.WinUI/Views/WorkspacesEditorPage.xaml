@@ -30,7 +30,6 @@
                     HorizontalContentAlignment="Stretch"
                     AutomationProperties.AutomationId="{x:Bind AppName, Mode=OneWay}"
                     AutomationProperties.Name="{x:Bind AppName, Mode=OneWay}"
-                    IsEnabled="{x:Bind IsIncluded, Mode=OneWay}"
                     IsExpanded="{x:Bind IsExpanded, Mode=TwoWay}">
                     <tkcontrols:SettingsExpander.HeaderIcon>
                         <ImageIcon Source="{x:Bind IconImage, Mode=OneWay}" />
@@ -70,14 +69,19 @@
                         Tag="{x:Bind}" />
                     <tkcontrols:SettingsExpander.Items>
 
-                        <tkcontrols:SettingsCard x:Uid="LaunchAsAdminCard" ContentAlignment="Left">
+                        <tkcontrols:SettingsCard
+                            x:Uid="LaunchAsAdminCard"
+                            ContentAlignment="Left"
+                            IsEnabled="{x:Bind IsIncluded, Mode=OneWay}">
                             <CheckBox
                                 x:Uid="LaunchAsAdminLabel"
                                 MinWidth="12"
                                 IsChecked="{x:Bind IsElevated, Mode=TwoWay}"
                                 IsEnabled="{x:Bind CanLaunchElevated, Mode=OneWay}" />
                         </tkcontrols:SettingsCard>
-                        <tkcontrols:SettingsCard x:Uid="CliArgsTextBox">
+                        <tkcontrols:SettingsCard
+                            x:Uid="CliArgsTextBox"
+                            IsEnabled="{x:Bind IsIncluded, Mode=OneWay}">
 
                             <TextBox
                                 x:Uid="CliArgsInput"
@@ -89,7 +93,9 @@
                                 TextChanged="CommandLineTextBox_TextChanged" />
                         </tkcontrols:SettingsCard>
 
-                        <tkcontrols:SettingsCard x:Uid="WindowPositionComboBox">
+                        <tkcontrols:SettingsCard
+                            x:Uid="WindowPositionComboBox"
+                            IsEnabled="{x:Bind IsIncluded, Mode=OneWay}">
                             <ComboBox
                                 x:Uid="WindowPositionInput"
                                 VerticalAlignment="Center"
@@ -99,7 +105,10 @@
                                 <ComboBoxItem x:Uid="MinimizedItem" />
                             </ComboBox>
                         </tkcontrols:SettingsCard>
-                        <tkcontrols:SettingsCard x:Uid="PositionHeader" Visibility="{x:Bind EditPositionEnabled, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+                        <tkcontrols:SettingsCard
+                            x:Uid="PositionHeader"
+                            IsEnabled="{x:Bind IsIncluded, Mode=OneWay}"
+                            Visibility="{x:Bind EditPositionEnabled, Mode=OneWay, Converter={StaticResource BoolToVis}}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <TextBlock
                                     x:Uid="LeftLabel"
@@ -288,5 +297,4 @@
         </ScrollViewer>
     </Grid>
 </Page>
-
 

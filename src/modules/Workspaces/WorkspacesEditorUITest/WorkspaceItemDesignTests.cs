@@ -139,8 +139,8 @@ public class WorkspaceItemDesignTests : WorkspacesUiAutomationBase
     {
         try
         {
-            var root = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
-            return root != null;
+            var root = Find<Element>(By.AccessibilityId("WorkspacesList"));
+            return root.FindAll<Element>(By.ClassName("ListViewItem")).Count > 0;
         }
         catch
         {
@@ -150,8 +150,9 @@ public class WorkspaceItemDesignTests : WorkspacesUiAutomationBase
 
     private Element GetFirstWorkspaceItem()
     {
-        var root = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
-        var items = root.FindAll<Element>(By.ClassName("WorkspaceItem"));
-        return items.Count > 0 ? items[0] : root;
+        var root = Find<Element>(By.AccessibilityId("WorkspacesList"));
+        var items = root.FindAll<Element>(By.ClassName("ListViewItem"));
+        Assert.IsTrue(items.Count > 0, "Expected at least one workspace list item.");
+        return items[0];
     }
 }

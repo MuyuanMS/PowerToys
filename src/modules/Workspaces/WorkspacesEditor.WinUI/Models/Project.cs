@@ -311,8 +311,26 @@ namespace WorkspacesEditor.Models
                 return new MonitorSetup("Unknown", string.Empty, app.MonitorNumber, 96, default, default);
             }
 
-            return Monitors.FirstOrDefault(m => m.MonitorNumber == app.MonitorNumber)
-                ?? Monitors[0];
+            MonitorSetup monitor = Monitors.FirstOrDefault(m => m.MonitorNumber == app.MonitorNumber);
+            if (monitor != null)
+            {
+                return monitor;
+            }
+
+            int middleX = app.Position.X + (app.Position.Width / 2);
+            int middleY = app.Position.Y + (app.Position.Height / 2);
+            monitor = Monitors.FirstOrDefault(candidate =>
+                candidate.MonitorDpiUnawareBounds.Left < middleX &&
+                candidate.MonitorDpiUnawareBounds.Right > middleX &&
+                candidate.MonitorDpiUnawareBounds.Top < middleY &&
+                candidate.MonitorDpiUnawareBounds.Bottom > middleY);
+
+            monitor ??= Monitors
+                .OrderBy(candidate => Math.Abs(candidate.MonitorDpiUnawareBounds.Left) + Math.Abs(candidate.MonitorDpiUnawareBounds.Top))
+                .First();
+
+            app.MonitorNumber = monitor.MonitorNumber;
+            return monitor;
         }
 
         public void CloseExpanders()
@@ -326,7 +344,19 @@ namespace WorkspacesEditor.Models
         public void UpdateAfterLaunchAndEdit(Project projectBefore)
         {
             Id = projectBefore.Id;
+            Name = projectBefore.Name;
+            MoveExistingWindows = projectBefore.MoveExistingWindows;
             IsRevertEnabled = true;
+
+            foreach (Application app in Applications)
+            {
+                Application previousApp = projectBefore.Applications.FirstOrDefault(candidate => candidate.Id.Equals(app.Id, StringComparison.OrdinalIgnoreCase));
+                if (previousApp != null)
+                {
+                    app.CommandLineArguments = previousApp.CommandLineArguments;
+                    app.IsElevated = previousApp.IsElevated;
+                }
+            }
         }
 
         private static string GetString(string key)

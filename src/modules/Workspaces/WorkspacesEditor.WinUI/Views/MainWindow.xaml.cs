@@ -3,14 +3,17 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Threading;
 using CommunityToolkit.Mvvm.Messaging;
 using ManagedCommon;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.Graphics;
 using WinRT.Interop;
 using WinUIEx;
 using WorkspacesEditor.Helpers;
@@ -27,14 +30,20 @@ namespace WorkspacesEditor
 
         private readonly CancellationTokenSource _cancellationToken = new();
         private System.ComponentModel.PropertyChangedEventHandler _vmPropertyChangedHandler;
+        private RectInt32 _lastNormalBounds;
+
+        private static string WindowPlacementPath => Path.Combine(WorkspacesCsharpLibrary.Utils.FolderUtils.DataFolder(), "editor-window-placement.json");
 
         public MainWindow()
         {
             this.InitializeComponent();
+            MinWidth = MinWindowWidth;
+            MinHeight = MinWindowHeight;
 
             var hwnd = WindowNative.GetWindowHandle(this);
 
-            this.CenterOnScreen();
+            RestoreWindowPlacement();
+            AppWindow.Changed += AppWindow_Changed;
 
             AppWindow.SetIcon("Assets/Workspaces/Workspaces.ico");
 
@@ -207,9 +216,75 @@ namespace WorkspacesEditor
             }
 
             _cancellationToken.Cancel();
+            SaveWindowPlacement();
             _cancellationToken.Dispose();
             (Microsoft.UI.Xaml.Application.Current as IDisposable)?.Dispose();
         }
+
+        private void AppWindow_Changed(AppWindow sender, AppWindowChangedEventArgs args)
+        {
+            if (sender.Presenter is OverlappedPresenter presenter && presenter.State == OverlappedPresenterState.Restored)
+            {
+                _lastNormalBounds = new RectInt32(sender.Position.X, sender.Position.Y, sender.Size.Width, sender.Size.Height);
+            }
+        }
+
+        private void RestoreWindowPlacement()
+        {
+            try
+            {
+                if (File.Exists(WindowPlacementPath))
+                {
+                    WindowPlacement placement = JsonSerializer.Deserialize<WindowPlacement>(File.ReadAllText(WindowPlacementPath));
+                    if (placement != null && placement.Width >= MinWindowWidth && placement.Height >= MinWindowHeight)
+                    {
+                        var center = new PointInt32(placement.X + (placement.Width / 2), placement.Y + (placement.Height / 2));
+                        DisplayArea display = DisplayArea.GetFromPoint(center, DisplayAreaFallback.Nearest);
+                        RectInt32 workArea = display.WorkArea;
+                        var bounds = new RectInt32(placement.X, placement.Y, placement.Width, placement.Height);
+                        bool intersects = bounds.X < workArea.X + workArea.Width &&
+                                          bounds.X + bounds.Width > workArea.X &&
+                                          bounds.Y < workArea.Y + workArea.Height &&
+                                          bounds.Y + bounds.Height > workArea.Y;
+                        if (intersects)
+                        {
+                            AppWindow.MoveAndResize(bounds);
+                            _lastNormalBounds = bounds;
+                            if (placement.Maximized && AppWindow.Presenter is OverlappedPresenter presenter)
+                            {
+                                presenter.Maximize();
+                            }
+
+                            return;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning($"Failed to restore Workspaces Editor window placement: {ex.Message}");
+            }
+
+            this.CenterOnScreen();
+            _lastNormalBounds = new RectInt32(AppWindow.Position.X, AppWindow.Position.Y, AppWindow.Size.Width, AppWindow.Size.Height);
+        }
+
+        private void SaveWindowPlacement()
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(WindowPlacementPath));
+                bool maximized = AppWindow.Presenter is OverlappedPresenter presenter && presenter.State == OverlappedPresenterState.Maximized;
+                RectInt32 bounds = _lastNormalBounds.Width > 0 ? _lastNormalBounds : new RectInt32(AppWindow.Position.X, AppWindow.Position.Y, AppWindow.Size.Width, AppWindow.Size.Height);
+                File.WriteAllText(WindowPlacementPath, JsonSerializer.Serialize(new WindowPlacement(bounds.X, bounds.Y, bounds.Width, bounds.Height, maximized)));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning($"Failed to save Workspaces Editor window placement: {ex.Message}");
+            }
+        }
+
+        private sealed record WindowPlacement(int X, int Y, int Width, int Height, bool Maximized);
 
         private static bool ApplicationIsInFocus()
         {
