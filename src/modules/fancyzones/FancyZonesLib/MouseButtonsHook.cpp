@@ -8,6 +8,7 @@ HHOOK MouseButtonsHook::hHook = {};
 std::function<void()> MouseButtonsHook::secondaryClickCallback = {};
 std::function<void()> MouseButtonsHook::middleClickCallback = {};
 std::function<bool(bool)> MouseButtonsHook::wheelCallback = {};
+int MouseButtonsHook::wheelDeltaAccumulator = 0;
 
 MouseButtonsHook::MouseButtonsHook(std::function<void()> extRightClickCallback, std::function<void()> extMiddleClickCallback, std::function<bool(bool)> extWheelCallback)
 {
@@ -32,6 +33,8 @@ void MouseButtonsHook::enable()
 
 void MouseButtonsHook::disable()
 {
+    wheelDeltaAccumulator = 0;
+
     if (hHook)
     {
         UnhookWindowsHookEx(hHook);
@@ -58,9 +61,24 @@ LRESULT CALLBACK MouseButtonsHook::MouseButtonsProc(int nCode, WPARAM wParam, LP
         else if (wParam == WM_MOUSEWHEEL)
         {
             const auto delta = GET_WHEEL_DELTA_WPARAM(reinterpret_cast<MSLLHOOKSTRUCT*>(lParam)->mouseData);
-            if (delta != 0 && wheelCallback(delta > 0))
+            wheelDeltaAccumulator += delta;
+
+            bool handled = false;
+            while (std::abs(wheelDeltaAccumulator) >= WHEEL_DELTA)
             {
-                // The wheel event was used to switch layouts, don't let it scroll the underlying window
+                const bool up = wheelDeltaAccumulator > 0;
+                if (!wheelCallback(up))
+                {
+                    wheelDeltaAccumulator = 0;
+                    break;
+                }
+
+                handled = true;
+                wheelDeltaAccumulator += up ? -WHEEL_DELTA : WHEEL_DELTA;
+            }
+
+            if (handled)
+            {
                 return 1;
             }
         }

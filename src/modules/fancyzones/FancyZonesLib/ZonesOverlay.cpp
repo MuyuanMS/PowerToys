@@ -255,10 +255,24 @@ ZonesOverlay::RenderResult ZonesOverlay::Render()
             IDWriteTextLayout* nameLayout = nullptr;
             const float clientWidth = static_cast<float>(m_clientRect.right - m_clientRect.left);
             const float clientHeight = static_cast<float>(m_clientRect.bottom - m_clientRect.top);
+            const float marginX = clientWidth * LayoutNameMarginXRatio;
+            const float marginY = clientHeight * LayoutNameMarginYRatio;
+            const float maxTextWidth = (std::max)(1.f, clientWidth - 2 * marginX - 2 * m_layoutNameLabel->paddingX);
             if (nameFormat)
             {
                 nameFormat->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
-                writeFactory->CreateTextLayout(m_layoutNameLabel->text.c_str(), static_cast<UINT32>(m_layoutNameLabel->text.size()), nameFormat, clientWidth, clientHeight, &nameLayout);
+
+                IDWriteInlineObject* trimmingSign = nullptr;
+                if (SUCCEEDED(writeFactory->CreateEllipsisTrimmingSign(nameFormat, &trimmingSign)))
+                {
+                    const DWRITE_TRIMMING trimming{
+                        .granularity = DWRITE_TRIMMING_GRANULARITY_CHARACTER,
+                    };
+                    nameFormat->SetTrimming(&trimming, trimmingSign);
+                    trimmingSign->Release();
+                }
+
+                writeFactory->CreateTextLayout(m_layoutNameLabel->text.c_str(), static_cast<UINT32>(m_layoutNameLabel->text.size()), nameFormat, maxTextWidth, clientHeight, &nameLayout);
             }
 
             if (nameLayout)
@@ -266,10 +280,8 @@ ZonesOverlay::RenderResult ZonesOverlay::Render()
                 DWRITE_TEXT_METRICS metrics{};
                 nameLayout->GetMetrics(&metrics);
 
-                const float chipWidth = metrics.width + 2 * m_layoutNameLabel->paddingX;
+                const float chipWidth = (std::min)(metrics.width, maxTextWidth) + 2 * m_layoutNameLabel->paddingX;
                 const float chipHeight = metrics.height + 2 * m_layoutNameLabel->paddingY;
-                const float marginX = clientWidth * LayoutNameMarginXRatio;
-                const float marginY = clientHeight * LayoutNameMarginYRatio;
 
                 float left = (clientWidth - chipWidth) / 2.f;
                 float top = marginY;
