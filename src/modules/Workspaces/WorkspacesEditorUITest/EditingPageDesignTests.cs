@@ -96,7 +96,7 @@ public class EditingPageDesignTests : WorkspacesUiAutomationBase
 
         // Should have some app items visible
         Assert.IsTrue(
-            Has<Element>(By.AccessibilityId("AppList")) || Has<Custom>("AppList"),
+            Has<Element>(By.AccessibilityId("CapturedAppList")),
             "Editing page should have an application list");
 
         CancelAndReturn();
@@ -117,24 +117,11 @@ public class EditingPageDesignTests : WorkspacesUiAutomationBase
     private void NavigateToEditPage()
     {
         AttachWorkspacesEditor();
-        try
-        {
-            var root = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
-            var moreButton = root.Find<Button>(By.AccessibilityId("MoreButton"));
-            moreButton.Click();
-            Task.Delay(500).Wait();
-
-            var editButton = Find<Button>(By.Name("Edit"));
-            editButton.Click();
-            Task.Delay(1000).Wait();
-        }
-        catch
-        {
-            // If edit via more menu doesn't work, try direct edit button
-            var editButton = Find<Button>(By.Name("Edit"));
-            editButton?.Click();
-            Task.Delay(1000).Wait();
-        }
+        var root = Find<Element>(By.AccessibilityId("WorkspacesList"));
+        var items = root.FindAll<Element>(By.ClassName("ListViewItem"));
+        Assert.IsTrue(items.Count > 0, "Expected a workspace item to edit.");
+        items[0].Click();
+        Task.Delay(1000).Wait();
     }
 
     private void CancelAndReturn()

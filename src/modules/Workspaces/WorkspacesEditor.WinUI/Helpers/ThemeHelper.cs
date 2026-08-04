@@ -8,18 +8,22 @@ namespace WorkspacesEditor.Helpers
 {
     internal static class ThemeHelper
     {
+        private static ElementTheme _actualTheme = ElementTheme.Default;
+
+        internal static void TrackActualTheme(FrameworkElement root)
+        {
+            _actualTheme = root.ActualTheme;
+            root.ActualThemeChanged += (_, _) => _actualTheme = root.ActualTheme;
+        }
+
         /// <summary>
         /// Returns true if the current app theme is dark.
         /// Uses WinUI Application.RequestedTheme which respects system settings.
         /// </summary>
         internal static bool IsDarkTheme()
         {
-            if (Application.Current?.RequestedTheme == ApplicationTheme.Dark)
-            {
-                return true;
-            }
-
-            return false;
+            return _actualTheme == ElementTheme.Dark ||
+                   (_actualTheme == ElementTheme.Default && Application.Current?.RequestedTheme == ApplicationTheme.Dark);
         }
     }
 }
