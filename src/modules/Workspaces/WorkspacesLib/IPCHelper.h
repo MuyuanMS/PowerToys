@@ -19,11 +19,13 @@ public:
     ~IPCHelper();
 
     void send(const std::wstring& message) const;
+    void StopReceiving();
 
 private:
     void receive(const std::wstring& msg);
 
     std::unique_ptr<TwoWayPipeMessageIPC> ipc;
     std::mutex ipcMutex;
+    std::mutex callbackMutex;
     std::function<void(const std::wstring&)> callback;
 };
