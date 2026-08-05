@@ -12,8 +12,7 @@ namespace WorkspacesLauncherUI.Models
 {
     /// <summary>
     /// Model representing an application's launch status in the Launcher UI.
-    /// Drives the display of the spinner (Loading), checkmark/X glyph (StateGlyph),
-    /// and color (StateColor) for each app row.
+    /// Exposes loading, state, icon, and localized automation properties for each app row.
     /// </summary>
     public partial class AppLaunching : ObservableObject
     {

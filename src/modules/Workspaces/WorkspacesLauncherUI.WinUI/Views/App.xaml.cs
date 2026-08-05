@@ -80,6 +80,7 @@ namespace WorkspacesLauncherUI
                     }
                 });
             _ipcManager.Start();
+            SendIPCMessage("ready");
 
             _mainWindow.Activate();
         }

@@ -96,8 +96,8 @@ Example:
 public void ReceiveIpcMessage_NewFieldAdded_DeserializesWithoutBreakingExistingFields()
 ```
 
-## Note on Color Assertions
+## Note on Status Assertions
 
-Color tests use `AppLaunching.StateColorValue` (returns `Windows.UI.Color`) instead of
-`StateColor` (returns `SolidColorBrush`) because WinUI brush creation requires a UI thread.
-The `StateColorValue` property exposes the same ARGB values for headless test validation.
+Status tests validate `AppLaunching.Loading`, `LaunchStateInt`, and
+`StateAutomationName`. Glyphs and colors are selected by `StatusPage.xaml` and are
+not exposed as model properties.

@@ -25,7 +25,6 @@ Launcher::Launcher(const WorkspacesData::WorkspacesProject& project,
     Logger::info(L"Launch Workspace {} : {}", m_project.name, m_project.id);
 
     m_uiHelper->LaunchUI();
-    m_uiHelper->UpdateLaunchStatus(m_launchingStatus.Get());
 
     bool launchElevated = std::find_if(m_project.apps.begin(), m_project.apps.end(), [](const WorkspacesData::WorkspacesProject::Application& app) { return app.isElevated; }) != m_project.apps.end();
     m_windowArrangerHelper->Launch(m_project.id, launchElevated, [&]() -> bool
@@ -195,7 +194,12 @@ void Launcher::handleWindowArrangerMessage(const std::wstring& msg) // Workspace
 
 void Launcher::handleUIMessage(const std::wstring& msg) // UI IPC thread
 {
-    if (msg == L"cancel")
+    if (msg == L"ready")
+    {
+        std::lock_guard lock(m_uiHelperMutex);
+        m_uiHelper->UpdateLaunchStatus(m_launchingStatus.Get());
+    }
+    else if (msg == L"cancel")
     {
         m_launchingStatus.Cancel();
 
