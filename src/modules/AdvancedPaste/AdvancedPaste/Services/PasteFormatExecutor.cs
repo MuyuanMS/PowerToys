@@ -30,7 +30,8 @@ public sealed class PasteFormatExecutor(IKernelService kernelService, ICustomAct
             return null;
         }
 
-        if (!IsProviderAllowedByGPO(pasteFormat.ProviderId))
+        if (PasteFormat.MetadataDict[pasteFormat.Format].RequiresAIService
+            && !IsProviderAllowedByGPO(pasteFormat.ProviderId))
         {
             throw new PasteActionException(
                 ResourceLoaderInstance.ResourceLoader.GetString("PasteError"),

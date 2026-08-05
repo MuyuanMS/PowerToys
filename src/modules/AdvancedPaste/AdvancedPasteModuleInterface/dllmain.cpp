@@ -172,7 +172,6 @@ private:
     bool is_ai_enabled()
     {
         return gpo_policy_enabled_configuration() != powertoys_gpo::gpo_rule_configured_disabled &&
-               powertoys_gpo::getAllowedAdvancedPasteOnlineAIModelsValue() != powertoys_gpo::gpo_rule_configured_disabled &&
                m_is_ai_enabled;
     }
 
