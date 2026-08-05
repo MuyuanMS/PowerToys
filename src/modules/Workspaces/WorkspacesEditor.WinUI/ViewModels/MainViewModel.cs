@@ -213,6 +213,16 @@ namespace WorkspacesEditor.ViewModels
             _editedProject.PreviewIcons = projectToSave.PreviewIcons;
             _editedProject.PreviewImage = projectToSave.PreviewImage;
             _editedProject.Applications = projectToSave.Applications.Where(x => x.IsIncluded).ToList();
+            foreach (Application app in _editedProject.Applications)
+            {
+                app.Parent = _editedProject;
+            }
+
+            _editedProject.Monitors.Clear();
+            foreach (MonitorSetup monitor in projectToSave.Monitors)
+            {
+                _editedProject.Monitors.Add(new MonitorSetup(monitor));
+            }
 
             _editedProject.NotifyApplicationsChanged();
             _editedProject.InitializePreview();
