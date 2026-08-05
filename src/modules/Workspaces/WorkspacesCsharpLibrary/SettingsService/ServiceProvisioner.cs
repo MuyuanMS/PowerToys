@@ -241,12 +241,8 @@ public static class ServiceProvisioner
     /// re-point: Add-AppxPackage updates the binary and --register is idempotent
     /// (re-points binPath + restarts).
     ///
-    /// It also writes a TIMED provisioning log to
-    /// %LocalAppData%\Microsoft\PowerToys\Workspaces\Logs\svc-provision.log so the
-    /// per-phase cost (Add-AppxPackage vs --register) is diagnosable — the two
-    /// phases are the whole activation cost (note: Add-AppxPackage can WAIT if
-    /// another MSIX deployment, e.g. the PowerToys upgrade itself, is in flight,
-    /// because AppX deployment is serialized machine-wide).
+    /// Elevated provisioning intentionally performs no user-profile logging:
+    /// user-writable paths cannot safely receive elevated diagnostic writes.
     /// </summary>
     // Escapes a value for embedding inside a PowerShell single-quoted literal:
     // a lone ' would otherwise terminate the string and break the command (e.g. a

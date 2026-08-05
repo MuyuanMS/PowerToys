@@ -419,7 +419,16 @@ namespace PTSettingsSvc
                         GetOverlappedResult(pipe, &ov, &dummy, TRUE);
                     }
                 }
-        // else: connect failed outright — drop this pipe and loop.
+                else if (err == ERROR_NO_DATA)
+                {
+                    DisconnectNamedPipe(pipe);
+                    continue;
+                }
+                else
+                {
+                    rc = err;
+                    break;
+                }
             }
 
             if (stopping || WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0)

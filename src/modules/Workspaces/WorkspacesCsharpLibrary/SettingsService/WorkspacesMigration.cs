@@ -3,7 +3,10 @@
 // See the LICENSE file in the project root for more information.
 
 using System.IO;
+using System.Security.Principal;
+using System.Text.Json;
 using System.Threading;
+using WorkspacesCsharpLibrary.Data;
 
 namespace WorkspacesCsharpLibrary.SettingsService;
 
@@ -16,7 +19,9 @@ namespace WorkspacesCsharpLibrary.SettingsService;
 /// </summary>
 public static class WorkspacesMigration
 {
-    private const string MigrationMutexName = @"Local\PowerToys_Workspaces_SettingsMigration";
+    private static string MigrationMutexName =>
+        @"Global\PowerToys_Workspaces_SettingsMigration_" +
+        (WindowsIdentity.GetCurrent().User?.Value ?? "Unknown");
 
     public enum Outcome
     {
@@ -59,10 +64,6 @@ public static class WorkspacesMigration
     private static Outcome RunLocked()
     {
         var sentinel = SettingsPaths.MigrationSentinel();
-        if (File.Exists(sentinel))
-        {
-            return Outcome.AlreadyMigrated;
-        }
 
         // If the service already holds a blob for this user, another runner
         // invocation migrated it; drop the sentinel and stop.
@@ -102,6 +103,25 @@ public static class WorkspacesMigration
             return Outcome.SkippedLegacyUnreadable;
         }
         catch (System.UnauthorizedAccessException)
+        {
+            return Outcome.SkippedLegacyUnreadable;
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize(
+                bytes,
+                WorkspacesStorageJsonContext.Default.WorkspacesFile);
+            if (parsed?.Workspaces == null)
+            {
+                return Outcome.SkippedLegacyUnreadable;
+            }
+
+            bytes = JsonSerializer.SerializeToUtf8Bytes(
+                parsed,
+                WorkspacesStorageJsonContext.Default.WorkspacesFile);
+        }
+        catch (System.Exception)
         {
             return Outcome.SkippedLegacyUnreadable;
         }

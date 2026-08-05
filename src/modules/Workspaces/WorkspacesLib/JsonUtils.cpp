@@ -6,13 +6,17 @@
 #include <common/logger/logger.h>
 
 #include "../WorkspacesSettingsClient/PTSettingsClient.h"
+#include "../WorkspacesSettingsService/protocol/PipeName.h"
 
 namespace JsonUtils
 {
     namespace
     {
-        constexpr const wchar_t* MigrationMutexName =
-            L"Local\\PowerToys_Workspaces_SettingsMigration";
+        std::wstring MigrationMutexName()
+        {
+            return L"Global\\PowerToys_Workspaces_SettingsMigration_" +
+                   PTSettingsSvc::CurrentProcessUserSidString();
+        }
 
         Result<std::vector<WorkspacesData::WorkspacesProject>, WorkspacesFileError>
         ParseServiceBlob(const std::vector<uint8_t>& bytes)
@@ -133,7 +137,7 @@ namespace JsonUtils
             HANDLE migrationMutex = CreateMutexW(
                 nullptr,
                 FALSE,
-                MigrationMutexName);
+                MigrationMutexName().c_str());
             if (!migrationMutex)
             {
                 return Error(WorkspacesFileError::ServiceAccessError);
