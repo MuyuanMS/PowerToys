@@ -295,6 +295,7 @@
                                             AllowDisable="True"
                                             HotkeySettings="{x:Bind ViewModel.AdditionalActions.FixSpellingAndGrammar.CoachingShortcut, Mode=TwoWay}" />
                                         <ToggleSwitch
+                                            x:Uid="FixSpellingAndGrammar_CoachingToggle"
                                             IsOn="{x:Bind ViewModel.AdditionalActions.FixSpellingAndGrammar.CoachingEnabled, Mode=TwoWay}"
                                             OffContent=""
                                             OnContent="" />

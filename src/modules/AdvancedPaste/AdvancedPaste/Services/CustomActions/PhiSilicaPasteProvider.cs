@@ -169,12 +169,12 @@ public sealed class PhiSilicaPasteProvider : IPasteAIProvider
             PhiSilicaLafHelper.TryUnlock();
             var readyState = PhiSilicaLanguageModel.GetReadyState();
 
-            if (readyState is AIFeatureReadyState.NotSupportedOnCurrentSystem or AIFeatureReadyState.DisabledByUser)
+            if (readyState is not (AIFeatureReadyState.Ready or AIFeatureReadyState.NotReady))
             {
                 throw new PasteActionException(
                     "Phi Silica is not supported on this device. A Copilot+ PC is required.",
-                    new InvalidOperationException("Phi Silica requires a Copilot+ PC with an NPU."),
-                    aiServiceMessage: "Phi Silica requires a Copilot+ PC with an NPU. For on-device AI on any Windows PC, consider using Foundry Local.");
+                    new InvalidOperationException($"Phi Silica ready state is {readyState}."),
+                    aiServiceMessage: $"Phi Silica is unavailable ({readyState}). Verify Windows, hardware, capability, and user policy requirements.");
             }
 
             if (readyState is AIFeatureReadyState.NotReady)

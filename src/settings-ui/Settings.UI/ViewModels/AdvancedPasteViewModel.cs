@@ -185,12 +185,6 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
             _onlineAIModelsGpoRuleConfiguration = GPOWrapper.GetAllowedAdvancedPasteOnlineAIModelsValue();
             _onlineAIModelsDisallowedByGPO = _onlineAIModelsGpoRuleConfiguration == GpoRuleConfigured.Disabled;
-
-            if (_onlineAIModelsDisallowedByGPO)
-            {
-                // disable AI if it was enabled
-                DisableAI();
-            }
         }
 
         private void MigrateLegacyAIEnablement()
@@ -317,7 +311,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         public IEnumerable<AIServiceTypeMetadata> AvailableProvidersFilteredByGPO =>
             AvailableProviders.Where(metadata => IsServiceTypeAllowedByGPO(metadata.ServiceType));
 
-        public bool IsAIEnabled => _advancedPasteSettings.Properties.IsAIEnabled && !IsOnlineAIModelsDisallowedByGPO;
+        public bool IsAIEnabled => _advancedPasteSettings.Properties.IsAIEnabled;
 
         private PasswordCredential TryGetLegacyOpenAICredential()
         {
@@ -914,11 +908,6 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         {
             try
             {
-                if (IsOnlineAIModelsDisallowedByGPO)
-                {
-                    return;
-                }
-
                 bool stateChanged = false;
 
                 if (!_advancedPasteSettings.Properties.IsAIEnabled)

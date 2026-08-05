@@ -6246,6 +6246,9 @@ The break timer font matches the text font.</value>
     <value>Checking Phi Silica availability...</value>
     <comment>Do not localize "Phi Silica", it's a model name</comment>
   </data>
+  <data name="FixSpellingAndGrammar_CoachingToggle.AutomationProperties.Name" xml:space="preserve">
+    <value>Enable coaching mode</value>
+  </data>
   <data name="AdvancedPaste_PhiSilicaCopilotLearnMore.Content" xml:space="preserve">
     <value>Learn more about Copilot+ PCs</value>
     <comment>Do not localize "Copilot+ PCs", it's a product name</comment>

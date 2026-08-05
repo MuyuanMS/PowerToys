@@ -106,7 +106,7 @@ namespace AdvancedPaste.ViewModels
         {
             get
             {
-                if (!IsAllowedByGPO || !_userSettings.IsAIEnabled)
+                if (!_userSettings.IsAIEnabled)
                 {
                     return false;
                 }
@@ -351,8 +351,9 @@ namespace AdvancedPaste.ViewModels
         {
             var providerId = GetProviderIdForFormat(format);
             var effectiveProvider = ResolveEffectiveProvider(providerId);
-            var isAIServiceEnabled = IsCustomAIServiceEnabled
-                && (effectiveProvider is null || IsProviderAllowedByGPO(effectiveProvider))
+            var isAIServiceEnabled = _userSettings.IsAIEnabled
+                && effectiveProvider is not null
+                && IsProviderAllowedByGPO(effectiveProvider)
                 && (effectiveProvider?.ServiceTypeKind != AIServiceType.PhiSilica || AvailableClipboardFormats.HasFlag(ClipboardFormat.Text));
 
             return PasteFormat.CreateStandardFormat(format, AvailableClipboardFormats, isAIServiceEnabled, ResourceLoaderInstance.ResourceLoader.GetString, providerId);
@@ -361,8 +362,8 @@ namespace AdvancedPaste.ViewModels
         private PasteFormat CreateCustomAIPasteFormat(string name, string prompt, bool isSavedQuery, string providerId = null)
         {
             var format = CustomAIFormat;
-            var isEnabled = IsCustomAIServiceEnabled;
             var selectedProvider = ResolveEffectiveProvider(providerId);
+            var isEnabled = _userSettings.IsAIEnabled && selectedProvider is not null;
 
             if (selectedProvider is not null && !IsProviderAllowedByGPO(selectedProvider))
             {
@@ -473,6 +474,7 @@ namespace AdvancedPaste.ViewModels
 
             UpdateFormats(StandardPasteFormats, Enum.GetValues<PasteFormats>()
                                                     .Where(format => PasteFormat.MetadataDict[format].IsCoreAction || _userSettings.AdditionalActions.Contains(format))
+                                                    .OrderBy(GetStandardFormatOrder)
                                                     .Select(CreateStandardPasteFormat));
 
             UpdateFormats(
@@ -855,8 +857,7 @@ namespace AdvancedPaste.ViewModels
                     coachingProviderId = _userSettings.FixSpellingAndGrammarProviderId;
                 }
 
-                var coachingProvider = _userSettings.PasteAIConfiguration?.Providers?
-                    .FirstOrDefault(provider => string.Equals(provider.Id, coachingProviderId, StringComparison.OrdinalIgnoreCase));
+                var coachingProvider = ResolveEffectiveProvider(coachingProviderId);
                 if (coachingProvider is not null && !IsProviderAllowedByGPO(coachingProvider))
                 {
                     CoachingExplanation = null;
@@ -1016,6 +1017,24 @@ namespace AdvancedPaste.ViewModels
             return serviceType is AIServiceType.OpenAI
                 or AIServiceType.AzureOpenAI;
         }
+
+        private static int GetStandardFormatOrder(PasteFormats format) =>
+            format switch
+            {
+                PasteFormats.PlainText => 0,
+                PasteFormats.Markdown => 1,
+                PasteFormats.Json => 2,
+                PasteFormats.ImageToText => 3,
+                PasteFormats.FixSpellingAndGrammar => 4,
+                PasteFormats.PasteAsTxtFile => 5,
+                PasteFormats.PasteAsPngFile => 6,
+                PasteFormats.PasteAsHtmlFile => 7,
+                PasteFormats.TranscodeToMp3 => 8,
+                PasteFormats.TranscodeToMp4 => 9,
+                PasteFormats.KernelQuery => 10,
+                PasteFormats.CustomTextTransformation => 11,
+                _ => int.MaxValue,
+            };
 
         private bool UpdateOpenAIKey()
         {
