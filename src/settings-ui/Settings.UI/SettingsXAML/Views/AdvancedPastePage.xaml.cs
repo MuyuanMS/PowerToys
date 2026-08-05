@@ -754,6 +754,8 @@ namespace Microsoft.PowerToys.Settings.UI.Views
 
         private async void PhiSilicaPrepareButton_Click(object sender, RoutedEventArgs e)
         {
+            var draft = ViewModel?.PasteAIProviderDraft;
+            var operationVersion = ++_phiSilicaProbeVersion;
             var resourceLoader = ResourceLoaderInstance.ResourceLoader;
 
             ShowPhiSilicaLoadingState(resourceLoader.GetString("AdvancedPaste_PhiSilicaPreparing_Status"));
@@ -771,6 +773,11 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             catch (Exception ex)
             {
                 prepareResult = ("Failed", ex.Message);
+            }
+
+            if (operationVersion != _phiSilicaProbeVersion || !ReferenceEquals(draft, ViewModel?.PasteAIProviderDraft))
+            {
+                return;
             }
 
             if (prepareResult.Status == "Ready")

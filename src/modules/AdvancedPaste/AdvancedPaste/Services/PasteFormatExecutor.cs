@@ -32,7 +32,9 @@ public sealed class PasteFormatExecutor(IKernelService kernelService, ICustomAct
 
         if (!IsProviderAllowedByGPO(pasteFormat.ProviderId))
         {
-            return null;
+            throw new PasteActionException(
+                ResourceLoaderInstance.ResourceLoader.GetString("PasteError"),
+                new InvalidOperationException("The selected AI provider is disabled by policy."));
         }
 
         var format = pasteFormat.Format;

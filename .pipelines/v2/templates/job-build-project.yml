@@ -282,6 +282,9 @@ jobs:
     - template: .\steps-setup-versioning.yml
       parameters:
         directory: $(build.sourcesdirectory)\src\modules\AdvancedPaste
+    - pwsh: |
+        Write-Host "##vso[task.setvariable variable=AdvancedPasteVersion]$env:XES_APPXMANIFESTVERSION"
+      displayName: Preserve Advanced Paste version
     - template: .\steps-setup-versioning.yml
       parameters:
         directory: $(build.sourcesdirectory)\src\modules\cmdpal

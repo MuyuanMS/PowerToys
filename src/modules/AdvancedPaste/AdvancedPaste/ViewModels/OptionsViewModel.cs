@@ -837,6 +837,14 @@ namespace AdvancedPaste.ViewModels
                     coachingProviderId = _userSettings.FixSpellingAndGrammarProviderId;
                 }
 
+                var coachingProvider = _userSettings.PasteAIConfiguration?.Providers?
+                    .FirstOrDefault(provider => string.Equals(provider.Id, coachingProviderId, StringComparison.OrdinalIgnoreCase));
+                if (coachingProvider is not null && !IsProviderAllowedByGPO(coachingProvider))
+                {
+                    CoachingExplanation = null;
+                    return;
+                }
+
                 var result = await _customActionTransformService.TransformAsync(
                     coachingInstruction,
                     coachingInputText,
@@ -876,7 +884,7 @@ namespace AdvancedPaste.ViewModels
             if (customAction != null)
             {
                 await ReadClipboardAsync();
-                await ExecutePasteFormatAsync(CreateCustomAIPasteFormat(customAction.Name, customAction.Prompt, isSavedQuery: true), source);
+                await ExecutePasteFormatAsync(CreateCustomAIPasteFormat(customAction.Name, customAction.Prompt, isSavedQuery: true, customAction.ProviderId), source);
             }
         }
 
@@ -885,7 +893,7 @@ namespace AdvancedPaste.ViewModels
             var customAction = _userSettings.CustomActions
                                             .FirstOrDefault(customAction => Models.KernelQueryCache.CacheKey.PromptComparer.Equals(customAction.Prompt, Query));
 
-            await ExecutePasteFormatAsync(CreateCustomAIPasteFormat(customAction?.Name ?? "Default", Query, isSavedQuery: customAction != null), triggerSource);
+            await ExecutePasteFormatAsync(CreateCustomAIPasteFormat(customAction?.Name ?? "Default", Query, isSavedQuery: customAction != null, customAction?.ProviderId), triggerSource);
         }
 
         private void HideWindow()
