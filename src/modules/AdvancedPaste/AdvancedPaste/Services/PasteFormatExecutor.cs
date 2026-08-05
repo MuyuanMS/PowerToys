@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -25,6 +26,11 @@ public sealed class PasteFormatExecutor(IKernelService kernelService, ICustomAct
     public async Task<DataPackage> ExecutePasteFormatAsync(PasteFormat pasteFormat, PasteActionSource source, CancellationToken cancellationToken, IProgress<double> progress)
     {
         if (!pasteFormat.IsEnabled)
+        {
+            return null;
+        }
+
+        if (!IsProviderAllowedByGPO(pasteFormat.ProviderId))
         {
             return null;
         }
@@ -77,5 +83,28 @@ public sealed class PasteFormatExecutor(IKernelService kernelService, ICustomAct
     {
         var customSystemPrompt = _userSettings.FixSpellingAndGrammarSystemPrompt;
         return string.IsNullOrWhiteSpace(customSystemPrompt) ? AdvancedPasteDefaultPrompts.FixSpellingAndGrammarSystem : customSystemPrompt;
+    }
+
+    private bool IsProviderAllowedByGPO(string providerId)
+    {
+        if (string.IsNullOrWhiteSpace(providerId))
+        {
+            return true;
+        }
+
+        var provider = _userSettings.PasteAIConfiguration?.Providers?
+            .FirstOrDefault(item => string.Equals(item.Id, providerId, StringComparison.OrdinalIgnoreCase));
+
+        return provider?.ServiceTypeKind switch
+        {
+            AIServiceType.OpenAI => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOpenAIValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+            AIServiceType.AzureOpenAI => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteAzureOpenAIValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+            AIServiceType.AzureAIInference => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteAzureAIInferenceValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+            AIServiceType.Mistral => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteMistralValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+            AIServiceType.Google => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteGoogleValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+            AIServiceType.Ollama => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOllamaValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+            AIServiceType.FoundryLocal => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteFoundryLocalValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+            _ => true,
+        };
     }
 }

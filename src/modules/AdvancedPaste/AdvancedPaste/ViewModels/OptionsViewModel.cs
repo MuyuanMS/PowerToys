@@ -356,6 +356,15 @@ namespace AdvancedPaste.ViewModels
         private PasteFormat CreateCustomAIPasteFormat(string name, string prompt, bool isSavedQuery, string providerId = null)
         {
             var format = CustomAIFormat;
+            var isEnabled = IsCustomAIServiceEnabled;
+            var selectedProvider = _userSettings?.PasteAIConfiguration?.Providers?
+                .FirstOrDefault(provider => string.Equals(provider.Id, providerId, StringComparison.OrdinalIgnoreCase));
+
+            if (selectedProvider is not null && !IsProviderAllowedByGPO(selectedProvider))
+            {
+                isEnabled = false;
+            }
+
             if (!string.IsNullOrWhiteSpace(providerId)
                 && (!TryResolveAdvancedAIProvider(out var advancedProvider)
                     || !string.Equals(providerId, advancedProvider.Id, StringComparison.OrdinalIgnoreCase)))
@@ -363,7 +372,7 @@ namespace AdvancedPaste.ViewModels
                 format = PasteFormats.CustomTextTransformation;
             }
 
-            return PasteFormat.CreateCustomAIFormat(format, name, prompt, isSavedQuery, AvailableClipboardFormats, IsCustomAIServiceEnabled, providerId);
+            return PasteFormat.CreateCustomAIFormat(format, name, prompt, isSavedQuery, AvailableClipboardFormats, isEnabled, providerId);
         }
 
         private string GetProviderIdForFormat(PasteFormats format) =>

@@ -143,6 +143,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                     // Mirror the runner's hotkey order: the coaching shortcut is registered as a
                     // separate hotkey immediately after Fix Spelling and Grammar when it's active.
                     if (ReferenceEquals(additionalAction, _additionalActions.FixSpellingAndGrammar)
+                        && additionalAction.IsShown
                         && additionalAction.CoachingEnabled
                         && additionalAction.CoachingShortcut is { Code: not 0 })
                     {
@@ -621,7 +622,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
                 // The coaching shortcut is a separately-registered hotkey; include it when active.
                 var fixSpelling = _additionalActions.FixSpellingAndGrammar;
-                if (fixSpelling.CoachingEnabled && fixSpelling.CoachingShortcut is { Code: not 0 })
+                if (fixSpelling.IsShown && fixSpelling.CoachingEnabled && fixSpelling.CoachingShortcut is { Code: not 0 })
                 {
                     shortcuts.Add(fixSpelling.CoachingShortcut);
                 }
@@ -784,7 +785,10 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             if (_editingPasteAIProvider is null)
             {
                 config.Providers.Add(draft);
-                config.ActiveProviderId ??= draft.Id;
+                if (string.IsNullOrEmpty(config.ActiveProviderId))
+                {
+                    config.ActiveProviderId = draft.Id;
+                }
             }
             else
             {
@@ -1472,6 +1476,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
 
             var pasteConfig = _advancedPasteSettings?.Properties?.PasteAIConfiguration;
+            SyncProviderActiveFlags(pasteConfig);
 
             OnPropertyChanged(nameof(PasteAIConfiguration));
             SaveAndNotifySettings();

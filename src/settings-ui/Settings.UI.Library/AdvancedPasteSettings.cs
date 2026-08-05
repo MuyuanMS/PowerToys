@@ -91,6 +91,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                     // immediately after Fix Spelling and Grammar (and only when it's active), so it
                     // must appear in the same position here to keep hotkey IDs aligned with conflicts.
                     if (ReferenceEquals(additionalAction, Properties.AdditionalActions.FixSpellingAndGrammar)
+                        && additionalAction.IsShown
                         && additionalAction.CoachingEnabled
                         && additionalAction.CoachingShortcut is { Code: not 0 })
                     {

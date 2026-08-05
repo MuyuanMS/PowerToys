@@ -28,6 +28,12 @@ namespace AdvancedPaste
 
             if (args.Contains("--prepare-phi-silica", StringComparer.OrdinalIgnoreCase))
             {
+                if (PowerToys.GPOWrapper.GPOWrapper.GetConfiguredAdvancedPasteEnabledValue() == PowerToys.GPOWrapper.GpoRuleConfigured.Disabled)
+                {
+                    Logger.LogWarning("Phi Silica preparation blocked because Advanced Paste is disabled by policy.");
+                    return 2;
+                }
+
                 return PreparePhiSilica();
             }
 
@@ -110,8 +116,8 @@ namespace AdvancedPaste
 
                 Console.Error.WriteLine($"[phi-silica] LAF unlock status: {PhiSilicaLafHelper.LastUnlockStatus}; ReadyState: {readyState}");
 
-                if (readyState is Microsoft.Windows.AI.AIFeatureReadyState.NotSupportedOnCurrentSystem
-                    or Microsoft.Windows.AI.AIFeatureReadyState.DisabledByUser)
+                if (readyState != Microsoft.Windows.AI.AIFeatureReadyState.Ready
+                    && readyState != Microsoft.Windows.AI.AIFeatureReadyState.NotReady)
                 {
                     Console.Out.WriteLine("NotSupported");
                     return 2;

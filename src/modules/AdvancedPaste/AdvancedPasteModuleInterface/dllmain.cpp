@@ -18,6 +18,7 @@
 #include <common/utils/EventWaiter.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cwctype>
 #include <chrono>
 #include <thread>
@@ -76,7 +77,9 @@ class AdvancedPaste : public PowertoyModuleIface
 private:
     
     AdvancedPasteProcessManager m_process_manager;
-    bool m_enabled = false;
+    std::atomic_bool m_enabled = false;
+    std::atomic_bool m_hotkey_worker_running = false;
+    std::jthread m_hotkey_worker;
 
     std::wstring app_name;
 
@@ -1087,6 +1090,13 @@ public:
 
     void Disable(bool traceEvent)
     {
+        if (m_hotkey_worker.joinable())
+        {
+            m_hotkey_worker.request_stop();
+            m_hotkey_worker.join();
+            m_hotkey_worker_running = false;
+        }
+
         if (m_enabled)
         {
             m_process_manager.stop();
@@ -1119,10 +1129,20 @@ public:
 
         if (m_auto_copy_selection_custom_action)
         {
-            std::thread([this, hotkeyId]() {
+            if (m_hotkey_worker_running.exchange(true))
+            {
+                return false;
+            }
+
+            m_hotkey_worker = std::jthread([this, hotkeyId](std::stop_token stopToken) {
                 send_copy_selection(); // best-effort; use existing clipboard content on failure
-                execute_hotkey(hotkeyId);
-            }).detach();
+                if (!stopToken.stop_requested() && m_enabled)
+                {
+                    execute_hotkey(hotkeyId);
+                }
+
+                m_hotkey_worker_running = false;
+            });
             return true;
         }
 
