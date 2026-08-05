@@ -19,6 +19,7 @@ namespace WorkspacesLauncherUI.UnitTests
     ///   IPC JSON message → Deserialization → ViewModel → Model properties.
     /// </summary>
     [TestClass]
+    [DoNotParallelize]
     public class UserWorkflowIntegrationTests
     {
         [TestMethod]

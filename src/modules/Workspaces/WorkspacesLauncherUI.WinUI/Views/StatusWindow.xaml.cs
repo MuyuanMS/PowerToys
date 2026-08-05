@@ -66,8 +66,8 @@ namespace WorkspacesLauncherUI
             var displayArea = DisplayArea.GetFromWindowId(appWindow.Id, DisplayAreaFallback.Nearest);
             if (displayArea != null)
             {
-                int centerX = (displayArea.WorkArea.Width - appWindow.Size.Width) / 2;
-                int centerY = (displayArea.WorkArea.Height - appWindow.Size.Height) / 2;
+                int centerX = displayArea.WorkArea.X + ((displayArea.WorkArea.Width - appWindow.Size.Width) / 2);
+                int centerY = displayArea.WorkArea.Y + ((displayArea.WorkArea.Height - appWindow.Size.Height) / 2);
                 appWindow.Move(new Windows.Graphics.PointInt32(centerX, centerY));
             }
         }
@@ -81,6 +81,7 @@ namespace WorkspacesLauncherUI
         {
             StatusPageView.ViewModel?.Dispose();
             (Application.Current as IDisposable)?.Dispose();
+            Application.Current.Exit();
         }
     }
 }

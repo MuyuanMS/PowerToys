@@ -29,11 +29,18 @@ namespace WorkspacesLauncherUI.Views
         public StatusPage()
         {
             ViewModel = new MainViewModel();
+            App.CancelAcknowledgedCallback = () => CloseRequested?.Invoke(this, EventArgs.Empty);
             this.InitializeComponent();
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
+            if (ReferenceEquals(sender, CancelButton))
+            {
+                ViewModel.CancelLaunchCommand.Execute(null);
+                return;
+            }
+
             CloseRequested?.Invoke(this, EventArgs.Empty);
         }
     }

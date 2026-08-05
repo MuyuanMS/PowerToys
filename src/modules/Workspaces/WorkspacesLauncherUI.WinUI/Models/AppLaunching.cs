@@ -34,8 +34,17 @@ namespace WorkspacesLauncherUI.Models
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(Loading))]
         [NotifyPropertyChangedFor(nameof(LaunchStateInt))]
+        [NotifyPropertyChangedFor(nameof(StateAutomationName))]
         private LaunchingState _launchState;
 
         public int LaunchStateInt => (int)LaunchState;
+
+        public string StateAutomationName => LaunchState switch
+        {
+            LaunchingState.LaunchedAndMoved => ResourceLoaderInstance.ResourceLoader?.GetString("LaunchSucceededAutomationName") ?? "Launch succeeded",
+            LaunchingState.Failed => ResourceLoaderInstance.ResourceLoader?.GetString("LaunchFailedAutomationName") ?? "Launch failed",
+            LaunchingState.Canceled => ResourceLoaderInstance.ResourceLoader?.GetString("LaunchCanceledAutomationName") ?? "Launch canceled",
+            _ => ResourceLoaderInstance.ResourceLoader?.GetString("LaunchInProgressAutomationName") ?? "Launching",
+        };
     }
 }

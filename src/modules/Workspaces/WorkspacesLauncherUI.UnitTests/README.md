@@ -56,7 +56,6 @@ The output directory depends on your platform/config. For arm64 Debug:
 & "<path-to-vstest.console.exe>" <dll-path> /TestCaseFilter:"TestCategory=Model"
 & "<path-to-vstest.console.exe>" <dll-path> /TestCaseFilter:"TestCategory=Serialization"
 & "<path-to-vstest.console.exe>" <dll-path> /TestCaseFilter:"TestCategory=DataModel"
-& "<path-to-vstest.console.exe>" <dll-path> /TestCaseFilter:"TestCategory=Converter"
 ```
 
 ### Generate TRX Report
@@ -79,7 +78,6 @@ Report saved to `TestResults/TestResults.trx`.
 | `DataModel` | `WindowPositionDataTests.cs` | Window coordinates and equality |
 | `DataModel` | `ApplicationDataModelTests.cs` | All application fields |
 | `DataModel` | `LaunchStateEnumContractTests.cs` | Enum integers match `LaunchingStateEnum.h` |
-| `Converter` | `StatusIndicatorVisibilityTests.cs` | Loading → Visibility toggle |
 
 ## When to Run
 
