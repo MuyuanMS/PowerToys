@@ -75,21 +75,6 @@ public static class PTSettingsClient
             "PowerToys.PTSettingsSvc.exe");
     });
 
-    private static readonly Lazy<SecurityIdentifier> _expectedServiceSid = new(() =>
-    {
-        try
-        {
-            string sid = WindowsIdentity.GetCurrent().User?.Value ?? string.Empty;
-            return (SecurityIdentifier)new NTAccount(
-                "NT SERVICE",
-                "PTSettingsSvc_" + sid).Translate(typeof(SecurityIdentifier));
-        }
-        catch (IdentityNotMappedException)
-        {
-            return null;
-        }
-    });
-
     public static string PipeName => _pipeName.Value;
 
     // Mirror of PTSettingsSvc::kMaxPayloadBytes (1 MiB).
@@ -253,20 +238,12 @@ public static class PTSettingsClient
                 return false;
             }
 
-            if (!OpenProcessToken(process, TokenQuery, out IntPtr token))
+            if (!ServerPidMatchesRegisteredService(serverProcessId))
             {
                 return false;
             }
 
-            try
-            {
-                using var identity = new WindowsIdentity(token);
-                return identity.User?.Equals(_expectedServiceSid.Value) == true;
-            }
-            finally
-            {
-                CloseHandle(token);
-            }
+            return true;
         }
         catch (ArgumentException)
         {
@@ -275,6 +252,50 @@ public static class PTSettingsClient
         finally
         {
             CloseHandle(process);
+        }
+    }
+
+    private static bool ServerPidMatchesRegisteredService(uint serverProcessId)
+    {
+        IntPtr scm = OpenSCManagerW(IntPtr.Zero, IntPtr.Zero, ScManagerConnect);
+        if (scm == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            string sid = WindowsIdentity.GetCurrent().User?.Value ?? string.Empty;
+            IntPtr service = OpenServiceW(
+                scm,
+                "PTSettingsSvc_" + sid,
+                ServiceQueryStatus);
+            if (service == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            try
+            {
+                uint bytesNeeded;
+                ServiceStatusProcess status = default;
+                return QueryServiceStatusEx(
+                        service,
+                        ScStatusProcessInfo,
+                        ref status,
+                        (uint)Marshal.SizeOf<ServiceStatusProcess>(),
+                        out bytesNeeded) &&
+                    status.CurrentState != ServiceStopped &&
+                    status.ProcessId == serverProcessId;
+            }
+            finally
+            {
+                CloseServiceHandle(service);
+            }
+        }
+        finally
+        {
+            CloseServiceHandle(scm);
         }
     }
 
@@ -292,8 +313,25 @@ public static class PTSettingsClient
     }
 
     private const uint ProcessQueryLimitedInformation = 0x1000;
-    private const uint TokenQuery = 0x0008;
     private const int ImagePathCapacity = 4096;
+    private const uint ScManagerConnect = 0x0001;
+    private const uint ServiceQueryStatus = 0x0004;
+    private const int ScStatusProcessInfo = 0;
+    private const uint ServiceStopped = 0x00000001;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ServiceStatusProcess
+    {
+        public uint ServiceType;
+        public uint CurrentState;
+        public uint ControlsAccepted;
+        public uint Win32ExitCode;
+        public uint ServiceSpecificExitCode;
+        public uint CheckPoint;
+        public uint WaitHint;
+        public uint ProcessId;
+        public uint ServiceFlags;
+    }
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -316,11 +354,29 @@ public static class PTSettingsClient
         ref int imagePathLength);
 
     [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern IntPtr OpenSCManagerW(
+        IntPtr machineName,
+        IntPtr databaseName,
+        uint desiredAccess);
+
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr OpenServiceW(
+        IntPtr scm,
+        string serviceName,
+        uint desiredAccess);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool OpenProcessToken(
-        IntPtr process,
-        uint desiredAccess,
-        out IntPtr token);
+    private static extern bool QueryServiceStatusEx(
+        IntPtr service,
+        int infoLevel,
+        ref ServiceStatusProcess status,
+        uint bufferSize,
+        out uint bytesNeeded);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseServiceHandle(IntPtr serviceHandle);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

@@ -6,7 +6,6 @@
 #include "../WorkspacesSettingsService/protocol/PipeName.h"
 
 #include <windows.h>
-#include <sddl.h>
 #include <shlobj.h>
 #include <vector>
 #include <cstring>
@@ -128,59 +127,43 @@ namespace PTSettingsClient
                    sid + L"\\" + version + L"\\" + kServiceExeName;
         }
 
-        bool ServerTokenMatchesServiceAccount(HANDLE process,
-                                              const std::wstring& userSid)
+        bool ServerPidMatchesRegisteredService(ULONG serverPid,
+                                               const std::wstring& userSid)
         {
-            const std::wstring account =
-                L"NT SERVICE\\PTSettingsSvc_" + userSid;
-
-            DWORD sidSize = 0;
-            DWORD domainSize = 0;
-            SID_NAME_USE use{};
-            LookupAccountNameW(nullptr,
-                               account.c_str(),
-                               nullptr,
-                               &sidSize,
-                               nullptr,
-                               &domainSize,
-                               &use);
-            if (GetLastError() != ERROR_INSUFFICIENT_BUFFER || sidSize == 0)
+            SC_HANDLE scm = OpenSCManagerW(
+                nullptr,
+                nullptr,
+                SC_MANAGER_CONNECT);
+            if (!scm)
             {
                 return false;
             }
 
-            std::vector<BYTE> expectedSid(sidSize);
-            std::vector<wchar_t> domain(domainSize);
-            if (!LookupAccountNameW(nullptr,
-                                    account.c_str(),
-                                    expectedSid.data(),
-                                    &sidSize,
-                                    domain.data(),
-                                    &domainSize,
-                                    &use))
+            const std::wstring serviceName =
+                L"PTSettingsSvc_" + userSid;
+            SC_HANDLE service = OpenServiceW(
+                scm,
+                serviceName.c_str(),
+                SERVICE_QUERY_STATUS);
+            if (!service)
             {
+                CloseServiceHandle(scm);
                 return false;
             }
 
-            HANDLE token = nullptr;
-            if (!OpenProcessToken(process, TOKEN_QUERY, &token))
-            {
-                return false;
-            }
-
-            DWORD tokenSize = 0;
-            GetTokenInformation(token, TokenUser, nullptr, 0, &tokenSize);
-            std::vector<BYTE> tokenData(tokenSize);
+            SERVICE_STATUS_PROCESS status{};
+            DWORD needed = 0;
             const bool matched =
-                tokenSize > 0 &&
-                GetTokenInformation(token,
-                                    TokenUser,
-                                    tokenData.data(),
-                                    tokenSize,
-                                    &tokenSize) &&
-                EqualSid(reinterpret_cast<TOKEN_USER*>(tokenData.data())->User.Sid,
-                         expectedSid.data());
-            CloseHandle(token);
+                QueryServiceStatusEx(
+                    service,
+                    SC_STATUS_PROCESS_INFO,
+                    reinterpret_cast<BYTE*>(&status),
+                    sizeof(status),
+                    &needed) &&
+                status.dwCurrentState != SERVICE_STOPPED &&
+                status.dwProcessId == serverPid;
+            CloseServiceHandle(service);
+            CloseServiceHandle(scm);
             return matched;
         }
 
@@ -214,7 +197,7 @@ namespace PTSettingsClient
                 gotPath &&
                 !expectedPath.empty() &&
                 _wcsicmp(imagePath, expectedPath.c_str()) == 0 &&
-                ServerTokenMatchesServiceAccount(process, userSid);
+                ServerPidMatchesRegisteredService(serverPid, userSid);
 
             CloseHandle(process);
             return trusted;

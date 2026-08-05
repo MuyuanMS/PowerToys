@@ -157,6 +157,7 @@ public static class WorkspacesStorage
 
     internal sealed class WorkspacesFile
     {
+        [JsonPropertyName("workspaces")]
         public List<WorkspaceProject> Workspaces { get; set; } = new();
     }
 

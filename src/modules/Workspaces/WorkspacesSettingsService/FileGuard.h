@@ -69,6 +69,15 @@ namespace PTSettingsSvc
     // and write files that inherit the parent's protected DACL.
     HRESULT EnsureDirectory(const std::wstring& dir);
 
+    // Removes stale temp files and sanitizes an existing data file without
+    // following reparse points. Files owned by SYSTEM or the deterministic
+    // service account are preserved and re-ACL'd; pre-planted files are
+    // discarded before the service starts.
+    HRESULT SanitizeNamespaceFiles(const std::wstring& namespaceFolder,
+                                   const std::wstring& fileName,
+                                   const std::wstring& userSidString,
+                                   const std::wstring& serviceAccountName);
+
     // Atomically replaces `targetFile` with `bytes`.  Internally writes to
     // a sibling .tmp and uses ReplaceFileW so a crash during write never
     // leaves the file in a half-written state.
