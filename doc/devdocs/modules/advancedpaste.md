@@ -70,7 +70,7 @@ After registration verify:
 ```powershell
 $pkg = Get-AppxPackage -Name '*SparseApp*'
 $pkg.PackageFamilyName    # Microsoft.PowerToys.SparseApp_<PublisherId>
-$pkg.PublisherId          # djwsxzxb4ksa8
+$pkg.PublisherId          # Must match the supplied LAF attestation
 $pkg.IsDevelopmentMode    # True
 ```
 

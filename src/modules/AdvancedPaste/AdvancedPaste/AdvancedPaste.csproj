@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Look at Directory.Build.props in root for common stuff as well -->
-  <Import Project="$(RepoRoot)src\CmdPalVersion.props" />
+  <Import Project="$(RepoRoot)src\AdvancedPasteVersion.props" />
   <Import Project="$(RepoRoot)src\Common.Dotnet.CsWinRT.props" />
   <Import Project="$(RepoRoot)src\Common.SelfContained.props" />
 
@@ -133,6 +133,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Required to keep the shared UI assembly version aligned in the flattened output directory. -->
+    <ProjectReference Include="..\..\..\common\Common.UI\Common.UI.csproj" />
     <ProjectReference Include="..\..\..\common\ManagedCommon\ManagedCommon.csproj" />
     <ProjectReference Include="..\..\..\common\LanguageModelProvider\LanguageModelProvider.csproj" />
     <ProjectReference Include="..\..\..\common\GPOWrapper\GPOWrapper.vcxproj" />

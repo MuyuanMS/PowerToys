@@ -18,6 +18,7 @@ using AdvancedPaste.Models;
 using AdvancedPaste.Services;
 using AdvancedPaste.Services.CustomActions;
 using AdvancedPaste.Settings;
+using Common.UI;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ManagedCommon;
@@ -352,8 +353,18 @@ namespace AdvancedPaste.ViewModels
             return PasteFormat.CreateStandardFormat(format, AvailableClipboardFormats, IsCustomAIServiceEnabled, ResourceLoaderInstance.ResourceLoader.GetString, providerId);
         }
 
-        private PasteFormat CreateCustomAIPasteFormat(string name, string prompt, bool isSavedQuery, string providerId = null) =>
-            PasteFormat.CreateCustomAIFormat(CustomAIFormat, name, prompt, isSavedQuery, AvailableClipboardFormats, IsCustomAIServiceEnabled, providerId);
+        private PasteFormat CreateCustomAIPasteFormat(string name, string prompt, bool isSavedQuery, string providerId = null)
+        {
+            var format = CustomAIFormat;
+            if (!string.IsNullOrWhiteSpace(providerId)
+                && (!TryResolveAdvancedAIProvider(out var advancedProvider)
+                    || !string.Equals(providerId, advancedProvider.Id, StringComparison.OrdinalIgnoreCase)))
+            {
+                format = PasteFormats.CustomTextTransformation;
+            }
+
+            return PasteFormat.CreateCustomAIFormat(format, name, prompt, isSavedQuery, AvailableClipboardFormats, IsCustomAIServiceEnabled, providerId);
+        }
 
         private string GetProviderIdForFormat(PasteFormats format) =>
             format switch
@@ -683,27 +694,7 @@ namespace AdvancedPaste.ViewModels
         [RelayCommand]
         public void OpenSettings()
         {
-            try
-            {
-                var exePath = System.IO.Path.Combine(
-                    ManagedCommon.PowerToysPathResolver.GetPowerToysInstallPath(),
-                    "PowerToys.exe");
-
-                if (exePath != null && System.IO.File.Exists(exePath))
-                {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = exePath,
-                        Arguments = "--open-settings=AdvancedPaste",
-                        UseShellExecute = false,
-                    });
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Failed to open settings", ex);
-            }
-
+            SettingsDeepLink.OpenSettings(SettingsDeepLink.SettingsWindow.AdvancedPaste);
             GetMainWindow()?.Close();
         }
 

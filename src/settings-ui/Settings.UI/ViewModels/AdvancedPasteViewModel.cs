@@ -813,6 +813,12 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             if (config.Providers.Remove(provider))
             {
                 RemovePasteAICredentials(provider.Id, provider.ServiceType);
+                if (string.Equals(config.ActiveProviderId, provider.Id, StringComparison.OrdinalIgnoreCase))
+                {
+                    config.ActiveProviderId = config.Providers.FirstOrDefault()?.Id;
+                }
+
+                SyncProviderActiveFlags(config);
                 SaveAndNotifySettings();
                 OnPropertyChanged(nameof(PasteAIConfiguration));
             }

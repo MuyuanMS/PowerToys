@@ -22,7 +22,7 @@ Two identities — the baked token must match the registered package's publisher
 
 | Build | Publisher Id | LAF creds |
 |-------|--------------|-----------|
-| **Dev** | `djwsxzxb4ksa8` | dev default in [`src/PhiSilicaLaf.props`](../../../src/PhiSilicaLaf.props) |
+| **Dev** | Matches the development certificate | supplied securely as MSBuild properties |
 | **Prod** | `8wekyb3d8bbwe` | secret, injected only by `.pipelines/v2/release.yml` |
 
 Non-secret pairing check: the exe's baked **Attestation** must equal the registered package's
@@ -32,16 +32,20 @@ Non-secret pairing check: the exe's baked **Attestation** must equal the registe
 
 ```powershell
 $repo = "X:\GitHub\PowerToys"; $Plat = "ARM64"; $Cfg = "Debug"   # or x64 / Release
+$lafToken = $env:PHI_SILICA_LAF_TOKEN
+$lafAttestation = $env:PHI_SILICA_LAF_ATTESTATION
 
 # Build AP only (C#; reuses existing C++ outputs):
-dotnet restore "$repo\src\modules\AdvancedPaste\AdvancedPaste\AdvancedPaste.csproj" /p:Platform=$Plat
+dotnet restore "$repo\src\modules\AdvancedPaste\AdvancedPaste\AdvancedPaste.csproj" /p:Platform=$Plat `
+    /p:PhiSilicaLafToken=$lafToken /p:PhiSilicaLafAttestation=$lafAttestation
 & "$repo\tools\build\build.cmd" -Path "$repo\src\modules\AdvancedPaste\AdvancedPaste" `
-    -Platform $Plat -Configuration $Cfg /p:BuildProjectReferences=false
+    -Platform $Plat -Configuration $Cfg /p:BuildProjectReferences=false `
+    /p:PhiSilicaLafToken=$lafToken /p:PhiSilicaLafAttestation=$lafAttestation
 
 # Register the dev sparse package (creates + trusts a dev cert, grants identity):
 pwsh -ExecutionPolicy Bypass -File "$repo\src\PackageIdentity\BuildSparsePackage.ps1" `
     -Platform $Plat -Configuration $Cfg -DevRegister
-# Expect: PublisherId djwsxzxb4ksa8, IsDevelopmentMode True
+# Expect: PublisherId matches the supplied attestation, IsDevelopmentMode True
 ```
 
 ## Check the API

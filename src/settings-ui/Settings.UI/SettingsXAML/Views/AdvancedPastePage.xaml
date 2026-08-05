@@ -697,7 +697,8 @@
                                 <ProgressRing
                                     Width="36"
                                     Height="36"
-                                    HorizontalAlignment="Center" />
+                                    HorizontalAlignment="Center"
+                                    IsActive="True" />
                                 <TextBlock
                                     x:Name="PhiSilicaLoadingText"
                                     x:Uid="AdvancedPaste_PhiSilicaLoadingStatus"
