@@ -38,9 +38,13 @@ public sealed class PhiSilicaPasteProvider : IPasteAIProvider
 
         try
         {
-            PhiSilicaLafHelper.TryUnlock();
+            if (!PhiSilicaLafHelper.TryUnlock())
+            {
+                return Task.FromResult(false);
+            }
+
             var readyState = PhiSilicaLanguageModel.GetReadyState();
-            return Task.FromResult(readyState is not (AIFeatureReadyState.NotSupportedOnCurrentSystem or AIFeatureReadyState.DisabledByUser));
+            return Task.FromResult(readyState is AIFeatureReadyState.Ready or AIFeatureReadyState.NotReady);
         }
         catch (Exception)
         {
@@ -78,7 +82,7 @@ public sealed class PhiSilicaPasteProvider : IPasteAIProvider
             progress?.Report(0.1);
 
             var contentFilterOptions = new ContentFilterOptions();
-            var context = languageModel.CreateContext(systemPrompt, contentFilterOptions);
+            using var context = languageModel.CreateContext(systemPrompt, contentFilterOptions);
 
             var userPrompt = $"""
                 User instructions:
@@ -163,7 +167,14 @@ public sealed class PhiSilicaPasteProvider : IPasteAIProvider
                 return _cachedModel;
             }
 
-            PhiSilicaLafHelper.TryUnlock();
+            if (!PhiSilicaLafHelper.TryUnlock())
+            {
+                throw new PasteActionException(
+                    "Phi Silica access is unavailable",
+                    new InvalidOperationException($"LAF unlock failed: {PhiSilicaLafHelper.LastUnlockStatus}"),
+                    aiServiceMessage: "Phi Silica access could not be authorized for this application.");
+            }
+
             var readyState = PhiSilicaLanguageModel.GetReadyState();
 
             if (readyState is not (AIFeatureReadyState.Ready or AIFeatureReadyState.NotReady))

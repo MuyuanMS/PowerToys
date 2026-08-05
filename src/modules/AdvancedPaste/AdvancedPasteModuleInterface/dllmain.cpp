@@ -116,7 +116,7 @@ private:
     bool m_is_ai_enabled = false;
     bool m_is_advanced_ai_enabled = false;
     bool m_preview_custom_format_output = true;
-    bool m_auto_copy_selection_custom_action = false;
+    std::atomic_bool m_auto_copy_selection_custom_action = false;
 
     // Event listening for external triggers (e.g., from CmdPal extension)
     EventWaiter m_triggerEventWaiter;

@@ -162,6 +162,7 @@ try {
 # Project root folder (now set to current script folder for local builds)
 $ProjectRoot = $PSScriptRoot
 $UserFolder = Join-Path $ProjectRoot '.user'
+$DevRegistrationFolder = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) 'Microsoft\PowerToys\SparsePackageDevRegistration'
 if (-not (Test-Path $UserFolder)) { New-Item -ItemType Directory -Path $UserFolder | Out-Null }
 
 # Certificate file paths using configuration
@@ -178,6 +179,7 @@ if ($Clean) {
     }
     Write-BuildLog "Attempting to remove existing sparse package (best effort)" -Level Info
     try { Get-AppxPackage -Name $script:Config.IdentityName | Remove-AppxPackage } catch {}
+    if (Test-Path $DevRegistrationFolder) { Remove-Item $DevRegistrationFolder -Recurse -Force }
 }
 
 # Force certificate regeneration if requested
@@ -473,7 +475,7 @@ if ($DevRegister) {
     }
 
     # Keep the loose-registration manifest available for the lifetime of the package registration.
-    $devRegDir = Join-Path $UserFolder 'SparseDevRegistration'
+    $devRegDir = $DevRegistrationFolder
     if (Test-Path $devRegDir) { Remove-Item $devRegDir -Recurse -Force }
     New-Item -ItemType Directory -Path $devRegDir -Force | Out-Null
 

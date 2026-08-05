@@ -111,15 +111,8 @@ namespace AdvancedPaste.ViewModels
                     return false;
                 }
 
-                // Check if there are any allowed providers
-                if (!AllowedAIProviders.Any())
-                {
-                    return false;
-                }
-
-                // We should handle the IsAIEnabled logic in settings, don't check again here.
-                // If setting says yes, and here should pass check, and if error happens, it happens.
-                return true;
+                var activeProvider = ResolveEffectiveProvider(providerId: null);
+                return activeProvider is not null && IsProviderAllowedByGPO(activeProvider);
             }
         }
 
@@ -479,7 +472,7 @@ namespace AdvancedPaste.ViewModels
 
             UpdateFormats(
                 CustomActionPasteFormats,
-                IsCustomAIServiceEnabled ? _userSettings.CustomActions.Select(customAction => CreateCustomAIPasteFormat(customAction.Name, customAction.Prompt, isSavedQuery: true, customAction.ProviderId)) : []);
+                _userSettings.IsAIEnabled ? _userSettings.CustomActions.Select(customAction => CreateCustomAIPasteFormat(customAction.Name, customAction.Prompt, isSavedQuery: true, customAction.ProviderId)) : []);
         }
 
         public void Dispose()

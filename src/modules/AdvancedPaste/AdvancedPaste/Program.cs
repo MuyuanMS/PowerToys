@@ -71,7 +71,13 @@ namespace AdvancedPaste
         {
             try
             {
-                PhiSilicaLafHelper.TryUnlock();
+                if (!PhiSilicaLafHelper.TryUnlock())
+                {
+                    Console.Error.WriteLine($"[phi-silica] LAF unlock status: {PhiSilicaLafHelper.LastUnlockStatus}");
+                    Console.Out.WriteLine("NotSupported");
+                    return 2;
+                }
+
                 var readyState = Microsoft.Windows.AI.Text.LanguageModel.GetReadyState();
 
                 Console.Error.WriteLine($"[phi-silica] LAF unlock status: {PhiSilicaLafHelper.LastUnlockStatus}; ReadyState: {readyState}");
@@ -111,7 +117,13 @@ namespace AdvancedPaste
         {
             try
             {
-                PhiSilicaLafHelper.TryUnlock();
+                if (!PhiSilicaLafHelper.TryUnlock())
+                {
+                    Console.Error.WriteLine($"[phi-silica] LAF unlock status: {PhiSilicaLafHelper.LastUnlockStatus}");
+                    Console.Out.WriteLine("NotSupported");
+                    return 2;
+                }
+
                 var readyState = Microsoft.Windows.AI.Text.LanguageModel.GetReadyState();
 
                 Console.Error.WriteLine($"[phi-silica] LAF unlock status: {PhiSilicaLafHelper.LastUnlockStatus}; ReadyState: {readyState}");
