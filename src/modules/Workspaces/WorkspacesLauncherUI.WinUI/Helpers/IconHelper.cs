@@ -78,7 +78,7 @@ namespace WorkspacesLauncherUI.Helpers
             }
         }
 
-        private static string ResolvePackagedLogoPath(string path)
+        internal static string ResolvePackagedLogoPath(string path)
         {
             if (File.Exists(path))
             {
