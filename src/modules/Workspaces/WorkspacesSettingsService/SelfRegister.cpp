@@ -606,7 +606,13 @@ namespace PTSettingsSvc
                                          SERVICE_STOP | SERVICE_QUERY_STATUS | DELETE);
             if (svc)
             {
-                StopAndWait(svc);
+                if (!StopAndWait(svc))
+                {
+                    rc = static_cast<int>(ERROR_SERVICE_REQUEST_TIMEOUT);
+                    CloseServiceHandle(svc);
+                    CloseServiceHandle(scm);
+                    return rc;
+                }
                 if (!DeleteService(svc))
                 {
                     DWORD err = GetLastError();

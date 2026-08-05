@@ -193,6 +193,8 @@ namespace WorkspacesEditor.ViewModels
             }
         }
 
+        public bool ProtectedLoadSucceeded { get; set; }
+
         public void SetEditedProject(Project editedProject)
         {
             this.editedProject = editedProject;
@@ -205,6 +207,8 @@ namespace WorkspacesEditor.ViewModels
                 return false;
             }
 
+            projectToSave.Applications =
+                projectToSave.Applications.Where(x => x.IsIncluded).ToList();
             var updatedWorkspaces = Workspaces
                 .Select(project => project.Id == editedProject.Id ? projectToSave : project)
                 .ToList();
@@ -218,7 +222,6 @@ namespace WorkspacesEditor.ViewModels
                 RemoveShortcut(editedProject);
             }
 
-            projectToSave.Applications = projectToSave.Applications.Where(x => x.IsIncluded).ToList();
             projectToSave.OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs("AppsCountString"));
             projectToSave.Initialize(App.GetCurrentTheme());
 
@@ -425,13 +428,15 @@ namespace WorkspacesEditor.ViewModels
 
         private bool CanModifyWorkspaces()
         {
-            if (!IsProvisioning)
+            if (!IsProvisioning && ProtectedLoadSucceeded)
             {
                 return true;
             }
 
             System.Windows.MessageBox.Show(
-                "Workspaces is still finishing protected settings setup. Please wait a moment for your existing workspaces to load before making changes.",
+                IsProvisioning
+                    ? "Workspaces is still finishing protected settings setup. Please wait a moment for your existing workspaces to load before making changes."
+                    : "PowerToys couldn't safely load the protected workspace list. Restart PowerToys or reopen the Workspaces editor, and wait for your saved workspaces to appear before making changes.",
                 "Workspaces",
                 System.Windows.MessageBoxButton.OK,
                 System.Windows.MessageBoxImage.Information);

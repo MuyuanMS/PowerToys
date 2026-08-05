@@ -52,10 +52,12 @@ namespace WorkspacesEditor.Utils
                 {
                     case PTSettingsClient.Result.Ok:
                         workspaces = parser.Deserialize(Encoding.UTF8.GetString(blob));
+                        mainViewModel.ProtectedLoadSucceeded = true;
                         break;
 
                     case PTSettingsClient.Result.NotFound:
                         // Service is up but this user has no blob yet (first run).
+                        mainViewModel.ProtectedLoadSucceeded = true;
                         return new ParsingResult(true);
 
                     case PTSettingsClient.Result.Unavailable:
@@ -81,6 +83,7 @@ namespace WorkspacesEditor.Utils
                                 System.Windows.MessageBoxImage.Warning);
                         }
 
+                        mainViewModel.ProtectedLoadSucceeded = false;
                         return new ParsingResult(true);
 
                     case PTSettingsClient.Result.AuthRejected:
@@ -103,21 +106,36 @@ namespace WorkspacesEditor.Utils
                                 System.Windows.MessageBoxImage.Warning);
                         }
 
+                        mainViewModel.ProtectedLoadSucceeded = false;
                         return new ParsingResult(true);
 
                     default:
-                        // Protocol / IoError → fail safe to empty (transient/unknown).
-                        Logger.LogWarning($"GetBlob returned {rc}; treating workspaces as empty.");
-                        return new ParsingResult(true);
+                        // Protocol / IoError must not be treated as a legitimate
+                        // empty list: block mutations until a later protected
+                        // read succeeds, or stale UI state could overwrite data.
+                        mainViewModel.ProtectedLoadSucceeded = false;
+                        Logger.LogWarning($"GetBlob returned {rc}; protected load failed.");
+                        if (showDialogs)
+                        {
+                            System.Windows.MessageBox.Show(
+                                "PowerToys couldn't safely load your protected workspaces. Your saved data was not changed. Restart PowerToys or reopen the Workspaces editor and try again.",
+                                "Workspaces",
+                                System.Windows.MessageBoxButton.OK,
+                                System.Windows.MessageBoxImage.Warning);
+                        }
+
+                        return new ParsingResult(false, Properties.Resources.Error_Parsing_Message);
                 }
 
                 if (workspaces.Workspaces == null)
                 {
+                    mainViewModel.ProtectedLoadSucceeded = false;
                     return new ParsingResult(true);
                 }
 
                 if (!SetWorkspaces(mainViewModel, workspaces))
                 {
+                    mainViewModel.ProtectedLoadSucceeded = false;
                     Logger.LogWarning($"Workspaces storage file content could not be set. Reason: {Properties.Resources.Error_Parsing_Message}");
                     return new ParsingResult(false, WorkspacesEditor.Properties.Resources.Error_Parsing_Message);
                 }
@@ -126,6 +144,7 @@ namespace WorkspacesEditor.Utils
             }
             catch (Exception e)
             {
+                mainViewModel.ProtectedLoadSucceeded = false;
                 Logger.LogError($"Exception while parsing storage file: {e.Message}");
                 return new ParsingResult(false, e.Message);
             }
