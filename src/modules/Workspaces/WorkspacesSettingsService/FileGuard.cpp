@@ -385,8 +385,15 @@ namespace PTSettingsSvc
         }
         std::unique_ptr<void, LocalFreeDeleter> usersGuard(usersSid);
 
+        PSID allServicesSid = nullptr;
+        if (!ConvertStringSidToSidW(L"S-1-5-80-0", &allServicesSid)) // NT SERVICE\ALL SERVICES
+        {
+            return HRESULT_FROM_WIN32(GetLastError());
+        }
+        std::unique_ptr<void, LocalFreeDeleter> allServicesGuard(allServicesSid);
+
         std::wstring svcAccount = serviceAccountName;
-        EXPLICIT_ACCESS_W ea[4] = {};
+        EXPLICIT_ACCESS_W ea[5] = {};
 
         ea[0].grfAccessPermissions = GENERIC_ALL;
         ea[0].grfAccessMode = SET_ACCESS;
@@ -415,6 +422,13 @@ namespace PTSettingsSvc
         ea[3].Trustee.TrusteeForm = TRUSTEE_IS_NAME;
         ea[3].Trustee.TrusteeType = TRUSTEE_IS_USER;
         ea[3].Trustee.ptstrName = svcAccount.data();
+
+        ea[4].grfAccessPermissions = GENERIC_READ | GENERIC_EXECUTE;
+        ea[4].grfAccessMode = SET_ACCESS;
+        ea[4].grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
+        ea[4].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+        ea[4].Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
+        ea[4].Trustee.ptstrName = static_cast<LPWSTR>(allServicesSid);
 
         PACL acl = nullptr;
         DWORD rc = SetEntriesInAclW(ARRAYSIZE(ea), ea, nullptr, &acl);

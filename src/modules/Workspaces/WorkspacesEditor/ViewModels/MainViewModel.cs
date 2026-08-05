@@ -200,6 +200,11 @@ namespace WorkspacesEditor.ViewModels
 
         public bool SaveProject(Project projectToSave)
         {
+            if (!CanModifyWorkspaces())
+            {
+                return false;
+            }
+
             var updatedWorkspaces = Workspaces
                 .Select(project => project.Id == editedProject.Id ? projectToSave : project)
                 .ToList();
@@ -319,6 +324,11 @@ namespace WorkspacesEditor.ViewModels
 
         public void EditProject(Project selectedProject, bool isNewlyCreated = false)
         {
+            if (!CanModifyWorkspaces())
+            {
+                return;
+            }
+
             editPage = new ProjectEditor(this);
 
             SetEditedProject(selectedProject);
@@ -372,6 +382,11 @@ namespace WorkspacesEditor.ViewModels
 
         public bool AddNewProject(Project project)
         {
+            if (!CanModifyWorkspaces())
+            {
+                return false;
+            }
+
             project.Applications.RemoveAll(app => !app.IsIncluded);
             project.Initialize(App.GetCurrentTheme());
             var updatedWorkspaces = Workspaces.Append(project).ToList();
@@ -390,6 +405,11 @@ namespace WorkspacesEditor.ViewModels
 
         public bool DeleteProject(Project selectedProject)
         {
+            if (!CanModifyWorkspaces())
+            {
+                return false;
+            }
+
             var updatedWorkspaces = Workspaces.Where(project => project != selectedProject).ToList();
             if (!_workspacesEditorIO.SerializeWorkspaces(updatedWorkspaces))
             {
@@ -401,6 +421,21 @@ namespace WorkspacesEditor.ViewModels
             OnPropertyChanged(new PropertyChangedEventArgs(nameof(WorkspacesView)));
             SendDeleteTelemetryEvent();
             return true;
+        }
+
+        private bool CanModifyWorkspaces()
+        {
+            if (!IsProvisioning)
+            {
+                return true;
+            }
+
+            System.Windows.MessageBox.Show(
+                "Workspaces is still finishing protected settings setup. Please wait a moment for your existing workspaces to load before making changes.",
+                "Workspaces",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Information);
+            return false;
         }
 
         private void RemoveShortcut(Project selectedProject)

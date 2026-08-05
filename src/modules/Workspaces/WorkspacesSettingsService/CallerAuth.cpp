@@ -207,7 +207,12 @@ namespace PTSettingsSvc
             canonical = CanonicalizePath(exePath);
             hImage = CreateFileW(canonical.c_str(),
                                  GENERIC_READ,
-                                 FILE_SHARE_READ | FILE_SHARE_DELETE,
+                                 // Keep the signed image pinned against writes,
+                                 // replacement, and rename while the version is
+                                 // reopened by path below. If another process
+                                 // already holds incompatible write/delete
+                                 // access, fail closed.
+                                 FILE_SHARE_READ,
                                  nullptr,
                                  OPEN_EXISTING,
                                  FILE_ATTRIBUTE_NORMAL,
@@ -308,4 +313,3 @@ namespace PTSettingsSvc
         return S_OK;
     }
 }
-
