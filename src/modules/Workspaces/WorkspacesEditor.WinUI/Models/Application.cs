@@ -236,10 +236,13 @@ namespace WorkspacesEditor.Models
 
         private void LoadIcon()
         {
-            _iconImage = IconHelper.TryGetExecutableIcon(AppPath);
-            if (_iconImage == null && !string.IsNullOrEmpty(AppPath))
+            try
             {
-                IsNotFound = true;
+                _iconImage = IconHelper.FromIcon(Icon);
+            }
+            catch (Exception)
+            {
+                _iconImage = IconHelper.TryGetExecutableIcon(AppPath);
             }
         }
 

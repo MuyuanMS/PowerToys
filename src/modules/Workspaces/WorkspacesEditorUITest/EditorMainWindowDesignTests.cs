@@ -88,9 +88,10 @@ public class EditorMainWindowDesignTests : WorkspacesUiAutomationBase
         SendKeys(Key.Tab);
         Task.Delay(500).Wait();
 
-        // At least one focusable element should have focus
-        // This verifies keyboard navigation isn't broken
-        Assert.IsTrue(true, "Tab navigation executed without crash");
+        var focusedElements = FindAll<Element>(By.XPath("//*[@HasKeyboardFocus='true']"));
+        Assert.IsTrue(
+            focusedElements.Any(element => element.ControlType is "ControlType.Button" or "ControlType.Edit" or "ControlType.ComboBox" or "ControlType.ListItem"),
+            "Tab should move focus to an interactive control.");
     }
 
     [TestMethod("MainWindow.Accessibility.CreateButtonHasAutomationName")]
