@@ -962,8 +962,9 @@ namespace AdvancedPaste.ViewModels
 
             var metadata = AIServiceTypeRegistry.GetMetadata(serviceType);
 
-            // Check global online AI GPO for online services
-            if (metadata.IsOnlineService && !IsAllowedByGPO)
+            // Re-check at execution time because policy can change while the window is open.
+            if (metadata.IsOnlineService
+                && PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOnlineAIModelsValue() == PowerToys.GPOWrapper.GpoRuleConfigured.Disabled)
             {
                 return false;
             }
