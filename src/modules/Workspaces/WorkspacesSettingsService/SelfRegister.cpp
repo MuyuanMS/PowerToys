@@ -361,6 +361,18 @@ namespace PTSettingsSvc
                                 GetUserFolder(sid),
                                 sid,
                                 account);
+            if (SUCCEEDED(hr))
+            {
+                // Sanitize the currently registered namespace before the
+                // low-privilege service starts. A user could have pre-created a
+                // protected child DACL or junction before the SID folder was
+                // hardened; applying the same handle-verified protected DACL
+                // here removes that foothold.
+                hr = EnsureUserFolder(
+                    GetUserNamespaceFolder(sid, L"Workspaces"),
+                    sid,
+                    account);
+            }
             RegLog(L"ProvisionStore ms=" + std::to_wstring(NowMs() - t) + L" hr=" + std::to_wstring(hr));
             if (FAILED(hr))
             {

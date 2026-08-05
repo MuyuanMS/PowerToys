@@ -306,7 +306,11 @@ namespace PTSettingsSvc
                 PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE | FILE_FLAG_OVERLAPPED,
                 PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT |
                     PIPE_REJECT_REMOTE_CLIENTS,
-                /*nMaxInstances*/ PIPE_UNLIMITED_INSTANCES,
+                // Keep the sole first-instance handle for the service lifetime.
+                // Even though GENERIC_WRITE includes FILE_CREATE_PIPE_INSTANCE
+                // for named pipes, no second instance can be created while this
+                // one exists.
+                /*nMaxInstances*/ 1,
                 /*nOutBufferSize*/ 64 * 1024,
                 /*nInBufferSize*/ 64 * 1024,
                 /*nDefaultTimeOut*/ 5000,
@@ -327,17 +331,20 @@ namespace PTSettingsSvc
         }
 
         DWORD rc = ERROR_SUCCESS;
+        HANDLE pipe = CreateProtectedPipe();
+        if (pipe == INVALID_HANDLE_VALUE)
+        {
+            rc = GetLastError();
+            CloseHandle(g_ioEvent);
+            g_ioEvent = nullptr;
+            g_stopEvt = nullptr;
+            return rc;
+        }
+
         for (;;)
         {
             if (WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0)
             {
-                break;
-            }
-
-            HANDLE pipe = CreateProtectedPipe();
-            if (pipe == INVALID_HANDLE_VALUE)
-            {
-                rc = GetLastError();
                 break;
             }
 
@@ -386,7 +393,6 @@ namespace PTSettingsSvc
 
             if (stopping || WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0)
             {
-                CloseHandle(pipe);
                 break;
             }
 
@@ -396,10 +402,9 @@ namespace PTSettingsSvc
                 FlushFileBuffers(pipe);
                 DisconnectNamedPipe(pipe);
             }
-
-            CloseHandle(pipe);
         }
 
+        CloseHandle(pipe);
         CloseHandle(g_ioEvent);
         g_ioEvent = nullptr;
         g_stopEvt = nullptr;

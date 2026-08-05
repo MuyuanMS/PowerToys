@@ -265,9 +265,10 @@ namespace PTSettingsSvc
 
         rc = SetSecurityInfo(directory,
                              SE_FILE_OBJECT,
-                             DACL_SECURITY_INFORMATION |
+                             OWNER_SECURITY_INFORMATION |
+                                 DACL_SECURITY_INFORMATION |
                                  PROTECTED_DACL_SECURITY_INFORMATION,
-                             nullptr, nullptr, acl, nullptr);
+                             systemSid, nullptr, acl, nullptr);
         CloseHandle(directory);
         return rc == ERROR_SUCCESS ? S_OK : HRESULT_FROM_WIN32(rc);
     }
