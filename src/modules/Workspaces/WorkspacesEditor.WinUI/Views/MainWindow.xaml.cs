@@ -184,6 +184,7 @@ namespace WorkspacesEditor
             _cancellationToken.Cancel();
             _cancellationToken.Dispose();
             (Microsoft.UI.Xaml.Application.Current as IDisposable)?.Dispose();
+            Microsoft.UI.Xaml.Application.Current.Exit();
         }
 
         private void AppWindow_Changed(AppWindow sender, AppWindowChangedEventArgs args)
