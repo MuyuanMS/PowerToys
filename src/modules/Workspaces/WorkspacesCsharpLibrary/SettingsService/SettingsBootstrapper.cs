@@ -86,7 +86,8 @@ public static class SettingsBootstrapper
         // passive/background paths honor the sentinel back-off.
         var force = request.Reason is TriggerReason.ExplicitUserRequest
                                    or TriggerReason.WorkspaceSaving
-                                   or TriggerReason.EditorOpened;
+                                   or TriggerReason.EditorOpened
+                                   or TriggerReason.WorkspaceLaunching;
 
         // Block 1: service initialization.  Only attempt when we have an install
         // folder to locate the payload; otherwise skip straight to migration,
