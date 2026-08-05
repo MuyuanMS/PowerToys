@@ -27,12 +27,9 @@ public sealed class PhiSilicaPasteProvider : IPasteAIProvider
     private static readonly SemaphoreSlim _initLock = new(1, 1);
     private static PhiSilicaLanguageModel _cachedModel;
 
-    private readonly PasteAIConfig _config;
-
     public PhiSilicaPasteProvider(PasteAIConfig config)
     {
         ArgumentNullException.ThrowIfNull(config);
-        _config = config;
     }
 
     public Task<bool> IsAvailableAsync(CancellationToken cancellationToken)

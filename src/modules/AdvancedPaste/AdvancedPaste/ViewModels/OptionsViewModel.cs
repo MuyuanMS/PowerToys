@@ -953,6 +953,11 @@ namespace AdvancedPaste.ViewModels
             }
 
             var serviceType = provider.ServiceType.ToAIServiceType();
+            if (serviceType == AIServiceType.Unknown)
+            {
+                serviceType = AIServiceType.OpenAI;
+            }
+
             var metadata = AIServiceTypeRegistry.GetMetadata(serviceType);
 
             // Check global online AI GPO for online services

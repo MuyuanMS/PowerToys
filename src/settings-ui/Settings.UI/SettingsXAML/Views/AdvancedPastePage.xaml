@@ -83,7 +83,6 @@
                         <tkcontrols:SettingsExpander
                             Name="AdvancedPasteEnableAISettingsCard"
                             x:Uid="AdvancedPaste_EnableAISettingsCard"
-                            IsEnabled="{x:Bind ViewModel.IsOnlineAIModelsDisallowedByGPO, Mode=OneWay, Converter={StaticResource BoolNegationConverter}}"
                             IsExpanded="{x:Bind ViewModel.IsAIEnabled, Mode=OneWay}"
                             ItemsSource="{x:Bind ViewModel.PasteAIConfiguration.Providers, Mode=OneWay}">
                             <tkcontrols:SettingsExpander.HeaderIcon>
