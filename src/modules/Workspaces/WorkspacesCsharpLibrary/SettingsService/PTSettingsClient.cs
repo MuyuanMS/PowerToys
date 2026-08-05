@@ -185,6 +185,7 @@ public static class PTSettingsClient
                     }
                 }
 
+                pipe.WriteByte(ResponseAck);
                 return MapStatus(status);
             }
             catch (IOException)
@@ -313,6 +314,7 @@ public static class PTSettingsClient
     }
 
     private const uint ProcessQueryLimitedInformation = 0x1000;
+    private const byte ResponseAck = 0xA5;
     private const int ImagePathCapacity = 4096;
     private const uint ScManagerConnect = 0x0001;
     private const uint ServiceQueryStatus = 0x0004;

@@ -144,35 +144,36 @@ namespace PTSettingsSvc
             SendResponse(pipe, status);
         }
 
-        DWORD WINAPI FlushPipeThread(LPVOID parameter)
+        bool WaitForResponseAck(HANDLE pipe)
         {
-            return FlushFileBuffers(static_cast<HANDLE>(parameter))
-                       ? ERROR_SUCCESS
-                       : GetLastError();
-        }
-
-        void FlushPipeBounded(HANDLE pipe)
-        {
-            HANDLE thread = CreateThread(
-                nullptr,
-                0,
-                FlushPipeThread,
-                pipe,
-                0,
-                nullptr);
-            if (!thread)
+            constexpr uint8_t ExpectedAck = 0xA5;
+            uint8_t ack = 0;
+            OVERLAPPED ov{};
+            ov.hEvent = g_ioEvent;
+            ResetEvent(g_ioEvent);
+            DWORD read = 0;
+            if (ReadFile(pipe, &ack, sizeof(ack), &read, &ov))
             {
-                return;
+                return read == sizeof(ack) && ack == ExpectedAck;
+            }
+            if (GetLastError() != ERROR_IO_PENDING)
+            {
+                return false;
             }
 
-            HANDLE waits[2] = { thread, g_stopEvt };
+            HANDLE waits[2] = { g_ioEvent, g_stopEvt };
             DWORD wait = WaitForMultipleObjects(2, waits, FALSE, 2000);
             if (wait != WAIT_OBJECT_0)
             {
-                CancelSynchronousIo(thread);
-                WaitForSingleObject(thread, INFINITE);
+                CancelIoEx(pipe, &ov);
+                DWORD reaped = 0;
+                GetOverlappedResult(pipe, &ov, &reaped, TRUE);
+                return false;
             }
-            CloseHandle(thread);
+
+            return GetOverlappedResult(pipe, &ov, &read, TRUE) &&
+                   read == sizeof(ack) &&
+                   ack == ExpectedAck;
         }
 
         void HandleGetBlob(HANDLE pipe, const CallerIdentity& id)
@@ -439,7 +440,7 @@ namespace PTSettingsSvc
             if (connected)
             {
                 HandleConnection(pipe);
-                FlushPipeBounded(pipe);
+                WaitForResponseAck(pipe);
                 DisconnectNamedPipe(pipe);
             }
         }

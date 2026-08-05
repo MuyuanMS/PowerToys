@@ -999,7 +999,10 @@ namespace
                   L"$exe = if ($imagePath.StartsWith([char]34)) { $imagePath.Split([char]34)[1] } else { $imagePath.Split(' ')[0] }; "
                   L"if (-not (Test-Path -LiteralPath $exe)) { exit 3 }; "
                   L"& $exe --unregister $sid; "
-                  L"if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } "
+                  L"$unregisterExit = $LASTEXITCODE; "
+                  L"if ($unregisterExit -ne 0) { exit $unregisterExit }; "
+                  L"$sidBin = Split-Path (Split-Path $exe); "
+                  L"Remove-Item -LiteralPath $sidBin -Recurse -Force -ErrorAction Stop; "
                   L"}; "
                   L"Get-AppxPackage -Name '";
         params += packageName;

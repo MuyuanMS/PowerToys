@@ -325,6 +325,8 @@ namespace PTSettingsClient
                     return Result::ProtocolError;
                 }
             }
+            constexpr uint8_t ResponseAck = 0xA5;
+            WriteAll(pipe.h, &ResponseAck, sizeof(ResponseAck));
             return MapStatus(static_cast<Status>(statusByte));
         }
     }
