@@ -144,6 +144,37 @@ namespace PTSettingsSvc
             SendResponse(pipe, status);
         }
 
+        DWORD WINAPI FlushPipeThread(LPVOID parameter)
+        {
+            return FlushFileBuffers(static_cast<HANDLE>(parameter))
+                       ? ERROR_SUCCESS
+                       : GetLastError();
+        }
+
+        void FlushPipeBounded(HANDLE pipe)
+        {
+            HANDLE thread = CreateThread(
+                nullptr,
+                0,
+                FlushPipeThread,
+                pipe,
+                0,
+                nullptr);
+            if (!thread)
+            {
+                return;
+            }
+
+            HANDLE waits[2] = { thread, g_stopEvt };
+            DWORD wait = WaitForMultipleObjects(2, waits, FALSE, 2000);
+            if (wait != WAIT_OBJECT_0)
+            {
+                CancelSynchronousIo(thread);
+                WaitForSingleObject(thread, INFINITE);
+            }
+            CloseHandle(thread);
+        }
+
         void HandleGetBlob(HANDLE pipe, const CallerIdentity& id)
         {
             std::wstring target = GetUserFilePath(id.userSidString,
@@ -399,7 +430,7 @@ namespace PTSettingsSvc
             if (connected)
             {
                 HandleConnection(pipe);
-                FlushFileBuffers(pipe);
+                FlushPipeBounded(pipe);
                 DisconnectNamedPipe(pipe);
             }
         }

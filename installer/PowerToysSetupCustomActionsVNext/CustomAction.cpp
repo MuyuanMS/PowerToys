@@ -964,17 +964,22 @@ namespace
 
         std::wstring params =
             L"-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \""
-            L"$loc = (Get-AppxPackage -Name '";
-        params += packageName;
-        params += L"' | Select-Object -First 1).InstallLocation; "
-                  L"if ($loc) { & (Join-Path $loc '";
-        params += kPTSettingsSvcExeName;
-        params += L"') --unregister '";
+            L"$sid = '";
         params += sidLit;
-        params += L"' }; "
-                  L"Get-AppxPackage -Name '";
+        params += L"'; "
+                  L"$svcKey = 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\PTSettingsSvc_' + $sid; "
+                  L"if (Test-Path $svcKey) { "
+                  L"$imagePath = (Get-ItemProperty $svcKey -Name ImagePath -ErrorAction Stop).ImagePath; "
+                  L"$exe = if ($imagePath.StartsWith([char]34)) { $imagePath.Split([char]34)[1] } else { $imagePath.Split(' ')[0] }; "
+                  L"if (-not (Test-Path -LiteralPath $exe)) { exit 3 }; "
+                  L"& $exe --unregister $sid; "
+                  L"if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } "
+                  L"}; "
+                  L"Get-AppxPackage -User $sid -Name '";
         params += packageName;
-        params += L"' | Remove-AppxPackage\"";
+        params += L"' | ForEach-Object { "
+                  L"Remove-AppxPackage -Package $_.PackageFullName -User $sid -ErrorAction Stop "
+                  L"}\"";
 
         SHELLEXECUTEINFOW sei{};
         sei.cbSize = sizeof(sei);
