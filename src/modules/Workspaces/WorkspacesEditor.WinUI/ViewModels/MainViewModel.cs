@@ -425,6 +425,7 @@ namespace WorkspacesEditor.ViewModels
                 {
                     project.UpdateAfterLaunchAndEdit(_projectBeforeLaunch);
                     project.EditorWindowTitle = GetString("EditWorkspace");
+                    project.InitializePreview();
 
                     // Navigate to editor page with the updated project
                     StrongReferenceMessenger.Default.Send(new NavigateToEditorMessage(project));
