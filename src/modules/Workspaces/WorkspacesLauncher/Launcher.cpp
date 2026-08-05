@@ -51,6 +51,11 @@ Launcher::Launcher(const WorkspacesData::WorkspacesProject& project,
 
 Launcher::~Launcher()
 {
+    if (m_launchThread.joinable())
+    {
+        m_launchThread.join();
+    }
+
     // main thread, will wait until arranger is finished
     Logger::trace(L"Finalizing launch");
 
@@ -172,7 +177,9 @@ void Launcher::handleWindowArrangerMessage(const std::wstring& msg) // Workspace
 {
     if (msg == L"ready")
     {
-        std::thread([&]() { Launch(); }).detach();
+        std::call_once(m_launchOnce, [this]() {
+            m_launchThread = std::thread([this]() { Launch(); });
+        });
     }
     else
     {
