@@ -120,8 +120,28 @@ namespace JsonUtils
         }
 
         case PTSettingsClient::Result::NotFound:
-            // Service is up but this user has no blob yet (first run).
+        {
+            // A direct desktop shortcut can start the native launcher before a
+            // managed host has run the migration bootstrap. If the protected
+            // service is already up but empty, validate the legacy file and
+            // seed it through the service before continuing.
+            const auto legacyFile = WorkspacesData::WorkspacesFile();
+            if (std::filesystem::exists(legacyFile))
+            {
+                auto legacy = ReadWorkspaces(legacyFile);
+                if (legacy.isError())
+                {
+                    return Error(legacy.error());
+                }
+                if (!WriteWorkspacesToService(legacy.getValue()))
+                {
+                    return Error(WorkspacesFileError::ServiceAccessError);
+                }
+                return Ok(legacy.getValue());
+            }
+
             return Ok(std::vector<WorkspacesData::WorkspacesProject>{});
+        }
 
         case PTSettingsClient::Result::ServiceUnavailable:
             // Protected-store-only: do NOT read the stale, user-writable legacy

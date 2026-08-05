@@ -130,6 +130,12 @@ namespace PTSettingsSvc
         // ProtectServiceBinDir once the service — hence the account — exists.
         HRESULT EnsureHardenedStagingDir(const std::wstring& dir)
         {
+            HRESULT hierarchyHr = EnsureDirectoryHierarchyNoReparse(dir);
+            if (FAILED(hierarchyHr))
+            {
+                return hierarchyHr;
+            }
+
             DWORD attr = GetFileAttributesW(dir.c_str());
             if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_REPARSE_POINT))
             {

@@ -7,6 +7,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Security.Principal;
+using System.Threading;
 
 #nullable enable
 
@@ -208,7 +209,17 @@ public static class ServiceProvisioner
                 // The elevated helper ran (whether or not it fully succeeded) —
                 // record the attempt so a repeat trigger doesn't re-prompt.
                 TryWriteAttemptSentinel();
-                return IsServiceAvailable() ? Outcome.Provisioned : Outcome.AttemptedNotConfirmed;
+                for (int attempt = 0; attempt < 40; attempt++)
+                {
+                    if (IsServiceAvailable())
+                    {
+                        return Outcome.Provisioned;
+                    }
+
+                    Thread.Sleep(250);
+                }
+
+                return Outcome.AttemptedNotConfirmed;
         }
     }
 
