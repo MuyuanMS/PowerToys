@@ -13,6 +13,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="MSTest" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
     <ProjectReference Include="..\..\..\common\UITestAutomation\UITestAutomation.csproj" />
   </ItemGroup>
 
