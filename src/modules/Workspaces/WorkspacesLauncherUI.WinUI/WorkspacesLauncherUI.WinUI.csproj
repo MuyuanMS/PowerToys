@@ -63,4 +63,8 @@
     <PackageReference Include="System.IO.Abstractions" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="PowerToys.WorkspacesLauncherUI.Tests" />
+  </ItemGroup>
+
 </Project>
