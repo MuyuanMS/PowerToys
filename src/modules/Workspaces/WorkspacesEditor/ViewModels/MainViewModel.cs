@@ -200,8 +200,6 @@ namespace WorkspacesEditor.ViewModels
 
         public bool SaveProject(Project projectToSave)
         {
-            SendEditTelemetryEvent(projectToSave, editedProject);
-
             var updatedWorkspaces = Workspaces
                 .Select(project => project.Id == editedProject.Id ? projectToSave : project)
                 .ToList();
@@ -222,6 +220,7 @@ namespace WorkspacesEditor.ViewModels
             int index = Workspaces.IndexOf(editedProject);
             Workspaces[index] = projectToSave;
             ApplyShortcut(projectToSave);
+            SendEditTelemetryEvent(projectToSave, editedProject);
             return true;
         }
 
