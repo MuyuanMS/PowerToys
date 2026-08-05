@@ -46,6 +46,56 @@ namespace PTSettingsSvc
             CloseHandle(token);
         }
 
+        HRESULT EnsureAndOpenRealDirectory(const std::wstring& path,
+                                           DWORD desiredAccess,
+                                           HANDLE& outHandle)
+        {
+            outHandle = INVALID_HANDLE_VALUE;
+            if (!CreateDirectoryW(path.c_str(), nullptr))
+            {
+                DWORD err = GetLastError();
+                if (err != ERROR_ALREADY_EXISTS)
+                {
+                    return HRESULT_FROM_WIN32(err);
+                }
+            }
+
+            HANDLE directory = CreateFileW(
+                path.c_str(),
+                desiredAccess,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                nullptr,
+                OPEN_EXISTING,
+                FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
+                nullptr);
+            if (directory == INVALID_HANDLE_VALUE)
+            {
+                return HRESULT_FROM_WIN32(GetLastError());
+            }
+
+            FILE_ATTRIBUTE_TAG_INFO attributes{};
+            if (!GetFileInformationByHandleEx(
+                    directory,
+                    FileAttributeTagInfo,
+                    &attributes,
+                    sizeof(attributes)))
+            {
+                DWORD err = GetLastError();
+                CloseHandle(directory);
+                return HRESULT_FROM_WIN32(err);
+            }
+
+            if ((attributes.FileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0 ||
+                (attributes.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
+            {
+                CloseHandle(directory);
+                return HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
+            }
+
+            outHandle = directory;
+            return S_OK;
+        }
+
         // Applies the PROTECTED per-user DACL and sets owner = SYSTEM.
         //   serviceAccountName = the virtual account, e.g.
         //   L"NT SERVICE\\PTSettingsSvc_<SID>" (Full Control writer).
@@ -123,29 +173,29 @@ namespace PTSettingsSvc
             EnablePrivilege(SE_RESTORE_NAME);
             EnablePrivilege(SE_TAKE_OWNERSHIP_NAME);
 
-            std::vector<wchar_t> mutableName(target.begin(), target.end());
-            mutableName.push_back(L'\0');
-            rc = SetNamedSecurityInfoW(mutableName.data(),
-                                       SE_FILE_OBJECT,
-                                       OWNER_SECURITY_INFORMATION |
-                                           DACL_SECURITY_INFORMATION |
-                                           PROTECTED_DACL_SECURITY_INFORMATION,
-                                       systemSid, nullptr, acl, nullptr);
+            HANDLE directory = INVALID_HANDLE_VALUE;
+            HRESULT hr = EnsureAndOpenRealDirectory(
+                target,
+                READ_CONTROL | WRITE_DAC | WRITE_OWNER,
+                directory);
+            if (FAILED(hr))
+            {
+                return hr;
+            }
+
+            rc = SetSecurityInfo(directory,
+                                 SE_FILE_OBJECT,
+                                 OWNER_SECURITY_INFORMATION |
+                                     DACL_SECURITY_INFORMATION |
+                                     PROTECTED_DACL_SECURITY_INFORMATION,
+                                 systemSid, nullptr, acl, nullptr);
+            CloseHandle(directory);
             return rc == ERROR_SUCCESS ? S_OK : HRESULT_FROM_WIN32(rc);
         }
     }
 
     HRESULT EnsureStoreRoot(const std::wstring& root)
     {
-        if (!CreateDirectoryW(root.c_str(), nullptr))
-        {
-            DWORD err = GetLastError();
-            if (err != ERROR_ALREADY_EXISTS)
-            {
-                return HRESULT_FROM_WIN32(err);
-            }
-        }
-
         PSID adminSid = nullptr;
         if (!ConvertStringSidToSidW(L"S-1-5-32-544", &adminSid))
         {
@@ -200,27 +250,30 @@ namespace PTSettingsSvc
         }
         std::unique_ptr<void, LocalFreeDeleter> aclGuard(acl);
 
-        std::vector<wchar_t> mutableName(root.begin(), root.end());
-        mutableName.push_back(L'\0');
-        rc = SetNamedSecurityInfoW(mutableName.data(),
-                                   SE_FILE_OBJECT,
-                                   DACL_SECURITY_INFORMATION |
-                                       PROTECTED_DACL_SECURITY_INFORMATION,
-                                   nullptr, nullptr, acl, nullptr);
+        EnablePrivilege(SE_RESTORE_NAME);
+        EnablePrivilege(SE_TAKE_OWNERSHIP_NAME);
+
+        HANDLE directory = INVALID_HANDLE_VALUE;
+        HRESULT hr = EnsureAndOpenRealDirectory(
+            root,
+            READ_CONTROL | WRITE_DAC | WRITE_OWNER,
+            directory);
+        if (FAILED(hr))
+        {
+            return hr;
+        }
+
+        rc = SetSecurityInfo(directory,
+                             SE_FILE_OBJECT,
+                             DACL_SECURITY_INFORMATION |
+                                 PROTECTED_DACL_SECURITY_INFORMATION,
+                             nullptr, nullptr, acl, nullptr);
+        CloseHandle(directory);
         return rc == ERROR_SUCCESS ? S_OK : HRESULT_FROM_WIN32(rc);
     }
 
     HRESULT HardenStagingDirAdminOnly(const std::wstring& dir)
     {
-        if (!CreateDirectoryW(dir.c_str(), nullptr))
-        {
-            DWORD err = GetLastError();
-            if (err != ERROR_ALREADY_EXISTS)
-            {
-                return HRESULT_FROM_WIN32(err);
-            }
-        }
-
         PSID adminSid = nullptr;
         if (!ConvertStringSidToSidW(L"S-1-5-32-544", &adminSid)) // BUILTIN\Administrators
         {
@@ -267,14 +320,23 @@ namespace PTSettingsSvc
         EnablePrivilege(SE_RESTORE_NAME);
         EnablePrivilege(SE_TAKE_OWNERSHIP_NAME);
 
-        std::vector<wchar_t> mutableName(dir.begin(), dir.end());
-        mutableName.push_back(L'\0');
-        rc = SetNamedSecurityInfoW(mutableName.data(),
-                                   SE_FILE_OBJECT,
-                                   OWNER_SECURITY_INFORMATION |
-                                       DACL_SECURITY_INFORMATION |
-                                       PROTECTED_DACL_SECURITY_INFORMATION,
-                                   systemSid, nullptr, acl, nullptr);
+        HANDLE directory = INVALID_HANDLE_VALUE;
+        HRESULT hr = EnsureAndOpenRealDirectory(
+            dir,
+            READ_CONTROL | WRITE_DAC | WRITE_OWNER,
+            directory);
+        if (FAILED(hr))
+        {
+            return hr;
+        }
+
+        rc = SetSecurityInfo(directory,
+                             SE_FILE_OBJECT,
+                             OWNER_SECURITY_INFORMATION |
+                                 DACL_SECURITY_INFORMATION |
+                                 PROTECTED_DACL_SECURITY_INFORMATION,
+                             systemSid, nullptr, acl, nullptr);
+        CloseHandle(directory);
         return rc == ERROR_SUCCESS ? S_OK : HRESULT_FROM_WIN32(rc);
     }
 
@@ -282,14 +344,6 @@ namespace PTSettingsSvc
                              const std::wstring& userSidString,
                              const std::wstring& serviceAccountName)
     {
-        if (!CreateDirectoryW(folder.c_str(), nullptr))
-        {
-            DWORD err = GetLastError();
-            if (err != ERROR_ALREADY_EXISTS)
-            {
-                return HRESULT_FROM_WIN32(err);
-            }
-        }
         return ApplyProtectiveDacl(folder, userSidString, serviceAccountName);
     }
 
@@ -372,28 +426,38 @@ namespace PTSettingsSvc
         EnablePrivilege(SE_RESTORE_NAME);
         EnablePrivilege(SE_TAKE_OWNERSHIP_NAME);
 
-        std::vector<wchar_t> mutableName(binDir.begin(), binDir.end());
-        mutableName.push_back(L'\0');
-        rc = SetNamedSecurityInfoW(mutableName.data(),
-                                   SE_FILE_OBJECT,
-                                   OWNER_SECURITY_INFORMATION |
-                                       DACL_SECURITY_INFORMATION |
-                                       PROTECTED_DACL_SECURITY_INFORMATION,
-                                   systemSid, nullptr, acl, nullptr);
+        HANDLE directory = INVALID_HANDLE_VALUE;
+        HRESULT hr = EnsureAndOpenRealDirectory(
+            binDir,
+            READ_CONTROL | WRITE_DAC | WRITE_OWNER,
+            directory);
+        if (FAILED(hr))
+        {
+            return hr;
+        }
+
+        rc = SetSecurityInfo(directory,
+                             SE_FILE_OBJECT,
+                             OWNER_SECURITY_INFORMATION |
+                                 DACL_SECURITY_INFORMATION |
+                                 PROTECTED_DACL_SECURITY_INFORMATION,
+                             systemSid, nullptr, acl, nullptr);
+        CloseHandle(directory);
         return rc == ERROR_SUCCESS ? S_OK : HRESULT_FROM_WIN32(rc);
     }
 
     HRESULT EnsureDirectory(const std::wstring& dir)
     {
-        if (!CreateDirectoryW(dir.c_str(), nullptr))
+        HANDLE directory = INVALID_HANDLE_VALUE;
+        HRESULT hr = EnsureAndOpenRealDirectory(
+            dir,
+            FILE_READ_ATTRIBUTES,
+            directory);
+        if (SUCCEEDED(hr))
         {
-            DWORD err = GetLastError();
-            if (err != ERROR_ALREADY_EXISTS)
-            {
-                return HRESULT_FROM_WIN32(err);
-            }
+            CloseHandle(directory);
         }
-        return S_OK;
+        return hr;
     }
 
     HRESULT WriteFileAtomically(const std::wstring& targetFile,

@@ -237,7 +237,10 @@ namespace PTSettingsSvc
             const std::wstring runExe = binDir + L"\\" + kExeName;
             const std::wstring binPath = BuildBinPath(runExe, sid);
 
-            SC_HANDLE scm = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CREATE_SERVICE);
+            SC_HANDLE scm = OpenSCManagerW(
+                nullptr,
+                nullptr,
+                SC_MANAGER_CREATE_SERVICE | SC_MANAGER_CONNECT);
             if (!scm)
             {
                 return static_cast<int>(GetLastError());
