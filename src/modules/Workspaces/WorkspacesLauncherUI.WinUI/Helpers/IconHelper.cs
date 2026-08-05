@@ -65,7 +65,8 @@ namespace WorkspacesLauncherUI.Helpers
                     return null;
                 }
 
-                return TryLoadImageFile(Path.Combine(package.InstalledLocation.Path, logoPath.TrimStart('/', '\\')));
+                string unqualifiedPath = Path.Combine(package.InstalledLocation.Path, logoPath.TrimStart('/', '\\'));
+                return TryLoadImageFile(ResolvePackagedLogoPath(unqualifiedPath));
             }
             catch (Exception ex) when (ex is ArgumentException
                                     or UnauthorizedAccessException
@@ -76,6 +77,44 @@ namespace WorkspacesLauncherUI.Helpers
             {
                 return null;
             }
+        }
+
+        private static string ResolvePackagedLogoPath(string path)
+        {
+            if (File.Exists(path))
+            {
+                return path;
+            }
+
+            string extension = Path.GetExtension(path);
+            string prefix = path[..^extension.Length];
+            int[] targetSizes = [36, 44, 30, 24, 48, 60, 72, 96, 128, 180, 256, 16];
+            foreach (int targetSize in targetSizes)
+            {
+                string targetSizePath = $"{prefix}.targetsize-{targetSize}{extension}";
+                if (File.Exists(targetSizePath))
+                {
+                    return targetSizePath;
+                }
+
+                string unplatedPath = $"{prefix}.targetsize-{targetSize}_altform-unplated{extension}";
+                if (File.Exists(unplatedPath))
+                {
+                    return unplatedPath;
+                }
+            }
+
+            int[] scaleFactors = [100, 125, 150, 200, 400];
+            foreach (int scaleFactor in scaleFactors)
+            {
+                string scalePath = $"{prefix}.scale-{scaleFactor}{extension}";
+                if (File.Exists(scalePath))
+                {
+                    return scalePath;
+                }
+            }
+
+            return path;
         }
 
         private static BitmapImage TryGetPwaIcon(string pwaAppId)
