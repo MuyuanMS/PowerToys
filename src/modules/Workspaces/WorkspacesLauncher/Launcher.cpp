@@ -51,6 +51,7 @@ Launcher::Launcher(const WorkspacesData::WorkspacesProject& project,
 
 Launcher::~Launcher()
 {
+    m_uiHelper->StopReceiving();
     m_windowArrangerHelper->StopReceiving();
 
     if (m_launchThread.joinable())

@@ -60,6 +60,11 @@ void LauncherUIHelper::LaunchUI()
     }
 }
 
+void LauncherUIHelper::StopReceiving()
+{
+    m_ipcHelper.StopReceiving();
+}
+
 void LauncherUIHelper::UpdateLaunchStatus(WorkspacesData::LaunchingAppStateMap launchedApps) const
 {
     WorkspacesData::AppLaunchData appData;
