@@ -189,7 +189,12 @@ public static class ServiceProvisioner
         arguments = BuildInstallArguments(serviceMsix!, userSid!);
 #endif
 
-        var elevation = runner("powershell.exe", arguments);
+        string powerShellPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.System),
+            "WindowsPowerShell",
+            "v1.0",
+            "powershell.exe");
+        var elevation = runner(powerShellPath, arguments);
         switch (elevation)
         {
             case ElevationResult.Declined:

@@ -223,7 +223,19 @@ namespace PTSettingsSvc
         // Revert before we touch any service-side resources (file IO etc) AND
         // before the signature trust decision, so WinVerifyTrust consults the
         // service's own (SYSTEM) machine trust store rather than the caller's.
-        RevertToSelf();
+        if (!RevertToSelf())
+        {
+            DWORD revertError = GetLastError();
+            if (hImage != INVALID_HANDLE_VALUE)
+            {
+                CloseHandle(hImage);
+            }
+            if (hProc)
+            {
+                CloseHandle(hProc);
+            }
+            return HRESULT_FROM_WIN32(revertError);
+        }
 
         // Now in the service's own context: verify the signature through the
         // handle opened under impersonation.  SYSTEM cannot re-open a per-user
