@@ -51,7 +51,7 @@ namespace WorkspacesEditor
 
         protected override void OnLaunched(LaunchActivatedEventArgs args)
         {
-            DispatcherQueue = DispatcherQueue.GetForCurrentThread();
+            DispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
 
             WorkspacesEditorIO = new WorkspacesEditorIO();
             MainViewModel = new MainViewModel(WorkspacesEditorIO);
