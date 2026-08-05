@@ -27,6 +27,8 @@ private:
 
     bool m_cancelRequested{};
     std::mutex m_launchCancellationMutex;
+    std::once_flag m_launchOnce;
+    std::thread m_launchThread;
 
     std::unique_ptr<WindowArrangerHelper> m_windowArrangerHelper;
     std::mutex m_windowArrangerHelperMutex;
