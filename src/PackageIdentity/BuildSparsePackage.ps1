@@ -472,13 +472,12 @@ if ($DevRegister) {
         $existing | Remove-AppxPackage
     }
 
-    # Create a temp manifest with the dev publisher for -Register
-    $devRegDir = Join-Path ([System.IO.Path]::GetTempPath()) "PowerToysSparseDevReg"
+    # Keep the loose-registration manifest available for the lifetime of the package registration.
+    $devRegDir = Join-Path $UserFolder 'SparseDevRegistration'
     if (Test-Path $devRegDir) { Remove-Item $devRegDir -Recurse -Force }
     New-Item -ItemType Directory -Path $devRegDir -Force | Out-Null
 
-    try {
-        Copy-Item $manifestPath (Join-Path $devRegDir 'AppxManifest.xml')
+    Copy-Item $manifestPath (Join-Path $devRegDir 'AppxManifest.xml')
         $imagesDir = Join-Path $sparseDir 'Images'
         if (Test-Path $imagesDir) {
             Copy-Item $imagesDir (Join-Path $devRegDir 'Images') -Recurse
@@ -511,10 +510,5 @@ if ($DevRegister) {
         } else {
             Write-BuildLog "Dev registration failed — package not found." -Level Error
             exit 1
-        }
-    } finally {
-        if (Test-Path $devRegDir) {
-            Remove-Item $devRegDir -Recurse -Force -ErrorAction SilentlyContinue
-        }
     }
 }

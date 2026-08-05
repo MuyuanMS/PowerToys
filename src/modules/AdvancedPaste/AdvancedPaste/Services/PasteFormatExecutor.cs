@@ -89,13 +89,11 @@ public sealed class PasteFormatExecutor(IKernelService kernelService, ICustomAct
 
     private bool IsProviderAllowedByGPO(string providerId)
     {
-        if (string.IsNullOrWhiteSpace(providerId))
-        {
-            return true;
-        }
-
-        var provider = _userSettings.PasteAIConfiguration?.Providers?
-            .FirstOrDefault(item => string.Equals(item.Id, providerId, StringComparison.OrdinalIgnoreCase));
+        var configuration = _userSettings.PasteAIConfiguration;
+        var provider = !string.IsNullOrWhiteSpace(providerId)
+            ? configuration?.Providers?.FirstOrDefault(item => string.Equals(item.Id, providerId, StringComparison.OrdinalIgnoreCase))
+            : null;
+        provider ??= configuration?.ActiveProvider ?? configuration?.Providers?.FirstOrDefault();
 
         if (provider is null)
         {

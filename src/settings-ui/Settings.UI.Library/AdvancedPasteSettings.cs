@@ -80,6 +80,12 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             {
                 if (action is AdvancedPasteAdditionalAction additionalAction)
                 {
+                    if (ReferenceEquals(additionalAction, Properties.AdditionalActions.FixSpellingAndGrammar) && !Properties.IsAIEnabled)
+                    {
+                        index++;
+                        continue;
+                    }
+
                     var headerKey = additionalActionHeaderKeys[Math.Min(index, additionalActionHeaderKeys.Length - 1)];
                     hotkeyAccessors.Add(new HotkeyAccessor(
                         () => additionalAction.Shortcut,

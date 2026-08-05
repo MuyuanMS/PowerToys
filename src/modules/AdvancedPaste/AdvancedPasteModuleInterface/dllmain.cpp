@@ -21,6 +21,8 @@
 #include <atomic>
 #include <cwctype>
 #include <chrono>
+#include <condition_variable>
+#include <deque>
 #include <functional>
 #include <mutex>
 #include <thread>
@@ -80,10 +82,11 @@ private:
     
     AdvancedPasteProcessManager m_process_manager;
     std::atomic_bool m_enabled = false;
-    std::atomic_bool m_hotkey_worker_running = false;
     std::jthread m_hotkey_worker;
     std::mutex m_actions_mutex;
     std::mutex m_hotkey_worker_mutex;
+    std::condition_variable m_hotkey_worker_condition;
+    std::deque<std::function<void()>> m_hotkey_actions;
 
     std::wstring app_name;
 
@@ -439,6 +442,11 @@ private:
                         // Process actions in the predefined order
                         for (auto& actionKey : expectedOrder)
                         {
+                            if (actionKey == L"fix-spelling-and-grammar" && !is_ai_enabled())
+                            {
+                                continue;
+                            }
+
                             if (additionalActions.HasKey(actionKey))
                             {
                                 const auto actionValue = additionalActions.GetNamedValue(actionKey);
@@ -1083,7 +1091,40 @@ public:
     {
         Logger::trace("AdvancedPaste::enable()");
         Trace::AdvancedPaste_Enable(true);
-        m_enabled = true;
+        {
+            std::scoped_lock lock(m_hotkey_worker_mutex);
+            m_enabled = true;
+            if (!m_hotkey_worker.joinable())
+            {
+                m_hotkey_worker = std::jthread([this](std::stop_token stopToken) {
+                    while (!stopToken.stop_requested())
+                    {
+                        std::function<void()> action;
+                        {
+                            std::unique_lock lock(m_hotkey_worker_mutex);
+                            m_hotkey_worker_condition.wait(lock, [this, &stopToken]() {
+                                return stopToken.stop_requested() || !m_hotkey_actions.empty();
+                            });
+
+                            if (stopToken.stop_requested())
+                            {
+                                return;
+                            }
+
+                            action = std::move(m_hotkey_actions.front());
+                            m_hotkey_actions.pop_front();
+                        }
+
+                        send_copy_selection(); // best-effort; use existing clipboard content on failure
+                        if (!stopToken.stop_requested() && m_enabled)
+                        {
+                            execute_hotkey(action);
+                        }
+                    }
+                });
+            }
+        }
+
         m_process_manager.start();
 
         // Start listening for external trigger event so we can invoke the same logic as the hotkey.
@@ -1106,17 +1147,24 @@ public:
 
     void Disable(bool traceEvent)
     {
+        bool wasEnabled = false;
         {
             std::scoped_lock lock(m_hotkey_worker_mutex);
+            wasEnabled = m_enabled.exchange(false);
+            m_hotkey_actions.clear();
             if (m_hotkey_worker.joinable())
             {
                 m_hotkey_worker.request_stop();
-                m_hotkey_worker.join();
-                m_hotkey_worker_running = false;
+                m_hotkey_worker_condition.notify_all();
             }
         }
 
-        if (m_enabled)
+        if (m_hotkey_worker.joinable())
+        {
+            m_hotkey_worker.join();
+        }
+
+        if (wasEnabled)
         {
             m_process_manager.stop();
 
@@ -1129,7 +1177,6 @@ public:
             }
         }
 
-        m_enabled = false;
     }
 
     virtual void disable()
@@ -1160,20 +1207,8 @@ public:
                 return false;
             }
 
-            if (m_hotkey_worker_running.exchange(true))
-            {
-                return true;
-            }
-
-            m_hotkey_worker = std::jthread([this, action = std::move(action)](std::stop_token stopToken) {
-                send_copy_selection(); // best-effort; use existing clipboard content on failure
-                if (!stopToken.stop_requested() && m_enabled)
-                {
-                    execute_hotkey(action);
-                }
-
-                m_hotkey_worker_running = false;
-            });
+            m_hotkey_actions.push_back(std::move(action));
+            m_hotkey_worker_condition.notify_one();
             return true;
         }
 

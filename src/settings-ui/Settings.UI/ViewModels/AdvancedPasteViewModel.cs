@@ -138,6 +138,11 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             {
                 if (action is AdvancedPasteAdditionalAction additionalAction)
                 {
+                    if (ReferenceEquals(additionalAction, _additionalActions.FixSpellingAndGrammar) && !IsAIEnabled)
+                    {
+                        continue;
+                    }
+
                     hotkeySettings.Add(additionalAction.Shortcut);
 
                     // Mirror the runner's hotkey order: the coaching shortcut is registered as a
@@ -617,12 +622,13 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             {
                 var shortcuts = _additionalActions.GetAllActions()
                                                   .OfType<AdvancedPasteAdditionalAction>()
+                                                  .Where(additionalAction => !ReferenceEquals(additionalAction, _additionalActions.FixSpellingAndGrammar) || IsAIEnabled)
                                                   .Select(additionalAction => additionalAction.Shortcut)
                                                   .ToList();
 
                 // The coaching shortcut is a separately-registered hotkey; include it when active.
                 var fixSpelling = _additionalActions.FixSpellingAndGrammar;
-                if (fixSpelling.IsShown && fixSpelling.CoachingEnabled && fixSpelling.CoachingShortcut is { Code: not 0 })
+                if (IsAIEnabled && fixSpelling.IsShown && fixSpelling.CoachingEnabled && fixSpelling.CoachingShortcut is { Code: not 0 })
                 {
                     shortcuts.Add(fixSpelling.CoachingShortcut);
                 }
