@@ -167,10 +167,9 @@ namespace PTSettingsSvc
         }
         std::unique_ptr<void, LocalFreeDeleter> authUsersGuard(authUsersSid);
 
-        // Root: SYSTEM/Admins Full, Authenticated Users RX (traverse only).  Not
-        // protected — each <sid> node below protects itself; the blanket RX here
-        // lets every user reach their own node but the protected child DACL
-        // stops A reading B.
+        // Root: SYSTEM/Admins Full, Authenticated Users RX (traverse only).
+        // Protect the DACL so inherited ProgramData ACEs cannot reintroduce
+        // create/write rights at this security boundary.
         EXPLICIT_ACCESS_W ea[3] = {};
         ea[0].grfAccessPermissions = GENERIC_ALL;
         ea[0].grfAccessMode = SET_ACCESS;
@@ -205,7 +204,8 @@ namespace PTSettingsSvc
         mutableName.push_back(L'\0');
         rc = SetNamedSecurityInfoW(mutableName.data(),
                                    SE_FILE_OBJECT,
-                                   DACL_SECURITY_INFORMATION,
+                                   DACL_SECURITY_INFORMATION |
+                                       PROTECTED_DACL_SECURITY_INFORMATION,
                                    nullptr, nullptr, acl, nullptr);
         return rc == ERROR_SUCCESS ? S_OK : HRESULT_FROM_WIN32(rc);
     }

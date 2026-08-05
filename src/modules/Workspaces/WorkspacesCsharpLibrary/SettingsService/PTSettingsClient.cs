@@ -3,9 +3,13 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
 using System.Security.Principal;
+using System.Text;
+using Microsoft.Win32.SafeHandles;
 
 namespace WorkspacesCsharpLibrary.SettingsService;
 
@@ -48,6 +52,43 @@ public static class PTSettingsClient
 
     private static readonly Lazy<string> _pipeName = new(() =>
         PipeNamePrefix + (WindowsIdentity.GetCurrent().User?.Value ?? string.Empty));
+
+    private static readonly Lazy<string> _expectedServerPath = new(() =>
+    {
+        string processPath = Environment.ProcessPath;
+        if (string.IsNullOrEmpty(processPath))
+        {
+            return string.Empty;
+        }
+
+        FileVersionInfo version = FileVersionInfo.GetVersionInfo(processPath);
+        string versionFolder =
+            $"{version.FileMajorPart}.{version.FileMinorPart}.{version.FileBuildPart}.{version.FilePrivatePart}";
+        string sid = WindowsIdentity.GetCurrent().User?.Value ?? string.Empty;
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "Microsoft",
+            "PowerToys",
+            "SettingsSvcBin",
+            sid,
+            versionFolder,
+            "PowerToys.PTSettingsSvc.exe");
+    });
+
+    private static readonly Lazy<SecurityIdentifier> _expectedServiceSid = new(() =>
+    {
+        try
+        {
+            string sid = WindowsIdentity.GetCurrent().User?.Value ?? string.Empty;
+            return (SecurityIdentifier)new NTAccount(
+                "NT SERVICE",
+                "PTSettingsSvc_" + sid).Translate(typeof(SecurityIdentifier));
+        }
+        catch (IdentityNotMappedException)
+        {
+            return null;
+        }
+    });
 
     public static string PipeName => _pipeName.Value;
 
@@ -102,6 +143,11 @@ public static class PTSettingsClient
                 PipeOptions.None,
                 TokenImpersonationLevel.Impersonation);
             pipe.Connect(ConnectTimeoutMs);
+            if (!IsTrustedServer(pipe))
+            {
+                pipe.Dispose();
+                return Result.Unavailable;
+            }
         }
         catch (TimeoutException)
         {
@@ -180,6 +226,58 @@ public static class PTSettingsClient
         return true;
     }
 
+    private static bool IsTrustedServer(NamedPipeClientStream pipe)
+    {
+        if (!GetNamedPipeServerProcessId(pipe.SafePipeHandle, out uint serverProcessId))
+        {
+            return false;
+        }
+
+        IntPtr process = OpenProcess(ProcessQueryLimitedInformation, false, serverProcessId);
+        if (process == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            var imagePath = new StringBuilder(ImagePathCapacity);
+            int imagePathLength = imagePath.Capacity;
+            if (string.IsNullOrEmpty(_expectedServerPath.Value) ||
+                !QueryFullProcessImageNameW(process, 0, imagePath, ref imagePathLength) ||
+                !string.Equals(
+                    Path.GetFullPath(imagePath.ToString()),
+                    Path.GetFullPath(_expectedServerPath.Value),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (!OpenProcessToken(process, TokenQuery, out IntPtr token))
+            {
+                return false;
+            }
+
+            try
+            {
+                using var identity = new WindowsIdentity(token);
+                return identity.User?.Equals(_expectedServiceSid.Value) == true;
+            }
+            finally
+            {
+                CloseHandle(token);
+            }
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        finally
+        {
+            CloseHandle(process);
+        }
+    }
+
     private static Result MapStatus(byte status)
     {
         // Mirror of PTSettingsSvc::Status, collapsed to the coarse Result.
@@ -192,4 +290,39 @@ public static class PTSettingsClient
             _ => Result.Protocol,
         };
     }
+
+    private const uint ProcessQueryLimitedInformation = 0x1000;
+    private const uint TokenQuery = 0x0008;
+    private const int ImagePathCapacity = 4096;
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetNamedPipeServerProcessId(
+        SafePipeHandle pipe,
+        out uint serverProcessId);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(
+        uint desiredAccess,
+        [MarshalAs(UnmanagedType.Bool)] bool inheritHandle,
+        uint processId);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool QueryFullProcessImageNameW(
+        IntPtr process,
+        uint flags,
+        StringBuilder imagePath,
+        ref int imagePathLength);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool OpenProcessToken(
+        IntPtr process,
+        uint desiredAccess,
+        out IntPtr token);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseHandle(IntPtr handle);
 }

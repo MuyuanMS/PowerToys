@@ -5,6 +5,7 @@
 #include "FileGuard.h"
 #include "Paths.h"
 #include "CallerVerify.h"
+#include "protocol/PipeName.h"
 
 #include <windows.h>
 #include <vector>
@@ -94,15 +95,22 @@ namespace PTSettingsSvc
             return buf;
         }
 
-        // Per-version directory holding the service's runnable exe copy.
-        std::wstring VersionBinDir()
+        std::wstring UserBinRoot(const std::wstring& sid)
+        {
+            return GetServiceBinRoot() + L"\\" + sid;
+        }
+
+        // Per-user, per-version directory holding the service's runnable exe
+        // copy.  Per-user isolation prevents one registration from replacing
+        // another service account's execute ACL or pruning its active version.
+        std::wstring VersionBinDir(const std::wstring& sid)
         {
             std::wstring ver = FormatVersion(GetServiceOwnVersion());
             if (ver.empty())
             {
                 ver = L"0";
             }
-            return GetServiceBinRoot() + L"\\" + ver;
+            return UserBinRoot(sid) + L"\\" + ver;
         }
 
         // Prepares a staging directory to receive the elevated exe copy.  A
@@ -127,16 +135,13 @@ namespace PTSettingsSvc
             return HardenStagingDirAdminOnly(dir);
         }
 
-        // Upgrade tidy-up: remove every version subfolder under SettingsSvcBin
-        // except `keepDir` (the version the service now runs from).  Without this,
-        // each upgrade leaves the previous version's exe copy behind and they
-        // accumulate.  Best-effort and collected-then-deleted so we don't remove
-        // entries mid-iteration; a still-locked old exe is simply left for a
-        // later run.
-        void PruneOldServiceBinVersions(const std::wstring& keepDir)
+        // Upgrade tidy-up: remove old versions for this SID only.  Other users
+        // have independent roots and can keep running an older version.
+        void PruneOldServiceBinVersions(const std::wstring& userRoot,
+                                        const std::wstring& keepDir)
         {
             std::error_code ec;
-            std::filesystem::path root(GetServiceBinRoot());
+            std::filesystem::path root(userRoot);
             std::filesystem::path keep(keepDir);
             std::vector<std::filesystem::path> toRemove;
             for (std::filesystem::directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec))
@@ -227,7 +232,8 @@ namespace PTSettingsSvc
             // account-readable %ProgramData% dir and run the service from there
             //.  Copy happens while the (possibly running) old
             // service is stopped below.
-            const std::wstring binDir = VersionBinDir();
+            const std::wstring userBinRoot = UserBinRoot(sid);
+            const std::wstring binDir = VersionBinDir(sid);
             const std::wstring runExe = binDir + L"\\" + kExeName;
             const std::wstring binPath = BuildBinPath(runExe, sid);
 
@@ -247,7 +253,14 @@ namespace PTSettingsSvc
             {
                 // Existing (re-install / upgrade): stop first so no exe copy in
                 // this version's dir is held open, then re-point below.
-                StopAndWait(svc);
+                if (!StopAndWait(svc))
+                {
+                    rc = static_cast<int>(ERROR_SERVICE_REQUEST_TIMEOUT);
+                    RegLog(L"stop-existing TIMEOUT rc=" + std::to_wstring(rc));
+                    CloseServiceHandle(svc);
+                    CloseServiceHandle(scm);
+                    return rc;
+                }
                 RegLog(L"stop-existing ms=" + std::to_wstring(NowMs() - t));
             }
 
@@ -256,6 +269,7 @@ namespace PTSettingsSvc
             // the admin-only DACL) BEFORE writing the elevated exe into them.
             t = NowMs();
             if (FAILED(EnsureHardenedStagingDir(GetServiceBinRoot())) ||
+                FAILED(EnsureHardenedStagingDir(userBinRoot)) ||
                 FAILED(EnsureHardenedStagingDir(binDir)))
             {
                 rc = static_cast<int>(GetLastError());
@@ -374,9 +388,8 @@ namespace PTSettingsSvc
                    L" total-ms=" + std::to_wstring(NowMs() - t0) +
                    (created ? L" (created)" : L" (repointed)"));
 
-            // Now the service runs from binDir; drop any older version copies so
-            // upgrades don't accumulate stale exe dirs under SettingsSvcBin.
-            PruneOldServiceBinVersions(binDir);
+            // Now the service runs from binDir; drop older copies for this SID.
+            PruneOldServiceBinVersions(userBinRoot, binDir);
 
             (void)created;
             CloseServiceHandle(svc);
@@ -387,7 +400,7 @@ namespace PTSettingsSvc
 
     int RunRegister(const std::wstring& userSidString)
     {
-        if (userSidString.empty())
+        if (!IsValidSidString(userSidString))
         {
             return static_cast<int>(E_INVALIDARG);
         }
@@ -476,47 +489,9 @@ namespace PTSettingsSvc
         }
     }
 
-    // True if any PTSettingsSvc_<other-sid> service still exists.  Used to keep
-    // the SHARED runnable-exe dir (SettingsSvcBin) when other users' per-user
-    // services still point at it; only the last user removes it.
-    static bool AnyOtherPerUserServiceRemains(const std::wstring& excludeSid)
-    {
-        SC_HANDLE scm = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_ENUMERATE_SERVICE);
-        if (!scm)
-        {
-            return true; // unknown -> conservative (keep the shared bin)
-        }
-        DWORD need = 0, count = 0, resume = 0;
-        EnumServicesStatusExW(scm, SC_ENUM_PROCESS_INFO, SERVICE_WIN32, SERVICE_STATE_ALL,
-                              nullptr, 0, &need, &count, &resume, nullptr);
-        bool remains = false;
-        if (GetLastError() == ERROR_MORE_DATA && need > 0)
-        {
-            std::vector<BYTE> buf(need);
-            if (EnumServicesStatusExW(scm, SC_ENUM_PROCESS_INFO, SERVICE_WIN32, SERVICE_STATE_ALL,
-                                      buf.data(), need, &need, &count, &resume, nullptr))
-            {
-                auto* svcs = reinterpret_cast<ENUM_SERVICE_STATUS_PROCESSW*>(buf.data());
-                const std::wstring prefix = L"PTSettingsSvc_";
-                const std::wstring self = ServiceKeyName(excludeSid);
-                for (DWORD i = 0; i < count; ++i)
-                {
-                    const wchar_t* n = svcs[i].lpServiceName;
-                    if (n && wcsncmp(n, prefix.c_str(), prefix.size()) == 0 && self != n)
-                    {
-                        remains = true;
-                        break;
-                    }
-                }
-            }
-        }
-        CloseServiceHandle(scm);
-        return remains;
-    }
-
     int RunUnregister(const std::wstring& userSidString)
     {
-        if (userSidString.empty())
+        if (!IsValidSidString(userSidString))
         {
             return static_cast<int>(E_INVALIDARG);
         }
@@ -564,25 +539,13 @@ namespace PTSettingsSvc
         // (SYSTEM-owned, user RX-only, protected DACL — a normal non-admin user
         // still cannot modify it), and on reinstall the same deterministic virtual
         // account re-owns it and ProvisionStore re-asserts the DACL.  Only APP
-        // artifacts are removed here: (1) the virtual-account profile, and (2) —
-        // when this was the last user — the shared runnable-exe copy.
+        // artifacts are removed here: (1) the virtual-account profile, and (2)
+        // this user's isolated runnable-exe copies.
         DeleteServiceAccountProfile(userSidString);
 
-        const bool removeSharedBin = !AnyOtherPerUserServiceRemains(userSidString);
-
-        // Log the end BEFORE removing the shared bin.  RegLog writes into (and
-        // re-creates) SettingsSvcBin, so anything logged AFTER the bin removal
-        // would resurrect the very directory we just deleted (leaving an empty
-        // SettingsSvcBin\register.log behind).  The bin removal is therefore the
-        // last action and is intentionally NOT logged.
         RegLog(L"--unregister end rc=" + std::to_wstring(rc) +
-               (removeSharedBin ? L" (removing shared bin)" : L" (shared bin kept)"));
-
-        if (removeSharedBin)
-        {
-            std::error_code ec;
-            std::filesystem::remove_all(std::filesystem::path(GetServiceBinRoot()), ec);
-        }
+               L" (removing per-user bin)");
+        RemoveTreeBestEffort(UserBinRoot(userSidString));
 
         return rc;
     }

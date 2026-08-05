@@ -28,7 +28,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>..\;..\WorkspacesLib\;$(RepoRoot)src\;$(RepoRoot)src\common;$(RepoRoot)src\common\Telemetry;..\..\;$(RepoRoot)src\;$(VCInstallDir)UnitTest\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\;..\WorkspacesLib\;..\WorkspacesSettingsClient\;..\WorkspacesSettingsService\;$(RepoRoot)src\;$(RepoRoot)src\common;$(RepoRoot)src\common\Telemetry;..\..\;$(RepoRoot)src\;$(VCInstallDir)UnitTest\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UseFullPaths>true</UseFullPaths>
     </ClCompile>
@@ -50,6 +50,7 @@
     <ClCompile Include="JsonUtilsTests.cpp" />
     <ClCompile Include="AppUtilsTests.cpp" />
     <ClCompile Include="PwaHelperTests.cpp" />
+    <ClCompile Include="PTSettingsClientTests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -60,6 +61,9 @@
     </ProjectReference>
     <ProjectReference Include="..\WorkspacesLib\WorkspacesLib.vcxproj">
       <Project>{b31fcc55-b5a4-4ea7-b414-2dceae6af332}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\WorkspacesSettingsClient\WorkspacesSettingsClient.vcxproj">
+      <Project>{D24E2C12-9911-4E51-B102-39E7B62B22F1}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
