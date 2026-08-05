@@ -1544,11 +1544,12 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
 
             var activeId = config.ActiveProviderId;
+            var activeProvider = config.Providers.FirstOrDefault(
+                provider => string.Equals(provider.Id, activeId, StringComparison.OrdinalIgnoreCase));
 
-            // If no explicit active ID, default to the first provider
-            if (string.IsNullOrEmpty(activeId) && config.Providers.Count > 0)
+            if (activeProvider is null)
             {
-                activeId = config.Providers[0].Id;
+                activeId = config.Providers.FirstOrDefault()?.Id;
                 config.ActiveProviderId = activeId;
             }
 

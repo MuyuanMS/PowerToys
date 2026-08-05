@@ -97,7 +97,19 @@ public sealed class PasteFormatExecutor(IKernelService kernelService, ICustomAct
         var provider = _userSettings.PasteAIConfiguration?.Providers?
             .FirstOrDefault(item => string.Equals(item.Id, providerId, StringComparison.OrdinalIgnoreCase));
 
-        return provider?.ServiceTypeKind switch
+        if (provider is null)
+        {
+            return true;
+        }
+
+        var serviceType = provider.ServiceTypeKind;
+        if (AIServiceTypeRegistry.GetMetadata(serviceType).IsOnlineService
+            && PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOnlineAIModelsValue() == PowerToys.GPOWrapper.GpoRuleConfigured.Disabled)
+        {
+            return false;
+        }
+
+        return serviceType switch
         {
             AIServiceType.OpenAI => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOpenAIValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
             AIServiceType.AzureOpenAI => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteAzureOpenAIValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,

@@ -96,7 +96,7 @@ namespace AdvancedPaste
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine(ex.Message);
+                Console.Error.WriteLine($"[phi-silica] {ex.Message}");
                 Console.Out.WriteLine("NotSupported");
                 return 2;
             }
@@ -148,7 +148,7 @@ namespace AdvancedPaste
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine(ex.Message);
+                Console.Error.WriteLine($"[phi-silica] {ex.Message}");
                 Console.Out.WriteLine("NotSupported");
                 return 2;
             }
