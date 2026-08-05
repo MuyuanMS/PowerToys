@@ -412,7 +412,9 @@ namespace WorkspacesEditor.ViewModels
             }
 
             var updatedWorkspaces = Workspaces.Where(project => project != selectedProject).ToList();
-            if (!_workspacesEditorIO.SerializeWorkspaces(updatedWorkspaces))
+            if (!_workspacesEditorIO.SerializeWorkspaces(
+                    updatedWorkspaces,
+                    removedIds: new HashSet<string>(StringComparer.Ordinal) { selectedProject.Id }))
             {
                 return false;
             }

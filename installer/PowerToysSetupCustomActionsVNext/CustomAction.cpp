@@ -1199,9 +1199,13 @@ UINT __stdcall UnRegisterPTSettingsSvcCA(MSIHANDLE hInstall)
                 Logger::warn(L"PTSettingsSvc deprovision failed: HRESULT 0x{:08X}", static_cast<uint32_t>(ex.code()));
             }
 
-            auto packages = pm.FindPackagesForUserWithPackageTypes({}, kPTSettingsSvcFamilyName, PackageTypes::Main);
+            auto packages = pm.FindPackages();
             for (const auto& package : packages)
             {
+                if (package.Id().FamilyName() != kPTSettingsSvcFamilyName)
+                {
+                    continue;
+                }
                 try
                 {
                     auto removeResult = pm.RemovePackageAsync(package.Id().FullName(), RemovalOptions::RemoveForAllUsers).get();

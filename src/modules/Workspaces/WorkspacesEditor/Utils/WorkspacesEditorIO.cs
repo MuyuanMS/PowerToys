@@ -57,6 +57,24 @@ namespace WorkspacesEditor.Utils
 
                     case PTSettingsClient.Result.NotFound:
                         // Service is up but this user has no blob yet (first run).
+                        // If legacy data still exists, migration did not complete;
+                        // do not enable mutations that would create a new blob and
+                        // permanently shadow that data.
+                        if (File.Exists(SettingsPaths.LegacyWorkspacesFile()))
+                        {
+                            mainViewModel.ProtectedLoadSucceeded = false;
+                            if (showDialogs)
+                            {
+                                System.Windows.MessageBox.Show(
+                                    "PowerToys found existing Workspaces data but couldn't migrate it to protected storage. Your data was not changed. Check that the legacy workspaces file is readable and valid, then restart PowerToys or reopen the editor.",
+                                    "Workspaces",
+                                    System.Windows.MessageBoxButton.OK,
+                                    System.Windows.MessageBoxImage.Warning);
+                            }
+
+                            return new ParsingResult(false, Properties.Resources.Error_Parsing_Message);
+                        }
+
                         mainViewModel.ProtectedLoadSucceeded = true;
                         return new ParsingResult(true);
 
@@ -234,7 +252,10 @@ namespace WorkspacesEditor.Utils
             }
         }
 
-        public bool SerializeWorkspaces(List<Project> workspaces, bool useTempFile = false)
+        public bool SerializeWorkspaces(
+            List<Project> workspaces,
+            bool useTempFile = false,
+            ISet<string> removedIds = null)
         {
             WorkspacesData serializer = new();
             WorkspacesData.WorkspacesListWrapper workspacesWrapper = new() { };
@@ -344,7 +365,19 @@ namespace WorkspacesEditor.Utils
                         // newly protected state with this pending candidate
                         // before retrying so a save from an initially-empty UI
                         // cannot overwrite the migration.
-                        if (PTSettingsClient.GetBlob(out var protectedBlob) == PTSettingsClient.Result.Ok)
+                        var protectedRead = PTSettingsClient.GetBlob(out var protectedBlob);
+                        if (protectedRead == PTSettingsClient.Result.NotFound &&
+                            File.Exists(SettingsPaths.LegacyWorkspacesFile()))
+                        {
+                            System.Windows.MessageBox.Show(
+                                "PowerToys couldn't migrate your existing workspaces to protected storage, so this change was not saved. Check that the legacy workspaces file is readable and valid, then restart PowerToys or reopen the editor.",
+                                "Workspaces",
+                                System.Windows.MessageBoxButton.OK,
+                                System.Windows.MessageBoxImage.Warning);
+                            return false;
+                        }
+
+                        if (protectedRead == PTSettingsClient.Result.Ok)
                         {
                             var protectedWorkspaces = serializer.Deserialize(
                                 Encoding.UTF8.GetString(protectedBlob));
@@ -352,7 +385,9 @@ namespace WorkspacesEditor.Utils
                                 .Select(workspace => workspace.Id)
                                 .ToHashSet(StringComparer.Ordinal);
                             var protectedOnly = protectedWorkspaces.Workspaces
-                                .Where(workspace => !pendingIds.Contains(workspace.Id))
+                                .Where(workspace =>
+                                    !pendingIds.Contains(workspace.Id) &&
+                                    (removedIds == null || !removedIds.Contains(workspace.Id)))
                                 .ToList();
                             workspaces.InsertRange(
                                 0,
