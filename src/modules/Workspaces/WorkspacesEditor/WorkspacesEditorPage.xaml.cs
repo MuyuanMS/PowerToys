@@ -34,16 +34,20 @@ namespace WorkspacesEditor
             Project projectToSave = this.DataContext as Project;
             projectToSave.CloseExpanders();
 
+            bool saved;
             if (_mainViewModel.Workspaces.Any(x => x.Id == projectToSave.Id))
             {
-                _mainViewModel.SaveProject(projectToSave);
+                saved = _mainViewModel.SaveProject(projectToSave);
             }
             else
             {
-                _mainViewModel.AddNewProject(projectToSave);
+                saved = _mainViewModel.AddNewProject(projectToSave);
             }
 
-            _mainViewModel.SwitchToMainView();
+            if (saved)
+            {
+                _mainViewModel.SwitchToMainView();
+            }
         }
 
         private void CancelButtonClicked(object sender, RoutedEventArgs e)

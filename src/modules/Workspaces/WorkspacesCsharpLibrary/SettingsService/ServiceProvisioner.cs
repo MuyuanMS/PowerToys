@@ -239,21 +239,34 @@ public static class ServiceProvisioner
 
     public static string BuildInstallArguments(string serviceMsix, string userSid)
     {
+        var processPath = Environment.ProcessPath;
+        if (string.IsNullOrEmpty(processPath))
+        {
+            throw new InvalidOperationException("Cannot determine the current PowerToys executable path.");
+        }
+
+        var versionInfo = FileVersionInfo.GetVersionInfo(processPath);
+        string expectedVersion =
+            $"{versionInfo.FileMajorPart}.{versionInfo.FileMinorPart}.{versionInfo.FileBuildPart}.{versionInfo.FilePrivatePart}";
+
         // NB: kept as a single -Command; Measure-Command times each phase and the
         // result is appended to a user-readable log.  -ForceApplicationShutdown /
-        // -ForceUpdateFromAnyVersion make staging tolerate an in-place update; the
-        // service itself is stopped/re-pointed by the exe's --register path.
+        // the service's --register path make staging tolerate an in-place update.
+        // Downgrades are deliberately not forced: an older signed package must
+        // never replace the service for the current PowerToys version.
         return "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "
              + "\""
              + "$log = Join-Path $env:LOCALAPPDATA 'Microsoft\\PowerToys\\Workspaces\\Logs\\svc-provision.log'; "
              + "New-Item -ItemType Directory -Force (Split-Path $log) | Out-Null; "
              + "function W($m){ Add-Content -Path $log -Value ((Get-Date).ToString('o') + ' ' + $m) }; "
              + "W 'provision start (elevated)'; "
-             + "$ta = Measure-Command { Add-AppxPackage -Path '" + PsLit(serviceMsix) + "' -ForceUpdateFromAnyVersion -ForceApplicationShutdown }; "
+             + "$ta = Measure-Command { Add-AppxPackage -Path '" + PsLit(serviceMsix) + "' -ForceApplicationShutdown }; "
              + "W ('Add-AppxPackage ms=' + [int]$ta.TotalMilliseconds); "
              + "$loc = (Get-AppxPackage -Name 'Microsoft.PowerToys.SettingsService' | Select-Object -First 1).InstallLocation; "
              + "if (-not $loc) { W 'ERROR: package InstallLocation not found'; exit 3 }; "
              + "$exe = Join-Path $loc 'PowerToys.PTSettingsSvc.exe'; "
+             + "$actualVersion = (Get-Item $exe).VersionInfo.FileVersion; "
+             + "if ([version]$actualVersion -ne [version]'" + PsLit(expectedVersion) + "') { W ('ERROR: service version mismatch actual=' + $actualVersion + ' expected=" + PsLit(expectedVersion) + "'); exit 4 }; "
              + "$tr = Measure-Command { & $exe --register '" + PsLit(userSid) + "' }; "
              + "W ('register ms=' + [int]$tr.TotalMilliseconds + ' exit=' + $LASTEXITCODE); "
              + "W ('provision done total-ms=' + [int]($ta.TotalMilliseconds + $tr.TotalMilliseconds)); "

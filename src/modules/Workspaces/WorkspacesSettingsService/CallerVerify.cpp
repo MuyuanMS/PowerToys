@@ -70,15 +70,17 @@ namespace PTSettingsSvc
                         if (leaf && leaf->pCert)
                         {
                             wchar_t name[256] = {};
-                            DWORD n = CertGetNameStringW(leaf->pCert,
-                                                        CERT_NAME_SIMPLE_DISPLAY_TYPE,
-                                                        0,
-                                                        nullptr,
-                                                        name,
-                                                        ARRAYSIZE(name));
+                            char organizationOid[] = szOID_ORGANIZATION_NAME;
+                            DWORD n = CertGetNameStringW(
+                                leaf->pCert,
+                                CERT_NAME_ATTR_TYPE,
+                                0,
+                                organizationOid,
+                                name,
+                                ARRAYSIZE(name));
                             if (n > 1)
                             {
-                                isMicrosoft = (wcsstr(name, L"Microsoft Corporation") != nullptr);
+                                isMicrosoft = (_wcsicmp(name, L"Microsoft Corporation") == 0);
                             }
                         }
                     }

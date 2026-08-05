@@ -10,10 +10,18 @@ src/modules/Workspaces/WorkspacesSettingsService/build-msix.ps1
 which stages `package/AppxManifest.xml` + the built `PowerToys.PTSettingsSvc.exe`
 into a signed MSIX (see `.pipelines/v2/templates/steps-build-installer-vnext.yml`).
 
-The prototype developer/security-verification harness (service setup and the
-end-to-end 9-step security suite: liveness, caller allow-list, path-prefix, DACL
-hardness, round-trip, NotFound, per-user DACL, non-user-owner, and the core
-Medium-IL tamper-rejection check) is preserved on the
+`Workspaces.Lib.UnitTests` contains automated checks for the client-facing
+security invariants that do not require elevation: a same-user process that
+squats on the predictable pipe name is rejected, and malformed/path-like SID
+management input is rejected. These tests run through the repository's normal
+native unit-test target.
+
+The installed-service checks require an elevated service, a virtual account,
+and protected ProgramData ACLs, which are not available on the ordinary unit
+test agents. Run the end-to-end security suite for release candidates:
+liveness, caller allow-list, server identity, DACL hardness, round-trip,
+NotFound, per-user isolation, non-user ownership, repair, and the core
+Medium-IL tamper-rejection check. The harness is preserved on the
 `workspaces-eop-v6-devtools-archive` branch under
 `src/modules/Workspaces/WorkspacesSettingsService/devtools/`.
 

@@ -30,6 +30,35 @@ namespace PTSettingsSvc
         return std::wstring(kPipeNamePrefix) + sidString;
     }
 
+    inline bool IsValidSidString(const std::wstring& sidString)
+    {
+        if (sidString.empty())
+        {
+            return false;
+        }
+
+        PSID sid = nullptr;
+        if (!ConvertStringSidToSidW(sidString.c_str(), &sid))
+        {
+            return false;
+        }
+
+        const bool valid = IsValidSid(sid) != FALSE;
+        LPWSTR canonical = nullptr;
+        const bool canonicalized =
+            valid &&
+            ConvertSidToStringSidW(sid, &canonical) &&
+            canonical != nullptr &&
+            _wcsicmp(canonical, sidString.c_str()) == 0;
+
+        if (canonical)
+        {
+            LocalFree(canonical);
+        }
+        LocalFree(sid);
+        return canonicalized;
+    }
+
     // Current process token's user SID in string form (S-1-5-...).  Empty on
     // failure.  Clients use this to reach THEIR OWN user's service; the service
     // uses it as a fallback owner SID for console/dev runs (no SID argument).

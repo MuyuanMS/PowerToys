@@ -156,7 +156,9 @@ namespace WorkspacesEditor
                     // surfaces the "set up protection" message instead of leaving a
                     // silently-empty editor.  When the service IS available it loads
                     // the (possibly just-migrated) protected workspaces.
-                    if (initialListEmpty && !_mainViewModel.IsEditInProgress)
+                    if (initialListEmpty &&
+                        _mainViewModel.Workspaces.Count == 0 &&
+                        !_mainViewModel.IsEditInProgress)
                     {
                         WorkspacesEditorIO.ParseWorkspaces(_mainViewModel, runBootstrap: false, showDialogs: true);
                     }

@@ -215,7 +215,7 @@ namespace WorkspacesEditor.Utils
             }
         }
 
-        public void SerializeWorkspaces(List<Project> workspaces, bool useTempFile = false)
+        public bool SerializeWorkspaces(List<Project> workspaces, bool useTempFile = false)
         {
             WorkspacesData serializer = new();
             WorkspacesData.WorkspacesListWrapper workspacesWrapper = new() { };
@@ -301,7 +301,7 @@ namespace WorkspacesEditor.Utils
                     // file (not the protected store).
                     IOUtils ioUtils = new();
                     ioUtils.WriteFile(TempProjectData.File, json);
-                    return;
+                    return true;
                 }
 
                 // v6 (security): persist the settings through the service (PutBlob)
@@ -328,7 +328,7 @@ namespace WorkspacesEditor.Utils
                 switch (rc)
                 {
                     case PTSettingsClient.Result.Ok:
-                        break;
+                        return true;
 
                     case PTSettingsClient.Result.Unavailable:
                         // Protected service still not available (elevation declined /
@@ -343,7 +343,7 @@ namespace WorkspacesEditor.Utils
                             "Workspaces",
                             System.Windows.MessageBoxButton.OK,
                             System.Windows.MessageBoxImage.Warning);
-                        break;
+                        return false;
 
                     case PTSettingsClient.Result.AuthRejected:
                         // The service refused this app (e.g. version mismatch right
@@ -359,7 +359,7 @@ namespace WorkspacesEditor.Utils
                             "Workspaces",
                             System.Windows.MessageBoxButton.OK,
                             System.Windows.MessageBoxImage.Warning);
-                        break;
+                        return false;
 
                     default:
                         Logger.LogError($"Failed to save workspaces through the settings service: {rc}");
@@ -369,13 +369,13 @@ namespace WorkspacesEditor.Utils
                             "Workspaces",
                             System.Windows.MessageBoxButton.OK,
                             System.Windows.MessageBoxImage.Warning);
-                        break;
+                        return false;
                 }
             }
             catch (Exception e)
             {
-                // TODO: show error
                 Logger.LogError($"Exception while writing storage file: {e.Message}");
+                return false;
             }
         }
 
@@ -398,7 +398,7 @@ namespace WorkspacesEditor.Utils
 
         internal void SerializeTempProject(Project project)
         {
-            SerializeWorkspaces([project], true);
+            _ = SerializeWorkspaces([project], true);
         }
     }
 }

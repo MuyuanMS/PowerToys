@@ -6,10 +6,15 @@
 #include "../WorkspacesSettingsService/protocol/PipeName.h"
 
 #include <windows.h>
+#include <sddl.h>
+#include <shlobj.h>
 #include <vector>
 #include <cstring>
 #include <string>
 
+#pragma comment(lib, "Advapi32.lib")
+#pragma comment(lib, "Shell32.lib")
+#pragma comment(lib, "Ole32.lib")
 namespace PTSettingsClient
 {
     namespace
@@ -17,6 +22,7 @@ namespace PTSettingsClient
         using PTSettingsSvc::kMaxPayloadBytes;
         using PTSettingsSvc::Opcode;
         using PTSettingsSvc::Status;
+        constexpr const wchar_t* kServiceExeName = L"PowerToys.PTSettingsSvc.exe";
 
         // This client reaches ITS OWN user's service instance, whose pipe is
         // \\.\pipe\PTSettingsSvc_<SID> where <SID> is our own token SID
@@ -37,6 +43,183 @@ namespace PTSettingsClient
             }
         };
 
+        std::wstring CurrentProcessVersion()
+        {
+            wchar_t path[MAX_PATH * 2] = {};
+            DWORD length = GetModuleFileNameW(nullptr, path, ARRAYSIZE(path));
+            if (length == 0 || length >= ARRAYSIZE(path))
+            {
+                return {};
+            }
+
+            HMODULE module = LoadLibraryExW(
+                path,
+                nullptr,
+                LOAD_LIBRARY_AS_IMAGE_RESOURCE | LOAD_LIBRARY_AS_DATAFILE);
+            if (!module)
+            {
+                return {};
+            }
+
+            VS_FIXEDFILEINFO fixedInfo{};
+            bool found = false;
+            if (HRSRC resource =
+                    FindResourceW(module, MAKEINTRESOURCEW(1), RT_VERSION))
+            {
+                if (HGLOBAL loaded = LoadResource(module, resource))
+                {
+                    const void* data = LockResource(loaded);
+                    const DWORD size = SizeofResource(module, resource);
+                    if (data && size >= sizeof(VS_FIXEDFILEINFO))
+                    {
+                        const BYTE* bytes = static_cast<const BYTE*>(data);
+                        for (size_t offset = 0;
+                             offset + sizeof(VS_FIXEDFILEINFO) <= size;
+                             offset += sizeof(DWORD))
+                        {
+                            memcpy(&fixedInfo,
+                                   bytes + offset,
+                                   sizeof(fixedInfo));
+                            if (fixedInfo.dwSignature == 0xFEEF04BD)
+                            {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            FreeLibrary(module);
+
+            if (!found)
+            {
+                return {};
+            }
+
+            wchar_t version[64] = {};
+            swprintf_s(version,
+                       L"%u.%u.%u.%u",
+                       HIWORD(fixedInfo.dwFileVersionMS),
+                       LOWORD(fixedInfo.dwFileVersionMS),
+                       HIWORD(fixedInfo.dwFileVersionLS),
+                       LOWORD(fixedInfo.dwFileVersionLS));
+            return version;
+        }
+
+        std::wstring ExpectedServerPath()
+        {
+            PWSTR programData = nullptr;
+            if (FAILED(SHGetKnownFolderPath(FOLDERID_ProgramData, 0, nullptr, &programData)))
+            {
+                return {};
+            }
+
+            std::wstring result(programData);
+            CoTaskMemFree(programData);
+
+            const std::wstring sid = PTSettingsSvc::CurrentProcessUserSidString();
+            const std::wstring version = CurrentProcessVersion();
+            if (sid.empty() || version.empty())
+            {
+                return {};
+            }
+
+            return result + L"\\Microsoft\\PowerToys\\SettingsSvcBin\\" +
+                   sid + L"\\" + version + L"\\" + kServiceExeName;
+        }
+
+        bool ServerTokenMatchesServiceAccount(HANDLE process,
+                                              const std::wstring& userSid)
+        {
+            const std::wstring account =
+                L"NT SERVICE\\PTSettingsSvc_" + userSid;
+
+            DWORD sidSize = 0;
+            DWORD domainSize = 0;
+            SID_NAME_USE use{};
+            LookupAccountNameW(nullptr,
+                               account.c_str(),
+                               nullptr,
+                               &sidSize,
+                               nullptr,
+                               &domainSize,
+                               &use);
+            if (GetLastError() != ERROR_INSUFFICIENT_BUFFER || sidSize == 0)
+            {
+                return false;
+            }
+
+            std::vector<BYTE> expectedSid(sidSize);
+            std::vector<wchar_t> domain(domainSize);
+            if (!LookupAccountNameW(nullptr,
+                                    account.c_str(),
+                                    expectedSid.data(),
+                                    &sidSize,
+                                    domain.data(),
+                                    &domainSize,
+                                    &use))
+            {
+                return false;
+            }
+
+            HANDLE token = nullptr;
+            if (!OpenProcessToken(process, TOKEN_QUERY, &token))
+            {
+                return false;
+            }
+
+            DWORD tokenSize = 0;
+            GetTokenInformation(token, TokenUser, nullptr, 0, &tokenSize);
+            std::vector<BYTE> tokenData(tokenSize);
+            const bool matched =
+                tokenSize > 0 &&
+                GetTokenInformation(token,
+                                    TokenUser,
+                                    tokenData.data(),
+                                    tokenSize,
+                                    &tokenSize) &&
+                EqualSid(reinterpret_cast<TOKEN_USER*>(tokenData.data())->User.Sid,
+                         expectedSid.data());
+            CloseHandle(token);
+            return matched;
+        }
+
+        bool IsTrustedServer(HANDLE pipe)
+        {
+            ULONG serverPid = 0;
+            if (!GetNamedPipeServerProcessId(pipe, &serverPid))
+            {
+                return false;
+            }
+
+            HANDLE process =
+                OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, serverPid);
+            if (!process)
+            {
+                return false;
+            }
+
+            wchar_t imagePath[4096] = {};
+            DWORD imagePathLength = ARRAYSIZE(imagePath);
+            const bool gotPath =
+                QueryFullProcessImageNameW(process,
+                                           0,
+                                           imagePath,
+                                           &imagePathLength) != FALSE;
+
+            const std::wstring expectedPath = ExpectedServerPath();
+            const std::wstring userSid =
+                PTSettingsSvc::CurrentProcessUserSidString();
+            const bool trusted =
+                gotPath &&
+                !expectedPath.empty() &&
+                _wcsicmp(imagePath, expectedPath.c_str()) == 0 &&
+                ServerTokenMatchesServiceAccount(process, userSid);
+
+            CloseHandle(process);
+            return trusted;
+        }
+
         bool Connect(PipeHandle& out)
         {
             const std::wstring& pipeName = OwnPipeName();
@@ -55,6 +238,11 @@ namespace PTSettingsClient
                                        nullptr);
                 if (h != INVALID_HANDLE_VALUE)
                 {
+                    if (!IsTrustedServer(h))
+                    {
+                        CloseHandle(h);
+                        return false;
+                    }
                     out.h = h;
                     return true;
                 }

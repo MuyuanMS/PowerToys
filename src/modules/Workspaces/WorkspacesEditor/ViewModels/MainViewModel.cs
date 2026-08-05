@@ -198,26 +198,31 @@ namespace WorkspacesEditor.ViewModels
             this.editedProject = editedProject;
         }
 
-        public void SaveProject(Project projectToSave)
+        public bool SaveProject(Project projectToSave)
         {
             SendEditTelemetryEvent(projectToSave, editedProject);
+
+            var updatedWorkspaces = Workspaces
+                .Select(project => project.Id == editedProject.Id ? projectToSave : project)
+                .ToList();
+            if (!_workspacesEditorIO.SerializeWorkspaces(updatedWorkspaces))
+            {
+                return false;
+            }
 
             if (editedProject.Name != projectToSave.Name)
             {
                 RemoveShortcut(editedProject);
             }
 
-            editedProject.Name = projectToSave.Name;
-            editedProject.IsShortcutNeeded = projectToSave.IsShortcutNeeded;
-            editedProject.MoveExistingWindows = projectToSave.MoveExistingWindows;
-            editedProject.PreviewIcons = projectToSave.PreviewIcons;
-            editedProject.PreviewImage = projectToSave.PreviewImage;
-            editedProject.Applications = projectToSave.Applications.Where(x => x.IsIncluded).ToList();
+            projectToSave.Applications = projectToSave.Applications.Where(x => x.IsIncluded).ToList();
+            projectToSave.OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs("AppsCountString"));
+            projectToSave.Initialize(App.GetCurrentTheme());
 
-            editedProject.OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs("AppsCountString"));
-            editedProject.Initialize(App.GetCurrentTheme());
-            _workspacesEditorIO.SerializeWorkspaces(Workspaces.ToList());
-            ApplyShortcut(editedProject);
+            int index = Workspaces.IndexOf(editedProject);
+            Workspaces[index] = projectToSave;
+            ApplyShortcut(projectToSave);
+            return true;
         }
 
         private string GetDesktopShortcutAddress(Project project) => Path.Combine(FolderUtils.Desktop(), project.Name + ".lnk");
@@ -366,25 +371,37 @@ namespace WorkspacesEditor.ViewModels
             project.IsShortcutNeeded = File.Exists(shortcutAddress);
         }
 
-        public void AddNewProject(Project project)
+        public bool AddNewProject(Project project)
         {
             project.Applications.RemoveAll(app => !app.IsIncluded);
             project.Initialize(App.GetCurrentTheme());
+            var updatedWorkspaces = Workspaces.Append(project).ToList();
+            if (!_workspacesEditorIO.SerializeWorkspaces(updatedWorkspaces))
+            {
+                return false;
+            }
+
             Workspaces.Add(project);
-            _workspacesEditorIO.SerializeWorkspaces(Workspaces.ToList());
             TempProjectData.DeleteTempFile();
             OnPropertyChanged(new PropertyChangedEventArgs(nameof(WorkspacesView)));
             ApplyShortcut(project);
             SendCreateTelemetryEvent(project);
+            return true;
         }
 
-        public void DeleteProject(Project selectedProject)
+        public bool DeleteProject(Project selectedProject)
         {
+            var updatedWorkspaces = Workspaces.Where(project => project != selectedProject).ToList();
+            if (!_workspacesEditorIO.SerializeWorkspaces(updatedWorkspaces))
+            {
+                return false;
+            }
+
             Workspaces.Remove(selectedProject);
-            _workspacesEditorIO.SerializeWorkspaces(Workspaces.ToList());
             RemoveShortcut(selectedProject);
             OnPropertyChanged(new PropertyChangedEventArgs(nameof(WorkspacesView)));
             SendDeleteTelemetryEvent();
+            return true;
         }
 
         private void RemoveShortcut(Project selectedProject)
@@ -415,6 +432,7 @@ namespace WorkspacesEditor.ViewModels
             OnPropertyChanged(new PropertyChangedEventArgs(nameof(SearchTerm)));
             lastUpdatedTimer.Start();
             editedProject = null;
+            editPage = null;
         }
 
         public void LaunchProject(string projectId)

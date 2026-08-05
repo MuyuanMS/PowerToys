@@ -145,7 +145,7 @@ int wmain(int argc, wchar_t* argv[])
     // Self-management verbs run elevated and exit; they never start the pipe.
     if (verb)
     {
-        if (ownerSid.empty())
+        if (!PTSettingsSvc::IsValidSidString(ownerSid))
         {
             return static_cast<int>(E_INVALIDARG);
         }
@@ -163,6 +163,10 @@ int wmain(int argc, wchar_t* argv[])
     if (ownerSid.empty())
     {
         ownerSid = PTSettingsSvc::CurrentProcessUserSidString();
+    }
+    if (!PTSettingsSvc::IsValidSidString(ownerSid))
+    {
+        return static_cast<int>(E_INVALIDARG);
     }
     PTSettingsSvc::SetServiceOwnerSid(ownerSid);
 
