@@ -97,7 +97,7 @@ namespace WorkspacesEditor.UnitTests
                 TestHelpers.CreateProject("Browsing", 0, 0, "Edge"),
             };
 
-            vm.SearchTerm = "dev setup";
+            vm.SearchTerm = "devsetup";
             Assert.AreEqual(1, vm.WorkspacesView.Count);
         }
 
