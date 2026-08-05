@@ -263,6 +263,16 @@ namespace WorkspacesLauncherUI.UnitTests
             vm.Dispose();
         }
 
+        [TestMethod]
+        [TestCategory("ViewModel")]
+        public void DisposeViewModel_RegisteredCallback_RemovesCallback()
+        {
+            var vm = new MainViewModel();
+            vm.Dispose();
+
+            Assert.IsNull(App.IPCMessageReceivedCallback);
+        }
+
         private static void SimulateIpcMessage(string message)
         {
             App.IPCMessageReceivedCallback?.Invoke(message);
