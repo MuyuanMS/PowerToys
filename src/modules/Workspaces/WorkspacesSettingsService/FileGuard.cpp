@@ -714,13 +714,18 @@ namespace PTSettingsSvc
                             &written,
                             nullptr);
         DWORD writeErr = ok ? ERROR_SUCCESS : GetLastError();
-        FlushFileBuffers(h);
+        const BOOL flushed = FlushFileBuffers(h);
+        const DWORD flushError = flushed ? ERROR_SUCCESS : GetLastError();
         CloseHandle(h);
 
-        if (!ok || written != bytes.size())
+        if (!ok || written != bytes.size() || !flushed)
         {
             DeleteFileW(tmp.c_str());
-            return HRESULT_FROM_WIN32(writeErr ? writeErr : ERROR_WRITE_FAULT);
+            const DWORD error =
+                writeErr ? writeErr :
+                flushError ? flushError :
+                ERROR_WRITE_FAULT;
+            return HRESULT_FROM_WIN32(error);
         }
 
         if (!ReplaceFileW(targetFile.c_str(),

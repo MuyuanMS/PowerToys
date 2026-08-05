@@ -9,6 +9,34 @@
 
 namespace JsonUtils
 {
+    namespace
+    {
+        constexpr const wchar_t* MigrationMutexName =
+            L"Local\\PowerToys_Workspaces_SettingsMigration";
+
+        Result<std::vector<WorkspacesData::WorkspacesProject>, WorkspacesFileError>
+        ParseServiceBlob(const std::vector<uint8_t>& bytes)
+        {
+            try
+            {
+                std::string utf8(bytes.begin(), bytes.end());
+                auto obj = json::JsonValue::Parse(winrt::to_hstring(utf8)).GetObjectW();
+                auto parsed = WorkspacesData::WorkspacesListJSON::FromJson(obj);
+                if (parsed.has_value())
+                {
+                    return Ok(parsed.value());
+                }
+                Logger::critical("Incorrect Workspaces blob from service");
+                return Error(WorkspacesFileError::IncorrectFileError);
+            }
+            catch (const std::exception& ex)
+            {
+                Logger::critical("Exception parsing Workspaces blob: {}", ex.what());
+                return Error(WorkspacesFileError::FileReadingError);
+            }
+        }
+    }
+
     Result<WorkspacesData::WorkspacesProject, WorkspacesFileError> ReadSingleWorkspace(const std::wstring& fileName)
     {
         if (std::filesystem::exists(fileName))
@@ -98,29 +126,40 @@ namespace JsonUtils
         switch (rc)
         {
         case PTSettingsClient::Result::Ok:
-        {
-            try
-            {
-                // The blob is the same UTF-8 JSON the Editor writes.
-                std::string utf8(bytes.begin(), bytes.end());
-                auto obj = json::JsonValue::Parse(winrt::to_hstring(utf8)).GetObjectW();
-                auto parsed = WorkspacesData::WorkspacesListJSON::FromJson(obj);
-                if (parsed.has_value())
-                {
-                    return Ok(parsed.value());
-                }
-                Logger::critical("Incorrect Workspaces blob from service");
-                return Error(WorkspacesFileError::IncorrectFileError);
-            }
-            catch (const std::exception& ex)
-            {
-                Logger::critical("Exception parsing Workspaces blob: {}", ex.what());
-                return Error(WorkspacesFileError::FileReadingError);
-            }
-        }
+            return ParseServiceBlob(bytes);
 
         case PTSettingsClient::Result::NotFound:
         {
+            HANDLE migrationMutex = CreateMutexW(
+                nullptr,
+                FALSE,
+                MigrationMutexName);
+            if (!migrationMutex)
+            {
+                return Error(WorkspacesFileError::ServiceAccessError);
+            }
+            DWORD wait = WaitForSingleObject(migrationMutex, 30000);
+            if (wait != WAIT_OBJECT_0 && wait != WAIT_ABANDONED)
+            {
+                CloseHandle(migrationMutex);
+                return Error(WorkspacesFileError::ServiceAccessError);
+            }
+
+            std::vector<uint8_t> currentBytes;
+            auto current = PTSettingsClient::GetBlob(currentBytes);
+            if (current == PTSettingsClient::Result::Ok)
+            {
+                ReleaseMutex(migrationMutex);
+                CloseHandle(migrationMutex);
+                return ParseServiceBlob(currentBytes);
+            }
+            if (current != PTSettingsClient::Result::NotFound)
+            {
+                ReleaseMutex(migrationMutex);
+                CloseHandle(migrationMutex);
+                return Error(WorkspacesFileError::ServiceAccessError);
+            }
+
             // A direct desktop shortcut can start the native launcher before a
             // managed host has run the migration bootstrap. If the protected
             // service is already up but empty, validate the legacy file and
@@ -131,15 +170,23 @@ namespace JsonUtils
                 auto legacy = ReadWorkspaces(legacyFile);
                 if (legacy.isError())
                 {
+                    ReleaseMutex(migrationMutex);
+                    CloseHandle(migrationMutex);
                     return Error(legacy.error());
                 }
                 if (!WriteWorkspacesToService(legacy.getValue()))
                 {
+                    ReleaseMutex(migrationMutex);
+                    CloseHandle(migrationMutex);
                     return Error(WorkspacesFileError::ServiceAccessError);
                 }
+                ReleaseMutex(migrationMutex);
+                CloseHandle(migrationMutex);
                 return Ok(legacy.getValue());
             }
 
+            ReleaseMutex(migrationMutex);
+            CloseHandle(migrationMutex);
             return Ok(std::vector<WorkspacesData::WorkspacesProject>{});
         }
 

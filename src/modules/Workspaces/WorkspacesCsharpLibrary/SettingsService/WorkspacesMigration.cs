@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.IO;
+using System.Threading;
 
 namespace WorkspacesCsharpLibrary.SettingsService;
 
@@ -15,6 +16,8 @@ namespace WorkspacesCsharpLibrary.SettingsService;
 /// </summary>
 public static class WorkspacesMigration
 {
+    private const string MigrationMutexName = @"Local\PowerToys_Workspaces_SettingsMigration";
+
     public enum Outcome
     {
         AlreadyMigrated,
@@ -26,6 +29,34 @@ public static class WorkspacesMigration
     }
 
     public static Outcome Run()
+    {
+        using var migrationMutex = new Mutex(false, MigrationMutexName);
+        bool lockTaken;
+        try
+        {
+            lockTaken = migrationMutex.WaitOne(TimeSpan.FromSeconds(30));
+        }
+        catch (AbandonedMutexException)
+        {
+            lockTaken = true;
+        }
+
+        if (!lockTaken)
+        {
+            return Outcome.SkippedServiceUnavailable;
+        }
+
+        try
+        {
+            return RunLocked();
+        }
+        finally
+        {
+            migrationMutex.ReleaseMutex();
+        }
+    }
+
+    private static Outcome RunLocked()
     {
         var sentinel = SettingsPaths.MigrationSentinel();
         if (File.Exists(sentinel))

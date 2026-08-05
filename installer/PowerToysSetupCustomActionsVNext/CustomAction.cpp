@@ -730,7 +730,13 @@ UINT __stdcall UninstallPackageIdentityMSIXCA(MSIHANDLE hInstall)
     ExitOnFailure(hr, "Failed to initialize");
     
     // Check if this was a machine-level installation
-    hr = WcaGetProperty(L"InstallScope", &installScope);
+    hr = WcaGetProperty(L"CustomActionData", &installScope);
+    if (FAILED(hr) || !installScope || installScope[0] == L'\0')
+    {
+        ReleaseStr(installScope);
+        installScope = nullptr;
+        hr = WcaGetProperty(L"InstallScope", &installScope);
+    }
     if (SUCCEEDED(hr) && installScope && wcscmp(installScope, L"perMachine") == 0)
     {
         isMachineLevel = true;
@@ -982,10 +988,19 @@ namespace
                   L"}\"";
 
         SHELLEXECUTEINFOW sei{};
+        wchar_t systemDirectory[MAX_PATH] = {};
+        if (!GetSystemDirectoryW(systemDirectory, ARRAYSIZE(systemDirectory)))
+        {
+            return false;
+        }
+        std::wstring powerShellPath =
+            std::wstring(systemDirectory) +
+            L"\\WindowsPowerShell\\v1.0\\powershell.exe";
+
         sei.cbSize = sizeof(sei);
         sei.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
         sei.lpVerb = L"runas";
-        sei.lpFile = L"powershell.exe";
+        sei.lpFile = powerShellPath.c_str();
         sei.lpParameters = params.c_str();
         sei.nShow = SW_HIDE;
 
