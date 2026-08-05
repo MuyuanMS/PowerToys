@@ -42,7 +42,11 @@ namespace WorkspacesLauncherUI
             string title;
             try
             {
-                title = ResourceLoaderInstance.ResourceLoader?.GetString("LauncherWindowTitle") ?? "Workspaces";
+                title = ResourceLoaderInstance.ResourceLoader?.GetString("LauncherWindowTitle");
+                if (string.IsNullOrEmpty(title))
+                {
+                    title = "Workspaces";
+                }
             }
             catch (Exception ex)
             {
