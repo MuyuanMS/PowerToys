@@ -140,7 +140,7 @@ namespace WorkspacesLauncherUI.UnitTests
 
         [TestMethod]
         [TestCategory("Scenario")]
-        public void UserLaunchesWorkspace_AdminApp_ElevatedFlagPreservedInUi()
+        public void UserLaunchesWorkspace_AdminNamedApp_DisplaysName()
         {
             using var vm = new MainViewModel();
 

@@ -33,8 +33,15 @@ void IPCHelper::send(const std::wstring& message) const
     ipc->send(message);
 }
 
+void IPCHelper::StopReceiving()
+{
+    std::lock_guard lock{ callbackMutex };
+    callback = nullptr;
+}
+
 void IPCHelper::receive(const std::wstring& msg)
 {
+    std::lock_guard lock{ callbackMutex };
     if (callback)
     {
         callback(msg);

@@ -23,7 +23,7 @@
             x:Uid="ApplicationLaunchStatusList"
             Grid.ColumnSpan="2"
             TabIndex="0">
-            <StackPanel AutomationProperties.AccessibilityView="Content" AutomationProperties.LiveSetting="Polite">
+            <StackPanel AutomationProperties.AccessibilityView="Content">
                 <ItemsControl x:Uid="ApplicationsList" ItemsSource="{x:Bind ViewModel.AppsListed, Mode=OneWay}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="models:AppLaunching">
@@ -53,6 +53,7 @@
                                     Margin="8"
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
+                                    AutomationProperties.LiveSetting="Polite"
                                     AutomationProperties.Name="{x:Bind StateAutomationName, Mode=OneWay}"
                                     TargetType="x:Boolean"
                                     Value="{x:Bind Loading, Mode=OneWay}">
