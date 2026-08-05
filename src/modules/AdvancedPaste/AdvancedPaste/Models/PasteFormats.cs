@@ -46,7 +46,7 @@ public enum PasteFormats
         CanPreview = true,
         SupportedClipboardFormats = ClipboardFormat.Text,
         IPCKey = AdvancedPasteAdditionalActions.PropertyNames.FixSpellingAndGrammar)]
-    FixSpellingAndGrammar,
+    FixSpellingAndGrammar = 11,
 
     [PasteFormatMetadata(
         IsCoreAction = false,
@@ -57,7 +57,7 @@ public enum PasteFormats
         SupportedClipboardFormats = ClipboardFormat.Image,
         IPCKey = AdvancedPasteAdditionalActions.PropertyNames.ImageToText,
         KernelFunctionDescription = "Takes an image from the clipboard and extracts text using OCR. This function is intended only for explicit text extraction or OCR requests.")]
-    ImageToText,
+    ImageToText = 3,
 
     [PasteFormatMetadata(
         IsCoreAction = false,

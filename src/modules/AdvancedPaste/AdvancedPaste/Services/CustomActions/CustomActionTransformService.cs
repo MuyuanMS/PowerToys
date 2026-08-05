@@ -153,7 +153,7 @@ namespace AdvancedPaste.Services.CustomActions
             return serviceType == AIServiceType.Unknown ? AIServiceType.OpenAI : serviceType;
         }
 
-        private PasteAIConfig BuildProviderConfig(PasteAIConfiguration config, string providerIdOverride = null)
+        internal PasteAIConfig BuildProviderConfig(PasteAIConfiguration config, string providerIdOverride = null)
         {
             config ??= new PasteAIConfiguration();
             PasteAIProviderDefinition provider;

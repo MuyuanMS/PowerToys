@@ -350,15 +350,19 @@ namespace AdvancedPaste.ViewModels
         private PasteFormat CreateStandardPasteFormat(PasteFormats format)
         {
             var providerId = GetProviderIdForFormat(format);
-            return PasteFormat.CreateStandardFormat(format, AvailableClipboardFormats, IsCustomAIServiceEnabled, ResourceLoaderInstance.ResourceLoader.GetString, providerId);
+            var effectiveProvider = ResolveEffectiveProvider(providerId);
+            var isAIServiceEnabled = IsCustomAIServiceEnabled
+                && (effectiveProvider is null || IsProviderAllowedByGPO(effectiveProvider))
+                && (effectiveProvider?.ServiceTypeKind != AIServiceType.PhiSilica || AvailableClipboardFormats.HasFlag(ClipboardFormat.Text));
+
+            return PasteFormat.CreateStandardFormat(format, AvailableClipboardFormats, isAIServiceEnabled, ResourceLoaderInstance.ResourceLoader.GetString, providerId);
         }
 
         private PasteFormat CreateCustomAIPasteFormat(string name, string prompt, bool isSavedQuery, string providerId = null)
         {
             var format = CustomAIFormat;
             var isEnabled = IsCustomAIServiceEnabled;
-            var selectedProvider = _userSettings?.PasteAIConfiguration?.Providers?
-                .FirstOrDefault(provider => string.Equals(provider.Id, providerId, StringComparison.OrdinalIgnoreCase));
+            var selectedProvider = ResolveEffectiveProvider(providerId);
 
             if (selectedProvider is not null && !IsProviderAllowedByGPO(selectedProvider))
             {
@@ -379,6 +383,20 @@ namespace AdvancedPaste.ViewModels
             }
 
             return PasteFormat.CreateCustomAIFormat(format, name, prompt, isSavedQuery, AvailableClipboardFormats, isEnabled, providerId);
+        }
+
+        private PasteAIProviderDefinition ResolveEffectiveProvider(string providerId)
+        {
+            var configuration = _userSettings?.PasteAIConfiguration;
+            if (!string.IsNullOrWhiteSpace(providerId))
+            {
+                return configuration?.Providers?
+                    .FirstOrDefault(provider => string.Equals(provider.Id, providerId, StringComparison.OrdinalIgnoreCase))
+                    ?? configuration?.ActiveProvider
+                    ?? configuration?.Providers?.FirstOrDefault();
+            }
+
+            return configuration?.ActiveProvider ?? configuration?.Providers?.FirstOrDefault();
         }
 
         private string GetProviderIdForFormat(PasteFormats format) =>

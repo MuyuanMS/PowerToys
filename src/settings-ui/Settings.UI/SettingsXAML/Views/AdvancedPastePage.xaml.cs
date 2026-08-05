@@ -441,8 +441,7 @@ namespace Microsoft.PowerToys.Settings.UI.Views
         {
             var draft = ViewModel?.PasteAIProviderDraft;
             var probeVersion = ++_phiSilicaProbeVersion;
-            string selectedType = draft?.ServiceType ?? string.Empty;
-            bool isPhiSilica = string.Equals(selectedType, "PhiSilica", StringComparison.OrdinalIgnoreCase);
+            bool isPhiSilica = draft?.ServiceTypeKind == AIServiceType.PhiSilica;
 
             if (PhiSilicaPanel is not null)
             {

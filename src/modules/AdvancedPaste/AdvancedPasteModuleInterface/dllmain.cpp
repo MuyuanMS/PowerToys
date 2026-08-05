@@ -83,6 +83,7 @@ private:
     std::atomic_bool m_hotkey_worker_running = false;
     std::jthread m_hotkey_worker;
     std::mutex m_actions_mutex;
+    std::mutex m_hotkey_worker_mutex;
 
     std::wstring app_name;
 
@@ -1105,11 +1106,14 @@ public:
 
     void Disable(bool traceEvent)
     {
-        if (m_hotkey_worker.joinable())
         {
-            m_hotkey_worker.request_stop();
-            m_hotkey_worker.join();
-            m_hotkey_worker_running = false;
+            std::scoped_lock lock(m_hotkey_worker_mutex);
+            if (m_hotkey_worker.joinable())
+            {
+                m_hotkey_worker.request_stop();
+                m_hotkey_worker.join();
+                m_hotkey_worker_running = false;
+            }
         }
 
         if (m_enabled)
@@ -1150,6 +1154,12 @@ public:
 
         if (m_auto_copy_selection_custom_action)
         {
+            std::scoped_lock lock(m_hotkey_worker_mutex);
+            if (!m_enabled)
+            {
+                return false;
+            }
+
             if (m_hotkey_worker_running.exchange(true))
             {
                 return true;
