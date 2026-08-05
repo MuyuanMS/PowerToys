@@ -223,13 +223,22 @@ namespace AdvancedPaste.ViewModels
 
         public bool ClipboardHasData => AvailableClipboardFormats != ClipboardFormat.None;
 
-        public bool ClipboardHasDataForCustomAI => PasteFormat.SupportsClipboardFormats(CustomAIFormat, AvailableClipboardFormats);
+        public bool ClipboardHasDataForCustomAI
+        {
+            get
+            {
+                var activeProvider = ResolveEffectiveProvider(providerId: null);
+                return activeProvider?.ServiceTypeKind == AIServiceType.PhiSilica
+                    ? AvailableClipboardFormats.HasFlag(ClipboardFormat.Text)
+                    : PasteFormat.SupportsClipboardFormats(CustomAIFormat, AvailableClipboardFormats);
+            }
+        }
 
         public bool ShowClipboardPreview => _userSettings.EnableClipboardPreview;
 
         public bool ShowClipboardHistoryButton => ClipboardHistoryEnabled;
 
-        public bool ShowAIPasteSection => _userSettings.ShowAIPaste && IsCustomAIServiceEnabled;
+        public bool ShowAIPasteSection => _userSettings.ShowAIPaste && _userSettings.IsAIEnabled && AllowedAIProviders.Any();
 
         public bool HasIndeterminateTransformProgress => double.IsNaN(TransformProgress);
 
