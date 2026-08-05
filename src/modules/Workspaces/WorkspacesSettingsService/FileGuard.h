@@ -69,6 +69,12 @@ namespace PTSettingsSvc
     // and write files that inherit the parent's protected DACL.
     HRESULT EnsureDirectory(const std::wstring& dir);
 
+    // Creates each missing component and verifies every resulting directory
+    // through a non-following handle. Used before provisioning leaf directories
+    // on clean per-user installs where the PowerToys ProgramData parent may not
+    // exist yet.
+    HRESULT EnsureDirectoryHierarchyNoReparse(const std::wstring& dir);
+
     // Removes stale temp files and sanitizes an existing data file without
     // following reparse points. Files owned by SYSTEM or the deterministic
     // service account are preserved and re-ACL'd; pre-planted files are

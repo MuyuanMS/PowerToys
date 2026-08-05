@@ -9,6 +9,8 @@
 #include <pathcch.h>
 #include <memory>
 #include <vector>
+#include <algorithm>
+#include <filesystem>
 
 #pragma comment(lib, "Advapi32.lib")
 #pragma comment(lib, "Pathcch.lib")
@@ -299,6 +301,12 @@ namespace PTSettingsSvc
 
     HRESULT EnsureStoreRoot(const std::wstring& root)
     {
+        HRESULT hierarchyHr = EnsureDirectoryHierarchyNoReparse(root);
+        if (FAILED(hierarchyHr))
+        {
+            return hierarchyHr;
+        }
+
         PSID adminSid = nullptr;
         if (!ConvertStringSidToSidW(L"S-1-5-32-544", &adminSid))
         {
@@ -576,6 +584,34 @@ namespace PTSettingsSvc
             CloseHandle(directory);
         }
         return hr;
+    }
+
+    HRESULT EnsureDirectoryHierarchyNoReparse(const std::wstring& dir)
+    {
+        std::vector<std::filesystem::path> components;
+        std::filesystem::path current(dir);
+        const std::filesystem::path root = current.root_path();
+        while (!current.empty() && current != root)
+        {
+            components.push_back(current);
+            current = current.parent_path();
+        }
+        std::reverse(components.begin(), components.end());
+
+        for (const auto& component : components)
+        {
+            HANDLE directory = INVALID_HANDLE_VALUE;
+            HRESULT hr = EnsureAndOpenRealDirectory(
+                component.wstring(),
+                FILE_READ_ATTRIBUTES,
+                directory);
+            if (FAILED(hr))
+            {
+                return hr;
+            }
+            CloseHandle(directory);
+        }
+        return S_OK;
     }
 
     HRESULT SanitizeNamespaceFiles(const std::wstring& namespaceFolder,
