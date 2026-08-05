@@ -832,7 +832,10 @@ namespace
     const wchar_t* const kPTSettingsSvcExeName = L"PowerToys.PTSettingsSvc.exe";
     const wchar_t* const kPTSettingsSvcKeyPrefix = L"PTSettingsSvc_";
 
-    // Resolves the staged WindowsApps exe path for the current package version.
+    // Resolves the machine-wide staged WindowsApps exe path for the current
+    // package version. FindPackages enumerates across users when called by the
+    // elevated per-machine CA; unlike FindPackagesForUser("", ...), it does not
+    // depend on SYSTEM having a package registration.
     // The registrar (service exe) is invoked from this path; it then re-resolves
     // its OWN module path, so a bad value here only fails the launch, it cannot
     // point the service at an attacker binary.
@@ -842,9 +845,13 @@ namespace
         try
         {
             PackageManager pm;
-            auto packages = pm.FindPackagesForUserWithPackageTypes({}, kPTSettingsSvcFamilyName, PackageTypes::Main);
+            auto packages = pm.FindPackages();
             for (const auto& package : packages)
             {
+                if (package.Id().FamilyName() != kPTSettingsSvcFamilyName)
+                {
+                    continue;
+                }
                 auto loc = package.InstalledLocation().Path();
                 std::filesystem::path exe = std::filesystem::path(std::wstring(loc)) / kPTSettingsSvcExeName;
                 if (std::filesystem::exists(exe))
@@ -1081,13 +1088,22 @@ UINT __stdcall InstallPTSettingsSvcCA(MSIHANDLE hInstall)
         // lazily per user by the managed provisioner.  Users who are not logged
         // in / have no service yet are handled by that lazy per-user path.
         std::wstring exePath = ResolveStagedExePath();
+        const auto serviceSids = EnumeratePerUserServiceSids();
+        if (!serviceSids.empty() && exePath.empty())
+        {
+            Logger::error(L"PTSettingsSvc staged executable could not be resolved for service re-point.");
+            er = ERROR_INSTALL_FAILURE;
+            ExitFunction();
+        }
         if (!exePath.empty())
         {
-            for (const auto& sid : EnumeratePerUserServiceSids())
+            for (const auto& sid : serviceSids)
             {
                 if (!RunExeVerb(exePath, L"--repoint", sid))
                 {
-                    Logger::warn(L"PTSettingsSvc re-point failed for SID {}", sid);
+                    Logger::error(L"PTSettingsSvc re-point failed for SID {}", sid);
+                    er = ERROR_INSTALL_FAILURE;
+                    ExitFunction();
                 }
             }
         }

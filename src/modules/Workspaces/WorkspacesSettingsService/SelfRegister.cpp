@@ -249,6 +249,16 @@ namespace PTSettingsSvc
             const std::wstring runExe = binDir + L"\\" + kExeName;
             const std::wstring binPath = BuildBinPath(runExe, sid);
 
+            // Protect the common ProgramData anchor before creating either
+            // Settings or SettingsSvcBin beneath it. Otherwise an attacker-owned
+            // parent with DELETE_CHILD could swap a hardened child after
+            // registration.
+            HRESULT anchorHr = EnsureStoreRoot(GetPowerToysProgramDataRoot());
+            if (FAILED(anchorHr))
+            {
+                return static_cast<int>(anchorHr);
+            }
+
             SC_HANDLE scm = OpenSCManagerW(
                 nullptr,
                 nullptr,

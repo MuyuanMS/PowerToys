@@ -27,16 +27,12 @@ $sdkBin  = (Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse 
 
 if (-not (Test-Path $ExePath)) { throw "Service exe not found: $ExePath (build the vcxproj first)." }
 
-# 1x1 transparent logo if none present.
-$logo = Join-Path $pkgSrc 'logo.png'
-if (-not (Test-Path $logo)) {
-    [IO.File]::WriteAllBytes($logo,[Convert]::FromBase64String('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='))
-}
-
 Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force $staging | Out-Null
 Copy-Item (Join-Path $pkgSrc 'AppxManifest.xml') $staging
-Copy-Item $logo $staging
+Copy-Item (Join-Path $pkgSrc 'StoreLogo.png') $staging
+Copy-Item (Join-Path $pkgSrc 'Square150x150Logo.png') $staging
+Copy-Item (Join-Path $pkgSrc 'Square44x44Logo.png') $staging
 Copy-Item $ExePath $staging
 
 # Stamp the package version (must be 4-part) to keep it in lockstep with the build.
