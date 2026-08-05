@@ -321,6 +321,26 @@ namespace WorkspacesEditor.Utils
                     // and retry — but NEVER fall back to an unprotected write.
                     if (TryProvisionProtectedStore())
                     {
+                        // Provisioning can migrate the legacy list. Merge that
+                        // newly protected state with this pending candidate
+                        // before retrying so a save from an initially-empty UI
+                        // cannot overwrite the migration.
+                        if (PTSettingsClient.GetBlob(out var protectedBlob) == PTSettingsClient.Result.Ok)
+                        {
+                            var protectedWorkspaces = serializer.Deserialize(
+                                Encoding.UTF8.GetString(protectedBlob));
+                            var pendingIds = workspacesWrapper.Workspaces
+                                .Select(workspace => workspace.Id)
+                                .ToHashSet(StringComparer.Ordinal);
+                            var merged = protectedWorkspaces.Workspaces
+                                .Where(workspace => !pendingIds.Contains(workspace.Id))
+                                .Concat(workspacesWrapper.Workspaces)
+                                .ToList();
+                            workspacesWrapper.Workspaces = merged;
+                            json = serializer.Serialize(workspacesWrapper);
+                            payload = Encoding.UTF8.GetBytes(json);
+                        }
+
                         rc = PTSettingsClient.PutBlob(payload);
                     }
                 }
