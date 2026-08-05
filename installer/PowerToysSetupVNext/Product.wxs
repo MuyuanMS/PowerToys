@@ -255,7 +255,10 @@
     <!-- PTSettingsSvc MSIX provisioning (per-machine). -->
     <CustomAction Id="SetInstallPTSettingsSvcParam" Property="InstallPTSettingsSvc" Value="[INSTALLFOLDER]" />
 
-    <CustomAction Id="InstallPTSettingsSvc" Return="check" Impersonate="no" Execute="deferred" DllEntry="InstallPTSettingsSvcCA" BinaryRef="PTCustomActions" />
+    <!-- Commit-time execution avoids repointing services until MSI has
+         successfully committed, so a rollback cannot leave new services paired
+         with restored old PowerToys callers. -->
+    <CustomAction Id="InstallPTSettingsSvc" Return="check" Impersonate="no" Execute="commit" DllEntry="InstallPTSettingsSvcCA" BinaryRef="PTCustomActions" />
 
     <CustomAction Id="SetUnRegisterPTSettingsSvcMachineParam" Property="UnRegisterPTSettingsSvcMachine" Value="perMachine" />
     <CustomAction Id="UnRegisterPTSettingsSvcMachine" Return="ignore" Impersonate="no" Execute="deferred" DllEntry="UnRegisterPTSettingsSvcCA" BinaryRef="PTCustomActions" />

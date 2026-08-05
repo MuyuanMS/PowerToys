@@ -33,6 +33,7 @@ namespace PTSettingsSvc
             { L"PowerToys.WorkspacesSnapshotTool.exe",   L"Workspaces", L"workspaces.json" },
             { L"PowerToys.WorkspacesWindowArranger.exe", L"Workspaces", L"workspaces.json" },
             { L"PowerToys.WorkspacesLauncherUI.exe",     L"Workspaces", L"workspaces.json" },
+            { L"Microsoft.CmdPal.Ext.PowerToys.exe",       L"Workspaces", L"workspaces.json" },
 
             // Runner can act on behalf of any module that needs runner-owned
             // one-shot tasks (e.g. legacy migration).  v6.0 ships with one

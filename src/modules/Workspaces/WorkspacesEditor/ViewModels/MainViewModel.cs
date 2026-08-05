@@ -225,8 +225,7 @@ namespace WorkspacesEditor.ViewModels
             projectToSave.OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs("AppsCountString"));
             projectToSave.Initialize(App.GetCurrentTheme());
 
-            int index = Workspaces.IndexOf(editedProject);
-            Workspaces[index] = projectToSave;
+            CommitPersistedWorkspaces(updatedWorkspaces);
             ApplyShortcut(projectToSave);
             SendEditTelemetryEvent(projectToSave, editedProject);
             return true;
@@ -398,9 +397,8 @@ namespace WorkspacesEditor.ViewModels
                 return false;
             }
 
-            Workspaces.Add(project);
+            CommitPersistedWorkspaces(updatedWorkspaces);
             TempProjectData.DeleteTempFile();
-            OnPropertyChanged(new PropertyChangedEventArgs(nameof(WorkspacesView)));
             ApplyShortcut(project);
             SendCreateTelemetryEvent(project);
             return true;
@@ -419,11 +417,16 @@ namespace WorkspacesEditor.ViewModels
                 return false;
             }
 
-            Workspaces.Remove(selectedProject);
+            CommitPersistedWorkspaces(updatedWorkspaces);
             RemoveShortcut(selectedProject);
-            OnPropertyChanged(new PropertyChangedEventArgs(nameof(WorkspacesView)));
             SendDeleteTelemetryEvent();
             return true;
+        }
+
+        private void CommitPersistedWorkspaces(List<Project> persistedWorkspaces)
+        {
+            Workspaces = new ObservableCollection<Project>(persistedWorkspaces);
+            Initialize();
         }
 
         private bool CanModifyWorkspaces()
