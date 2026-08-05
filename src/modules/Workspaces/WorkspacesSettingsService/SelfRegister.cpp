@@ -634,7 +634,17 @@ namespace PTSettingsSvc
 
         RegLog(L"--unregister end rc=" + std::to_wstring(rc) +
                L" (removing per-user bin)");
-        RemoveTreeBestEffort(UserBinRoot(userSidString));
+        const std::wstring userBinRoot = UserBinRoot(userSidString);
+        RemoveTreeBestEffort(userBinRoot);
+
+        // If this command is executing from the per-user bin, Windows keeps the
+        // image locked until process exit. Schedule the remaining executable and
+        // now-empty directories for deletion at reboot so direct/manual
+        // unregister does not report permanent cleanup while retaining them.
+        const std::filesystem::path currentExe(OwnExePath());
+        MoveFileExW(currentExe.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
+        MoveFileExW(currentExe.parent_path().c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
+        MoveFileExW(userBinRoot.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
 
         return rc;
     }
