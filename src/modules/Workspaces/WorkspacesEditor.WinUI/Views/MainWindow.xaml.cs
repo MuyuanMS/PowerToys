@@ -194,6 +194,11 @@ namespace WorkspacesEditor
                             }
                             else
                             {
+                                if (IsIconic(hwnd))
+                                {
+                                    ShowWindow(hwnd, 9); // SW_RESTORE
+                                }
+
                                 WindowHelpers.BringToForeground(hwnd);
                             }
                         });
@@ -310,6 +315,9 @@ namespace WorkspacesEditor
         // Win32 interop
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr hWnd);
 
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
