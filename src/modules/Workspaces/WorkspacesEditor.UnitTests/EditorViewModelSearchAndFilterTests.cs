@@ -65,7 +65,7 @@ namespace WorkspacesEditor.UnitTests
             var results = vm.WorkspacesView.ToList();
 
             Assert.AreEqual(1, results.Count);
-            Assert.AreEqual("DevSetup", results[0].Name);
+            Assert.AreEqual("Development", results[0].Name);
         }
 
         [TestMethod]
@@ -75,7 +75,7 @@ namespace WorkspacesEditor.UnitTests
             var vm = TestHelpers.CreateViewModel();
             vm.Workspaces = new ObservableCollection<Project>
             {
-                TestHelpers.CreateProject("DevSetup", 0, 0, "VS Code", "Terminal"),
+                TestHelpers.CreateProject("Development", 0, 0, "VS Code", "Terminal"),
                 TestHelpers.CreateProject("Browsing", 0, 0, "Edge", "Notepad"),
             };
 
@@ -83,7 +83,7 @@ namespace WorkspacesEditor.UnitTests
             var results = vm.WorkspacesView.ToList();
 
             Assert.AreEqual(1, results.Count);
-            Assert.AreEqual("DevSetup", results[0].Name);
+            Assert.AreEqual("Development", results[0].Name);
         }
 
         [TestMethod]
@@ -93,7 +93,7 @@ namespace WorkspacesEditor.UnitTests
             var vm = TestHelpers.CreateViewModel();
             vm.Workspaces = new ObservableCollection<Project>
             {
-                TestHelpers.CreateProject("DevSetup", 0, 0, "VS Code"),
+                TestHelpers.CreateProject("Development", 0, 0, "VS Code"),
                 TestHelpers.CreateProject("Browsing", 0, 0, "Edge"),
             };
 
