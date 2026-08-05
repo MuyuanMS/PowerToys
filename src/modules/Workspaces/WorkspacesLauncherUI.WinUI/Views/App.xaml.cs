@@ -19,6 +19,7 @@ namespace WorkspacesLauncherUI
     {
         private StatusWindow _mainWindow;
         private TwoWayPipeMessageIPCManaged _ipcManager;
+        private DispatcherQueueTimer _readyTimer;
         private bool _isDisposed;
 
         public static Action<string> IPCMessageReceivedCallback { get; set; }
@@ -71,15 +72,22 @@ namespace WorkspacesLauncherUI
                         return;
                     }
 
-                    if (IPCMessageReceivedCallback != null && message.Length > 0)
+                    Action<string> callback = IPCMessageReceivedCallback;
+                    if (callback != null && message.Length > 0)
                     {
                         DispatcherQueue.TryEnqueue(() =>
                         {
-                            IPCMessageReceivedCallback(message);
+                            _readyTimer?.Stop();
+                            callback(message);
                         });
                     }
                 });
             _ipcManager.Start();
+
+            _readyTimer = DispatcherQueue.CreateTimer();
+            _readyTimer.Interval = TimeSpan.FromMilliseconds(100);
+            _readyTimer.Tick += (_, _) => SendIPCMessage("ready");
+            _readyTimer.Start();
             SendIPCMessage("ready");
 
             _mainWindow.Activate();
@@ -94,6 +102,7 @@ namespace WorkspacesLauncherUI
         {
             if (!_isDisposed)
             {
+                _readyTimer?.Stop();
                 _ipcManager?.End();
                 _ipcManager?.Dispose();
                 _isDisposed = true;
