@@ -278,7 +278,9 @@ public static class ServiceProvisioner
              + "$actualVersion = (Get-Item $exe).VersionInfo.FileVersion; "
              + "if ([version]$actualVersion -ne [version]'" + PsLit(expectedVersion) + "') { exit 4 }; "
              + "& $exe --register '" + PsLit(userSid) + "'; "
-             + "exit $LASTEXITCODE"
+             + "$registerExit = $LASTEXITCODE; "
+             + "if ($registerExit -eq 0) { Get-AppxPackage -Name 'Microsoft.PowerToys.SettingsService' | Remove-AppxPackage }; "
+             + "exit $registerExit"
              + "\"";
     }
 

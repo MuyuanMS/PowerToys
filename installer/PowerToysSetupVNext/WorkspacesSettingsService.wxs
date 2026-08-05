@@ -172,12 +172,12 @@
     <!-- Remove the service APP artifacts as SYSTEM on uninstall (data preserved). -->
     <CustomAction Id="PtCleanupStore"
                   Directory="WorkspacesSettingsServiceFolder"
-                  ExeCommand="powershell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -File &quot;[#PtCleanupScript]&quot; -RemoveService:$false -RemoveAppArtifacts"
+                  ExeCommand="&quot;[SystemFolder]WindowsPowerShell\v1.0\powershell.exe&quot; -NonInteractive -NoProfile -ExecutionPolicy Bypass -File &quot;[#PtCleanupScript]&quot; -RemoveService:$false -RemoveAppArtifacts"
                   Execute="deferred" Impersonate="no" Return="ignore" />
 
     <InstallExecuteSequence>
       <!-- While the script still exists; only on full uninstall. -->
-      <Custom Action="PtCleanupStore" Before="RemoveFiles" Condition="Installed AND (REMOVE=&quot;ALL&quot;)" />
+      <Custom Action="PtCleanupStore" Before="RemoveFiles" Condition="Installed AND (NOT UPGRADINGPRODUCTCODE) AND (REMOVE=&quot;ALL&quot;)" />
     </InstallExecuteSequence>
 
     <ComponentGroup Id="PTSettingsServiceComponentGroup">

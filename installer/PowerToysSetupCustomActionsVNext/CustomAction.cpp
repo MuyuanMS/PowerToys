@@ -981,6 +981,9 @@ namespace
                   L"& $exe --unregister $sid; "
                   L"if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } "
                   L"}; "
+                  L"Get-AppxPackage -Name '";
+        params += packageName;
+        params += L"' | Remove-AppxPackage -ErrorAction Stop; "
                   L"Get-AppxPackage -User $sid -Name '";
         params += packageName;
         params += L"' | ForEach-Object { "
