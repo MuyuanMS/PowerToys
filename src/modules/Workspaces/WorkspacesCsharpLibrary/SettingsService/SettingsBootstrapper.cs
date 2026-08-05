@@ -43,6 +43,7 @@ public static class SettingsBootstrapper
 
     // Auto (non-forced) bootstrap runs at most once per process to keep the hot
     // path (every editor open) cheap; an explicit user request always runs.
+    private static readonly object _bootstrapLock = new();
     private static int _autoBootstrapped;
 
     /// <summary>
@@ -55,6 +56,14 @@ public static class SettingsBootstrapper
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        lock (_bootstrapLock)
+        {
+            return EnsureInitializedCore(request);
+        }
+    }
+
+    private static Result EnsureInitializedCore(BootstrapRequest request)
+    {
         // Explicit one-off actions (an explicit "enable protection" request, or a
         // save) always run and always re-attempt.  Automatic triggers (editor
         // open) run their provisioning at most once per process, so a single
