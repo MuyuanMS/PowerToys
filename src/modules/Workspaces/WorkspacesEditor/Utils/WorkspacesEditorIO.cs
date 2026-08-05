@@ -351,8 +351,13 @@ namespace WorkspacesEditor.Utils
                             var pendingIds = workspacesWrapper.Workspaces
                                 .Select(workspace => workspace.Id)
                                 .ToHashSet(StringComparer.Ordinal);
-                            var merged = protectedWorkspaces.Workspaces
+                            var protectedOnly = protectedWorkspaces.Workspaces
                                 .Where(workspace => !pendingIds.Contains(workspace.Id))
+                                .ToList();
+                            workspaces.InsertRange(
+                                0,
+                                protectedOnly.Select(workspace => new Project(workspace)));
+                            var merged = protectedOnly
                                 .Concat(workspacesWrapper.Workspaces)
                                 .ToList();
                             workspacesWrapper.Workspaces = merged;

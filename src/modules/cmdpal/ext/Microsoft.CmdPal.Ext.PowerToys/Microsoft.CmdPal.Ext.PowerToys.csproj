@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<Import Project="$(RepoRoot)src\Common.Dotnet.CsWinRT.props" />
 	<Import Project="$(RepoRoot)src\Common.Dotnet.AotCompatibility.props" />
+	<PropertyGroup>
+		<PowerToysProductVersion>$(Version)</PowerToysProductVersion>
+	</PropertyGroup>
 	<Import Project="$(RepoRoot)src\CmdPalVersion.props" />
 
 	<PropertyGroup>
@@ -19,6 +22,7 @@
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
 		<Version>$(CmdPalVersion)</Version>
+		<FileVersion>$(PowerToysProductVersion)</FileVersion>
 	</PropertyGroup>
 
 	<PropertyGroup>
