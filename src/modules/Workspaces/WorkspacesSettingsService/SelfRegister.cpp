@@ -22,11 +22,17 @@ namespace PTSettingsSvc
     namespace
     {
         constexpr const wchar_t* kExeName = L"PowerToys.PTSettingsSvc.exe";
+        bool g_regLogEnabled = false;
 
         // Append a timed line to the register step-timing log next to the bin root
         // (elevated context can write %ProgramData%).  Best-effort; never throws.
         void RegLog(const std::wstring& msg)
         {
+            if (!g_regLogEnabled)
+            {
+                return;
+            }
+
             try
             {
                 CreateDirectoryW(GetServiceBinRoot().c_str(), nullptr);
@@ -282,10 +288,66 @@ namespace PTSettingsSvc
                 CloseServiceHandle(scm);
                 return rc;
             }
-            if (!CopyFileW(srcExe.c_str(), runExe.c_str(), FALSE))
+            g_regLogEnabled = true;
+
+            DWORD destinationAttributes = GetFileAttributesW(runExe.c_str());
+            if (destinationAttributes != INVALID_FILE_ATTRIBUTES)
+            {
+                if ((destinationAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+                {
+                    rc = static_cast<int>(ERROR_DIRECTORY);
+                    RegLog(L"destination-is-directory rc=" + std::to_wstring(rc));
+                    if (svc) { CloseServiceHandle(svc); }
+                    CloseServiceHandle(scm);
+                    return rc;
+                }
+
+                SetFileAttributesW(runExe.c_str(), FILE_ATTRIBUTE_NORMAL);
+                if (!DeleteFileW(runExe.c_str()))
+                {
+                    rc = static_cast<int>(GetLastError());
+                    RegLog(L"delete-old-exe FAILED rc=" + std::to_wstring(rc));
+                    if (svc) { CloseServiceHandle(svc); }
+                    CloseServiceHandle(scm);
+                    return rc;
+                }
+            }
+
+            if (!CopyFileW(srcExe.c_str(), runExe.c_str(), TRUE))
             {
                 rc = static_cast<int>(GetLastError());
                 RegLog(L"copy-exe FAILED rc=" + std::to_wstring(rc));
+                if (svc) { CloseServiceHandle(svc); }
+                CloseServiceHandle(scm);
+                return rc;
+            }
+
+            HANDLE copiedFile = CreateFileW(
+                runExe.c_str(),
+                FILE_READ_ATTRIBUTES,
+                FILE_SHARE_READ,
+                nullptr,
+                OPEN_EXISTING,
+                FILE_FLAG_OPEN_REPARSE_POINT,
+                nullptr);
+            FILE_ATTRIBUTE_TAG_INFO copiedAttributes{};
+            const bool copiedFileValid =
+                copiedFile != INVALID_HANDLE_VALUE &&
+                GetFileInformationByHandleEx(
+                    copiedFile,
+                    FileAttributeTagInfo,
+                    &copiedAttributes,
+                    sizeof(copiedAttributes)) &&
+                (copiedAttributes.FileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0 &&
+                (copiedAttributes.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) == 0;
+            if (copiedFile != INVALID_HANDLE_VALUE)
+            {
+                CloseHandle(copiedFile);
+            }
+            if (!copiedFileValid)
+            {
+                rc = static_cast<int>(ERROR_ACCESS_DENIED);
+                RegLog(L"validate-copied-exe FAILED rc=" + std::to_wstring(rc));
                 if (svc) { CloseServiceHandle(svc); }
                 CloseServiceHandle(scm);
                 return rc;
@@ -342,7 +404,15 @@ namespace PTSettingsSvc
             // Now the virtual account exists: grant it RX on the bin dir so the
             // service can actually launch (owner=SYSTEM, protected DACL).
             t = NowMs();
-            HRESULT hr = ProtectServiceBinDir(binDir, account);
+            HRESULT hr = ProtectServiceBinDir(GetServiceBinRoot(), account);
+            if (SUCCEEDED(hr))
+            {
+                hr = ProtectServiceBinDir(userBinRoot, account);
+            }
+            if (SUCCEEDED(hr))
+            {
+                hr = ProtectServiceBinDir(binDir, account);
+            }
             if (FAILED(hr))
             {
                 RegLog(L"ProtectServiceBinDir FAILED hr=" + std::to_wstring(hr));
