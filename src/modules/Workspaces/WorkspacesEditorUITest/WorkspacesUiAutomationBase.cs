@@ -33,11 +33,11 @@ namespace WorkspacesEditorUITest
             Task.Delay(5000).Wait();
 
             // Set name
-            var nameTextBox = Find<TextBox>("EditNameTextBox");
+            var nameTextBox = Find<TextBox>(By.AccessibilityId("EditNameTextBox"));
             nameTextBox.SetText(name);
 
             // Save
-            Find<Button>("Save Workspace").Click();
+            Find<Button>("Save").Click();
 
             // Close notepad
             CloseNotepad();
