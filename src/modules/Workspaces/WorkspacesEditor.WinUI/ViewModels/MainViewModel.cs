@@ -29,13 +29,13 @@ namespace WorkspacesEditor.ViewModels
 {
     public partial class MainViewModel : ObservableObject, IDisposable
     {
+        private readonly bool _persistSettings;
         private WorkspacesEditorIO _workspacesEditorIO;
         private Project _editedProject;
         private Project _projectBeforeLaunch;
         private string _projectNameBeingEdited;
         private Microsoft.UI.Xaml.DispatcherTimer _lastUpdatedTimer;
         private WorkspacesSettings _settings;
-        private readonly bool _persistSettings;
         private bool _isDisposed;
         private bool _isExistingProjectLaunched;
 
