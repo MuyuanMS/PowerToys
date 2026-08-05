@@ -39,15 +39,18 @@ namespace WorkspacesLauncherUI.Models
 
         public int LaunchStateInt => (int)LaunchState;
 
-        public string StateAutomationName
+        public string StateAutomationName => LaunchState switch
         {
-            get => LaunchState switch
-            {
-                LaunchingState.LaunchedAndMoved => ResourceLoaderInstance.ResourceLoader?.GetString("LaunchSucceededAutomationName") ?? "Launch succeeded",
-                LaunchingState.Failed => ResourceLoaderInstance.ResourceLoader?.GetString("LaunchFailedAutomationName") ?? "Launch failed",
-                LaunchingState.Canceled => ResourceLoaderInstance.ResourceLoader?.GetString("LaunchCanceledAutomationName") ?? "Launch canceled",
-                _ => ResourceLoaderInstance.ResourceLoader?.GetString("LaunchInProgressAutomationName") ?? "Launching",
-            };
+            LaunchingState.LaunchedAndMoved => GetResourceOrDefault("LaunchSucceededAutomationName", "Launch succeeded"),
+            LaunchingState.Failed => GetResourceOrDefault("LaunchFailedAutomationName", "Launch failed"),
+            LaunchingState.Canceled => GetResourceOrDefault("LaunchCanceledAutomationName", "Launch canceled"),
+            _ => GetResourceOrDefault("LaunchInProgressAutomationName", "Launching"),
+        };
+
+        private static string GetResourceOrDefault(string resourceName, string fallback)
+        {
+            string value = ResourceLoaderInstance.ResourceLoader?.GetString(resourceName);
+            return string.IsNullOrEmpty(value) ? fallback : value;
         }
     }
 }
