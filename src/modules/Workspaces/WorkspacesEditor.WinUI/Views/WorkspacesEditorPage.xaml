@@ -79,82 +79,85 @@
                                 IsEnabled="True" />
                         </Grid>
                     </Expander.Header>
-                    <Grid
+                    <ContentControl
                         Margin="52,8,48,8"
                         HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Stretch"
                         IsEnabled="{Binding IsIncluded, Mode=OneWay}">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <CheckBox
-                            x:Uid="LaunchAsAdminLabel"
-                            MinWidth="12"
-                            IsChecked="{Binding IsElevated, Mode=TwoWay}"
-                            IsEnabled="{Binding CanLaunchElevated, Mode=OneWay}" />
-                        <StackPanel
-                            Grid.Row="1"
-                            Margin="0,16,0,0"
-                            Orientation="Horizontal">
-                            <TextBlock
-                                x:Uid="CliArgumentsLabel"
-                                VerticalAlignment="Center"
-                                Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-                            <TextBox
-                                x:Uid="CliArgsTextBox"
-                                MinWidth="200"
-                                Margin="12,0,0,0"
-                                HorizontalAlignment="Stretch"
-                                VerticalContentAlignment="Center"
-                                Text="{Binding CommandLineArguments, Mode=TwoWay}"
-                                TextChanged="CommandLineTextBox_TextChanged" />
-                        </StackPanel>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <CheckBox
+                                x:Uid="LaunchAsAdminLabel"
+                                MinWidth="12"
+                                IsChecked="{Binding IsElevated, Mode=TwoWay}"
+                                IsEnabled="{Binding CanLaunchElevated, Mode=OneWay}" />
+                            <StackPanel
+                                Grid.Row="1"
+                                Margin="0,16,0,0"
+                                Orientation="Horizontal">
+                                <TextBlock
+                                    x:Uid="CliArgumentsLabel"
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                <TextBox
+                                    x:Uid="CliArgsTextBox"
+                                    MinWidth="200"
+                                    Margin="12,0,0,0"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalContentAlignment="Center"
+                                    Text="{Binding CommandLineArguments, Mode=TwoWay}"
+                                    TextChanged="CommandLineTextBox_TextChanged" />
+                            </StackPanel>
 
-                        <StackPanel
-                            Grid.Row="2"
-                            Margin="0,16,0,0"
-                            Orientation="Horizontal"
-                            Spacing="8">
-                            <TextBlock x:Uid="WindowPositionLabel" VerticalAlignment="Center" />
-                            <ComboBox
-                                x:Uid="WindowPositionComboBox"
-                                VerticalAlignment="Center"
-                                SelectedIndex="{Binding PositionComboboxIndex, Mode=TwoWay}">
-                                <ComboBoxItem x:Uid="CustomItem" />
-                                <ComboBoxItem x:Uid="MaximizedItem" />
-                                <ComboBoxItem x:Uid="MinimizedItem" />
-                            </ComboBox>
-                            <TextBlock x:Uid="LeftLabel" VerticalAlignment="Center" />
-                            <TextBox
-                                x:Uid="LeftTextBox"
-                                MinWidth="60"
-                                IsEnabled="{Binding EditPositionEnabled, Mode=OneWay}"
-                                Text="{Binding Position.X, Mode=OneWay}"
-                                TextChanged="LeftTextBox_TextChanged" />
-                            <TextBlock x:Uid="TopLabel" VerticalAlignment="Center" />
-                            <TextBox
-                                x:Uid="TopTextBox"
-                                MinWidth="60"
-                                IsEnabled="{Binding EditPositionEnabled, Mode=OneWay}"
-                                Text="{Binding Position.Y, Mode=OneWay}"
-                                TextChanged="TopTextBox_TextChanged" />
-                            <TextBlock x:Uid="WidthLabel" VerticalAlignment="Center" />
-                            <TextBox
-                                x:Uid="WidthTextBox"
-                                MinWidth="60"
-                                IsEnabled="{Binding EditPositionEnabled, Mode=OneWay}"
-                                Text="{Binding Position.Width, Mode=OneWay}"
-                                TextChanged="WidthTextBox_TextChanged" />
-                            <TextBlock x:Uid="HeightLabel" VerticalAlignment="Center" />
-                            <TextBox
-                                x:Uid="HeightTextBox"
-                                MinWidth="60"
-                                IsEnabled="{Binding EditPositionEnabled, Mode=OneWay}"
-                                Text="{Binding Position.Height, Mode=OneWay}"
-                                TextChanged="HeightTextBox_TextChanged" />
-                        </StackPanel>
-                    </Grid>
+                            <StackPanel
+                                Grid.Row="2"
+                                Margin="0,16,0,0"
+                                Orientation="Horizontal"
+                                Spacing="8">
+                                <TextBlock x:Uid="WindowPositionLabel" VerticalAlignment="Center" />
+                                <ComboBox
+                                    x:Uid="WindowPositionComboBox"
+                                    VerticalAlignment="Center"
+                                    SelectedIndex="{Binding PositionComboboxIndex, Mode=TwoWay}">
+                                    <ComboBoxItem x:Uid="CustomItem" />
+                                    <ComboBoxItem x:Uid="MaximizedItem" />
+                                    <ComboBoxItem x:Uid="MinimizedItem" />
+                                </ComboBox>
+                                <TextBlock x:Uid="LeftLabel" VerticalAlignment="Center" />
+                                <TextBox
+                                    x:Uid="LeftTextBox"
+                                    MinWidth="60"
+                                    IsEnabled="{Binding EditPositionEnabled, Mode=OneWay}"
+                                    Text="{Binding Position.X, Mode=OneWay}"
+                                    TextChanged="LeftTextBox_TextChanged" />
+                                <TextBlock x:Uid="TopLabel" VerticalAlignment="Center" />
+                                <TextBox
+                                    x:Uid="TopTextBox"
+                                    MinWidth="60"
+                                    IsEnabled="{Binding EditPositionEnabled, Mode=OneWay}"
+                                    Text="{Binding Position.Y, Mode=OneWay}"
+                                    TextChanged="TopTextBox_TextChanged" />
+                                <TextBlock x:Uid="WidthLabel" VerticalAlignment="Center" />
+                                <TextBox
+                                    x:Uid="WidthTextBox"
+                                    MinWidth="60"
+                                    IsEnabled="{Binding EditPositionEnabled, Mode=OneWay}"
+                                    Text="{Binding Position.Width, Mode=OneWay}"
+                                    TextChanged="WidthTextBox_TextChanged" />
+                                <TextBlock x:Uid="HeightLabel" VerticalAlignment="Center" />
+                                <TextBox
+                                    x:Uid="HeightTextBox"
+                                    MinWidth="60"
+                                    IsEnabled="{Binding EditPositionEnabled, Mode=OneWay}"
+                                    Text="{Binding Position.Height, Mode=OneWay}"
+                                    TextChanged="HeightTextBox_TextChanged" />
+                            </StackPanel>
+                        </Grid>
+                    </ContentControl>
                 </Expander>
             </Border>
         </DataTemplate>
