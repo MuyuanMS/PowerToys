@@ -35,6 +35,7 @@ namespace WorkspacesEditor.ViewModels
         private string _projectNameBeingEdited;
         private Microsoft.UI.Xaml.DispatcherTimer _lastUpdatedTimer;
         private WorkspacesSettings _settings;
+        private readonly bool _persistSettings;
         private bool _isDisposed;
         private bool _isExistingProjectLaunched;
 
@@ -162,16 +163,21 @@ namespace WorkspacesEditor.ViewModels
         partial void OnOrderByIndexChanged(int value)
         {
             _settings.Properties.SortBy = (WorkspacesProperties.SortByProperty)value;
-            _settings.Save(SettingsUtils.Default);
+            if (_persistSettings)
+            {
+                _settings.Save(SettingsUtils.Default);
+            }
+
             RefreshWorkspacesView();
         }
 
         [ObservableProperty]
         private bool _isLoading;
 
-        public MainViewModel(WorkspacesEditorIO workspacesEditorIO)
+        public MainViewModel(WorkspacesEditorIO workspacesEditorIO, WorkspacesSettings settings = null, bool persistSettings = true)
         {
-            _settings = Utils.Settings.ReadSettings();
+            _persistSettings = persistSettings;
+            _settings = settings ?? Utils.Settings.ReadSettings();
             OrderByIndex = (int)_settings.Properties.SortBy;
             _workspacesEditorIO = workspacesEditorIO;
 
