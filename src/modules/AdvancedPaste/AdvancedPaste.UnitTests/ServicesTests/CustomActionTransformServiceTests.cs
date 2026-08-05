@@ -18,7 +18,7 @@ public sealed class CustomActionTransformServiceTests
     [TestMethod]
     public void BuildProviderConfigUsesExplicitProviderAndCredentials()
     {
-        var (service, configuration, credentials) = CreateService();
+        var (service, configuration, credentials, _, _) = CreateService();
 
         var result = service.BuildProviderConfig(configuration, "secondary");
 
@@ -31,7 +31,7 @@ public sealed class CustomActionTransformServiceTests
     [TestMethod]
     public void BuildProviderConfigUsesActiveProviderWithoutOverride()
     {
-        var (service, configuration, credentials) = CreateService();
+        var (service, configuration, credentials, _, _) = CreateService();
 
         var result = service.BuildProviderConfig(configuration);
 
@@ -44,7 +44,7 @@ public sealed class CustomActionTransformServiceTests
     [TestMethod]
     public void BuildProviderConfigFallsBackToActiveProviderForStaleOverride()
     {
-        var (service, configuration, _) = CreateService();
+        var (service, configuration, _, _, _) = CreateService();
 
         var result = service.BuildProviderConfig(configuration, "missing");
 
@@ -52,7 +52,27 @@ public sealed class CustomActionTransformServiceTests
         Assert.AreEqual("active-model", result.Model);
     }
 
-    private static (CustomActionTransformService Service, PasteAIConfiguration Configuration, Mock<IAICredentialsProvider> Credentials) CreateService()
+    [TestMethod]
+    public async System.Threading.Tasks.Task TransformAsyncModeratesWithExplicitProviderCredential()
+    {
+        var (service, _, _, moderation, _) = CreateService();
+
+        await service.TransformAsync("rewrite", "input", null, default, null, providerIdOverride: "secondary");
+
+        moderation.Verify(
+            item => item.ValidateAsync(
+                It.IsAny<string>(),
+                It.IsAny<System.Threading.CancellationToken>(),
+                "secondary-key"),
+            Times.Once);
+    }
+
+    private static (
+        CustomActionTransformService Service,
+        PasteAIConfiguration Configuration,
+        Mock<IAICredentialsProvider> Credentials,
+        Mock<IPromptModerationService> Moderation,
+        Mock<IPasteAIProviderFactory> Factory) CreateService()
     {
         var active = new PasteAIProviderDefinition
         {
@@ -65,6 +85,7 @@ public sealed class CustomActionTransformServiceTests
             Id = "secondary",
             ServiceTypeKind = AIServiceType.AzureOpenAI,
             ModelName = "secondary-model",
+            ModerationEnabled = true,
         };
         var configuration = new PasteAIConfiguration
         {
@@ -79,12 +100,23 @@ public sealed class CustomActionTransformServiceTests
         credentials.Setup(provider => provider.GetKey(AIServiceType.OpenAI, "active")).Returns("active-key");
         credentials.Setup(provider => provider.GetKey(AIServiceType.AzureOpenAI, "secondary")).Returns("secondary-key");
 
+        var moderation = new Mock<IPromptModerationService>();
+        var pasteProvider = new Mock<IPasteAIProvider>();
+        pasteProvider
+            .Setup(provider => provider.ProcessPasteAsync(
+                It.IsAny<PasteAIRequest>(),
+                It.IsAny<System.Threading.CancellationToken>(),
+                It.IsAny<System.IProgress<double>>()))
+            .ReturnsAsync("result");
+        var factory = new Mock<IPasteAIProviderFactory>();
+        factory.Setup(item => item.CreateProvider(It.IsAny<PasteAIConfig>())).Returns(pasteProvider.Object);
+
         var service = new CustomActionTransformService(
-            Mock.Of<IPromptModerationService>(),
-            Mock.Of<IPasteAIProviderFactory>(),
+            moderation.Object,
+            factory.Object,
             credentials.Object,
             userSettings.Object);
 
-        return (service, configuration, credentials);
+        return (service, configuration, credentials, moderation, factory);
     }
 }

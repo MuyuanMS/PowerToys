@@ -20,12 +20,17 @@ public sealed class PromptModerationService(IAICredentialsProvider aiCredentials
 
     private readonly IAICredentialsProvider _aiCredentialsProvider = aiCredentialsProvider;
 
-    public async Task ValidateAsync(string fullPrompt, CancellationToken cancellationToken)
+    public async Task ValidateAsync(string fullPrompt, CancellationToken cancellationToken, string apiKey = null)
     {
         try
         {
-            _aiCredentialsProvider.Refresh();
-            var apiKey = _aiCredentialsProvider.GetKey()?.Trim() ?? string.Empty;
+            if (apiKey is null)
+            {
+                _aiCredentialsProvider.Refresh();
+                apiKey = _aiCredentialsProvider.GetKey();
+            }
+
+            apiKey = apiKey?.Trim() ?? string.Empty;
 
             if (string.IsNullOrEmpty(apiKey))
             {

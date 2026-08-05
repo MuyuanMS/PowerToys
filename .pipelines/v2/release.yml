@@ -102,8 +102,27 @@ extends:
                 useManagedIdentity: $(SigningUseManagedIdentity)
                 clientId: $(SigningOriginalClientId)
               # Have msbuild use the release nuget config profile
-              additionalBuildOptions: /p:RestoreConfigFile="$(Build.SourcesDirectory)\.pipelines\release-nuget.config" /p:EnableCmdPalAOT=true /p:PhiSilicaLafToken=$(PhiSilicaLafToken) /p:PhiSilicaLafAttestation="$(PhiSilicaLafAttestation)"
+              additionalBuildOptions: /p:RestoreConfigFile="$(Build.SourcesDirectory)\.pipelines\release-nuget.config" /p:EnableCmdPalAOT=true /p:PhiSilicaLafCredentialsFile="$(PhiSilicaLafCredentialsFile)"
               beforeBuildSteps:
+                - pwsh: |
+                    $outputDirectory = Join-Path $env:AGENT_TEMPDIRECTORY 'PowerToysPhiSilica'
+                    New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
+                    $outputPath = Join-Path $outputDirectory 'PhiSilicaLafCredentials.g.cs'
+                    $token = $env:PHI_SILICA_LAF_TOKEN.Replace('\', '\\').Replace('"', '\"')
+                    $attestation = $env:PHI_SILICA_LAF_ATTESTATION.Replace('\', '\\').Replace('"', '\"')
+                    @"
+                    namespace AdvancedPaste;
+                    internal static class PhiSilicaLafCredentials
+                    {
+                        internal const string Token = "$token";
+                        internal const string Attestation = "$attestation";
+                    }
+                    "@ | Set-Content -Path $outputPath -Encoding UTF8
+                    Write-Host "##vso[task.setvariable variable=PhiSilicaLafCredentialsFile]$outputPath"
+                  displayName: Prepare Phi Silica credentials
+                  env:
+                    PHI_SILICA_LAF_TOKEN: $(PhiSilicaLafToken)
+                    PHI_SILICA_LAF_ATTESTATION: $(PhiSilicaLafAttestation)
                 # Install the Terrapin retrieval tool, which replaces vcpkg's download handler
                 # to redirect it to a safe Microsoft-controlled location
                 - template: .pipelines/v2/templates/steps-install-terrapin.yml@self

@@ -236,7 +236,7 @@ namespace AdvancedPaste.ViewModels
 
         public bool ShowClipboardHistoryButton => ClipboardHistoryEnabled;
 
-        public bool ShowAIPasteSection => _userSettings.ShowAIPaste && IsAllowedByGPO;
+        public bool ShowAIPasteSection => _userSettings.ShowAIPaste && IsCustomAIServiceEnabled;
 
         public bool HasIndeterminateTransformProgress => double.IsNaN(TransformProgress);
 

@@ -74,7 +74,7 @@ namespace AdvancedPaste.Services.CustomActions
 
             if (ShouldModerate(providerConfig))
             {
-                await promptModerationService.ValidateAsync(fullPrompt, cancellationToken);
+                await promptModerationService.ValidateAsync(fullPrompt, cancellationToken, providerConfig.ApiKey);
             }
 
             try

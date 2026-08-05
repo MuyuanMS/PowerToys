@@ -34,13 +34,22 @@ Non-secret pairing check: the exe's baked **Attestation** must equal the registe
 $repo = "X:\GitHub\PowerToys"; $Plat = "ARM64"; $Cfg = "Debug"   # or x64 / Release
 $lafToken = $env:PHI_SILICA_LAF_TOKEN
 $lafAttestation = $env:PHI_SILICA_LAF_ATTESTATION
+$credentialFile = "$repo\src\PackageIdentity\.user\PhiSilicaLafCredentials.g.cs"
+@"
+namespace AdvancedPaste;
+internal static class PhiSilicaLafCredentials
+{
+    internal const string Token = "$lafToken";
+    internal const string Attestation = "$lafAttestation";
+}
+"@ | Set-Content $credentialFile
 
 # Build AP only (C#; reuses existing C++ outputs):
 dotnet restore "$repo\src\modules\AdvancedPaste\AdvancedPaste\AdvancedPaste.csproj" /p:Platform=$Plat `
-    /p:PhiSilicaLafToken=$lafToken /p:PhiSilicaLafAttestation=$lafAttestation
+    /p:PhiSilicaLafCredentialsFile=$credentialFile
 & "$repo\tools\build\build.cmd" -Path "$repo\src\modules\AdvancedPaste\AdvancedPaste" `
     -Platform $Plat -Configuration $Cfg /p:BuildProjectReferences=false `
-    /p:PhiSilicaLafToken=$lafToken /p:PhiSilicaLafAttestation=$lafAttestation
+    /p:PhiSilicaLafCredentialsFile=$credentialFile
 
 # Register the dev sparse package (creates + trusts a dev cert, grants identity):
 pwsh -ExecutionPolicy Bypass -File "$repo\src\PackageIdentity\BuildSparsePackage.ps1" `
