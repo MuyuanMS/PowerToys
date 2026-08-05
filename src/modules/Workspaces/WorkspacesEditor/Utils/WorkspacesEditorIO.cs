@@ -236,13 +236,21 @@ namespace WorkspacesEditor.Utils
             try
             {
                 ProjectData parser = new();
-                if (!File.Exists(TempProjectData.File))
+                var rc = PTSettingsClient.GetTransientBlob(out var blob);
+                if (rc == PTSettingsClient.Result.NotFound)
                 {
-                    Logger.LogWarning($"ParseProject method. Workspaces storage file not found: {TempProjectData.File}");
+                    Logger.LogWarning("Protected transient workspace was not found.");
                     return null;
                 }
 
-                Project project = new(parser.Read(TempProjectData.File));
+                if (rc != PTSettingsClient.Result.Ok)
+                {
+                    Logger.LogWarning($"Protected transient workspace read failed: {rc}");
+                    return null;
+                }
+
+                Project project = new(
+                    parser.Deserialize(Encoding.UTF8.GetString(blob)));
                 return project;
             }
             catch (Exception e)
@@ -337,11 +345,17 @@ namespace WorkspacesEditor.Utils
 
                 if (useTempFile)
                 {
-                    // Transient snapshot→editor handoff stays a direct user-writable
-                    // file (not the protected store).
-                    IOUtils ioUtils = new();
-                    ioUtils.WriteFile(TempProjectData.File, json);
-                    return true;
+                    if (workspacesWrapper.Workspaces.Count != 1)
+                    {
+                        return false;
+                    }
+
+                    ProjectData projectSerializer = new();
+                    string projectJson =
+                        projectSerializer.Serialize(workspacesWrapper.Workspaces[0]);
+                    return PTSettingsClient.PutTransientBlob(
+                               Encoding.UTF8.GetBytes(projectJson)) ==
+                           PTSettingsClient.Result.Ok;
                 }
 
                 // v6 (security): persist the settings through the service (PutBlob)

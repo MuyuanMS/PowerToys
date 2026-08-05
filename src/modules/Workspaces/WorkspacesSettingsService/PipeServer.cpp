@@ -176,11 +176,13 @@ namespace PTSettingsSvc
                    ack == ExpectedAck;
         }
 
-        void HandleGetBlob(HANDLE pipe, const CallerIdentity& id)
+        void HandleGetBlob(HANDLE pipe,
+                           const CallerIdentity& id,
+                           const wchar_t* fileName)
         {
             std::wstring target = GetUserFilePath(id.userSidString,
                                                   id.binding->namespaceId,
-                                                  id.binding->fileName);
+                                                  fileName);
             std::vector<BYTE> bytes;
             HRESULT hr = ReadFileFully(target, kMaxPayloadBytes, bytes);
             if (hr == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) ||
@@ -203,7 +205,8 @@ namespace PTSettingsSvc
         }
 
         void HandlePutBlob(HANDLE pipe, const CallerIdentity& id,
-                           const std::vector<BYTE>& payload)
+                           const std::vector<BYTE>& payload,
+                           const wchar_t* fileName)
         {
             // No structural / schema check on the payload.  The service is
             // payload-agnostic; the caller is responsible for whatever
@@ -245,9 +248,26 @@ namespace PTSettingsSvc
             hr = WriteFileAtomically(
                 GetUserFilePath(id.userSidString,
                                 id.binding->namespaceId,
-                                id.binding->fileName),
+                                fileName),
                 payload);
             SendStatus(pipe, FAILED(hr) ? Status::IoError : Status::Ok);
+        }
+
+        void HandleDeleteBlob(HANDLE pipe,
+                              const CallerIdentity& id,
+                              const wchar_t* fileName)
+        {
+            const std::wstring path = GetUserFilePath(
+                id.userSidString,
+                id.binding->namespaceId,
+                fileName);
+            if (DeleteFileW(path.c_str()) ||
+                GetLastError() == ERROR_FILE_NOT_FOUND)
+            {
+                SendStatus(pipe, Status::Ok);
+                return;
+            }
+            SendStatus(pipe, Status::IoError);
         }
 
         void HandleConnection(HANDLE pipe)
@@ -295,11 +315,23 @@ namespace PTSettingsSvc
                 break;
 
             case Opcode::GetBlob:
-                HandleGetBlob(pipe, id);
+                HandleGetBlob(pipe, id, id.binding->fileName);
                 break;
 
             case Opcode::PutBlob:
-                HandlePutBlob(pipe, id, payload);
+                HandlePutBlob(pipe, id, payload, id.binding->fileName);
+                break;
+
+            case Opcode::GetTransientBlob:
+                HandleGetBlob(pipe, id, L"temp-workspaces.json");
+                break;
+
+            case Opcode::PutTransientBlob:
+                HandlePutBlob(pipe, id, payload, L"temp-workspaces.json");
+                break;
+
+            case Opcode::DeleteTransientBlob:
+                HandleDeleteBlob(pipe, id, L"temp-workspaces.json");
                 break;
 
             default:

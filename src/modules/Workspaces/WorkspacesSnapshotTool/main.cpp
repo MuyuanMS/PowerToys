@@ -80,7 +80,12 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdLine, int cm
         }
         return project.monitors[0].monitorRectDpiUnaware; });
 
-    JsonUtils::Write(WorkspacesData::TempWorkspacesFile(), project);
+    if (!JsonUtils::WriteTransientWorkspaceToService(project))
+    {
+        Logger::error(L"Failed to write protected transient workspace");
+        CoUninitialize();
+        return 1;
+    }
     Logger::trace(L"WorkspacesProject {}:{} created", project.name, project.id);
 
     CoUninitialize();

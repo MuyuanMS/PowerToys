@@ -46,4 +46,8 @@ namespace PTSettingsClient
     // Replaces the caller's namespace blob with `bytes`.  Service does
     // the atomic write + DACL re-assertion.
     Result PutBlob(const std::vector<uint8_t>& bytes);
+
+    Result GetTransientBlob(std::vector<uint8_t>& outBytes);
+    Result PutTransientBlob(const std::vector<uint8_t>& bytes);
+    Result DeleteTransientBlob();
 }

@@ -350,4 +350,24 @@ namespace PTSettingsClient
                          static_cast<uint32_t>(bytes.size()),
                          resp);
     }
+
+    Result GetTransientBlob(std::vector<uint8_t>& outBytes)
+    {
+        return RoundTrip(Opcode::GetTransientBlob, nullptr, 0, outBytes);
+    }
+
+    Result PutTransientBlob(const std::vector<uint8_t>& bytes)
+    {
+        std::vector<uint8_t> resp;
+        return RoundTrip(Opcode::PutTransientBlob,
+                         bytes.data(),
+                         static_cast<uint32_t>(bytes.size()),
+                         resp);
+    }
+
+    Result DeleteTransientBlob()
+    {
+        std::vector<uint8_t> resp;
+        return RoundTrip(Opcode::DeleteTransientBlob, nullptr, 0, resp);
+    }
 }

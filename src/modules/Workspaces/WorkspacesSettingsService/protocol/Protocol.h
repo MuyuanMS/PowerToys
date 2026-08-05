@@ -41,6 +41,9 @@ namespace PTSettingsSvc
         Ping     = 0x00,   // No payload.  Authn still runs.  Used by liveness checks.
         GetBlob  = 0x01,   // No payload.  Returns the caller's namespace blob bytes.
         PutBlob  = 0x02,   // payload = full blob bytes.  Atomic replace.
+        GetTransientBlob = 0x03, // Protected snapshot/editor handoff.
+        PutTransientBlob = 0x04,
+        DeleteTransientBlob = 0x05,
     };
 
     enum class Status : uint8_t

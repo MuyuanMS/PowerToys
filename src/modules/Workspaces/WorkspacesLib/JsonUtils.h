@@ -24,6 +24,8 @@ namespace JsonUtils
     // skipped, so a stale user-writable file can never shadow the protected store.
     Result<std::vector<WorkspacesData::WorkspacesProject>, WorkspacesFileError> ReadWorkspacesFromService();
     bool WriteWorkspacesToService(const std::vector<WorkspacesData::WorkspacesProject>& projects);
+    Result<WorkspacesData::WorkspacesProject, WorkspacesFileError> ReadTransientWorkspaceFromService();
+    bool WriteTransientWorkspaceToService(const WorkspacesData::WorkspacesProject& project);
 
     bool Write(const std::wstring& fileName, const std::vector<WorkspacesData::WorkspacesProject>& projects);
     bool Write(const std::wstring& fileName, const WorkspacesData::WorkspacesProject& project);

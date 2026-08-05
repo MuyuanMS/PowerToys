@@ -439,6 +439,14 @@ namespace PTSettingsSvc
                         L"workspaces.json",
                         sid,
                         account);
+                    if (SUCCEEDED(hr))
+                    {
+                        hr = SanitizeNamespaceFiles(
+                            GetUserNamespaceFolder(sid, L"Workspaces"),
+                            L"temp-workspaces.json",
+                            sid,
+                            account);
+                    }
                 }
             }
             RegLog(L"ProvisionStore ms=" + std::to_wstring(NowMs() - t) + L" hr=" + std::to_wstring(hr));
