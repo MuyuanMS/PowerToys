@@ -22,35 +22,11 @@ namespace PTSettingsSvc
     namespace
     {
         constexpr const wchar_t* kExeName = L"PowerToys.PTSettingsSvc.exe";
-        bool g_regLogEnabled = false;
-
-        // Append a timed line to the register step-timing log next to the bin root
-        // (elevated context can write %ProgramData%).  Best-effort; never throws.
-        void RegLog(const std::wstring& msg)
+        // Elevated path logging is intentionally disabled. Any path available
+        // before the staging hierarchy is secured can be attacker-precreated as
+        // a reparse point, and registration must not perform such writes.
+        void RegLog(const std::wstring&)
         {
-            if (!g_regLogEnabled)
-            {
-                return;
-            }
-
-            try
-            {
-                CreateDirectoryW(GetServiceBinRoot().c_str(), nullptr);
-                std::wstring path = GetServiceBinRoot() + L"\\register.log";
-                std::wofstream f(path, std::ios::app);
-                if (f)
-                {
-                    SYSTEMTIME st{};
-                    GetLocalTime(&st);
-                    wchar_t ts[40];
-                    swprintf_s(ts, L"%04d-%02d-%02d %02d:%02d:%02d.%03d ",
-                               st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
-                    f << ts << msg << L"\n";
-                }
-            }
-            catch (...)
-            {
-            }
         }
 
         long long NowMs()
@@ -304,8 +280,6 @@ namespace PTSettingsSvc
                 CloseServiceHandle(scm);
                 return rc;
             }
-            g_regLogEnabled = true;
-
             DWORD destinationAttributes = GetFileAttributesW(runExe.c_str());
             if (destinationAttributes != INVALID_FILE_ATTRIBUTES)
             {

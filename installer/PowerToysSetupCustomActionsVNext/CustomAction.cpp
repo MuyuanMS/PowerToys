@@ -846,6 +846,8 @@ namespace
         {
             PackageManager pm;
             auto packages = pm.FindPackages();
+            std::wstring selectedPath;
+            uint64_t selectedVersion = 0;
             for (const auto& package : packages)
             {
                 if (package.Id().FamilyName() != kPTSettingsSvcFamilyName)
@@ -856,9 +858,20 @@ namespace
                 std::filesystem::path exe = std::filesystem::path(std::wstring(loc)) / kPTSettingsSvcExeName;
                 if (std::filesystem::exists(exe))
                 {
-                    return exe.wstring();
+                    const auto version = package.Id().Version();
+                    const uint64_t versionKey =
+                        (static_cast<uint64_t>(version.Major) << 48) |
+                        (static_cast<uint64_t>(version.Minor) << 32) |
+                        (static_cast<uint64_t>(version.Build) << 16) |
+                        static_cast<uint64_t>(version.Revision);
+                    if (selectedPath.empty() || versionKey > selectedVersion)
+                    {
+                        selectedVersion = versionKey;
+                        selectedPath = exe.wstring();
+                    }
                 }
             }
+            return selectedPath;
         }
         catch (...)
         {
@@ -1146,7 +1159,13 @@ UINT __stdcall UnRegisterPTSettingsSvcCA(MSIHANDLE hInstall)
     // elevate, the signed+immutable WindowsApps package is left as a harmless
     // orphan, removed later by a per-machine install or a manual elevated
     // Remove-AppxPackage.
-    hr = WcaGetProperty(L"InstallScope", &installScope);
+    hr = WcaGetProperty(L"CustomActionData", &installScope);
+    if (FAILED(hr) || !installScope || installScope[0] == L'\0')
+    {
+        ReleaseStr(installScope);
+        installScope = nullptr;
+        hr = WcaGetProperty(L"InstallScope", &installScope);
+    }
     if (SUCCEEDED(hr) && installScope && wcscmp(installScope, L"perMachine") == 0)
     {
         isMachineLevel = true;
