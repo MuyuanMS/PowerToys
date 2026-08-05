@@ -30,6 +30,7 @@ namespace WorkspacesEditor.UnitTests
             };
 
             vm.SearchTerm = string.Empty;
+            vm.RefreshWorkspacesView();
             Assert.AreEqual(2, vm.WorkspacesView.Count);
         }
 
