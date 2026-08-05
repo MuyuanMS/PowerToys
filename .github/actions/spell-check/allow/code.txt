@@ -311,6 +311,8 @@ Aot
 ify
 LAF
 Laf
+laf
+TEMPDIRECTORY
 languagemodel
 philm
 phisilica
