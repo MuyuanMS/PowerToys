@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using WorkspacesCsharpLibrary.Data;
+using WorkspacesCsharpLibrary.SettingsService;
 using WorkspacesCsharpLibrary.Utils;
 
 namespace WorkspacesCsharpLibrary.Data
@@ -13,6 +14,7 @@ namespace WorkspacesCsharpLibrary.Data
 
         public static void DeleteTempFile()
         {
+            PTSettingsClient.DeleteTransientBlob();
             if (System.IO.File.Exists(File))
             {
                 System.IO.File.Delete(File);

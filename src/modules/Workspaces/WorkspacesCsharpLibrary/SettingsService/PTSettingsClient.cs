@@ -86,6 +86,9 @@ public static class PTSettingsClient
     private const byte OpPing = 0x00;
     private const byte OpGetBlob = 0x01;
     private const byte OpPutBlob = 0x02;
+    private const byte OpGetTransientBlob = 0x03;
+    private const byte OpPutTransientBlob = 0x04;
+    private const byte OpDeleteTransientBlob = 0x05;
 
     /// <summary>Liveness probe.  Authentication still runs server-side.</summary>
     public static Result Ping()
@@ -105,6 +108,23 @@ public static class PTSettingsClient
     public static Result PutBlob(ReadOnlySpan<byte> blob)
     {
         return RoundTrip(OpPutBlob, blob, out _);
+    }
+
+    public static Result GetTransientBlob(out byte[] blob)
+    {
+        var rc = RoundTrip(OpGetTransientBlob, ReadOnlySpan<byte>.Empty, out var resp);
+        blob = rc == Result.Ok ? resp : Array.Empty<byte>();
+        return rc;
+    }
+
+    public static Result PutTransientBlob(ReadOnlySpan<byte> blob)
+    {
+        return RoundTrip(OpPutTransientBlob, blob, out _);
+    }
+
+    public static Result DeleteTransientBlob()
+    {
+        return RoundTrip(OpDeleteTransientBlob, ReadOnlySpan<byte>.Empty, out _);
     }
 
     private static Result RoundTrip(byte opcode, ReadOnlySpan<byte> payload, out byte[] response)

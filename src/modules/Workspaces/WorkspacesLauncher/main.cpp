@@ -98,9 +98,9 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
     WorkspacesData::WorkspacesProject projectToLaunch{};
     if (cmdArgs.invokePoint == InvokePoint::LaunchAndEdit)
     {
-        // check the temp file in case the project is just created and not saved to the workspaces.json yet
-        auto file = WorkspacesData::TempWorkspacesFile();
-        auto res = JsonUtils::ReadSingleWorkspace(file);
+        // Check the protected transient handoff in case the project was just
+        // created and is not yet present in the main protected list.
+        auto res = JsonUtils::ReadTransientWorkspaceFromService();
         if (res.isOk() && res.getValue().id == cmdArgs.workspaceId)
         {
             projectToLaunch = res.getValue();
@@ -111,10 +111,10 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
             switch (res.error())
             {
             case JsonUtils::WorkspacesFileError::FileReadingError:
-                formattedMessage = fmt::format(GET_RESOURCE_STRING(IDS_FILE_READING_ERROR), file);
+                formattedMessage = GET_RESOURCE_STRING(IDS_SERVICE_ACCESS_ERROR);
                 break;
             case JsonUtils::WorkspacesFileError::IncorrectFileError:
-                formattedMessage = fmt::format(GET_RESOURCE_STRING(IDS_INCORRECT_FILE_ERROR), file);
+                formattedMessage = GET_RESOURCE_STRING(IDS_SERVICE_ACCESS_ERROR);
                 break;
             case JsonUtils::WorkspacesFileError::ServiceAccessError:
                 formattedMessage = GET_RESOURCE_STRING(IDS_SERVICE_ACCESS_ERROR);

@@ -229,6 +229,7 @@ namespace JsonUtils
             {
                 return true;
             }
+
             if (rc == PTSettingsClient::Result::ServiceUnavailable)
             {
                 // Protected-store-only: NO unprotected plaintext fallback for saves.
@@ -245,6 +246,54 @@ namespace JsonUtils
         catch (const std::exception& ex)
         {
             Logger::error("Exception writing workspaces via service: {}", ex.what());
+            return false;
+        }
+    }
+
+    Result<WorkspacesData::WorkspacesProject, WorkspacesFileError> ReadTransientWorkspaceFromService()
+    {
+        std::vector<uint8_t> bytes;
+        auto rc = PTSettingsClient::GetTransientBlob(bytes);
+        if (rc == PTSettingsClient::Result::NotFound)
+        {
+            return Ok(WorkspacesData::WorkspacesProject{});
+        }
+        if (rc != PTSettingsClient::Result::Ok)
+        {
+            return Error(WorkspacesFileError::ServiceAccessError);
+        }
+
+        try
+        {
+            std::string utf8(bytes.begin(), bytes.end());
+            auto value = json::JsonValue::Parse(winrt::to_hstring(utf8)).GetObjectW();
+            auto parsed = WorkspacesData::WorkspacesProjectJSON::FromJson(value);
+            if (parsed.has_value())
+            {
+                return Ok(parsed.value());
+            }
+            return Error(WorkspacesFileError::IncorrectFileError);
+        }
+        catch (const std::exception&)
+        {
+            return Error(WorkspacesFileError::FileReadingError);
+        }
+    }
+
+    bool WriteTransientWorkspaceToService(const WorkspacesData::WorkspacesProject& project)
+    {
+        try
+        {
+            std::wstring jsonText{
+                WorkspacesData::WorkspacesProjectJSON::ToJson(project).Stringify().c_str()
+            };
+            std::string utf8 = winrt::to_string(winrt::hstring(jsonText));
+            std::vector<uint8_t> bytes(utf8.begin(), utf8.end());
+            return PTSettingsClient::PutTransientBlob(bytes) ==
+                   PTSettingsClient::Result::Ok;
+        }
+        catch (const std::exception&)
+        {
             return false;
         }
     }
