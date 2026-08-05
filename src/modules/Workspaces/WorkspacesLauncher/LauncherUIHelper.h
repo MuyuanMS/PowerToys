@@ -10,6 +10,7 @@ public:
     ~LauncherUIHelper();
 
     void LaunchUI();
+    void StopReceiving();
     void UpdateLaunchStatus(WorkspacesData::LaunchingAppStateMap launchedApps) const;
     void SendMessage(const std::wstring& message) const;
 
