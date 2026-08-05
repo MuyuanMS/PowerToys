@@ -31,7 +31,8 @@ public class EditingPageDesignTests : WorkspacesUiAutomationBase
     {
         // Ensure at least one workspace exists
         AttachWorkspacesEditor();
-        if (!Has<Element>(By.AccessibilityId("WorkspacesItemsControl")))
+        var workspacesList = Find<Element>(By.AccessibilityId("WorkspacesList"));
+        if (workspacesList.FindAll<Element>(By.ClassName("ListViewItem")).Count == 0)
         {
             CreateTestWorkspace("EditDesignTest");
             Task.Delay(2000).Wait();

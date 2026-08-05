@@ -86,12 +86,20 @@
                 VerticalAlignment="Center"
                 Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
             <ComboBox
+                x:Name="SortByComboBox"
                 x:Uid="SortByComboBox"
                 MinWidth="140"
+                AutomationProperties.LabeledBy="{Binding ElementName=SortByLabel}"
                 SelectedIndex="{x:Bind ViewModel.OrderByIndex, Mode=TwoWay}">
-                <ComboBoxItem x:Uid="SortLastLaunchedItem" />
-                <ComboBoxItem x:Uid="SortCreatedItem" />
-                <ComboBoxItem x:Uid="SortNameItem" />
+                <ComboBoxItem>
+                    <TextBlock x:Uid="SortLastLaunchedItem" />
+                </ComboBoxItem>
+                <ComboBoxItem>
+                    <TextBlock x:Uid="SortCreatedItem" />
+                </ComboBoxItem>
+                <ComboBoxItem>
+                    <TextBlock x:Uid="SortNameItem" />
+                </ComboBoxItem>
             </ComboBox>
         </StackPanel>
 

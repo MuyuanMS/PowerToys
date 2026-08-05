@@ -89,11 +89,10 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <CheckBox
+                            x:Uid="LaunchAsAdminLabel"
                             MinWidth="12"
                             IsChecked="{Binding IsElevated, Mode=TwoWay}"
-                            IsEnabled="{Binding CanLaunchElevated, Mode=OneWay}">
-                            <TextBlock x:Uid="LaunchAsAdminLabel" />
-                        </CheckBox>
+                            IsEnabled="{Binding CanLaunchElevated, Mode=OneWay}" />
                         <StackPanel
                             Grid.Row="1"
                             Margin="0,16,0,0"
