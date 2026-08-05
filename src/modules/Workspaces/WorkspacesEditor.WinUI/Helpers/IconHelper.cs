@@ -45,23 +45,23 @@ namespace WorkspacesEditor.Helpers
             {
                 return null;
             }
+        }
 
-            public static BitmapImage FromIcon(Icon icon)
+        public static BitmapImage FromIcon(Icon icon)
+        {
+            if (icon == null)
             {
-                if (icon == null)
-                {
-                    return null;
-                }
-
-                using Bitmap bitmap = icon.ToBitmap();
-                using MemoryStream stream = new();
-                bitmap.Save(stream, ImageFormat.Png);
-                stream.Position = 0;
-
-                BitmapImage bitmapImage = new();
-                bitmapImage.SetSource(stream.AsRandomAccessStream());
-                return bitmapImage;
+                return null;
             }
+
+            using Bitmap bitmap = icon.ToBitmap();
+            using MemoryStream stream = new();
+            bitmap.Save(stream, ImageFormat.Png);
+            stream.Position = 0;
+
+            BitmapImage bitmapImage = new();
+            bitmapImage.SetSource(stream.AsRandomAccessStream());
+            return bitmapImage;
         }
     }
 }
