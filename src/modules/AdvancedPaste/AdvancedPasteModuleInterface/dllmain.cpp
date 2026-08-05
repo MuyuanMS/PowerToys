@@ -86,7 +86,12 @@ private:
     std::mutex m_actions_mutex;
     std::mutex m_hotkey_worker_mutex;
     std::condition_variable m_hotkey_worker_condition;
-    std::deque<std::function<void()>> m_hotkey_actions;
+    struct QueuedHotkeyAction
+    {
+        std::function<void()> action;
+        bool copySelection = false;
+    };
+    std::deque<QueuedHotkeyAction> m_hotkey_actions;
 
     std::wstring app_name;
 
@@ -917,9 +922,7 @@ private:
         {
             return [this]() {
                 Logger::trace(L"Paste as plain text hotkey pressed");
-                std::thread([this]() {
-                    try_to_paste_as_plain_text();
-                }).detach();
+                try_to_paste_as_plain_text();
                 Trace::AdvancedPaste_Invoked(L"PastePlainTextDirect");
             };
         }
@@ -1098,7 +1101,7 @@ public:
                 m_hotkey_worker = std::jthread([this](std::stop_token stopToken) {
                     while (!stopToken.stop_requested())
                     {
-                        std::function<void()> action;
+                        QueuedHotkeyAction queuedAction;
                         {
                             std::unique_lock lock(m_hotkey_worker_mutex);
                             m_hotkey_worker_condition.wait(lock, [this, &stopToken]() {
@@ -1110,14 +1113,18 @@ public:
                                 return;
                             }
 
-                            action = std::move(m_hotkey_actions.front());
+                            queuedAction = std::move(m_hotkey_actions.front());
                             m_hotkey_actions.pop_front();
                         }
 
-                        send_copy_selection(); // best-effort; use existing clipboard content on failure
+                        if (queuedAction.copySelection)
+                        {
+                            send_copy_selection(); // best-effort; use existing clipboard content on failure
+                        }
+
                         if (!stopToken.stop_requested() && m_enabled)
                         {
-                            execute_hotkey(action);
+                            execute_hotkey(queuedAction.action);
                         }
                     }
                 });
@@ -1198,7 +1205,6 @@ public:
             return false;
         }
 
-        if (m_auto_copy_selection_custom_action)
         {
             std::scoped_lock lock(m_hotkey_worker_mutex);
             if (!m_enabled)
@@ -1206,13 +1212,10 @@ public:
                 return false;
             }
 
-            m_hotkey_actions.push_back(std::move(action));
+            m_hotkey_actions.push_back({ std::move(action), m_auto_copy_selection_custom_action.load() });
             m_hotkey_worker_condition.notify_one();
             return true;
         }
-
-        execute_hotkey(action);
-        return true;
     }
 
     virtual size_t get_hotkeys(Hotkey* hotkeys, size_t buffer_size) override
