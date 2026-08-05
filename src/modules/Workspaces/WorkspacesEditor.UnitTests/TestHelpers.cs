@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.PowerToys.Settings.UI.Library;
 using WorkspacesCsharpLibrary.Data;
 using WorkspacesEditor.Models;
 using WorkspacesEditor.ViewModels;
@@ -20,7 +21,7 @@ namespace WorkspacesEditor.UnitTests
     {
         internal static MainViewModel CreateViewModel()
         {
-            return new MainViewModel(new Utils.WorkspacesEditorIO());
+            return new MainViewModel(new Utils.WorkspacesEditorIO(), new WorkspacesSettings(), false);
         }
 
         internal static Project CreateProject(string name, long creationTime = 0, long lastLaunchedTime = 0, params string[] appNames)
