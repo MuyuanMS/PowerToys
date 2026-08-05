@@ -33,6 +33,7 @@ namespace Microsoft.PowerToys.Settings.UI.Views
         private bool _suppressFoundrySelectionChanged;
         private bool _isFoundryLocalAvailable;
         private bool _isPhiSilicaAvailable;
+        private int _phiSilicaProbeVersion;
         private bool _disposed;
         private const string PasteAiDialogDefaultTitle = "Paste with AI provider configuration";
 
@@ -438,7 +439,9 @@ namespace Microsoft.PowerToys.Settings.UI.Views
 
         private async Task UpdatePhiSilicaUIAsync()
         {
-            string selectedType = ViewModel?.PasteAIProviderDraft?.ServiceType ?? string.Empty;
+            var draft = ViewModel?.PasteAIProviderDraft;
+            var probeVersion = ++_phiSilicaProbeVersion;
+            string selectedType = draft?.ServiceType ?? string.Empty;
             bool isPhiSilica = string.Equals(selectedType, "PhiSilica", StringComparison.OrdinalIgnoreCase);
 
             if (PhiSilicaPanel is not null)
@@ -466,6 +469,10 @@ namespace Microsoft.PowerToys.Settings.UI.Views
                 // LanguageModel.GetReadyState() directly. Instead, probe via AdvancedPaste
                 // which runs with its own package identity. See microsoft-ui-xaml#10856.
                 var (status, diagnostics) = await Task.Run(() => CheckPhiSilicaViaAdvancedPaste());
+                if (probeVersion != _phiSilicaProbeVersion || !ReferenceEquals(draft, ViewModel?.PasteAIProviderDraft))
+                {
+                    return;
+                }
 
                 if (status == "NotSupported")
                 {
@@ -492,6 +499,11 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             }
             catch (Exception)
             {
+                if (probeVersion != _phiSilicaProbeVersion || !ReferenceEquals(draft, ViewModel?.PasteAIProviderDraft))
+                {
+                    return;
+                }
+
                 _isPhiSilicaAvailable = false;
                 ShowPhiSilicaNotAvailableState(
                     resourceLoader.GetString("AdvancedPaste_PhiSilicaNotAvailable_Title"),
@@ -506,9 +518,11 @@ namespace Microsoft.PowerToys.Settings.UI.Views
 
         private void ShowPhiSilicaLoadingState(string message = null)
         {
-            if (PhiSilicaLoadingText is not null && !string.IsNullOrEmpty(message))
+            if (PhiSilicaLoadingText is not null)
             {
-                PhiSilicaLoadingText.Text = message;
+                PhiSilicaLoadingText.Text = string.IsNullOrEmpty(message)
+                    ? ResourceLoaderInstance.ResourceLoader.GetString("AdvancedPaste_PhiSilicaLoadingStatus/Text")
+                    : message;
             }
 
             if (PhiSilicaLoadingPanel is not null)
@@ -1545,6 +1559,7 @@ namespace Microsoft.PowerToys.Settings.UI.Views
 
         private void PasteAIProviderConfigurationDialog_Closed(ContentDialog sender, ContentDialogClosedEventArgs args)
         {
+            _phiSilicaProbeVersion++;
             ViewModel?.CancelPasteAIProviderDraft();
             PasteAIProviderConfigurationDialog.Title = PasteAiDialogDefaultTitle;
             PasteAIApiKeyPasswordBox.Password = string.Empty;

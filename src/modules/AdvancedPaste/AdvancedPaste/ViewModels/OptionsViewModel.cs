@@ -365,6 +365,12 @@ namespace AdvancedPaste.ViewModels
                 isEnabled = false;
             }
 
+            if (selectedProvider?.ServiceTypeKind == AIServiceType.PhiSilica
+                && !AvailableClipboardFormats.HasFlag(ClipboardFormat.Text))
+            {
+                isEnabled = false;
+            }
+
             if (!string.IsNullOrWhiteSpace(providerId)
                 && (!TryResolveAdvancedAIProvider(out var advancedProvider)
                     || !string.Equals(providerId, advancedProvider.Id, StringComparison.OrdinalIgnoreCase)))

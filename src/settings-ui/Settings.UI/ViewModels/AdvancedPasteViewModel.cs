@@ -1151,7 +1151,8 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
             if (e.PropertyName is nameof(AdvancedPasteAdditionalAction.Shortcut)
                 or nameof(AdvancedPasteAdditionalAction.CoachingShortcut)
-                or nameof(AdvancedPasteAdditionalAction.CoachingEnabled))
+                or nameof(AdvancedPasteAdditionalAction.CoachingEnabled)
+                or nameof(AdvancedPasteAdditionalAction.IsShown))
             {
                 OnPropertyChanged(nameof(IsAdditionalActionConflictingCopyShortcut));
             }
