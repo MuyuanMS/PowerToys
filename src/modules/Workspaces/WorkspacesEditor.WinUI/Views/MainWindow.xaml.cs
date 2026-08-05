@@ -72,7 +72,13 @@ namespace WorkspacesEditor
             var vm = App.MainViewModel;
             StrongReferenceMessenger.Default.Register<NavigateToEditorMessage>(this, (r, m) =>
             {
+                bool replacingEditorPage = ContentFrame.Content is Views.WorkspacesEditorPage;
                 ContentFrame.Navigate(typeof(Views.WorkspacesEditorPage), (vm, m.Project));
+                if (replacingEditorPage && ContentFrame.BackStack.Count > 0)
+                {
+                    ContentFrame.BackStack.RemoveAt(ContentFrame.BackStack.Count - 1);
+                }
+
                 AppTitleBar.IsBackButtonVisible = true;
                 AppTitleBar.Title = m.Project.EditorWindowTitle;
             });
