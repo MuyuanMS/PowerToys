@@ -26,7 +26,7 @@
   <Properties>
     <DisplayName>PowerToys Settings Service</DisplayName>
     <PublisherDisplayName>Microsoft Corporation</PublisherDisplayName>
-    <Logo>logo.png</Logo>
+    <Logo>StoreLogo.png</Logo>
   </Properties>
 
   <Dependencies>
@@ -47,11 +47,10 @@
                  EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements DisplayName="PowerToys Settings Service"
         Description="Sole writer of the protected PowerToys settings store (EoP defense)."
-        BackgroundColor="transparent" Square150x150Logo="logo.png" Square44x44Logo="logo.png"
+        BackgroundColor="transparent" Square150x150Logo="Square150x150Logo.png" Square44x44Logo="Square44x44Logo.png"
         AppListEntry="none" />
     </Application>
   </Applications>
 </Package>
-
 
 

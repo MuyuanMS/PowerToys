@@ -7,6 +7,10 @@
 
 namespace PTSettingsSvc
 {
+    // %ProgramData%\Microsoft\PowerToys
+    // Common protected anchor for both service boundaries below.
+    std::wstring GetPowerToysProgramDataRoot();
+
     // %ProgramData%\Microsoft\PowerToys\Settings
     std::wstring GetSettingsRoot();
 
