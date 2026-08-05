@@ -20,6 +20,7 @@ namespace WorkspacesLauncherUI.ViewModels
     public partial class MainViewModel : ObservableObject, IDisposable
     {
         private readonly PwaHelper _pwaHelper;
+        private readonly Action<string> _ipcMessageReceivedCallback;
         private bool _isDisposed;
 
         [ObservableProperty]
@@ -29,7 +30,7 @@ namespace WorkspacesLauncherUI.ViewModels
         {
             _pwaHelper = new PwaHelper();
 
-            App.IPCMessageReceivedCallback = (string msg) =>
+            _ipcMessageReceivedCallback = (string msg) =>
             {
                 try
                 {
@@ -42,6 +43,7 @@ namespace WorkspacesLauncherUI.ViewModels
                     Logger.LogError(ex.Message);
                 }
             };
+            App.IPCMessageReceivedCallback = _ipcMessageReceivedCallback;
         }
 
         private void HandleAppLaunchingState(AppLaunchData.AppLaunchDataWrapper appLaunchData)
@@ -74,6 +76,11 @@ namespace WorkspacesLauncherUI.ViewModels
         {
             if (!_isDisposed)
             {
+                if (ReferenceEquals(App.IPCMessageReceivedCallback, _ipcMessageReceivedCallback))
+                {
+                    App.IPCMessageReceivedCallback = null;
+                }
+
                 _isDisposed = true;
             }
 
