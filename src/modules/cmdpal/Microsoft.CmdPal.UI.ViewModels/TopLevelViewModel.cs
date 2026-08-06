@@ -27,12 +27,15 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
     private readonly IServiceProvider _serviceProvider;
     private readonly CommandItemViewModel _commandItemViewModel;
     private readonly IContextMenuFactory _contextMenuFactory;
+    private readonly object _fallbackQueryStateLock = new();
 
     public ICommandProviderContext ProviderContext { get; private set; }
 
     private string IdFromModel => IsFallback && !string.IsNullOrWhiteSpace(_fallbackId) ? _fallbackId : _commandItemViewModel.Command.Id;
 
     private string _fallbackId = string.Empty;
+    private string _latestFallbackQuery = string.Empty;
+    private string? _lastCompletedFallbackQuery;
 
     private string _generatedId = string.Empty;
 
@@ -425,7 +428,7 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
     /// RPC work, so make sure you're calling it on a BG thread.
     /// </summary>
     /// <param name="newQuery">The new search text to pass to the extension</param>
-    /// <returns>true if our Title changed across this call</returns>
+    /// <returns>true if either scoring label changed across this call</returns>
     private bool UnsafeUpdateFallbackSynchronous(string newQuery)
     {
         var model = _commandItemViewModel.Model.Unsafe;
@@ -433,15 +436,47 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
         // RPC to check type
         if (model is IFallbackCommandItem fallback)
         {
-            var wasEmpty = string.IsNullOrEmpty(Title);
+            lock (_fallbackQueryStateLock)
+            {
+                _latestFallbackQuery = newQuery;
+            }
 
-            // RPC for method
+            var oldTitle = Title;
+            var oldSubtitle = Subtitle;
+
+            // RPC for method. Overlapping calls are allowed; readiness is published only
+            // by the latest query so stale completions cannot be rendered.
             fallback.FallbackHandler.UpdateQuery(newQuery);
-            var isEmpty = string.IsNullOrEmpty(Title);
-            return wasEmpty != isEmpty;
+            var newTitle = Title;
+            var newSubtitle = Subtitle;
+
+            lock (_fallbackQueryStateLock)
+            {
+                if (!string.Equals(_latestFallbackQuery, newQuery, StringComparison.Ordinal))
+                {
+                    _lastCompletedFallbackQuery = null;
+                    return true;
+                }
+
+                _lastCompletedFallbackQuery = newQuery;
+            }
+
+            return ScoringLabelsChanged(oldTitle, newTitle, oldSubtitle, newSubtitle);
         }
 
         return false;
+    }
+
+    internal static bool ScoringLabelsChanged(string oldTitle, string newTitle, string oldSubtitle, string newSubtitle)
+        => !string.Equals(oldTitle, newTitle, StringComparison.Ordinal) ||
+           !string.Equals(oldSubtitle, newSubtitle, StringComparison.Ordinal);
+
+    internal bool IsFallbackReadyForQuery(string query)
+    {
+        lock (_fallbackQueryStateLock)
+        {
+            return string.Equals(_lastCompletedFallbackQuery, query, StringComparison.Ordinal);
+        }
     }
 
     public PerformCommandMessage GetPerformCommandMessage()
