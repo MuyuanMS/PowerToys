@@ -251,19 +251,19 @@
     <comment>{0} = comma-separated continuous setting names (CLI syntax, not translated).</comment>
   </data>
   <data name="Hint_UseSetForAbsolute" xml:space="preserve">
-    <value>use 'PowerToys.PowerDisplay.Cli.exe set' to assign an absolute value</value>
-    <comment>'PowerToys.PowerDisplay.Cli.exe set' is a literal command and must not be translated.</comment>
+    <value>use 'PowerToys.PowerDisplay.CLI.exe set' to assign an absolute value</value>
+    <comment>'PowerToys.PowerDisplay.CLI.exe set' is a literal command and must not be translated.</comment>
   </data>
   <data name="Hint_UseHexVcp" xml:space="preserve">
-    <value>use a hex VCP value (0x??); run 'PowerToys.PowerDisplay.Cli.exe capabilities' to list supported values</value>
+    <value>use a hex VCP value (0x??); run 'PowerToys.PowerDisplay.CLI.exe capabilities' to list supported values</value>
     <comment>The command and 0x?? are CLI syntax and must not be translated.</comment>
   </data>
   <data name="Hint_RunList" xml:space="preserve">
-    <value>run 'PowerToys.PowerDisplay.Cli.exe list' to see available monitors</value>
-    <comment>'PowerToys.PowerDisplay.Cli.exe list' is a literal command and must not be translated.</comment>
+    <value>run 'PowerToys.PowerDisplay.CLI.exe list' to see available monitors</value>
+    <comment>'PowerToys.PowerDisplay.CLI.exe list' is a literal command and must not be translated.</comment>
   </data>
   <data name="Hint_SelectorMissing" xml:space="preserve">
-    <value>specify --monitor-number/-n or --monitor-id/-i; run 'PowerToys.PowerDisplay.Cli.exe list' to see available monitors</value>
+    <value>specify --monitor-number/-n or --monitor-id/-i; run 'PowerToys.PowerDisplay.CLI.exe list' to see available monitors</value>
     <comment>The option and command names are CLI syntax and must not be translated.</comment>
   </data>
   <data name="Hint_Orientation" xml:space="preserve">
@@ -275,7 +275,7 @@
     <comment>--confirm-power-off is CLI syntax and must not be translated.</comment>
   </data>
   <data name="Hint_RunProfiles" xml:space="preserve">
-    <value>run 'PowerToys.PowerDisplay.Cli.exe profiles' to see available profiles</value>
-    <comment>'PowerToys.PowerDisplay.Cli.exe profiles' is a literal command and must not be translated.</comment>
+    <value>run 'PowerToys.PowerDisplay.CLI.exe profiles' to see available profiles</value>
+    <comment>'PowerToys.PowerDisplay.CLI.exe profiles' is a literal command and must not be translated.</comment>
   </data>
 </root>
