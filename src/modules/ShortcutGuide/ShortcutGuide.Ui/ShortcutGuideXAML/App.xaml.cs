@@ -45,6 +45,7 @@ namespace ShortcutGuide
         private EventWaitHandle? _launchedEvent;
         private EventWaitHandle? _winKeyLaunchedEvent;
         private bool _openedByWinKeyHold;
+        private bool _winKeyReleasePending;
 
         private Thread? _listenForLaunchedEventThread;
 
@@ -125,13 +126,16 @@ namespace ShortcutGuide
                             {
                                 OverlayWindow.CloseAnimated();
                             });
+                            _openedByWinKeyHold = false;
                         }
 
                         NativeMethods.SendInput(1, [new() { Type = 1, Data = new() { Keyboard = new NativeMethods.KEYBDINPUT { WVk = 0xFF, DwFlags = 0x2 } } }], Marshal.SizeOf<NativeMethods.INPUT>());
                         SendSingleKeyboardInput((short)key, 0x2); // key up
+                        _winKeyReleasePending = false;
                     }
                     else
                     {
+                        _winKeyReleasePending = true;
                         SendSingleKeyboardInput((short)key, 0x2); // key up
                     }
                 },
@@ -210,11 +214,17 @@ namespace ShortcutGuide
                     {
                         Logger.LogInfo("Shortcut Guide trigger event signaled.");
                         bool isWinKeyTrigger = _winKeyLaunchedEvent is not null && index == 1;
-                        _openedByWinKeyHold = isWinKeyTrigger;
                         OverlayWindow.DispatcherQueue.TryEnqueue(async () =>
                         {
+                            if (isWinKeyTrigger && _winKeyReleasePending)
+                            {
+                                _winKeyReleasePending = false;
+                                return;
+                            }
+
                             if (isWinKeyTrigger && ShortcutGuideProperties.WindowsKeyAction.Value == (int)ShortcutGuideWindowsKeyAction.Off)
                             {
+                                _openedByWinKeyHold = false;
                                 return;
                             }
 
@@ -222,9 +232,11 @@ namespace ShortcutGuide
                             {
                                 if (OverlayWindow.AppWindow.IsVisible)
                                 {
+                                    _openedByWinKeyHold = false;
                                     return;
                                 }
 
+                                _openedByWinKeyHold = true;
                                 OverlayWindow.MainPaneControl.Visibility = Visibility.Collapsed;
                                 OverlayWindow.ShowOverlay();
                                 OverlayWindow.UpdateTaskbarPaneLayout();
@@ -239,6 +251,7 @@ namespace ShortcutGuide
                             }
                             else
                             {
+                                _openedByWinKeyHold = isWinKeyTrigger;
                                 Program.ForegroundWindowHandle = NativeMethods.GetForegroundWindow();
                                 OverlayWindow.MainPaneControl.Visibility = Visibility.Collapsed;
                                 OverlayWindow.ShowOverlay();
