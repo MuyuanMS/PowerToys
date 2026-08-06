@@ -129,15 +129,17 @@ public sealed partial class FastFirstPaintTests
         var fallback = new MutableListItem { Title = string.Empty };
         IReadOnlyList<IListItem> sources = new IListItem[] { fallback };
         var scorer = FloorScorerFor();
+        var matcher = new PrecomputedFuzzyMatcher(new PrecomputedFuzzyMatcherOptions());
+        var query = matcher.PrecomputeQuery("remote");
 
         // First paint: unresolved title -> not present.
-        Assert.IsNull(MainListPage.ScoreDeferredFallbacks(sources, default, scorer));
+        Assert.IsNull(MainListPage.ScoreDeferredFallbacks(sources, query, scorer));
 
         // The extension resolves the dynamic title asynchronously (off the typing path).
         fallback.Title = "Remote Desktop: server01";
 
         // A later refresh re-scores the same snapshot and folds the fallback in.
-        var after = MainListPage.ScoreDeferredFallbacks(sources, default, scorer);
+        var after = MainListPage.ScoreDeferredFallbacks(sources, query, scorer);
 
         Assert.IsNotNull(after);
         Assert.AreEqual(1, after!.Count);
@@ -151,15 +153,17 @@ public sealed partial class FastFirstPaintTests
         var fallback = new MutableListItem { Title = "no match here" };
         IReadOnlyList<IListItem> sources = new IListItem[] { fallback };
         var scorer = FloorScorerFor();
+        var matcher = new PrecomputedFuzzyMatcher(new PrecomputedFuzzyMatcherOptions());
+        var query = matcher.PrecomputeQuery("remote");
 
-        var weak = MainListPage.ScoreDeferredFallbacks(sources, default, scorer);
+        var weak = MainListPage.ScoreDeferredFallbacks(sources, query, scorer);
         Assert.IsNotNull(weak);
         var weakScore = weak![0].Score;
 
         // The title resolves to a strong match. If scoring were frozen at keystroke time, the
         // weak score would persist; deferred re-scoring must reflect the fresh title.
         fallback.Title = "Remote host";
-        var strong = MainListPage.ScoreDeferredFallbacks(sources, default, scorer);
+        var strong = MainListPage.ScoreDeferredFallbacks(sources, query, scorer);
 
         Assert.IsNotNull(strong);
         Assert.IsTrue(strong![0].Score > weakScore, "Re-scoring must reflect the freshly resolved title, not a frozen value.");
