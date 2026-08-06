@@ -217,10 +217,11 @@ namespace ShortcutGuide
                         bool isWinKeyTrigger = _winKeyLaunchedEvent is not null && index == 1;
                         OverlayWindow.DispatcherQueue.TryEnqueue(async () =>
                         {
-                            if (isWinKeyTrigger && _winKeyReleasePending)
+                            bool winKeyReleasedBeforeDispatch = isWinKeyTrigger && _winKeyReleasePending;
+                            if (winKeyReleasedBeforeDispatch)
                             {
                                 _winKeyReleasePending = false;
-                                return;
+                                NativeMethods.SendInput(1, [new() { Type = 1, Data = new() { Keyboard = new NativeMethods.KEYBDINPUT { WVk = 0xFF, DwFlags = 0x2 } } }], Marshal.SizeOf<NativeMethods.INPUT>());
                             }
 
                             if (isWinKeyTrigger && ShortcutGuideProperties.WindowsKeyAction.Value == (int)ShortcutGuideWindowsKeyAction.Off)

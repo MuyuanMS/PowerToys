@@ -315,7 +315,7 @@ private:
                     if (jsonActionObject.HasKey(L"value"))
                     {
                         auto action = jsonActionObject.GetNamedNumber(L"value");
-                        m_windowsKeyAction = action < 0 ? 1 : static_cast<int>(action);
+                        m_windowsKeyAction = action >= 0 && action <= 2 ? static_cast<int>(action) : 1;
                     }
                 }
 
