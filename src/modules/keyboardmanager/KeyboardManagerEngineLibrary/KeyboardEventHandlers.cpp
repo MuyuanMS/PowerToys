@@ -1493,6 +1493,15 @@ namespace KeyboardEventHandlers
                         expandedArgs,
                         currentDir,
                         ProgramLauncher::GetExplorerShowCommand(shortcut.startWindowType));
+                    if (!processStarted)
+                    {
+                        processStarted = run_non_elevated(
+                            fullExpandedFilePath,
+                            expandedArgs,
+                            &processId,
+                            currentDirPtr,
+                            true);
+                    }
                 }
                 else
                 {
