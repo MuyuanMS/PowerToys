@@ -233,13 +233,14 @@ intptr_t KeyboardManager::HandleKeyboardHookEvent(LowlevelKeyboardEvent* data) n
         return 1;
     }
 
-    intptr_t TextReplacementResult = KeyboardEventHandlers::HandleTextReplacementEvent(inputHandler, data, state);
+    // OS-level shortcuts have priority over typed text replacement.
+    intptr_t OSLevelShortcutRemapResult = KeyboardEventHandlers::HandleOSLevelShortcutRemapEvent(inputHandler, data, state);
 
-    if (TextReplacementResult == 1)
+    if (OSLevelShortcutRemapResult == 1)
     {
         return 1;
     }
 
-    // Handle an os-level shortcut remapping
-    return KeyboardEventHandlers::HandleOSLevelShortcutRemapEvent(inputHandler, data, state);
+    intptr_t TextReplacementResult = KeyboardEventHandlers::HandleTextReplacementEvent(inputHandler, data, state);
+    return TextReplacementResult == 1 ? 1 : OSLevelShortcutRemapResult;
 }
