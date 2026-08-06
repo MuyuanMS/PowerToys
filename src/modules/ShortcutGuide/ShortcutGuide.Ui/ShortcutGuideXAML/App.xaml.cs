@@ -114,6 +114,7 @@ namespace ShortcutGuide
                 _winKeyUpKeyboardHook = new HotkeySettingsControlHook(
                 (int key) =>
                 {
+                    _winKeyReleasePending = false;
                     SendSingleKeyboardInput((short)key, 0x0); // key down
                 },
                 (int key) =>
@@ -139,7 +140,7 @@ namespace ShortcutGuide
                         SendSingleKeyboardInput((short)key, 0x2); // key up
                     }
                 },
-                () => true,
+                () => ShortcutGuideProperties.WindowsKeyAction.Value != (int)ShortcutGuideWindowsKeyAction.Off,
                 (int key, nuint specialFlags) => (key == 91 || key == 92) && specialFlags != _ignoreKeyEventFlag);
             }
             catch (Exception ex)
