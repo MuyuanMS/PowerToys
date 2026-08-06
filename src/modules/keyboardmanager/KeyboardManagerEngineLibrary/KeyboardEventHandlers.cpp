@@ -259,7 +259,7 @@ namespace
         const auto pressedShiftKeys = GetPressedShiftKeys(ii);
         SendModifierInput(ii, pressedShiftKeys, KEYEVENTF_KEYUP);
         SendBackspaceInput(ii, backspaceCount);
-        Helpers::SendTextInput(replacement);
+        Helpers::SendTextInput(replacement, ii);
         SendModifierInput(ii, pressedShiftKeys, 0);
     }
 
