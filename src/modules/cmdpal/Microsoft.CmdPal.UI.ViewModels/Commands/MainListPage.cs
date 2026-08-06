@@ -271,7 +271,10 @@ public sealed partial class MainListPage : DynamicListPage,
     {
         // Score global fallbacks against their current titles so a fallback whose title
         // resolved after first paint gets the right score. Cheap: only a handful are configured.
-        var validScoredFallbacks = ScoreDeferredFallbacks(_globalFallbackSources, _globalFallbackQuery, _scoringFunction);
+        var readyFallbackSources = _globalFallbackSources?
+            .Where(s => s is not TopLevelViewModel fallback || fallback.IsFallbackReadyForQuery(_globalFallbackQuery.Original))
+            .ToArray();
+        var validScoredFallbacks = ScoreDeferredFallbacks(readyFallbackSources, _globalFallbackQuery, _scoringFunction);
 
         var validFallbacks = _fallbackItems?
             .Where(s => !string.IsNullOrWhiteSpace(s.Item.Title))

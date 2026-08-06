@@ -165,8 +165,9 @@ internal sealed partial class FallbackUpdateManager : IDisposable
                     DispatchPending(counter.TakePending());
                 }
 
-                // Guard against a stale refresh if the COM call returned after cancellation.
-                if (changed && !cancellationToken.IsCancellationRequested)
+                // Refresh even for stale completions so the current-query readiness filter
+                // removes labels that an older overlapping RPC published after cancellation.
+                if (changed)
                 {
                     _onFallbackChanged();
                 }
@@ -224,7 +225,7 @@ internal sealed partial class FallbackUpdateManager : IDisposable
                 DispatchPending(ctr.TakePending());
             }
 
-            if (changed && !ct.IsCancellationRequested)
+            if (changed)
             {
                 _onFallbackChanged();
             }

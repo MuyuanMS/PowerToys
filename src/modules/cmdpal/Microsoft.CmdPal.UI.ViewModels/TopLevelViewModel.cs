@@ -27,7 +27,6 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
     private readonly IServiceProvider _serviceProvider;
     private readonly CommandItemViewModel _commandItemViewModel;
     private readonly IContextMenuFactory _contextMenuFactory;
-    private readonly object _fallbackUpdateGate = new();
     private readonly object _fallbackQueryStateLock = new();
 
     public ICommandProviderContext ProviderContext { get; private set; }
@@ -36,6 +35,7 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
 
     private string _fallbackId = string.Empty;
     private string _latestFallbackQuery = string.Empty;
+    private string? _lastCompletedFallbackQuery;
 
     private string _generatedId = string.Empty;
 
@@ -441,26 +441,27 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
                 _latestFallbackQuery = newQuery;
             }
 
-            lock (_fallbackUpdateGate)
+            var oldTitle = Title;
+            var oldSubtitle = Subtitle;
+
+            // RPC for method. Overlapping calls are allowed; readiness is published only
+            // by the latest query so stale completions cannot be rendered.
+            fallback.FallbackHandler.UpdateQuery(newQuery);
+            var newTitle = Title;
+            var newSubtitle = Subtitle;
+
+            lock (_fallbackQueryStateLock)
             {
-                lock (_fallbackQueryStateLock)
+                if (!string.Equals(_latestFallbackQuery, newQuery, StringComparison.Ordinal))
                 {
-                    if (!string.Equals(_latestFallbackQuery, newQuery, StringComparison.Ordinal))
-                    {
-                        return false;
-                    }
+                    _lastCompletedFallbackQuery = null;
+                    return true;
                 }
 
-                var oldTitle = Title;
-                var oldSubtitle = Subtitle;
-
-                // RPC for method
-                fallback.FallbackHandler.UpdateQuery(newQuery);
-                var newTitle = Title;
-                var newSubtitle = Subtitle;
-
-                return ScoringLabelsChanged(oldTitle, newTitle, oldSubtitle, newSubtitle);
+                _lastCompletedFallbackQuery = newQuery;
             }
+
+            return ScoringLabelsChanged(oldTitle, newTitle, oldSubtitle, newSubtitle);
         }
 
         return false;
@@ -469,6 +470,14 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
     internal static bool ScoringLabelsChanged(string oldTitle, string newTitle, string oldSubtitle, string newSubtitle)
         => !string.Equals(oldTitle, newTitle, StringComparison.Ordinal) ||
            !string.Equals(oldSubtitle, newSubtitle, StringComparison.Ordinal);
+
+    internal bool IsFallbackReadyForQuery(string query)
+    {
+        lock (_fallbackQueryStateLock)
+        {
+            return string.Equals(_lastCompletedFallbackQuery, query, StringComparison.Ordinal);
+        }
+    }
 
     public PerformCommandMessage GetPerformCommandMessage()
     {
