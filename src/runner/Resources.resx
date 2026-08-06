@@ -214,6 +214,9 @@
   <data name="BUGREPORT_CLOSE" xml:space="preserve">
     <value>Close</value>
   </data>
+  <data name="BUGREPORT_PATH_LABEL" xml:space="preserve">
+    <value>Saved report path</value>
+  </data>
   <data name="PT_VERSION_CHANGE_ASK_FOR_COMPUTER_RESTART" xml:space="preserve">
     <value>A new PowerToys version has been installed. Please restart the computer, when possible, to fully reload File Explorer extensions.</value>
     <comment>File Explorer refers to the Windows File Explorer application.</comment>

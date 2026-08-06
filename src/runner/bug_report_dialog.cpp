@@ -34,6 +34,7 @@ namespace
     {
         UINT dpi = 96;
         HWND hStatus = nullptr; // header text (generating / done / failed)
+        HWND hPathLabel = nullptr; // accessible label for the saved report path
         HWND hPath = nullptr; // read-only edit showing the .zip path
         HWND hHint = nullptr; // secondary explanatory text
         HWND hOpenFolder = nullptr;
@@ -237,6 +238,11 @@ namespace
         SendMessageW(st->hStatus, WM_SETFONT, reinterpret_cast<WPARAM>(st->hHeaderFont), TRUE);
         y += Scale(64, dpi);
 
+        st->hPathLabel = CreateWindowExW(0, L"STATIC", GET_RESOURCE_STRING(IDS_BUGREPORT_PATH_LABEL).c_str(), WS_CHILD | SS_LEFT | SS_NOPREFIX, margin, y, contentW, Scale(18, dpi), hwnd, nullptr, inst, nullptr);
+        SendMessageW(st->hPathLabel, WM_SETFONT, reinterpret_cast<WPARAM>(st->hFont), TRUE);
+        ShowCtl(st->hPathLabel, false);
+        y += Scale(18, dpi);
+
         st->hPath = CreateWindowExW(0, L"EDIT", L"", WS_CHILD | ES_READONLY | ES_AUTOHSCROLL | WS_TABSTOP, margin, y, contentW, Scale(24, dpi), hwnd, nullptr, inst, nullptr);
         SendMessageW(st->hPath, WM_SETFONT, reinterpret_cast<WPARAM>(st->hFont), TRUE);
         ShowCtl(st->hPath, false);
@@ -272,8 +278,9 @@ namespace
         const int wClose = Scale(90, dpi);
 
         SetWindowPos(st->hStatus, nullptr, margin, margin, contentW, Scale(58, dpi), SWP_NOZORDER | SWP_NOACTIVATE);
-        SetWindowPos(st->hPath, nullptr, margin, margin + Scale(64, dpi), contentW, Scale(24, dpi), SWP_NOZORDER | SWP_NOACTIVATE);
-        SetWindowPos(st->hHint, nullptr, margin, margin + Scale(98, dpi), contentW, Scale(48, dpi), SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(st->hPathLabel, nullptr, margin, margin + Scale(64, dpi), contentW, Scale(18, dpi), SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(st->hPath, nullptr, margin, margin + Scale(82, dpi), contentW, Scale(24, dpi), SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(st->hHint, nullptr, margin, margin + Scale(116, dpi), contentW, Scale(48, dpi), SWP_NOZORDER | SWP_NOACTIVATE);
         SetWindowPos(st->hOpenFolder, nullptr, margin, btnY, wOpen, btnH, SWP_NOZORDER | SWP_NOACTIVATE);
         SetWindowPos(st->hCreateIssue, nullptr, margin + wOpen + gap, btnY, wIssue, btnH, SWP_NOZORDER | SWP_NOACTIVATE);
         SetWindowPos(st->hClose, nullptr, cr.right - margin - wClose, btnY, wClose, btnH, SWP_NOZORDER | SWP_NOACTIVATE);
@@ -297,7 +304,7 @@ namespace
         HFONT oldHeaderFont = st->hHeaderFont;
         st->hFont = MakeFont(st->dpi, false);
         st->hHeaderFont = MakeFont(st->dpi, true);
-        for (HWND control : { st->hStatus, st->hPath, st->hHint, st->hOpenFolder, st->hCreateIssue, st->hClose })
+        for (HWND control : { st->hStatus, st->hPathLabel, st->hPath, st->hHint, st->hOpenFolder, st->hCreateIssue, st->hClose })
         {
             SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(control == st->hStatus ? st->hHeaderFont : st->hFont), TRUE);
         }
@@ -312,6 +319,7 @@ namespace
         SetWindowTextW(st->hStatus, GET_RESOURCE_STRING(IDS_BUGREPORT_DONE_HEADER).c_str());
         SetWindowTextW(st->hPath, st->zipPath.c_str());
         SetWindowTextW(st->hHint, GET_RESOURCE_STRING(IDS_BUGREPORT_DONE_HINT).c_str());
+        ShowCtl(st->hPathLabel, true);
         ShowCtl(st->hPath, true);
         ShowCtl(st->hOpenFolder, true);
         ShowCtl(st->hCreateIssue, true);
@@ -322,6 +330,7 @@ namespace
     {
         st->done = true;
         SetWindowTextW(st->hStatus, GET_RESOURCE_STRING(IDS_BUGREPORT_FAILED).c_str());
+        ShowCtl(st->hPathLabel, false);
         ShowCtl(st->hPath, false);
         ShowCtl(st->hHint, false);
         ShowCtl(st->hOpenFolder, false);
@@ -491,11 +500,16 @@ void run_bug_report_dialog(const std::wstring& toolPath, const std::function<voi
         sei.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NO_CONSOLE;
         sei.lpFile = toolPath.c_str();
         sei.nShow = SW_HIDE;
-        if (ShellExecuteExW(&sei) && sei.hProcess)
+        const bool started = ShellExecuteExW(&sei) && sei.hProcess;
+        if (started)
         {
             WaitForSingleObject(sei.hProcess, INFINITE);
             CloseHandle(sei.hProcess);
         }
+        MessageBoxW(nullptr,
+                    GET_RESOURCE_STRING(started ? IDS_BUGREPORT_SUCCESS : IDS_BUGREPORT_FAILED).c_str(),
+                    GET_RESOURCE_STRING(IDS_BUGREPORT_DIALOG_TITLE).c_str(),
+                    MB_OK | (started ? MB_ICONINFORMATION : MB_ICONERROR));
         notifyFinished();
         if (st.hFont)
         {
