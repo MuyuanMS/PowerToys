@@ -25,6 +25,18 @@ namespace RemappingLogicTests
             Assert::IsFalse(KeyboardEventHandlers::ProgramLauncher::ShouldUseExplorerShell(Shortcut::StartWindowType::Hidden));
         }
 
+        TEST_METHOD (MinimizedWindow_ShouldUseExplorerShell)
+        {
+            Assert::IsTrue(KeyboardEventHandlers::ProgramLauncher::ShouldUseExplorerShell(Shortcut::StartWindowType::Minimized));
+            Assert::AreEqual(SW_SHOWMINIMIZED, KeyboardEventHandlers::ProgramLauncher::GetExplorerShowCommand(Shortcut::StartWindowType::Minimized));
+        }
+
+        TEST_METHOD (MaximizedWindow_ShouldUseExplorerShell)
+        {
+            Assert::IsTrue(KeyboardEventHandlers::ProgramLauncher::ShouldUseExplorerShell(Shortcut::StartWindowType::Maximized));
+            Assert::AreEqual(SW_SHOWMAXIMIZED, KeyboardEventHandlers::ProgramLauncher::GetExplorerShowCommand(Shortcut::StartWindowType::Maximized));
+        }
+
         TEST_METHOD (EmptyWorkingDirectory_ShouldUseExecutableDirectory)
         {
             const auto workingDirectory = KeyboardEventHandlers::ProgramLauncher::GetWorkingDirectory(

@@ -14,7 +14,20 @@ namespace KeyboardEventHandlers
     {
         constexpr bool ShouldUseExplorerShell(Shortcut::StartWindowType startWindowType) noexcept
         {
-            return startWindowType == Shortcut::StartWindowType::Normal;
+            return startWindowType != Shortcut::StartWindowType::Hidden;
+        }
+
+        constexpr int GetExplorerShowCommand(Shortcut::StartWindowType startWindowType) noexcept
+        {
+            switch (startWindowType)
+            {
+            case Shortcut::StartWindowType::Minimized:
+                return SW_SHOWMINIMIZED;
+            case Shortcut::StartWindowType::Maximized:
+                return SW_SHOWMAXIMIZED;
+            default:
+                return SW_SHOWNORMAL;
+            }
         }
 
         std::wstring GetWorkingDirectory(const std::wstring& filePath, const std::wstring& configuredDirectory);

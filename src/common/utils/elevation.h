@@ -125,7 +125,8 @@ namespace
     inline bool ShellExecuteFromExplorer(
         PCWSTR pszFile,
         PCWSTR pszParameters = nullptr,
-        PCWSTR workingDir = L"")
+        PCWSTR workingDir = L"",
+        int showCommand = SW_SHOWNORMAL)
     {
         CComPtr<IShellFolderViewDual> spFolderView;
         if (!GetDesktopAutomationObject(IID_PPV_ARGS(&spFolderView)))
@@ -152,7 +153,7 @@ namespace
                                               CComVariant(pszParameters ? pszParameters : L""),
                                               CComVariant(workingDir),
                                               CComVariant(L""),
-                                              CComVariant(SW_SHOWNORMAL));
+                                              CComVariant(showCommand));
         if (FAILED(result))
         {
             Logger::warn(L"ShellExecuteW() failed. {}", GetErrorString(result));
@@ -384,14 +385,18 @@ inline bool run_non_elevated(const std::wstring& file, const std::wstring& param
     return succeeded;
 }
 
-inline bool RunNonElevatedEx(const std::wstring& file, const std::wstring& params, const std::wstring& working_dir)
+inline bool RunNonElevatedEx(
+    const std::wstring& file,
+    const std::wstring& params,
+    const std::wstring& working_dir,
+    int show_command = SW_SHOWNORMAL)
 {
     bool success = false;
     HRESULT co_init = E_FAIL;
     try
     {
         co_init = CoInitialize(nullptr);
-        success = ShellExecuteFromExplorer(file.c_str(), params.c_str(), working_dir.c_str());
+        success = ShellExecuteFromExplorer(file.c_str(), params.c_str(), working_dir.c_str(), show_command);
     }
     catch (...)
     {
