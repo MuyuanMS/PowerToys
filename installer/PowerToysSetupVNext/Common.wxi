@@ -68,7 +68,7 @@
     must NOT use this - InstallPrivileges is "limited" there, and this SDDL would leave the
     installing user with only read + execute on their own install.
   -->
-  <?define MachinePathFolderSddl="D:PAI(A;OICI;GA;;;SY)(A;OICI;GA;;;BA)(A;OICI;GRGX;;;BU)(A;OICIIO;GA;;;CO)" ?>
+  <?define MachinePathFolderSddl="O:BAG:BAD:PAI(A;OICI;GA;;;SY)(A;OICI;GA;;;BA)(A;OICI;GRGX;;;BU)(A;OICIIO;GA;;;CO)" ?>
 
   <?define BinX32Dir="$(var.RepoDir)x86\$(var.Configuration)\" ?>
 </Include>
