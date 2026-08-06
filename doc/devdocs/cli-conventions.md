@@ -7,9 +7,9 @@ This document describes the conventions for implementing command-line interfaces
 - Name module CLI command shims `PowerToys.<ModuleName>.CLI.exe` (for example, `PowerToys.ImageResizer.CLI.exe`).
 - Install these shims in the `bin` subfolder of the PowerToys installation directory, which the installer adds to `PATH`.
 
-Every command is the same `PowerToys.CliShim.exe` payload (`tools/CliShim/`) installed under a different name. The shim resolves which CLI to launch from its own file name, forwards the raw argument tail unchanged, shares the caller's console, and returns the CLI's exit code. The CLI runs in a job object owned by the shim, so killing the shim kills the CLI with it; processes the CLI itself starts (the Settings window, for example) break away and survive.
+Every command is the same `PowerToys.CliShim.exe` payload (`tools/CliShim/`) installed under a different name. The shim resolves which CLI to launch from its own file name, forwards the raw argument tail unchanged, shares the caller's console, and returns the CLI's exit code. The CLI runs in a job object owned by the shim when the host permits assignment, so killing the shim normally kills the CLI with it; processes the CLI itself starts (the Settings window, for example) break away and survive. If the host uses an incompatible job, the CLI continues unprotected so the command remains usable.
 
-On a per-machine install the `bin` folder is created with a protected DACL (`MachinePathFolderSddl` in `installer/PowerToysSetupVNext/Common.wxi`) so that a custom installation root cannot leave a machine-`PATH` folder writable by standard users. Author that `<CreateFolder>` on the same component as the folder's `<Environment>` `PATH` entry, so the two cannot drift apart.
+On a per-machine install the installation root, `WinUI3Apps`, and `bin` folders are created with a protected DACL (`MachinePathFolderSddl` in `installer/PowerToysSetupVNext/Common.wxi`) so that a custom installation root cannot leave a machine-`PATH` folder or a trusted target writable by standard users. Author that `<CreateFolder>` on each protected directory, and keep the `bin` ACL on the same component as its `<Environment>` `PATH` entry, so the two cannot drift apart.
 
 ### Adding a new shim
 

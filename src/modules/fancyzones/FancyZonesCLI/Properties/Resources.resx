@@ -259,7 +259,7 @@ Tip: For templates, use the type name (e.g., 'focus', 'columns', 'rows', 'grid',
     <value>FancyZones CLI - Command line interface for FancyZones</value>
   </data>
   <data name="usage_syntax" xml:space="preserve">
-    <value>Usage: FancyZonesCLI [command] [options]</value>
+    <value>Usage: PowerToys.FancyZones.CLI.exe [command] [options]</value>
   </data>
   <data name="usage_options" xml:space="preserve">
     <value>Options:</value>
@@ -286,6 +286,6 @@ Tip: For templates, use the type name (e.g., 'focus', 'columns', 'rows', 'grid',
     <value>Unknown command: {0}</value>
   </data>
   <data name="usage_run_help" xml:space="preserve">
-    <value>Run 'FancyZonesCLI --help' to see available commands.</value>
+    <value>Run 'PowerToys.FancyZones.CLI.exe --help' to see available commands.</value>
   </data>
 </root>

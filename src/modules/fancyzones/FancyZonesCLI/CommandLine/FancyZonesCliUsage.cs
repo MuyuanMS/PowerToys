@@ -53,12 +53,12 @@ internal static class FancyZonesCliUsage
 
         Console.WriteLine();
         Console.WriteLine(Properties.Resources.usage_examples);
-        Console.WriteLine("  FancyZonesCLI --help");
-        Console.WriteLine("  FancyZonesCLI --version");
-        Console.WriteLine("  FancyZonesCLI get-monitors");
-        Console.WriteLine("  FancyZonesCLI set-layout focus");
-        Console.WriteLine("  FancyZonesCLI set-layout <uuid> --monitor 1");
-        Console.WriteLine("  FancyZonesCLI get-hotkeys");
+        Console.WriteLine("  PowerToys.FancyZones.CLI.exe --help");
+        Console.WriteLine("  PowerToys.FancyZones.CLI.exe --version");
+        Console.WriteLine("  PowerToys.FancyZones.CLI.exe get-monitors");
+        Console.WriteLine("  PowerToys.FancyZones.CLI.exe set-layout focus");
+        Console.WriteLine("  PowerToys.FancyZones.CLI.exe set-layout <uuid> --monitor 1");
+        Console.WriteLine("  PowerToys.FancyZones.CLI.exe get-hotkeys");
     }
 
     public static void PrintCommandUsage(string commandName)
@@ -91,7 +91,7 @@ internal static class FancyZonesCliUsage
         // Usage line
         string argsLabel = string.Join(" ", subcommand.Arguments.Select(a => $"<{a.Name}>"));
         string optionsLabel = subcommand.Options.Any() ? " [options]" : string.Empty;
-        Console.WriteLine($"Usage: FancyZonesCLI {subcommand.Name} {argsLabel}{optionsLabel}".TrimEnd());
+        Console.WriteLine($"Usage: PowerToys.FancyZones.CLI.exe {subcommand.Name} {argsLabel}{optionsLabel}".TrimEnd());
         Console.WriteLine();
 
         // Aliases
@@ -140,54 +140,54 @@ internal static class FancyZonesCliUsage
         switch (commandName.ToLowerInvariant())
         {
             case "get-monitors":
-                Console.WriteLine("  FancyZonesCLI get-monitors");
-                Console.WriteLine("  FancyZonesCLI m");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe get-monitors");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe m");
                 break;
 
             case "get-layouts":
-                Console.WriteLine("  FancyZonesCLI get-layouts");
-                Console.WriteLine("  FancyZonesCLI ls");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe get-layouts");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe ls");
                 break;
 
             case "get-active-layout":
-                Console.WriteLine("  FancyZonesCLI get-active-layout");
-                Console.WriteLine("  FancyZonesCLI active");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe get-active-layout");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe active");
                 break;
 
             case "set-layout":
-                Console.WriteLine("  FancyZonesCLI set-layout focus");
-                Console.WriteLine("  FancyZonesCLI set-layout columns --monitor 1");
-                Console.WriteLine("  FancyZonesCLI set-layout {uuid} --all");
-                Console.WriteLine("  FancyZonesCLI s rows -m 2");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe set-layout focus");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe set-layout columns --monitor 1");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe set-layout {uuid} --all");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe s rows -m 2");
                 break;
 
             case "open-editor":
-                Console.WriteLine("  FancyZonesCLI open-editor");
-                Console.WriteLine("  FancyZonesCLI e");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe open-editor");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe e");
                 break;
 
             case "open-settings":
-                Console.WriteLine("  FancyZonesCLI open-settings");
-                Console.WriteLine("  FancyZonesCLI settings");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe open-settings");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe settings");
                 break;
 
             case "get-hotkeys":
-                Console.WriteLine("  FancyZonesCLI get-hotkeys");
-                Console.WriteLine("  FancyZonesCLI hk");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe get-hotkeys");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe hk");
                 break;
 
             case "set-hotkey":
-                Console.WriteLine("  FancyZonesCLI set-hotkey 1 {layout-uuid}");
-                Console.WriteLine("  FancyZonesCLI shk 2 0CEBCBA9-9C32-4395-B93E-DC77485AD6D0");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe set-hotkey 1 {layout-uuid}");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe shk 2 0CEBCBA9-9C32-4395-B93E-DC77485AD6D0");
                 break;
 
             case "remove-hotkey":
-                Console.WriteLine("  FancyZonesCLI remove-hotkey 1");
-                Console.WriteLine("  FancyZonesCLI rhk 2");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe remove-hotkey 1");
+                Console.WriteLine("  PowerToys.FancyZones.CLI.exe rhk 2");
                 break;
 
             default:
-                Console.WriteLine($"  FancyZonesCLI {commandName}");
+                Console.WriteLine($"  PowerToys.FancyZones.CLI.exe {commandName}");
                 break;
         }
     }
