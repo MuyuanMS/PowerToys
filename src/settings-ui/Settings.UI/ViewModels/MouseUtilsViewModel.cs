@@ -137,6 +137,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             // Null-safe in case a hand-edited settings.json carries explicit nulls: repair the
             // property objects to their defaults so both the reads below and the property setters
             // are safe (mirrors the null-handling the CursorWrap block above uses).
+            MouseButtonLockSettingsConfig.Properties ??= new MouseButtonLockProperties();
             MouseButtonLockSettingsConfig.Properties.LmbLockEnabled ??= new BoolProperty(false);
             MouseButtonLockSettingsConfig.Properties.RmbLockEnabled ??= new BoolProperty(true);
             MouseButtonLockSettingsConfig.Properties.MmbLockEnabled ??= new BoolProperty(false);
