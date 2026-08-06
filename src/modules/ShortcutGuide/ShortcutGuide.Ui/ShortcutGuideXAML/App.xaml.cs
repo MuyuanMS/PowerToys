@@ -278,10 +278,6 @@ namespace ShortcutGuide
                     Logger.LogWarning($"Failed to load pinned shortcuts from '{pinnedPath}'. Falling back to empty list. Reason: {ex.Message}");
                 }
             }
-
-            ShortcutGuideSettings = SettingsRepository<ShortcutGuideSettings>.GetInstance(settingsUtils).SettingsConfig;
-            ShortcutGuideProperties = ShortcutGuideSettings.Properties;
-
         }
 
         private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
@@ -337,4 +333,3 @@ namespace ShortcutGuide
         }
     }
 }
-
