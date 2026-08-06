@@ -149,7 +149,8 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                     break;
             }
 
-            _isDevBuild = Helper.GetProductVersion() == "v0.0.1";
+            _isDevBuild = Helper.GetProductVersion() == "v0.0.1" ||
+                string.Equals(global::PowerToys.Interop.CommonManaged.GetProductVersionChannel(), "private", StringComparison.OrdinalIgnoreCase);
 
             _runAtStartupGpoRuleConfiguration = GPOWrapper.GetConfiguredRunAtStartupValue();
             if (_runAtStartupGpoRuleConfiguration == GpoRuleConfigured.Disabled || _runAtStartupGpoRuleConfiguration == GpoRuleConfigured.Enabled)

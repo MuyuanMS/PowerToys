@@ -157,7 +157,7 @@ extends:
       - stage: PublishPreview
         displayName: Publish preview release
         dependsOn: Build
-        condition: and(succeeded(), eq(stageDependencies.Build.Build.outputs['Release_x64.resolveVersion.ShouldPublishPreview'], 'True'))
+        condition: and(succeeded(), eq(dependencies.Build.outputs['Release_x64.resolveVersion.ShouldPublishPreview'], 'True'))
         variables:
           ResolvedVersionNumber: $[ stageDependencies.Build.Build.outputs['Release_x64.resolveVersion.ResolvedVersionNumber'] ]
         jobs:
@@ -208,6 +208,7 @@ extends:
                     -Target '$(Build.SourceVersion)' `
                     -Prerelease `
                     -LatestFalse `
+                    -Clobber `
                     -Publish
                 env:
                   GH_TOKEN: $(GH_TOKEN)

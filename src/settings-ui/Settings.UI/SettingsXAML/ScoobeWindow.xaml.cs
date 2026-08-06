@@ -9,6 +9,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
+using global::PowerToys.GPOWrapper;
 using ManagedCommon;
 using Microsoft.PowerToys.Settings.UI.Helpers;
 using Microsoft.PowerToys.Settings.UI.Library;
@@ -198,7 +199,8 @@ namespace Microsoft.PowerToys.Settings.UI
                 global::PowerToys.Interop.CommonManaged.GetProductVersionChannel(),
                 "preview",
                 StringComparison.OrdinalIgnoreCase);
-            return generalSettings.IncludePrereleaseUpdates || isPreviewBuild;
+            bool previewUpdatesDisabled = GPOWrapper.GetDisablePreviewUpdatesValue() == GpoRuleConfigured.Enabled;
+            return (!previewUpdatesDisabled && generalSettings.IncludePrereleaseUpdates) || isPreviewBuild;
         }
 
         private static string GetMajorMinorVersion(PowerToysReleaseInfo release)
