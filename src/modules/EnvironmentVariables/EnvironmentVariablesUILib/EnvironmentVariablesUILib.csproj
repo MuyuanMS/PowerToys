@@ -56,7 +56,6 @@
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>EnvironmentVariablesUILib.UnitTests</_Parameter1>
     </AssemblyAttribute>
-    <ProjectReference Include="$(RepoRoot)src\settings-ui\Settings.UI.Library\Settings.UI.Library.csproj" />
   </ItemGroup>
 
 </Project>

@@ -46,9 +46,18 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             }
 
             var segments = value.Split(new[] { System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
-            if (segments.Length == 0 || Array.Exists(segments, segment => segment == "." || segment == ".."))
+            for (int i = 0; i < segments.Length; i++)
             {
-                throw new ArgumentException("The path must not contain traversal segments.", parameterName);
+                segments[i] = segments[i].TrimEnd(' ', '.');
+                if (string.IsNullOrEmpty(segments[i]) || segments[i] == "." || segments[i] == "..")
+                {
+                    throw new ArgumentException("The path must not contain traversal segments.", parameterName);
+                }
+            }
+
+            if (segments.Length == 0)
+            {
+                throw new ArgumentException("The path must not be empty.", parameterName);
             }
 
             return string.Join(System.IO.Path.DirectorySeparatorChar.ToString(), segments);

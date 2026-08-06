@@ -136,5 +136,14 @@ namespace CommonLibTest
 
             Assert.ThrowsException<ArgumentException>(() => settingPath.GetSettingsPath("FancyZones", "..\\outside.json"));
         }
+
+        [TestMethod]
+        public void GetSettingsPath_WithTrailingDotTraversalModuleName_Throws()
+        {
+            var mockFileSystem = new MockFileSystem();
+            var settingPath = new SettingPath(mockFileSystem.Directory, mockFileSystem.Path);
+
+            Assert.ThrowsException<ArgumentException>(() => settingPath.GetSettingsPath(".. "));
+        }
     }
 }
