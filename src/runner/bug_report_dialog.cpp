@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 
 namespace
 {
@@ -80,9 +81,45 @@ namespace
         return result;
     }
 
-    // The tool names its output PowerToysReport_<timestamp>.zip, so pick the most
-    // recently written matching file in the destination folder.
-    std::wstring FindNewestReport(const std::wstring& folder)
+    using ReportSnapshot = std::unordered_map<std::wstring, std::filesystem::file_time_type>;
+
+    ReportSnapshot SnapshotReports(const std::wstring& folder)
+    {
+        namespace fs = std::filesystem;
+        ReportSnapshot snapshot;
+        if (folder.empty())
+        {
+            return snapshot;
+        }
+
+        std::error_code ec;
+        for (const auto& entry : fs::directory_iterator(folder, ec))
+        {
+            if (ec)
+            {
+                break;
+            }
+            std::error_code itemEc;
+            if (!entry.is_regular_file(itemEc))
+            {
+                continue;
+            }
+            const auto name = entry.path().filename().wstring();
+            if (name.rfind(L"PowerToysReport_", 0) != 0 || entry.path().extension() != L".zip")
+            {
+                continue;
+            }
+            const auto writeTime = fs::last_write_time(entry, itemEc);
+            if (!itemEc)
+            {
+                snapshot.emplace(entry.path().wstring(), writeTime);
+            }
+        }
+        return snapshot;
+    }
+
+    // Only return a report created or modified by this invocation.
+    std::wstring FindNewestReport(const std::wstring& folder, const ReportSnapshot& beforeRun)
     {
         namespace fs = std::filesystem;
         if (folder.empty())
@@ -111,6 +148,11 @@ namespace
             }
             const auto writeTime = fs::last_write_time(entry, itemEc);
             if (itemEc)
+            {
+                continue;
+            }
+            const auto before = beforeRun.find(entry.path().wstring());
+            if (before != beforeRun.end() && writeTime <= before->second)
             {
                 continue;
             }
@@ -421,6 +463,7 @@ void run_bug_report_dialog(const std::wstring& toolPath, const std::function<voi
     ForceForeground(hwnd);
 
     const std::wstring desktop = GetDesktopPath();
+    const ReportSnapshot reportsBeforeRun = SnapshotReports(desktop);
 
     STARTUPINFOW si{ sizeof(si) };
     PROCESS_INFORMATION pi{};
@@ -452,7 +495,7 @@ void run_bug_report_dialog(const std::wstring& toolPath, const std::function<voi
             pi.hProcess = nullptr;
             pi.hThread = nullptr;
 
-            const std::wstring zip = (exitCode == 0) ? FindNewestReport(desktop) : std::wstring{};
+            const std::wstring zip = (exitCode == 0) ? FindNewestReport(desktop, reportsBeforeRun) : std::wstring{};
             if (exitCode == 0 && !zip.empty())
             {
                 st.zipPath = zip;
@@ -481,7 +524,8 @@ void run_bug_report_dialog(const std::wstring& toolPath, const std::function<voi
         }
     }
 
-    g_dialogWnd.store(nullptr);
+    HWND expectedDialog = hwnd;
+    g_dialogWnd.compare_exchange_strong(expectedDialog, nullptr);
 
     // If the window was closed before the tool finished, keep waiting for the tool
     // so we only clear the "running" state once the process actually exits.
