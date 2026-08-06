@@ -28,11 +28,11 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         /// </summary>
         /// <param name="themeAdaptive">Whether theme-adaptive tray icons should be enabled.</param>
         /// <param name="sendConfigMsg">Optional IPC callback used by the Settings UI (may be null in tests).</param>
-        public static void ApplyToModules(bool themeAdaptive, Func<string, int> sendConfigMsg)
+        public static void ApplyToModules(bool themeAdaptive, Func<string, int> sendConfigMsg, bool overwriteExisting = true)
         {
             try
             {
-                ApplyAwake(themeAdaptive, sendConfigMsg);
+                ApplyAwake(themeAdaptive, sendConfigMsg, overwriteExisting);
             }
             catch (Exception ex)
             {
@@ -41,7 +41,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
             try
             {
-                ApplyZoomIt(themeAdaptive, sendConfigMsg);
+                ApplyZoomIt(themeAdaptive, sendConfigMsg, overwriteExisting);
             }
             catch (Exception ex)
             {
@@ -50,7 +50,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
             try
             {
-                ApplyPowerDisplay(themeAdaptive);
+                ApplyPowerDisplay(themeAdaptive, overwriteExisting);
             }
             catch (Exception ex)
             {
@@ -59,7 +59,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
             try
             {
-                ApplyMouseWithoutBorders(themeAdaptive);
+                ApplyMouseWithoutBorders(themeAdaptive, overwriteExisting);
             }
             catch (Exception ex)
             {
@@ -82,9 +82,9 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             return settingsUtils.GetSettingsFilePath(ZoomItSettings.ModuleName);
         }
 
-        private static void ApplyAwake(bool themeAdaptive, Func<string, int> sendConfigMsg)
+        private static void ApplyAwake(bool themeAdaptive, Func<string, int> sendConfigMsg, bool overwriteExisting)
         {
-            if (!PatchModuleSettingsFile(AwakeSettings.ModuleName, SnakeCasePropertyName, themeAdaptive, wrapAsBoolProperty: false))
+            if (!PatchModuleSettingsFile(AwakeSettings.ModuleName, SnakeCasePropertyName, themeAdaptive, wrapAsBoolProperty: false, overwriteExisting))
             {
                 return;
             }
@@ -100,9 +100,9 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             sendConfigMsg("{\"powertoys\":{\"Awake\":" + settingsJson + "}}");
         }
 
-        private static void ApplyZoomIt(bool themeAdaptive, Func<string, int> sendConfigMsg)
+        private static void ApplyZoomIt(bool themeAdaptive, Func<string, int> sendConfigMsg, bool overwriteExisting)
         {
-            if (!PatchModuleSettingsFile(ZoomItSettings.ModuleName, PascalCasePropertyName, themeAdaptive, wrapAsBoolProperty: true))
+            if (!PatchModuleSettingsFile(ZoomItSettings.ModuleName, PascalCasePropertyName, themeAdaptive, wrapAsBoolProperty: true, overwriteExisting))
             {
                 return;
             }
@@ -111,9 +111,9 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             // interop save succeeds.
         }
 
-        private static void ApplyPowerDisplay(bool themeAdaptive)
+        private static void ApplyPowerDisplay(bool themeAdaptive, bool overwriteExisting)
         {
-            if (!PatchModuleSettingsFile(PowerDisplaySettings.ModuleName, SnakeCasePropertyName, themeAdaptive, wrapAsBoolProperty: false))
+            if (!PatchModuleSettingsFile(PowerDisplaySettings.ModuleName, SnakeCasePropertyName, themeAdaptive, wrapAsBoolProperty: false, overwriteExisting))
             {
                 return;
             }
@@ -122,17 +122,17 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             SignalNamedEvent(Constants.SettingsUpdatedPowerDisplayEvent());
         }
 
-        private static void ApplyMouseWithoutBorders(bool themeAdaptive)
+        private static void ApplyMouseWithoutBorders(bool themeAdaptive, bool overwriteExisting)
         {
             // MWB watches settings.json and applies ShowThemeAdaptiveTrayIcon from file changes.
-            PatchModuleSettingsFile(MouseWithoutBordersSettings.ModuleName, SnakeCasePropertyName, themeAdaptive, wrapAsBoolProperty: true);
+            PatchModuleSettingsFile(MouseWithoutBordersSettings.ModuleName, SnakeCasePropertyName, themeAdaptive, wrapAsBoolProperty: true, overwriteExisting);
         }
 
         /// <summary>
         /// Patches an existing module settings.json. Returns false when the file does not exist yet
         /// (module never configured) so we do not create incomplete settings stubs.
         /// </summary>
-        private static bool PatchModuleSettingsFile(string moduleName, string propertyName, bool value, bool wrapAsBoolProperty)
+        private static bool PatchModuleSettingsFile(string moduleName, string propertyName, bool value, bool wrapAsBoolProperty, bool overwriteExisting)
         {
             var settingsUtils = SettingsUtils.Default;
             if (!settingsUtils.SettingsExists(moduleName))
@@ -154,6 +154,10 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             {
                 properties = new JsonObject();
                 root["properties"] = properties;
+            }
+            else if (!overwriteExisting && properties[propertyName] != null)
+            {
+                return false;
             }
 
             if (wrapAsBoolProperty)
