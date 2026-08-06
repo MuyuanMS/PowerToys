@@ -32,7 +32,7 @@ HICON LoadThemeAdaptiveTrayIcon(
         }
     }
 
-    return LoadIcon(fallbackInstance, fallbackResourceName);
+    return CopyIcon(LoadIcon(fallbackInstance, fallbackResourceName));
 }
 
 HRESULT GetIconIndexFromPath(_In_ PCWSTR path, _Out_ int* index)

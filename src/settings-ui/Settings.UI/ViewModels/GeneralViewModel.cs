@@ -165,6 +165,8 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
             _showSysTrayIcon = GeneralSettingsConfig.ShowSysTrayIcon;
             _showThemeAdaptiveSysTrayIcon = GeneralSettingsConfig.ShowThemeAdaptiveTrayIcon;
+            ThemeAdaptiveTrayIconFanOut.ApplyToModules(_showThemeAdaptiveSysTrayIcon, SendConfigMSG);
+            ApplyZoomItThemeAdaptiveTrayIconViaInterop();
             _showNewUpdatesToastNotification = GeneralSettingsConfig.ShowNewUpdatesToastNotification;
             _autoDownloadUpdates = GeneralSettingsConfig.AutoDownloadUpdates;
             _showWhatsNewAfterUpdates = GeneralSettingsConfig.ShowWhatsNewAfterUpdates;
@@ -423,6 +425,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                     GeneralSettingsConfig.ShowThemeAdaptiveTrayIcon = value;
                     ThemeAdaptiveTrayIconFanOut.ApplyToModules(value, SendConfigMSG);
                     ApplyZoomItThemeAdaptiveTrayIconViaInterop();
+                    SendConfigMSG?.Invoke("{\"action\":{\"ZoomIt\":{\"action_name\":\"refresh_settings\", \"value\":\"\"}}}");
                     NotifyPropertyChanged();
                 }
             }

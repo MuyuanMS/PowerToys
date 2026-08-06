@@ -107,9 +107,8 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                 return;
             }
 
-            // Registry application via ZoomItSettingsInterop happens in Settings.UI (GeneralViewModel).
-            // ShowThemeAdaptiveTrayIcon is honored once the ZoomIt module PR's RegSettings entry is present.
-            sendConfigMsg?.Invoke("{\"action\":{\"ZoomIt\":{\"action_name\":\"refresh_settings\", \"value\":\"\"}}}");
+            // Registry application and the refresh notification happen in Settings.UI after the
+            // interop save succeeds.
         }
 
         private static void ApplyPowerDisplay(bool themeAdaptive)
@@ -166,7 +165,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                 properties[propertyName] = value;
             }
 
-            settingsUtils.SaveSettings(root.ToJsonString(), moduleName);
+            File.WriteAllText(path, root.ToJsonString());
             Logger.LogInfo($"Fanned out show_theme_adaptive_tray_icon={value} to {moduleName}.");
             return true;
         }
