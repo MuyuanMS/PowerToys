@@ -167,7 +167,8 @@ resources:
     properties:
       settings:
         properties:
-          MmbLockEnabled: true
+          mmb_lock_enabled:
+            value: true
         name: MouseButtonLock
         version: 1.0
 ```
@@ -185,9 +186,12 @@ resources:
     properties:
       settings:
         properties:
-          RmbLockEnabled: true
-          HoldDurationMs: 600
-          MoveCancelPixels: 3
+          rmb_lock_enabled:
+            value: true
+          hold_duration_ms:
+            value: 600
+          move_cancel_pixels:
+            value: 3
         name: MouseButtonLock
         version: 1.0
 ```
@@ -204,10 +208,14 @@ resources:
     properties:
       settings:
         properties:
-          LmbLockEnabled: true
-          RmbLockEnabled: true
-          HoldDurationMs: 2000
-          MoveCancelPixels: 15
+          lmb_lock_enabled:
+            value: true
+          rmb_lock_enabled:
+            value: true
+          hold_duration_ms:
+            value: 2000
+          move_cancel_pixels:
+            value: 15
         name: MouseButtonLock
         version: 1.0
 ```
