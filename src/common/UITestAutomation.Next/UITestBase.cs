@@ -213,7 +213,7 @@ public class UITestBase : IDisposable
     /// the PowerToys log files. Idempotent and fully tolerant — runs from both the <see cref="TestInit"/>
     /// failure path (where <c>[TestCleanup]</c> won't fire) and <see cref="TestCleanup"/>.
     /// </summary>
-    private async Task CaptureFailureArtifactsAsync()
+    protected async Task CaptureFailureArtifactsAsync()
     {
         if (artifactsCaptured)
         {
@@ -221,6 +221,20 @@ public class UITestBase : IDisposable
         }
 
         artifactsCaptured = true;
+
+        try
+        {
+            var screenshotPath = Path.Combine(
+                TestContext.TestResultsDirectory ?? Path.GetTempPath(),
+                $"failure-{Guid.NewGuid():N}.png");
+            if (ScreenCapture.TryCaptureDesktop(screenshotPath))
+            {
+                TestContext.AddResultFile(screenshotPath);
+            }
+        }
+        catch
+        {
+        }
 
         if (isInPipeline)
         {
@@ -244,6 +258,32 @@ public class UITestBase : IDisposable
             {
             }
         }
+    }
+
+    /// <summary>
+    /// Preserve and capture a failed test's terminal UI before derived cleanup closes its windows.
+    /// Call this at the beginning of a derived <c>[TestCleanup]</c>; passing tests return immediately.
+    /// </summary>
+    /// <param name="failureStateTail">
+    /// Optional time to keep the failed UI visible in the recording before finalizing artifacts.
+    /// </param>
+    protected async Task CaptureFailureArtifactsBeforeCleanupAsync(TimeSpan failureStateTail = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(failureStateTail, TimeSpan.Zero);
+
+        var failed = TestContext.CurrentTestOutcome is
+            UnitTestOutcome.Failed or UnitTestOutcome.Error or UnitTestOutcome.Unknown;
+        if (!failed)
+        {
+            return;
+        }
+
+        if (failureStateTail > TimeSpan.Zero)
+        {
+            await Task.Delay(failureStateTail);
+        }
+
+        await CaptureFailureArtifactsAsync();
     }
 
     /// <summary>

@@ -177,17 +177,32 @@ jobs:
       inputs:
         displaySettings: 'optimal'
 
+  # Sign the sparse shell-extension MSIX packages with a machine-trusted TEST certificate so they
+  # register on unsigned PR builds and the UI tests can drive the real modern (Win11 tier-1) context
+  # menu instead of the signing-free fallback. Test-only trust anchor; asserts no security. All roots
+  # are passed (buildNow run-in-place tree + the machine and per-user install locations); missing ones
+  # are skipped. Signing is required because the Win11 Image Resizer suite exercises the modern menu
+  # unconditionally. Verified in a local Win11 VM — unsigned Add-AppxPackage fails
+  # 0x800B0100; after signing + force-trust the same registration succeeds.
+  - pwsh: |
+      & "$(build.sourcesdirectory)\.pipelines\signSparsePackages.ps1" -PackageRoot @(
+        "$(Pipeline.Workspace)\$(TestArtifactsName)",
+        "$env:ProgramFiles\PowerToys\WinUI3Apps",
+        "$env:LOCALAPPDATA\PowerToys\WinUI3Apps")
+    displayName: "Sign sparse MSIX packages (test trust)"
+
   # Start WinAppDriver once for the whole job — WinAppDriver's documented CI pattern
   # (https://github.com/microsoft/WinAppDriver/blob/master/Docs/CI_AzureDevOps.md). Launching it
-  # detached gives it its own console whose stdin blocks, so it stays alive for the run instead of
-  # reading EOF and exiting the moment it starts listening (the failure mode when a test host launches
-  # it as a child). The legacy UITest harness reuses an already-listening instance rather than
+  # detached gives it its own hidden console whose stdin blocks, so it stays alive for the run without
+  # stealing foreground from non-elevated apps under test. This also avoids reading EOF and exiting the
+  # moment it starts listening (the failure mode when a test host launches it as a child). The legacy
+  # UITest harness reuses an already-listening instance rather than
   # relaunching it per test, so this removes the per-assembly launch cost. The winappcli-based .Next
   # tests don't use WinAppDriver. Best-effort: if the pre-start fails, each assembly still launches its own.
   - pwsh: |
       $winapp = "C:\Program Files (x86)\Windows Application Driver\WinAppDriver.exe"
       if (Test-Path $winapp) {
-        Start-Process -FilePath $winapp
+        Start-Process -FilePath $winapp -WindowStyle Hidden
 
         $deadline = (Get-Date).AddSeconds(30)
         $ready = $false
@@ -282,6 +297,23 @@ jobs:
     # set `env: { platform: $(TestPlatform) }`; the MTP migration to this pwsh step dropped it.
     env:
       platform: $(TestPlatform)
+
+  # Remove the temporary test trust anchors from persistent self-hosted agents, even when tests fail.
+  - pwsh: |
+      $thumbprints = '$(PowerToysTestCertThumbprints)' -split ';' | Where-Object { $_ }
+      foreach ($thumbprint in $thumbprints) {
+        foreach ($store in @(
+          'Cert:\CurrentUser\My',
+          'Cert:\LocalMachine\Root',
+          'Cert:\LocalMachine\TrustedPeople',
+          'Cert:\CurrentUser\TrustedPeople')) {
+          Get-ChildItem $store -ErrorAction SilentlyContinue |
+            Where-Object Thumbprint -eq $thumbprint |
+            Remove-Item -Force -ErrorAction SilentlyContinue
+        }
+      }
+    displayName: "Remove sparse MSIX test certificates"
+    condition: always()
 
   - task: PublishTestResults@2
     displayName: "Publish UI Test Results"
