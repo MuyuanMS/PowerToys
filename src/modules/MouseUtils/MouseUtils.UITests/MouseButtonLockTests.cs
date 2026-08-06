@@ -44,8 +44,15 @@ namespace MouseUtils.UITests
             mmbLock.SetCheck(false);
             Assert.IsFalse(mmbLock.IsChecked);
 
+            rmbLock.SetCheck(false);
+            Assert.IsFalse(rmbLock.IsChecked);
             rmbLock.SetCheck(true);
             Assert.IsTrue(rmbLock.IsChecked);
+
+            lmbLock.SetCheck(true);
+            Assert.IsTrue(lmbLock.IsChecked);
+            lmbLock.SetCheck(false);
+            Assert.IsFalse(lmbLock.IsChecked);
 
             // [Test Case] Hold duration snaps to 100 ms steps across the 200-2200 ms range.
             var holdDuration = foundCustom.Find<Slider>(By.AccessibilityId(MouseUtilsSettings.AccessibilityIds.MouseButtonLockHoldDuration));
