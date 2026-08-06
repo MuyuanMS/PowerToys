@@ -197,7 +197,7 @@ namespace
     void OpenIssuePage(const std::wstring& zipPath)
     {
         const std::wstring url =
-            L"https://github.com/microsoft/PowerToys/issues/new?template=bug_report.yml&labels=Issue-Bug%2CTriage-Needed&version=" +
+            L"https://github.com/microsoft/PowerToys/issues/new?template=bug_report.yml&labels=Issue-Bug%2CNeeds-Triage&version=" +
             get_product_version(false);
         RunNonElevatedEx(url, L"", L"");
 
@@ -496,21 +496,26 @@ void run_bug_report_dialog(const std::wstring& toolPath, const std::function<voi
     if (!hwnd)
     {
         // Fall back to running the tool without UI so a report is still produced.
+        const std::wstring desktop = GetDesktopPath();
+        const ReportSnapshot reportsBeforeRun = SnapshotReports(desktop);
         SHELLEXECUTEINFOW sei{ sizeof(sei) };
         sei.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NO_CONSOLE;
         sei.lpFile = toolPath.c_str();
         sei.nShow = SW_HIDE;
         const bool started = ShellExecuteExW(&sei) && sei.hProcess;
+        DWORD exitCode = 1;
         if (started)
         {
             WaitForSingleObject(sei.hProcess, INFINITE);
+            GetExitCodeProcess(sei.hProcess, &exitCode);
             CloseHandle(sei.hProcess);
         }
-        MessageBoxW(nullptr,
-                    GET_RESOURCE_STRING(started ? IDS_BUGREPORT_SUCCESS : IDS_BUGREPORT_FAILED).c_str(),
-                    GET_RESOURCE_STRING(IDS_BUGREPORT_DIALOG_TITLE).c_str(),
-                    MB_OK | (started ? MB_ICONINFORMATION : MB_ICONERROR));
+        const bool reportCreated = started && exitCode == 0 && !FindNewestReport(desktop, reportsBeforeRun).empty();
         notifyFinished();
+        MessageBoxW(nullptr,
+                    GET_RESOURCE_STRING(reportCreated ? IDS_BUGREPORT_SUCCESS : IDS_BUGREPORT_FAILED).c_str(),
+                    GET_RESOURCE_STRING(IDS_BUGREPORT_DIALOG_TITLE).c_str(),
+                    MB_OK | (reportCreated ? MB_ICONINFORMATION : MB_ICONERROR));
         if (st.hFont)
         {
             DeleteObject(st.hFont);
