@@ -1488,7 +1488,11 @@ namespace KeyboardEventHandlers
             {
                 if (ProgramLauncher::ShouldUseExplorerShell(shortcut.startWindowType))
                 {
-                    processStarted = RunNonElevatedEx(fullExpandedFilePath, expandedArgs, currentDir);
+                    processStarted = RunNonElevatedEx(
+                        fullExpandedFilePath,
+                        expandedArgs,
+                        currentDir,
+                        ProgramLauncher::GetExplorerShowCommand(shortcut.startWindowType));
                 }
                 else
                 {
