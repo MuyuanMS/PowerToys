@@ -119,7 +119,7 @@ std::optional<fs::path> ObtainInstaller(bool& isUpToDate)
         }
 
         UpdateState::store([](UpdateState& current) {
-            current.state = UpdateState::networkError;
+            current.state = UpdateState::readyToDownload;
             current.downloadedInstallerFilename.clear();
             current.isPrerelease = false;
         });

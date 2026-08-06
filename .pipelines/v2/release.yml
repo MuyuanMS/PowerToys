@@ -136,6 +136,10 @@ extends:
                     Write-Host "##vso[task.setvariable variable=ResolvedReleaseChannel;isOutput=true]$($metadata.Channel)"
                     Write-Host "##vso[task.setvariable variable=ResolvedBuildIntent;isOutput=true]$($metadata.Intent)"
                     Write-Host "##vso[task.setvariable variable=ShouldPublishPreview;isOutput=true]$($metadata.ShouldPublishPreview)"
+                    Write-Host "##vso[task.setvariable variable=EffectiveVersionNumber]$resolvedVersion"
+                    Write-Host "##vso[task.setvariable variable=ResolvedReleaseChannel]$($metadata.Channel)"
+                    Write-Host "##vso[task.setvariable variable=ResolvedBuildIntent]$($metadata.Intent)"
+                    Write-Host "##vso[task.setvariable variable=ShouldPublishPreview]$($metadata.ShouldPublishPreview)"
                   name: resolveVersion
                   displayName: Prepare versioning
 

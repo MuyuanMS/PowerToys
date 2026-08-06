@@ -46,9 +46,6 @@ function Get-BuildStamp {
     }
 
     $revision = [int]::Parse($matches["revision"])
-    if ($revision -lt 1 -or $revision -gt 99) {
-        throw "Build number '$PipelineBuildNumber' has daily revision '$revision'; canonical versions support revisions 001 through 099"
-    }
 
     return [pscustomobject]@{
         Date = $date
@@ -158,6 +155,10 @@ function Get-PrivateVersion {
         [Parameter(Mandatory)][datetime]$Epoch,
         [Parameter(Mandatory)]$BuildStamp
     )
+
+    if ($BuildStamp.Revision -lt 1 -or $BuildStamp.Revision -gt 99) {
+        throw "Private build revision '$($BuildStamp.Revision)' is outside the supported range 1-99"
+    }
 
     $extendedDay = ($BuildStamp.Date - $Epoch).Days + 1
     if ($extendedDay -lt 1) {
