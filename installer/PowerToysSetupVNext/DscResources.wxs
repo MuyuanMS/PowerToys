@@ -23,6 +23,14 @@
     <ComponentGroup Id="DscResourcesComponentGroup">
       <ComponentRef Id="PowerToysDSCReference" />
       <?if $(var.PerUser) = "false" ?>
+      <Component Id="SecureMachineInstallFolder" Guid="5F7B6A4D-8A7E-4A4A-9D7D-1E3F7B6C2A90" Directory="INSTALLFOLDER" Bitness="always64">
+        <RegistryKey Root="$(var.RegistryScope)" Key="Software\Classes\powertoys\components">
+          <RegistryValue Type="string" Name="SecureMachineInstallFolder" Value="" KeyPath="yes" />
+        </RegistryKey>
+        <CreateFolder>
+          <PermissionEx Sddl="$(var.MachinePathFolderSddl)" />
+        </CreateFolder>
+      </Component>
       <Component Id="SecureDSCModulesFolder" Guid="7D2F4E57-CCB2-4F89-9B8B-62E9B3CC4E12" Directory="DSCModulesReferenceFolder" Bitness="always64">
         <RegistryKey Root="$(var.RegistryScope)" Key="Software\Classes\powertoys\components">
           <RegistryValue Type="string" Name="SecureDSCModulesFolder" Value="" KeyPath="yes" />
