@@ -65,17 +65,17 @@ public sealed partial class FastFirstPaintTests
     // A stand-in ranker that mirrors the real contract for fallbacks: an item with no
     // (resolved) title scores 0 and is dropped; otherwise it lands at the FallbackFloor tier
     // with a stronger within-floor score when its current title overlaps the query text.
-    private static ScoringFunction<IListItem> FloorScorerFor(string queryText)
+    private static ScoringFunction<IListItem> FloorScorerFor()
     {
-        return (in FuzzyQuery _, IListItem item) =>
+        return (in FuzzyQuery query, IListItem item) =>
         {
-            var title = item.Title;
-            if (string.IsNullOrWhiteSpace(title))
+            var labels = $"{item.Title} {item.Subtitle}";
+            if (string.IsNullOrWhiteSpace(labels))
             {
                 return 0;
             }
 
-            var within = title.Contains(queryText, StringComparison.OrdinalIgnoreCase) ? 100 : 1;
+            var within = labels.Contains(query.Original, StringComparison.OrdinalIgnoreCase) ? 100 : 1;
             return MainListRanker.Pack(RankTier.FallbackFloor, within);
         };
     }
@@ -117,7 +117,8 @@ public sealed partial class FastFirstPaintTests
         var fallback = new MutableListItem { Title = string.Empty };
         IReadOnlyList<IListItem> sources = new IListItem[] { fallback };
 
-        var scored = MainListPage.ScoreDeferredFallbacks(sources, default, FloorScorerFor("remote"));
+        var matcher = new PrecomputedFuzzyMatcher(new PrecomputedFuzzyMatcherOptions());
+        var scored = MainListPage.ScoreDeferredFallbacks(sources, matcher.PrecomputeQuery("remote"), FloorScorerFor());
 
         Assert.IsNull(scored, "A fallback whose dynamic title has not resolved yet must not appear.");
     }
@@ -127,7 +128,7 @@ public sealed partial class FastFirstPaintTests
     {
         var fallback = new MutableListItem { Title = string.Empty };
         IReadOnlyList<IListItem> sources = new IListItem[] { fallback };
-        var scorer = FloorScorerFor("remote");
+        var scorer = FloorScorerFor();
 
         // First paint: unresolved title -> not present.
         Assert.IsNull(MainListPage.ScoreDeferredFallbacks(sources, default, scorer));
@@ -149,7 +150,7 @@ public sealed partial class FastFirstPaintTests
     {
         var fallback = new MutableListItem { Title = "no match here" };
         IReadOnlyList<IListItem> sources = new IListItem[] { fallback };
-        var scorer = FloorScorerFor("remote");
+        var scorer = FloorScorerFor();
 
         var weak = MainListPage.ScoreDeferredFallbacks(sources, default, scorer);
         Assert.IsNotNull(weak);
@@ -176,13 +177,14 @@ public sealed partial class FastFirstPaintTests
         IReadOnlyList<IListItem> sources = new IListItem[] { fallback };
 
         // Query A ("remote") is a strong match for the current title.
-        var a = MainListPage.ScoreDeferredFallbacks(sources, default, FloorScorerFor("remote"));
+        var matcher = new PrecomputedFuzzyMatcher(new PrecomputedFuzzyMatcherOptions());
+        var a = MainListPage.ScoreDeferredFallbacks(sources, matcher.PrecomputeQuery("remote"), FloorScorerFor());
         Assert.IsNotNull(a);
         var strongScore = a![0].Score;
 
         // A newer keystroke installs query B ("zzz"), which does not overlap the title. The
         // render path always scores the latest snapshot, so query A's strong score is gone.
-        var b = MainListPage.ScoreDeferredFallbacks(sources, default, FloorScorerFor("zzz"));
+        var b = MainListPage.ScoreDeferredFallbacks(sources, matcher.PrecomputeQuery("zzz"), FloorScorerFor());
 
         Assert.IsNotNull(b);
         Assert.IsTrue(b![0].Score < strongScore, "A superseding query must not inherit the prior query's stale score.");

@@ -425,7 +425,7 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
     /// RPC work, so make sure you're calling it on a BG thread.
     /// </summary>
     /// <param name="newQuery">The new search text to pass to the extension</param>
-    /// <returns>true if our Title changed across this call</returns>
+    /// <returns>true if either scoring label changed across this call</returns>
     private bool UnsafeUpdateFallbackSynchronous(string newQuery)
     {
         var model = _commandItemViewModel.Model.Unsafe;
@@ -434,15 +434,17 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
         if (model is IFallbackCommandItem fallback)
         {
             var oldTitle = Title;
+            var oldSubtitle = Subtitle;
 
             // RPC for method
             fallback.FallbackHandler.UpdateQuery(newQuery);
             var newTitle = Title;
 
-            // Report any title change, not just an empty <-> non-empty flip: the render path
-            // re-scores fallbacks off this signal, so a change like "server01" -> "server02"
-            // must still trigger a refresh or the fallback keeps its stale score and position.
-            return !string.Equals(oldTitle, newTitle, StringComparison.Ordinal);
+            var newSubtitle = Subtitle;
+
+            // Re-score when either label changes because both contribute to fallback ranking.
+            return !string.Equals(oldTitle, newTitle, StringComparison.Ordinal) ||
+                !string.Equals(oldSubtitle, newSubtitle, StringComparison.Ordinal);
         }
 
         return false;
