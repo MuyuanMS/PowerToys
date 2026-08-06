@@ -525,11 +525,19 @@ void Highlighter::QueueMouseEvent(MouseEvent event) noexcept
     }
     ReleaseSRWLockExclusive(&m_mouseEventQueueLock);
 
-    if (postMessage && !PostMessage(m_hwnd, WM_PROCESS_MOUSE_EVENTS, 0, 0))
+    HWND window = nullptr;
+    if (postMessage)
+    {
+        AcquireSRWLockShared(&m_settingsLock);
+        window = m_hwnd;
+        ReleaseSRWLockShared(&m_settingsLock);
+    }
+
+    if (postMessage && (window == nullptr || !PostMessage(window, WM_PROCESS_MOUSE_EVENTS, 0, 0)))
     {
         AcquireSRWLockExclusive(&m_mouseEventQueueLock);
-        m_mouseEventQueueHead = 0;
-        m_mouseEventQueueSize = 0;
+        // Keep queued events, including button-up events, so the next hook
+        // event can retry posting instead of losing the recovery signal.
         m_mouseEventMessagePending = false;
         ReleaseSRWLockExclusive(&m_mouseEventQueueLock);
     }
@@ -989,7 +997,14 @@ void Highlighter::ProcessPendingSettings()
     m_settingsPending = false;
     ReleaseSRWLockExclusive(&m_settingsLock);
 
-    ApplySettings(settings);
+    try
+    {
+        ApplySettings(settings);
+    }
+    catch (...)
+    {
+        Logger::error("Failed to apply Mouse Highlighter settings on the window thread.");
+    }
 }
 
 void Highlighter::BringToFront()
@@ -1009,7 +1024,9 @@ LRESULT CALLBACK Highlighter::WndProc(HWND hWnd, UINT message, WPARAM wParam, LP
     switch (message)
     {
     case WM_NCCREATE:
+        AcquireSRWLockExclusive(&instance->m_settingsLock);
         instance->m_hwnd = hWnd;
+        ReleaseSRWLockExclusive(&instance->m_settingsLock);
         return DefWindowProc(hWnd, message, wParam, lParam);
     case WM_CREATE:
         if (!instance->CreateHighlighter())
