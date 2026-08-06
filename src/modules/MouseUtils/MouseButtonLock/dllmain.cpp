@@ -131,10 +131,6 @@ namespace
                 return true;
             }
             const bool success = InjectUpNow(button);
-            if (!success && m_failureHandler)
-            {
-                m_failureHandler(button);
-            }
             return success;
         }
 
