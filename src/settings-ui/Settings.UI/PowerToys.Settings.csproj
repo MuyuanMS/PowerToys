@@ -152,6 +152,12 @@
 			<LogicalName>Microsoft.PowerToys.Settings.UI.Assets.search.index.json</LogicalName>
 		</EmbeddedResource>
 	</ItemGroup>
+	<ItemGroup>
+		<XamlIndexInputFiles Include="$(MSBuildProjectDirectory)\SettingsXAML\**\*.xaml" />
+		<XamlIndexInputDirectories Include="$(MSBuildProjectDirectory)\SettingsXAML\**\" />
+		<XamlIndexBuilderInputFiles Include="..\Settings.UI.XamlIndexBuilder\**\*.cs" />
+		<XamlIndexBuilderInputFiles Include="..\Settings.UI.XamlIndexBuilder\Settings.UI.XamlIndexBuilder.csproj" />
+	</ItemGroup>
 
 	<ItemGroup>
 		<None Update="Assets\Settings\icon.ico">
@@ -207,7 +213,7 @@
 		</Page>
 	</ItemGroup>
 
-	<Target Name="BuildXamlIndexBeforeSettings" BeforeTargets="CoreCompile" Condition="'$(DesignTimeBuild)' != 'true'" Inputs="$(MSBuildProjectDirectory)\SettingsXAML\;$(MSBuildProjectDirectory)\SettingsXAML\**\;$(MSBuildProjectDirectory)\SettingsXAML\**\*.xaml;..\Settings.UI.XamlIndexBuilder\**\*.cs;..\Settings.UI.XamlIndexBuilder\Settings.UI.XamlIndexBuilder.csproj" Outputs="$(GeneratedJsonFile)">
+	<Target Name="BuildXamlIndexBeforeSettings" BeforeTargets="CoreCompile" Condition="'$(DesignTimeBuild)' != 'true'" Inputs="@(XamlIndexInputFiles);@(XamlIndexInputDirectories);@(XamlIndexBuilderInputFiles)" Outputs="$(GeneratedJsonFile)">
 		<Message Importance="high" Text="[Settings] Building XamlIndexBuilder prior to compile. Views='$(MSBuildProjectDirectory)\SettingsXAML\Views' Out='$(GeneratedJsonFile)'" />
 		<MSBuild Projects="..\Settings.UI.XamlIndexBuilder\Settings.UI.XamlIndexBuilder.csproj" Targets="Build" Properties="Configuration=$(Configuration);Platform=Any CPU;TargetFramework=$(CoreTargetFramework);XamlViewsDir=$(MSBuildProjectDirectory)\SettingsXAML\Views;GeneratedJsonFile=$(GeneratedJsonFile)" />
 	</Target>
