@@ -40,8 +40,11 @@ namespace UnitTestsCommonUtils
             bool Create()
             {
                 server = CreateNamedPipeW(name.c_str(),
-                                          PIPE_ACCESS_DUPLEX,
-                                          PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
+                                          PIPE_ACCESS_DUPLEX | WRITE_DAC,
+                                          PIPE_TYPE_MESSAGE |
+                                              PIPE_READMODE_MESSAGE |
+                                              PIPE_WAIT |
+                                              PIPE_REJECT_REMOTE_CLIENTS,
                                           PIPE_UNLIMITED_INSTANCES,
                                           4096,
                                           4096,
