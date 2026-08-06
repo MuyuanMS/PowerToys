@@ -139,7 +139,7 @@ int wmain()
 
     if (!CreateProcessW(
             targetPath.c_str(),
-            commandLine.data(), // Requires a mutable buffer; CreateProcessW may write to it.
+            &commandLine[0], // CreateProcessW may write to the mutable command-line buffer.
             nullptr,
             nullptr,
             TRUE, // Inherit handles: share stdin/stdout/stderr and stay in this console.
