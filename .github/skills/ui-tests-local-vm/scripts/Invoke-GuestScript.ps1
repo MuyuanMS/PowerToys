@@ -16,8 +16,7 @@ The scriptblock to run in the guest. Its output is returned to the host.
 Host loopback WinRM port mapped to the guest (Win11 scaffold default 15986 HTTPS; Win10 15985 HTTP).
 
 .PARAMETER UseHttp
-Use http:// (unencrypted Basic) instead of https:// — the older Win10 manual scheme. The guest's
-WSMan client must already allow Basic/unencrypted (the Win10 controller path configures this).
+Use http:// with Negotiate authentication instead of https:// — the older Win10 manual scheme.
 
 .EXAMPLE
 ./Invoke-GuestScript.ps1 -WinRmPort 15986 -CredentialPath "$env:LOCALAPPDATA\PowerToysUiTestVm\admin.credential.xml" -ScriptBlock {
@@ -47,7 +46,7 @@ if (-not (Test-Path $CredentialPath)) {
 $credential = Import-Clixml $CredentialPath
 
 if ($UseHttp) {
-    $session = New-PSSession -ConnectionUri "http://127.0.0.1:$WinRmPort/wsman" -Authentication Basic -Credential $credential
+    $session = New-PSSession -ConnectionUri "http://127.0.0.1:$WinRmPort/wsman" -Authentication Negotiate -Credential $credential
 }
 else {
     $sessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck -SkipRevocationCheck
