@@ -45,7 +45,7 @@ public class FileExplorerAddonsTests : UITestBase
     private const double PreviewRegionDifferenceThreshold = 0.75;
     private static readonly TimeSpan FailureRecordingTail = TimeSpan.FromSeconds(2);
 
-    private static readonly string[] FileExplorerModule = { "File Explorer" };
+    private static readonly string[] FileExplorerModule = { "File Explorer Preview" };
     private static readonly (string Extension, string Clsid)[] ThumbnailProviders =
     {
         (".svg", SvgThumbnailProvider),
