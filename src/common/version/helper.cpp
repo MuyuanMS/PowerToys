@@ -3,6 +3,7 @@
 #include "../utils/string_utils.h"
 
 #include <algorithm>
+#include <array>
 
 VersionHelper::VersionHelper(const size_t major, const size_t minor, const size_t revision, const size_t build) :
     major{ major },
@@ -42,6 +43,12 @@ std::optional<VersionHelper> fromString(std::basic_string_view<CharT> str)
         str = left_trim<CharT>(trim<CharT>(str), Constants<CharT>::UPPER_V);
         if (const auto suffixPos = str.find(static_cast<CharT>('-')); suffixPos != std::basic_string_view<CharT>::npos)
         {
+            const auto suffix = str.substr(suffixPos);
+            constexpr std::array<CharT, 8> expectedSuffix{ static_cast<CharT>('-'), static_cast<CharT>('p'), static_cast<CharT>('r'), static_cast<CharT>('e'), static_cast<CharT>('v'), static_cast<CharT>('i'), static_cast<CharT>('e'), static_cast<CharT>('w') };
+            if (suffix.size() != expectedSuffix.size() || !std::equal(suffix.begin(), suffix.end(), expectedSuffix.begin()))
+            {
+                return std::nullopt;
+            }
             str = str.substr(0, suffixPos);
         }
 

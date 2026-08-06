@@ -18,6 +18,7 @@
 #include <common/updating/updateLifecycle.h>
 
 #include <common/utils/elevation.h>
+#include <common/utils/gpo.h>
 #include <common/utils/HttpClient.h>
 #include <common/utils/process_path.h>
 #include <common/utils/resources.h>
@@ -146,7 +147,9 @@ std::optional<fs::path> ObtainInstaller(bool& isUpToDate)
         return std::nullopt;
     }
 
-    const bool include_prerelease_updates = PTSettingsHelper::load_general_settings().GetNamedBoolean(L"include_prerelease_updates", false);
+    const bool include_prerelease_updates =
+        powertoys_gpo::getDisablePreviewUpdatesValue() != powertoys_gpo::gpo_rule_configured_enabled &&
+        PTSettingsHelper::load_general_settings().GetNamedBoolean(L"include_prerelease_updates", false);
     const auto new_version_info = std::move(get_github_version_info_async(include_prerelease_updates)).get();
 
     // Check for error BEFORE dereferencing — the old code crashed here

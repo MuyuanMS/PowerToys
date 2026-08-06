@@ -138,12 +138,21 @@ namespace Microsoft.PowerToys.Settings.UI
             using var httpClient = new HttpClient(proxyClientHandler);
             httpClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "PowerToys");
 
-            string json = await httpClient.GetStringAsync("https://api.github.com/repos/microsoft/PowerToys/releases?per_page=100");
-            var allReleases = JsonSerializer.Deserialize<IList<PowerToysReleaseInfo>>(json, SourceGenerationContextContext.Default.IListPowerToysReleaseInfo);
-
-            if (allReleases is null || allReleases.Count == 0)
+            var allReleases = new List<PowerToysReleaseInfo>();
+            for (int page = 1; page <= 10; page++)
             {
-                return [];
+                string json = await httpClient.GetStringAsync($"https://api.github.com/repos/microsoft/PowerToys/releases?per_page=100&page={page}");
+                var pageReleases = JsonSerializer.Deserialize<IList<PowerToysReleaseInfo>>(json, SourceGenerationContextContext.Default.IListPowerToysReleaseInfo);
+                if (pageReleases is null || pageReleases.Count == 0)
+                {
+                    break;
+                }
+
+                allReleases.AddRange(pageReleases);
+                if (allReleases.Count(r => !r.IsPrerelease) >= 20 && (!ShouldShowPrereleases() || allReleases.Count(r => r.IsPrerelease) >= 10))
+                {
+                    break;
+                }
             }
 
             return allReleases
