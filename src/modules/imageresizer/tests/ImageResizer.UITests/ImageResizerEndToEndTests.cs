@@ -720,7 +720,6 @@ public sealed class ImageResizerEndToEndTests : UITestBase
             return;
         }
 
-        contextMenuExplorerRefreshed = true;
         Thread.Sleep(3_000);
 
         var previousProcessIds = Process.GetProcessesByName(ExplorerProcessName)
@@ -751,6 +750,7 @@ public sealed class ImageResizerEndToEndTests : UITestBase
         }
 
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        var freshShellObserved = false;
         while (DateTime.UtcNow < deadline)
         {
             var current = Process.GetProcessesByName(ExplorerProcessName);
@@ -762,12 +762,15 @@ public sealed class ImageResizerEndToEndTests : UITestBase
 
             if (hasFreshShell)
             {
+                freshShellObserved = true;
                 break;
             }
 
             Thread.Sleep(500);
         }
 
+        Assert.IsTrue(freshShellObserved, "Explorer did not restart with a fresh shell process.");
+        contextMenuExplorerRefreshed = true;
         Thread.Sleep(2_000);
     }
 

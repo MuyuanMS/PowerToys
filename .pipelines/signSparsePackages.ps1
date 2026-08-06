@@ -179,7 +179,8 @@ function Get-TrustedSigningCert {
         Where-Object {
             $_.Subject -eq $Subject -and
             $_.Issuer -eq $_.Subject -and
-            $_.HasPrivateKey
+            $_.HasPrivateKey -and
+            @($_.EnhancedKeyUsageList | ForEach-Object { $_.ObjectId.Value }) -contains '1.3.6.1.5.5.7.3.3'
         } |
         Sort-Object NotAfter -Descending | Select-Object -First 1
 
