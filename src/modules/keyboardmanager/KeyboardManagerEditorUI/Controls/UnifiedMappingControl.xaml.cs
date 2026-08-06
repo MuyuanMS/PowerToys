@@ -220,6 +220,8 @@ namespace KeyboardManagerEditorUI.Controls
                 {
                     SetActionType(ActionType.Text);
                 }
+
+                TextContentBox.MaxLength = tag == "Text" ? 4096 : 0;
             }
         }
 
