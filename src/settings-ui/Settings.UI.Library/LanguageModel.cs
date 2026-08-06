@@ -11,6 +11,9 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 {
     public class LanguageModel
     {
+        public const string SettingsFilePath = "\\Microsoft\\PowerToys\\";
+        public const string SettingsFile = "language.json";
+
         public string Tag { get; set; }
 
         public string ResourceID { get; set; }

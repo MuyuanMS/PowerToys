@@ -39,6 +39,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         public string DownloadedInstallerFilename { get; set; }
 
         // Non-localizable strings: Files
+        public const string SettingsFilePath = "\\Microsoft\\PowerToys\\";
         public const string SettingsFile = "UpdateState.json";
 
         public string NewVersion
