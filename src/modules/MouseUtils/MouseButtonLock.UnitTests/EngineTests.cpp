@@ -19,11 +19,22 @@ namespace
     public:
         std::vector<MouseButton> upCalls;
         bool succeed = true;
+        std::function<void(MouseButton)> failureHandler;
 
         bool InjectUp(MouseButton button) override
         {
             upCalls.push_back(button);
             return succeed;
+        }
+
+        void SetFailureHandler(std::function<void(MouseButton)> handler) override
+        {
+            failureHandler = std::move(handler);
+        }
+
+        void FailDeferred(MouseButton button)
+        {
+            failureHandler(button);
         }
     };
 
@@ -123,6 +134,39 @@ namespace MouseButtonLockEngineTests
             // Release tap, injection fails: don't suppress, and drop the lock so state can't disagree.
             Assert::IsFalse(e.OnButtonDown(MouseButton::Right, 1000, PointL{ 0, 0 }, s));
             Assert::IsFalse(e.IsLocked(MouseButton::Right));
+        }
+
+        TEST_METHOD(DeferredTapReleaseFailureDoesNotSwallowPhysicalUp)
+        {
+            FakeInjector inj;
+            Engine e(inj);
+            Settings s = DefaultSettings();
+
+            e.OnButtonDown(MouseButton::Right, 0, PointL{ 0, 0 }, s);
+            e.OnButtonUp(MouseButton::Right, 400, s);
+            Assert::IsTrue(e.IsLocked(MouseButton::Right));
+
+            Assert::IsTrue(e.OnButtonDown(MouseButton::Right, 1000, PointL{ 0, 0 }, s));
+            inj.FailDeferred(MouseButton::Right);
+
+            Assert::IsFalse(e.IsLocked(MouseButton::Right));
+            Assert::IsFalse(e.OnButtonUp(MouseButton::Right, 1005, s));
+        }
+
+        TEST_METHOD(DeferredReleaseFailureRestoresLogicalLock)
+        {
+            FakeInjector inj;
+            Engine e(inj);
+            Settings s = DefaultSettings();
+
+            e.OnButtonDown(MouseButton::Right, 0, PointL{ 0, 0 }, s);
+            e.OnButtonUp(MouseButton::Right, 400, s);
+            Assert::IsTrue(e.IsLocked(MouseButton::Right));
+
+            e.OnButtonDown(MouseButton::Left, 1000, PointL{ 0, 0 }, s);
+            inj.FailDeferred(MouseButton::Right);
+
+            Assert::IsTrue(e.IsLocked(MouseButton::Right));
         }
     };
 

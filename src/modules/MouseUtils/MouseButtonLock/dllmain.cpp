@@ -541,6 +541,9 @@ bool MouseButtonLock::HandleMouseMessage(WPARAM wParam, const MSLLHOOKSTRUCT* da
         return m_engine.OnButtonDown(mousebuttonlock::MouseButton::Middle, tick, pt, snapshot);
     case WM_MBUTTONUP:
         return m_engine.OnButtonUp(mousebuttonlock::MouseButton::Middle, tick, snapshot);
+    case WM_XBUTTONDOWN:
+        m_engine.ReleaseAll();
+        return false;
     case WM_MOUSEMOVE:
         m_engine.OnMove(tick, pt, snapshot);
         return false;
