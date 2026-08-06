@@ -35,17 +35,10 @@ internal sealed partial class MainListPageSearchTelemetry : IDisposable
     private (int QueryLength, int ResultCount, long LatencyMs) _pendingResults;
     private int _resultsGeneration;
 
-    // Snapshots of the most recent rendered search results, read off the hot path (only when the
-    // user invokes a result) to resolve the invoked item's visible rank and ranker tier. The scored
-    // inputs and query length are captured together with the rendered items at render time, so
-    // selection telemetry resolves rank, tier and query length from one coherent generation even
-    // after a newer query has already published fresh scored fields.
-    private IReadOnlyList<IListItem>? _lastViewItems;
-    private IReadOnlyList<RoScored<IListItem>>? _lastScoredGlobalFallbacks;
-    private RoScored<IListItem>[]? _lastViewFilteredItems;
-    private RoScored<IListItem>[]? _lastViewFilteredApps;
-    private IEnumerable<RoScored<IListItem>>? _lastViewFallbackItems;
-    private int _lastViewQueryLength;
+    // Snapshot of the most recent rendered search results, read off the hot path (only when the
+    // user invokes a result). A single reference assignment publishes every value as one coherent
+    // generation even when rendering and invocation happen on different threads.
+    private SearchViewSnapshot? _lastView;
 
     public MainListPageSearchTelemetry()
     {
@@ -81,12 +74,13 @@ internal sealed partial class MainListPageSearchTelemetry : IDisposable
         IEnumerable<RoScored<IListItem>>? fallbackItems,
         int queryLength)
     {
-        _lastViewItems = renderedItems;
-        _lastScoredGlobalFallbacks = scoredGlobalFallbacks;
-        _lastViewFilteredItems = filteredItems;
-        _lastViewFilteredApps = filteredApps;
-        _lastViewFallbackItems = fallbackItems;
-        _lastViewQueryLength = queryLength;
+        _lastView = new SearchViewSnapshot(
+            renderedItems,
+            filteredItems,
+            filteredApps,
+            scoredGlobalFallbacks,
+            fallbackItems,
+            queryLength);
     }
 
     // Drops any pending settled-search event without emitting it. Used when an alias query supersedes
@@ -109,12 +103,7 @@ internal sealed partial class MainListPageSearchTelemetry : IDisposable
             ++_resultsGeneration;
             _resultsDebounce.Cancel();
         }
-        _lastViewItems = null;
-        _lastScoredGlobalFallbacks = null;
-        _lastViewFilteredItems = null;
-        _lastViewFilteredApps = null;
-        _lastViewFallbackItems = null;
-        _lastViewQueryLength = 0;
+        _lastView = null;
     }
 
     // Emits selection telemetry when the user invokes a result during an active search. Runs only on
@@ -127,29 +116,29 @@ internal sealed partial class MainListPageSearchTelemetry : IDisposable
         // Resolve everything from the last rendered search-view snapshot so the invoked item's rank,
         // tier, and the reported query length all come from one generation. If the last render was
         // the default (no-search) view, _lastViewItems is null and nothing is emitted.
-        var lastView = _lastViewItems;
-        if (lastView is null || _lastViewQueryLength <= 0)
+        var lastView = _lastView;
+        if (lastView is null || lastView.QueryLength <= 0)
         {
             return;
         }
 
-        var index = ResolveVisibleIndex(lastView, invoked, resultsSeparator, fallbacksSeparator);
+        var index = ResolveVisibleIndex(lastView.RenderedItems, invoked, resultsSeparator, fallbacksSeparator);
         if (index < 0)
         {
             return;
         }
 
-        var packed = (_lastViewFilteredItems ?? Enumerable.Empty<RoScored<IListItem>>())
-            .Concat(_lastViewFilteredApps ?? Enumerable.Empty<RoScored<IListItem>>())
-            .Concat(_lastScoredGlobalFallbacks ?? Enumerable.Empty<RoScored<IListItem>>());
+        var packed = (lastView.FilteredItems ?? Enumerable.Empty<RoScored<IListItem>>())
+            .Concat(lastView.FilteredApps ?? Enumerable.Empty<RoScored<IListItem>>())
+            .Concat(lastView.ScoredGlobalFallbacks ?? Enumerable.Empty<RoScored<IListItem>>());
 
-        var tier = ResolveSelectedTier(invoked, packed, _lastViewFallbackItems);
+        var tier = ResolveSelectedTier(invoked, packed, lastView.FallbackItems);
         if (tier == RankTier.None)
         {
             return;
         }
 
-        WeakReferenceMessenger.Default.Send(BuildSearchSelectedMessage(_lastViewQueryLength, index, tier));
+        WeakReferenceMessenger.Default.Send(BuildSearchSelectedMessage(lastView.QueryLength, index, tier));
     }
 
     private void EmitPendingResults(int generation)
@@ -274,5 +263,13 @@ internal sealed partial class MainListPageSearchTelemetry : IDisposable
             ++_resultsGeneration;
             _resultsDebounce.Dispose();
         }
+
+        private sealed record SearchViewSnapshot(
+            IReadOnlyList<IListItem> RenderedItems,
+            RoScored<IListItem>[]? FilteredItems,
+            RoScored<IListItem>[]? FilteredApps,
+            IReadOnlyList<RoScored<IListItem>>? ScoredGlobalFallbacks,
+            IEnumerable<RoScored<IListItem>>? FallbackItems,
+            int QueryLength);
     }
 }
