@@ -68,6 +68,7 @@ namespace MouseUtils.UITests
             var moveCancelPixels = foundCustom.Find<TextBox>(By.AccessibilityId(MouseUtilsSettings.AccessibilityIds.MouseButtonLockMoveCancelPixels));
             Assert.IsNotNull(moveCancelPixels);
             moveCancelPixels.SetText("12");
+            Assert.AreEqual("12", moveCancelPixels.Text);
 
             // Leave the module off so a later test starts from a known state.
             MouseUtilsSettings.SetMouseUtilEnabled(foundCustom, MouseUtilsSettings.MouseUtils.MouseButtonLock, false);
