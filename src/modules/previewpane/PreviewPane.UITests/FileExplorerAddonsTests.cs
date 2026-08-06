@@ -881,9 +881,10 @@ public class FileExplorerAddonsTests : UITestBase
         using var image = new Bitmap(imagePath);
         var colorBuckets = new HashSet<int>();
 
+        var iconRegionWidth = Math.Max(1, image.Width / 2);
         for (var y = 0; y < image.Height; y += 3)
         {
-            for (var x = 0; x < image.Width; x += 3)
+            for (var x = 0; x < iconRegionWidth; x += 3)
             {
                 var color = image.GetPixel(x, y);
                 colorBuckets.Add(((color.R >> 5) << 6) | ((color.G >> 5) << 3) | (color.B >> 5));
@@ -892,7 +893,7 @@ public class FileExplorerAddonsTests : UITestBase
 
         Assert.IsTrue(
             colorBuckets.Count >= 6,
-            $"The captured {extension} Explorer item has only {colorBuckets.Count} sampled color buckets; " +
+            $"The captured {extension} Explorer icon region has only {colorBuckets.Count} sampled color buckets; " +
             "the thumbnail appears blank or generic.");
     }
 

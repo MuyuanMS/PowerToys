@@ -526,6 +526,7 @@ finally {
                 Invoke-Command -Session $session -ScriptBlock {
                     param($ProbeTaskName, $TestTaskName)
                     foreach ($name in @($ProbeTaskName, $TestTaskName)) {
+                        Stop-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
                         Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue
                     }
                 } -ArgumentList $probeTaskName, $testTaskName -ErrorAction Stop
