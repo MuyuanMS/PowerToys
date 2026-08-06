@@ -106,6 +106,25 @@ std::optional<fs::path> ObtainInstaller(bool& isUpToDate)
     isUpToDate = false;
 
     auto state = UpdateState::read();
+    const bool include_prerelease_updates =
+        powertoys_gpo::getDisablePreviewUpdatesValue() != powertoys_gpo::gpo_rule_configured_enabled &&
+        PTSettingsHelper::load_general_settings().GetNamedBoolean(L"include_prerelease_updates", false);
+
+    if (state.state == UpdateState::readyToInstall && state.isPrerelease && !include_prerelease_updates)
+    {
+        if (IsSafeDownloadedInstallerFilename(state.downloadedInstallerFilename))
+        {
+            std::error_code ec;
+            fs::remove(get_pending_updates_path() / state.downloadedInstallerFilename, ec);
+        }
+
+        UpdateState::store([](UpdateState& current) {
+            current.state = UpdateState::networkError;
+            current.downloadedInstallerFilename.clear();
+            current.isPrerelease = false;
+        });
+        state = UpdateState::read();
+    }
 
     // Handle readyToInstall first — the installer is already on disk,
     // so we don't need a GitHub API call (which may fail if offline).
@@ -147,9 +166,6 @@ std::optional<fs::path> ObtainInstaller(bool& isUpToDate)
         return std::nullopt;
     }
 
-    const bool include_prerelease_updates =
-        powertoys_gpo::getDisablePreviewUpdatesValue() != powertoys_gpo::gpo_rule_configured_enabled &&
-        PTSettingsHelper::load_general_settings().GetNamedBoolean(L"include_prerelease_updates", false);
     const auto new_version_info = std::move(get_github_version_info_async(include_prerelease_updates)).get();
 
     // Check for error BEFORE dereferencing — the old code crashed here

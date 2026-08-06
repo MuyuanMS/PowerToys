@@ -1,11 +1,12 @@
 <#
 .SYNOPSIS
-    Creates or updates a GitHub draft release from a prepared PowerToys release folder.
+    Creates or updates a PowerToys release from a prepared release folder.
 
 .DESCRIPTION
     Validates a prepared release folder, finds the four installers, two symbol
     zips, GPO zip, and release notes, then uses GitHub CLI (`gh`) to create or
-    update a draft release and upload the assets. Asset filenames use the
+    update a release and upload the assets. Use -Publish to promote it
+    immediately; otherwise it remains a draft. Asset filenames use the
     numeric product version; -TagName may include channel suffixes such as
     v0.100.2607.08001-preview.
 #>
@@ -24,6 +25,8 @@ param(
     [string]$NotesFile,
 
     [switch]$Prerelease,
+
+    [switch]$Publish,
 
     [switch]$LatestFalse,
 
@@ -189,7 +192,8 @@ if ($releaseExists) {
         throw "Release $TagName already exists and is not a draft: $($release.url)"
     }
 
-    $editArgs = @("release", "edit", $TagName, "--repo", $GitHubRepo, "--draft", "--title", $Title, "--notes-file", $notesFilePath)
+    $editArgs = @("release", "edit", $TagName, "--repo", $GitHubRepo, "--title", $Title, "--notes-file", $notesFilePath)
+    $editArgs += if ($Publish) { "--draft=false" } else { "--draft" }
     if ($Target) { $editArgs += @("--target", $Target) }
     if ($Prerelease) { $editArgs += "--prerelease" }
     Invoke-Gh -Arguments $editArgs | Out-Null
@@ -198,7 +202,8 @@ if ($releaseExists) {
     if ($Clobber) { $uploadArgs += "--clobber" }
     Invoke-Gh -Arguments $uploadArgs | Out-Null
 } else {
-    $createArgs = @("release", "create", $TagName) + $assets + @("--repo", $GitHubRepo, "--draft", "--title", $Title, "--notes-file", $notesFilePath)
+    $createArgs = @("release", "create", $TagName) + $assets + @("--repo", $GitHubRepo, "--title", $Title, "--notes-file", $notesFilePath)
+    if (-not $Publish) { $createArgs += "--draft" }
     if ($Target) { $createArgs += @("--target", $Target) }
     if ($Prerelease) { $createArgs += "--prerelease" }
     if ($Prerelease -or $LatestFalse) { $createArgs += "--latest=false" }
@@ -209,5 +214,6 @@ if ($DryRun) {
     Write-Host "Dry run complete. No GitHub release was created or modified." -ForegroundColor Yellow
 } else {
     $result = Invoke-Gh -Arguments @("release", "view", $TagName, "--repo", $GitHubRepo, "--json", "url", "--jq", ".url")
-    Write-Host "Draft release ready: $result" -ForegroundColor Green
+    $message = if ($Publish) { "Published release ready: $result" } else { "Draft release ready: $result" }
+    Write-Host $message -ForegroundColor Green
 }

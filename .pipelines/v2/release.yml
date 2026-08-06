@@ -173,6 +173,17 @@ extends:
                   Get-ChildItem -Path '$(Pipeline.Workspace)\build-x64-Release', '$(Pipeline.Workspace)\build-arm64-Release' -Recurse -File |
                     Copy-Item -Destination $releaseFolder -Force
 
+                  foreach ($architecture in @('x64', 'arm64')) {
+                    $symbolDirectory = Get-ChildItem -Path '$(Pipeline.Workspace)\build-' + $architecture + '-Release' -Directory -Filter "symbols-$architecture" -Recurse |
+                      Select-Object -First 1
+                    if (-not $symbolDirectory) {
+                      throw "Could not find symbols-$architecture in the build artifact."
+                    }
+
+                    Compress-Archive -Path (Join-Path $symbolDirectory.FullName '*') `
+                      -DestinationPath (Join-Path $releaseFolder "symbols-$architecture.zip") -Force
+                  }
+
                   $version = '$(ResolvedVersionNumber)'
                   @"
                   [ptUserX64]: https://github.com/microsoft/PowerToys/releases/download/v$version-preview/PowerToysUserSetup-$version-x64.exe
@@ -191,7 +202,8 @@ extends:
                     -TagName "v$version-preview" `
                     -Target '$(Build.SourceVersion)' `
                     -Prerelease `
-                    -LatestFalse
+                    -LatestFalse `
+                    -Publish
                 displayName: Create preview GitHub release
 
       - stage: Build_SDK
