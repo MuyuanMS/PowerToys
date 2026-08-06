@@ -195,6 +195,17 @@ public sealed partial class FastFirstPaintTests
     }
 
     [TestMethod]
+    public void SubtitleOnlyFallbackUpdate_TriggersRescore()
+    {
+        Assert.IsTrue(
+            TopLevelViewModel.ScoringLabelsChanged(
+                oldTitle: "Browser",
+                newTitle: "Browser",
+                oldSubtitle: "old query",
+                newSubtitle: "new query"));
+    }
+
+    [TestMethod]
     public void LateFallback_MergesBelowDeterministicMatches_NoLeapfrog()
     {
         // A minimal deterministic Fuzzy match versus a fallback with the maximum possible

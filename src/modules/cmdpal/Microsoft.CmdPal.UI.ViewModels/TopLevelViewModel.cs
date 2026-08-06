@@ -442,13 +442,15 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
 
             var newSubtitle = Subtitle;
 
-            // Re-score when either label changes because both contribute to fallback ranking.
-            return !string.Equals(oldTitle, newTitle, StringComparison.Ordinal) ||
-                !string.Equals(oldSubtitle, newSubtitle, StringComparison.Ordinal);
+            return ScoringLabelsChanged(oldTitle, newTitle, oldSubtitle, newSubtitle);
         }
 
         return false;
     }
+
+    internal static bool ScoringLabelsChanged(string oldTitle, string newTitle, string oldSubtitle, string newSubtitle)
+        => !string.Equals(oldTitle, newTitle, StringComparison.Ordinal) ||
+           !string.Equals(oldSubtitle, newSubtitle, StringComparison.Ordinal);
 
     public PerformCommandMessage GetPerformCommandMessage()
     {
