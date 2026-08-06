@@ -221,6 +221,12 @@ namespace ShortcutGuide
                             if (winKeyReleasedBeforeDispatch)
                             {
                                 _winKeyReleasePending = false;
+                                if (ShortcutGuideProperties.WindowsKeyAction.Value != (int)ShortcutGuideWindowsKeyAction.OpenShortcutGuide || ShortcutGuideProperties.CloseOnWindowsKeyRelease.Value)
+                                {
+                                    _openedByWinKeyHold = false;
+                                    return;
+                                }
+
                                 NativeMethods.SendInput(1, [new() { Type = 1, Data = new() { Keyboard = new NativeMethods.KEYBDINPUT { WVk = 0xFF, DwFlags = 0x2 } } }], Marshal.SizeOf<NativeMethods.INPUT>());
                             }
 

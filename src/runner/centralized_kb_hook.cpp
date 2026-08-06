@@ -255,6 +255,7 @@ namespace CentralizedKeyboardHook
             {
                 if (it->moduleName == moduleName)
                 {
+                    KillTimer(runnerWindow, it->idTimer);
                     it = pressedKeyDescriptors.erase(it);
                 }
                 else
