@@ -127,6 +127,11 @@ public:
     {
     }
 
+    virtual void OnWinKeyEx()
+    {
+        OnHotkeyEx();
+    }
+
     /* Called when one of the registered hotkeys is pressed. Should return true
      * if the key press is to be swallowed.
      */
