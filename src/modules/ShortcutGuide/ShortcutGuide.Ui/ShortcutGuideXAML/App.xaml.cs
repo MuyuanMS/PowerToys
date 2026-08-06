@@ -43,6 +43,7 @@ namespace ShortcutGuide
         internal static string CurrentAppName { get; set; } = string.Empty;
 
         private EventWaitHandle? _launchedEvent;
+        private EventWaitHandle? _winKeyLaunchedEvent;
 
         private Thread? _listenForLaunchedEventThread;
 
@@ -86,6 +87,7 @@ namespace ShortcutGuide
                 try
                 {
                     _launchedEvent = EventWaitHandle.OpenExisting(Constants.ShortcutGuideTriggerEvent());
+                    _winKeyLaunchedEvent = EventWaitHandle.OpenExisting(Constants.ShortcutGuideWinKeyTriggerEvent());
                     Logger.LogInfo($"Opened Shortcut Guide trigger event '{Constants.ShortcutGuideTriggerEvent()}'.");
                 }
                 catch (Exception ex)
@@ -125,7 +127,7 @@ namespace ShortcutGuide
                     }
                 },
                 () => true,
-                (int key, nuint specialFlags) => key == 91 && specialFlags != _ignoreKeyEventFlag);
+                (int key, nuint specialFlags) => (key == 91 || key == 92) && specialFlags != _ignoreKeyEventFlag);
             }
             catch (Exception ex)
             {
@@ -186,32 +188,25 @@ namespace ShortcutGuide
                 return;
             }
 
-            var handles = new WaitHandle[] { _launchedEvent };
+            var handles = new WaitHandle[] { _launchedEvent!, _winKeyLaunchedEvent! };
             try
             {
                 Logger.LogInfo("Shortcut Guide show-event listener started.");
                 while (true)
                 {
                     var index = WaitHandle.WaitAny(handles);
-                    if (index == 0)
+                    if (index is 0 or 1)
                     {
                         Logger.LogInfo("Shortcut Guide trigger event signaled.");
+                        bool isWinKeyTrigger = index == 1;
                         OverlayWindow.DispatcherQueue.TryEnqueue(async () =>
                         {
-                            // VK_LWIN long-press shows only the taskbar pane.
-                            // Use the Win32 key state directly: WPF's
-                            // System.Windows.Input.Keyboard is not initialized
-                            // on the WinUI UI thread.
-                            const int VK_LWIN = 0x5B;
-                            const int VK_RWIN = 0x5C;
-                            bool winKeyDown = ((NativeMethods.GetAsyncKeyState(VK_LWIN) & 0x8000) != 0) ||
-                                              ((NativeMethods.GetAsyncKeyState(VK_RWIN) & 0x8000) != 0);
-                            if (winKeyDown && ShortcutGuideProperties.WindowsKeyAction.Value == (int)ShortcutGuideWindowsKeyAction.Off)
+                            if (isWinKeyTrigger && ShortcutGuideProperties.WindowsKeyAction.Value == (int)ShortcutGuideWindowsKeyAction.Off)
                             {
                                 return;
                             }
 
-                            if (winKeyDown && ShortcutGuideProperties.WindowsKeyAction.Value == (int)ShortcutGuideWindowsKeyAction.TaskbarIndicators)
+                            if (isWinKeyTrigger && ShortcutGuideProperties.WindowsKeyAction.Value == (int)ShortcutGuideWindowsKeyAction.TaskbarIndicators)
                             {
                                 if (OverlayWindow.AppWindow.IsVisible)
                                 {
