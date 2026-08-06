@@ -3,6 +3,7 @@
 #include "Generated files/resource.h"
 
 #include <common/utils/resources.h>
+#include <common/utils/elevation.h>
 #include <common/version/version.h>
 
 #include <ShlObj.h>
@@ -202,8 +203,8 @@ namespace
     {
         const std::wstring url =
             L"https://github.com/microsoft/PowerToys/issues/new?template=bug_report.yml&labels=Issue-Bug%2CTriage-Needed&version=" +
-            get_product_version();
-        ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+            get_product_version(false);
+        RunNonElevatedEx(url, L"", L"");
 
         // Reveal the .zip so the user can drag it into the freshly opened issue page.
         RevealZip(zipPath);
@@ -262,6 +263,55 @@ namespace
         st->hClose = CreateButton(hwnd, ID_BTN_CLOSE, GET_RESOURCE_STRING(IDS_BUGREPORT_CLOSE), cr.right - margin - wClose, btnY, wClose, btnH, st->hFont, inst, true);
     }
 
+    void LayoutControls(HWND hwnd, DialogState* st)
+    {
+        RECT cr{};
+        GetClientRect(hwnd, &cr);
+        const UINT dpi = st->dpi;
+        const int margin = Scale(20, dpi);
+        const int contentW = cr.right - 2 * margin;
+        const int btnH = Scale(30, dpi);
+        const int btnY = cr.bottom - margin - btnH;
+        const int gap = Scale(10, dpi);
+        const int wOpen = Scale(110, dpi);
+        const int wIssue = Scale(150, dpi);
+        const int wClose = Scale(90, dpi);
+
+        SetWindowPos(st->hStatus, nullptr, margin, margin, contentW, Scale(58, dpi), SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(st->hPath, nullptr, margin, margin + Scale(64, dpi), contentW, Scale(24, dpi), SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(st->hHint, nullptr, margin, margin + Scale(98, dpi), contentW, Scale(48, dpi), SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(st->hOpenFolder, nullptr, margin, btnY, wOpen, btnH, SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(st->hCreateIssue, nullptr, margin + wOpen + gap, btnY, wIssue, btnH, SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(st->hClose, nullptr, cr.right - margin - wClose, btnY, wClose, btnH, SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+
+    void UpdateDpi(HWND hwnd, DialogState* st, UINT dpi, const RECT* suggestedRect)
+    {
+        st->dpi = dpi;
+        if (suggestedRect)
+        {
+            SetWindowPos(hwnd,
+                         nullptr,
+                         suggestedRect->left,
+                         suggestedRect->top,
+                         suggestedRect->right - suggestedRect->left,
+                         suggestedRect->bottom - suggestedRect->top,
+                         SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+
+        HFONT oldFont = st->hFont;
+        HFONT oldHeaderFont = st->hHeaderFont;
+        st->hFont = MakeFont(st->dpi, false);
+        st->hHeaderFont = MakeFont(st->dpi, true);
+        for (HWND control : { st->hStatus, st->hPath, st->hHint, st->hOpenFolder, st->hCreateIssue, st->hClose })
+        {
+            SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(control == st->hStatus ? st->hHeaderFont : st->hFont), TRUE);
+        }
+        DeleteObject(oldFont);
+        DeleteObject(oldHeaderFont);
+        LayoutControls(hwnd, st);
+    }
+
     void SetDoneState(DialogState* st)
     {
         st->done = true;
@@ -307,6 +357,12 @@ namespace
                 std::wstring text = GET_RESOURCE_STRING(IDS_BUGREPORT_GENERATING);
                 text.append(static_cast<size_t>(st->animDots), L'.');
                 SetWindowTextW(st->hStatus, text.c_str());
+            }
+            return 0;
+        case WM_DPICHANGED:
+            if (st)
+            {
+                UpdateDpi(hwnd, st, HIWORD(wParam), reinterpret_cast<const RECT*>(lParam));
             }
             return 0;
         case WM_BUGREPORT_DONE:
