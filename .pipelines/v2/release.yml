@@ -16,9 +16,9 @@ parameters:
     default: false
 
   - name: versionNumber
-    displayName: "Version Number"
+    displayName: "Version Override (optional; main and stable default to the release-train version)"
     type: string
-    default: '0.0.1'
+    default: ''
 
   - name: buildConfigurations
     displayName: "Build Configurations"
@@ -42,6 +42,14 @@ name: $(BuildDefinitionName)_$(date:yyMM).$(date:dd)$(rev:rrr)
 
 variables:
   - template: templates/variables-nuget-package-version.yml
+  - name: versionDate
+    value: $[format('{0:yyyyMMdd}', pipeline.startTime)]
+  - ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.SourceBranch'], 'refs/heads/stable')) }}:
+    - name: dailyVersionSequence
+      value: $[counter(format('release-{0:yyyyMMdd}', pipeline.startTime), 1)]
+  - ${{ else }}:
+    - name: dailyVersionSequence
+      value: 0
 
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
@@ -110,7 +118,29 @@ extends:
 
                 # Sets versions for all PowerToy created DLLs
                 - pwsh: |-
-                    .pipelines/versionSetting.ps1 -versionNumber '${{ parameters.versionNumber }}' -DevEnvironment ''
+                    $metadata = .pipelines/resolveBuildMetadata.ps1 `
+                      -VersionOverride '${{ parameters.versionNumber }}' `
+                      -BuildDate '$(versionDate)' `
+                      -DailyVersionSequence '$(dailyVersionSequence)'
+                    $publishSymbolsToPublic = $${{ parameters.publishSymbolsToPublic }}
+                    if ($publishSymbolsToPublic -and -not $metadata.AllowPublicSymbols) {
+                      throw "Public symbols are only supported for manually queued stable-branch releases"
+                    }
+
+                    .pipelines/versionSetting.ps1 -versionNumber $metadata.Version -DevEnvironment '' -Channel $metadata.Channel
+                    [xml]$versionProps = Get-Content 'src\Version.props'
+                    $resolvedVersion = [string]$versionProps.Project.PropertyGroup.Version
+                    Write-Host "Resolved PowerToys version: $resolvedVersion"
+                    Write-Host "##vso[task.setvariable variable=ResolvedVersionNumber;isOutput=true]$resolvedVersion"
+                    Write-Host "##vso[task.setvariable variable=EffectiveVersionNumber;isOutput=true]$resolvedVersion"
+                    Write-Host "##vso[task.setvariable variable=ResolvedReleaseChannel;isOutput=true]$($metadata.Channel)"
+                    Write-Host "##vso[task.setvariable variable=ResolvedBuildIntent;isOutput=true]$($metadata.Intent)"
+                    Write-Host "##vso[task.setvariable variable=ShouldPublishPreview;isOutput=true]$($metadata.ShouldPublishPreview)"
+                    Write-Host "##vso[task.setvariable variable=EffectiveVersionNumber]$resolvedVersion"
+                    Write-Host "##vso[task.setvariable variable=ResolvedReleaseChannel]$($metadata.Channel)"
+                    Write-Host "##vso[task.setvariable variable=ResolvedBuildIntent]$($metadata.Intent)"
+                    Write-Host "##vso[task.setvariable variable=ShouldPublishPreview]$($metadata.ShouldPublishPreview)"
+                  name: resolveVersion
                   displayName: Prepare versioning
 
                 # Prepare the localizations and telemetry config before the release build
@@ -123,6 +153,66 @@ extends:
                     Move-Item -Force -Verbose "Microsoft.PowerToys.Telemetry.*\build\include\TraceLoggingDefines.h" "src\common\Telemetry\TraceLoggingDefines.h"
                     Move-Item -Force -Verbose "Microsoft.PowerToys.Telemetry.*\build\include\TelemetryBase.cs" "src\common\Telemetry\TelemetryBase.cs"
                   displayName: Emplace telemetry files
+
+      - stage: PublishPreview
+        displayName: Publish preview release
+        dependsOn: Build
+        condition: and(succeeded(), eq(dependencies.Build.outputs['Release_x64.resolveVersion.ShouldPublishPreview'], 'True'))
+        variables:
+          ResolvedVersionNumber: $[ stageDependencies.Build.Build.outputs['Release_x64.resolveVersion.ResolvedVersionNumber'] ]
+        jobs:
+          - job: PublishPreview
+            pool:
+              name: SHINE-INT-L
+              os: windows
+            steps:
+              - download: current
+                artifact: build-x64-Release
+              - download: current
+                artifact: build-arm64-Release
+              - pwsh: |-
+                  $ErrorActionPreference = 'Stop'
+                  $releaseFolder = Join-Path '$(Pipeline.Workspace)' 'preview-release'
+                  New-Item -ItemType Directory -Path $releaseFolder -Force | Out-Null
+                  Get-ChildItem -Path '$(Pipeline.Workspace)\build-x64-Release', '$(Pipeline.Workspace)\build-arm64-Release' -Recurse -File |
+                    Copy-Item -Destination $releaseFolder -Force
+
+                  foreach ($architecture in @('x64', 'arm64')) {
+                    $artifactPath = Join-Path '$(Pipeline.Workspace)' "build-$architecture-Release"
+                    $symbolDirectory = Get-ChildItem -Path $artifactPath -Directory -Filter "symbols-$architecture" -Recurse |
+                      Select-Object -First 1
+                    if (-not $symbolDirectory) {
+                      throw "Could not find symbols-$architecture in the build artifact."
+                    }
+
+                    Compress-Archive -Path (Join-Path $symbolDirectory.FullName '*') `
+                      -DestinationPath (Join-Path $releaseFolder "symbols-$architecture.zip") -Force
+                  }
+
+                  $version = '$(ResolvedVersionNumber)'
+                  @"
+                  [ptUserX64]: https://github.com/microsoft/PowerToys/releases/download/v$version-preview/PowerToysUserSetup-$version-x64.exe
+                  [ptUserArm64]: https://github.com/microsoft/PowerToys/releases/download/v$version-preview/PowerToysUserSetup-$version-arm64.exe
+                  [ptMachineX64]: https://github.com/microsoft/PowerToys/releases/download/v$version-preview/PowerToysSetup-$version-x64.exe
+                  [ptMachineArm64]: https://github.com/microsoft/PowerToys/releases/download/v$version-preview/PowerToysSetup-$version-arm64.exe
+                  "@ | Set-Content (Join-Path $releaseFolder 'release-notes.md')
+
+                  if ([string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
+                    throw 'GH_TOKEN must be configured as a secret pipeline variable for preview publication.'
+                  }
+                  $env:GH_TOKEN | gh auth login --with-token
+                  & .github/skills/release-note-generation/scripts/create-github-draft-release.ps1 `
+                    -ReleaseFolder $releaseFolder `
+                    -GitHubRepo microsoft/PowerToys `
+                    -TagName "v$version-preview" `
+                    -Target '$(Build.SourceVersion)' `
+                    -Prerelease `
+                    -LatestFalse `
+                    -Clobber `
+                    -Publish
+                env:
+                  GH_TOKEN: $(GH_TOKEN)
+                displayName: Create preview GitHub release
 
       - stage: Build_SDK
         displayName: Build SDK
