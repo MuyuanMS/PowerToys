@@ -57,7 +57,7 @@
   <!--
     DACL for every folder PowerToys adds to the machine PATH.
 
-    D:P is the point: it drops inherited ACEs. A per-machine INSTALLFOLDER is overridable
+    D:PAI is the point: P drops inherited ACEs while AI preserves inheritance for the explicit ACEs below. A per-machine INSTALLFOLDER is overridable
     (PowerToys.wxs InstallFolder), and a custom root such as C:\PowerToys inherits
     "Authenticated Users: Modify" from the drive root - which would let any standard user plant
     binaries in a folder that every process on the machine searches. SYSTEM and Administrators
