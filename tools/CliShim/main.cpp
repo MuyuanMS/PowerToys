@@ -120,8 +120,9 @@ int wmain()
     // Forward the raw tail so the caller's argument quoting remains unchanged.
     const std::wstring forwardedArguments = CommandLine::StripArgumentZero(GetCommandLineW());
 
-    // lpApplicationName selects the target; argv[0] in the command line is cosmetic.
-    std::wstring commandLine = L'"' + targetPath.wstring() + L'"';
+    // lpApplicationName selects the target while argv[0] preserves the invoked shim name for
+    // managed CLIs that derive their displayed command name from the process command line.
+    std::wstring commandLine = L'"' + selfPath.wstring() + L'"';
     if (!forwardedArguments.empty())
     {
         commandLine.push_back(L' ');
