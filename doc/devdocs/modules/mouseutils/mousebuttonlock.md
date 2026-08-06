@@ -14,7 +14,7 @@ Releasing on any button press (not only a same-button tap) is deliberate: a held
 
 This is a "hands-free drag" accessibility feature (for users with motor disabilities, RSI, or tremors), modeled on the reference project https://github.com/owenpkent/linux-quickdrag. It generalizes Windows' built-in ClickLock, which covers the left button only, to the right and middle buttons.
 
-**Right-button caveat (context menu).** Releasing a right-button lock necessarily emits a right-button-up, which applications answer with a context menu (that is just what a right-click is). To keep hands-free right-drag usable, the module injects an `Esc` immediately after the release up to dismiss that menu. Normal quick right-clicks never lock and are untouched, so context menus still work; only a lock *release* auto-dismisses. The trade-off is that a genuine right-drag-drop menu (e.g. Explorer's copy/move) is also dismissed.
+**Right-button caveat (context menu).** Releasing a right-button lock emits a right-button-up, so applications may open their normal context menu. The module preserves that target-application behavior; normal quick right-clicks are untouched.
 
 A moving hold does not lock. Any cursor move beyond the dead-zone during the hold marks the gesture as a drag (text selection, window or file drag), cancels the pending lock, and lets the button-up pass through normally. The "Drag threshold (pixels)" value (`move_cancel_pixels`) is the dead-zone that separates hand jitter from a deliberate drag: a larger value tolerates more hand tremor during the hold before the gesture is treated as a drag. Motion after the button actually locks never cancels, because `physicalDown` is already false by then, so a genuine lock-then-drag is unaffected.
 
