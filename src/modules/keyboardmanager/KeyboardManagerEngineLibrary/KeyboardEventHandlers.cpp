@@ -193,7 +193,7 @@ namespace
         std::wstring text(output, output + (std::min)(result, static_cast<int>(std::size(output))));
         std::vector<WORD> characterTypes(text.size());
         if (!GetStringTypeW(CT_CTYPE1, text.data(), static_cast<int>(text.size()), characterTypes.data()) ||
-            std::any_of(characterTypes.begin(), characterTypes.end(), [](WORD type) { return (type & C1_PRINTABLE) == 0; }))
+            std::any_of(characterTypes.begin(), characterTypes.end(), [](WORD type) { return (type & C1_DEFINED) == 0 || (type & C1_CNTRL) != 0; }))
         {
             return std::nullopt;
         }
@@ -201,11 +201,11 @@ namespace
         return text;
     }
 
-    void SendBackspaceInput(KeyboardManagerInput::InputInterface& ii, const size_t count)
+    bool SendBackspaceInput(KeyboardManagerInput::InputInterface& ii, const size_t count)
     {
         if (count == 0)
         {
-            return;
+            return true;
         }
 
         std::vector<INPUT> inputs;
@@ -217,7 +217,7 @@ namespace
             Helpers::SetKeyEvent(inputs, INPUT_KEYBOARD, VK_BACK, KEYEVENTF_KEYUP, KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG);
         }
 
-        ii.SendVirtualInput(inputs);
+        return ii.SendVirtualInput(inputs);
     }
 
     std::vector<DWORD> GetPressedShiftKeys(KeyboardManagerInput::InputInterface& ii)
@@ -244,14 +244,14 @@ namespace
         return pressedShiftKeys;
     }
 
-    void SendModifierInput(KeyboardManagerInput::InputInterface& ii,
+    bool SendModifierInput(KeyboardManagerInput::InputInterface& ii,
                            const std::vector<DWORD>& modifiers,
                            const DWORD flags,
                            const ULONG_PTR extraInfo = KeyboardManagerConstants::KEYBOARDMANAGER_SUPPRESS_FLAG)
     {
         if (modifiers.empty())
         {
-            return;
+            return true;
         }
 
         std::vector<INPUT> inputs;
@@ -262,16 +262,17 @@ namespace
             Helpers::SetKeyEvent(inputs, INPUT_KEYBOARD, static_cast<WORD>(modifier), flags, extraInfo);
         }
 
-        ii.SendVirtualInput(inputs);
+        return ii.SendVirtualInput(inputs);
     }
 
-    void SendTextReplacementInput(KeyboardManagerInput::InputInterface& ii, const size_t backspaceCount, const std::wstring& replacement)
+    bool SendTextReplacementInput(KeyboardManagerInput::InputInterface& ii, const size_t backspaceCount, const std::wstring& replacement)
     {
         const auto pressedShiftKeys = GetPressedShiftKeys(ii);
-        SendModifierInput(ii, pressedShiftKeys, KEYEVENTF_KEYUP, KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG);
-        SendBackspaceInput(ii, backspaceCount);
-        Helpers::SendTextInput(replacement, ii);
-        SendModifierInput(ii, pressedShiftKeys, 0, KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG);
+        const bool releasedShift = SendModifierInput(ii, pressedShiftKeys, KEYEVENTF_KEYUP, KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG);
+        const bool removedTrigger = SendBackspaceInput(ii, backspaceCount);
+        const bool sentReplacement = Helpers::SendTextInput(replacement, ii);
+        const bool restoredShift = SendModifierInput(ii, pressedShiftKeys, 0, KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG);
+        return releasedShift && removedTrigger && sentReplacement && restoredShift;
     }
 
 }
@@ -2157,7 +2158,10 @@ namespace KeyboardEventHandlers
             const std::wstring_view trigger = textReplacementBufferView.substr(textReplacementBufferView.length() - length);
             if (const auto replacement = state.textReplacements.find(trigger); replacement != state.textReplacements.end())
             {
-                SendTextReplacementInput(ii, trigger.length() > text->length() ? trigger.length() - text->length() : 0, replacement->second);
+                if (!SendTextReplacementInput(ii, trigger.length() > text->length() ? trigger.length() - text->length() : 0, replacement->second))
+                {
+                    return 0;
+                }
                 state.textReplacementBuffer.clear();
                 return 1;
             }
