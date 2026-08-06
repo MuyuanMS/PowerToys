@@ -44,6 +44,7 @@ namespace ShortcutGuide
 
         private EventWaitHandle? _launchedEvent;
         private EventWaitHandle? _winKeyLaunchedEvent;
+        private bool _openedByWinKeyHold;
 
         private Thread? _listenForLaunchedEventThread;
 
@@ -87,12 +88,20 @@ namespace ShortcutGuide
                 try
                 {
                     _launchedEvent = EventWaitHandle.OpenExisting(Constants.ShortcutGuideTriggerEvent());
-                    _winKeyLaunchedEvent = EventWaitHandle.OpenExisting(Constants.ShortcutGuideWinKeyTriggerEvent());
                     Logger.LogInfo($"Opened Shortcut Guide trigger event '{Constants.ShortcutGuideTriggerEvent()}'.");
                 }
                 catch (Exception ex)
                 {
                     Logger.LogError($"Failed to open existing event '{Constants.ShortcutGuideTriggerEvent()}': {ex.Message}");
+                }
+
+                try
+                {
+                    _winKeyLaunchedEvent = EventWaitHandle.OpenExisting(Constants.ShortcutGuideWinKeyTriggerEvent());
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"Failed to open optional Windows-key trigger event '{Constants.ShortcutGuideWinKeyTriggerEvent()}': {ex.Message}");
                 }
 
                 _listenForLaunchedEventThread = new Thread(ListenForLaunchedEvents)
@@ -110,7 +119,7 @@ namespace ShortcutGuide
                 {
                     if (OverlayWindow.AppWindow.IsVisible)
                     {
-                        if (ShortcutGuideProperties.WindowsKeyAction.Value != ((int)ShortcutGuideWindowsKeyAction.OpenShortcutGuide) || ShortcutGuideProperties.CloseOnWindowsKeyRelease.Value)
+                        if (_openedByWinKeyHold && (ShortcutGuideProperties.WindowsKeyAction.Value != ((int)ShortcutGuideWindowsKeyAction.OpenShortcutGuide) || ShortcutGuideProperties.CloseOnWindowsKeyRelease.Value))
                         {
                             OverlayWindow.DispatcherQueue.TryEnqueue(() =>
                             {
@@ -188,7 +197,9 @@ namespace ShortcutGuide
                 return;
             }
 
-            var handles = new WaitHandle[] { _launchedEvent!, _winKeyLaunchedEvent! };
+            var handles = _winKeyLaunchedEvent is null
+                ? new WaitHandle[] { _launchedEvent! }
+                : new WaitHandle[] { _launchedEvent!, _winKeyLaunchedEvent };
             try
             {
                 Logger.LogInfo("Shortcut Guide show-event listener started.");
@@ -198,7 +209,8 @@ namespace ShortcutGuide
                     if (index is 0 or 1)
                     {
                         Logger.LogInfo("Shortcut Guide trigger event signaled.");
-                        bool isWinKeyTrigger = index == 1;
+                        bool isWinKeyTrigger = _winKeyLaunchedEvent is not null && index == 1;
+                        _openedByWinKeyHold = isWinKeyTrigger;
                         OverlayWindow.DispatcherQueue.TryEnqueue(async () =>
                         {
                             if (isWinKeyTrigger && ShortcutGuideProperties.WindowsKeyAction.Value == (int)ShortcutGuideWindowsKeyAction.Off)

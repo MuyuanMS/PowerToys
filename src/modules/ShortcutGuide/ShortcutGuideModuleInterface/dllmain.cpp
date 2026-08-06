@@ -168,20 +168,25 @@ public:
         SetEvent(triggerEvent);
     }
 
-    virtual void OnWinKeyEx() override
+    virtual bool on_hotkey(size_t hotkeyId) override
     {
-        Logger::trace("OnWinKeyEx()");
-        if (!_enabled)
+        if (hotkeyId != PowertoyModuleIface::WinKeyHotkeyId)
         {
-            return;
+            return false;
         }
 
+        Logger::trace("Windows key hold invoked");
+        if (!_enabled)
+        {
+            return false;
+        }
         if (!IsProcessActive())
         {
             StartProcess();
         }
 
         SetEvent(winKeyTriggerEvent);
+        return false;
     }
 
     virtual void send_settings_telemetry() override
