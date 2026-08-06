@@ -30,9 +30,10 @@ internal sealed partial class MainListPageSearchTelemetry : IDisposable
 {
     private static readonly TimeSpan SettleDelay = TimeSpan.FromMilliseconds(600);
 
-    private readonly ThrottledDebouncedAction _resultsDebounce;
+    private ThrottledDebouncedAction _resultsDebounce;
     private readonly Lock _pendingLock = new();
     private (int QueryLength, int ResultCount, long LatencyMs) _pendingResults;
+    private int _resultsGeneration;
 
     // Snapshots of the most recent rendered search results, read off the hot path (only when the
     // user invokes a result) to resolve the invoked item's visible rank and ranker tier. The scored
@@ -48,18 +49,24 @@ internal sealed partial class MainListPageSearchTelemetry : IDisposable
 
     public MainListPageSearchTelemetry()
     {
-        _resultsDebounce = new ThrottledDebouncedAction(EmitPendingResults, SettleDelay);
+        _resultsDebounce = new ThrottledDebouncedAction(() => EmitPendingResults(0), SettleDelay);
     }
 
     // Stores the latest settled-search metrics and (re)arms the debounce. Only the query LENGTH is
     // retained - the query text is never stored for telemetry.
     public void QueueSearchResults(int queryLength, int resultCount, long latencyMs)
     {
+        ThrottledDebouncedAction oldDebounce;
+        int generation;
         lock (_pendingLock)
         {
             _pendingResults = (queryLength, resultCount, latencyMs);
+            generation = ++_resultsGeneration;
+            oldDebounce = _resultsDebounce;
+            _resultsDebounce = new ThrottledDebouncedAction(() => EmitPendingResults(generation), SettleDelay);
         }
 
+        oldDebounce.Cancel();
         _resultsDebounce.Invoke();
     }
 
@@ -84,13 +91,24 @@ internal sealed partial class MainListPageSearchTelemetry : IDisposable
 
     // Drops any pending settled-search event without emitting it. Used when an alias query supersedes
     // a normal query whose telemetry is still pending in the debounce.
-    public void CancelPendingResults() => _resultsDebounce.Cancel();
+    public void CancelPendingResults()
+    {
+        lock (_pendingLock)
+        {
+            ++_resultsGeneration;
+            _resultsDebounce.Cancel();
+        }
+    }
 
     // Drops any pending settled-search event and forgets the last rendered search view, so a cleared
     // query never emits and a subsequent selection resolves to nothing.
     public void ClearSearchView()
     {
-        _resultsDebounce.Cancel();
+        lock (_pendingLock)
+        {
+            ++_resultsGeneration;
+            _resultsDebounce.Cancel();
+        }
         _lastViewItems = null;
         _lastScoredGlobalFallbacks = null;
         _lastViewFilteredItems = null;
@@ -134,11 +152,16 @@ internal sealed partial class MainListPageSearchTelemetry : IDisposable
         WeakReferenceMessenger.Default.Send(BuildSearchSelectedMessage(_lastViewQueryLength, index, tier));
     }
 
-    private void EmitPendingResults()
+    private void EmitPendingResults(int generation)
     {
         (int QueryLength, int ResultCount, long LatencyMs) snapshot;
         lock (_pendingLock)
         {
+            if (generation != _resultsGeneration)
+            {
+                return;
+            }
+
             snapshot = _pendingResults;
         }
 
@@ -244,5 +267,12 @@ internal sealed partial class MainListPageSearchTelemetry : IDisposable
         return RankTier.None;
     }
 
-    public void Dispose() => _resultsDebounce.Dispose();
+    public void Dispose()
+    {
+        lock (_pendingLock)
+        {
+            ++_resultsGeneration;
+            _resultsDebounce.Dispose();
+        }
+    }
 }
