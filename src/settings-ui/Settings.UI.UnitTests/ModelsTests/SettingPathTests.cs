@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.IO.Abstractions.TestingHelpers;
+using System;
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.PowerToys.Settings.UI.Library.Utilities;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -101,6 +102,35 @@ namespace CommonLibTest
 
             // Assert
             Assert.IsFalse(mockFileSystem.Directory.Exists(folderPath));
+        }
+
+        [TestMethod]
+        public void GetSettingsPath_WithEmptyFileName_ReturnsModuleFolderWithTrailingSeparator()
+        {
+            var mockFileSystem = new MockFileSystem();
+            var settingPath = new SettingPath(mockFileSystem.Directory, mockFileSystem.Path);
+
+            string actualPath = settingPath.GetSettingsPath(string.Empty, string.Empty);
+
+            StringAssert.EndsWith(actualPath, "Microsoft\\PowerToys\\");
+        }
+
+        [TestMethod]
+        public void GetSettingsPath_WithRootedModuleName_Throws()
+        {
+            var mockFileSystem = new MockFileSystem();
+            var settingPath = new SettingPath(mockFileSystem.Directory, mockFileSystem.Path);
+
+            Assert.ThrowsException<ArgumentException>(() => settingPath.GetSettingsPath("\\Outside"));
+        }
+
+        [TestMethod]
+        public void GetSettingsPath_WithTraversalFileName_Throws()
+        {
+            var mockFileSystem = new MockFileSystem();
+            var settingPath = new SettingPath(mockFileSystem.Directory, mockFileSystem.Path);
+
+            Assert.ThrowsException<ArgumentException>(() => settingPath.GetSettingsPath("FancyZones", "..\\outside.json"));
         }
     }
 }

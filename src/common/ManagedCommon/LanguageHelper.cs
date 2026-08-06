@@ -12,6 +12,9 @@ namespace ManagedCommon
 {
     public static class LanguageHelper
     {
+        public const string SettingsFilePath = "\\Microsoft\\PowerToys\\";
+        public const string SettingsFile = "language.json";
+
         internal sealed class OutGoingLanguageSettings
         {
             [JsonPropertyName("language")]

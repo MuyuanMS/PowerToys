@@ -31,7 +31,17 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         private string GetModuleFolderPath(string powertoy = "") =>
             string.IsNullOrWhiteSpace(powertoy)
                 ? _path.Combine(Helper.LocalApplicationDataFolder(), "Microsoft", "PowerToys")
-                : _path.Combine(Helper.LocalApplicationDataFolder(), "Microsoft", "PowerToys", powertoy);
+                : _path.Combine(Helper.LocalApplicationDataFolder(), "Microsoft", "PowerToys", ValidatePathSegment(powertoy, nameof(powertoy)));
+
+        private static string ValidatePathSegment(string value, string parameterName)
+        {
+            if (System.IO.Path.IsPathRooted(value) || System.IO.Path.GetFileName(value) != value || value == "." || value == "..")
+            {
+                throw new ArgumentException("The path segment must be a single relative name.", parameterName);
+            }
+
+            return value;
+        }
 
         public bool SettingsFolderExists(string powertoy)
         {
@@ -54,7 +64,12 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         /// <returns>string path.</returns>
         public string GetSettingsPath(string powertoy, string fileName = DefaultFileName)
         {
-            return _path.Combine(GetModuleFolderPath(powertoy), fileName);
+            if (string.IsNullOrEmpty(fileName))
+            {
+                return GetModuleFolderPath(powertoy) + System.IO.Path.DirectorySeparatorChar;
+            }
+
+            return _path.Combine(GetModuleFolderPath(powertoy), ValidatePathSegment(fileName, nameof(fileName)));
         }
     }
 }
