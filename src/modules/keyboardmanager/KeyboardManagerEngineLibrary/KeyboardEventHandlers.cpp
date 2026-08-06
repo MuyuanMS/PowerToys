@@ -116,8 +116,9 @@ namespace
 
     bool IsTextReplacementShortcutModifierPressed(KeyboardManagerInput::InputInterface& ii)
     {
-        return IsModifierPressed(ii, VK_CONTROL, VK_LCONTROL, VK_RCONTROL) ||
-               IsModifierPressed(ii, VK_MENU, VK_LMENU, VK_RMENU) ||
+        const bool isAltGrPressed = ii.GetVirtualKeyState(VK_LCONTROL) && ii.GetVirtualKeyState(VK_RMENU);
+        return (!isAltGrPressed && (IsModifierPressed(ii, VK_CONTROL, VK_LCONTROL, VK_RCONTROL) ||
+                                    IsModifierPressed(ii, VK_MENU, VK_LMENU, VK_RMENU))) ||
                ii.GetVirtualKeyState(VK_LWIN) ||
                ii.GetVirtualKeyState(VK_RWIN) ||
                ii.GetVirtualKeyState(CommonSharedConstants::VK_WIN_BOTH);

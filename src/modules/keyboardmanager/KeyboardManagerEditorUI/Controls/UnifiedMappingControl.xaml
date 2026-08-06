@@ -138,6 +138,7 @@
                     <TextBox
                         x:Name="TextTriggerBox"
                         x:Uid="TextTriggerBox"
+                        MaxLength="64"
                         MinHeight="86"
                         Background="{ThemeResource TextControlBackgroundFocused}"
                         BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
