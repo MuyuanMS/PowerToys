@@ -41,6 +41,12 @@ public:
             Logger::warn(L"Failed to create {} event. {}", CommonSharedConstants::SHORTCUT_GUIDE_TRIGGER_EVENT, get_last_error_or_default(GetLastError()));
         }
 
+        winKeyTriggerEvent = CreateEvent(nullptr, false, false, CommonSharedConstants::SHORTCUT_GUIDE_WIN_KEY_TRIGGER_EVENT);
+        if (!winKeyTriggerEvent)
+        {
+            Logger::warn(L"Failed to create {} event. {}", CommonSharedConstants::SHORTCUT_GUIDE_WIN_KEY_TRIGGER_EVENT, get_last_error_or_default(GetLastError()));
+        }
+
         InitSettings();
     }
 
@@ -132,6 +138,10 @@ public:
         {
             CloseHandle(triggerEvent);
         }
+        if (winKeyTriggerEvent)
+        {
+            CloseHandle(winKeyTriggerEvent);
+        }
 
         delete this;
     }
@@ -156,6 +166,22 @@ public:
         }
 
         SetEvent(triggerEvent);
+    }
+
+    virtual void OnWinKeyEx() override
+    {
+        Logger::trace("OnWinKeyEx()");
+        if (!_enabled)
+        {
+            return;
+        }
+
+        if (!IsProcessActive())
+        {
+            StartProcess();
+        }
+
+        SetEvent(winKeyTriggerEvent);
     }
 
     virtual void send_settings_telemetry() override
@@ -186,6 +212,7 @@ private:
     UINT m_millisecondsWinKeyPressTimeForTaskbarIconShortcuts = DEFAULT_MILLISECONDS_WIN_KEY_PRESS_TIME_FOR_TASKBAR_ICON_SHORTCUTS;
 
     HANDLE triggerEvent;
+    HANDLE winKeyTriggerEvent;
     HANDLE exitEvent;
 
     bool StartProcess(std::wstring args = L"")
@@ -198,6 +225,10 @@ private:
         if (triggerEvent)
         {
             ResetEvent(triggerEvent);
+        }
+        if (winKeyTriggerEvent)
+        {
+            ResetEvent(winKeyTriggerEvent);
         }
 
         unsigned long powertoys_pid = GetCurrentProcessId();
@@ -310,17 +341,17 @@ try
                     auto jsonDurationObject = propertiesObject.GetNamedObject(L"press_time");
                     if (jsonDurationObject.HasKey(L"value"))
                     {
-                        auto pressTime = static_cast<UINT>(jsonDurationObject.GetNamedNumber(L"value"));
-                        if (pressTime < 100)
+                        auto pressTimeValue = jsonDurationObject.GetNamedNumber(L"value");
+                        if (pressTimeValue < 100)
                         {
-                            pressTime = 100;
+                            pressTimeValue = 100;
                         }
-                        else if (pressTime > 5000)
+                        else if (pressTimeValue > 5000)
                         {
-                            pressTime = 5000;
+                            pressTimeValue = 5000;
                         }
 
-                        m_millisecondsWinKeyPressTimeForGlobalWindowsShortcuts = pressTime;
+                        m_millisecondsWinKeyPressTimeForGlobalWindowsShortcuts = static_cast<UINT>(pressTimeValue);
                     }
                 }
             }
