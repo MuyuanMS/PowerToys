@@ -157,9 +157,9 @@ extends:
       - stage: PublishPreview
         displayName: Publish preview release
         dependsOn: Build
-        condition: and(succeeded(), eq(stageDependencies.Build.Build.outputs['resolveVersion.ShouldPublishPreview'], 'True'))
+        condition: and(succeeded(), eq(stageDependencies.Build.Build.outputs['Release_x64.resolveVersion.ShouldPublishPreview'], 'True'))
         variables:
-          ResolvedVersionNumber: $[ stageDependencies.Build.Build.outputs['resolveVersion.ResolvedVersionNumber'] ]
+          ResolvedVersionNumber: $[ stageDependencies.Build.Build.outputs['Release_x64.resolveVersion.ResolvedVersionNumber'] ]
         jobs:
           - job: PublishPreview
             pool:
@@ -208,6 +208,8 @@ extends:
                     -Prerelease `
                     -LatestFalse `
                     -Publish
+                env:
+                  GH_TOKEN: $(GH_TOKEN)
                 displayName: Create preview GitHub release
 
       - stage: Build_SDK

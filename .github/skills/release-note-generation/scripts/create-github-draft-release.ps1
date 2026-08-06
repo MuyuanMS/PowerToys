@@ -8,7 +8,7 @@
     update a release and upload the assets. Use -Publish to promote it
     immediately; otherwise it remains a draft. Asset filenames use the
     numeric product version; -TagName may include channel suffixes such as
-    v0.100.2607.08001-preview.
+    v0.100.2111.0-preview.
 #>
 param(
     [Parameter(Mandatory = $true)]

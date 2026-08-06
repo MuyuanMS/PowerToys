@@ -276,10 +276,6 @@ $isMain = $SourceBranch -eq "refs/heads/main"
 $isStable = $SourceBranch -eq "refs/heads/stable"
 $isScheduled = $BuildReason -eq "Schedule"
 
-if ($isScheduled -and -not $isMain) {
-    throw "Scheduled release builds are only supported from refs/heads/main"
-}
-
 $releaseMetadata = Get-ReleaseTrainMetadata -Path $VersionPropsPath
 $releaseTrain = $releaseMetadata.Version
 $buildStamp = Get-BuildStamp -PipelineBuildNumber $BuildNumber
