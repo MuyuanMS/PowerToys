@@ -228,18 +228,28 @@ IFACEMETHODIMP SvgThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_A
 
                 if (std::filesystem::exists(fileNamePng))
                 {
-                    *phbmp = LoadPngAsPremultipliedDib(fileNamePng);
-                    if (*phbmp != nullptr)
+                    HBITMAP thumbnail = LoadPngAsPremultipliedDib(fileNamePng);
+                    std::error_code cleanupError;
+                    std::filesystem::remove(fileNamePng, cleanupError);
+                    if (cleanupError)
                     {
-                        *pdwAlpha = WTS_ALPHATYPE::WTSAT_ARGB;
+                        if (thumbnail != nullptr)
+                        {
+                            DeleteObject(thumbnail);
+                        }
+
+                        Logger::error(L"Failed to remove temporary PNG thumbnail.");
+                        return E_FAIL;
                     }
-                    else
+
+                    if (thumbnail == nullptr)
                     {
                         Logger::info(L"Failed to decode PNG thumbnail.");
                         return E_FAIL;
                     }
 
-                    std::filesystem::remove(fileNamePng);
+                    *phbmp = thumbnail;
+                    *pdwAlpha = WTS_ALPHATYPE::WTSAT_ARGB;
                 }
                 else
                 {
