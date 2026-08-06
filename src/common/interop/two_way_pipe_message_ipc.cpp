@@ -436,9 +436,8 @@ void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::start_named_pipe_server(HAN
 
     // Create the first instance with FILE_FLAG_FIRST_PIPE_INSTANCE so that CreateNamedPipe
     // fails fast if a pipe with this name already exists (for example a leftover instance
-    // from a previous run or another process), making this server the sole owner of the
-    // pipe name instead of silently sharing it. The flag is only valid on the first
-    // instance; subsequent instances must omit it.
+    // from a previous run or another process), instead of silently joining that pipe.
+    // The flag is only valid on the first instance; subsequent instances must omit it.
     bool first_instance = true;
     while (!closed.load())
     {
