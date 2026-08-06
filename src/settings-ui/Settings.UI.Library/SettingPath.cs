@@ -31,16 +31,27 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         private string GetModuleFolderPath(string powertoy = "") =>
             string.IsNullOrWhiteSpace(powertoy)
                 ? _path.Combine(Helper.LocalApplicationDataFolder(), "Microsoft", "PowerToys")
-                : _path.Combine(Helper.LocalApplicationDataFolder(), "Microsoft", "PowerToys", ValidatePathSegment(powertoy, nameof(powertoy)));
+                : _path.Combine(Helper.LocalApplicationDataFolder(), "Microsoft", "PowerToys", NormalizeRelativePath(powertoy, nameof(powertoy), true));
 
-        private static string ValidatePathSegment(string value, string parameterName)
+        private static string NormalizeRelativePath(string value, string parameterName, bool trimLeadingSeparators = false)
         {
-            if (System.IO.Path.IsPathRooted(value) || System.IO.Path.GetFileName(value) != value || value == "." || value == "..")
+            if (trimLeadingSeparators)
             {
-                throw new ArgumentException("The path segment must be a single relative name.", parameterName);
+                value = value.TrimStart(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
             }
 
-            return value;
+            if (System.IO.Path.IsPathRooted(value))
+            {
+                throw new ArgumentException("The path must be relative to the PowerToys settings folder.", parameterName);
+            }
+
+            var segments = value.Split(new[] { System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length == 0 || Array.Exists(segments, segment => segment == "." || segment == ".."))
+            {
+                throw new ArgumentException("The path must not contain traversal segments.", parameterName);
+            }
+
+            return string.Join(System.IO.Path.DirectorySeparatorChar.ToString(), segments);
         }
 
         public bool SettingsFolderExists(string powertoy)
@@ -69,7 +80,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                 return GetModuleFolderPath(powertoy) + System.IO.Path.DirectorySeparatorChar;
             }
 
-            return _path.Combine(GetModuleFolderPath(powertoy), ValidatePathSegment(fileName, nameof(fileName)));
+            return _path.Combine(GetModuleFolderPath(powertoy), NormalizeRelativePath(fileName, nameof(fileName)));
         }
     }
 }

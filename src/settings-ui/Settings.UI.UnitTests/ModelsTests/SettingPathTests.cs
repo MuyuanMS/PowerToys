@@ -116,12 +116,14 @@ namespace CommonLibTest
         }
 
         [TestMethod]
-        public void GetSettingsPath_WithRootedModuleName_Throws()
+        public void GetSettingsPath_WithLegacyLeadingSeparator_StaysUnderSettingsRoot()
         {
             var mockFileSystem = new MockFileSystem();
             var settingPath = new SettingPath(mockFileSystem.Directory, mockFileSystem.Path);
 
-            Assert.ThrowsException<ArgumentException>(() => settingPath.GetSettingsPath("\\Outside"));
+            string actualPath = settingPath.GetSettingsPath("\\Outside");
+
+            StringAssert.Contains(actualPath, "Microsoft\\PowerToys\\Outside");
         }
 
         [TestMethod]
