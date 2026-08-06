@@ -732,7 +732,23 @@ public sealed class ImageResizerEndToEndTests : UITestBase
             })
             .ToHashSet();
 
-        WindowControl.TryKillProcessByName(ExplorerProcessName);
+        var explorerProcesses = Process.GetProcessesByName(ExplorerProcessName);
+        foreach (var process in explorerProcesses)
+        {
+            try
+            {
+                process.Kill();
+                process.WaitForExit(10_000);
+            }
+            catch
+            {
+                // Best effort.
+            }
+            finally
+            {
+                process.Dispose();
+            }
+        }
 
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
         while (DateTime.UtcNow < deadline)

@@ -323,9 +323,12 @@ public sealed class Session
     {
         Assert.IsTrue(Scope == TargetScope.Window && WindowHandle != 0, "Visible-frame capture requires a window-scoped session.");
         var windowHandle = new IntPtr(WindowHandle);
-        var foregroundFailure = $"HWND {WindowHandle} did not become foreground before screenshot capture. " +
-                                $"Current foreground: {WindowControl.GetForegroundWindowInfo()}";
-        Assert.IsTrue(WindowControl.WaitForForeground(windowHandle, timeoutMS: 5_000), foregroundFailure);
+        if (!WindowControl.WaitForForeground(windowHandle, timeoutMS: 5_000))
+        {
+            var foregroundFailure = $"HWND {WindowHandle} did not become foreground before screenshot capture. " +
+                                    $"Current foreground: {WindowControl.GetForegroundWindowInfo()}";
+            Assert.Fail(foregroundFailure);
+        }
         WindowHelper.CaptureVisibleWindow(windowHandle, outputPath);
         return outputPath;
     }

@@ -176,7 +176,11 @@ function Get-TrustedSigningCert {
     if ($certCache.ContainsKey($Subject)) { return $certCache[$Subject] }
 
     $cert = Get-ChildItem Cert:\CurrentUser\My |
-        Where-Object { $_.Subject -eq $Subject -and $_.HasPrivateKey } |
+        Where-Object {
+            $_.Subject -eq $Subject -and
+            $_.Issuer -eq $_.Subject -and
+            $_.HasPrivateKey
+        } |
         Sort-Object NotAfter -Descending | Select-Object -First 1
 
     if (-not $cert) {

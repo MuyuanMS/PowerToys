@@ -95,7 +95,9 @@ if (-not (Test-Path $guestRunnerSourcePath -PathType Leaf)) {
 }
 
 $relativeExchange = [IO.Path]::GetRelativePath($sharedRoot, $exchangePath)
-if ($relativeExchange -eq '..' -or $relativeExchange.StartsWith("..$([IO.Path]::DirectorySeparatorChar)")) {
+if ([IO.Path]::IsPathRooted($relativeExchange) -or
+    $relativeExchange -eq '..' -or
+    $relativeExchange.StartsWith("..$([IO.Path]::DirectorySeparatorChar)")) {
     throw "ExchangeRoot must be inside the VM shared root '$sharedRoot'."
 }
 $guestExchangeRoot = if ($relativeExchange -eq '.') {
@@ -487,6 +489,9 @@ Add-Type -AssemblyName System.Windows.Forms
     } while ($true)
 
     $trx = Get-TrxSummary -ResultRoot $hostResultRoot
+    if (@($trx.Suites).Count -eq 0 -or $trx.Totals.Executed -eq 0) {
+        throw "UI-test run completed without a parsed TRX test result."
+    }
     $controllerResult = [pscustomobject]@{
         Controller = 'dockur/windows local VM'
         RunId = $runId

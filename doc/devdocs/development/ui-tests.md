@@ -12,11 +12,11 @@ Two repository skills cover the complete implementation and validation loop:
 - [UI-tests migration skill](../../../.github/skills/ui-tests-migration/SKILL.md): create new
   `.Next` test projects, port legacy WinAppDriver tests, design stable selectors/waits/lifecycle, and
   prepare tests for CI.
-- [Windows Sandbox UI-tests skill](../../../.github/skills/windows-sandbox-ui-tests/SKILL.md): enable
-  and launch Windows Sandbox, package current build/test artifacts, execute tests in a clean
-  interactive desktop, collect TRX/logs/screenshots, compare revisions, and tear down automatically.
+- [Local VM UI-tests skill](../../../.github/skills/ui-tests-local-vm/SKILL.md): launch a persistent
+  Windows VM, package current build/test artifacts, execute tests in a clean interactive desktop,
+  collect TRX/logs/screenshots, compare revisions, and tear down automatically.
 
-For new or migrated tests, use both skills. Build first, then use Windows Sandbox as the default live
+For new or migrated tests, use both skills. Build first, then use the local VM as the default live
 agentic loop: run one deterministic test, diagnose and fix it, and finally widen to the module suite.
 
 ## Before running tests
