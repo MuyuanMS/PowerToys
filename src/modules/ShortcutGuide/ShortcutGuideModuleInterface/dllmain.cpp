@@ -197,7 +197,7 @@ public:
             Logger::error("Failed to create a process to send settings telemetry");
         }
     }
-    virtual bool keep_track_of_pressed_win_key() override { return true; }
+    virtual bool keep_track_of_pressed_win_key() override { return m_windowsKeyAction != 0; }
     virtual UINT milliseconds_win_key_must_be_pressed() override { return m_millisecondsWinKeyPressTimeForGlobalWindowsShortcuts; }
 
 private:
@@ -215,6 +215,7 @@ private:
     const UINT DEFAULT_MILLISECONDS_WIN_KEY_PRESS_TIME_FOR_TASKBAR_ICON_SHORTCUTS = 900;
     UINT m_millisecondsWinKeyPressTimeForGlobalWindowsShortcuts = DEFAULT_MILLISECONDS_WIN_KEY_PRESS_TIME_FOR_GLOBAL_WINDOWS_SHORTCUTS;
     UINT m_millisecondsWinKeyPressTimeForTaskbarIconShortcuts = DEFAULT_MILLISECONDS_WIN_KEY_PRESS_TIME_FOR_TASKBAR_ICON_SHORTCUTS;
+    int m_windowsKeyAction = 1;
 
     HANDLE triggerEvent;
     HANDLE winKeyTriggerEvent;
@@ -307,6 +308,17 @@ private:
         {
             try
             {
+                auto jsonPropertiesObject = settingsObject.GetNamedObject(L"properties");
+                if (jsonPropertiesObject.HasKey(L"win_key_action"))
+                {
+                    auto jsonActionObject = jsonPropertiesObject.GetNamedObject(L"win_key_action");
+                    if (jsonActionObject.HasKey(L"value"))
+                    {
+                        auto action = jsonActionObject.GetNamedNumber(L"value");
+                        m_windowsKeyAction = action < 0 ? 1 : static_cast<int>(action);
+                    }
+                }
+
                 // Parse HotKey
                 auto jsonHotkeyObject = settingsObject.GetNamedObject(L"properties").GetNamedObject(L"open_shortcutguide");
                 auto hotkey = PowerToysSettings::HotkeyObject::from_json(jsonHotkeyObject);
