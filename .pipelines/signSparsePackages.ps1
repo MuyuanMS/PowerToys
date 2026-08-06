@@ -232,6 +232,7 @@ if (-not $packages) {
 }
 
 $signed = 0
+$testThumbprints = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 foreach ($pkg in $packages) {
     if (-not $Force) {
         $existing = Get-AuthenticodeSignature -FilePath $pkg.FullName
@@ -249,6 +250,7 @@ foreach ($pkg in $packages) {
     }
 
     $cert = Get-TrustedSigningCert -Subject $publisher
+    $testThumbprints.Add($cert.Thumbprint) | Out-Null
     Write-Host "Signing $($pkg.Name)  (Publisher: $publisher)"
     & $signtool sign /fd SHA256 /sha1 $cert.Thumbprint $pkg.FullName
     if ($LASTEXITCODE -ne 0) {
@@ -265,4 +267,7 @@ foreach ($pkg in $packages) {
     }
 }
 
+if ($testThumbprints.Count -gt 0) {
+    Write-Host "##vso[task.setvariable variable=PowerToysTestCertThumbprints]$($testThumbprints -join ';')"
+}
 Write-Host "Signed $signed package(s) with a trusted test certificate."

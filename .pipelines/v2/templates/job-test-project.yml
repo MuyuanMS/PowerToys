@@ -302,6 +302,23 @@ jobs:
     env:
       platform: $(TestPlatform)
 
+  # Remove the temporary test trust anchors from persistent self-hosted agents, even when tests fail.
+  - pwsh: |
+      $thumbprints = '$(PowerToysTestCertThumbprints)' -split ';' | Where-Object { $_ }
+      foreach ($thumbprint in $thumbprints) {
+        foreach ($store in @(
+          'Cert:\CurrentUser\My',
+          'Cert:\LocalMachine\Root',
+          'Cert:\LocalMachine\TrustedPeople',
+          'Cert:\CurrentUser\TrustedPeople')) {
+          Get-ChildItem $store -ErrorAction SilentlyContinue |
+            Where-Object Thumbprint -eq $thumbprint |
+            Remove-Item -Force -ErrorAction SilentlyContinue
+        }
+      }
+    displayName: "Remove sparse MSIX test certificates"
+    condition: always()
+
   - task: PublishTestResults@2
     displayName: "Publish UI Test Results"
     condition: always()
