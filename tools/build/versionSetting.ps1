@@ -12,7 +12,13 @@ Param(
 
   [string]$SourceCommit = $env:BUILD_SOURCEVERSION,
 
-  [string]$BuildNumber = $env:BUILD_BUILDNUMBER
+  [string]$BuildNumber = $env:BUILD_BUILDNUMBER,
+
+  [AllowEmptyString()]
+  [string]$BuildDate = "",
+
+  [AllowEmptyString()]
+  [string]$DailyVersionSequence = ""
 )
 
 Write-Host $PSScriptRoot
@@ -34,21 +40,28 @@ function Get-NormalizedVersion {
     $InputVersion = $matches["numeric"]
   }
 
-  if ($ReleaseChannel -eq "preview" -and $InputVersion -match "^(\d+)\.(\d+)$") {
-    $major = [int]::Parse($matches[1])
-    $minor = [int]::Parse($matches[2])
-    $now = Get-Date
-    $yyMM = [int]::Parse($now.ToString("yyMM"))
-    $day = $now.ToString("dd")
-    $rev = "001"
-    if ($PipelineBuildNumber -match "_(?<yyMM>\d{4})\.(?<day>\d{2})(?<rev>\d{3})") {
-      $yyMM = [int]::Parse($matches["yyMM"])
-      $day = $matches["day"]
-      $rev = $matches["rev"]
+  if ($ReleaseChannel -eq "preview") {
+    $sequence = $DailyVersionSequence
+    if ([string]::IsNullOrWhiteSpace($sequence)) {
+      $sequence = if ($PipelineBuildNumber -match "_\d{4}\.\d{2}(?<revision>\d{3})") {
+        [int]$matches["revision"]
+      } else {
+        1
+      }
     }
 
-    $build = [int]::Parse("$day$rev")
-    return "$major.$minor.$yyMM.$build"
+    if ([int]$sequence -lt 1 -or [int]$sequence -gt 9) {
+      throw "Preview daily release sequence '$sequence' must be between 1 and 9"
+    }
+
+    $metadata = & (Join-Path $PSScriptRoot "..\..\.pipelines\resolveBuildMetadata.ps1") `
+      -VersionOverride $InputVersion `
+      -SourceBranch "refs/heads/main" `
+      -BuildReason "Manual" `
+      -BuildNumber $PipelineBuildNumber `
+      -BuildDate $BuildDate `
+      -DailyVersionSequence ([string]$sequence)
+    return $metadata.Version
   }
 
   if ($InputVersion -match "^(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?$") {
