@@ -206,8 +206,12 @@ namespace mousebuttonlock
         void OnInjectionFailed(MouseButton button)
         {
             ButtonState& st = State(button);
+            if (st.swallowNextRealUp)
+            {
+                st.swallowNextRealUp = false;
+                return;
+            }
             st.locked.store(true);
-            st.swallowNextRealUp = false;
         }
 
     private:

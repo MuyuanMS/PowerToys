@@ -4,6 +4,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{15f55815-dffc-4eb7-99e4-b6754a52a5c7}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
+    <ProjectSubType>NativeUnitTestProject</ProjectSubType>
     <RootNamespace>MouseButtonLockUnitTests</RootNamespace>
     <ProjectName>MouseButtonLock.UnitTests</ProjectName>
     <!-- Pure C++ test of a header-only engine: no vcpkg/spdlog, and skip code analysis on test code. -->
