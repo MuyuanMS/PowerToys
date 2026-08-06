@@ -98,7 +98,10 @@ bool MappingConfiguration::AddSingleKeyToTextRemap(const DWORD originalKey, cons
 
 bool MappingConfiguration::AddTextReplacement(const std::wstring& trigger, const std::wstring& text)
 {
-    if (trigger.empty() || trigger.length() > KeyboardManagerConstants::MaxTextReplacementTriggerLength || text.empty())
+    if (trigger.empty() ||
+        trigger.length() > KeyboardManagerConstants::MaxTextReplacementTriggerLength ||
+        text.empty() ||
+        text.length() > KeyboardManagerConstants::MaxTextReplacementTextLength)
     {
         return false;
     }
