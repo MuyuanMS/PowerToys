@@ -221,5 +221,17 @@ namespace SvgThumbnailProviderUnitTests
 
             Assert.IsTrue(bitmap != null);
         }
+
+        [TestMethod]
+        public void ResizeImagePreservesAlphaChannel()
+        {
+            using var source = new Bitmap(1, 1, PixelFormat.Format32bppArgb);
+            source.SetPixel(0, 0, Color.FromArgb(0, 255, 0, 0));
+
+            using Bitmap resized = SvgThumbnailProvider.ResizeImage(source, 1, 1);
+
+            Assert.AreEqual(PixelFormat.Format32bppArgb, resized.PixelFormat);
+            Assert.AreEqual(0, resized.GetPixel(0, 0).A);
+        }
     }
 }
