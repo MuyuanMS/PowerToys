@@ -14,12 +14,15 @@ namespace CommandLine
 
         size_t index = 0;
 
-        // A non-shell CreateProcessW caller can prepend whitespace; without this skip the scan
-        // below stalls at index 0 and leaks argv[0] into the forwarded tail. This is a deliberate
-        // departure from the CRT, which would report an empty argv[0] instead.
+        // A non-shell CreateProcessW caller can prepend whitespace. The CRT treats argv[0] as
+        // empty in that case, so the entire remaining command line is forwarded as the tail.
         while (index < commandLine.size() && isWhitespace(commandLine[index]))
         {
             ++index;
+        }
+        if (index != 0)
+        {
+            return std::wstring{ commandLine.substr(index) };
         }
 
         // argv[0] is tokenized differently from every later argument, and the rule that matters is
