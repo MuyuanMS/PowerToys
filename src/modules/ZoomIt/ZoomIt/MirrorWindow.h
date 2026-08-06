@@ -15,7 +15,7 @@
 
 // Posted to the notify window when mirroring must stop because the mirrored
 // window closed. Keep distinct from the WM_USER messages in zoomit.h.
-#define WM_USER_MIRROR_STOP		WM_USER+112
+#define WM_USER_MIRROR_STOP		WM_USER+113
 
 // Bright green, distinguishing the mirror border from the yellow
 // record/panorama borders and the orange recording-active border.
