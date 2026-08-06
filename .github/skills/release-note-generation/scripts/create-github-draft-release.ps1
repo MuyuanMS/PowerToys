@@ -192,8 +192,7 @@ if ($releaseExists) {
         throw "Release $TagName already exists and is not a draft: $($release.url)"
     }
 
-    $editArgs = @("release", "edit", $TagName, "--repo", $GitHubRepo, "--title", $Title, "--notes-file", $notesFilePath)
-    $editArgs += if ($Publish) { "--draft=false" } else { "--draft" }
+    $editArgs = @("release", "edit", $TagName, "--repo", $GitHubRepo, "--draft", "--title", $Title, "--notes-file", $notesFilePath)
     if ($Target) { $editArgs += @("--target", $Target) }
     if ($Prerelease) { $editArgs += "--prerelease" }
     Invoke-Gh -Arguments $editArgs | Out-Null
@@ -201,13 +200,20 @@ if ($releaseExists) {
     $uploadArgs = @("release", "upload", $TagName) + $assets + @("--repo", $GitHubRepo)
     if ($Clobber) { $uploadArgs += "--clobber" }
     Invoke-Gh -Arguments $uploadArgs | Out-Null
+
+    if ($Publish) {
+        Invoke-Gh -Arguments @("release", "edit", $TagName, "--repo", $GitHubRepo, "--draft=false") | Out-Null
+    }
 } else {
-    $createArgs = @("release", "create", $TagName) + $assets + @("--repo", $GitHubRepo, "--title", $Title, "--notes-file", $notesFilePath)
-    if (-not $Publish) { $createArgs += "--draft" }
+    $createArgs = @("release", "create", $TagName) + $assets + @("--repo", $GitHubRepo, "--draft", "--title", $Title, "--notes-file", $notesFilePath)
     if ($Target) { $createArgs += @("--target", $Target) }
     if ($Prerelease) { $createArgs += "--prerelease" }
     if ($Prerelease -or $LatestFalse) { $createArgs += "--latest=false" }
     Invoke-Gh -Arguments $createArgs | Out-Null
+
+    if ($Publish) {
+        Invoke-Gh -Arguments @("release", "edit", $TagName, "--repo", $GitHubRepo, "--draft=false") | Out-Null
+    }
 }
 
 if ($DryRun) {

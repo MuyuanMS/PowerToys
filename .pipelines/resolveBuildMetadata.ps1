@@ -269,7 +269,20 @@ function Get-StableVersion {
         return $GeneratedVersion
     }
 
-    return Get-MsiSafeVersionOverride -Override $Override -VersionKind "Stable"
+    $normalizedOverride = Get-MsiSafeVersionOverride -Override $Override -VersionKind "Stable"
+    $generatedParts = @($GeneratedVersion -split "\." | ForEach-Object { [int]$_ })
+    $overrideParts = @($normalizedOverride -split "\." | ForEach-Object { [int]$_ })
+    for ($index = 0; $index -lt $generatedParts.Count; $index++) {
+        if ($overrideParts[$index] -gt $generatedParts[$index]) {
+            return $normalizedOverride
+        }
+
+        if ($overrideParts[$index] -lt $generatedParts[$index]) {
+            throw "Stable version override '$normalizedOverride' must not be lower than generated version '$GeneratedVersion'"
+        }
+    }
+
+    return $normalizedOverride
 }
 
 $isMain = $SourceBranch -eq "refs/heads/main"

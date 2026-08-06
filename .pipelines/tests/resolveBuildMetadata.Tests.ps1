@@ -141,14 +141,14 @@ Describe "resolveBuildMetadata" {
 
     It "preserves an explicit stable override" {
         $result = & $scriptPath `
-            -VersionOverride "0.100.2" `
+            -VersionOverride "0.100.2112" `
             -SourceBranch "refs/heads/stable" `
             -BuildReason "Manual" `
             -BuildNumber "PowerToys Signed YAML Release Build_2607.30001-stable" `
             -DailyVersionSequence "1" `
             -VersionPropsPath (New-VersionProps)
 
-        $result.Version | Should Be "0.100.2.0"
+        $result.Version | Should Be "0.100.2112.0"
     }
 
     It "rejects a stable override with a nonzero fourth component" {
