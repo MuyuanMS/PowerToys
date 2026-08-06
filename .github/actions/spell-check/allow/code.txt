@@ -477,3 +477,15 @@ wslconfig
 wsman
 wusa
 
+buildtools
+CLASSNOTREG
+flatcontainer
+lpgui
+PNGs
+sideloading
+thumbprints
+timestamped
+Toolpath
+WDAG
+wsb
+
