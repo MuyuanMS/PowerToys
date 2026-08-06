@@ -204,7 +204,7 @@ function Get-TrustedSigningCert {
     Import-CertTrust -CerPath $cerPath -Thumbprint $cert.Thumbprint -StorePath 'Cert:\LocalMachine\TrustedPeople' -Optional | Out-Null
     Import-CertTrust -CerPath $cerPath -Thumbprint $cert.Thumbprint -StorePath 'Cert:\CurrentUser\TrustedPeople' -Optional | Out-Null
     if (-not $rootTrusted) {
-        Write-Warning "Could not establish machine root trust for '$Subject' (run elevated). Signed packages may not register."
+        throw "Could not establish machine root trust for '$Subject' (run elevated). Signed packages may not register."
     }
 
     $certCache[$Subject] = $cert

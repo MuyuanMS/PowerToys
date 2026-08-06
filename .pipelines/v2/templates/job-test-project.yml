@@ -181,18 +181,14 @@ jobs:
   # register on unsigned PR builds and the UI tests can drive the real modern (Win11 tier-1) context
   # menu instead of the signing-free fallback. Test-only trust anchor; asserts no security. All roots
   # are passed (buildNow run-in-place tree + the machine and per-user install locations); missing ones
-  # are skipped. Best-effort: on failure the shell-extension tests fall back to their ModernRegistered()
-  # guard, so the job never regresses. Verified in a local Win11 VM — unsigned Add-AppxPackage fails
+  # are skipped. Signing is required because the Win11 Image Resizer suite exercises the modern menu
+  # unconditionally. Verified in a local Win11 VM — unsigned Add-AppxPackage fails
   # 0x800B0100; after signing + force-trust the same registration succeeds.
   - pwsh: |
-      try {
-        & "$(build.sourcesdirectory)\.pipelines\signSparsePackages.ps1" -PackageRoot @(
-          "$(Pipeline.Workspace)\$(TestArtifactsName)",
-          "$env:ProgramFiles\PowerToys\WinUI3Apps",
-          "$env:LOCALAPPDATA\PowerToys\WinUI3Apps")
-      } catch {
-        Write-Host "##vso[task.logissue type=warning]Sparse MSIX signing skipped: $($_.Exception.Message)"
-      }
+      & "$(build.sourcesdirectory)\.pipelines\signSparsePackages.ps1" -PackageRoot @(
+        "$(Pipeline.Workspace)\$(TestArtifactsName)",
+        "$env:ProgramFiles\PowerToys\WinUI3Apps",
+        "$env:LOCALAPPDATA\PowerToys\WinUI3Apps")
     displayName: "Sign sparse MSIX packages (test trust)"
 
   # Start WinAppDriver once for the whole job — WinAppDriver's documented CI pattern
