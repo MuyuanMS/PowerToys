@@ -116,15 +116,10 @@ winrt::IAsyncAction AudioSampleGenerator::InitializeAsync()
         auto graphProps = m_audioGraph.EncodingProperties();
         m_graphSampleRate = graphProps.SampleRate();
 
-        // Force the captured audio to stereo.  The default render device mix format
-        // is often multichannel (e.g. 7.1 / 8 channels), which produces a multichannel
-        // AAC track that plays back fine but cannot be re-encoded by the trim /
-        // MediaComposition transcode source reader (fails with 0xC00DA7FC /
-        // TranscodeFailureReason::Unknown).  Screen recordings only need stereo, so we
-        // build a stereo output-node format and let the graph downmix the multichannel
-        // mix automatically.  (Forcing the whole graph to stereo via
-        // AudioGraphSettings.EncodingProperties is rejected by many devices, so we only
-        // constrain the frame output node.)
+        // Keep the captured audio stereo. The graph above is recreated with an
+        // explicit stereo format when the device accepts it. If that constrained
+        // graph cannot be created, retain the default graph and constrain only
+        // the frame output node so it can downmix multichannel audio.
         auto outputProps = m_audioGraph.EncodingProperties();
         outputProps.ChannelCount(2);
         outputProps.Bitrate(outputProps.SampleRate() * 2 * outputProps.BitsPerSample());
