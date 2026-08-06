@@ -233,12 +233,17 @@ IFACEMETHODIMP SvgThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_A
                     {
                         *pdwAlpha = WTS_ALPHATYPE::WTSAT_ARGB;
                     }
+                    else
+                    {
+                        Logger::info(L"Failed to decode PNG thumbnail.");
+                        return E_FAIL;
+                    }
 
                     std::filesystem::remove(fileNamePng);
                 }
                 else
                 {
-                    Logger::info(L"Bmp file not generated.");
+                    Logger::info(L"PNG file not generated.");
                     return E_FAIL;
                 }
             }
@@ -246,6 +251,7 @@ IFACEMETHODIMP SvgThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_A
             {
                 std::wstring errorMessage = std::wstring{ winrt::to_hstring(e.what()) };
                 Logger::error(L"Failed to start SvgThumbnailProvider.exe. Error: {}", errorMessage);
+                return E_FAIL;
             }
         }
     }
