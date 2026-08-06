@@ -77,7 +77,7 @@ void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::start(HANDLE _restricted_pi
 
 void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::end()
 {
-    closed = true;
+    closed.store(true);
     input_queue.interrupt();
     input_queue_thread.join();
     output_queue.interrupt();
@@ -165,7 +165,7 @@ void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::send_pipe_message(std::wstr
 
 void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::consume_output_queue_thread()
 {
-    while (!closed)
+    while (!closed.load())
     {
         std::wstring message = output_queue.pop_message();
         if (message.length() == 0)
@@ -433,14 +433,30 @@ void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::start_named_pipe_server(HAN
     const wchar_t* pipe_name = input_pipe_name.c_str();
     BOOL connected = FALSE;
     HANDLE connect_pipe_handle = INVALID_HANDLE_VALUE;
-    while (!closed)
+
+    // Create the first instance with FILE_FLAG_FIRST_PIPE_INSTANCE so that CreateNamedPipe
+    // fails fast if a pipe with this name already exists (for example a leftover instance
+    // from a previous run or another process), instead of silently joining that pipe.
+    // The flag is only valid on the first instance; subsequent instances must omit it.
+    bool first_instance = true;
+    while (!closed.load())
     {
         {
             std::unique_lock lock(pipe_connect_handle_mutex);
+            if (closed.load())
+            {
+                break;
+            }
+
+            DWORD open_mode = PIPE_ACCESS_DUPLEX | WRITE_DAC;
+            if (first_instance)
+            {
+                open_mode |= FILE_FLAG_FIRST_PIPE_INSTANCE;
+            }
+
             connect_pipe_handle = CreateNamedPipe(
                 pipe_name,
-                PIPE_ACCESS_DUPLEX |
-                    WRITE_DAC,
+                open_mode,
                 PIPE_TYPE_MESSAGE |
                     PIPE_READMODE_MESSAGE |
                     PIPE_WAIT |
@@ -455,6 +471,8 @@ void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::start_named_pipe_server(HAN
             {
                 return;
             }
+
+            first_instance = false;
 
             if (token != NULL)
             {
@@ -481,7 +499,7 @@ void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::start_named_pipe_server(HAN
 
 void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::consume_input_queue_thread()
 {
-    while (!closed)
+    while (!closed.load())
     {
         outgoing_message = L"";
         std::wstring message = input_queue.pop_message();
