@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -16,6 +17,8 @@ public static class UnicodeHelper
     // u_charName name choice: 0 = U_UNICODE_CHAR_NAME (official Unicode name).
     private const int UnicodeCharName = 0;
     private const int BufferSize = 128;
+    private static readonly object CacheLock = new();
+    private static readonly Dictionary<int, string> CharacterNameCache = new();
     private static bool _icuUnavailable;
 
     /// <summary>
@@ -50,7 +53,7 @@ public static class UnicodeHelper
                 // The native function writes a null-terminated ASCII string.
                 // We pass a raw byte[] so the P/Invoke marshaller never touches the
                 // encoding — then decode as Latin-1 ourselves.
-                string name = GetCodePointName(codePoint);
+                string name = GetCachedCodePointName(codePoint);
                 if (!string.IsNullOrEmpty(name))
                 {
                     names.Add(name);
@@ -69,6 +72,26 @@ public static class UnicodeHelper
         }
 
         return null;
+    }
+
+    private static string GetCachedCodePointName(int codePoint)
+    {
+        lock (CacheLock)
+        {
+            if (CharacterNameCache.TryGetValue(codePoint, out string cachedName))
+            {
+                return cachedName;
+            }
+        }
+
+        string name = GetCodePointName(codePoint) ?? string.Empty;
+
+        lock (CacheLock)
+        {
+            CharacterNameCache[codePoint] = name;
+        }
+
+        return name;
     }
 
     private static string GetCodePointName(int codePoint)
