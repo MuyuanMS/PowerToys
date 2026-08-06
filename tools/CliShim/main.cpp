@@ -142,7 +142,7 @@ int wmain()
             nullptr,
             nullptr,
             TRUE, // Inherit handles: share stdin/stdout/stderr and stay in this console.
-            0,
+            CREATE_SUSPENDED,
             nullptr,
             nullptr,
             &startupInfo,
@@ -152,9 +152,22 @@ int wmain()
         return ExitLaunchFailed;
     }
 
-    if (shimJob)
+    if (shimJob && !AssignProcessToJobObject(shimJob.get(), processInfo.hProcess))
     {
-        AssignProcessToJobObject(shimJob.get(), processInfo.hProcess);
+        const DWORD error = GetLastError();
+        TerminateProcess(processInfo.hProcess, ExitLaunchFailed);
+        WaitForSingleObject(processInfo.hProcess, INFINITE);
+        std::fwprintf(stderr, L"cli-shim: failed to secure the launched process (error %lu).\n", error);
+        return ExitLaunchFailed;
+    }
+
+    if (ResumeThread(processInfo.hThread) == static_cast<DWORD>(-1))
+    {
+        const DWORD error = GetLastError();
+        TerminateProcess(processInfo.hProcess, ExitLaunchFailed);
+        WaitForSingleObject(processInfo.hProcess, INFINITE);
+        std::fwprintf(stderr, L"cli-shim: failed to start the launched process (error %lu).\n", error);
+        return ExitLaunchFailed;
     }
 
     WaitForSingleObject(processInfo.hProcess, INFINITE);
