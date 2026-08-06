@@ -13,6 +13,7 @@
 
 #include <atomic>
 #include <cmath>
+#include <functional>
 #include <thread>
 
 // Mouse Button Lock
@@ -101,12 +102,22 @@ namespace
             return Post(button);
         }
 
+        void SetFailureHandler(std::function<void(mousebuttonlock::MouseButton)> handler) override
+        {
+            m_failureHandler = std::move(handler);
+        }
+
         // Runs the actual SendInput. Called from the hook thread's message loop when it drains a
         // WM_MBL_INJECT it posted to itself (see HookThreadMain), i.e. after the triggering hook
         // callback has returned and suppressed the physical event.
-        static void PerformDeferred(WPARAM packed)
+        void PerformDeferred(WPARAM packed)
         {
-            InjectUpNow(static_cast<mousebuttonlock::MouseButton>(packed));
+            const auto button = static_cast<mousebuttonlock::MouseButton>(packed);
+            const bool success = InjectUpNow(button);
+            if (!success && m_failureHandler)
+            {
+                m_failureHandler(button);
+            }
         }
 
     private:
@@ -120,7 +131,12 @@ namespace
             {
                 return true;
             }
-            return InjectUpNow(button);
+            const bool success = InjectUpNow(button);
+            if (!success && m_failureHandler)
+            {
+                m_failureHandler(button);
+            }
+            return success;
         }
 
         static bool InjectUpNow(mousebuttonlock::MouseButton button)
@@ -148,36 +164,11 @@ namespace
                 Logger::warn(L"Failed to inject synthetic button-up event.");
                 return false;
             }
-            // Releasing a right-button lock emits a right-button-up, which apps treat as a right-click
-            // and answer with a context menu. Since every injected right-up here is a lock release (a
-            // normal quick right-click never locks and is untouched), immediately queue an Esc to
-            // dismiss that menu. Esc lands right behind the up in the input queue, so the menu's modal
-            // loop consumes it as soon as it opens. This is what makes hands-free right-drag usable;
-            // the trade-off is that a genuine right-drag-drop menu (e.g. Explorer's copy/move) is also
-            // dismissed.
-            if (button == mousebuttonlock::MouseButton::Right)
-            {
-                InjectEscape();
-            }
             return true;
         }
 
-        // Tap Esc to dismiss a context menu opened by a right-lock release. Tagged like our mouse
-        // injections; the module hooks only the mouse, so this never feeds back into our own hook.
-        static void InjectEscape()
-        {
-            INPUT keys[2]{};
-            keys[0].type = INPUT_KEYBOARD;
-            keys[0].ki.wVk = VK_ESCAPE;
-            keys[0].ki.dwExtraInfo = INJECTION_TAG;
-            keys[1].type = INPUT_KEYBOARD;
-            keys[1].ki.wVk = VK_ESCAPE;
-            keys[1].ki.dwFlags = KEYEVENTF_KEYUP;
-            keys[1].ki.dwExtraInfo = INJECTION_TAG;
-            SendInput(2, keys, sizeof(INPUT));
-        }
-
         std::atomic<DWORD> m_threadId{ 0 };
+        std::function<void(mousebuttonlock::MouseButton)> m_failureHandler;
     };
 }
 
@@ -485,7 +476,7 @@ void MouseButtonLock::HookThreadMain()
             // returned, keeps the suppressed physical event from leaking to applications.
             if (msg.message == WM_MBL_INJECT)
             {
-                WinInjector::PerformDeferred(msg.wParam);
+                m_injector.PerformDeferred(msg.wParam);
                 continue;
             }
             TranslateMessage(&msg);
@@ -497,7 +488,7 @@ void MouseButtonLock::HookThreadMain()
     // a button held, then unhook.
     while (PeekMessage(&msg, nullptr, WM_MBL_INJECT, WM_MBL_INJECT, PM_REMOVE))
     {
-        WinInjector::PerformDeferred(msg.wParam);
+        m_injector.PerformDeferred(msg.wParam);
     }
 
     if (m_mouseHook)

@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <functional>
 
 // The per-button ClickLock state machine, deliberately decoupled from Win32 so it can be unit
 // tested. The caller (the module's low-level mouse hook) feeds it events with a monotonic
@@ -51,6 +52,9 @@ namespace mousebuttonlock
     {
         virtual ~IButtonUpInjector() = default;
         virtual bool InjectUp(MouseButton button) = 0;
+        virtual void SetFailureHandler(std::function<void(MouseButton)>)
+        {
+        }
     };
 
     class Engine
@@ -59,6 +63,7 @@ namespace mousebuttonlock
         explicit Engine(IButtonUpInjector& injector) :
             m_injector(injector)
         {
+            m_injector.SetFailureHandler([this](MouseButton button) { OnInjectionFailed(button); });
         }
 
         Engine(const Engine&) = delete;
@@ -196,6 +201,13 @@ namespace mousebuttonlock
         bool IsLocked(MouseButton button) const
         {
             return State(button).locked.load();
+        }
+
+        void OnInjectionFailed(MouseButton button)
+        {
+            ButtonState& st = State(button);
+            st.locked.store(true);
+            st.swallowNextRealUp = false;
         }
 
     private:

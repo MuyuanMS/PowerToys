@@ -9,13 +9,14 @@ using Microsoft.UI.Xaml.Data;
 namespace Microsoft.PowerToys.Settings.UI.Converters
 {
     // Formats a millisecond value (int property binding, or the double a Slider passes to its
-    // ThumbToolTipValueConverter) as a short "<n> ms" label. One-way display only.
+    // ThumbToolTipValueConverter) as a localized label. One-way display only.
     public sealed partial class MillisecondsLabelConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, string language)
         {
             int milliseconds = System.Convert.ToInt32(value, CultureInfo.InvariantCulture);
-            return $"{milliseconds} ms";
+            string format = Helpers.ResourceLoaderInstance.ResourceLoader.GetString("MouseUtils_MouseButtonLock_HoldDuration.ValueFormat");
+            return string.Format(CultureInfo.CurrentCulture, format, milliseconds);
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, string language)
