@@ -186,7 +186,7 @@ public:
         }
 
         SetEvent(winKeyTriggerEvent);
-        return false;
+        return true;
     }
 
     virtual void send_settings_telemetry() override
