@@ -165,8 +165,12 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
             _showSysTrayIcon = GeneralSettingsConfig.ShowSysTrayIcon;
             _showThemeAdaptiveSysTrayIcon = GeneralSettingsConfig.ShowThemeAdaptiveTrayIcon;
-            ThemeAdaptiveTrayIconFanOut.ApplyToModules(_showThemeAdaptiveSysTrayIcon, SendConfigMSG);
-            ApplyZoomItThemeAdaptiveTrayIconViaInterop();
+            ThemeAdaptiveTrayIconFanOut.ApplyToModules(_showThemeAdaptiveSysTrayIcon, SendConfigMSG, overwriteExisting: false);
+            if (ApplyZoomItThemeAdaptiveTrayIconViaInterop())
+            {
+                SendConfigMSG?.Invoke("{\"action\":{\"ZoomIt\":{\"action_name\":\"refresh_settings\", \"value\":\"\"}}}");
+            }
+
             _showNewUpdatesToastNotification = GeneralSettingsConfig.ShowNewUpdatesToastNotification;
             _autoDownloadUpdates = GeneralSettingsConfig.AutoDownloadUpdates;
             _showWhatsNewAfterUpdates = GeneralSettingsConfig.ShowWhatsNewAfterUpdates;
@@ -424,8 +428,11 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                     _showThemeAdaptiveSysTrayIcon = value;
                     GeneralSettingsConfig.ShowThemeAdaptiveTrayIcon = value;
                     ThemeAdaptiveTrayIconFanOut.ApplyToModules(value, SendConfigMSG);
-                    ApplyZoomItThemeAdaptiveTrayIconViaInterop();
-                    SendConfigMSG?.Invoke("{\"action\":{\"ZoomIt\":{\"action_name\":\"refresh_settings\", \"value\":\"\"}}}");
+                    if (ApplyZoomItThemeAdaptiveTrayIconViaInterop())
+                    {
+                        SendConfigMSG?.Invoke("{\"action\":{\"ZoomIt\":{\"action_name\":\"refresh_settings\", \"value\":\"\"}}}");
+                    }
+
                     NotifyPropertyChanged();
                 }
             }
@@ -1171,21 +1178,23 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
         }
 
-        private static void ApplyZoomItThemeAdaptiveTrayIconViaInterop()
+        private static bool ApplyZoomItThemeAdaptiveTrayIconViaInterop()
         {
             try
             {
                 var path = ThemeAdaptiveTrayIconFanOut.TryGetPatchedZoomItSettingsPath();
                 if (string.IsNullOrEmpty(path) || !File.Exists(path))
                 {
-                    return;
+                    return false;
                 }
 
                 global::PowerToys.ZoomItSettingsInterop.ZoomItSettings.SaveSettingsJson(File.ReadAllText(path));
+                return true;
             }
             catch (Exception ex)
             {
                 Logger.LogError("Failed to apply ZoomIt theme-adaptive tray icon via interop.", ex);
+                return false;
             }
         }
 
