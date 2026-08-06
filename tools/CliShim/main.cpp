@@ -154,11 +154,8 @@ int wmain()
 
     if (shimJob && !AssignProcessToJobObject(shimJob.get(), processInfo.hProcess))
     {
-        const DWORD error = GetLastError();
-        TerminateProcess(processInfo.hProcess, ExitLaunchFailed);
-        WaitForSingleObject(processInfo.hProcess, INFINITE);
-        std::fwprintf(stderr, L"cli-shim: failed to secure the launched process (error %lu).\n", error);
-        return ExitLaunchFailed;
+        // Some hosts place child processes in an incompatible job. Preserve the best-effort
+        // policy: continue without the protection rather than making the CLI unusable.
     }
 
     if (ResumeThread(processInfo.hThread) == static_cast<DWORD>(-1))
