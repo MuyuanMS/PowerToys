@@ -125,7 +125,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         private static void ApplyMouseWithoutBorders(bool themeAdaptive, bool overwriteExisting)
         {
             // MWB watches settings.json and applies ShowThemeAdaptiveTrayIcon from file changes.
-            PatchModuleSettingsFile(MouseWithoutBordersSettings.ModuleName, SnakeCasePropertyName, themeAdaptive, wrapAsBoolProperty: true, overwriteExisting);
+            PatchModuleSettingsFile(MouseWithoutBordersSettings.ModuleName, PascalCasePropertyName, themeAdaptive, wrapAsBoolProperty: true, overwriteExisting);
         }
 
         /// <summary>
