@@ -178,7 +178,8 @@ extends:
                     Copy-Item -Destination $releaseFolder -Force
 
                   foreach ($architecture in @('x64', 'arm64')) {
-                    $symbolDirectory = Get-ChildItem -Path '$(Pipeline.Workspace)\build-' + $architecture + '-Release' -Directory -Filter "symbols-$architecture" -Recurse |
+                    $artifactPath = Join-Path '$(Pipeline.Workspace)' "build-$architecture-Release"
+                    $symbolDirectory = Get-ChildItem -Path $artifactPath -Directory -Filter "symbols-$architecture" -Recurse |
                       Select-Object -First 1
                     if (-not $symbolDirectory) {
                       throw "Could not find symbols-$architecture in the build artifact."
