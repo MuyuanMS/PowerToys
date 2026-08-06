@@ -77,9 +77,9 @@ to the default right button.
 $config = @{
     settings = @{
         properties = @{
-            LmbLockEnabled = $true
-            RmbLockEnabled = $true
-            MmbLockEnabled = $true
+            lmb_lock_enabled = @{ value = $true }
+            rmb_lock_enabled = @{ value = $true }
+            mmb_lock_enabled = @{ value = $true }
         }
         name = "MouseButtonLock"
         version = "1.0"
@@ -106,8 +106,10 @@ resources:
     properties:
       settings:
         properties:
-          HoldDurationMs: 1600
-          MoveCancelPixels: 10
+          hold_duration_ms:
+            value: 1600
+          move_cancel_pixels:
+            value: 10
         name: MouseButtonLock
         version: 1.0
 ```
@@ -139,8 +141,10 @@ resources:
     properties:
       settings:
         properties:
-          RmbLockEnabled: true
-          HoldDurationMs: 1000
+          rmb_lock_enabled:
+            value: true
+          hold_duration_ms:
+            value: 1000
         name: MouseButtonLock
         version: 1.0
 ```
