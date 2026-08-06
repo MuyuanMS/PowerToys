@@ -27,12 +27,15 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
     private readonly IServiceProvider _serviceProvider;
     private readonly CommandItemViewModel _commandItemViewModel;
     private readonly IContextMenuFactory _contextMenuFactory;
+    private readonly object _fallbackUpdateGate = new();
+    private readonly object _fallbackQueryStateLock = new();
 
     public ICommandProviderContext ProviderContext { get; private set; }
 
     private string IdFromModel => IsFallback && !string.IsNullOrWhiteSpace(_fallbackId) ? _fallbackId : _commandItemViewModel.Command.Id;
 
     private string _fallbackId = string.Empty;
+    private string _latestFallbackQuery = string.Empty;
 
     private string _generatedId = string.Empty;
 
@@ -433,16 +436,31 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
         // RPC to check type
         if (model is IFallbackCommandItem fallback)
         {
-            var oldTitle = Title;
-            var oldSubtitle = Subtitle;
+            lock (_fallbackQueryStateLock)
+            {
+                _latestFallbackQuery = newQuery;
+            }
 
-            // RPC for method
-            fallback.FallbackHandler.UpdateQuery(newQuery);
-            var newTitle = Title;
+            lock (_fallbackUpdateGate)
+            {
+                lock (_fallbackQueryStateLock)
+                {
+                    if (!string.Equals(_latestFallbackQuery, newQuery, StringComparison.Ordinal))
+                    {
+                        return false;
+                    }
+                }
 
-            var newSubtitle = Subtitle;
+                var oldTitle = Title;
+                var oldSubtitle = Subtitle;
 
-            return ScoringLabelsChanged(oldTitle, newTitle, oldSubtitle, newSubtitle);
+                // RPC for method
+                fallback.FallbackHandler.UpdateQuery(newQuery);
+                var newTitle = Title;
+                var newSubtitle = Subtitle;
+
+                return ScoringLabelsChanged(oldTitle, newTitle, oldSubtitle, newSubtitle);
+            }
         }
 
         return false;
