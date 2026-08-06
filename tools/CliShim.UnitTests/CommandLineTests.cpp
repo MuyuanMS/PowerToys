@@ -51,10 +51,11 @@ namespace CliShimUnitTests
                 { L"PowerToys.FancyZones.CLI\targ", L"arg" },
                 { L"PowerToys.FancyZones.CLI \t arg", L"arg" },
 
-                // Non-shell CreateProcessW callers can prepend whitespace; argv[0] must not leak.
-                { L"  PowerToys.FancyZones.CLI arg", L"arg" },
-                { L" PowerToys.FancyZones.CLI", L"" },
-                { LR"(  "C:\bin\PowerToys.FancyZones.CLI.exe" arg)", L"arg" },
+                // Non-shell CreateProcessW callers can prepend whitespace; the CRT treats argv[0]
+                // as empty and passes the remaining text as arguments.
+                { L"  PowerToys.FancyZones.CLI arg", L"PowerToys.FancyZones.CLI arg" },
+                { L" PowerToys.FancyZones.CLI", L"PowerToys.FancyZones.CLI" },
+                { LR"(  "C:\bin\PowerToys.FancyZones.CLI.exe" arg)", LR"("C:\bin\PowerToys.FancyZones.CLI.exe" arg)" },
 
                 { L"", L"" },
 
