@@ -83,6 +83,9 @@ void KeyboardManager::LoadSettings()
         // retry once
         state.LoadSettings();
     }
+    state.textReplacementBuffer.clear();
+    state.textReplacementProcessId = 0;
+    state.textReplacementWindow = nullptr;
     try
     {
         // Send telemetry about configured key/shortcut to key/shortcut mappings, OS an app specific level.

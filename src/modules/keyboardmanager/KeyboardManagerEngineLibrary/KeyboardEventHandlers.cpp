@@ -180,13 +180,20 @@ namespace
         wchar_t output[8]{};
         constexpr UINT toUnicodeFlags = 1u << 2; // Do not change keyboard state.
         const int result = ToUnicodeEx(vkCode, scanCode, keyState, output, static_cast<int>(std::size(output)), toUnicodeFlags, layout);
-        if (result <= 0)
+        if (result == 0)
         {
             return std::nullopt;
         }
 
+        if (result < 0)
+        {
+            return std::wstring{};
+        }
+
         std::wstring text(output, output + (std::min)(result, static_cast<int>(std::size(output))));
-        if (std::any_of(text.begin(), text.end(), [](wchar_t ch) { return !iswprint(ch); }))
+        std::vector<WORD> characterTypes(text.size());
+        if (!GetStringTypeW(CT_CTYPE1, text.data(), static_cast<int>(text.size()), characterTypes.data()) ||
+            std::any_of(characterTypes.begin(), characterTypes.end(), [](WORD type) { return (type & C1_PRINTABLE) == 0; }))
         {
             return std::nullopt;
         }
