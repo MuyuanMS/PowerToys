@@ -295,7 +295,10 @@ namespace mousebuttonlock
             // exchange() claims the lock atomically so among racing releasers exactly one injects.
             if (st.locked.exchange(false))
             {
-                m_injector.InjectUp(button);
+                if (!m_injector.InjectUp(button))
+                {
+                    st.locked.store(true);
+                }
             }
         }
 
