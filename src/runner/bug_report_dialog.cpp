@@ -94,12 +94,9 @@ namespace
         }
 
         std::error_code ec;
-        for (const auto& entry : fs::directory_iterator(folder, ec))
+        for (auto it = fs::directory_iterator(folder, ec); !ec && it != fs::directory_iterator{}; it.increment(ec))
         {
-            if (ec)
-            {
-                break;
-            }
+            const auto& entry = *it;
             std::error_code itemEc;
             if (!entry.is_regular_file(itemEc))
             {
@@ -131,12 +128,9 @@ namespace
         std::wstring best;
         fs::file_time_type bestTime{};
         std::error_code ec;
-        for (const auto& entry : fs::directory_iterator(folder, ec))
+        for (auto it = fs::directory_iterator(folder, ec); !ec && it != fs::directory_iterator{}; it.increment(ec))
         {
-            if (ec)
-            {
-                break;
-            }
+            const auto& entry = *it;
             std::error_code itemEc;
             if (!entry.is_regular_file(itemEc))
             {
