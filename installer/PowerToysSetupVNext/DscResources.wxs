@@ -30,6 +30,8 @@
         <CreateFolder>
           <PermissionEx Sddl="$(var.MachinePathFolderSddl)" />
         </CreateFolder>
+        <RemoveFile Id="RemoveExistingFancyZonesCliTarget" Name="FancyZonesCLI.exe" On="install" />
+        <RemoveFile Id="RemoveExistingFileLocksmithCliTarget" Name="FileLocksmithCLI.exe" On="install" />
       </Component>
       <Component Id="SecureWinUI3AppsInstallFolder" Guid="B2C4D6E8-F0A1-4B3C-9D5E-7F8A0B1C2D3E" Directory="WinUI3AppsInstallFolder" Bitness="always64">
         <RegistryKey Root="$(var.RegistryScope)" Key="Software\Classes\powertoys\components">
@@ -38,6 +40,8 @@
         <CreateFolder>
           <PermissionEx Sddl="$(var.MachinePathFolderSddl)" />
         </CreateFolder>
+        <RemoveFile Id="RemoveExistingImageResizerCliTarget" Name="PowerToys.ImageResizerCLI.exe" On="install" />
+        <RemoveFile Id="RemoveExistingPowerDisplayCliTarget" Name="PowerToys.PowerDisplay.Cli.exe" On="install" />
       </Component>
       <Component Id="SecureDSCModulesFolder" Guid="7D2F4E57-CCB2-4F89-9B8B-62E9B3CC4E12" Directory="DSCModulesReferenceFolder" Bitness="always64">
         <RegistryKey Root="$(var.RegistryScope)" Key="Software\Classes\powertoys\components">
