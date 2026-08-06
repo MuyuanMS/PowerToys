@@ -2789,7 +2789,7 @@ From there, simply click on one of the supported files in the File Explorer and 
   <data name="MouseUtils_MouseButtonLock_HoldDuration.Description" xml:space="preserve">
     <value>How long to hold a button before it locks</value>
   </data>
-  <data name="MouseUtils_MouseButtonLock_HoldDuration.ValueFormat" xml:space="preserve">
+  <data name="MouseUtils_MouseButtonLock_HoldDuration/ValueFormat" xml:space="preserve">
     <value>{0} ms</value>
     <comment>Format string for the hold-duration value. ms is the abbreviation for milliseconds.</comment>
   </data>

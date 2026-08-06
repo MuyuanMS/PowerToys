@@ -15,7 +15,7 @@ namespace Microsoft.PowerToys.Settings.UI.Converters
         public object Convert(object value, Type targetType, object parameter, string language)
         {
             int milliseconds = System.Convert.ToInt32(value, CultureInfo.InvariantCulture);
-            string format = Helpers.ResourceLoaderInstance.ResourceLoader.GetString("MouseUtils_MouseButtonLock_HoldDuration.ValueFormat");
+            string format = Helpers.ResourceLoaderInstance.ResourceLoader.GetString("MouseUtils_MouseButtonLock_HoldDuration/ValueFormat");
             return string.Format(CultureInfo.CurrentCulture, format, milliseconds);
         }
 
