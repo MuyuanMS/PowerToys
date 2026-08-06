@@ -237,7 +237,10 @@ namespace
         return pressedShiftKeys;
     }
 
-    void SendModifierInput(KeyboardManagerInput::InputInterface& ii, const std::vector<DWORD>& modifiers, const DWORD flags)
+    void SendModifierInput(KeyboardManagerInput::InputInterface& ii,
+                           const std::vector<DWORD>& modifiers,
+                           const DWORD flags,
+                           const ULONG_PTR extraInfo = KeyboardManagerConstants::KEYBOARDMANAGER_SUPPRESS_FLAG)
     {
         if (modifiers.empty())
         {
@@ -249,7 +252,7 @@ namespace
 
         for (const DWORD modifier : modifiers)
         {
-            Helpers::SetKeyEvent(inputs, INPUT_KEYBOARD, static_cast<WORD>(modifier), flags, KeyboardManagerConstants::KEYBOARDMANAGER_SUPPRESS_FLAG);
+            Helpers::SetKeyEvent(inputs, INPUT_KEYBOARD, static_cast<WORD>(modifier), flags, extraInfo);
         }
 
         ii.SendVirtualInput(inputs);
@@ -258,10 +261,10 @@ namespace
     void SendTextReplacementInput(KeyboardManagerInput::InputInterface& ii, const size_t backspaceCount, const std::wstring& replacement)
     {
         const auto pressedShiftKeys = GetPressedShiftKeys(ii);
-        SendModifierInput(ii, pressedShiftKeys, KEYEVENTF_KEYUP);
+        SendModifierInput(ii, pressedShiftKeys, KEYEVENTF_KEYUP, KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG);
         SendBackspaceInput(ii, backspaceCount);
         Helpers::SendTextInput(replacement, ii);
-        SendModifierInput(ii, pressedShiftKeys, 0);
+        SendModifierInput(ii, pressedShiftKeys, 0, KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG);
     }
 
 }

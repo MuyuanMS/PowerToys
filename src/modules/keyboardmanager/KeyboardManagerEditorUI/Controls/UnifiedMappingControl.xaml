@@ -298,6 +298,7 @@
                         x:Uid="TextContentBox"
                         MinHeight="120"
                         MaxHeight="240"
+                        MaxLength="4096"
                         AcceptsReturn="True"
                         Background="{ThemeResource TextControlBackgroundFocused}"
                         BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"

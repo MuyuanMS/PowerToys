@@ -47,6 +47,7 @@ namespace KeyboardManagerConstants
     inline const std::wstring TriggerTextSettingName = L"trigger";
 
     inline constexpr size_t MaxTextReplacementTriggerLength = 64;
+    inline constexpr size_t MaxTextReplacementTextLength = 4096;
 
     // Name of the property use to store new remap keys.
     inline const std::wstring NewRemapKeysSettingName = L"newRemapKeys";

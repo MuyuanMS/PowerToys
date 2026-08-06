@@ -547,6 +547,7 @@ namespace RemappingUITests
             Assert::AreEqual(false, testShortcuts.AddTextReplacement(L"", L"world"));
             Assert::AreEqual(false, testShortcuts.AddTextReplacement(L"greeting", L""));
             Assert::AreEqual(false, testShortcuts.AddTextReplacement(std::wstring(65, L'x'), L"world"));
+            Assert::AreEqual(false, testShortcuts.AddTextReplacement(L"large", std::wstring(4097, L'x')));
             Assert::AreEqual(static_cast<size_t>(1), testShortcuts.textReplacements.size());
             Assert::AreEqual(static_cast<size_t>(5), testShortcuts.maxTextReplacementTriggerLength);
         }
