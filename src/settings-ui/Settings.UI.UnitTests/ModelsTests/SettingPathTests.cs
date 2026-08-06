@@ -123,7 +123,9 @@ namespace CommonLibTest
 
             string actualPath = settingPath.GetSettingsPath("\\Outside");
 
-            StringAssert.Contains(actualPath, "Microsoft\\PowerToys\\Outside");
+            string expectedPath = mockFileSystem.Path.Combine(Helper.LocalApplicationDataFolder(), "Microsoft", "PowerToys", "Outside", "settings.json");
+
+            Assert.AreEqual(expectedPath, actualPath);
         }
 
         [TestMethod]

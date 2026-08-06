@@ -4,7 +4,6 @@
 
 using System;
 using System.IO;
-using Microsoft.PowerToys.Settings.UI.Library;
 
 namespace WorkspacesCsharpLibrary.Utils;
 
@@ -23,6 +22,6 @@ public class FolderUtils
     // Note: the same path should be used in SnapshotTool and Launcher
     public static string DataFolder()
     {
-        return Path.GetDirectoryName(SettingsUtils.Default.GetSettingsFilePath("Workspaces", "workspaces.json"))!;
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "PowerToys", "Workspaces");
     }
 }
