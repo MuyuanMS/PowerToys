@@ -51,12 +51,12 @@ namespace ShortcutGuide.Helpers
             var labels = new List<string>();
             if (description.Win)
             {
-                labels.Add("Win");
+                labels.Add("Win Windows");
             }
 
             if (description.Ctrl)
             {
-                labels.Add("Ctrl");
+                labels.Add("Ctrl Control");
             }
 
             if (description.Alt)

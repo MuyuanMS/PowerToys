@@ -66,6 +66,17 @@ public sealed class ShortcutSearchMatcherTests
     }
 
     [TestMethod]
+    [DataRow("Windows K", false, false, false, true)]
+    [DataRow("Control K", true, false, false, false)]
+    public void Matches_SemanticModifierInChord_ReturnsTrue(string query, bool ctrl, bool shift, bool alt, bool win)
+    {
+        var shortcut = CreateShortcut(
+            shortcutDescriptions: [new ShortcutDescription(ctrl, shift, alt, win, ["K"])]);
+
+        Assert.IsTrue(ShortcutSearchMatcher.Matches(shortcut, query));
+    }
+
+    [TestMethod]
     [DataRow("K", "K")]
     [DataRow("F1", "112")]
     [DataRow("Esc", "<Escape>")]
