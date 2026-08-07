@@ -3,9 +3,11 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Collections.ObjectModel;
+using AdvancedPaste.Helpers;
 using AdvancedPaste.Models;
 using AdvancedPaste.Services;
 using Microsoft.PowerToys.Settings.UI.Library;
+using Microsoft.SemanticKernel;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace AdvancedPaste.UnitTests.ServicesTests;
@@ -65,6 +67,16 @@ public sealed class AdvancedAIProviderResolverTests
         Assert.IsFalse(AIProviderPolicy.SupportsClipboardFormats(provider, ClipboardFormat.Image));
         Assert.IsTrue(AIProviderPolicy.SupportsClipboardFormats(provider, ClipboardFormat.Text));
         Assert.IsTrue(AIProviderPolicy.SupportsClipboardFormats(provider, ClipboardFormat.Text | ClipboardFormat.Image));
+    }
+
+    [TestMethod]
+    public void KernelProviderId_RoundTrips()
+    {
+        var kernel = Kernel.CreateBuilder().Build();
+
+        kernel.SetProviderId("provider-b");
+
+        Assert.AreEqual("provider-b", kernel.GetProviderId());
     }
 
     private static PasteAIProviderDefinition CreateAdvancedProvider(string id, AIServiceType serviceType) =>

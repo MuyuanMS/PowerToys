@@ -1070,15 +1070,27 @@ public:
             // Same logic as hotkeyId == 1 (m_advanced_paste_ui_hotkey)
             Logger::trace(L"AdvancedPaste ShowUI event triggered");
 
-            if (m_auto_copy_selection_custom_action)
-            {
-                send_copy_selection(); // best-effort; ignore failure
-            }
+            m_hotkey_executor.submit(OnThreadExecutor::task_t{ [this]() {
+                if (!m_enabled)
+                {
+                    return;
+                }
 
-            m_process_manager.start();
-            m_process_manager.bring_to_front();
-            m_process_manager.send_message(CommonSharedConstants::ADVANCED_PASTE_SHOW_UI_MESSAGE);
-            Trace::AdvancedPaste_Invoked(L"AdvancedPasteUIEvent");
+                if (m_auto_copy_selection_custom_action)
+                {
+                    send_copy_selection(); // best-effort; ignore failure
+                }
+
+                if (!m_enabled)
+                {
+                    return;
+                }
+
+                m_process_manager.start();
+                m_process_manager.bring_to_front();
+                m_process_manager.send_message(CommonSharedConstants::ADVANCED_PASTE_SHOW_UI_MESSAGE);
+                Trace::AdvancedPaste_Invoked(L"AdvancedPasteUIEvent");
+            } });
         });
     };
 

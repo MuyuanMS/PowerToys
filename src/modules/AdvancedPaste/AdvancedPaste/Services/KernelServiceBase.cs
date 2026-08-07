@@ -53,6 +53,7 @@ public abstract class KernelServiceBase(
         kernel.SetDataPackageView(clipboardData);
         kernel.SetCancellationToken(cancellationToken);
         kernel.SetProgress(progress);
+        kernel.SetProviderId(runtimeConfig.ProviderId);
 
         CacheKey cacheKey = new() { Prompt = prompt, AvailableFormats = await clipboardData.GetAvailableFormatsAsync() };
         var maybeCacheValue = _queryCacheService.ReadOrNull(cacheKey);
@@ -280,7 +281,7 @@ public abstract class KernelServiceBase(
                     ? $"Runs the \"{customAction.Name}\" custom action."
                     : customAction.Description;
                 return KernelFunctionFactory.CreateFromMethod(
-                    method: async (Kernel kernel) => await ExecuteCustomActionAsync(kernel, customAction.Prompt),
+                    method: async (Kernel kernel) => await ExecuteCustomActionAsync(kernel, customAction.Prompt, customAction.ProviderId),
                     functionName: functionName,
                     description: description,
                     parameters: null,
@@ -329,7 +330,7 @@ public abstract class KernelServiceBase(
         return string.IsNullOrEmpty(sanitized) ? "_CustomAction" : sanitized;
     }
 
-    private Task<string> ExecuteCustomActionAsync(Kernel kernel, string fixedPrompt) =>
+    private Task<string> ExecuteCustomActionAsync(Kernel kernel, string fixedPrompt, string providerId) =>
         ExecuteTransformAsync(
             kernel,
             new ActionChainItem(PasteFormats.CustomTextTransformation, Arguments: new() { { PromptParameterName, fixedPrompt } }),
@@ -344,7 +345,8 @@ public abstract class KernelServiceBase(
                     input = await dataPackageView.GetClipboardTextOrThrowAsync(kernel.GetCancellationToken());
                 }
 
-                var result = await _customActionTransformService.TransformAsync(fixedPrompt, input, imageBytes, kernel.GetCancellationToken(), kernel.GetProgress());
+                var providerIdOverride = string.IsNullOrWhiteSpace(providerId) ? kernel.GetProviderId() : providerId;
+                var result = await _customActionTransformService.TransformAsync(fixedPrompt, input, imageBytes, kernel.GetCancellationToken(), kernel.GetProgress(), providerIdOverride: providerIdOverride);
                 return DataPackageHelpers.CreateFromText(result?.Content ?? string.Empty);
             });
 
@@ -362,14 +364,14 @@ public abstract class KernelServiceBase(
                     input = await dataPackageView.GetClipboardTextOrThrowAsync(kernel.GetCancellationToken());
                 }
 
-                string output = await GetPromptBasedOutput(format, prompt, input, imageBytes, kernel.GetCancellationToken(), kernel.GetProgress());
+                string output = await GetPromptBasedOutput(format, prompt, input, imageBytes, kernel.GetCancellationToken(), kernel.GetProgress(), kernel.GetProviderId());
                 return DataPackageHelpers.CreateFromText(output);
             });
 
-    private async Task<string> GetPromptBasedOutput(PasteFormats format, string prompt, string input, byte[] imageBytes, CancellationToken cancellationToken, IProgress<double> progress) =>
+    private async Task<string> GetPromptBasedOutput(PasteFormats format, string prompt, string input, byte[] imageBytes, CancellationToken cancellationToken, IProgress<double> progress, string providerId) =>
         format switch
         {
-            PasteFormats.CustomTextTransformation => (await _customActionTransformService.TransformAsync(prompt, input, imageBytes, cancellationToken, progress))?.Content ?? string.Empty,
+            PasteFormats.CustomTextTransformation => (await _customActionTransformService.TransformAsync(prompt, input, imageBytes, cancellationToken, progress, providerIdOverride: providerId))?.Content ?? string.Empty,
             _ => throw new ArgumentException($"Unsupported format {format} for prompt transform", nameof(format)),
         };
 

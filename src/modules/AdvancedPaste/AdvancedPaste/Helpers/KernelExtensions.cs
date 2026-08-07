@@ -20,6 +20,7 @@ internal static class KernelExtensions
     private const string ActionChainKey = "ActionChain";
     private const string CancellationTokenKey = "CancellationToken";
     private const string ProgressKey = "Progress";
+    private const string ProviderIdKey = "ProviderId";
 
     internal static DataPackageView GetDataPackageView(this Kernel kernel)
     {
@@ -50,6 +51,10 @@ internal static class KernelExtensions
     internal static IProgress<double> GetProgress(this Kernel kernel) => kernel.Data.TryGetValue(ProgressKey, out object obj) ? obj as IProgress<double> : null;
 
     internal static void SetProgress(this Kernel kernel, IProgress<double> progress) => kernel.Data[ProgressKey] = progress;
+
+    internal static string GetProviderId(this Kernel kernel) => kernel.Data.TryGetValue(ProviderIdKey, out object value) ? value as string : null;
+
+    internal static void SetProviderId(this Kernel kernel, string providerId) => kernel.Data[ProviderIdKey] = providerId;
 
     internal static Exception GetLastError(this Kernel kernel) => kernel.Data.TryGetValue(LastErrorKey, out object obj) ? obj as Exception : null;
 
