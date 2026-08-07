@@ -13,6 +13,8 @@ namespace AdvancedPaste.Services.CustomActions
     {
         public AIServiceType ProviderType { get; set; }
 
+        public string ProviderId { get; set; }
+
         public string Model { get; set; }
 
         public string ApiKey { get; set; }

@@ -36,24 +36,24 @@ public abstract class KernelServiceBase(
     private readonly IUserSettings _userSettings = userSettings;
     private readonly ICustomActionTransformService _customActionTransformService = customActionTransformService;
 
-    protected abstract string AdvancedAIModelName { get; }
+    protected abstract PromptExecutionSettings GetPromptExecutionSettings(IKernelRuntimeConfiguration runtimeConfig);
 
-    protected abstract PromptExecutionSettings PromptExecutionSettings { get; }
-
-    protected abstract void AddChatCompletionService(IKernelBuilder kernelBuilder);
+    protected abstract void AddChatCompletionService(IKernelBuilder kernelBuilder, IKernelRuntimeConfiguration runtimeConfig);
 
     protected abstract AIServiceUsage GetAIServiceUsage(ChatMessageContent chatMessage);
 
-    protected abstract IKernelRuntimeConfiguration GetRuntimeConfiguration();
+    protected abstract IKernelRuntimeConfiguration GetRuntimeConfiguration(string providerIdOverride);
 
-    public async Task<DataPackage> TransformClipboardAsync(string prompt, DataPackageView clipboardData, bool isSavedQuery, CancellationToken cancellationToken, IProgress<double> progress)
+    public async Task<DataPackage> TransformClipboardAsync(string prompt, DataPackageView clipboardData, bool isSavedQuery, CancellationToken cancellationToken, IProgress<double> progress, string providerIdOverride = null)
     {
         Logger.LogTrace();
 
-        var kernel = CreateKernel();
+        var runtimeConfig = GetRuntimeConfiguration(providerIdOverride);
+        var kernel = CreateKernel(runtimeConfig);
         kernel.SetDataPackageView(clipboardData);
         kernel.SetCancellationToken(cancellationToken);
         kernel.SetProgress(progress);
+        kernel.SetProviderId(runtimeConfig.ProviderId);
 
         CacheKey cacheKey = new() { Prompt = prompt, AvailableFormats = await clipboardData.GetAvailableFormatsAsync() };
         var maybeCacheValue = _queryCacheService.ReadOrNull(cacheKey);
@@ -63,9 +63,9 @@ public abstract class KernelServiceBase(
 
         try
         {
-            (chatHistory, var usage) = cacheUsed ? await ExecuteCachedActionChain(kernel, maybeCacheValue.ActionChain) : await ExecuteAICompletion(kernel, prompt, cancellationToken);
+            (chatHistory, var usage) = cacheUsed ? await ExecuteCachedActionChain(kernel, maybeCacheValue.ActionChain) : await ExecuteAICompletion(kernel, prompt, runtimeConfig, cancellationToken);
 
-            LogResult(cacheUsed, isSavedQuery, kernel.GetOrAddActionChain(), usage);
+            LogResult(cacheUsed, isSavedQuery, kernel.GetOrAddActionChain(), usage, runtimeConfig);
 
             var outputPackage = kernel.GetDataPackage();
             var hasUsableData = await outputPackage.GetView().HasUsableDataAsync();
@@ -163,10 +163,8 @@ public abstract class KernelServiceBase(
         return $"{combinedSystemMessage}{newLine}{newLine}User instructions:{newLine}{userPromptMessage.Content}";
     }
 
-    private async Task<(ChatHistory ChatHistory, AIServiceUsage Usage)> ExecuteAICompletion(Kernel kernel, string prompt, CancellationToken cancellationToken)
+    private async Task<(ChatHistory ChatHistory, AIServiceUsage Usage)> ExecuteAICompletion(Kernel kernel, string prompt, IKernelRuntimeConfiguration runtimeConfig, CancellationToken cancellationToken)
     {
-        var runtimeConfig = GetRuntimeConfiguration();
-
         ChatHistory chatHistory = [];
 
         var systemPrompt = string.IsNullOrWhiteSpace(runtimeConfig.SystemPrompt) ? DefaultSystemPrompt : runtimeConfig.SystemPrompt;
@@ -188,13 +186,13 @@ public abstract class KernelServiceBase(
             chatHistory.AddUserMessage(prompt);
         }
 
-        if (ShouldModerateAdvancedAI())
+        if (ShouldModerateAdvancedAI(runtimeConfig))
         {
-            await _promptModerationService.ValidateAsync(GetFullPrompt(chatHistory), cancellationToken);
+            await _promptModerationService.ValidateAsync(GetFullPrompt(chatHistory), runtimeConfig.ServiceType, runtimeConfig.ProviderId, cancellationToken);
         }
 
-        var chatResult = await kernel.GetRequiredService<IChatCompletionService>(AdvancedAIModelName)
-                                     .GetChatMessageContentAsync(chatHistory, PromptExecutionSettings, kernel, cancellationToken);
+        var chatResult = await kernel.GetRequiredService<IChatCompletionService>(runtimeConfig.ModelName)
+                                     .GetChatMessageContentAsync(chatHistory, GetPromptExecutionSettings(runtimeConfig), kernel, cancellationToken);
         chatHistory.Add(chatResult);
 
         var totalUsage = chatHistory.Select(GetAIServiceUsage)
@@ -224,32 +222,30 @@ public abstract class KernelServiceBase(
 
     protected IUserSettings UserSettings => _userSettings;
 
-    private void LogResult(bool cacheUsed, bool isSavedQuery, IEnumerable<ActionChainItem> actionChain, AIServiceUsage usage)
+    private void LogResult(bool cacheUsed, bool isSavedQuery, IEnumerable<ActionChainItem> actionChain, AIServiceUsage usage, IKernelRuntimeConfiguration runtimeConfig)
     {
-        var runtimeConfig = GetRuntimeConfiguration();
-
         AdvancedPasteSemanticKernelFormatEvent telemetryEvent = new(
             cacheUsed,
             isSavedQuery,
             usage.PromptTokens,
             usage.CompletionTokens,
-            AdvancedAIModelName,
+            runtimeConfig.ModelName,
             runtimeConfig.ServiceType.ToString(),
             AdvancedPasteSemanticKernelFormatEvent.FormatActionChain(actionChain));
         PowerToysTelemetry.Log.WriteEvent(telemetryEvent);
 
         // Log endpoint usage
-        var endpointEvent = new AdvancedPasteEndpointUsageEvent(runtimeConfig.ServiceType, AdvancedAIModelName, isAdvanced: true);
+        var endpointEvent = new AdvancedPasteEndpointUsageEvent(runtimeConfig.ServiceType, runtimeConfig.ModelName, isAdvanced: true);
         PowerToysTelemetry.Log.WriteEvent(endpointEvent);
 
         var logEvent = new AIServiceFormatEvent(telemetryEvent);
         Logger.LogDebug($"{nameof(TransformClipboardAsync)} complete; {logEvent.ToJsonString()}");
     }
 
-    private Kernel CreateKernel()
+    private Kernel CreateKernel(IKernelRuntimeConfiguration runtimeConfig)
     {
         var kernelBuilder = Kernel.CreateBuilder();
-        AddChatCompletionService(kernelBuilder);
+        AddChatCompletionService(kernelBuilder, runtimeConfig);
         kernelBuilder.Plugins.AddFromFunctions("Actions", GetKernelFunctions());
         return kernelBuilder.Build();
     }
@@ -285,7 +281,7 @@ public abstract class KernelServiceBase(
                     ? $"Runs the \"{customAction.Name}\" custom action."
                     : customAction.Description;
                 return KernelFunctionFactory.CreateFromMethod(
-                    method: async (Kernel kernel) => await ExecuteCustomActionAsync(kernel, customAction.Prompt),
+                    method: async (Kernel kernel) => await ExecuteCustomActionAsync(kernel, customAction.Prompt, customAction.ProviderId),
                     functionName: functionName,
                     description: description,
                     parameters: null,
@@ -334,7 +330,7 @@ public abstract class KernelServiceBase(
         return string.IsNullOrEmpty(sanitized) ? "_CustomAction" : sanitized;
     }
 
-    private Task<string> ExecuteCustomActionAsync(Kernel kernel, string fixedPrompt) =>
+    private Task<string> ExecuteCustomActionAsync(Kernel kernel, string fixedPrompt, string providerId) =>
         ExecuteTransformAsync(
             kernel,
             new ActionChainItem(PasteFormats.CustomTextTransformation, Arguments: new() { { PromptParameterName, fixedPrompt } }),
@@ -349,7 +345,8 @@ public abstract class KernelServiceBase(
                     input = await dataPackageView.GetClipboardTextOrThrowAsync(kernel.GetCancellationToken());
                 }
 
-                var result = await _customActionTransformService.TransformAsync(fixedPrompt, input, imageBytes, kernel.GetCancellationToken(), kernel.GetProgress());
+                var providerIdOverride = string.IsNullOrWhiteSpace(providerId) ? kernel.GetProviderId() : providerId;
+                var result = await _customActionTransformService.TransformAsync(fixedPrompt, input, imageBytes, kernel.GetCancellationToken(), kernel.GetProgress(), providerIdOverride: providerIdOverride);
                 return DataPackageHelpers.CreateFromText(result?.Content ?? string.Empty);
             });
 
@@ -367,14 +364,14 @@ public abstract class KernelServiceBase(
                     input = await dataPackageView.GetClipboardTextOrThrowAsync(kernel.GetCancellationToken());
                 }
 
-                string output = await GetPromptBasedOutput(format, prompt, input, imageBytes, kernel.GetCancellationToken(), kernel.GetProgress());
+                string output = await GetPromptBasedOutput(format, prompt, input, imageBytes, kernel.GetProgress(), kernel.GetProviderId(), kernel.GetCancellationToken());
                 return DataPackageHelpers.CreateFromText(output);
             });
 
-    private async Task<string> GetPromptBasedOutput(PasteFormats format, string prompt, string input, byte[] imageBytes, CancellationToken cancellationToken, IProgress<double> progress) =>
+    private async Task<string> GetPromptBasedOutput(PasteFormats format, string prompt, string input, byte[] imageBytes, IProgress<double> progress, string providerId, CancellationToken cancellationToken) =>
         format switch
         {
-            PasteFormats.CustomTextTransformation => (await _customActionTransformService.TransformAsync(prompt, input, imageBytes, cancellationToken, progress))?.Content ?? string.Empty,
+            PasteFormats.CustomTextTransformation => (await _customActionTransformService.TransformAsync(prompt, input, imageBytes, cancellationToken, progress, providerIdOverride: providerId))?.Content ?? string.Empty,
             _ => throw new ArgumentException($"Unsupported format {format} for prompt transform", nameof(format)),
         };
 
@@ -436,7 +433,7 @@ public abstract class KernelServiceBase(
         return $"-> {role}: {redactedContent}{usageString}";
     }
 
-    protected virtual bool ShouldModerateAdvancedAI()
+    protected virtual bool ShouldModerateAdvancedAI(IKernelRuntimeConfiguration runtimeConfig)
     {
         return false;
     }

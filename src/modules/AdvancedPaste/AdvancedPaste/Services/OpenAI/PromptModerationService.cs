@@ -10,6 +10,7 @@ using AdvancedPaste.Helpers;
 using AdvancedPaste.Models;
 using AdvancedPaste.Services;
 using ManagedCommon;
+using Microsoft.PowerToys.Settings.UI.Library;
 using OpenAI.Moderations;
 
 namespace AdvancedPaste.Services.OpenAI;
@@ -20,12 +21,12 @@ public sealed class PromptModerationService(IAICredentialsProvider aiCredentials
 
     private readonly IAICredentialsProvider _aiCredentialsProvider = aiCredentialsProvider;
 
-    public async Task ValidateAsync(string fullPrompt, CancellationToken cancellationToken)
+    public async Task ValidateAsync(string fullPrompt, AIServiceType serviceType, string providerId, CancellationToken cancellationToken)
     {
         try
         {
             _aiCredentialsProvider.Refresh();
-            var apiKey = _aiCredentialsProvider.GetKey()?.Trim() ?? string.Empty;
+            var apiKey = _aiCredentialsProvider.GetKey(serviceType, providerId)?.Trim() ?? string.Empty;
 
             if (string.IsNullOrEmpty(apiKey))
             {
