@@ -3,12 +3,16 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Collections.ObjectModel;
+using System.Threading;
+using System.Threading.Tasks;
 using AdvancedPaste.Helpers;
 using AdvancedPaste.Models;
 using AdvancedPaste.Services;
+using AdvancedPaste.Services.OpenAI;
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.SemanticKernel;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
 
 namespace AdvancedPaste.UnitTests.ServicesTests;
 
@@ -77,6 +81,18 @@ public sealed class AdvancedAIProviderResolverTests
         kernel.SetProviderId("provider-b");
 
         Assert.AreEqual("provider-b", kernel.GetProviderId());
+    }
+
+    [TestMethod]
+    public async Task PromptModeration_UsesSelectedProviderCredential()
+    {
+        var credentials = new Mock<IAICredentialsProvider>();
+        credentials.Setup(provider => provider.GetKey(AIServiceType.OpenAI, "provider-b")).Returns(string.Empty);
+        var moderationService = new PromptModerationService(credentials.Object);
+
+        await moderationService.ValidateAsync("prompt", AIServiceType.OpenAI, "provider-b", CancellationToken.None);
+
+        credentials.Verify(provider => provider.GetKey(AIServiceType.OpenAI, "provider-b"), Times.Once);
     }
 
     private static PasteAIProviderDefinition CreateAdvancedProvider(string id, AIServiceType serviceType) =>

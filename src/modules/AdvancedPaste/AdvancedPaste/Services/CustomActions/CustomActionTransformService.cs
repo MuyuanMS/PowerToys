@@ -74,7 +74,7 @@ namespace AdvancedPaste.Services.CustomActions
 
             if (ShouldModerate(providerConfig))
             {
-                await promptModerationService.ValidateAsync(fullPrompt, cancellationToken);
+                await promptModerationService.ValidateAsync(fullPrompt, providerConfig.ProviderType, providerConfig.ProviderId, cancellationToken);
             }
 
             try
@@ -185,6 +185,7 @@ namespace AdvancedPaste.Services.CustomActions
             var providerConfig = new PasteAIConfig
             {
                 ProviderType = serviceType,
+                ProviderId = provider.Id,
                 ApiKey = apiKey,
                 Model = modelName,
                 Endpoint = provider.EndpointUrl,

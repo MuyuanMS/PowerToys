@@ -5,9 +5,11 @@
 using System.Threading;
 using System.Threading.Tasks;
 
+using Microsoft.PowerToys.Settings.UI.Library;
+
 namespace AdvancedPaste.Services;
 
 public interface IPromptModerationService
 {
-    Task ValidateAsync(string fullPrompt, CancellationToken cancellationToken);
+    Task ValidateAsync(string fullPrompt, AIServiceType serviceType, string providerId, CancellationToken cancellationToken);
 }

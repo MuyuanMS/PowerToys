@@ -45,8 +45,7 @@ public enum PasteFormats
         RequiresAIService = true,
         CanPreview = true,
         SupportedClipboardFormats = ClipboardFormat.Text,
-        IPCKey = AdvancedPasteAdditionalActions.PropertyNames.FixSpellingAndGrammar,
-        KernelFunctionDescription = "Fixes all spelling and grammar errors in the clipboard text and returns the corrected version.")]
+        IPCKey = AdvancedPasteAdditionalActions.PropertyNames.FixSpellingAndGrammar)]
     FixSpellingAndGrammar,
 
     [PasteFormatMetadata(

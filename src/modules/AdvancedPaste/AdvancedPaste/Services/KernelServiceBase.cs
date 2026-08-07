@@ -188,7 +188,7 @@ public abstract class KernelServiceBase(
 
         if (ShouldModerateAdvancedAI(runtimeConfig))
         {
-            await _promptModerationService.ValidateAsync(GetFullPrompt(chatHistory), cancellationToken);
+            await _promptModerationService.ValidateAsync(GetFullPrompt(chatHistory), runtimeConfig.ServiceType, runtimeConfig.ProviderId, cancellationToken);
         }
 
         var chatResult = await kernel.GetRequiredService<IChatCompletionService>(runtimeConfig.ModelName)
