@@ -132,6 +132,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 AdvancedPasteUIShortcut,
                 PasteAsMarkdownShortcut,
                 PasteAsJsonShortcut,
+                PasteAsSingleLineShortcut,
             };
 
             foreach (var action in _additionalActions.GetAllActions())
@@ -475,6 +476,21 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
         }
 
+        public HotkeySettings PasteAsSingleLineShortcut
+        {
+            get => _advancedPasteSettings.Properties.PasteAsSingleLineShortcut;
+            set
+            {
+                if (_advancedPasteSettings.Properties.PasteAsSingleLineShortcut != value)
+                {
+                    _advancedPasteSettings.Properties.PasteAsSingleLineShortcut = value ?? new HotkeySettings();
+                    OnPropertyChanged(nameof(IsConflictingCopyShortcut));
+                    OnPropertyChanged(nameof(PasteAsSingleLineShortcut));
+                    SaveAndNotifySettings();
+                }
+            }
+        }
+
         public PasteAIConfiguration PasteAIConfiguration
         {
             get
@@ -597,7 +613,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         public bool IsConflictingCopyShortcut =>
             _customActions.Select(customAction => customAction.Shortcut)
-                          .Concat([PasteAsPlainTextShortcut, AdvancedPasteUIShortcut, PasteAsMarkdownShortcut, PasteAsJsonShortcut])
+                          .Concat([PasteAsPlainTextShortcut, AdvancedPasteUIShortcut, PasteAsMarkdownShortcut, PasteAsJsonShortcut, PasteAsSingleLineShortcut])
                           .Any(hotkey => WarnHotkeys.Contains(hotkey.ToString()));
 
         public bool IsAdditionalActionConflictingCopyShortcut =>
