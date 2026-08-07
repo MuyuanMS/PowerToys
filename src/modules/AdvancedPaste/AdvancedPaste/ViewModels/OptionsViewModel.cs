@@ -16,6 +16,7 @@ using System.Threading.Tasks;
 using AdvancedPaste.Helpers;
 using AdvancedPaste.Models;
 using AdvancedPaste.Services;
+using AdvancedPaste.Services.CustomActions;
 using AdvancedPaste.Settings;
 using Common.UI;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -41,6 +42,7 @@ namespace AdvancedPaste.ViewModels
         private readonly IUserSettings _userSettings;
         private readonly IPasteFormatExecutor _pasteFormatExecutor;
         private readonly IAICredentialsProvider _credentialsProvider;
+        private readonly ICustomActionTransformService _customActionTransformService;
 
         private CancellationTokenSource _pasteActionCancellationTokenSource;
 
@@ -104,20 +106,13 @@ namespace AdvancedPaste.ViewModels
         {
             get
             {
-                if (!IsAllowedByGPO || !_userSettings.IsAIEnabled)
+                if (!_userSettings.IsAIEnabled)
                 {
                     return false;
                 }
 
-                // Check if there are any allowed providers
-                if (!AllowedAIProviders.Any())
-                {
-                    return false;
-                }
-
-                // We should handle the IsAIEnabled logic in settings, don't check again here.
-                // If setting says yes, and here should pass check, and if error happens, it happens.
-                return true;
+                var activeProvider = ResolveEffectiveProvider(providerId: null);
+                return activeProvider is not null && IsProviderAllowedByGPO(activeProvider);
             }
         }
 
@@ -228,13 +223,22 @@ namespace AdvancedPaste.ViewModels
 
         public bool ClipboardHasData => AvailableClipboardFormats != ClipboardFormat.None;
 
-        public bool ClipboardHasDataForCustomAI => PasteFormat.SupportsClipboardFormats(CustomAIFormat, AvailableClipboardFormats);
+        public bool ClipboardHasDataForCustomAI
+        {
+            get
+            {
+                var activeProvider = ResolveEffectiveProvider(providerId: null);
+                return activeProvider?.ServiceTypeKind == AIServiceType.PhiSilica
+                    ? AvailableClipboardFormats.HasFlag(ClipboardFormat.Text)
+                    : PasteFormat.SupportsClipboardFormats(CustomAIFormat, AvailableClipboardFormats);
+            }
+        }
 
         public bool ShowClipboardPreview => _userSettings.EnableClipboardPreview;
 
         public bool ShowClipboardHistoryButton => ClipboardHistoryEnabled;
 
-        public bool ShowAIPasteSection => _userSettings.ShowAIPaste && IsAllowedByGPO;
+        public bool ShowAIPasteSection => _userSettings.ShowAIPaste && _userSettings.IsAIEnabled && AllowedAIProviders.Any();
 
         public bool HasIndeterminateTransformProgress => double.IsNaN(TransformProgress);
 
@@ -260,11 +264,12 @@ namespace AdvancedPaste.ViewModels
 
         public event EventHandler PreviewRequested;
 
-        public OptionsViewModel(IFileSystem fileSystem, IAICredentialsProvider credentialsProvider, IUserSettings userSettings, IPasteFormatExecutor pasteFormatExecutor)
+        public OptionsViewModel(IFileSystem fileSystem, IAICredentialsProvider credentialsProvider, IUserSettings userSettings, IPasteFormatExecutor pasteFormatExecutor, ICustomActionTransformService customActionTransformService)
         {
             _credentialsProvider = credentialsProvider;
             _userSettings = userSettings;
             _pasteFormatExecutor = pasteFormatExecutor;
+            _customActionTransformService = customActionTransformService;
 
             GeneratedResponses = [];
             GeneratedResponses.CollectionChanged += (s, e) =>
@@ -344,11 +349,65 @@ namespace AdvancedPaste.ViewModels
             });
         }
 
-        private PasteFormat CreateStandardPasteFormat(PasteFormats format) =>
-            PasteFormat.CreateStandardFormat(format, AvailableClipboardFormats, IsCustomAIServiceEnabled, ResourceLoaderInstance.ResourceLoader.GetString);
+        private PasteFormat CreateStandardPasteFormat(PasteFormats format)
+        {
+            var providerId = GetProviderIdForFormat(format);
+            var effectiveProvider = ResolveEffectiveProvider(providerId);
+            var isAIServiceEnabled = _userSettings.IsAIEnabled
+                && effectiveProvider is not null
+                && IsProviderAllowedByGPO(effectiveProvider)
+                && (effectiveProvider?.ServiceTypeKind != AIServiceType.PhiSilica || AvailableClipboardFormats.HasFlag(ClipboardFormat.Text));
 
-        private PasteFormat CreateCustomAIPasteFormat(string name, string prompt, bool isSavedQuery) =>
-            PasteFormat.CreateCustomAIFormat(CustomAIFormat, name, prompt, isSavedQuery, AvailableClipboardFormats, IsCustomAIServiceEnabled);
+            return PasteFormat.CreateStandardFormat(format, AvailableClipboardFormats, isAIServiceEnabled, ResourceLoaderInstance.ResourceLoader.GetString, providerId);
+        }
+
+        private PasteFormat CreateCustomAIPasteFormat(string name, string prompt, bool isSavedQuery, string providerId = null)
+        {
+            var format = CustomAIFormat;
+            var selectedProvider = ResolveEffectiveProvider(providerId);
+            var isEnabled = _userSettings.IsAIEnabled && selectedProvider is not null;
+
+            if (selectedProvider is not null && !IsProviderAllowedByGPO(selectedProvider))
+            {
+                isEnabled = false;
+            }
+
+            if (selectedProvider?.ServiceTypeKind == AIServiceType.PhiSilica
+                && !AvailableClipboardFormats.HasFlag(ClipboardFormat.Text))
+            {
+                isEnabled = false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(providerId)
+                && (!TryResolveAdvancedAIProvider(out var advancedProvider)
+                    || !string.Equals(providerId, advancedProvider.Id, StringComparison.OrdinalIgnoreCase)))
+            {
+                format = PasteFormats.CustomTextTransformation;
+            }
+
+            return PasteFormat.CreateCustomAIFormat(format, name, prompt, isSavedQuery, AvailableClipboardFormats, isEnabled, providerId);
+        }
+
+        private PasteAIProviderDefinition ResolveEffectiveProvider(string providerId)
+        {
+            var configuration = _userSettings?.PasteAIConfiguration;
+            if (!string.IsNullOrWhiteSpace(providerId))
+            {
+                return configuration?.Providers?
+                    .FirstOrDefault(provider => string.Equals(provider.Id, providerId, StringComparison.OrdinalIgnoreCase))
+                    ?? configuration?.ActiveProvider
+                    ?? configuration?.Providers?.FirstOrDefault();
+            }
+
+            return configuration?.ActiveProvider ?? configuration?.Providers?.FirstOrDefault();
+        }
+
+        private string GetProviderIdForFormat(PasteFormats format) =>
+            format switch
+            {
+                PasteFormats.FixSpellingAndGrammar => _userSettings.FixSpellingAndGrammarProviderId,
+                _ => string.Empty,
+            };
 
         private void UpdateAIProviderActiveFlags()
         {
@@ -417,11 +476,12 @@ namespace AdvancedPaste.ViewModels
 
             UpdateFormats(StandardPasteFormats, Enum.GetValues<PasteFormats>()
                                                     .Where(format => PasteFormat.MetadataDict[format].IsCoreAction || _userSettings.AdditionalActions.Contains(format))
+                                                    .OrderBy(GetStandardFormatOrder)
                                                     .Select(CreateStandardPasteFormat));
 
             UpdateFormats(
                 CustomActionPasteFormats,
-                IsCustomAIServiceEnabled ? _userSettings.CustomActions.Select(customAction => CreateCustomAIPasteFormat(customAction.Name, customAction.Prompt, isSavedQuery: true)) : []);
+                _userSettings.IsAIEnabled ? _userSettings.CustomActions.Select(customAction => CreateCustomAIPasteFormat(customAction.Name, customAction.Prompt, isSavedQuery: true, customAction.ProviderId)) : []);
         }
 
         public void Dispose()
@@ -542,6 +602,7 @@ namespace AdvancedPaste.ViewModels
         {
             PasteActionError = PasteActionError.None;
             Query = string.Empty;
+            CoachingExplanation = null;
 
             await ReadClipboardAsync();
 
@@ -619,6 +680,12 @@ namespace AdvancedPaste.ViewModels
         [ObservableProperty]
         private string _customFormatResult;
 
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasCoachingExplanation))]
+        private string _coachingExplanation;
+
+        public bool HasCoachingExplanation => !string.IsNullOrEmpty(CoachingExplanation);
+
         [RelayCommand]
         public async Task PasteCustomAsync()
         {
@@ -668,13 +735,13 @@ namespace AdvancedPaste.ViewModels
             GetMainWindow()?.Close();
         }
 
-        internal async Task ExecutePasteFormatAsync(PasteFormats format, PasteActionSource source)
+        internal async Task ExecutePasteFormatAsync(PasteFormats format, PasteActionSource source, bool forceCoaching = false)
         {
             await ReadClipboardAsync();
-            await ExecutePasteFormatAsync(CreateStandardPasteFormat(format), source);
+            await ExecutePasteFormatAsync(CreateStandardPasteFormat(format), source, forceCoaching);
         }
 
-        internal async Task ExecutePasteFormatAsync(PasteFormat pasteFormat, PasteActionSource source)
+        internal async Task ExecutePasteFormatAsync(PasteFormat pasteFormat, PasteActionSource source, bool forceCoaching = false)
         {
             if (IsBusy)
             {
@@ -707,12 +774,30 @@ namespace AdvancedPaste.ViewModels
                 await delayTask;
 
                 var outputText = await dataPackage.GetView().GetTextOrEmptyAsync();
+                bool isCoachingAction = pasteFormat.Format == PasteFormats.FixSpellingAndGrammar &&
+                    (forceCoaching || (_userSettings.FixSpellingAndGrammarCoachingEnabled && !_userSettings.FixSpellingAndGrammarCoachingShortcutSet));
                 bool shouldPreview = pasteFormat.Metadata.CanPreview && _userSettings.ShowCustomPreview && !string.IsNullOrEmpty(outputText) && source != PasteActionSource.GlobalKeyboardShortcut;
+
+                // Coaching mode forces preview even for global keyboard shortcuts
+                if (isCoachingAction && !string.IsNullOrEmpty(outputText))
+                {
+                    shouldPreview = true;
+                }
 
                 if (shouldPreview)
                 {
                     GeneratedResponses.Add(outputText);
                     CurrentResponseIndex = GeneratedResponses.Count - 1;
+
+                    if (isCoachingAction)
+                    {
+                        await GenerateCoachingExplanationAsync(outputText);
+                    }
+                    else
+                    {
+                        CoachingExplanation = null;
+                    }
+
                     PreviewRequested?.Invoke(this, EventArgs.Empty);
                 }
                 else
@@ -731,6 +816,72 @@ namespace AdvancedPaste.ViewModels
             _pasteActionCancellationTokenSource = null;
             elapsedWatch.Stop();
             Logger.LogDebug($"Finished executing {pasteFormat.Format} from source {source}; timeTakenMs={elapsedWatch.ElapsedMilliseconds}");
+        }
+
+        private async Task GenerateCoachingExplanationAsync(string correctedText)
+        {
+            try
+            {
+                var originalText = ClipboardData != null ? await ClipboardData.GetTextOrEmptyAsync() : string.Empty;
+
+                if (string.IsNullOrEmpty(originalText))
+                {
+                    CoachingExplanation = null;
+                    return;
+                }
+
+                static string NormalizeForComparison(string s) =>
+                    s.Replace('\u2018', '\'') // left single quote
+                     .Replace('\u2019', '\'') // right single quote / apostrophe
+                     .Replace('\u201C', '"') // left double quote
+                     .Replace('\u201D', '"') // right double quote
+                     .Replace('\u2013', '-') // en dash
+                     .Replace('\u2014', '-'); // em dash
+
+                if (string.Equals(NormalizeForComparison(originalText), NormalizeForComparison(correctedText), StringComparison.Ordinal))
+                {
+                    CoachingExplanation = null;
+                    return;
+                }
+
+                var coachingInstruction = string.IsNullOrWhiteSpace(_userSettings.FixSpellingAndGrammarCoachingPrompt)
+                    ? AdvancedPasteDefaultPrompts.FixSpellingAndGrammarCoaching
+                    : _userSettings.FixSpellingAndGrammarCoachingPrompt;
+                var coachingInputText = $"Original:\n\"{originalText}\"\n\nCorrected:\n\"{correctedText}\"";
+
+                var coachingSystemPrompt = string.IsNullOrWhiteSpace(_userSettings.FixSpellingAndGrammarCoachingSystemPrompt)
+                    ? AdvancedPasteDefaultPrompts.FixSpellingAndGrammarCoachingSystem
+                    : _userSettings.FixSpellingAndGrammarCoachingSystemPrompt;
+
+                var coachingProviderId = _userSettings.FixSpellingAndGrammarCoachingProviderId;
+                if (string.IsNullOrWhiteSpace(coachingProviderId))
+                {
+                    coachingProviderId = _userSettings.FixSpellingAndGrammarProviderId;
+                }
+
+                var coachingProvider = ResolveEffectiveProvider(coachingProviderId);
+                if (coachingProvider is not null && !IsProviderAllowedByGPO(coachingProvider))
+                {
+                    CoachingExplanation = null;
+                    return;
+                }
+
+                var result = await _customActionTransformService.TransformAsync(
+                    coachingInstruction,
+                    coachingInputText,
+                    null,
+                    _pasteActionCancellationTokenSource?.Token ?? CancellationToken.None,
+                    null,
+                    coachingSystemPrompt,
+                    string.IsNullOrWhiteSpace(coachingProviderId) ? null : coachingProviderId);
+
+                CoachingExplanation = result?.Content;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error generating coaching explanation", ex);
+                CoachingExplanation = null;
+            }
         }
 
         internal async Task ExecutePasteFormatAsync(VirtualKey key)
@@ -754,7 +905,7 @@ namespace AdvancedPaste.ViewModels
             if (customAction != null)
             {
                 await ReadClipboardAsync();
-                await ExecutePasteFormatAsync(CreateCustomAIPasteFormat(customAction.Name, customAction.Prompt, isSavedQuery: true), source);
+                await ExecutePasteFormatAsync(CreateCustomAIPasteFormat(customAction.Name, customAction.Prompt, isSavedQuery: true, customAction.ProviderId), source);
             }
         }
 
@@ -763,7 +914,7 @@ namespace AdvancedPaste.ViewModels
             var customAction = _userSettings.CustomActions
                                             .FirstOrDefault(customAction => Models.KernelQueryCache.CacheKey.PromptComparer.Equals(customAction.Prompt, Query));
 
-            await ExecutePasteFormatAsync(CreateCustomAIPasteFormat(customAction?.Name ?? "Default", Query, isSavedQuery: customAction != null), triggerSource);
+            await ExecutePasteFormatAsync(CreateCustomAIPasteFormat(customAction?.Name ?? "Default", Query, isSavedQuery: customAction != null, customAction?.ProviderId), triggerSource);
         }
 
         private void HideWindow()
@@ -804,10 +955,16 @@ namespace AdvancedPaste.ViewModels
             }
 
             var serviceType = provider.ServiceType.ToAIServiceType();
+            if (serviceType == AIServiceType.Unknown)
+            {
+                serviceType = AIServiceType.OpenAI;
+            }
+
             var metadata = AIServiceTypeRegistry.GetMetadata(serviceType);
 
-            // Check global online AI GPO for online services
-            if (metadata.IsOnlineService && !IsAllowedByGPO)
+            // Re-check at execution time because policy can change while the window is open.
+            if (metadata.IsOnlineService
+                && PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOnlineAIModelsValue() == PowerToys.GPOWrapper.GpoRuleConfigured.Disabled)
             {
                 return false;
             }
@@ -868,6 +1025,24 @@ namespace AdvancedPaste.ViewModels
             return serviceType is AIServiceType.OpenAI
                 or AIServiceType.AzureOpenAI;
         }
+
+        private static int GetStandardFormatOrder(PasteFormats format) =>
+            format switch
+            {
+                PasteFormats.PlainText => 0,
+                PasteFormats.Markdown => 1,
+                PasteFormats.Json => 2,
+                PasteFormats.ImageToText => 3,
+                PasteFormats.FixSpellingAndGrammar => 4,
+                PasteFormats.PasteAsTxtFile => 5,
+                PasteFormats.PasteAsPngFile => 6,
+                PasteFormats.PasteAsHtmlFile => 7,
+                PasteFormats.TranscodeToMp3 => 8,
+                PasteFormats.TranscodeToMp4 => 9,
+                PasteFormats.KernelQuery => 10,
+                PasteFormats.CustomTextTransformation => 11,
+                _ => int.MaxValue,
+            };
 
         private bool UpdateOpenAIKey()
         {

@@ -18,8 +18,13 @@
 #include <common/utils/EventWaiter.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cwctype>
 #include <chrono>
+#include <condition_variable>
+#include <deque>
+#include <functional>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -66,6 +71,8 @@ namespace
     const wchar_t JSON_KEY_PROVIDERS[] = L"providers";
     const wchar_t JSON_KEY_SERVICE_TYPE[] = L"service-type";
     const wchar_t JSON_KEY_ENABLE_ADVANCED_AI[] = L"enable-advanced-ai";
+    const wchar_t JSON_KEY_COACHING_SHORTCUT[] = L"coaching-shortcut";
+    const wchar_t JSON_KEY_COACHING_ENABLED[] = L"coaching-enabled";
     const wchar_t JSON_KEY_VALUE[] = L"value";
 }
 
@@ -74,7 +81,17 @@ class AdvancedPaste : public PowertoyModuleIface
 private:
     
     AdvancedPasteProcessManager m_process_manager;
-    bool m_enabled = false;
+    std::atomic_bool m_enabled = false;
+    std::jthread m_hotkey_worker;
+    std::mutex m_actions_mutex;
+    std::mutex m_hotkey_worker_mutex;
+    std::condition_variable m_hotkey_worker_condition;
+    struct QueuedHotkeyAction
+    {
+        std::function<void()> action;
+        bool copySelection = false;
+    };
+    std::deque<QueuedHotkeyAction> m_hotkey_actions;
 
     std::wstring app_name;
 
@@ -104,7 +121,7 @@ private:
     bool m_is_ai_enabled = false;
     bool m_is_advanced_ai_enabled = false;
     bool m_preview_custom_format_output = true;
-    bool m_auto_copy_selection_custom_action = false;
+    std::atomic_bool m_auto_copy_selection_custom_action = false;
 
     // Event listening for external triggers (e.g., from CmdPal extension)
     EventWaiter m_triggerEventWaiter;
@@ -160,7 +177,6 @@ private:
     bool is_ai_enabled()
     {
         return gpo_policy_enabled_configuration() != powertoys_gpo::gpo_rule_configured_disabled &&
-               powertoys_gpo::getAllowedAdvancedPasteOnlineAIModelsValue() != powertoys_gpo::gpo_rule_configured_disabled &&
                m_is_ai_enabled;
     }
 
@@ -255,6 +271,21 @@ private:
             };
 
             m_additional_actions.push_back(additionalAction);
+
+            // Register coaching shortcut as a separate hotkey with a "-coaching" suffix ID
+            if (action.HasKey(JSON_KEY_COACHING_SHORTCUT) && action.GetNamedBoolean(JSON_KEY_COACHING_ENABLED, false))
+            {
+                auto coachingHotkey = parse_single_hotkey(action.GetNamedObject(JSON_KEY_COACHING_SHORTCUT), actionIsShown);
+                if (coachingHotkey.key != 0)
+                {
+                    const AdditionalAction coachingAction
+                    {
+                        std::wstring(actionName.c_str()) + L"-coaching",
+                        coachingHotkey
+                    };
+                    m_additional_actions.push_back(coachingAction);
+                }
+            }
         }
         else
         {
@@ -407,6 +438,7 @@ private:
                         // Define the expected order to ensure consistent hotkey ID assignment
                         const std::vector<winrt::hstring> expectedOrder = {
                             L"image-to-text",
+                            L"fix-spelling-and-grammar",
                             L"paste-as-file",
                             L"transcode"
                         };
@@ -414,6 +446,11 @@ private:
                         // Process actions in the predefined order
                         for (auto& actionKey : expectedOrder)
                         {
+                            if (actionKey == L"fix-spelling-and-grammar" && !is_ai_enabled())
+                            {
+                                continue;
+                            }
+
                             if (additionalActions.HasKey(actionKey))
                             {
                                 const auto actionValue = additionalActions.GetNamedValue(actionKey);
@@ -866,6 +903,87 @@ private:
         }
     }
 
+    std::function<void()> resolve_hotkey_action(size_t hotkeyId)
+    {
+        std::scoped_lock lock(m_actions_mutex);
+        size_t additional_action_index = 0;
+        size_t custom_action_index = 0;
+
+        if (hotkeyId >= NUM_DEFAULT_HOTKEYS)
+        {
+            additional_action_index = hotkeyId - NUM_DEFAULT_HOTKEYS;
+            if (additional_action_index >= m_additional_actions.size())
+            {
+                custom_action_index = additional_action_index - m_additional_actions.size();
+            }
+        }
+
+        if (hotkeyId == 0)
+        {
+            return [this]() {
+                Logger::trace(L"Paste as plain text hotkey pressed");
+                try_to_paste_as_plain_text();
+                Trace::AdvancedPaste_Invoked(L"PastePlainTextDirect");
+            };
+        }
+
+        if (hotkeyId == 1)
+        {
+            return [this]() {
+                Logger::trace(L"Setting start up event");
+                m_process_manager.bring_to_front();
+                m_process_manager.send_message(CommonSharedConstants::ADVANCED_PASTE_SHOW_UI_MESSAGE);
+                Trace::AdvancedPaste_Invoked(L"AdvancedPasteUI");
+            };
+        }
+
+        if (hotkeyId == 2)
+        {
+            return [this]() {
+                Logger::trace(L"Starting paste as markdown directly");
+                m_process_manager.send_message(CommonSharedConstants::ADVANCED_PASTE_MARKDOWN_MESSAGE);
+                Trace::AdvancedPaste_Invoked(L"MarkdownDirect");
+            };
+        }
+
+        if (hotkeyId == 3)
+        {
+            return [this]() {
+                Logger::trace(L"Starting paste as json directly");
+                m_process_manager.send_message(CommonSharedConstants::ADVANCED_PASTE_JSON_MESSAGE);
+                Trace::AdvancedPaste_Invoked(L"JsonDirect");
+            };
+        }
+
+        if (additional_action_index < m_additional_actions.size())
+        {
+            const auto id = m_additional_actions.at(additional_action_index).id;
+            return [this, id]() {
+                Logger::trace(L"Starting additional action id={}", id);
+                Trace::AdvancedPaste_Invoked(std::format(L"{}Direct", kebab_to_pascal_case(id)));
+                m_process_manager.send_message(CommonSharedConstants::ADVANCED_PASTE_ADDITIONAL_ACTION_MESSAGE, id);
+            };
+        }
+
+        if (custom_action_index < m_custom_actions.size())
+        {
+            const auto id = m_custom_actions.at(custom_action_index).id;
+            return [this, id]() {
+                Logger::trace(L"Starting custom action id={}", id);
+                m_process_manager.send_message(CommonSharedConstants::ADVANCED_PASTE_CUSTOM_ACTION_MESSAGE, std::to_wstring(id));
+                Trace::AdvancedPaste_Invoked(L"CustomActionDirect");
+            };
+        }
+
+        return {};
+    }
+
+    void execute_hotkey(const std::function<void()>& action)
+    {
+        m_process_manager.start();
+        action();
+    }
+
 public:
     AdvancedPaste()
     {
@@ -935,6 +1053,7 @@ public:
 
     virtual void set_config(const wchar_t* config) override
     {
+        std::scoped_lock lock(m_actions_mutex);
         try
         {
             // Parse the input JSON string.
@@ -974,7 +1093,44 @@ public:
     {
         Logger::trace("AdvancedPaste::enable()");
         Trace::AdvancedPaste_Enable(true);
-        m_enabled = true;
+        {
+            std::scoped_lock lock(m_hotkey_worker_mutex);
+            m_enabled = true;
+            if (!m_hotkey_worker.joinable())
+            {
+                m_hotkey_worker = std::jthread([this](std::stop_token stopToken) {
+                    while (!stopToken.stop_requested())
+                    {
+                        QueuedHotkeyAction queuedAction;
+                        {
+                            std::unique_lock lock(m_hotkey_worker_mutex);
+                            m_hotkey_worker_condition.wait(lock, [this, &stopToken]() {
+                                return stopToken.stop_requested() || !m_hotkey_actions.empty();
+                            });
+
+                            if (stopToken.stop_requested())
+                            {
+                                return;
+                            }
+
+                            queuedAction = std::move(m_hotkey_actions.front());
+                            m_hotkey_actions.pop_front();
+                        }
+
+                        if (queuedAction.copySelection)
+                        {
+                            send_copy_selection(); // best-effort; use existing clipboard content on failure
+                        }
+
+                        if (!stopToken.stop_requested() && m_enabled)
+                        {
+                            execute_hotkey(queuedAction.action);
+                        }
+                    }
+                });
+            }
+        }
+
         m_process_manager.start();
 
         // Start listening for external trigger event so we can invoke the same logic as the hotkey.
@@ -982,6 +1138,12 @@ public:
         m_triggerEventWaiter.start(CommonSharedConstants::ADVANCED_PASTE_SHOW_UI_EVENT, [this](DWORD) {
             // Same logic as hotkeyId == 1 (m_advanced_paste_ui_hotkey)
             Logger::trace(L"AdvancedPaste ShowUI event triggered");
+
+            if (m_auto_copy_selection_custom_action)
+            {
+                send_copy_selection(); // best-effort; ignore failure
+            }
+
             m_process_manager.start();
             m_process_manager.bring_to_front();
             m_process_manager.send_message(CommonSharedConstants::ADVANCED_PASTE_SHOW_UI_MESSAGE);
@@ -991,7 +1153,24 @@ public:
 
     void Disable(bool traceEvent)
     {
-        if (m_enabled)
+        bool wasEnabled = false;
+        {
+            std::scoped_lock lock(m_hotkey_worker_mutex);
+            wasEnabled = m_enabled.exchange(false);
+            m_hotkey_actions.clear();
+            if (m_hotkey_worker.joinable())
+            {
+                m_hotkey_worker.request_stop();
+                m_hotkey_worker_condition.notify_all();
+            }
+        }
+
+        if (m_hotkey_worker.joinable())
+        {
+            m_hotkey_worker.join();
+        }
+
+        if (wasEnabled)
         {
             m_process_manager.stop();
 
@@ -1004,7 +1183,6 @@ public:
             }
         }
 
-        m_enabled = false;
     }
 
     virtual void disable()
@@ -1016,102 +1194,33 @@ public:
     virtual bool on_hotkey(size_t hotkeyId) override
     {
         Logger::trace(L"AdvancedPaste hotkey pressed");
-        if (m_enabled)
+        if (!m_enabled)
         {
-            size_t additional_action_index = 0;
-            size_t custom_action_index = 0;
-            bool is_custom_action_hotkey = false;
-
-            if (hotkeyId >= NUM_DEFAULT_HOTKEYS)
-            {
-                additional_action_index = hotkeyId - NUM_DEFAULT_HOTKEYS;
-                if (additional_action_index >= m_additional_actions.size())
-                {
-                    custom_action_index = additional_action_index - m_additional_actions.size();
-                    is_custom_action_hotkey = custom_action_index < m_custom_actions.size();
-                }
-            }
-
-            if (is_custom_action_hotkey && m_auto_copy_selection_custom_action)
-            {
-                if (!send_copy_selection())
-                {
-                    Logger::warn(L"Auto-copy: failed to copy selection for custom action index {} — aborting action", custom_action_index);
-                    return false;
-                }
-            }
-
-            m_process_manager.start();
-
-            // hotkeyId in same order as set by get_hotkeys
-            if (hotkeyId == 0)
-            { // m_paste_as_plain_hotkey
-                Logger::trace(L"Paste as plain text hotkey pressed");
-
-                std::thread([=]() {
-                    // hotkey work should be kept to a minimum, or Windows might deregister our low level keyboard hook.
-                    // Move work to another thread.
-                    try_to_paste_as_plain_text();
-                }).detach();
-
-                Trace::AdvancedPaste_Invoked(L"PastePlainTextDirect");
-                return true;
-            }
-
-            if (hotkeyId == 1)
-            { // m_advanced_paste_ui_hotkey
-                Logger::trace(L"Setting start up event");
-
-                m_process_manager.bring_to_front();
-                m_process_manager.send_message(CommonSharedConstants::ADVANCED_PASTE_SHOW_UI_MESSAGE);
-                Trace::AdvancedPaste_Invoked(L"AdvancedPasteUI");
-                return true;
-            }
-            if (hotkeyId == 2)
-            { // m_paste_as_markdown_hotkey
-                Logger::trace(L"Starting paste as markdown directly");
-                m_process_manager.send_message(CommonSharedConstants::ADVANCED_PASTE_MARKDOWN_MESSAGE);
-                Trace::AdvancedPaste_Invoked(L"MarkdownDirect");
-                return true;
-            }
-            if (hotkeyId == 3)
-            { // m_paste_as_json_hotkey
-                Logger::trace(L"Starting paste as json directly");
-                m_process_manager.send_message(CommonSharedConstants::ADVANCED_PASTE_JSON_MESSAGE);
-                Trace::AdvancedPaste_Invoked(L"JsonDirect");
-                return true;
-            }
-
-
-            if (additional_action_index < m_additional_actions.size())
-            {
-                const auto& id = m_additional_actions.at(additional_action_index).id;
-
-                Logger::trace(L"Starting additional action id={}", id);
-
-                Trace::AdvancedPaste_Invoked(std::format(L"{}Direct", kebab_to_pascal_case(id)));
-
-                m_process_manager.send_message(CommonSharedConstants::ADVANCED_PASTE_ADDITIONAL_ACTION_MESSAGE, id);
-                return true;
-            }
-
-            if (custom_action_index < m_custom_actions.size())
-            {
-                const auto id = m_custom_actions.at(custom_action_index).id;
-
-                Logger::trace(L"Starting custom action id={}", id);
-
-                m_process_manager.send_message(CommonSharedConstants::ADVANCED_PASTE_CUSTOM_ACTION_MESSAGE, std::to_wstring(id));
-                Trace::AdvancedPaste_Invoked(L"CustomActionDirect");
-                return true;
-            }
+            return false;
         }
 
-        return false;
+        auto action = resolve_hotkey_action(hotkeyId);
+        if (!action)
+        {
+            return false;
+        }
+
+        {
+            std::scoped_lock lock(m_hotkey_worker_mutex);
+            if (!m_enabled)
+            {
+                return false;
+            }
+
+            m_hotkey_actions.push_back({ std::move(action), m_auto_copy_selection_custom_action.load() });
+            m_hotkey_worker_condition.notify_one();
+            return true;
+        }
     }
 
     virtual size_t get_hotkeys(Hotkey* hotkeys, size_t buffer_size) override
     {
+        std::scoped_lock lock(m_actions_mutex);
         const size_t num_hotkeys = NUM_DEFAULT_HOTKEYS + m_additional_actions.size() + m_custom_actions.size();
 
         if (hotkeys && buffer_size >= num_hotkeys)

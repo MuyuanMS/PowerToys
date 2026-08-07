@@ -9,5 +9,5 @@ namespace AdvancedPaste.Services;
 
 public interface IPromptModerationService
 {
-    Task ValidateAsync(string fullPrompt, CancellationToken cancellationToken);
+    Task ValidateAsync(string fullPrompt, CancellationToken cancellationToken, string apiKey = null);
 }

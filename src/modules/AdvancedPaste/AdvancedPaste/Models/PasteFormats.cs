@@ -40,6 +40,16 @@ public enum PasteFormats
 
     [PasteFormatMetadata(
         IsCoreAction = false,
+        ResourceId = "FixSpellingAndGrammar",
+        IconGlyph = "\uE8E2",
+        RequiresAIService = true,
+        CanPreview = true,
+        SupportedClipboardFormats = ClipboardFormat.Text,
+        IPCKey = AdvancedPasteAdditionalActions.PropertyNames.FixSpellingAndGrammar)]
+    FixSpellingAndGrammar = 11,
+
+    [PasteFormatMetadata(
+        IsCoreAction = false,
         ResourceId = "ImageToText",
         IconGlyph = "\uE91B",
         RequiresAIService = false,
@@ -47,7 +57,7 @@ public enum PasteFormats
         SupportedClipboardFormats = ClipboardFormat.Image,
         IPCKey = AdvancedPasteAdditionalActions.PropertyNames.ImageToText,
         KernelFunctionDescription = "Takes an image from the clipboard and extracts text using OCR. This function is intended only for explicit text extraction or OCR requests.")]
-    ImageToText,
+    ImageToText = 3,
 
     [PasteFormatMetadata(
         IsCoreAction = false,
