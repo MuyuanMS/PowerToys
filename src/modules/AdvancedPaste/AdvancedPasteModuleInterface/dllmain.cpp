@@ -76,7 +76,8 @@ class AdvancedPaste : public PowertoyModuleIface
 private:
     
     AdvancedPasteProcessManager m_process_manager;
-    bool m_enabled = false;
+    OnThreadExecutor m_hotkey_executor;
+    std::atomic<bool> m_enabled = false;
 
     std::wstring app_name;
 
@@ -1085,6 +1086,8 @@ public:
     {
         if (m_enabled)
         {
+            m_enabled = false;
+            m_hotkey_executor.cancel();
             m_process_manager.stop();
 
             // Stop event listening
@@ -1136,10 +1139,13 @@ public:
             // If nothing is selected (clipboard unchanged), fall through to use existing clipboard content.
             if (m_auto_copy_selection_custom_action)
             {
-                std::thread([this, hotkeyId, additional_action_id, custom_action_id]() {
+                m_hotkey_executor.submit(OnThreadExecutor::task_t{ [this, hotkeyId, additional_action_id, custom_action_id]() {
                     send_copy_selection(); // best-effort; ignore failure
-                    execute_hotkey_action(hotkeyId, additional_action_id, custom_action_id);
-                }).detach();
+                    if (m_enabled)
+                    {
+                        execute_hotkey_action(hotkeyId, additional_action_id, custom_action_id);
+                    }
+                } });
                 return true;
             }
 

@@ -15,7 +15,7 @@ internal static class AIProviderPolicy
             return false;
         }
 
-        var serviceType = provider.ServiceTypeKind;
+        var serviceType = provider.ServiceTypeKind == AIServiceType.Unknown ? AIServiceType.OpenAI : provider.ServiceTypeKind;
         var metadata = AIServiceTypeRegistry.GetMetadata(serviceType);
 
         if (metadata.IsOnlineService &&
