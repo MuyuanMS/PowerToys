@@ -438,7 +438,8 @@ namespace Microsoft.PowerToys.Settings.UI.Views
 
         private async Task UpdatePhiSilicaUIAsync()
         {
-            string selectedType = ViewModel?.PasteAIProviderDraft?.ServiceType ?? string.Empty;
+            var providerDraft = ViewModel?.PasteAIProviderDraft;
+            string selectedType = providerDraft?.ServiceType ?? string.Empty;
             bool isPhiSilica = string.Equals(selectedType, "PhiSilica", StringComparison.OrdinalIgnoreCase);
 
             if (PhiSilicaPanel is not null)
@@ -467,6 +468,11 @@ namespace Microsoft.PowerToys.Settings.UI.Views
                 // which runs with its own package identity. See microsoft-ui-xaml#10856.
                 var (status, diagnostics) = await Task.Run(() => CheckPhiSilicaViaAdvancedPaste());
 
+                if (!ReferenceEquals(providerDraft, ViewModel?.PasteAIProviderDraft))
+                {
+                    return;
+                }
+
                 if (status == "NotSupported")
                 {
                     _isPhiSilicaAvailable = false;
@@ -492,6 +498,11 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             }
             catch (Exception)
             {
+                if (!ReferenceEquals(providerDraft, ViewModel?.PasteAIProviderDraft))
+                {
+                    return;
+                }
+
                 _isPhiSilicaAvailable = false;
                 ShowPhiSilicaNotAvailableState(
                     resourceLoader.GetString("AdvancedPaste_PhiSilicaNotAvailable_Title"),

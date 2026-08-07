@@ -32,7 +32,13 @@ internal static class AdvancedAIProviderResolver
     public static bool TryResolveAdvancedProvider(PasteAIConfiguration configuration, string providerIdOverride, out PasteAIProviderDefinition provider)
     {
         provider = ResolveProvider(configuration, providerIdOverride);
-        return IsAdvancedProvider(provider);
+        if (IsAdvancedProvider(provider))
+        {
+            return true;
+        }
+
+        provider = null;
+        return false;
     }
 
     private static bool IsAdvancedProvider(PasteAIProviderDefinition provider)

@@ -331,16 +331,10 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         private string GetHotkeyLocalizationHeader(string moduleName, int hotkeyID, string headerKey)
         {
-            // Handle AdvancedPaste custom actions
-            if (string.Equals(moduleName, AdvancedPasteSettings.ModuleName, StringComparison.OrdinalIgnoreCase)
-                && hotkeyID > 9)
-            {
-                return headerKey;
-            }
-
             try
             {
-                return resourceLoader.GetString($"{headerKey}/Header");
+                var localizedHeader = resourceLoader.GetString($"{headerKey}/Header");
+                return string.IsNullOrEmpty(localizedHeader) ? headerKey : localizedHeader;
             }
             catch (Exception ex)
             {
