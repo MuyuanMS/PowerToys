@@ -1482,11 +1482,11 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             }
 
             await UpdateFoundryLocalUIAsync();
-            await UpdatePhiSilicaUIAsync();
             UpdatePasteAIUIVisibility();
             RefreshDialogBindings();
 
             PasteAIApiKeyPasswordBox.Password = string.Empty;
+            _ = UpdatePhiSilicaUIAsync();
             await PasteAIProviderConfigurationDialog.ShowAsync();
         }
 
@@ -1512,9 +1512,9 @@ namespace Microsoft.PowerToys.Settings.UI.Views
 
             UpdatePasteAIUIVisibility();
             await UpdateFoundryLocalUIAsync();
-            await UpdatePhiSilicaUIAsync();
             RefreshDialogBindings();
             PasteAIApiKeyPasswordBox.Password = ViewModel.GetPasteAIApiKey(provider.Id, provider.ServiceType);
+            _ = UpdatePhiSilicaUIAsync();
             await PasteAIProviderConfigurationDialog.ShowAsync();
         }
 

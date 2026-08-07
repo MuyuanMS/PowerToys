@@ -38,6 +38,24 @@ public sealed class AdvancedAIProviderResolverTests
         Assert.AreSame(overrideProvider, provider);
     }
 
+    [TestMethod]
+    public void ResolveProvider_WithNonActiveOverride_ReturnsOverride()
+    {
+        var activeProvider = CreateAdvancedProvider("active", AIServiceType.OpenAI);
+        var overrideProvider = new PasteAIProviderDefinition { Id = "override", ServiceTypeKind = AIServiceType.PhiSilica };
+        var configuration = CreateConfiguration(activeProvider, activeProvider, overrideProvider);
+
+        var provider = AdvancedAIProviderResolver.ResolveProvider(configuration, overrideProvider.Id);
+
+        Assert.AreSame(overrideProvider, provider);
+    }
+
+    [TestMethod]
+    public void GetDefaultModelName_WithPhiSilica_ReturnsDisplayName()
+    {
+        Assert.AreEqual("Phi Silica", PasteAIProviderDefaults.GetDefaultModelName(AIServiceType.PhiSilica));
+    }
+
     private static PasteAIProviderDefinition CreateAdvancedProvider(string id, AIServiceType serviceType) =>
         new()
         {

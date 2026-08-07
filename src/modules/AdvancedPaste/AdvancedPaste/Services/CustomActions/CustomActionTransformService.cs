@@ -170,6 +170,13 @@ namespace AdvancedPaste.Services.CustomActions
                 provider = config.ActiveProvider ?? config.Providers?.FirstOrDefault() ?? new PasteAIProviderDefinition();
             }
 
+            if (!AIProviderPolicy.IsAllowed(provider))
+            {
+                throw new PasteActionException(
+                    ResourceLoaderInstance.ResourceLoader.GetString("PasteError"),
+                    new InvalidOperationException($"AI provider '{provider.Id}' is disabled by policy."));
+            }
+
             var serviceType = NormalizeServiceType(provider.ServiceTypeKind);
             var systemPrompt = string.IsNullOrWhiteSpace(provider.SystemPrompt) ? DefaultSystemPrompt : provider.SystemPrompt;
             var apiKey = AcquireApiKey(serviceType, provider.Id);

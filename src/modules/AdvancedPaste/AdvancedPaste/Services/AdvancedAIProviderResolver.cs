@@ -10,13 +10,11 @@ namespace AdvancedPaste.Services;
 
 internal static class AdvancedAIProviderResolver
 {
-    public static bool TryResolveAdvancedProvider(PasteAIConfiguration configuration, string providerIdOverride, out PasteAIProviderDefinition provider)
+    public static PasteAIProviderDefinition ResolveProvider(PasteAIConfiguration configuration, string providerIdOverride)
     {
-        provider = null;
-
         if (configuration is null)
         {
-            return false;
+            return null;
         }
 
         if (!string.IsNullOrWhiteSpace(providerIdOverride))
@@ -24,30 +22,17 @@ internal static class AdvancedAIProviderResolver
             var configuredProvider = configuration.Providers?.FirstOrDefault(candidate => string.Equals(candidate.Id, providerIdOverride, StringComparison.OrdinalIgnoreCase));
             if (configuredProvider is not null)
             {
-                if (!IsAdvancedProvider(configuredProvider))
-                {
-                    return false;
-                }
-
-                provider = configuredProvider;
-                return true;
+                return configuredProvider;
             }
         }
 
-        var activeProvider = configuration.ActiveProvider;
-        if (IsAdvancedProvider(activeProvider))
-        {
-            provider = activeProvider;
-            return true;
-        }
+        return configuration.ActiveProvider;
+    }
 
-        if (activeProvider is not null)
-        {
-            return false;
-        }
-
-        provider = configuration.Providers?.FirstOrDefault(IsAdvancedProvider);
-        return provider is not null;
+    public static bool TryResolveAdvancedProvider(PasteAIConfiguration configuration, string providerIdOverride, out PasteAIProviderDefinition provider)
+    {
+        provider = ResolveProvider(configuration, providerIdOverride);
+        return IsAdvancedProvider(provider);
     }
 
     private static bool IsAdvancedProvider(PasteAIProviderDefinition provider)

@@ -97,7 +97,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                         hotkeyAccessors.Add(new HotkeyAccessor(
                             () => additionalAction.CoachingShortcut,
                             value => additionalAction.CoachingShortcut = value ?? new HotkeySettings(),
-                            "FixSpellingAndGrammarCoaching"));
+                            "FixSpellingAndGrammar_CoachingShortcut"));
                     }
                 }
             }

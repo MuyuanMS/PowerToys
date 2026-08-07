@@ -34,6 +34,12 @@ if ($Unregister) {
     } else {
         Write-Host "Microsoft.PowerToys.SparseApp is not registered."
     }
+
+    $registrationDir = Join-Path $PSScriptRoot '.user\registration'
+    if (Test-Path $registrationDir) {
+        Remove-Item $registrationDir -Recurse -Force
+    }
+
     exit 0
 }
 
@@ -44,8 +50,6 @@ if ($CIBuild.IsPresent) {
     $isCIBuild = $env:CIBuild -ieq 'true'
 }
 
-$currentPublisherHint = $script:Config.CertSubject
-
 # Configuration constants - centralized management
 $script:Config = @{
     IdentityName   = "Microsoft.PowerToys.SparseApp"
@@ -54,6 +58,8 @@ $script:Config = @{
     CertSubject    = 'CN=PowerToys Dev, O=PowerToys, L=Redmond, S=Washington, C=US'
     CertValidMonths = 12
 }
+
+$currentPublisherHint = $script:Config.CertSubject
 
 #region Helper Functions
 
@@ -472,49 +478,44 @@ if ($DevRegister) {
         $existing | Remove-AppxPackage
     }
 
-    # Create a temp manifest with the dev publisher for -Register
-    $devRegDir = Join-Path ([System.IO.Path]::GetTempPath()) "PowerToysSparseDevReg"
+    # Keep the loose-registration files in a stable location. Windows records this
+    # directory as the package install location and needs it after this script exits.
+    $devRegDir = Join-Path $UserFolder 'registration'
     if (Test-Path $devRegDir) { Remove-Item $devRegDir -Recurse -Force }
     New-Item -ItemType Directory -Path $devRegDir -Force | Out-Null
 
-    try {
-        Copy-Item $manifestPath (Join-Path $devRegDir 'AppxManifest.xml')
-        $imagesDir = Join-Path $sparseDir 'Images'
-        if (Test-Path $imagesDir) {
-            Copy-Item $imagesDir (Join-Path $devRegDir 'Images') -Recurse
+    Copy-Item $manifestPath (Join-Path $devRegDir 'AppxManifest.xml')
+    $imagesDir = Join-Path $sparseDir 'Images'
+    if (Test-Path $imagesDir) {
+        Copy-Item $imagesDir (Join-Path $devRegDir 'Images') -Recurse
+    }
+
+    $devManifest = Join-Path $devRegDir 'AppxManifest.xml'
+    [xml]$devXml = Get-Content $devManifest -Raw
+    $devIdentity = $devXml.Package.Identity
+
+    if ($devIdentity.Publisher -ne $script:Config.CertSubject) {
+        Write-BuildLog "Rewriting publisher for dev registration" -Level Info
+        $devIdentity.SetAttribute('Publisher', $script:Config.CertSubject)
+        $devXml.Save($devManifest)
+    }
+
+    Write-BuildLog "Registering with ExternalLocation: $winUI3AppsDir" -Level Info
+    Add-AppxPackage -Register $devManifest -ExternalLocation $winUI3AppsDir
+
+    $pkg = Get-AppxPackage -Name $script:Config.IdentityName -ErrorAction SilentlyContinue
+    if ($pkg) {
+        Write-BuildLog "Dev registration successful:" -Level Success
+        Write-BuildLog "  Publisher:         $($pkg.Publisher)" -Level Info
+        Write-BuildLog "  PublisherId:       $($pkg.PublisherId)" -Level Info
+        Write-BuildLog "  IsDevelopmentMode: $($pkg.IsDevelopmentMode)" -Level Info
+        Write-BuildLog "  InstallLocation:   $($pkg.InstallLocation)" -Level Info
+
+        if ($pkg.PublisherId -ne 'djwsxzxb4ksa8') {
+            Write-BuildLog "PublisherId mismatch! Expected 'djwsxzxb4ksa8', got '$($pkg.PublisherId)'. LAF unlock will fail." -Level Warning
         }
-
-        $devManifest = Join-Path $devRegDir 'AppxManifest.xml'
-        [xml]$devXml = Get-Content $devManifest -Raw
-        $devIdentity = $devXml.Package.Identity
-
-        if ($devIdentity.Publisher -ne $script:Config.CertSubject) {
-            Write-BuildLog "Rewriting publisher for dev registration" -Level Info
-            $devIdentity.SetAttribute('Publisher', $script:Config.CertSubject)
-            $devXml.Save($devManifest)
-        }
-
-        Write-BuildLog "Registering with ExternalLocation: $winUI3AppsDir" -Level Info
-        Add-AppxPackage -Register $devManifest -ExternalLocation $winUI3AppsDir
-
-        $pkg = Get-AppxPackage -Name $script:Config.IdentityName -ErrorAction SilentlyContinue
-        if ($pkg) {
-            Write-BuildLog "Dev registration successful:" -Level Success
-            Write-BuildLog "  Publisher:         $($pkg.Publisher)" -Level Info
-            Write-BuildLog "  PublisherId:       $($pkg.PublisherId)" -Level Info
-            Write-BuildLog "  IsDevelopmentMode: $($pkg.IsDevelopmentMode)" -Level Info
-            Write-BuildLog "  InstallLocation:   $($pkg.InstallLocation)" -Level Info
-
-            if ($pkg.PublisherId -ne 'djwsxzxb4ksa8') {
-                Write-BuildLog "PublisherId mismatch! Expected 'djwsxzxb4ksa8', got '$($pkg.PublisherId)'. LAF unlock will fail." -Level Warning
-            }
-        } else {
-            Write-BuildLog "Dev registration failed — package not found." -Level Error
-            exit 1
-        }
-    } finally {
-        if (Test-Path $devRegDir) {
-            Remove-Item $devRegDir -Recurse -Force -ErrorAction SilentlyContinue
-        }
+    } else {
+        Write-BuildLog "Dev registration failed — package not found." -Level Error
+        exit 1
     }
 }

@@ -1467,6 +1467,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
             var pasteConfig = _advancedPasteSettings?.Properties?.PasteAIConfiguration;
 
+            SyncProviderActiveFlags(pasteConfig);
             OnPropertyChanged(nameof(PasteAIConfiguration));
             SaveAndNotifySettings();
         }
@@ -1532,9 +1533,16 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
 
             var activeId = config.ActiveProviderId;
+            var activeProvider = config.Providers.FirstOrDefault(provider => string.Equals(provider.Id, activeId, StringComparison.OrdinalIgnoreCase));
 
-            // If no explicit active ID, default to the first provider
-            if (string.IsNullOrEmpty(activeId) && config.Providers.Count > 0)
+            if (config.Providers.Count == 0)
+            {
+                config.ActiveProviderId = string.Empty;
+                return;
+            }
+
+            // If the active ID is empty or stale, default to the first provider.
+            if (activeProvider is null)
             {
                 activeId = config.Providers[0].Id;
                 config.ActiveProviderId = activeId;

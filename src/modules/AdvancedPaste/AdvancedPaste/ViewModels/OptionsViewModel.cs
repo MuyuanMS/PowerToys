@@ -351,11 +351,19 @@ namespace AdvancedPaste.ViewModels
         private PasteFormat CreateStandardPasteFormat(PasteFormats format)
         {
             var providerId = GetProviderIdForFormat(format);
-            return PasteFormat.CreateStandardFormat(format, AvailableClipboardFormats, IsCustomAIServiceEnabled, ResourceLoaderInstance.ResourceLoader.GetString, providerId);
+            var isAIServiceEnabled = IsCustomAIServiceEnabled && IsSelectedProviderAllowedByGPO(providerId);
+            return PasteFormat.CreateStandardFormat(format, AvailableClipboardFormats, isAIServiceEnabled, ResourceLoaderInstance.ResourceLoader.GetString, providerId);
         }
 
         private PasteFormat CreateCustomAIPasteFormat(string name, string prompt, bool isSavedQuery, string providerId = null) =>
-            PasteFormat.CreateCustomAIFormat(GetCustomAIFormat(providerId), name, prompt, isSavedQuery, AvailableClipboardFormats, IsCustomAIServiceEnabled, providerId);
+            PasteFormat.CreateCustomAIFormat(
+                GetCustomAIFormat(providerId),
+                name,
+                prompt,
+                isSavedQuery,
+                AvailableClipboardFormats,
+                IsCustomAIServiceEnabled && IsSelectedProviderAllowedByGPO(providerId),
+                providerId);
 
         private string GetProviderIdForFormat(PasteFormats format) =>
             format switch
@@ -916,33 +924,11 @@ namespace AdvancedPaste.ViewModels
 
         private bool IsProviderAllowedByGPO(PasteAIProviderDefinition provider)
         {
-            if (provider is null)
-            {
-                return false;
-            }
-
-            var serviceType = provider.ServiceType.ToAIServiceType();
-            var metadata = AIServiceTypeRegistry.GetMetadata(serviceType);
-
-            // Check global online AI GPO for online services
-            if (metadata.IsOnlineService && !IsAllowedByGPO)
-            {
-                return false;
-            }
-
-            // Check individual endpoint GPO
-            return serviceType switch
-            {
-                AIServiceType.OpenAI => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOpenAIValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
-                AIServiceType.AzureOpenAI => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteAzureOpenAIValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
-                AIServiceType.AzureAIInference => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteAzureAIInferenceValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
-                AIServiceType.Mistral => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteMistralValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
-                AIServiceType.Google => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteGoogleValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
-                AIServiceType.Ollama => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOllamaValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
-                AIServiceType.FoundryLocal => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteFoundryLocalValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
-                _ => true, // Allow unknown types by default
-            };
+            return AIProviderPolicy.IsAllowed(provider);
         }
+
+        private bool IsSelectedProviderAllowedByGPO(string providerId) =>
+            AIProviderPolicy.IsAllowed(AdvancedAIProviderResolver.ResolveProvider(_userSettings?.PasteAIConfiguration, providerId));
 
         private bool UpdateOpenAIKey()
         {

@@ -114,6 +114,11 @@ public sealed class AdvancedAIKernelService : KernelServiceBase
             return false;
         }
 
+        if (!AIProviderPolicy.IsAllowed(provider))
+        {
+            return false;
+        }
+
         var serviceType = NormalizeServiceType(provider.ServiceTypeKind);
         if (!IsServiceTypeSupported(serviceType))
         {
