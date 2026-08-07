@@ -229,7 +229,9 @@ namespace AdvancedPaste.ViewModels
 
         public bool ClipboardHasData => AvailableClipboardFormats != ClipboardFormat.None;
 
-        public bool ClipboardHasDataForCustomAI => PasteFormat.SupportsClipboardFormats(CustomAIFormat, AvailableClipboardFormats);
+        public bool ClipboardHasDataForCustomAI =>
+            PasteFormat.SupportsClipboardFormats(CustomAIFormat, AvailableClipboardFormats) &&
+            IsSelectedProviderAvailable(providerId: null);
 
         public bool ShowClipboardPreview => _userSettings.EnableClipboardPreview;
 
@@ -351,7 +353,7 @@ namespace AdvancedPaste.ViewModels
         private PasteFormat CreateStandardPasteFormat(PasteFormats format)
         {
             var providerId = GetProviderIdForFormat(format);
-            var isAIServiceEnabled = IsCustomAIServiceEnabled && IsSelectedProviderAllowedByGPO(providerId);
+            var isAIServiceEnabled = IsCustomAIServiceEnabled && IsSelectedProviderAvailable(providerId);
             return PasteFormat.CreateStandardFormat(format, AvailableClipboardFormats, isAIServiceEnabled, ResourceLoaderInstance.ResourceLoader.GetString, providerId);
         }
 
@@ -362,7 +364,7 @@ namespace AdvancedPaste.ViewModels
                 prompt,
                 isSavedQuery,
                 AvailableClipboardFormats,
-                IsCustomAIServiceEnabled && IsSelectedProviderAllowedByGPO(providerId),
+                IsCustomAIServiceEnabled && IsSelectedProviderAvailable(providerId),
                 providerId);
 
         private string GetProviderIdForFormat(PasteFormats format) =>
@@ -927,8 +929,11 @@ namespace AdvancedPaste.ViewModels
             return AIProviderPolicy.IsAllowed(provider);
         }
 
-        private bool IsSelectedProviderAllowedByGPO(string providerId) =>
-            AIProviderPolicy.IsAllowed(AdvancedAIProviderResolver.ResolveProvider(_userSettings?.PasteAIConfiguration, providerId));
+        private bool IsSelectedProviderAvailable(string providerId)
+        {
+            var provider = AdvancedAIProviderResolver.ResolveProvider(_userSettings?.PasteAIConfiguration, providerId);
+            return AIProviderPolicy.IsAllowed(provider) && AIProviderPolicy.SupportsClipboardFormats(provider, AvailableClipboardFormats);
+        }
 
         private bool UpdateOpenAIKey()
         {

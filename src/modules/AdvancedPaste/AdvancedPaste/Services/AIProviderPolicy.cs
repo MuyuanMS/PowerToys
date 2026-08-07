@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using AdvancedPaste.Models;
 using Microsoft.PowerToys.Settings.UI.Library;
 
 namespace AdvancedPaste.Services;
@@ -35,5 +36,15 @@ internal static class AIProviderPolicy
             AIServiceType.FoundryLocal => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteFoundryLocalValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
             _ => true,
         };
+    }
+
+    public static bool SupportsClipboardFormats(PasteAIProviderDefinition provider, ClipboardFormat clipboardFormats)
+    {
+        if (provider?.ServiceTypeKind != AIServiceType.PhiSilica)
+        {
+            return true;
+        }
+
+        return (clipboardFormats & (ClipboardFormat.Text | ClipboardFormat.Html)) != ClipboardFormat.None;
     }
 }

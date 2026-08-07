@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Collections.ObjectModel;
+using AdvancedPaste.Models;
 using AdvancedPaste.Services;
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -54,6 +55,16 @@ public sealed class AdvancedAIProviderResolverTests
     public void GetDefaultModelName_WithPhiSilica_ReturnsDisplayName()
     {
         Assert.AreEqual("Phi Silica", PasteAIProviderDefaults.GetDefaultModelName(AIServiceType.PhiSilica));
+    }
+
+    [TestMethod]
+    public void SupportsClipboardFormats_WithPhiSilica_RequiresText()
+    {
+        var provider = new PasteAIProviderDefinition { ServiceTypeKind = AIServiceType.PhiSilica };
+
+        Assert.IsFalse(AIProviderPolicy.SupportsClipboardFormats(provider, ClipboardFormat.Image));
+        Assert.IsTrue(AIProviderPolicy.SupportsClipboardFormats(provider, ClipboardFormat.Text));
+        Assert.IsTrue(AIProviderPolicy.SupportsClipboardFormats(provider, ClipboardFormat.Text | ClipboardFormat.Image));
     }
 
     private static PasteAIProviderDefinition CreateAdvancedProvider(string id, AIServiceType serviceType) =>
