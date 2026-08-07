@@ -364,11 +364,11 @@ public abstract class KernelServiceBase(
                     input = await dataPackageView.GetClipboardTextOrThrowAsync(kernel.GetCancellationToken());
                 }
 
-                string output = await GetPromptBasedOutput(format, prompt, input, imageBytes, kernel.GetCancellationToken(), kernel.GetProgress(), kernel.GetProviderId());
+                string output = await GetPromptBasedOutput(format, prompt, input, imageBytes, kernel.GetProgress(), kernel.GetProviderId(), kernel.GetCancellationToken());
                 return DataPackageHelpers.CreateFromText(output);
             });
 
-    private async Task<string> GetPromptBasedOutput(PasteFormats format, string prompt, string input, byte[] imageBytes, CancellationToken cancellationToken, IProgress<double> progress, string providerId) =>
+    private async Task<string> GetPromptBasedOutput(PasteFormats format, string prompt, string input, byte[] imageBytes, IProgress<double> progress, string providerId, CancellationToken cancellationToken) =>
         format switch
         {
             PasteFormats.CustomTextTransformation => (await _customActionTransformService.TransformAsync(prompt, input, imageBytes, cancellationToken, progress, providerIdOverride: providerId))?.Content ?? string.Empty,
