@@ -73,7 +73,6 @@ public sealed partial class MainWindow : WindowEx,
     private readonly LocalKeyboardListener _localKeyboardListener;
     private readonly HiddenOwnerWindowBehavior _hiddenOwnerBehavior = new();
     private readonly ICmdPalProtocolActivation _protocolActivation;
-    private readonly ViewModels.Models.IMonitorService _monitorService;
     private readonly IThemeService _themeService;
     private readonly WindowThemeSynchronizer _windowThemeSynchronizer;
     private readonly List<long> _breakthroughTimestamps = [];
@@ -136,8 +135,6 @@ public sealed partial class MainWindow : WindowEx,
     public MainWindow()
     {
         _protocolActivation = App.Current.Services.GetRequiredService<ICmdPalProtocolActivation>();
-        _monitorService = App.Current.Services.GetRequiredService<ViewModels.Models.IMonitorService>();
-
         InitializeComponent();
 
         ViewModel = App.Current.Services.GetService<MainWindowViewModel>()!;
@@ -1451,28 +1448,32 @@ public sealed partial class MainWindow : WindowEx,
                 if (activatedEventArgs.Data is IProtocolActivatedEventArgs protocolArgs &&
                     _protocolActivation.TryParse(protocolArgs.Uri, out var route))
                 {
-                    switch (route)
+                    switch (CmdPalProtocolPolicy.Evaluate(route))
                     {
-                        case CmdPalProtocolRoute.Background:
-                            // we're running, we don't want to activate our window. bail
+                        case CmdPalProtocolAction.RunInBackground:
+                            // We're running, but this route intentionally does not activate a window.
                             return;
 
-                        case CmdPalProtocolRoute.OpenSettings openSettings:
+                        case CmdPalProtocolAction.OpenSettings openSettings:
                             WeakReferenceMessenger.Default.Send(openSettings.Message);
                             return;
 
-                        case CmdPalProtocolRoute.Reload:
+                        case CmdPalProtocolAction.RequestConsent requestConsent:
                             var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
-                            if (settings?.AllowExternalReload == true)
+                            if (settings.EnableExternalCommandLinks)
                             {
-                                Logger.LogInfo("External Reload triggered");
-                                WeakReferenceMessenger.Default.Send<ReloadCommandsMessage>(new());
+                                WeakReferenceMessenger.Default.Send(new ExternalCommandLinkRequestedMessage(requestConsent.Route));
                             }
                             else
                             {
-                                Logger.LogInfo("External Reload is disabled");
+                                Logger.LogInfo("External command links are disabled");
                             }
 
+                            return;
+
+                        case CmdPalProtocolAction.Reject:
+                        default:
+                            Logger.LogWarning("Ignoring an unsupported CmdPal protocol route.");
                             return;
                     }
                 }
@@ -1769,14 +1770,6 @@ public sealed partial class MainWindow : WindowEx,
 
                     return (LRESULT)IntPtr.Zero;
                 }
-
-            // Unlike DockWindow instances, MainWindow always exists, so it's the one
-            // reliable place to catch topology changes. Without this, the Settings page's
-            // monitor list goes stale whenever no dock window is around to see WM_DISPLAYCHANGE.
-            case PInvoke.WM_DISPLAYCHANGE:
-                Logger.LogDebug("MainWindow WM_DISPLAYCHANGE");
-                _monitorService.NotifyMonitorsChanged();
-                break;
 
             default:
                 if (uMsg == WM_TASKBAR_RESTART)
