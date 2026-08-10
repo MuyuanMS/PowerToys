@@ -52,7 +52,7 @@ public:
     void SaveData();
     void AdjustWorkAreaIds(const std::vector<FancyZonesDataTypes::MonitorId>& ids);
 
-    static std::wstring GetProcessPathWithAUMID(HWND window) noexcept;
+    static std::wstring GetProcessPathWithAUMID(HWND window);
     bool SetAppLastZones(HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId, const GUID& layoutId, const ZoneIndexSet& zoneIndexSet);
     bool RemoveAppLastZone(HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId, const GUID& layoutId);
 
@@ -61,7 +61,7 @@ public:
     const TAppZoneHistoryMap& GetFullAppZoneHistory() const noexcept;
     std::optional<FancyZonesDataTypes::AppZoneHistoryData> GetZoneHistory(const std::wstring& appPath, const FancyZonesDataTypes::WorkAreaId& workAreaId) const noexcept;
 
-    bool IsAnotherWindowOfApplicationInstanceZoned(HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId) const noexcept;
+    bool IsAnotherWindowOfApplicationInstanceZoned(HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId) const;
     bool IsAnotherWindowOfApplicationInstanceZoned(const std::wstring& processPath, HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId) const noexcept;
     ZoneIndexSet GetAppLastZoneIndexSet(HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId, const GUID& layoutId) const;
 

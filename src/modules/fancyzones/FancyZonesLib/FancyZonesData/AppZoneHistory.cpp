@@ -323,9 +323,13 @@ void AppZoneHistory::AdjustWorkAreaIds(const std::vector<FancyZonesDataTypes::Mo
     }
 }
 
-std::wstring AppZoneHistory::GetProcessPathWithAUMID(HWND window) noexcept
+std::wstring AppZoneHistory::GetProcessPathWithAUMID(HWND window)
 {
     auto processPath = get_process_path_waiting_uwp(window);
+    if (processPath.empty())
+    {
+        return {};
+    }
 
     ComPtr<IPropertyStore> propStore;
     HRESULT hr = SHGetPropertyStoreForWindow(window, IID_PPV_ARGS(&propStore));
@@ -546,7 +550,7 @@ std::optional<FancyZonesDataTypes::AppZoneHistoryData> AppZoneHistory::GetZoneHi
     return std::nullopt;
 }
 
-bool AppZoneHistory::IsAnotherWindowOfApplicationInstanceZoned(HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId) const noexcept
+bool AppZoneHistory::IsAnotherWindowOfApplicationInstanceZoned(HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId) const
 {
     auto processPath = GetProcessPathWithAUMID(window);
     return IsAnotherWindowOfApplicationInstanceZoned(processPath, window, workAreaId);
