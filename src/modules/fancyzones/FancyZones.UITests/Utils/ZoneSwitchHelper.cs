@@ -34,13 +34,17 @@ namespace Microsoft.FancyZones.UITests.Utils
                 foreach (var item in historyArray.EnumerateArray())
                 {
                     if (item.TryGetProperty("app-path", out var appPathElement) &&
-                        appPathElement.GetString() is string path &&
-                        path.EndsWith(exeName, StringComparison.OrdinalIgnoreCase))
+                        appPathElement.GetString() is string path)
                     {
-                        var history = item.GetProperty("history");
-                        if (history.GetArrayLength() > 0)
+                        int aumidSeparator = path.IndexOf('?');
+                        string executablePath = aumidSeparator >= 0 ? path[..aumidSeparator] : path;
+                        if (executablePath.EndsWith(exeName, StringComparison.OrdinalIgnoreCase))
                         {
-                            return history[0].GetProperty("zone-index-set")[0].GetRawText();
+                            var history = item.GetProperty("history");
+                            if (history.GetArrayLength() > 0)
+                            {
+                                return history[0].GetProperty("zone-index-set")[0].GetRawText();
+                            }
                         }
                     }
                 }

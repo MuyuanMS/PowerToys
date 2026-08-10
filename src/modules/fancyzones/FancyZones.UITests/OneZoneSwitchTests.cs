@@ -200,6 +200,8 @@ namespace UITests_FancyZones
             string? zoneIndexOfPowertoys = ZoneSwitchHelper.GetZoneIndexSetByAppName("PowerToys.Settings.exe", appZoneHistoryJson);
 
             // check the AppZoneHistory layout is set and in the same zone
+            Assert.IsNotNull(zoneIndexOfFileWindow);
+            Assert.IsNotNull(zoneIndexOfPowertoys);
             Assert.AreEqual(zoneIndexOfPowertoys, zoneIndexOfFileWindow);
 
             return (preWindow, powertoysWindowName);
