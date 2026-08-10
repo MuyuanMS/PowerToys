@@ -387,9 +387,10 @@ namespace MouseUtils.UITests
 
         private void VerifyRapidMouseInputDoesNotStick()
         {
+            Session.MoveMouseTo(500, 500, 0, 0);
             var start = Session.GetMousePosition();
-            var restingX = start.Item1 > 200 ? start.Item1 - 100 : start.Item1 + 100;
-            var restingY = start.Item2 > 200 ? start.Item2 - 100 : start.Item2 + 100;
+            var restingX = start.Item1 - 100;
+            var restingY = start.Item2 - 100;
             Session.MoveMouseTo(restingX, restingY, 0, 0);
             Task.Delay(500).Wait();
 
