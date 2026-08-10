@@ -564,7 +564,43 @@ void Highlighter::ProcessPendingMouseEvents()
         --m_mouseEventQueueSize;
         ReleaseSRWLockExclusive(&m_mouseEventQueueLock);
 
-        HandleMouseEvent(event);
+        try
+        {
+            HandleMouseEvent(event);
+        }
+        catch (...)
+        {
+            Logger::error("Failed to process a Mouse Highlighter event on the window thread.");
+
+            AcquireSRWLockExclusive(&m_mouseEventQueueLock);
+            m_mouseEventQueueHead = 0;
+            m_mouseEventQueueSize = 0;
+            m_mouseEventMessagePending = false;
+            ReleaseSRWLockExclusive(&m_mouseEventQueueLock);
+
+            if (m_leftHoldTimer != 0)
+            {
+                KillTimer(m_hwnd, m_leftHoldTimer);
+                m_leftHoldTimer = 0;
+            }
+            if (m_rightHoldTimer != 0)
+            {
+                KillTimer(m_hwnd, m_rightHoldTimer);
+                m_rightHoldTimer = 0;
+            }
+            if (m_timer_id != 0)
+            {
+                KillTimer(m_hwnd, m_timer_id);
+                m_timer_id = 0;
+            }
+            m_bringToFrontTimerFireCount = 0;
+            m_leftButtonPressed = false;
+            m_rightButtonPressed = false;
+            m_spotlightPressed = false;
+            m_leftHoldIndicatorShown = false;
+            m_rightHoldIndicatorShown = false;
+            return;
+        }
     }
 }
 
