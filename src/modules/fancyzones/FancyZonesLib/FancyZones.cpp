@@ -706,6 +706,11 @@ FancyZones::OnKeyDown(PKBDLLHOOKSTRUCT info) noexcept
             return false;
         }
     }
+    else if (m_monitorRotationPreviewActive)
+    {
+        m_monitorRotationPreviewActive = false;
+        PostMessageW(m_window, WM_PRIV_MONITOR_ROTATION_PREVIEW_HIDE, 0, 0);
+    }
 
     if ((win && !shift && !ctrl) || (win && ctrl && alt))
     {
@@ -1040,7 +1045,11 @@ LRESULT FancyZones::WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lpa
             const bool reverse = static_cast<bool>(wparam);
             m_pendingMonitorRotationReverse = reverse;
             ShowMonitorRotationPreview(reverse, true);
-            SetTimer(m_window, MonitorRotationCommitTimerId, MonitorRotationCommitDelayMillis, nullptr);
+            if (SetTimer(m_window, MonitorRotationCommitTimerId, MonitorRotationCommitDelayMillis, nullptr) == 0)
+            {
+                m_pendingMonitorRotationReverse.reset();
+                ShowMonitorRotationPreview();
+            }
         }
         else if (message == WM_TIMER && wparam == MonitorRotationCommitTimerId)
         {
