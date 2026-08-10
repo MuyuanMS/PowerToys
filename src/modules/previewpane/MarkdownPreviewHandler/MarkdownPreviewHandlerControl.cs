@@ -5,6 +5,8 @@
 using System.IO.Abstractions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.RegularExpressions;
 
 using Common;
@@ -13,6 +15,7 @@ using Microsoft.PowerToys.PreviewHandler.Markdown.Telemetry.Events;
 using Microsoft.PowerToys.Telemetry;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using Microsoft.Win32.SafeHandles;
 using Windows.System;
 
 namespace Microsoft.PowerToys.PreviewHandler.Markdown
@@ -25,6 +28,29 @@ namespace Microsoft.PowerToys.PreviewHandler.Markdown
         private static readonly IFileSystem FileSystem = new FileSystem();
         private static readonly IPath Path = FileSystem.Path;
         private static readonly IFile File = FileSystem.File;
+
+        private const uint FileShareRead = 0x00000001;
+        private const uint FileShareWrite = 0x00000002;
+        private const uint FileShareDelete = 0x00000004;
+        private const uint OpenExisting = 3;
+        private const uint FileFlagBackupSemantics = 0x02000000;
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "CreateFileW")]
+        private static extern SafeFileHandle OpenDirectoryHandle(
+            string fileName,
+            uint desiredAccess,
+            uint shareMode,
+            IntPtr securityAttributes,
+            uint creationDisposition,
+            uint flagsAndAttributes,
+            IntPtr templateFile);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "GetFinalPathNameByHandleW")]
+        private static extern uint GetFinalPathNameByHandle(
+            SafeFileHandle file,
+            StringBuilder filePath,
+            uint filePathLength,
+            uint flags);
 
         /// <summary>
         /// RichTextBox control to display if external images are blocked.
@@ -55,6 +81,10 @@ namespace Microsoft.PowerToys.PreviewHandler.Markdown
         /// True if external image is blocked, false otherwise.
         /// </summary>
         private bool _infoBarDisplayed;
+
+        private string _markdownDirectory;
+        private string _allowedBasePath;
+        private bool _allowLocalImages;
 
         /// <summary>
         /// Gets the path of the current assembly.
@@ -116,14 +146,33 @@ namespace Microsoft.PowerToys.PreviewHandler.Markdown
                     throw new ArgumentException($"{nameof(dataSource)} for {nameof(MarkdownPreviewHandlerControl)} must be a string but was a '{typeof(T)}'");
                 }
 
-                string fileText = File.ReadAllText(filePath);
-                Regex imageTagRegex = new Regex(@"<[ ]*img.*>");
-                if (imageTagRegex.IsMatch(fileText))
+                _allowLocalImages = Settings.GetLocalImagesEnabled();
+                _markdownDirectory = Path.GetDirectoryName(filePath) ?? string.Empty;
+
+                _allowedBasePath = _markdownDirectory;
+                if (_markdownDirectory.StartsWith(@"\\", StringComparison.Ordinal))
                 {
-                    _infoBarDisplayed = true;
+                    string trimmed = _markdownDirectory.Substring(2);
+                    int firstSep = trimmed.IndexOf('\\');
+                    int secondSep = firstSep >= 0 ? trimmed.IndexOf('\\', firstSep + 1) : -1;
+                    if (secondSep >= 0)
+                    {
+                        _allowedBasePath = string.Concat(@"\\", trimmed.AsSpan(0, secondSep));
+                    }
                 }
 
-                string markdownHTML = FilePreviewCommon.MarkdownHelper.MarkdownHtml(fileText, Settings.GetTheme(), filePath, ImagesBlockedCallBack);
+                string fileText = File.ReadAllText(filePath);
+
+                if (!_allowLocalImages)
+                {
+                    Regex imageTagRegex = new Regex(@"<[ ]*img.*>");
+                    if (imageTagRegex.IsMatch(fileText))
+                    {
+                        _infoBarDisplayed = true;
+                    }
+                }
+
+                string markdownHTML = FilePreviewCommon.MarkdownHelper.MarkdownHtml(fileText, Settings.GetTheme(), filePath, ImagesBlockedCallBack, _allowLocalImages, _allowedBasePath);
 
                 _browser = new WebView2()
                 {
@@ -152,14 +201,56 @@ namespace Microsoft.PowerToys.PreviewHandler.Markdown
                         _browser.CoreWebView2.Settings.IsScriptEnabled = false;
                         _browser.CoreWebView2.Settings.IsWebMessageEnabled = false;
 
-                        // Don't load any resources.
+                        // Don't load any resources except virtual host mapped ones.
                         _browser.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
-                        _browser.CoreWebView2.WebResourceRequested += (object sender, CoreWebView2WebResourceRequestedEventArgs e) =>
+                        _browser.CoreWebView2.WebResourceRequested += async (object sender, CoreWebView2WebResourceRequestedEventArgs e) =>
                         {
-                            // Show local file we've saved with the markdown contents. Block all else.
-                            if (new Uri(e.Request.Uri) != _localFileURI)
+                            CoreWebView2Deferral deferral = e.GetDeferral();
+                            try
                             {
+                                // Allow the local HTML file
+                                if (_localFileURI != null && new Uri(e.Request.Uri) == _localFileURI)
+                                {
+                                    return;
+                                }
+
+                                // Serve virtual host image requests (localmdimages) directly. WebView2
+                                // Runtime 150+ no longer serves UNC/network paths through
+                                // SetVirtualHostNameToFolderMapping, so the image bytes are read here
+                                // after re-validating the resolved path against the allowed base path.
+                                if (_allowLocalImages && e.Request.Uri.StartsWith("https://localmdimages/", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    (FileStream Stream, string ContentType)? imageResponse = await Task.Run(
+                                        () => OpenValidatedImage(e.Request.Uri, _allowedBasePath));
+
+                                    if (imageResponse.HasValue)
+                                    {
+                                        try
+                                        {
+                                            e.Response = _browser.CoreWebView2.Environment.CreateWebResourceResponse(
+                                                imageResponse.Value.Stream,
+                                                200,
+                                                "OK",
+                                                "Content-Type: " + imageResponse.Value.ContentType);
+                                            return;
+                                        }
+                                        catch
+                                        {
+                                            imageResponse.Value.Stream.Dispose();
+                                            throw;
+                                        }
+                                    }
+
+                                    e.Response = _browser.CoreWebView2.Environment.CreateWebResourceResponse(null, 404, "Not Found", null);
+                                    return;
+                                }
+
+                                // Block everything else
                                 e.Response = _browser.CoreWebView2.Environment.CreateWebResourceResponse(null, 403, "Forbidden", null);
+                            }
+                            finally
+                            {
+                                deferral.Complete();
                             }
                         };
 
@@ -217,7 +308,10 @@ namespace Microsoft.PowerToys.PreviewHandler.Markdown
 
                         if (_infoBarDisplayed)
                         {
-                            _infoBar = GetTextBoxControl(Resources.BlockedImageInfoText);
+                            string message = _allowLocalImages
+                                ? Resources.RemoteImagesBlockedInfoText
+                                : Resources.BlockedImageInfoText;
+                            _infoBar = GetTextBoxControl(message);
                             Resize += FormResized;
                             Controls.Add(_infoBar);
                         }
@@ -301,6 +395,117 @@ namespace Microsoft.PowerToys.PreviewHandler.Markdown
             {
                 _infoBar.Width = Width;
             }
+        }
+
+        /// <summary>
+        /// Returns the HTTP Content-Type for an image file based on its extension.
+        /// </summary>
+        /// <param name="imagePath">Path of the image file.</param>
+        /// <returns>The content type string.</returns>
+        private static string GetImageContentType(string imagePath)
+        {
+            return Path.GetExtension(imagePath).ToUpperInvariant() switch
+            {
+                ".PNG" => "image/png",
+                ".JPG" or ".JPEG" => "image/jpeg",
+                ".GIF" => "image/gif",
+                ".BMP" => "image/bmp",
+                ".WEBP" => "image/webp",
+                ".SVG" => "image/svg+xml",
+                ".ICO" => "image/x-icon",
+                ".TIF" or ".TIFF" => "image/tiff",
+                ".AVIF" => "image/avif",
+                _ => "application/octet-stream",
+            };
+        }
+
+        private static (FileStream Stream, string ContentType)? OpenValidatedImage(string requestUri, string allowedBasePath)
+        {
+            if (!FilePreviewCommon.HTMLParsingExtension.TryResolveVirtualUrl(requestUri, allowedBasePath, out string imagePath))
+            {
+                return null;
+            }
+
+            FileStream imageStream = null;
+            try
+            {
+                imageStream = new FileStream(imagePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                if (!TryGetFinalPath(imageStream.SafeFileHandle, out string finalImagePath))
+                {
+                    imageStream.Dispose();
+                    return null;
+                }
+
+                using SafeFileHandle baseHandle = OpenDirectoryHandle(
+                    allowedBasePath,
+                    0,
+                    FileShareRead | FileShareWrite | FileShareDelete,
+                    IntPtr.Zero,
+                    OpenExisting,
+                    FileFlagBackupSemantics,
+                    IntPtr.Zero);
+                if (baseHandle.IsInvalid || !TryGetFinalPath(baseHandle, out string finalBasePath) || !IsContainedPath(finalBasePath, finalImagePath))
+                {
+                    imageStream.Dispose();
+                    return null;
+                }
+
+                return (imageStream, GetImageContentType(finalImagePath));
+            }
+            catch (ArgumentException)
+            {
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+            catch (NotSupportedException)
+            {
+            }
+
+            imageStream?.Dispose();
+            return null;
+        }
+
+        private static bool TryGetFinalPath(SafeFileHandle handle, out string finalPath)
+        {
+            finalPath = null;
+            StringBuilder pathBuffer = new StringBuilder(512);
+            uint length = GetFinalPathNameByHandle(handle, pathBuffer, (uint)pathBuffer.Capacity, 0);
+            if (length == 0)
+            {
+                return false;
+            }
+
+            if (length >= pathBuffer.Capacity)
+            {
+                pathBuffer.EnsureCapacity((int)length + 1);
+                length = GetFinalPathNameByHandle(handle, pathBuffer, (uint)pathBuffer.Capacity, 0);
+                if (length == 0 || length >= pathBuffer.Capacity)
+                {
+                    return false;
+                }
+            }
+
+            string path = pathBuffer.ToString();
+            finalPath = path.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase)
+                ? string.Concat(@"\\", path.AsSpan(8))
+                : path.StartsWith(@"\\?\", StringComparison.OrdinalIgnoreCase)
+                    ? path[4..]
+                    : path;
+            return true;
+        }
+
+        private static bool IsContainedPath(string basePath, string candidatePath)
+        {
+            string relativePath = System.IO.Path.GetRelativePath(basePath, candidatePath);
+            return relativePath != "." &&
+                   relativePath != ".." &&
+                   !relativePath.StartsWith(".." + System.IO.Path.DirectorySeparatorChar, StringComparison.Ordinal) &&
+                   !relativePath.StartsWith(".." + System.IO.Path.AltDirectorySeparatorChar, StringComparison.Ordinal) &&
+                   !System.IO.Path.IsPathRooted(relativePath);
         }
 
         /// <summary>

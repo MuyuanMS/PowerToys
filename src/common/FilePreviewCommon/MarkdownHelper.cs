@@ -2,7 +2,9 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.IO;
+using System.Text;
 
 using Markdig;
 
@@ -10,6 +12,8 @@ namespace Microsoft.PowerToys.FilePreviewCommon
 {
     public static class MarkdownHelper
     {
+        private const string HtmlDoctype = "<!doctype html>";
+
         /// <summary>
         /// Markdown HTML header for light theme.
         /// </summary>
@@ -27,11 +31,20 @@ namespace Microsoft.PowerToys.FilePreviewCommon
 
         public static string MarkdownHtml(string fileContent, string theme, string filePath, ImagesBlockedCallBack imagesBlockedCallBack)
         {
-            var htmlHeader = theme == "dark" ? HtmlDarkHeader : HtmlLightHeader;
+            return MarkdownHtml(fileContent, theme, filePath, imagesBlockedCallBack, false, null);
+        }
+
+        public static string MarkdownHtml(string fileContent, string theme, string filePath, ImagesBlockedCallBack imagesBlockedCallBack, bool allowLocalImages, string? allowedBasePath)
+        {
+            string imageSourcePolicy = allowLocalImages ? "https://localmdimages" : "'none'";
+            string contentSecurityPolicy = $"<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src {imageSourcePolicy}; object-src 'none'; frame-src 'none';\">";
+            string htmlHeader = (theme == "dark" ? HtmlDarkHeader : HtmlLightHeader).Insert(HtmlDoctype.Length, contentSecurityPolicy);
 
             // Extension to modify markdown AST.
             HTMLParsingExtension extension = new HTMLParsingExtension(imagesBlockedCallBack);
             extension.FilePath = Path.GetDirectoryName(filePath) ?? string.Empty;
+            extension.AllowedBasePath = allowedBasePath ?? extension.FilePath;
+            extension.AllowLocalImages = allowLocalImages;
 
             // if you have a string with double space, some people view it as a new line.
             // while this is against spec, even GH supports this. Technically looks like GH just trims whitespace
@@ -46,8 +59,239 @@ namespace Microsoft.PowerToys.FilePreviewCommon
             MarkdownPipeline pipeline = pipelineBuilder.Build();
             string parsedMarkdown = Markdown.ToHtml(fileContent, pipeline);
 
+            parsedMarkdown = SanitizeRawImageTags(parsedMarkdown, extension, imagesBlockedCallBack, allowLocalImages);
+
             string markdownHTML = $"{htmlHeader}{parsedMarkdown}{HtmlFooter}";
             return markdownHTML;
+        }
+
+        private static string SanitizeRawImageTags(string html, HTMLParsingExtension extension, ImagesBlockedCallBack imagesBlockedCallBack, bool allowLocalImages)
+        {
+            StringBuilder? sanitized = null;
+            int copyFrom = 0;
+            int searchFrom = 0;
+
+            while (true)
+            {
+                int tagStart = FindNextImageTag(html, searchFrom);
+                if (tagStart < 0)
+                {
+                    break;
+                }
+
+                int tagEnd = FindTagEnd(html, tagStart + 4);
+                if (tagEnd < 0)
+                {
+                    break;
+                }
+
+                sanitized ??= new StringBuilder(html.Length);
+                sanitized.Append(html, copyFrom, tagStart - copyFrom);
+                sanitized.Append(SanitizeRawImageTag(html.Substring(tagStart, tagEnd - tagStart + 1), extension, imagesBlockedCallBack, allowLocalImages));
+
+                copyFrom = tagEnd + 1;
+                searchFrom = copyFrom;
+            }
+
+            if (sanitized == null)
+            {
+                return html;
+            }
+
+            sanitized.Append(html, copyFrom, html.Length - copyFrom);
+            return sanitized.ToString();
+        }
+
+        private static int FindNextImageTag(string html, int startIndex)
+        {
+            while (startIndex < html.Length)
+            {
+                int tagStart = html.IndexOf("<img", startIndex, StringComparison.OrdinalIgnoreCase);
+                if (tagStart < 0)
+                {
+                    return -1;
+                }
+
+                int afterName = tagStart + 4;
+                if (afterName == html.Length || char.IsWhiteSpace(html[afterName]) || html[afterName] == '/' || html[afterName] == '>')
+                {
+                    return tagStart;
+                }
+
+                startIndex = afterName;
+            }
+
+            return -1;
+        }
+
+        private static int FindTagEnd(string html, int startIndex)
+        {
+            char quote = '\0';
+            bool expectingAttributeValue = false;
+            for (int i = startIndex; i < html.Length; i++)
+            {
+                char current = html[i];
+                if (quote != '\0')
+                {
+                    if (current == quote)
+                    {
+                        quote = '\0';
+                    }
+                }
+                else if (expectingAttributeValue)
+                {
+                    if (char.IsWhiteSpace(current))
+                    {
+                        continue;
+                    }
+
+                    if (current == '"' || current == '\'')
+                    {
+                        quote = current;
+                    }
+
+                    expectingAttributeValue = false;
+                }
+                else if (current == '=')
+                {
+                    expectingAttributeValue = true;
+                }
+                else if (current == '>')
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private static string SanitizeRawImageTag(string tag, HTMLParsingExtension extension, ImagesBlockedCallBack imagesBlockedCallBack, bool allowLocalImages)
+        {
+            StringBuilder sanitized = new StringBuilder(tag.Length);
+            sanitized.Append(tag, 0, 4);
+
+            int cursor = 4;
+            int tagContentEnd = tag.Length - 1;
+            while (cursor < tagContentEnd)
+            {
+                int segmentStart = cursor;
+                while (cursor < tagContentEnd && char.IsWhiteSpace(tag[cursor]))
+                {
+                    cursor++;
+                }
+
+                if (cursor >= tagContentEnd || tag[cursor] == '/')
+                {
+                    sanitized.Append(tag, segmentStart, tagContentEnd - segmentStart);
+                    break;
+                }
+
+                int nameStart = cursor;
+                while (cursor < tagContentEnd &&
+                       !char.IsWhiteSpace(tag[cursor]) &&
+                       tag[cursor] != '=' &&
+                       tag[cursor] != '/' &&
+                       tag[cursor] != '>')
+                {
+                    cursor++;
+                }
+
+                if (cursor == nameStart)
+                {
+                    sanitized.Append(tag[cursor]);
+                    cursor++;
+                    continue;
+                }
+
+                string attributeName = tag.Substring(nameStart, cursor - nameStart);
+                while (cursor < tagContentEnd && char.IsWhiteSpace(tag[cursor]))
+                {
+                    cursor++;
+                }
+
+                if (cursor >= tagContentEnd || tag[cursor] != '=')
+                {
+                    sanitized.Append(tag, segmentStart, cursor - segmentStart);
+                    continue;
+                }
+
+                cursor++;
+                while (cursor < tagContentEnd && char.IsWhiteSpace(tag[cursor]))
+                {
+                    cursor++;
+                }
+
+                int valueTokenStart = cursor;
+                char valueQuote = '\0';
+                int valueStart = cursor;
+                int valueEnd;
+                if (cursor < tagContentEnd && (tag[cursor] == '"' || tag[cursor] == '\''))
+                {
+                    valueQuote = tag[cursor];
+                    valueStart = ++cursor;
+                    while (cursor < tagContentEnd && tag[cursor] != valueQuote)
+                    {
+                        cursor++;
+                    }
+
+                    valueEnd = cursor;
+                    if (cursor < tagContentEnd)
+                    {
+                        cursor++;
+                    }
+                }
+                else
+                {
+                    while (cursor < tagContentEnd && !char.IsWhiteSpace(tag[cursor]) && tag[cursor] != '>')
+                    {
+                        cursor++;
+                    }
+
+                    valueEnd = cursor;
+                }
+
+                string attributeValue = tag.Substring(valueStart, valueEnd - valueStart);
+
+                if (string.Equals(attributeName, "srcset", StringComparison.OrdinalIgnoreCase))
+                {
+                    imagesBlockedCallBack();
+                    continue;
+                }
+
+                sanitized.Append(tag, segmentStart, valueTokenStart - segmentStart);
+                if (!string.Equals(attributeName, "src", StringComparison.OrdinalIgnoreCase))
+                {
+                    sanitized.Append(tag, valueTokenStart, cursor - valueTokenStart);
+                    continue;
+                }
+
+                if (attributeValue == "#" ||
+                    (allowLocalImages && attributeValue.StartsWith("https://localmdimages/", StringComparison.OrdinalIgnoreCase)))
+                {
+                    sanitized.Append(tag, valueTokenStart, cursor - valueTokenStart);
+                }
+                else if (allowLocalImages &&
+                         HTMLParsingExtension.TryGetLocalImageVirtualUrl(attributeValue, extension.FilePath, extension.AllowedBasePath, out string? virtualUrl))
+                {
+                    AppendAttributeValue(sanitized, virtualUrl, valueQuote);
+                }
+                else
+                {
+                    imagesBlockedCallBack();
+                    AppendAttributeValue(sanitized, "#", valueQuote);
+                }
+            }
+
+            sanitized.Append('>');
+            return sanitized.ToString();
+        }
+
+        private static void AppendAttributeValue(StringBuilder output, string value, char quote)
+        {
+            char outputQuote = quote == '\0' ? '"' : quote;
+            output.Append(outputQuote);
+            output.Append(value);
+            output.Append(outputQuote);
         }
     }
 }
