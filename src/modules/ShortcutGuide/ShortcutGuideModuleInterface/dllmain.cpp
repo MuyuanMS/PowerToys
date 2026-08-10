@@ -182,11 +182,13 @@ public:
         }
         if (!IsProcessActive())
         {
-            StartProcess();
+            if (!StartProcess())
+            {
+                return false;
+            }
         }
 
-        SetEvent(winKeyTriggerEvent);
-        return true;
+        return SetEvent(winKeyTriggerEvent) != 0;
     }
 
     virtual void send_settings_telemetry() override
