@@ -539,8 +539,7 @@ void Highlighter::QueueMouseEvent(MouseEvent event) noexcept
     if (postMessage && (window == nullptr || !PostMessage(window, WM_PROCESS_MOUSE_EVENTS, 0, 0)))
     {
         AcquireSRWLockExclusive(&m_mouseEventQueueLock);
-        // Keep queued events, including button-up events, so the next hook
-        // event can retry posting instead of losing the recovery signal.
+        // Preserve queued events so the next hook event can retry delivery.
         m_mouseEventMessagePending = false;
         ReleaseSRWLockExclusive(&m_mouseEventQueueLock);
     }
