@@ -332,7 +332,13 @@ namespace FancyZonesUnitTests
             Assert::IsTrue(std::vector<ZoneIndex>{ 2 } == AppZoneHistory::instance().GetAppLastZoneIndexSet(window, workAreaId, layoutId));
 
             Assert::IsTrue(AppZoneHistory::instance().RemoveAppLastZone(window, workAreaId, layoutId));
-            Assert::IsFalse(AppZoneHistory::instance().GetFullAppZoneHistory().contains(qualifiedProcessPath));
+            Assert::IsTrue(AppZoneHistory::instance().GetFullAppZoneHistory().contains(qualifiedProcessPath));
+            Assert::IsTrue(std::vector<ZoneIndex>{} == AppZoneHistory::instance().GetAppLastZoneIndexSet(window, workAreaId, layoutId));
+            Assert::IsTrue(std::vector<ZoneIndex>{ 1 } == AppZoneHistory::instance().GetAppLastZoneIndexSet(legacyWindow, workAreaId, layoutId));
+
+            AppZoneHistory::instance().LoadData();
+            Assert::IsTrue(AppZoneHistory::instance().GetFullAppZoneHistory().contains(qualifiedProcessPath));
+            Assert::IsTrue(std::vector<ZoneIndex>{} == AppZoneHistory::instance().GetAppLastZoneIndexSet(window, workAreaId, layoutId));
             Assert::IsTrue(std::vector<ZoneIndex>{ 1 } == AppZoneHistory::instance().GetAppLastZoneIndexSet(legacyWindow, workAreaId, layoutId));
         }
 

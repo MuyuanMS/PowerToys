@@ -134,9 +134,12 @@ namespace JsonUtils
                 AppZoneHistoryJSON result;
 
                 result.appPath = json.GetNamedString(NonLocalizable::AppZoneHistoryIds::AppPathID);
+                // An explicit empty history is a persisted tombstone for an AUMID-qualified identity.
+                bool hasExplicitEmptyHistory = false;
                 if (json.HasKey(NonLocalizable::AppZoneHistoryIds::HistoryID))
                 {
                     auto appHistoryArray = json.GetNamedArray(NonLocalizable::AppZoneHistoryIds::HistoryID);
+                    hasExplicitEmptyHistory = appHistoryArray.Size() == 0;
                     for (uint32_t i = 0; i < appHistoryArray.Size(); ++i)
                     {
                         json::JsonObject json_hist = appHistoryArray.GetObjectAt(i);
@@ -154,7 +157,7 @@ namespace JsonUtils
                         result.data.push_back(std::move(data.value()));
                     }
                 }
-                if (result.data.empty())
+                if (result.data.empty() && !hasExplicitEmptyHistory)
                 {
                     return std::nullopt;
                 }
@@ -484,7 +487,11 @@ bool AppZoneHistory::RemoveAppLastZone(HWND window, const FancyZonesDataTypes::W
             data = perDesktopData.erase(data);
             if (perDesktopData.empty())
             {
-                m_history.erase(history);
+                const bool isQualifiedHistory = history->first == processPath && GetProcessPathWithoutAUMID(processPath) != processPath;
+                if (!isQualifiedHistory)
+                {
+                    m_history.erase(history);
+                }
             }
             SaveData();
             return true;
