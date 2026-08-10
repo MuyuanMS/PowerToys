@@ -127,6 +127,7 @@ namespace MouseUtils.UITests
                 Task.Delay(1000).Wait();
                 VerifyMouseHighlighterDrag(ref settings, "leftClick");
                 VerifyMouseHighlighterDrag(ref settings, "rightClick");
+                VerifyRapidMouseInputDoesNotStick(ref settings);
             }
             else
             {
@@ -382,6 +383,57 @@ namespace MouseUtils.UITests
             Task.Delay(duration + 100).Wait();
             colorLeftClick = this.GetPixelColorString(location.Item1, location.Item2);
             Assert.AreNotEqual("#" + settings.PrimaryButtonHighlightColor, colorLeftClick);
+        }
+
+        private void VerifyRapidMouseInputDoesNotStick(ref MouseHighlighterSettings settings)
+        {
+            Session.MoveMouseTo(500, 500, 0, 0);
+            var start = Session.GetMousePosition();
+            var restingX = start.Item1 - 100;
+            var restingY = start.Item2 - 100;
+            Session.MoveMouseTo(restingX, restingY, 0, 0);
+            Task.Delay(500).Wait();
+
+            var baselineColors = new string[16];
+            var restingBaselineColors = new string[16];
+            for (int i = 0; i < 8; i++)
+            {
+                baselineColors[i * 2] = this.GetPixelColorString(start.Item1 + i, start.Item2 + (i % 4));
+                baselineColors[(i * 2) + 1] = this.GetPixelColorString(start.Item1 - i, start.Item2 - (i % 4));
+                restingBaselineColors[i * 2] = this.GetPixelColorString(restingX + i, restingY + (i % 4));
+                restingBaselineColors[(i * 2) + 1] = this.GetPixelColorString(restingX - i, restingY - (i % 4));
+            }
+
+            Session.MoveMouseTo(start.Item1, start.Item2, 0, 0);
+            for (int i = 0; i < 32; i++)
+            {
+                Session.PerformMouseAction(MouseActionType.LeftDown, 0, 0);
+                Session.MoveMouseTo(start.Item1 + (i % 8), start.Item2 + (i % 4), 0, 0);
+                Session.PerformMouseAction(MouseActionType.LeftUp, 0, 0);
+                Session.PerformMouseAction(MouseActionType.RightDown, 0, 0);
+                Session.MoveMouseTo(start.Item1 - (i % 8), start.Item2 - (i % 4), 0, 0);
+                Session.PerformMouseAction(MouseActionType.RightUp, 0, 0);
+            }
+
+            Session.MoveMouseTo(restingX, restingY, 0, 0);
+            Task.Delay(1500).Wait();
+
+            for (int i = 0; i < 8; i++)
+            {
+                var positiveColor = this.GetPixelColorString(start.Item1 + i, start.Item2 + (i % 4));
+                Assert.AreEqual(baselineColors[i * 2], positiveColor);
+
+                var negativeColor = this.GetPixelColorString(start.Item1 - i, start.Item2 - (i % 4));
+                Assert.AreEqual(baselineColors[(i * 2) + 1], negativeColor);
+
+                var restingPositiveColor = this.GetPixelColorString(restingX + i, restingY + (i % 4));
+                Assert.AreEqual(restingBaselineColors[i * 2], restingPositiveColor);
+
+                var restingNegativeColor = this.GetPixelColorString(restingX - i, restingY - (i % 4));
+                Assert.AreEqual(restingBaselineColors[(i * 2) + 1], restingNegativeColor);
+            }
+
+            VerifyMouseHighlighterAppears(ref settings, "leftClick");
         }
 
         private void SetColor(ref Custom foundCustom, string colorName = "Primary button highlight color", string colorValue = "000000", string opacity = "0")
