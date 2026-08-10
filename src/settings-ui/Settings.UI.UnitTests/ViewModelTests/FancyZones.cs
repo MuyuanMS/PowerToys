@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Generic;
 using System.IO.Abstractions;
 using System.Text.Json;
 
@@ -172,6 +173,64 @@ namespace ViewModelTests
             var expected = viewModel.OverrideSnapHotkeys;
             var actual = SettingsRepository<FancyZonesSettings>.GetInstance(mockFancyZonesSettingsUtils.Object).SettingsConfig.Properties.FancyzonesOverrideSnapHotkeys.Value;
             Assert.AreEqual(expected, actual);
+        }
+
+        [TestMethod]
+        public void MonitorRotationSettingsShouldPersist()
+        {
+            Mock<SettingsUtils> mockSettingsUtils = new Mock<SettingsUtils>(new FileSystem(), null);
+            FancyZonesViewModel viewModel = new FancyZonesViewModel(mockSettingsUtils.Object, SettingsRepository<GeneralSettings>.GetInstance(mockGeneralSettingsUtils.Object), SettingsRepository<FancyZonesSettings>.GetInstance(mockFancyZonesSettingsUtils.Object), sendMockIPCConfigMSG, FancyZonesTestFolderName);
+            var hotkey = new HotkeySettings(true, true, false, false, 0x52);
+
+            viewModel.MonitorRotation = true;
+            viewModel.MonitorRotationHotkey = hotkey;
+
+            var properties = SettingsRepository<FancyZonesSettings>.GetInstance(mockFancyZonesSettingsUtils.Object).SettingsConfig.Properties;
+            Assert.IsTrue(properties.FancyzonesMonitorRotation.Value);
+            Assert.AreEqual(hotkey, properties.FancyzonesMonitorRotationHotkey.Value);
+        }
+
+        [TestMethod]
+        public void MonitorRotationHotkeyShouldUseDefaultForNullOrArrowKeys()
+        {
+            Mock<SettingsUtils> mockSettingsUtils = new Mock<SettingsUtils>(new FileSystem(), null);
+            FancyZonesViewModel viewModel = new FancyZonesViewModel(mockSettingsUtils.Object, SettingsRepository<GeneralSettings>.GetInstance(mockGeneralSettingsUtils.Object), SettingsRepository<FancyZonesSettings>.GetInstance(mockFancyZonesSettingsUtils.Object), sendMockIPCConfigMSG, FancyZonesTestFolderName);
+
+            viewModel.MonitorRotationHotkey = null;
+            Assert.AreEqual(FZConfigProperties.DefaultMonitorRotationHotkeyValue, viewModel.MonitorRotationHotkey);
+
+            viewModel.MonitorRotationHotkey = new HotkeySettings(false, true, false, false, FZConfigProperties.VkLeft);
+            Assert.AreEqual(FZConfigProperties.DefaultMonitorRotationHotkeyValue, viewModel.MonitorRotationHotkey);
+
+            viewModel.MonitorRotationHotkey = new HotkeySettings(false, true, false, false, FZConfigProperties.VkRight);
+            Assert.AreEqual(FZConfigProperties.DefaultMonitorRotationHotkeyValue, viewModel.MonitorRotationHotkey);
+        }
+
+        [TestMethod]
+        public void MonitorRotationHotkeyShouldBeIncludedInHotkeyEnumeration()
+        {
+            Mock<SettingsUtils> mockSettingsUtils = new Mock<SettingsUtils>(new FileSystem(), null);
+            FancyZonesViewModel viewModel = new FancyZonesViewModel(mockSettingsUtils.Object, SettingsRepository<GeneralSettings>.GetInstance(mockGeneralSettingsUtils.Object), SettingsRepository<FancyZonesSettings>.GetInstance(mockFancyZonesSettingsUtils.Object), sendMockIPCConfigMSG, FancyZonesTestFolderName);
+
+            Dictionary<string, HotkeySettings[]> hotkeys = viewModel.GetAllHotkeySettings();
+
+            CollectionAssert.Contains(hotkeys[FancyZonesSettings.ModuleName], viewModel.MonitorRotationHotkey);
+        }
+
+        [TestMethod]
+        public void RefreshEnabledStateShouldNotifyMonitorRotationCategory()
+        {
+            Mock<SettingsUtils> mockSettingsUtils = new Mock<SettingsUtils>(new FileSystem(), null);
+            var generalSettingsRepository = SettingsRepository<GeneralSettings>.GetInstance(mockGeneralSettingsUtils.Object);
+            FancyZonesViewModel viewModel = new FancyZonesViewModel(mockSettingsUtils.Object, generalSettingsRepository, SettingsRepository<FancyZonesSettings>.GetInstance(mockFancyZonesSettingsUtils.Object), sendMockIPCConfigMSG, FancyZonesTestFolderName);
+            var changedProperties = new List<string>();
+            viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+            generalSettingsRepository.SettingsConfig.Enabled.FancyZones = false;
+
+            viewModel.RefreshEnabledState();
+
+            Assert.IsFalse(viewModel.MonitorRotationCategoryEnabled);
+            CollectionAssert.Contains(changedProperties, nameof(viewModel.MonitorRotationCategoryEnabled));
         }
 
         [TestMethod]

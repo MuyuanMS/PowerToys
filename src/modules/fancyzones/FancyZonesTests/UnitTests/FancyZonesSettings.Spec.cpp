@@ -4,6 +4,7 @@
 
 #include <FancyZonesLib/Settings.h>
 #include <FancyZonesLib/FancyZones.h>
+#include <FancyZonesLib/MonitorRotation.h>
 #include <FancyZonesLib/ModuleConstants.h>
 #include <common/SettingsAPI/settings_helpers.h>
 
@@ -43,6 +44,7 @@ namespace FancyZonesUnitTests
         Assert::AreEqual(expected.spanZonesAcrossMonitors, actual.spanZonesAcrossMonitors);
         Assert::AreEqual(expected.makeDraggedWindowTransparent, actual.makeDraggedWindowTransparent);
         Assert::AreEqual(expected.windowSwitching, actual.windowSwitching);
+        Assert::AreEqual(expected.monitorRotation, actual.monitorRotation);
         Assert::AreEqual(expected.zoneColor.c_str(), actual.zoneColor.c_str());
         Assert::AreEqual(expected.zoneBorderColor.c_str(), actual.zoneBorderColor.c_str());
         Assert::AreEqual(expected.zoneHighlightColor.c_str(), actual.zoneHighlightColor.c_str());
@@ -57,6 +59,7 @@ namespace FancyZonesUnitTests
         compareHotkeyObjects(expected.editorHotkey, actual.editorHotkey);
         compareHotkeyObjects(expected.nextTabHotkey, actual.nextTabHotkey);
         compareHotkeyObjects(expected.prevTabHotkey, actual.prevTabHotkey);
+        compareHotkeyObjects(expected.monitorRotationHotkey, actual.monitorRotationHotkey);
     }
 
     TEST_CLASS (FancyZonesSettingsUnitTest)
@@ -90,6 +93,8 @@ namespace FancyZonesUnitTests
             values.add_property(L"fancyzones_windowSwitching", m_defaultSettings.windowSwitching);
             values.add_property(L"fancyzones_nextTab_hotkey", m_defaultSettings.nextTabHotkey.get_json());
             values.add_property(L"fancyzones_prevTab_hotkey", m_defaultSettings.prevTabHotkey.get_json());
+            values.add_property(L"fancyzones_monitorRotation", m_defaultSettings.monitorRotation);
+            values.add_property(L"fancyzones_monitorRotation_hotkey", m_defaultSettings.monitorRotationHotkey.get_json());
             values.add_property(L"fancyzones_excluded_apps", m_defaultSettings.excludedApps);
 
             json::to_file(FancyZonesSettings::GetSettingsFileName(), values.get_raw_json());
@@ -105,6 +110,8 @@ namespace FancyZonesUnitTests
         {
             //prepare data
             const Settings expected{
+                .monitorRotation = true,
+                .monitorRotationHotkey = PowerToysSettings::HotkeyObject::from_settings(true, true, false, false, 'R'),
                 .excludedApps = L"app\r\napp1\r\napp2\r\nanother app",
                 .excludedAppsArray = { L"APP", L"APP1", L"APP2", L"ANOTHER APP" },
             };
@@ -133,6 +140,8 @@ namespace FancyZonesUnitTests
             values.add_property(L"fancyzones_windowSwitching", expected.windowSwitching);
             values.add_property(L"fancyzones_nextTab_hotkey", expected.nextTabHotkey.get_json());
             values.add_property(L"fancyzones_prevTab_hotkey", expected.prevTabHotkey.get_json());
+            values.add_property(L"fancyzones_monitorRotation", expected.monitorRotation);
+            values.add_property(L"fancyzones_monitorRotation_hotkey", expected.monitorRotationHotkey.get_json());
             values.add_property(L"fancyzones_excluded_apps", expected.excludedApps);
 
             json::to_file(FancyZonesSettings::GetSettingsFileName(), values.get_raw_json());
@@ -159,6 +168,53 @@ namespace FancyZonesUnitTests
             FancyZonesSettings::instance().LoadSettings();
             auto actual = FancyZonesSettings::settings();
             compareSettings(m_defaultSettings, actual);
+        }
+    };
+
+    TEST_CLASS (MonitorRotationUnitTest)
+    {
+        TEST_METHOD (RotatedMonitorIndexWrapsInBothDirections)
+        {
+            Assert::AreEqual<size_t>(1, MonitorRotation::GetRotatedMonitorIndex(0, 3, false));
+            Assert::AreEqual<size_t>(0, MonitorRotation::GetRotatedMonitorIndex(2, 3, false));
+            Assert::AreEqual<size_t>(2, MonitorRotation::GetRotatedMonitorIndex(0, 3, true));
+            Assert::AreEqual<size_t>(1, MonitorRotation::GetRotatedMonitorIndex(2, 3, true));
+        }
+
+        TEST_METHOD (MapsRectBetweenDifferentAndNegativeWorkAreas)
+        {
+            const RECT sourceWorkArea{ -1920, 0, 0, 1080 };
+            const RECT targetWorkArea{ 0, -200, 2560, 1240 };
+            const RECT sourceRect{ -1440, 270, -480, 810 };
+
+            const auto mapped = MonitorRotation::MapRectBetweenMonitorWorkAreas(sourceRect, sourceWorkArea, targetWorkArea);
+
+            Assert::AreEqual<LONG>(640, mapped.left);
+            Assert::AreEqual<LONG>(160, mapped.top);
+            Assert::AreEqual<LONG>(1920, mapped.right);
+            Assert::AreEqual<LONG>(880, mapped.bottom);
+        }
+
+        TEST_METHOD (ModifierStateKeepsOtherSidePressedAndConsumesArrowRelease)
+        {
+            MonitorRotation::KeyState state;
+            state.Update(VK_LWIN, true);
+            state.Update(VK_RWIN, true);
+            state.Update(VK_LWIN, false);
+
+            Assert::IsTrue(state.IsAnyDown({ VK_LWIN, VK_RWIN }));
+
+            Assert::IsTrue(state.Consume(VK_LEFT));
+            Assert::IsFalse(state.Consume(VK_LEFT));
+            Assert::IsTrue(state.ReleaseWasConsumed(VK_LEFT));
+            Assert::IsFalse(state.ReleaseWasConsumed(VK_LEFT));
+        }
+
+        TEST_METHOD (RejectsDirectionKeysAsActivator)
+        {
+            Assert::IsFalse(MonitorRotation::IsValidActivatorKey(VK_LEFT));
+            Assert::IsFalse(MonitorRotation::IsValidActivatorKey(VK_RIGHT));
+            Assert::IsTrue(MonitorRotation::IsValidActivatorKey('X'));
         }
     };
 }
