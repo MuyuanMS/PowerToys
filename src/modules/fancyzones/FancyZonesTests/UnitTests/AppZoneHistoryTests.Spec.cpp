@@ -340,6 +340,11 @@ namespace FancyZonesUnitTests
             Assert::IsTrue(AppZoneHistory::instance().GetFullAppZoneHistory().contains(qualifiedProcessPath));
             Assert::IsTrue(std::vector<ZoneIndex>{} == AppZoneHistory::instance().GetAppLastZoneIndexSet(window, workAreaId, layoutId));
             Assert::IsTrue(std::vector<ZoneIndex>{ 1 } == AppZoneHistory::instance().GetAppLastZoneIndexSet(legacyWindow, workAreaId, layoutId));
+
+            AppZoneHistory::instance().SyncVirtualDesktops(workAreaId.virtualDesktopId, workAreaId.virtualDesktopId, std::vector<GUID>{ workAreaId.virtualDesktopId });
+            Assert::IsTrue(AppZoneHistory::instance().GetFullAppZoneHistory().contains(qualifiedProcessPath));
+            Assert::IsTrue(std::vector<ZoneIndex>{} == AppZoneHistory::instance().GetAppLastZoneIndexSet(window, workAreaId, layoutId));
+            Assert::IsTrue(std::vector<ZoneIndex>{ 1 } == AppZoneHistory::instance().GetAppLastZoneIndexSet(legacyWindow, workAreaId, layoutId));
         }
 
         TEST_METHOD (AppLastZoneRemoveWindow)
@@ -526,6 +531,24 @@ namespace FancyZonesUnitTests
             Assert::IsTrue(expected == AppZoneHistory::instance().GetZoneHistory(app, GetWorkAreaID(virtualDesktop1)).value());
             Assert::IsFalse(AppZoneHistory::instance().GetZoneHistory(app, GetWorkAreaID(virtualDesktop2)).has_value());
             Assert::IsFalse(AppZoneHistory::instance().GetZoneHistory(app, GetWorkAreaID(deletedVirtualDesktop)).has_value());
+        }
+
+        TEST_METHOD (SyncVirtualDesktops_QualifiedHistoryPrunedToTombstone)
+        {
+            AppZoneHistory::TAppZoneHistoryMap history{};
+            const std::wstring app = L"app?Test.App";
+            history.insert({ app, std::vector<FancyZonesDataTypes::AppZoneHistoryData>{
+                GetAppZoneHistoryData(deletedVirtualDesktop, L"{147243D0-1111-4225-BCD3-31029FE384FC}", { 0 }),
+            } });
+            AppZoneHistory::instance().SetAppZoneHistory(history);
+
+            GUID currentVirtualDesktop = virtualDesktop1;
+            GUID lastUsedVirtualDesktop = virtualDesktop2;
+            std::optional<std::vector<GUID>> virtualDesktopsInRegistry = { { virtualDesktop1 } };
+            AppZoneHistory::instance().SyncVirtualDesktops(currentVirtualDesktop, lastUsedVirtualDesktop, virtualDesktopsInRegistry);
+
+            Assert::IsTrue(AppZoneHistory::instance().GetFullAppZoneHistory().contains(app));
+            Assert::IsTrue(AppZoneHistory::instance().GetFullAppZoneHistory().at(app).empty());
         }
 
         TEST_METHOD (SyncVirtualDesktop_NoDesktopsInRegistry)
