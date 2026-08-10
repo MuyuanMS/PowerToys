@@ -110,6 +110,8 @@ namespace FancyZonesUnitTests
         {
             //prepare data
             const Settings expected{
+                .monitorRotation = true,
+                .monitorRotationHotkey = PowerToysSettings::HotkeyObject::from_settings(true, true, false, false, 'R'),
                 .excludedApps = L"app\r\napp1\r\napp2\r\nanother app",
                 .excludedAppsArray = { L"APP", L"APP1", L"APP2", L"ANOTHER APP" },
             };
