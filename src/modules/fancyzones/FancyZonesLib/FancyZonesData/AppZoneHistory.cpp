@@ -693,8 +693,16 @@ void AppZoneHistory::SyncVirtualDesktops(const GUID& currentVirtualDesktop, cons
 
         if (perDesktopData.empty())
         {
-            it = m_history.erase(it);
-            dirtyFlag = true;
+            const bool isQualifiedHistory = GetProcessPathWithoutAUMID(it->first) != it->first;
+            if (isQualifiedHistory)
+            {
+                ++it;
+            }
+            else
+            {
+                it = m_history.erase(it);
+                dirtyFlag = true;
+            }
         }
         else
         {
