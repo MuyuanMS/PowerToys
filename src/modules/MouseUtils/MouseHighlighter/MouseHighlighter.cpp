@@ -506,15 +506,16 @@ void Highlighter::QueueMouseEvent(MouseEvent event) noexcept
         {
             if (event.type == MouseEventType::Move)
             {
-                ReleaseSRWLockExclusive(&m_mouseEventQueueLock);
-                return;
+                coalesced = true;
             }
-
-            // Recover deterministically rather than risk dropping a button-up
-            // and leaving the visual pressed state stale.
-            m_mouseEventQueueHead = 0;
-            m_mouseEventQueueSize = 1;
-            m_mouseEventQueue[0] = { MouseEventType::Reset, event.position, event.timestamp };
+            else
+            {
+                // Recover deterministically rather than risk dropping a button-up
+                // and leaving the visual pressed state stale.
+                m_mouseEventQueueHead = 0;
+                m_mouseEventQueueSize = 1;
+                m_mouseEventQueue[0] = { MouseEventType::Reset, event.position, event.timestamp };
+            }
         }
 
         if (!coalesced)

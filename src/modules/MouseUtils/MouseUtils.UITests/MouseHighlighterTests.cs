@@ -127,7 +127,7 @@ namespace MouseUtils.UITests
                 Task.Delay(1000).Wait();
                 VerifyMouseHighlighterDrag(ref settings, "leftClick");
                 VerifyMouseHighlighterDrag(ref settings, "rightClick");
-                VerifyRapidMouseInputDoesNotStick();
+                VerifyRapidMouseInputDoesNotStick(ref settings);
             }
             else
             {
@@ -385,7 +385,7 @@ namespace MouseUtils.UITests
             Assert.AreNotEqual("#" + settings.PrimaryButtonHighlightColor, colorLeftClick);
         }
 
-        private void VerifyRapidMouseInputDoesNotStick()
+        private void VerifyRapidMouseInputDoesNotStick(ref MouseHighlighterSettings settings)
         {
             Session.MoveMouseTo(500, 500, 0, 0);
             var start = Session.GetMousePosition();
@@ -423,6 +423,8 @@ namespace MouseUtils.UITests
                 var negativeColor = this.GetPixelColorString(start.Item1 - i, start.Item2 - (i % 4));
                 Assert.AreEqual(baselineColors[(i * 2) + 1], negativeColor);
             }
+
+            VerifyMouseHighlighterAppears(ref settings, "leftClick");
         }
 
         private void SetColor(ref Custom foundCustom, string colorName = "Primary button highlight color", string colorValue = "000000", string opacity = "0")
