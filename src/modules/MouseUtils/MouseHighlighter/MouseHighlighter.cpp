@@ -70,6 +70,7 @@ private:
     void ClearDrawing();
     void BringToFront();
     void QueueMouseEvent(MouseEvent event) noexcept;
+    void ScheduleMouseEventProcessing(HWND window) noexcept;
     void ProcessPendingMouseEvents();
     void HandleMouseEvent(const MouseEvent& event);
     void ResetPendingMouseInput();
@@ -160,6 +161,7 @@ private:
     int m_bringToFrontTimerFireCount = 0;
 
     static constexpr size_t MOUSE_EVENT_QUEUE_CAPACITY = 128;
+    static constexpr size_t MAX_MOUSE_EVENTS_PER_DISPATCH = 8;
     std::array<MouseEvent, MOUSE_EVENT_QUEUE_CAPACITY> m_mouseEventQueue{};
     size_t m_mouseEventQueueHead = 0;
     size_t m_mouseEventQueueSize = 0;
@@ -535,7 +537,15 @@ void Highlighter::QueueMouseEvent(MouseEvent event) noexcept
 
     const HWND window = postMessage ? m_hwnd : nullptr;
 
-    if (postMessage && (window == nullptr || !PostMessage(window, WM_PROCESS_MOUSE_EVENTS, 0, 0)))
+    if (postMessage)
+    {
+        ScheduleMouseEventProcessing(window);
+    }
+}
+
+void Highlighter::ScheduleMouseEventProcessing(HWND window) noexcept
+{
+    if (window == nullptr || !PostMessage(window, WM_PROCESS_MOUSE_EVENTS, 0, 0))
     {
         if (window == nullptr || SetTimer(window, PROCESS_MOUSE_EVENTS_RETRY_TIMER_ID, USER_TIMER_MINIMUM, nullptr) == 0)
         {
@@ -548,6 +558,8 @@ void Highlighter::QueueMouseEvent(MouseEvent event) noexcept
 
 void Highlighter::ProcessPendingMouseEvents()
 {
+    size_t processedEventCount = 0;
+
     while (true)
     {
         MouseEvent event{};
@@ -625,6 +637,24 @@ void Highlighter::ProcessPendingMouseEvents()
             catch (...)
             {
                 Logger::error("Failed to clear Mouse Highlighter visuals after an event-processing failure.");
+            }
+            return;
+        }
+
+        ++processedEventCount;
+        if (processedEventCount == MAX_MOUSE_EVENTS_PER_DISPATCH)
+        {
+            AcquireSRWLockExclusive(&m_mouseEventQueueLock);
+            const bool eventsRemain = m_mouseEventQueueSize != 0;
+            if (!eventsRemain)
+            {
+                m_mouseEventMessagePending = false;
+            }
+            ReleaseSRWLockExclusive(&m_mouseEventQueueLock);
+
+            if (eventsRemain)
+            {
+                ScheduleMouseEventProcessing(m_hwnd);
             }
             return;
         }
