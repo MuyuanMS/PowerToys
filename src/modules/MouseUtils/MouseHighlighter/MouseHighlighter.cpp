@@ -99,7 +99,6 @@ private:
     HINSTANCE m_hinstance = NULL;
     static constexpr DWORD WM_SWITCH_ACTIVATION_MODE = WM_APP;
     static constexpr DWORD WM_PROCESS_MOUSE_EVENTS = WM_APP + 1;
-    static constexpr DWORD WM_APPLY_SETTINGS = WM_APP + 2;
 
     winrt::DispatcherQueueController m_dispatcherQueueController{ nullptr };
     winrt::Compositor m_compositor{ nullptr };
@@ -188,7 +187,6 @@ static const uint32_t BRING_TO_FRONT_TIMER_ID = 123;
 static const uint32_t HOLD_RIPPLE_TIMER_LEFT = 124;
 static const uint32_t HOLD_RIPPLE_TIMER_RIGHT = 125;
 static const uint32_t PROCESS_MOUSE_EVENTS_RETRY_TIMER_ID = 126;
-static const uint32_t APPLY_SETTINGS_RETRY_TIMER_ID = 127;
 // How long a ripple button must be held before the persistent "held indicator"
 // is shown. Releasing before this is treated as a quick click (single ripple).
 static const uint32_t HOLD_RIPPLE_THRESHOLD_MS = 180;
@@ -206,7 +204,11 @@ bool Highlighter::CreateHighlighter()
         };
         ABI::IDispatcherQueueController* controller;
         winrt::check_hresult(CreateDispatcherQueueController(options, &controller));
-        *winrt::put_abi(m_dispatcherQueueController) = controller;
+        winrt::DispatcherQueueController dispatcherQueueController{ nullptr };
+        *winrt::put_abi(dispatcherQueueController) = controller;
+        AcquireSRWLockExclusive(&m_settingsLock);
+        m_dispatcherQueueController = std::move(dispatcherQueueController);
+        ReleaseSRWLockExclusive(&m_settingsLock);
 
         // Create the compositor for our window.
         m_compositor = winrt::Compositor();
@@ -530,13 +532,7 @@ void Highlighter::QueueMouseEvent(MouseEvent event) noexcept
     }
     ReleaseSRWLockExclusive(&m_mouseEventQueueLock);
 
-    HWND window = nullptr;
-    if (postMessage)
-    {
-        AcquireSRWLockShared(&m_settingsLock);
-        window = m_hwnd;
-        ReleaseSRWLockShared(&m_settingsLock);
-    }
+    const HWND window = postMessage ? m_hwnd : nullptr;
 
     if (postMessage && (window == nullptr || !PostMessage(window, WM_PROCESS_MOUSE_EVENTS, 0, 0)))
     {
@@ -1046,24 +1042,34 @@ void Highlighter::ApplySettings(MouseHighlighterSettings settings)
 
 void Highlighter::QueueSettings(MouseHighlighterSettings settings)
 {
+    winrt::DispatcherQueue dispatcherQueue{ nullptr };
+
     AcquireSRWLockExclusive(&m_settingsLock);
     m_pendingSettings = settings;
     m_settingsPending = true;
-    if (m_hwnd != nullptr && !PostMessage(m_hwnd, WM_APPLY_SETTINGS, 0, 0))
+    if (m_hwnd != nullptr && m_dispatcherQueueController)
     {
-        SetTimer(m_hwnd, APPLY_SETTINGS_RETRY_TIMER_ID, USER_TIMER_MINIMUM, nullptr);
+        dispatcherQueue = m_dispatcherQueueController.DispatcherQueue();
     }
     ReleaseSRWLockExclusive(&m_settingsLock);
+
+    if (dispatcherQueue && !dispatcherQueue.TryEnqueue([]() {
+            if (Highlighter::instance != nullptr)
+            {
+                Highlighter::instance->ProcessPendingSettings();
+            }
+        }))
+    {
+        Logger::error("Failed to enqueue Mouse Highlighter settings on the window thread.");
+    }
 }
 
 void Highlighter::ProcessPendingSettings()
 {
-    KillTimer(m_hwnd, APPLY_SETTINGS_RETRY_TIMER_ID);
-
     MouseHighlighterSettings settings;
 
     AcquireSRWLockExclusive(&m_settingsLock);
-    if (!m_settingsPending)
+    if (!m_settingsPending || m_hwnd == nullptr)
     {
         ReleaseSRWLockExclusive(&m_settingsLock);
         return;
@@ -1125,14 +1131,10 @@ LRESULT CALLBACK Highlighter::WndProc(HWND hWnd, UINT message, WPARAM wParam, LP
     case WM_PROCESS_MOUSE_EVENTS:
         instance->ProcessPendingMouseEvents();
         break;
-    case WM_APPLY_SETTINGS:
-        instance->ProcessPendingSettings();
-        break;
     case WM_DESTROY:
         instance->DestroyHighlighter();
         break;
     case WM_NCDESTROY:
-        KillTimer(hWnd, APPLY_SETTINGS_RETRY_TIMER_ID);
         AcquireSRWLockExclusive(&instance->m_settingsLock);
         instance->m_hwnd = nullptr;
         instance->m_settingsPending = false;
@@ -1145,10 +1147,6 @@ LRESULT CALLBACK Highlighter::WndProc(HWND hWnd, UINT message, WPARAM wParam, LP
         case PROCESS_MOUSE_EVENTS_RETRY_TIMER_ID:
             KillTimer(instance->m_hwnd, PROCESS_MOUSE_EVENTS_RETRY_TIMER_ID);
             instance->ProcessPendingMouseEvents();
-            break;
-        case APPLY_SETTINGS_RETRY_TIMER_ID:
-            KillTimer(instance->m_hwnd, APPLY_SETTINGS_RETRY_TIMER_ID);
-            instance->ProcessPendingSettings();
             break;
         // when the bring-to-front-timer expires (every 10 ms), we are repositioning our window to topmost Z order position
         // As we experience that it takes 0-30 ms that the pinned window hides our window,
