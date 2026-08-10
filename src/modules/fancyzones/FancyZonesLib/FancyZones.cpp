@@ -5,6 +5,7 @@
 #include <common/logger/logger.h>
 #include <common/logger/call_tracer.h>
 #include <common/utils/EventWaiter.h>
+#include <common/utils/elevation.h>
 #include <common/utils/winapi_error.h>
 #include <common/SettingsAPI/FileWatcher.h>
 #include <common/notifications/NotificationUtil.h>
@@ -29,6 +30,7 @@
 #include <FancyZonesLib/Settings.h>
 #include <FancyZonesLib/SettingsObserver.h>
 #include <FancyZonesLib/trace.h>
+#include <FancyZonesLib/util.h>
 #include <FancyZonesLib/VirtualDesktop.h>
 #include <FancyZonesLib/WindowKeyboardSnap.h>
 #include <FancyZonesLib/WindowMouseSnap.h>
@@ -106,6 +108,7 @@ namespace
 {
     constexpr UINT_PTR MonitorRotationCommitTimerId = 0x4D525443;
     constexpr UINT MonitorRotationCommitDelayMillis = 760;
+    constexpr WORD NeutralKey = 0xFF;
 
     struct WindowRotationSnapshot
     {
@@ -134,6 +137,11 @@ namespace
         EnumWindows(
             [](HWND window, LPARAM param) -> BOOL {
                 if (!FancyZonesWindowProcessing::IsProcessableManually(window))
+                {
+                    return TRUE;
+                }
+
+                if (!is_process_elevated() && FancyZonesWindowUtils::IsProcessOfWindowElevated(window))
                 {
                     return TRUE;
                 }
@@ -668,6 +676,11 @@ FancyZones::OnKeyDown(PKBDLLHOOKSTRUCT info) noexcept
 
         if (IsMonitorRotationActivatorKey(info->vkCode))
         {
+            if (m_monitorRotationKeyState.Consume(info->vkCode))
+            {
+                FancyZonesUtils::SwallowKey(NeutralKey);
+            }
+
             return true;
         }
 

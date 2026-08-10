@@ -35,9 +35,9 @@ namespace MonitorRotation
             return std::ranges::any_of(keys, [this](DWORD key) { return IsDown(key); });
         }
 
-        void Consume(DWORD vkCode)
+        bool Consume(DWORD vkCode)
         {
-            m_consumedKeys.insert(vkCode);
+            return m_consumedKeys.insert(vkCode).second;
         }
 
         bool ReleaseWasConsumed(DWORD vkCode)

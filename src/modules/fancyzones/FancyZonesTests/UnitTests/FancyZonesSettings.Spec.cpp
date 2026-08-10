@@ -202,7 +202,8 @@ namespace FancyZonesUnitTests
 
             Assert::IsTrue(state.IsAnyDown({ VK_LWIN, VK_RWIN }));
 
-            state.Consume(VK_LEFT);
+            Assert::IsTrue(state.Consume(VK_LEFT));
+            Assert::IsFalse(state.Consume(VK_LEFT));
             Assert::IsTrue(state.ReleaseWasConsumed(VK_LEFT));
             Assert::IsFalse(state.ReleaseWasConsumed(VK_LEFT));
         }
