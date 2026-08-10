@@ -12,6 +12,8 @@ namespace Microsoft.PowerToys.FilePreviewCommon
 {
     public static class MarkdownHelper
     {
+        private const string HtmlDoctype = "<!doctype html>";
+
         /// <summary>
         /// Markdown HTML header for light theme.
         /// </summary>
@@ -34,7 +36,9 @@ namespace Microsoft.PowerToys.FilePreviewCommon
 
         public static string MarkdownHtml(string fileContent, string theme, string filePath, ImagesBlockedCallBack imagesBlockedCallBack, bool allowLocalImages, string? allowedBasePath)
         {
-            var htmlHeader = theme == "dark" ? HtmlDarkHeader : HtmlLightHeader;
+            string imageSourcePolicy = allowLocalImages ? "https://localmdimages" : "'none'";
+            string contentSecurityPolicy = $"<meta http-equiv=\"Content-Security-Policy\" content=\"img-src {imageSourcePolicy};\">";
+            string htmlHeader = (theme == "dark" ? HtmlDarkHeader : HtmlLightHeader).Insert(HtmlDoctype.Length, contentSecurityPolicy);
 
             // Extension to modify markdown AST.
             HTMLParsingExtension extension = new HTMLParsingExtension(imagesBlockedCallBack);

@@ -109,6 +109,7 @@ namespace PreviewPaneUnitTests
         [DataRow(@"C:\docs\images\test.png", @"C:\docs", @"C:\docs", "https://localmdimages/images/test.png")]
         [DataRow("images/test.png", @"\\server\share\sub\dir", @"\\server\share", "https://localmdimages/sub/dir/images/test.png")]
         [DataRow("../test.png", @"\\server\share\sub", @"\\server\share", "https://localmdimages/test.png")]
+        [DataRow("images/diagram#1 %20.png", @"C:\docs", @"C:\docs", "https://localmdimages/images/diagram%231%20%2520.png")]
         public void TryGetLocalImageVirtualUrlAllowsContainedPaths(string url, string markdownDirectory, string basePath, string expectedVirtualUrl)
         {
             bool result = Microsoft.PowerToys.FilePreviewCommon.HTMLParsingExtension.TryGetLocalImageVirtualUrl(url, markdownDirectory, basePath, out string virtualUrl);
@@ -277,6 +278,20 @@ namespace PreviewPaneUnitTests
             Assert.IsFalse(html.Contains(forbidden), "raw HTML img sources must be blocked while the setting is off");
             Assert.IsTrue(html.Contains("src=\"#\"") || html.Contains("src='#'"));
             Assert.AreNotEqual(0, blockedCount);
+        }
+
+        [DataTestMethod]
+        [DataRow(false, "img-src 'none'")]
+        [DataRow(true, "img-src https://localmdimages")]
+        public void MarkdownHtmlRestrictsAllImageSourcesWithContentSecurityPolicy(bool allowLocalImages, string expectedPolicy)
+        {
+            string mdString = "<picture><source srcset=\"data" + ":image/png;base64,AAAA\"><img src=\"#\"></picture>" +
+                              "<div style=\"background-image:url(data" + ":image/png;base64,AAAA)\"></div>";
+
+            string html = Microsoft.PowerToys.FilePreviewCommon.MarkdownHelper.MarkdownHtml(
+                mdString, "light", @"C:\docs\doc.md", () => { }, allowLocalImages, @"C:\docs");
+
+            StringAssert.Contains(html, expectedPolicy);
         }
 
         [TestMethod]
