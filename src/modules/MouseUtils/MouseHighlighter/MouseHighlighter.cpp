@@ -675,6 +675,11 @@ void Highlighter::HandleMouseEvent(const MouseEvent& event)
         m_leftHoldIndicatorShown = false;
         m_rightHoldIndicatorShown = false;
         SpotlightAnimateRelease();
+        if (!m_rippleMode && !m_spotlightMode && m_alwaysPointerEnabled)
+        {
+            m_alwaysPointer = nullptr;
+            AddDrawingPoint(MouseButton::None, event.position);
+        }
         return;
     }
 
