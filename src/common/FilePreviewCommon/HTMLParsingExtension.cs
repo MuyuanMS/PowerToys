@@ -181,9 +181,9 @@ namespace Microsoft.PowerToys.FilePreviewCommon
                 // anywhere below the base path can still redirect the read outside it, so walk the
                 // resolved path back up to the base and reject any reparse point on the way. The
                 // base path itself is not checked: that is the document's own location.
-                string baseComparand = TrimTrailingSeparators(basePath);
+                string normalizedBasePath = TrimTrailingSeparators(basePath);
                 string current = fullPath;
-                while (!string.Equals(TrimTrailingSeparators(current), baseComparand, StringComparison.OrdinalIgnoreCase))
+                while (!string.Equals(TrimTrailingSeparators(current), normalizedBasePath, StringComparison.OrdinalIgnoreCase))
                 {
                     if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
                     {

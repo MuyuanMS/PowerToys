@@ -195,7 +195,7 @@ namespace Microsoft.PowerToys.PreviewHandler.Markdown
                                 {
                                     try
                                     {
-                                        var imageStream = new MemoryStream(File.ReadAllBytes(imagePath));
+                                        var imageStream = File.OpenRead(imagePath);
                                         e.Response = _browser.CoreWebView2.Environment.CreateWebResourceResponse(imageStream, 200, "OK", "Content-Type: " + GetImageContentType(imagePath));
                                         return;
                                     }

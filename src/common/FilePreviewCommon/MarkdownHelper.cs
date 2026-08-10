@@ -4,7 +4,7 @@
 
 using System;
 using System.IO;
-using System.Text.RegularExpressions;
+using System.Text;
 
 using Markdig;
 
@@ -27,7 +27,12 @@ namespace Microsoft.PowerToys.FilePreviewCommon
         /// </summary>
         private static readonly string HtmlFooter = "</div></body></html>";
 
-        public static string MarkdownHtml(string fileContent, string theme, string filePath, ImagesBlockedCallBack imagesBlockedCallBack, bool allowLocalImages = false, string? allowedBasePath = null)
+        public static string MarkdownHtml(string fileContent, string theme, string filePath, ImagesBlockedCallBack imagesBlockedCallBack)
+        {
+            return MarkdownHtml(fileContent, theme, filePath, imagesBlockedCallBack, false, null);
+        }
+
+        public static string MarkdownHtml(string fileContent, string theme, string filePath, ImagesBlockedCallBack imagesBlockedCallBack, bool allowLocalImages, string? allowedBasePath)
         {
             var htmlHeader = theme == "dark" ? HtmlDarkHeader : HtmlLightHeader;
 
@@ -50,51 +55,224 @@ namespace Microsoft.PowerToys.FilePreviewCommon
             MarkdownPipeline pipeline = pipelineBuilder.Build();
             string parsedMarkdown = Markdown.ToHtml(fileContent, pipeline);
 
-            // srcset supports multiple candidates and descriptors, none of which the src sanitizer
-            // below validates. Remove the attribute rather than let a candidate through unchecked.
-            parsedMarkdown = Regex.Replace(
-                parsedMarkdown,
-                @"(<img\b[^>]*?)\s+srcset\s*=\s*(?:""[^""]*""|'[^']*'|[^\s>]+)",
-                m =>
-                {
-                    imagesBlockedCallBack();
-                    return m.Groups[1].Value;
-                },
-                RegexOptions.IgnoreCase);
-
-            // Sanitize src on raw HTML <img> tags in both setting states. Markdown images were
-            // already handled by the Markdig AST layer (rewritten to the virtual host URL or "#")
-            // and pass through unchanged. When local images are disabled everything else is blocked;
-            // when enabled it is validated the same way as the AST layer. Matches double-quoted,
-            // single-quoted and unquoted values, so every form an author can write is covered.
-            parsedMarkdown = Regex.Replace(
-                parsedMarkdown,
-                @"(<img\b[^>]*?\ssrc\s*=\s*)(?:(""|')(.+?)\2|([^\s""'>]+))",
-                m =>
-                {
-                    bool isQuoted = m.Groups[2].Success;
-                    string quote = isQuoted ? m.Groups[2].Value : "\"";
-                    string src = isQuoted ? m.Groups[3].Value : m.Groups[4].Value;
-
-                    if (src == "#" ||
-                        (allowLocalImages && src.StartsWith("https://localmdimages/", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        return m.Value;
-                    }
-
-                    if (allowLocalImages &&
-                        HTMLParsingExtension.TryGetLocalImageVirtualUrl(src, extension.FilePath, extension.AllowedBasePath, out string? virtualUrl))
-                    {
-                        return m.Groups[1].Value + quote + virtualUrl + quote;
-                    }
-
-                    imagesBlockedCallBack();
-                    return m.Groups[1].Value + quote + "#" + quote;
-                },
-                RegexOptions.IgnoreCase);
+            parsedMarkdown = SanitizeRawImageTags(parsedMarkdown, extension, imagesBlockedCallBack, allowLocalImages);
 
             string markdownHTML = $"{htmlHeader}{parsedMarkdown}{HtmlFooter}";
             return markdownHTML;
+        }
+
+        private static string SanitizeRawImageTags(string html, HTMLParsingExtension extension, ImagesBlockedCallBack imagesBlockedCallBack, bool allowLocalImages)
+        {
+            StringBuilder? sanitized = null;
+            int copyFrom = 0;
+            int searchFrom = 0;
+
+            while (true)
+            {
+                int tagStart = FindNextImageTag(html, searchFrom);
+                if (tagStart < 0)
+                {
+                    break;
+                }
+
+                int tagEnd = FindTagEnd(html, tagStart + 4);
+                if (tagEnd < 0)
+                {
+                    break;
+                }
+
+                sanitized ??= new StringBuilder(html.Length);
+                sanitized.Append(html, copyFrom, tagStart - copyFrom);
+                sanitized.Append(SanitizeRawImageTag(html.Substring(tagStart, tagEnd - tagStart + 1), extension, imagesBlockedCallBack, allowLocalImages));
+
+                copyFrom = tagEnd + 1;
+                searchFrom = copyFrom;
+            }
+
+            if (sanitized == null)
+            {
+                return html;
+            }
+
+            sanitized.Append(html, copyFrom, html.Length - copyFrom);
+            return sanitized.ToString();
+        }
+
+        private static int FindNextImageTag(string html, int startIndex)
+        {
+            while (startIndex < html.Length)
+            {
+                int tagStart = html.IndexOf("<img", startIndex, StringComparison.OrdinalIgnoreCase);
+                if (tagStart < 0)
+                {
+                    return -1;
+                }
+
+                int afterName = tagStart + 4;
+                if (afterName == html.Length || char.IsWhiteSpace(html[afterName]) || html[afterName] == '/' || html[afterName] == '>')
+                {
+                    return tagStart;
+                }
+
+                startIndex = afterName;
+            }
+
+            return -1;
+        }
+
+        private static int FindTagEnd(string html, int startIndex)
+        {
+            char quote = '\0';
+            for (int i = startIndex; i < html.Length; i++)
+            {
+                char current = html[i];
+                if (quote != '\0')
+                {
+                    if (current == quote)
+                    {
+                        quote = '\0';
+                    }
+                }
+                else if (current == '"' || current == '\'')
+                {
+                    quote = current;
+                }
+                else if (current == '>')
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private static string SanitizeRawImageTag(string tag, HTMLParsingExtension extension, ImagesBlockedCallBack imagesBlockedCallBack, bool allowLocalImages)
+        {
+            StringBuilder sanitized = new StringBuilder(tag.Length);
+            sanitized.Append(tag, 0, 4);
+
+            int cursor = 4;
+            int tagContentEnd = tag.Length - 1;
+            while (cursor < tagContentEnd)
+            {
+                int segmentStart = cursor;
+                while (cursor < tagContentEnd && char.IsWhiteSpace(tag[cursor]))
+                {
+                    cursor++;
+                }
+
+                if (cursor >= tagContentEnd || tag[cursor] == '/')
+                {
+                    sanitized.Append(tag, segmentStart, tagContentEnd - segmentStart);
+                    break;
+                }
+
+                int nameStart = cursor;
+                while (cursor < tagContentEnd &&
+                       !char.IsWhiteSpace(tag[cursor]) &&
+                       tag[cursor] != '=' &&
+                       tag[cursor] != '/' &&
+                       tag[cursor] != '>')
+                {
+                    cursor++;
+                }
+
+                if (cursor == nameStart)
+                {
+                    sanitized.Append(tag[cursor]);
+                    cursor++;
+                    continue;
+                }
+
+                string attributeName = tag.Substring(nameStart, cursor - nameStart);
+                while (cursor < tagContentEnd && char.IsWhiteSpace(tag[cursor]))
+                {
+                    cursor++;
+                }
+
+                if (cursor >= tagContentEnd || tag[cursor] != '=')
+                {
+                    sanitized.Append(tag, segmentStart, cursor - segmentStart);
+                    continue;
+                }
+
+                cursor++;
+                while (cursor < tagContentEnd && char.IsWhiteSpace(tag[cursor]))
+                {
+                    cursor++;
+                }
+
+                int valueTokenStart = cursor;
+                char valueQuote = '\0';
+                int valueStart = cursor;
+                int valueEnd;
+                if (cursor < tagContentEnd && (tag[cursor] == '"' || tag[cursor] == '\''))
+                {
+                    valueQuote = tag[cursor];
+                    valueStart = ++cursor;
+                    while (cursor < tagContentEnd && tag[cursor] != valueQuote)
+                    {
+                        cursor++;
+                    }
+
+                    valueEnd = cursor;
+                    if (cursor < tagContentEnd)
+                    {
+                        cursor++;
+                    }
+                }
+                else
+                {
+                    while (cursor < tagContentEnd && !char.IsWhiteSpace(tag[cursor]) && tag[cursor] != '>')
+                    {
+                        cursor++;
+                    }
+
+                    valueEnd = cursor;
+                }
+
+                string attributeValue = tag.Substring(valueStart, valueEnd - valueStart);
+
+                if (string.Equals(attributeName, "srcset", StringComparison.OrdinalIgnoreCase))
+                {
+                    imagesBlockedCallBack();
+                    continue;
+                }
+
+                sanitized.Append(tag, segmentStart, valueTokenStart - segmentStart);
+                if (!string.Equals(attributeName, "src", StringComparison.OrdinalIgnoreCase))
+                {
+                    sanitized.Append(tag, valueTokenStart, cursor - valueTokenStart);
+                    continue;
+                }
+
+                if (attributeValue == "#" ||
+                    (allowLocalImages && attributeValue.StartsWith("https://localmdimages/", StringComparison.OrdinalIgnoreCase)))
+                {
+                    sanitized.Append(tag, valueTokenStart, cursor - valueTokenStart);
+                }
+                else if (allowLocalImages &&
+                         HTMLParsingExtension.TryGetLocalImageVirtualUrl(attributeValue, extension.FilePath, extension.AllowedBasePath, out string? virtualUrl))
+                {
+                    AppendAttributeValue(sanitized, virtualUrl, valueQuote);
+                }
+                else
+                {
+                    imagesBlockedCallBack();
+                    AppendAttributeValue(sanitized, "#", valueQuote);
+                }
+            }
+
+            sanitized.Append('>');
+            return sanitized.ToString();
+        }
+
+        private static void AppendAttributeValue(StringBuilder output, string value, char quote)
+        {
+            char outputQuote = quote == '\0' ? '"' : quote;
+            output.Append(outputQuote);
+            output.Append(value);
+            output.Append(outputQuote);
         }
     }
 }

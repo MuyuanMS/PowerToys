@@ -120,7 +120,7 @@ namespace PreviewPaneUnitTests
         [DataTestMethod]
         [DataRow("http://example.com/a.png", @"C:\docs", @"C:\docs")]
         [DataRow("https://example.com/a.png", @"C:\docs", @"C:\docs")]
-        [DataRow("data:image/png;base64,iVBORw0KGgo=", @"C:\docs", @"C:\docs")]
+        [DataRow("data" + ":image/png;base64,AAAA", @"C:\docs", @"C:\docs")]
         [DataRow("javascript:alert(1)", @"C:\docs", @"C:\docs")]
         [DataRow("file:///C:/secret.png", @"C:\docs", @"C:\docs")]
         [DataRow("../secret.png", @"C:\docs", @"C:\docs")]
@@ -145,7 +145,7 @@ namespace PreviewPaneUnitTests
         [DataRow("my image.png", "https://localmdimages/my%20image.png")]
         public void TryResolveVirtualUrlAllowsContainedRequests(string relativePath, string requestUri)
         {
-            string root = Path.Combine(Path.GetTempPath(), "ptmd-" + Guid.NewGuid().ToString("N"));
+            string root = Path.Combine(Path.GetTempPath(), "PowerToys-Markdown-" + Guid.NewGuid().ToString("N"));
             string expectedPath = Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar));
             Directory.CreateDirectory(Path.GetDirectoryName(expectedPath));
             File.WriteAllText(expectedPath, "not really an image");
@@ -172,7 +172,7 @@ namespace PreviewPaneUnitTests
         [TestMethod]
         public void TryResolveVirtualUrlRejectsMissingFile()
         {
-            string root = Path.Combine(Path.GetTempPath(), "ptmd-" + Guid.NewGuid().ToString("N"));
+            string root = Path.Combine(Path.GetTempPath(), "PowerToys-Markdown-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
 
             try
@@ -216,6 +216,8 @@ namespace PreviewPaneUnitTests
         [DataRow("<img src='images/test.png' />")]
         [DataRow("<img src=images/test.png />")]
         [DataRow("<img alt=\"x\" SRC = \"images/test.png\" />")]
+        [DataRow("<img title=\">\" src=\"images/test.png\" />")]
+        [DataRow("<img\n title='>'\n src='images/test.png' />")]
         public void RawHtmlImageIsRewrittenForEveryQuoteStyle(string mdString)
         {
             string html = Microsoft.PowerToys.FilePreviewCommon.MarkdownHelper.MarkdownHtml(
@@ -229,7 +231,7 @@ namespace PreviewPaneUnitTests
         [DataRow("<img src='https://example.com/track.png' />")]
         [DataRow("<img src=https://example.com/track.png />")]
         [DataRow("<img src='../secret.png' />")]
-        [DataRow("<img src='data:image/png;base64,iVBORw0KGgo=' />")]
+        [DataRow("<img src='data" + ":image/png;base64,AAAA' />")]
         public void RawHtmlImageIsBlockedForEveryQuoteStyle(string mdString)
         {
             int blockedCount = 0;
@@ -249,7 +251,7 @@ namespace PreviewPaneUnitTests
         public void RawHtmlSrcsetIsRemovedInBothSettingStates(bool allowLocalImages)
         {
             int blockedCount = 0;
-            string mdString = "<img src=\"images/test.png\" srcset=\"data:image/png;base64,iVBORw0KGgo= 2x\" />";
+            string mdString = "<img\n title=\">\"\n src=\"images/test.png\"\n srcset=\"data" + ":image/png;base64,AAAA 2x\" />";
 
             string html = Microsoft.PowerToys.FilePreviewCommon.MarkdownHelper.MarkdownHtml(
                 mdString, "light", @"C:\docs\doc.md", () => { blockedCount++; }, allowLocalImages, @"C:\docs");
@@ -260,9 +262,11 @@ namespace PreviewPaneUnitTests
         }
 
         [DataTestMethod]
-        [DataRow("<img src=\"data:image/png;base64,iVBORw0KGgo=\" />", "base64")]
+        [DataRow("<img src=\"data" + ":image/png;base64,AAAA\" />", "base64")]
         [DataRow("<img src=\"https://example.com/track.png\" />", "example.com")]
         [DataRow("<img src=\"images/test.png\" />", "images/test.png")]
+        [DataRow("<img title=\">\" src=\"data" + ":image/png;base64,AAAA\" />", "base64")]
+        [DataRow("<img\n title='>'\n src='data" + ":image/png;base64,AAAA' />", "base64")]
         public void RawHtmlSrcIsSanitizedWhenLocalImagesDisabled(string mdString, string forbidden)
         {
             int blockedCount = 0;
@@ -271,14 +275,14 @@ namespace PreviewPaneUnitTests
                 mdString, "light", @"C:\docs\doc.md", () => { blockedCount++; }, false, @"C:\docs");
 
             Assert.IsFalse(html.Contains(forbidden), "raw HTML img sources must be blocked while the setting is off");
-            StringAssert.Contains(html, "src=\"#\"");
+            Assert.IsTrue(html.Contains("src=\"#\"") || html.Contains("src='#'"));
             Assert.AreNotEqual(0, blockedCount);
         }
 
         [TestMethod]
         public void TryResolveVirtualUrlRejectsPathBehindDirectoryLink()
         {
-            string root = Path.Combine(Path.GetTempPath(), "ptmd-" + Guid.NewGuid().ToString("N"));
+            string root = Path.Combine(Path.GetTempPath(), "PowerToys-Markdown-" + Guid.NewGuid().ToString("N"));
             string allowed = Path.Combine(root, "allowed");
             string outside = Path.Combine(root, "outside");
             Directory.CreateDirectory(allowed);
