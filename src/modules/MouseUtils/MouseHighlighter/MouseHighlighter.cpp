@@ -850,7 +850,7 @@ void Highlighter::HandleMouseEvent(const MouseEvent& event)
                     KillTimer(m_hwnd, m_leftHoldTimer);
                     m_leftHoldTimer = 0;
                 }
-                if (quickClick)
+                if (quickClick && !m_leftHoldIndicatorShown)
                 {
                     EmitSingleRipple(MouseButton::Left, event.position);
                 }
@@ -891,7 +891,7 @@ void Highlighter::HandleMouseEvent(const MouseEvent& event)
                     KillTimer(m_hwnd, m_rightHoldTimer);
                     m_rightHoldTimer = 0;
                 }
-                if (quickClick)
+                if (quickClick && !m_rightHoldIndicatorShown)
                 {
                     EmitSingleRipple(MouseButton::Right, event.position);
                 }
