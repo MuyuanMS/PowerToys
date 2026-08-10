@@ -1073,6 +1073,7 @@ void Highlighter::ApplySettings(MouseHighlighterSettings settings)
 
 void Highlighter::QueueSettings(MouseHighlighterSettings settings)
 {
+    winrt::DispatcherQueueController dispatcherQueueController{ nullptr };
     winrt::DispatcherQueue dispatcherQueue{ nullptr };
 
     AcquireSRWLockExclusive(&m_settingsLock);
@@ -1080,18 +1081,30 @@ void Highlighter::QueueSettings(MouseHighlighterSettings settings)
     m_settingsPending = true;
     if (m_hwnd != nullptr && m_dispatcherQueueController)
     {
-        dispatcherQueue = m_dispatcherQueueController.DispatcherQueue();
+        dispatcherQueueController = m_dispatcherQueueController;
     }
     ReleaseSRWLockExclusive(&m_settingsLock);
 
-    if (dispatcherQueue && !dispatcherQueue.TryEnqueue([]() {
-            if (Highlighter::instance != nullptr)
-            {
-                Highlighter::instance->ProcessPendingSettings();
-            }
-        }))
+    try
     {
-        Logger::error("Failed to enqueue Mouse Highlighter settings on the window thread.");
+        if (dispatcherQueueController)
+        {
+            dispatcherQueue = dispatcherQueueController.DispatcherQueue();
+        }
+
+        if (dispatcherQueue && !dispatcherQueue.TryEnqueue([]() {
+                if (Highlighter::instance != nullptr)
+                {
+                    Highlighter::instance->ProcessPendingSettings();
+                }
+            }))
+        {
+            Logger::error("Failed to enqueue Mouse Highlighter settings on the window thread.");
+        }
+    }
+    catch (const winrt::hresult_error& e)
+    {
+        Logger::error("Failed to access the Mouse Highlighter dispatcher queue: {}", winrt::to_string(e.message()));
     }
 }
 
