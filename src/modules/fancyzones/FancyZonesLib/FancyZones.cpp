@@ -141,7 +141,7 @@ namespace
                     return TRUE;
                 }
 
-                if (!is_process_elevated() && FancyZonesWindowUtils::IsProcessOfWindowElevated(window))
+                if (!is_process_elevated() && IsProcessOfWindowElevated(window))
                 {
                     return TRUE;
                 }
