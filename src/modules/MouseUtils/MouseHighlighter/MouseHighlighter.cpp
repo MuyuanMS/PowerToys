@@ -602,6 +602,32 @@ void Highlighter::ProcessPendingMouseEvents()
             m_spotlightPressed = false;
             m_leftHoldIndicatorShown = false;
             m_rightHoldIndicatorShown = false;
+
+            try
+            {
+                ClearDrawing();
+                m_leftPointer = nullptr;
+                m_rightPointer = nullptr;
+                m_alwaysPointer = nullptr;
+                m_leftGeometry = nullptr;
+                m_rightGeometry = nullptr;
+                m_leftRippleGlow = nullptr;
+                m_rightRippleGlow = nullptr;
+                m_leftGlowGeometry = nullptr;
+                m_rightGlowGeometry = nullptr;
+                if (m_overlay)
+                {
+                    m_overlay.IsVisible(false);
+                }
+                if (m_visible && m_alwaysPointerEnabled)
+                {
+                    AddDrawingPoint(MouseButton::None, m_latestMousePosition);
+                }
+            }
+            catch (...)
+            {
+                Logger::error("Failed to clear Mouse Highlighter visuals after an event-processing failure.");
+            }
             return;
         }
     }
