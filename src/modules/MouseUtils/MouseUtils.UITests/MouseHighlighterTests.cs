@@ -127,7 +127,7 @@ namespace MouseUtils.UITests
                 Task.Delay(1000).Wait();
                 VerifyMouseHighlighterDrag(ref settings, "leftClick");
                 VerifyMouseHighlighterDrag(ref settings, "rightClick");
-                VerifyRapidMouseInputDoesNotStick(ref settings);
+                VerifyRapidMouseInputDoesNotStick();
             }
             else
             {
@@ -385,32 +385,42 @@ namespace MouseUtils.UITests
             Assert.AreNotEqual("#" + settings.PrimaryButtonHighlightColor, colorLeftClick);
         }
 
-        private void VerifyRapidMouseInputDoesNotStick(ref MouseHighlighterSettings settings)
+        private void VerifyRapidMouseInputDoesNotStick()
         {
             var start = Session.GetMousePosition();
-            for (int i = 0; i < 32; i++)
+            var restingX = start.Item1 > 200 ? start.Item1 - 100 : start.Item1 + 100;
+            var restingY = start.Item2 > 200 ? start.Item2 - 100 : start.Item2 + 100;
+            Session.MoveMouseTo(restingX, restingY, 0, 0);
+            Task.Delay(500).Wait();
+
+            var baselineColors = new string[16];
+            for (int i = 0; i < 8; i++)
             {
-                Session.PerformMouseAction(MouseActionType.LeftDown);
-                Session.MoveMouseTo(start.Item1 + (i % 8), start.Item2 + (i % 4));
-                Session.PerformMouseAction(MouseActionType.LeftUp);
-                Session.PerformMouseAction(MouseActionType.RightDown);
-                Session.MoveMouseTo(start.Item1 - (i % 8), start.Item2 - (i % 4));
-                Session.PerformMouseAction(MouseActionType.RightUp);
+                baselineColors[i * 2] = this.GetPixelColorString(start.Item1 + i, start.Item2 + (i % 4));
+                baselineColors[(i * 2) + 1] = this.GetPixelColorString(start.Item1 - i, start.Item2 - (i % 4));
             }
 
+            Session.MoveMouseTo(start.Item1, start.Item2, 0, 0);
+            for (int i = 0; i < 32; i++)
+            {
+                Session.PerformMouseAction(MouseActionType.LeftDown, 0, 0);
+                Session.MoveMouseTo(start.Item1 + (i % 8), start.Item2 + (i % 4), 0, 0);
+                Session.PerformMouseAction(MouseActionType.LeftUp, 0, 0);
+                Session.PerformMouseAction(MouseActionType.RightDown, 0, 0);
+                Session.MoveMouseTo(start.Item1 - (i % 8), start.Item2 - (i % 4), 0, 0);
+                Session.PerformMouseAction(MouseActionType.RightUp, 0, 0);
+            }
+
+            Session.MoveMouseTo(restingX, restingY, 0, 0);
             Task.Delay(1500).Wait();
 
-            var primaryColor = string.Concat("#", settings.PrimaryButtonHighlightColor.AsSpan(2));
-            var secondaryColor = string.Concat("#", settings.SecondaryButtonHighlightColor.AsSpan(2));
             for (int i = 0; i < 8; i++)
             {
                 var positiveColor = this.GetPixelColorString(start.Item1 + i, start.Item2 + (i % 4));
-                Assert.AreNotEqual(primaryColor, positiveColor);
-                Assert.AreNotEqual(secondaryColor, positiveColor);
+                Assert.AreEqual(baselineColors[i * 2], positiveColor);
 
                 var negativeColor = this.GetPixelColorString(start.Item1 - i, start.Item2 - (i % 4));
-                Assert.AreNotEqual(primaryColor, negativeColor);
-                Assert.AreNotEqual(secondaryColor, negativeColor);
+                Assert.AreEqual(baselineColors[(i * 2) + 1], negativeColor);
             }
         }
 

@@ -187,6 +187,7 @@ private:
 static const uint32_t BRING_TO_FRONT_TIMER_ID = 123;
 static const uint32_t HOLD_RIPPLE_TIMER_LEFT = 124;
 static const uint32_t HOLD_RIPPLE_TIMER_RIGHT = 125;
+static const uint32_t PROCESS_MOUSE_EVENTS_RETRY_TIMER_ID = 126;
 // How long a ripple button must be held before the persistent "held indicator"
 // is shown. Releasing before this is treated as a quick click (single ripple).
 static const uint32_t HOLD_RIPPLE_THRESHOLD_MS = 180;
@@ -538,10 +539,12 @@ void Highlighter::QueueMouseEvent(MouseEvent event) noexcept
 
     if (postMessage && (window == nullptr || !PostMessage(window, WM_PROCESS_MOUSE_EVENTS, 0, 0)))
     {
-        AcquireSRWLockExclusive(&m_mouseEventQueueLock);
-        // Preserve queued events so the next hook event can retry delivery.
-        m_mouseEventMessagePending = false;
-        ReleaseSRWLockExclusive(&m_mouseEventQueueLock);
+        if (window == nullptr || SetTimer(window, PROCESS_MOUSE_EVENTS_RETRY_TIMER_ID, USER_TIMER_MINIMUM, nullptr) == 0)
+        {
+            AcquireSRWLockExclusive(&m_mouseEventQueueLock);
+            m_mouseEventMessagePending = false;
+            ReleaseSRWLockExclusive(&m_mouseEventQueueLock);
+        }
     }
 }
 
@@ -925,6 +928,8 @@ void Highlighter::StopDrawing()
 
 void Highlighter::ResetPendingMouseInput()
 {
+    KillTimer(m_hwnd, PROCESS_MOUSE_EVENTS_RETRY_TIMER_ID);
+
     AcquireSRWLockExclusive(&m_mouseEventQueueLock);
     m_acceptMouseEvents = false;
     m_mouseEventQueueHead = 0;
@@ -1101,11 +1106,15 @@ LRESULT CALLBACK Highlighter::WndProc(HWND hWnd, UINT message, WPARAM wParam, LP
     {
         switch (wParam)
         {
-            // when the bring-to-front-timer expires (every 10 ms), we are repositioning our window to topmost Z order position
-            // As we experience that it takes 0-30 ms that the pinned window hides our window,
-            // we await 5 timer ticks (50 ms together) and then we stop the timer.
-            // If we would use a timer with a 50 ms period, there would be a flickering on the UI, as in most of the cases
-            // the pinned window hides our window in a few milliseconds.
+        case PROCESS_MOUSE_EVENTS_RETRY_TIMER_ID:
+            KillTimer(instance->m_hwnd, PROCESS_MOUSE_EVENTS_RETRY_TIMER_ID);
+            instance->ProcessPendingMouseEvents();
+            break;
+        // when the bring-to-front-timer expires (every 10 ms), we are repositioning our window to topmost Z order position
+        // As we experience that it takes 0-30 ms that the pinned window hides our window,
+        // we await 5 timer ticks (50 ms together) and then we stop the timer.
+        // If we would use a timer with a 50 ms period, there would be a flickering on the UI, as in most of the cases
+        // the pinned window hides our window in a few milliseconds.
         case BRING_TO_FRONT_TIMER_ID:
         {
             if (instance->m_bringToFrontTimerFireCount++ >= 4)
