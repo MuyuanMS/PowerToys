@@ -161,7 +161,7 @@ private:
     int m_bringToFrontTimerFireCount = 0;
 
     static constexpr size_t MOUSE_EVENT_QUEUE_CAPACITY = 128;
-    static constexpr size_t MAX_MOUSE_EVENTS_PER_DISPATCH = 8;
+    static constexpr size_t MAX_MOUSE_EVENTS_PER_DISPATCH = 1;
     std::array<MouseEvent, MOUSE_EVENT_QUEUE_CAPACITY> m_mouseEventQueue{};
     size_t m_mouseEventQueueHead = 0;
     size_t m_mouseEventQueueSize = 0;
