@@ -198,7 +198,7 @@ namespace newplus::utilities
         return false;
     }
 
-    inline void explorer_enter_rename_mode(const std::filesystem::path target_fullpath_of_new_instance)
+    inline HWND explorer_enter_rename_mode_and_get_list_view_window(const std::filesystem::path target_fullpath_of_new_instance)
     {
         const std::filesystem::path path_without_new_file_or_dir = target_fullpath_of_new_instance.parent_path();
         const std::filesystem::path new_file_or_dir_without_path = target_fullpath_of_new_instance.filename();
@@ -208,7 +208,7 @@ namespace newplus::utilities
         HRESULT hr;
         if (FAILED(CoCreateInstance(CLSID_ShellWindows, NULL, CLSCTX_ALL, IID_PPV_ARGS(&shell_windows))))
         {
-            return;
+            return nullptr;
         }
 
         long window_handle;
@@ -222,7 +222,7 @@ namespace newplus::utilities
 
             if (FAILED(shell_windows->FindWindowSW(&empty_yet_needed_incl_init, &empty_yet_needed_incl_init, SWC_DESKTOP, &window_handle, SWFO_NEEDDISPATCH, &shell_window)))
             {
-                return;
+                return nullptr;
             }
         }
         else
@@ -264,7 +264,7 @@ namespace newplus::utilities
 
         if (!shell_window)
         {
-            return;
+            return nullptr;
         }
 
         ComPtr<IServiceProvider> service_provider;
@@ -275,6 +275,14 @@ namespace newplus::utilities
         shell_browser->QueryActiveShellView(&shell_view);
         ComPtr<IFolderView> folder_view;
         shell_view.As(&folder_view);
+        HWND list_view_window = nullptr;
+        HWND shell_view_window = nullptr;
+        if (SUCCEEDED(shell_view->GetWindow(&shell_view_window)) && shell_view_window != nullptr)
+        {
+            // Explorer currently hosts folder items in a SysListView32 child of the shell view.
+            // We use this handle to query whether in-place rename edit is still active.
+            list_view_window = FindWindowExW(shell_view_window, nullptr, L"SysListView32", nullptr);
+        }
 
         // Find the newly created object (file or folder)
         // And put object into edit mode (SVSI_EDIT) and if desktop also reposition
@@ -317,6 +325,13 @@ namespace newplus::utilities
             }
             CoTaskMemFree(shell_item_ids);
         }
+
+        return list_view_window;
+    }
+
+    inline void explorer_enter_rename_mode(const std::filesystem::path target_fullpath_of_new_instance)
+    {
+        explorer_enter_rename_mode_and_get_list_view_window(target_fullpath_of_new_instance);
     }
 
     inline void update_last_write_time(const std::filesystem::path path)
@@ -376,11 +391,10 @@ namespace newplus::utilities
             // Finally copy file/folder/subfolders
             std::filesystem::path target_final_fullpath = template_entry->copy_object_to(GetActiveWindow(), target_fullpath);
 
-            // Resolve variables and rename files in newly copied folders and subfolders and files
-            if (utilities::get_newplus_setting_resolve_variables() && helpers::filesystem::is_directory(target_final_fullpath))
-            {
-                helpers::variables::resolve_variables_in_filename_and_rename_files(target_final_fullpath);
-            }
+            // For folder templates: variable resolution in contents is deferred to after the user
+            // gives the folder its final name via rename mode, so that $PARENT_FOLDER_NAME resolves
+            // to the user-provided name rather than the template folder name.
+            const bool should_resolve_folder_contents = utilities::get_newplus_setting_resolve_variables() && helpers::filesystem::is_directory(target_final_fullpath);
 
             // Touch all files and set last modified to "now"
             update_last_write_time(target_final_fullpath);
@@ -395,8 +409,16 @@ namespace newplus::utilities
             // Refresh folder items
             template_entry->refresh_target(target_final_fullpath);
 
-            // Enter rename mode
-            template_entry->enter_rename_mode(target_final_fullpath);
+            // Enter rename mode. For folder templates with variable resolution enabled, monitor the
+            // rename and resolve variables in the folder contents afterwards using the final name.
+            if (should_resolve_folder_contents)
+            {
+                template_entry->enter_rename_mode_and_resolve_variables(target_final_fullpath);
+            }
+            else
+            {
+                template_entry->enter_rename_mode(target_final_fullpath);
+            }
         }
         catch (const std::exception& ex)
         {

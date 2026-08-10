@@ -5,9 +5,12 @@
 #include "trace.h"
 
 #include <common/Telemetry/EtwTrace/EtwTrace.h>
+#include <atomic>
+#include <stdexcept>
 
 HMODULE module_instance_handle = 0;
 Shared::Trace::ETWTrace trace(L"NewPlusShellExtension");
+std::atomic<long> active_background_workers = 0;
 
 BOOL APIENTRY DllMain(HMODULE module_handle, DWORD ul_reason_for_call, LPVOID reserved)
 {
@@ -33,7 +36,19 @@ STDAPI DllGetActivationFactory(_In_ HSTRING activatableClassId, _COM_Outptr_ IAc
 
 STDAPI DllCanUnloadNow()
 {
-    return Module<InProc>::GetModule().GetObjectCount() == 0 ? S_OK : S_FALSE;
+    const auto& module = Module<InProc>::GetModule();
+    if (module.GetObjectCount() != 0)
+    {
+        return S_FALSE;
+    }
+
+    if (active_background_workers.load(std::memory_order_acquire) != 0)
+    {
+        return S_FALSE;
+    }
+
+    // Re-check module count to reduce race window against concurrent COM object activity.
+    return module.GetObjectCount() == 0 ? S_OK : S_FALSE;
 }
 
 STDAPI DllGetClassObject(_In_ REFCLSID rclsid, _In_ REFIID riid, _Outptr_ LPVOID FAR* ppv)
@@ -42,3 +57,30 @@ STDAPI DllGetClassObject(_In_ REFCLSID rclsid, _In_ REFIID riid, _Outptr_ LPVOID
 }
 
 CoCreatableClass(shell_context_menu)
+
+HMODULE acquire_background_worker_module_reference()
+{
+    HMODULE module_reference = nullptr;
+    if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, reinterpret_cast<LPCWSTR>(&module_instance_handle), &module_reference) == FALSE)
+    {
+        throw std::runtime_error("Failed to acquire New+ shell extension module reference");
+    }
+
+    active_background_workers.fetch_add(1, std::memory_order_acq_rel);
+    return module_reference;
+}
+
+void release_background_worker_module_reference(HMODULE module_reference)
+{
+    active_background_workers.fetch_sub(1, std::memory_order_acq_rel);
+    if (module_reference != nullptr)
+    {
+        FreeLibrary(module_reference);
+    }
+}
+
+[[noreturn]] void release_background_worker_module_reference_and_exit_thread(HMODULE module_reference)
+{
+    active_background_workers.fetch_sub(1, std::memory_order_acq_rel);
+    FreeLibraryAndExitThread(module_reference, 0);
+}
