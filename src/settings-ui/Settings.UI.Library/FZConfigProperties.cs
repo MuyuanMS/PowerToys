@@ -15,6 +15,8 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         public const int VkOem3 = 0xc0;
         public const int VkNext = 0x22;
         public const int VkPrior = 0x21;
+        public const int VkLeft = 0x25;
+        public const int VkRight = 0x27;
         public const int VkX = 0x58;
 
         public static readonly HotkeySettings DefaultEditorHotkeyValue = new HotkeySettings(true, false, false, true, VkOem3);

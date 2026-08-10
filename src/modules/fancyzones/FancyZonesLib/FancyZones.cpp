@@ -791,6 +791,11 @@ bool FancyZones::IsMonitorRotationChordDown() const noexcept
     }
 
     const auto& hotkey = FancyZonesSettings::settings().monitorRotationHotkey;
+    if (!MonitorRotation::IsValidActivatorKey(hotkey.get_code()))
+    {
+        return false;
+    }
+
     const bool winDown = m_monitorRotationKeyState.IsAnyDown({ VK_LWIN, VK_RWIN });
     const bool ctrlDown = m_monitorRotationKeyState.IsAnyDown({ VK_CONTROL, VK_LCONTROL, VK_RCONTROL });
     const bool altDown = m_monitorRotationKeyState.IsAnyDown({ VK_MENU, VK_LMENU, VK_RMENU });

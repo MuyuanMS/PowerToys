@@ -209,5 +209,12 @@ namespace FancyZonesUnitTests
             Assert::IsTrue(state.ReleaseWasConsumed(VK_LEFT));
             Assert::IsFalse(state.ReleaseWasConsumed(VK_LEFT));
         }
+
+        TEST_METHOD (RejectsDirectionKeysAsActivator)
+        {
+            Assert::IsFalse(MonitorRotation::IsValidActivatorKey(VK_LEFT));
+            Assert::IsFalse(MonitorRotation::IsValidActivatorKey(VK_RIGHT));
+            Assert::IsTrue(MonitorRotation::IsValidActivatorKey('X'));
+        }
     };
 }

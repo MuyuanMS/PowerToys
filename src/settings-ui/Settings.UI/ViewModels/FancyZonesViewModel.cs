@@ -907,7 +907,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             {
                 if (value != _monitorRotationHotkey)
                 {
-                    if (value == null)
+                    if (value == null || value.Code == FZConfigProperties.VkLeft || value.Code == FZConfigProperties.VkRight)
                     {
                         _monitorRotationHotkey = FZConfigProperties.DefaultMonitorRotationHotkeyValue;
                     }
@@ -961,6 +961,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             OnPropertyChanged(nameof(SnapHotkeysCategoryEnabled));
             OnPropertyChanged(nameof(QuickSwitchEnabled));
             OnPropertyChanged(nameof(WindowSwitchingCategoryEnabled));
+            OnPropertyChanged(nameof(MonitorRotationCategoryEnabled));
         }
     }
 }

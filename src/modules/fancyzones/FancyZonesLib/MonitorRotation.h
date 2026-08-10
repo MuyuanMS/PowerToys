@@ -9,6 +9,10 @@ namespace MonitorRotation
     LONG ScaleCoordinate(LONG value, LONG sourceStart, LONG sourceSize, LONG targetStart, LONG targetSize) noexcept;
     RECT MapRectBetweenMonitorWorkAreas(const RECT& windowRect, const RECT& sourceWorkArea, const RECT& targetWorkArea) noexcept;
     size_t GetRotatedMonitorIndex(size_t sourceIndex, size_t monitorCount, bool reverse) noexcept;
+    constexpr bool IsValidActivatorKey(DWORD vkCode) noexcept
+    {
+        return vkCode != VK_LEFT && vkCode != VK_RIGHT;
+    }
 
     class KeyState
     {
