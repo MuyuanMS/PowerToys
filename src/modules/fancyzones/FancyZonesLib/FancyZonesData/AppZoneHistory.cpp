@@ -563,7 +563,7 @@ bool AppZoneHistory::IsAnotherWindowOfApplicationInstanceZoned(HWND window, cons
     return IsAnotherWindowOfApplicationInstanceZoned(processPath, window, workAreaId);
 }
 
-bool AppZoneHistory::IsAnotherWindowOfApplicationInstanceZoned(const std::wstring& processPath, HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId) const noexcept
+bool AppZoneHistory::IsAnotherWindowOfApplicationInstanceZoned(const std::wstring& processPath, HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId) const
 {
     if (!processPath.empty())
     {
