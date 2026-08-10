@@ -37,7 +37,7 @@ namespace Microsoft.PowerToys.FilePreviewCommon
         public static string MarkdownHtml(string fileContent, string theme, string filePath, ImagesBlockedCallBack imagesBlockedCallBack, bool allowLocalImages, string? allowedBasePath)
         {
             string imageSourcePolicy = allowLocalImages ? "https://localmdimages" : "'none'";
-            string contentSecurityPolicy = $"<meta http-equiv=\"Content-Security-Policy\" content=\"img-src {imageSourcePolicy};\">";
+            string contentSecurityPolicy = $"<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src {imageSourcePolicy}; object-src 'none'; frame-src 'none';\">";
             string htmlHeader = (theme == "dark" ? HtmlDarkHeader : HtmlLightHeader).Insert(HtmlDoctype.Length, contentSecurityPolicy);
 
             // Extension to modify markdown AST.
@@ -127,6 +127,7 @@ namespace Microsoft.PowerToys.FilePreviewCommon
         private static int FindTagEnd(string html, int startIndex)
         {
             char quote = '\0';
+            bool expectingAttributeValue = false;
             for (int i = startIndex; i < html.Length; i++)
             {
                 char current = html[i];
@@ -137,9 +138,23 @@ namespace Microsoft.PowerToys.FilePreviewCommon
                         quote = '\0';
                     }
                 }
-                else if (current == '"' || current == '\'')
+                else if (expectingAttributeValue)
                 {
-                    quote = current;
+                    if (char.IsWhiteSpace(current))
+                    {
+                        continue;
+                    }
+
+                    if (current == '"' || current == '\'')
+                    {
+                        quote = current;
+                    }
+
+                    expectingAttributeValue = false;
+                }
+                else if (current == '=')
+                {
+                    expectingAttributeValue = true;
                 }
                 else if (current == '>')
                 {

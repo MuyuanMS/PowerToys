@@ -280,6 +280,18 @@ namespace PreviewPaneUnitTests
             Assert.AreNotEqual(0, blockedCount);
         }
 
+        [TestMethod]
+        public void MalformedRawHtmlImageIsEscapedByMarkdownParser()
+        {
+            string mdString = "<img ' src=data" + ":image/png;base64,AAAA>";
+
+            string html = Microsoft.PowerToys.FilePreviewCommon.MarkdownHelper.MarkdownHtml(
+                mdString, "light", @"C:\docs\doc.md", () => { }, false, @"C:\docs");
+
+            StringAssert.Contains(html, "&lt;img");
+            Assert.IsFalse(html.Contains("<img '"), "the malformed tag must remain text rather than becoming a browser-parsed image");
+        }
+
         [DataTestMethod]
         [DataRow(false, "img-src 'none'")]
         [DataRow(true, "img-src https://localmdimages")]
@@ -292,6 +304,8 @@ namespace PreviewPaneUnitTests
                 mdString, "light", @"C:\docs\doc.md", () => { }, allowLocalImages, @"C:\docs");
 
             StringAssert.Contains(html, expectedPolicy);
+            StringAssert.Contains(html, "object-src 'none'");
+            StringAssert.Contains(html, "frame-src 'none'");
         }
 
         [TestMethod]
