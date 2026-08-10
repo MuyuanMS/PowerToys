@@ -395,10 +395,13 @@ namespace MouseUtils.UITests
             Task.Delay(500).Wait();
 
             var baselineColors = new string[16];
+            var restingBaselineColors = new string[16];
             for (int i = 0; i < 8; i++)
             {
                 baselineColors[i * 2] = this.GetPixelColorString(start.Item1 + i, start.Item2 + (i % 4));
                 baselineColors[(i * 2) + 1] = this.GetPixelColorString(start.Item1 - i, start.Item2 - (i % 4));
+                restingBaselineColors[i * 2] = this.GetPixelColorString(restingX + i, restingY + (i % 4));
+                restingBaselineColors[(i * 2) + 1] = this.GetPixelColorString(restingX - i, restingY - (i % 4));
             }
 
             Session.MoveMouseTo(start.Item1, start.Item2, 0, 0);
@@ -422,6 +425,12 @@ namespace MouseUtils.UITests
 
                 var negativeColor = this.GetPixelColorString(start.Item1 - i, start.Item2 - (i % 4));
                 Assert.AreEqual(baselineColors[(i * 2) + 1], negativeColor);
+
+                var restingPositiveColor = this.GetPixelColorString(restingX + i, restingY + (i % 4));
+                Assert.AreEqual(restingBaselineColors[i * 2], restingPositiveColor);
+
+                var restingNegativeColor = this.GetPixelColorString(restingX - i, restingY - (i % 4));
+                Assert.AreEqual(restingBaselineColors[(i * 2) + 1], restingNegativeColor);
             }
 
             VerifyMouseHighlighterAppears(ref settings, "leftClick");
