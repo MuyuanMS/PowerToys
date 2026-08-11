@@ -138,7 +138,9 @@ namespace ViewModelTests
             Assert.AreEqual(1, ipcMessageCount);
             settingsUtilsMock.Verify(
                 x => x.SaveSettings(
-                    It.Is<string>(json => JsonSerializer.Deserialize<ShortcutGuideSettings>(json).Properties.WindowsKeyAction.Value == (int)ShortcutGuideWindowsKeyAction.TaskbarIndicators),
+                    It.Is<string>(json =>
+                        JsonSerializer.Deserialize<ShortcutGuideSettings>(json).Properties.WindowsKeyAction.Value == (int)ShortcutGuideWindowsKeyAction.TaskbarIndicators &&
+                        JsonSerializer.Deserialize<ShortcutGuideSettings>(json).Properties.PressTime.Value == ShortcutGuideProperties.MaximumPressTimeMs),
                     ShortcutGuideSettings.ModuleName,
                     It.IsAny<string>()),
                 Times.Once);

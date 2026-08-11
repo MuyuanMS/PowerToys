@@ -352,7 +352,7 @@ private:
                 Logger::warn("Failed to initialize Shortcut Guide start shortcut");
             }
 
-try
+            try
             {
                 auto propertiesObject = settingsObject.GetNamedObject(L"properties");
                 if (propertiesObject.HasKey(L"press_time"))
