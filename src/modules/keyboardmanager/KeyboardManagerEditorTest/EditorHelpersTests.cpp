@@ -297,5 +297,24 @@ namespace EditorHelpersTests
             // Assert
             Assert::IsTrue(result == ShortcutErrorType::NoError);
         }
+
+        // Test if the IsShortcutIllegal method returns WinL on passing Win+L with additional modifiers
+        TEST_METHOD (IsShortcutIllegal_ShouldReturnWinL_OnPassingWinLWithAdditionalModifiers)
+        {
+            // Arrange
+            std::vector<Shortcut> testCases{
+                Shortcut(std::vector<int32_t>{ VK_LWIN, VK_CONTROL, 0x4C }),
+                Shortcut(std::vector<int32_t>{ VK_RWIN, VK_SHIFT, 0x4C }),
+            };
+
+            for (const auto& shortcut : testCases)
+            {
+                // Act
+                auto result = EditorHelpers::IsShortcutIllegal(shortcut);
+
+                // Assert
+                Assert::IsTrue(result == ShortcutErrorType::WinL);
+            }
+        }
     };
 }
