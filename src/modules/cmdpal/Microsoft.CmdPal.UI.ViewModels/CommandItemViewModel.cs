@@ -22,6 +22,7 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
     private readonly IContextMenuFactory? _contextMenuFactory;
 
     private readonly Lock _moreCommandsLock = new();
+    private readonly Lock _propChangedSubscriptionLock = new();
     private readonly List<IContextItemViewModel> _moreCommands = [];
     private volatile CommandContextItemViewModel? _secondaryMoreCommand;
     private volatile IContextItemViewModel[] _moreCommandsSnapshot = [];
@@ -30,6 +31,8 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
     private ExtensionObject<IExtendedAttributesProvider>? ExtendedAttributesProvider { get; set; }
 
     private readonly ExtensionObject<ICommandItem> _commandItemModel = new(null);
+    private bool _propChangedSubscribed;
+    private bool _cleanupStarted;
     private CommandContextItemViewModel? _defaultCommandContextItemViewModel;
 
     private FuzzyTargetCache _titleCache;
@@ -174,6 +177,14 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
             return;
         }
 
+        lock (_propChangedSubscriptionLock)
+        {
+            if (_cleanupStarted)
+            {
+                return;
+            }
+        }
+
         if (!IsFastInitialized)
         {
             FastInitializeProperties();
@@ -185,6 +196,58 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
             return;
         }
 
+        // Marshal WinRT event subscription to the UI thread to avoid a deadlock
+        // in the WinRT EventSourceCache (ReaderWriterLockSlim) that can occur when
+        // background threads subscribe while the UI thread concurrently removes handlers
+        // during theme reapply (via CommunityToolkit DispatcherQueueTimer.Debounce).
+        // Wait for this to complete so we don't miss updates between initialization
+        // and subscription.
+        var shouldContinue = true;
+        DoOnUiThreadAndWait(() =>
+        {
+            lock (_propChangedSubscriptionLock)
+            {
+                if (_cleanupStarted)
+                {
+                    shouldContinue = false;
+                    return;
+                }
+
+                if (_propChangedSubscribed)
+                {
+                    return;
+                }
+
+                // _commandItemModel.Unsafe can be reassigned between capture and lock
+                // acquisition. Avoid attaching to a stale instance that would keep this
+                // handler alive without a reliable unsubscribe path. This is paired with
+                // _cleanupStarted checks here and in cleanup to block late subscriptions.
+                if (!ReferenceEquals(model, _commandItemModel.Unsafe))
+                {
+                    shouldContinue = false;
+                    return;
+                }
+
+                model.PropChanged += Model_PropChanged;
+                _propChangedSubscribed = true;
+            }
+        });
+
+        if (!shouldContinue)
+        {
+            return;
+        }
+
+        lock (_propChangedSubscriptionLock)
+        {
+            if (_cleanupStarted)
+            {
+                return;
+            }
+        }
+
+        Command.PropertyChanged += Command_PropertyChanged;
+
         Command.InitializeProperties();
 
         var icon = model.Icon;
@@ -195,9 +258,6 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
         }
 
         // TODO: Do these need to go into FastInit?
-        model.PropChanged += Model_PropChanged;
-        Command.PropertyChanged += Command_PropertyChanged;
-
         UpdateProperty(nameof(Name));
         UpdateProperty(nameof(Title));
         UpdateProperty(nameof(Subtitle));
@@ -317,6 +377,14 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
     private void Model_PropChanged(object sender, IPropChangedEventArgs args)
     {
+        lock (_propChangedSubscriptionLock)
+        {
+            if (_cleanupStarted)
+            {
+                return;
+            }
+        }
+
         try
         {
             FetchProperty(args.PropertyName);
@@ -329,6 +397,14 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
     protected virtual void FetchProperty(string propertyName)
     {
+        lock (_propChangedSubscriptionLock)
+        {
+            if (_cleanupStarted)
+            {
+                return;
+            }
+        }
+
         var model = this._commandItemModel.Unsafe;
         if (model is null)
         {
@@ -635,6 +711,11 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
     {
         base.UnsafeCleanup();
 
+        lock (_propChangedSubscriptionLock)
+        {
+            _cleanupStarted = true;
+        }
+
         List<IContextItemViewModel> freedItems;
         CommandContextItemViewModel? freedDefault;
         lock (_moreCommandsLock)
@@ -675,7 +756,21 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
         var model = _commandItemModel.Unsafe;
         if (model is not null)
         {
-            model.PropChanged -= Model_PropChanged;
+            // Marshal WinRT event handler removal to the UI thread to match where
+            // it was subscribed, avoiding concurrent EventSourceCache lock contention.
+            DoOnUiThreadAndWait(() =>
+            {
+                lock (_propChangedSubscriptionLock)
+                {
+                    if (!_propChangedSubscribed)
+                    {
+                        return;
+                    }
+
+                    model.PropChanged -= Model_PropChanged;
+                    _propChangedSubscribed = false;
+                }
+            });
         }
     }
 

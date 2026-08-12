@@ -6,9 +6,11 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.CmdPal.Common;
 using Microsoft.CmdPal.Common.Helpers;
+using Microsoft.UI.Dispatching;
 
 namespace Microsoft.CmdPal.UI.ViewModels;
 
@@ -256,13 +258,54 @@ public abstract partial class ExtensionObjectViewModel : ObservableObject, IBatc
 
     protected void DoOnUiThread(Action action)
     {
-        if (PageContext.TryGetTarget(out var pageContext))
+        var scheduler = PageContext.TryGetTarget(out var pageContext) ? pageContext.Scheduler : _uiScheduler;
+        Task.Factory.StartNew(
+            action,
+            CancellationToken.None,
+            TaskCreationOptions.None,
+            scheduler);
+    }
+
+    protected void DoOnUiThreadAndWait(Action action)
+    {
+        var scheduler = PageContext.TryGetTarget(out var pageContext) ? pageContext.Scheduler : _uiScheduler;
+
+        // TaskScheduler.Current catches work already running through the target
+        // scheduler. DispatcherQueue covers direct UI-thread callbacks where
+        // TaskScheduler.Current can still be Default.
+        if (TaskScheduler.Current == scheduler || IsCurrentThreadUiThread())
         {
-            Task.Factory.StartNew(
-                action,
-                CancellationToken.None,
-                TaskCreationOptions.None,
-                pageContext.Scheduler);
+            action();
+            return;
+        }
+
+        Task.Factory.StartNew(
+            () =>
+            {
+                try
+                {
+                    action();
+                }
+                catch (Exception ex)
+                {
+                    CoreLogger.LogError("Failed to run action on UI thread.", ex);
+                    throw;
+                }
+            },
+            CancellationToken.None,
+            TaskCreationOptions.None,
+            scheduler).GetAwaiter().GetResult();
+    }
+
+    private static bool IsCurrentThreadUiThread()
+    {
+        try
+        {
+            return DispatcherQueue.GetForCurrentThread()?.HasThreadAccess == true;
+        }
+        catch (COMException)
+        {
+            return false;
         }
     }
 

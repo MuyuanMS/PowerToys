@@ -9,6 +9,10 @@ namespace Microsoft.CmdPal.UI.ViewModels;
 
 public partial class CommandViewModel : ExtensionObjectViewModel
 {
+    private readonly Lock _propChangedSubscriptionLock = new();
+    private bool _propChangedSubscribed;
+    private bool _cleanupStarted;
+
     public ExtensionObject<ICommand> Model { get; private set; } = new(null);
 
     public bool IsSet => Model.Unsafe is not null;
@@ -72,6 +76,14 @@ public partial class CommandViewModel : ExtensionObjectViewModel
             return;
         }
 
+        lock (_propChangedSubscriptionLock)
+        {
+            if (_cleanupStarted)
+            {
+                return;
+            }
+        }
+
         if (!IsFastInitialized)
         {
             FastInitializeProperties();
@@ -81,6 +93,56 @@ public partial class CommandViewModel : ExtensionObjectViewModel
         if (model is null)
         {
             return;
+        }
+
+        // Marshal WinRT event subscription to the UI thread to avoid a deadlock
+        // in the WinRT EventSourceCache (ReaderWriterLockSlim) that can occur when
+        // background threads subscribe while the UI thread concurrently removes handlers
+        // during theme reapply (via CommunityToolkit DispatcherQueueTimer.Debounce).
+        // Wait for this to complete so we don't miss updates between initialization
+        // and subscription.
+        var shouldContinue = true;
+        DoOnUiThreadAndWait(() =>
+        {
+            lock (_propChangedSubscriptionLock)
+            {
+                if (_cleanupStarted)
+                {
+                    shouldContinue = false;
+                    return;
+                }
+
+                if (_propChangedSubscribed)
+                {
+                    return;
+                }
+
+                // Model.Unsafe can be reassigned on another thread between capture
+                // and lock acquisition. Avoid attaching to an outdated instance that
+                // is no longer referenced by this view model, which would leak this
+                // event handler without a reliable unsubscribe path.
+                if (!ReferenceEquals(model, Model.Unsafe))
+                {
+                    shouldContinue = false;
+                    return;
+                }
+
+                model.PropChanged += Model_PropChanged;
+                _propChangedSubscribed = true;
+            }
+        });
+
+        if (!shouldContinue)
+        {
+            return;
+        }
+
+        lock (_propChangedSubscriptionLock)
+        {
+            if (_cleanupStarted)
+            {
+                return;
+            }
         }
 
         var ico = model.Icon;
@@ -95,12 +157,18 @@ public partial class CommandViewModel : ExtensionObjectViewModel
         {
             UpdatePropertiesFromExtension(command2);
         }
-
-        model.PropChanged += Model_PropChanged;
     }
 
     private void Model_PropChanged(object sender, IPropChangedEventArgs args)
     {
+        lock (_propChangedSubscriptionLock)
+        {
+            if (_cleanupStarted)
+            {
+                return;
+            }
+        }
+
         try
         {
             FetchProperty(args.PropertyName);
@@ -113,6 +181,14 @@ public partial class CommandViewModel : ExtensionObjectViewModel
 
     protected void FetchProperty(string propertyName)
     {
+        lock (_propChangedSubscriptionLock)
+        {
+            if (_cleanupStarted)
+            {
+                return;
+            }
+        }
+
         var model = Model.Unsafe;
         if (model is null)
         {
@@ -142,12 +218,30 @@ public partial class CommandViewModel : ExtensionObjectViewModel
     {
         base.UnsafeCleanup();
 
-        Icon = new(null); // necessary?
+        lock (_propChangedSubscriptionLock)
+        {
+            _cleanupStarted = true;
+        }
 
+        Icon = new(null); // necessary?
         var model = Model.Unsafe;
         if (model is not null)
         {
-            model.PropChanged -= Model_PropChanged;
+            // Marshal WinRT event handler removal to the UI thread to match where
+            // it was subscribed, avoiding concurrent EventSourceCache lock contention.
+            DoOnUiThreadAndWait(() =>
+            {
+                lock (_propChangedSubscriptionLock)
+                {
+                    if (!_propChangedSubscribed)
+                    {
+                        return;
+                    }
+
+                    model.PropChanged -= Model_PropChanged;
+                    _propChangedSubscribed = false;
+                }
+            });
         }
     }
 

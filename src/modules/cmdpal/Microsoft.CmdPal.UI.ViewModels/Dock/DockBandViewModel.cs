@@ -16,9 +16,13 @@ namespace Microsoft.CmdPal.UI.ViewModels.Dock;
 
 public sealed partial class DockBandViewModel : ExtensionObjectViewModel
 {
+    private readonly Lock _itemsChangedSubscriptionLock = new();
     private readonly CommandItemViewModel _rootItem;
     private readonly ISettingsService _settingsService;
     private readonly IContextMenuFactory _contextMenuFactory;
+    private bool _itemsChangedSubscribed;
+    private bool _cleanupStarted;
+    private IListPage? _subscribedList;
 
     private DockBandSettings _bandSettings;
 
@@ -253,12 +257,77 @@ public sealed partial class DockBandViewModel : ExtensionObjectViewModel
 
     public override void InitializeProperties()
     {
+        lock (_itemsChangedSubscriptionLock)
+        {
+            if (_cleanupStarted)
+            {
+                return;
+            }
+        }
+
         var command = _rootItem.Command;
         var list = command.Model.Unsafe as IListPage;
         if (list is not null)
         {
+            var shouldSubscribe = true;
+            lock (_itemsChangedSubscriptionLock)
+            {
+                if (_cleanupStarted || _itemsChangedSubscribed)
+                {
+                    shouldSubscribe = false;
+                }
+            }
+
+            if (shouldSubscribe)
+            {
+                // Marshal WinRT event subscription to the UI thread to avoid a deadlock
+                // in the WinRT EventSourceCache (ReaderWriterLockSlim) that can occur when
+                // background threads subscribe while the UI thread concurrently removes handlers
+                // during theme reapply (via CommunityToolkit DispatcherQueueTimer.Debounce).
+                // Wait for this to complete so we don't miss updates between initialization
+                // and subscription.
+                var shouldContinue = true;
+                DoOnUiThreadAndWait(() =>
+                {
+                    lock (_itemsChangedSubscriptionLock)
+                    {
+                        if (_cleanupStarted)
+                        {
+                            shouldContinue = false;
+                            return;
+                        }
+
+                        if (ReferenceEquals(_subscribedList, list))
+                        {
+                            return;
+                        }
+
+                        if (_itemsChangedSubscribed && _subscribedList is not null)
+                        {
+                            _subscribedList.ItemsChanged -= HandleItemsChanged;
+                        }
+
+                        list.ItemsChanged += HandleItemsChanged;
+                        _subscribedList = list;
+                        _itemsChangedSubscribed = true;
+                    }
+                });
+
+                if (!shouldContinue)
+                {
+                    return;
+                }
+            }
+
+            lock (_itemsChangedSubscriptionLock)
+            {
+                if (_cleanupStarted)
+                {
+                    return;
+                }
+            }
+
             InitializeFromList(list);
-            list.ItemsChanged += HandleItemsChanged;
         }
         else
         {
@@ -273,7 +342,20 @@ public sealed partial class DockBandViewModel : ExtensionObjectViewModel
 
     private void HandleItemsChanged(object sender, IItemsChangedEventArgs args)
     {
-        if (_rootItem.Command.Model.Unsafe is IListPage p)
+        lock (_itemsChangedSubscriptionLock)
+        {
+            if (_cleanupStarted)
+            {
+                return;
+            }
+
+            if (!ReferenceEquals(sender, _subscribedList))
+            {
+                return;
+            }
+        }
+
+        if (sender is IListPage p)
         {
             InitializeFromList(p);
         }
@@ -283,11 +365,27 @@ public sealed partial class DockBandViewModel : ExtensionObjectViewModel
     {
         base.UnsafeCleanup();
 
-        var command = _rootItem.Command;
-        if (command.Model.Unsafe is IListPage list)
+        lock (_itemsChangedSubscriptionLock)
         {
-            list.ItemsChanged -= HandleItemsChanged;
+            _cleanupStarted = true;
         }
+
+        // Marshal WinRT event handler removal to the UI thread to match where
+        // it was subscribed, avoiding concurrent EventSourceCache lock contention.
+        DoOnUiThreadAndWait(() =>
+        {
+            lock (_itemsChangedSubscriptionLock)
+            {
+                if (!_itemsChangedSubscribed || _subscribedList is null)
+                {
+                    return;
+                }
+
+                _subscribedList.ItemsChanged -= HandleItemsChanged;
+                _subscribedList = null;
+                _itemsChangedSubscribed = false;
+            }
+        });
 
         foreach (var item in Items)
         {
