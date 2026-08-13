@@ -3,7 +3,9 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Generic;
 using System.IO.Abstractions;
+using System.Reflection;
 using System.Text.Json;
 
 using Microsoft.PowerToys.Settings.UI.Library;
@@ -59,6 +61,26 @@ namespace ViewModelTests
             var viewModel = CreateViewModel(new Mock<SettingsUtils>(new FileSystem(), null));
 
             Assert.IsFalse(viewModel.IsEnabledGpoConfigured);
+        }
+
+        [TestMethod]
+        public void RefreshEnabledStateShouldClearRemovedPolicyAndNotifyBindings()
+        {
+            var viewModel = CreateViewModel(new Mock<SettingsUtils>(new FileSystem(), null));
+            var policyField = typeof(ClipPingViewModel).GetField(
+                "_enabledStateIsGpoConfigured",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(policyField);
+            policyField.SetValue(viewModel, true);
+
+            var changedProperties = new List<string>();
+            viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+            viewModel.RefreshEnabledState();
+
+            Assert.IsFalse(viewModel.IsEnabledGpoConfigured);
+            CollectionAssert.Contains(changedProperties, nameof(ClipPingViewModel.IsEnabled));
+            CollectionAssert.Contains(changedProperties, nameof(ClipPingViewModel.IsEnabledGpoConfigured));
         }
 
         [TestMethod]

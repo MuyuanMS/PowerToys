@@ -59,6 +59,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
             else
             {
+                _enabledStateIsGpoConfigured = false;
                 _isEnabled = GeneralSettingsConfig.Enabled.ClipPing;
             }
         }
@@ -139,6 +140,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         {
             InitializeEnabledValue();
             OnPropertyChanged(nameof(IsEnabled));
+            OnPropertyChanged(nameof(IsEnabledGpoConfigured));
         }
     }
 }
