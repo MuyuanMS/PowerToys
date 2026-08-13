@@ -213,6 +213,15 @@ public sealed class PythonScriptServiceTests
     }
 
     [TestMethod]
+    public void SanitizePackageList_RejectsPipOptions()
+    {
+        var result = PythonScriptService.SanitizePackageList(
+            "requests>=2 --break-system-packages numpy[core]");
+
+        Assert.AreEqual("requests>=2 numpy[core]", result);
+    }
+
+    [TestMethod]
     public void ParsePythonError_ModuleNotFoundError()
     {
         var stderr = """

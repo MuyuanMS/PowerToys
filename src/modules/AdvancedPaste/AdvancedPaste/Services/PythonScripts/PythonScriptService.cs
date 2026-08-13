@@ -1750,7 +1750,7 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
     /// Sanitizes a space-separated pip package list by rejecting any token containing shell metacharacters.
     /// Only allows: alphanumeric, hyphen, underscore, dot, square brackets, comparison operators, commas.
     /// </summary>
-    private static string SanitizePackageList(string packages)
+    internal static string SanitizePackageList(string packages)
     {
         if (string.IsNullOrWhiteSpace(packages))
         {
@@ -1759,7 +1759,7 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
 
         var safeTokens = packages
             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .Where(token => System.Text.RegularExpressions.Regex.IsMatch(token, @"^[a-zA-Z0-9\._\-\[\],>=<!=~]+$"))
+            .Where(token => System.Text.RegularExpressions.Regex.IsMatch(token, @"^[a-zA-Z0-9][a-zA-Z0-9\._\-\[\],>=<!=~]*$"))
             .ToArray();
 
         return string.Join(' ', safeTokens);
