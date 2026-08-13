@@ -14,7 +14,6 @@
 #include <algorithm>
 #include <array>
 #include <cwctype>
-#include <filesystem>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -29,7 +28,6 @@ extern HINSTANCE g_module_instance;
 namespace
 {
     constexpr DWORD PIPE_CONNECT_TIMEOUT_MS = 1000;
-    constexpr DWORD ENCODER_PROBE_TIMEOUT_MS = 10000;
 
     enum class FormatGroup
     {
@@ -260,86 +258,22 @@ namespace
         return true;
     }
 
-    bool ProbeTargetSupport(file_converter::ImageFormat format)
-    {
-        std::wstring module_path(MAX_PATH, L'\0');
-        for (;;)
-        {
-            const DWORD length =
-                GetModuleFileNameW(g_module_instance, module_path.data(), static_cast<DWORD>(module_path.size()));
-            if (length == 0)
-            {
-                return false;
-            }
-            if (length < module_path.size() - 1)
-            {
-                module_path.resize(length);
-                break;
-            }
-            module_path.resize(module_path.size() * 2);
-        }
-
-        const auto module_directory = std::filesystem::path(module_path).parent_path();
-        std::filesystem::path worker_path =
-            module_directory.parent_path() / L"PowerToys.FileConverterWorker.exe";
-        std::error_code worker_path_error;
-        if (!std::filesystem::is_regular_file(worker_path, worker_path_error))
-        {
-            worker_path_error.clear();
-            worker_path = module_directory.parent_path().parent_path() / L"PowerToys.FileConverterWorker.exe";
-        }
-        if (!std::filesystem::is_regular_file(worker_path, worker_path_error))
-        {
-            return false;
-        }
-        std::wstring command_line =
-            L"\"" + worker_path.wstring() + L"\" --probe " + std::to_wstring(static_cast<int>(format));
-
-        STARTUPINFOW startup_info{};
-        startup_info.cb = sizeof(startup_info);
-        PROCESS_INFORMATION process_info{};
-        if (!CreateProcessW(
-                worker_path.c_str(),
-                command_line.data(),
-                nullptr,
-                nullptr,
-                FALSE,
-                CREATE_NO_WINDOW,
-                nullptr,
-                worker_path.parent_path().c_str(),
-                &startup_info,
-                &process_info))
-        {
-            return false;
-        }
-
-        CloseHandle(process_info.hThread);
-        const DWORD wait_result = WaitForSingleObject(process_info.hProcess, ENCODER_PROBE_TIMEOUT_MS);
-        if (wait_result == WAIT_TIMEOUT)
-        {
-            TerminateProcess(process_info.hProcess, ERROR_TIMEOUT);
-        }
-
-        DWORD exit_code = ERROR_GEN_FAILURE;
-        const bool succeeded =
-            wait_result == WAIT_OBJECT_0 &&
-            GetExitCodeProcess(process_info.hProcess, &exit_code) &&
-            SUCCEEDED(static_cast<HRESULT>(exit_code));
-        CloseHandle(process_info.hProcess);
-        return succeeded;
-    }
-
     bool IsTargetSupported(const TargetFormatSpec& spec)
     {
-        constexpr size_t format_count = static_cast<size_t>(file_converter::ImageFormat::Webp) + 1;
-        static std::array<std::once_flag, format_count> availability_flags;
-        static std::array<bool, format_count> availability{};
-
         const size_t index = static_cast<size_t>(spec.image_format);
-        std::call_once(availability_flags[index], [&spec, index] {
-            availability[index] = ProbeTargetSupport(spec.image_format);
-        });
-        return availability[index];
+        const std::wstring value_name =
+            std::wstring(fc_constants::RegistryEncoderAvailabilityPrefix) + std::to_wstring(index);
+        DWORD value = 0;
+        DWORD size = sizeof(value);
+        return RegGetValueW(
+                   HKEY_CURRENT_USER,
+                   fc_constants::RegistryPath,
+                   value_name.c_str(),
+                   RRF_RT_REG_DWORD,
+                   nullptr,
+                   &value,
+                   &size) == ERROR_SUCCESS &&
+               value != 0;
     }
 
     bool IsModuleEnabled()
@@ -348,13 +282,27 @@ namespace
         DWORD size = sizeof(value);
         return RegGetValueW(
                    HKEY_CURRENT_USER,
-                   L"Software\\Microsoft\\PowerToys\\FileConverter",
-                   L"Enabled",
+                   fc_constants::RegistryPath,
+                   fc_constants::RegistryEnabledValue,
                    RRF_RT_REG_DWORD,
                    nullptr,
                    &value,
                    &size) == ERROR_SUCCESS &&
-               value != 0;
+               value != 0 &&
+               [] {
+                   DWORD session_id = 0;
+                   ProcessIdToSessionId(GetCurrentProcessId(), &session_id);
+                   const std::wstring event_name =
+                       std::wstring(fc_constants::EnabledEventNamePrefix) + std::to_wstring(session_id);
+                   const HANDLE event = OpenEventW(SYNCHRONIZE, FALSE, event_name.c_str());
+                   if (event == nullptr)
+                   {
+                       return false;
+                   }
+                   const bool signaled = WaitForSingleObject(event, 0) == WAIT_OBJECT_0;
+                   CloseHandle(event);
+                   return signaled;
+               }();
     }
 
     bool HasAnyAvailableDestination(const std::vector<std::wstring>& paths)

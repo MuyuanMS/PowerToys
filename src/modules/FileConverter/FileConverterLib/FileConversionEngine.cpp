@@ -259,6 +259,17 @@ namespace file_converter
         }
 
         Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> source_frame;
+        UINT frame_count = 0;
+        hr = decoder->GetFrameCount(&frame_count);
+        if (FAILED(hr))
+        {
+            return { hr, HrMessage(LoadLocalizedString(L"FileConverter_Engine_ReadFrameCountFailed", L"Failed reading image frame count."), hr) };
+        }
+        if (frame_count != 1)
+        {
+            return { WINCODEC_ERR_UNSUPPORTEDOPERATION, LoadLocalizedString(L"FileConverter_Engine_MultiFrameUnsupported", L"Multi-frame images are not supported.") };
+        }
+
         hr = decoder->GetFrame(0, &source_frame);
         if (FAILED(hr))
         {

@@ -6,6 +6,10 @@
 namespace winrt::PowerToys::FileConverter::Constants
 {
     inline constexpr wchar_t PipeNamePrefix[] = L"\\\\.\\pipe\\powertoys_fileconverter_";
+    inline constexpr wchar_t EnabledEventNamePrefix[] = L"Local\\PowerToys_FileConverter_Enabled_";
+    inline constexpr wchar_t RegistryPath[] = L"Software\\Microsoft\\PowerToys\\FileConverter";
+    inline constexpr wchar_t RegistryEnabledValue[] = L"Enabled";
+    inline constexpr wchar_t RegistryEncoderAvailabilityPrefix[] = L"EncoderAvailability";
 
     inline constexpr wchar_t ActionFormatConvert[] = L"FormatConvert";
 
