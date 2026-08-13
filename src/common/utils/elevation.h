@@ -125,7 +125,8 @@ namespace
     inline bool ShellExecuteFromExplorer(
         PCWSTR pszFile,
         PCWSTR pszParameters = nullptr,
-        PCWSTR workingDir = L"")
+        PCWSTR workingDir = L"",
+        int showCommand = SW_SHOWNORMAL)
     {
         CComPtr<IShellFolderViewDual> spFolderView;
         if (!GetDesktopAutomationObject(IID_PPV_ARGS(&spFolderView)))
@@ -141,12 +142,23 @@ namespace
             return false;
         }
 
-        CComQIPtr<IShellDispatch2>(spdispShell)
-            ->ShellExecuteW(CComBSTR(pszFile),
-                            CComVariant(pszParameters ? pszParameters : L""),
-                            CComVariant(workingDir),
-                            CComVariant(L""),
-                            CComVariant(SW_SHOWNORMAL));
+        CComQIPtr<IShellDispatch2> shellDispatch(spdispShell);
+        if (shellDispatch == nullptr)
+        {
+            Logger::warn(L"Failed to query IShellDispatch2");
+            return false;
+        }
+
+        result = shellDispatch->ShellExecuteW(CComBSTR(pszFile),
+                                              CComVariant(pszParameters ? pszParameters : L""),
+                                              CComVariant(workingDir),
+                                              CComVariant(L""),
+                                              CComVariant(showCommand));
+        if (result != S_OK)
+        {
+            Logger::warn(L"ShellExecuteW() failed. {}", GetErrorString(result));
+            return false;
+        }
 
         return true;
     }
@@ -263,7 +275,7 @@ inline HANDLE run_elevated(const std::wstring& file, const std::wstring& params,
 }
 
 // Run command as non-elevated user, returns true if succeeded, puts the process id into returnPid if returnPid != NULL
-inline bool run_non_elevated(const std::wstring& file, const std::wstring& params, DWORD* returnPid, const wchar_t* workingDir = nullptr, const bool showWindow = true)
+inline bool run_non_elevated(const std::wstring& file, const std::wstring& params, DWORD* returnPid, const wchar_t* workingDir = nullptr, const int showCommand = SW_SHOWNORMAL)
 {
     Logger::info(L"run_non_elevated with params={}", params);
     auto executable_args = L"\"" + file + L"\"";
@@ -332,11 +344,14 @@ inline bool run_non_elevated(const std::wstring& file, const std::wstring& param
     PROCESS_INFORMATION pi = { 0 };
     auto dwCreationFlags = EXTENDED_STARTUPINFO_PRESENT;
 
-    if (!showWindow)
+    if (showCommand != SW_SHOWNORMAL)
     {
         siex.StartupInfo.dwFlags = STARTF_USESHOWWINDOW;
-        siex.StartupInfo.wShowWindow = SW_HIDE;
-        dwCreationFlags = CREATE_NO_WINDOW;
+        siex.StartupInfo.wShowWindow = static_cast<WORD>(showCommand);
+        if (showCommand == SW_HIDE)
+        {
+            dwCreationFlags = CREATE_NO_WINDOW;
+        }
     }
 
     auto succeeded = CreateProcessW(file.c_str(),
@@ -373,14 +388,18 @@ inline bool run_non_elevated(const std::wstring& file, const std::wstring& param
     return succeeded;
 }
 
-inline bool RunNonElevatedEx(const std::wstring& file, const std::wstring& params, const std::wstring& working_dir)
+inline bool RunNonElevatedEx(
+    const std::wstring& file,
+    const std::wstring& params,
+    const std::wstring& working_dir,
+    int show_command = SW_SHOWNORMAL)
 {
     bool success = false;
     HRESULT co_init = E_FAIL;
     try
     {
         co_init = CoInitialize(nullptr);
-        success = ShellExecuteFromExplorer(file.c_str(), params.c_str(), working_dir.c_str());
+        success = ShellExecuteFromExplorer(file.c_str(), params.c_str(), working_dir.c_str(), show_command);
     }
     catch (...)
     {
