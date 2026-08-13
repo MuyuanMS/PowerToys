@@ -22,7 +22,7 @@ public interface IPythonScriptTrustService
     /// <summary>
     /// Persists the trust entry for <paramref name="scriptPath"/> with the given <paramref name="hash"/>.
     /// </summary>
-    void StoreTrust(string scriptPath, string hash);
+    Task StoreTrustAsync(string scriptPath, string hash);
 
     /// <summary>
     /// Computes the SHA-256 hash of the script file and returns the hex string.

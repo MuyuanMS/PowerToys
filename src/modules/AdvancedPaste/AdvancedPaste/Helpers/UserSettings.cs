@@ -474,34 +474,37 @@ namespace AdvancedPaste.Settings
             }
         }
 
-        public void StoreTrustedScriptHash(string scriptPath, string hash)
+        public Task StoreTrustedScriptHashAsync(string scriptPath, string hash)
         {
-            lock (_loadingSettingsLock)
+            return Task.Run(() =>
             {
-                try
+                lock (_loadingSettingsLock)
                 {
-                    var settings = _settingsUtils.GetSettingsOrDefault<AdvancedPasteSettings>(AdvancedPasteModuleName);
-                    if (settings?.Properties?.PythonScripts is null)
+                    try
                     {
-                        return;
+                        var settings = _settingsUtils.GetSettingsOrDefault<AdvancedPasteSettings>(AdvancedPasteModuleName);
+                        if (settings?.Properties?.PythonScripts is null)
+                        {
+                            return;
+                        }
+
+                        settings.Properties.PythonScripts.TrustedScriptHashes ??= new Dictionary<string, string>();
+                        settings.Properties.PythonScripts.TrustedScriptHashes[scriptPath] = hash;
+                        settings.Save(_settingsUtils);
+
+                        // Update in-memory cache.
+                        var updated = new Dictionary<string, string>(TrustedScriptHashes, StringComparer.OrdinalIgnoreCase)
+                        {
+                            [scriptPath] = hash,
+                        };
+                        TrustedScriptHashes = updated;
                     }
-
-                    settings.Properties.PythonScripts.TrustedScriptHashes ??= new Dictionary<string, string>();
-                    settings.Properties.PythonScripts.TrustedScriptHashes[scriptPath] = hash;
-                    settings.Save(_settingsUtils);
-
-                    // Update in-memory cache.
-                    var updated = new Dictionary<string, string>(TrustedScriptHashes, StringComparer.OrdinalIgnoreCase)
+                    catch (Exception ex)
                     {
-                        [scriptPath] = hash,
-                    };
-                    TrustedScriptHashes = updated;
+                        Logger.LogError("Failed to store trusted script hash", ex);
+                    }
                 }
-                catch (Exception ex)
-                {
-                    Logger.LogError("Failed to store trusted script hash", ex);
-                }
-            }
+            });
         }
 
         public async Task SetActiveAIProviderAsync(string providerId)

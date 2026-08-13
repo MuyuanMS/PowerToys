@@ -100,7 +100,8 @@ internal sealed class IntegrationTestUserSettings : IUserSettings
         return Task.CompletedTask;
     }
 
-    public void StoreTrustedScriptHash(string scriptPath, string hash)
+    public Task StoreTrustedScriptHashAsync(string scriptPath, string hash)
     {
+        return Task.CompletedTask;
     }
 }

@@ -65,6 +65,6 @@ namespace AdvancedPaste.Settings
 
         Task SetActiveAIProviderAsync(string providerId);
 
-        void StoreTrustedScriptHash(string scriptPath, string hash);
+        Task StoreTrustedScriptHashAsync(string scriptPath, string hash);
     }
 }

@@ -67,9 +67,9 @@ public sealed class PythonScriptTrustService(IUserSettings userSettings) : IPyth
         }
     }
 
-    public void StoreTrust(string scriptPath, string hash)
+    public Task StoreTrustAsync(string scriptPath, string hash)
     {
-        _userSettings.StoreTrustedScriptHash(scriptPath, hash);
+        return _userSettings.StoreTrustedScriptHashAsync(scriptPath, hash);
     }
 
     public string ComputeHash(string scriptPath)

@@ -92,7 +92,7 @@ public sealed class PasteFormatExecutor(
                 throw new OperationCanceledException("User declined to trust the Python script.");
             }
 
-            _pythonScriptTrustService.StoreTrust(scriptPath, trustedHash);
+            await _pythonScriptTrustService.StoreTrustAsync(scriptPath, trustedHash);
         }
 
         var scriptRoot = System.IO.Path.GetDirectoryName(scriptPath)
@@ -141,6 +141,10 @@ public sealed class PasteFormatExecutor(
             }
 
             var detectedFormat = await clipboardData.GetAvailableFormatsAsync();
+            if (clipboardData.Contains(StandardDataFormats.StorageItems))
+            {
+                detectedFormat |= ClipboardFormat.File;
+            }
 
             if (metadata.IsV2)
             {
