@@ -25,7 +25,9 @@ private:
     std::unique_ptr<LauncherUIHelper> m_uiHelper;
     std::mutex m_uiHelperMutex;
 
-    std::atomic<bool> m_cancelRequested{};
+    bool m_cancelRequested{};
+    bool m_launchInProgress{};
+    std::mutex m_launchStateMutex;
     std::once_flag m_launchOnce;
     std::thread m_launchThread;
 
