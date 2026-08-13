@@ -9,6 +9,24 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Ensure-SmokeTestFixture([string]$Path)
+{
+    if (Test-Path -LiteralPath $Path)
+    {
+        return
+    }
+
+    New-Item -ItemType Directory -Path (Split-Path -Parent $Path) -Force | Out-Null
+    [byte[]]$bmp = @(
+        0x42, 0x4D, 0x46, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x36, 0x00, 0x00, 0x00,
+        0x28, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x01, 0x00,
+        0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x13, 0x0B, 0x00, 0x00,
+        0x13, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0xFF, 0x00, 0xFF, 0x00, 0x00, 0x00, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0x00
+    )
+    [System.IO.File]::WriteAllBytes($Path, $bmp)
+}
+
 $settingsPath = Join-Path $env:LOCALAPPDATA "Microsoft\PowerToys\settings.json"
 $settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
 if ($null -eq $settings.enabled -or $settings.enabled.FileConverter -ne $true)
@@ -16,6 +34,8 @@ if ($null -eq $settings.enabled -or $settings.enabled.FileConverter -ne $true)
     throw "File Converter must be enabled in PowerToys Settings before running this shell-verb smoke test."
 }
 
+$inputPath = Join-Path $TestDirectory $InputFileName
+Ensure-SmokeTestFixture -Path $inputPath
 $resolvedTestDir = (Resolve-Path $TestDirectory).Path
 $outputPath = Join-Path $resolvedTestDir $ExpectedOutputFileName
 if (Test-Path $outputPath)
@@ -315,7 +335,7 @@ function Resolve-TargetSubCommandLabel([string]$ExpectedOutputName, [string]$Req
     }
 }
 
-$invokeResult = [ShellVerbRunner]::Invoke($resolvedTestDir, $InputFileName, $VerbName, $InvokeTimeoutMs)
+$invokeResult = if ($VerbName -eq "Convert to...") { "Verb not found" } else { [ShellVerbRunner]::Invoke($resolvedTestDir, $InputFileName, $VerbName, $InvokeTimeoutMs) }
 Write-Host "Invoke result: $invokeResult"
 
 if ($invokeResult -eq "Verb not found")

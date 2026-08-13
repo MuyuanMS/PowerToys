@@ -402,7 +402,15 @@ namespace
         }
 
         winrt_json::JsonObject json_payload;
-        if (!winrt_json::JsonObject::TryParse(winrt::to_hstring(payload), json_payload))
+        try
+        {
+            if (!winrt_json::JsonObject::TryParse(winrt::to_hstring(payload), json_payload))
+            {
+                rejection_reason = LoadLocalizedString(L"FileConverter_Error_InvalidJson", L"invalid JSON");
+                return false;
+            }
+        }
+        catch (...)
         {
             rejection_reason = LoadLocalizedString(L"FileConverter_Error_InvalidJson", L"invalid JSON");
             return false;

@@ -38,7 +38,7 @@ function Start-PowerToys {
 function Send-PipePayload {
     param(
         [string]$PipeSimpleName,
-        [string]$Payload,
+        [object]$Payload,
         [int]$ConnectTimeoutMs,
         [int]$Attempts
     )
@@ -53,7 +53,7 @@ function Send-PipePayload {
         try {
             $client.Connect($ConnectTimeoutMs)
 
-            $bytes = [System.Text.Encoding]::UTF8.GetBytes($Payload)
+            $bytes = if ($Payload -is [byte[]]) { $Payload } else { [System.Text.Encoding]::UTF8.GetBytes([string]$Payload) }
             $client.Write($bytes, 0, $bytes.Length)
             return $true
         }
@@ -78,6 +78,7 @@ try {
     $outputFile = Join-Path $RepoRoot "x64\Debug\WinUI3Apps\FileConverterSmokeTest\sample_converted.png"
     $runnerLog = Join-Path $RepoRoot "src\runner\x64\Debug\runner.log"
 
+    Ensure-FileConverterSmokeTestFixture -Path $sampleInput
     if (-not (Test-Path $sampleInput)) {
         throw "Sample input file not found at: $sampleInput"
     }
@@ -88,6 +89,10 @@ try {
     [pscustomobject]@{
         Name = "invalid-json"
         Payload = "not-json"
+    },
+    [pscustomobject]@{
+        Name = "invalid-utf8"
+        Payload = [byte[]](0xC3, 0x28)
     },
     [pscustomobject]@{
         Name = "missing-files"

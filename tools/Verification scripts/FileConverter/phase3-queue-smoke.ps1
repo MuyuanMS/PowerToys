@@ -61,6 +61,7 @@ try {
     $output1 = Join-Path $sampleDir "sample_converted.png"
     $output2 = Join-Path $sampleDir "sample2_converted.png"
 
+    Ensure-FileConverterSmokeTestFixture -Path $input1
     if (-not (Test-Path $powerToysExe)) {
         throw "PowerToys executable not found at: $powerToysExe"
     }
