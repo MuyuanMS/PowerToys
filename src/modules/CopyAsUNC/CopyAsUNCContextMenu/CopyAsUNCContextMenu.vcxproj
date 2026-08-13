@@ -150,7 +150,8 @@ xcopy /Y "$(ProjectDir)Assets\CopyAsUNC\CopyAsUNC.ico" "$(OutDir)Assets\CopyAsUN
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="CopyAsUNCContextMenu.base.rc" />
+    <ResourceCompile Include="Generated Files\CopyAsUNCContextMenu.rc" />
+    <None Include="CopyAsUNCContextMenu.base.rc" />
   </ItemGroup>
   <Import Project="$(RepoRoot)deps\spdlog.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
