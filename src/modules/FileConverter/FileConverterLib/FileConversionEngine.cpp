@@ -343,7 +343,8 @@ namespace file_converter
             hr = format_converter->CanConvert(pixel_format, target_pixel_format, &can_convert);
             if (FAILED(hr) || !can_convert)
             {
-                return { hr, HrMessage(LoadLocalizedString(L"FileConverter_Engine_UnsupportedPixelConversion", L"Source pixel format cannot be converted to target pixel format."), FAILED(hr) ? hr : E_FAIL) };
+                const HRESULT conversion_error = FAILED(hr) ? hr : E_FAIL;
+                return { conversion_error, HrMessage(LoadLocalizedString(L"FileConverter_Engine_UnsupportedPixelConversion", L"Source pixel format cannot be converted to target pixel format."), conversion_error) };
             }
 
             hr = format_converter->Initialize(oriented_source.Get(), target_pixel_format, WICBitmapDitherTypeNone, nullptr, 0.0f, WICBitmapPaletteTypeCustom);
