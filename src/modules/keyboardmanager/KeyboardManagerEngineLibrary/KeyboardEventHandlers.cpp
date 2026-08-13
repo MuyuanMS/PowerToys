@@ -46,6 +46,14 @@ namespace
             auto it = state.scanMap.find(scanKey);
             if (it != state.scanMap.end())
             {
+                if (state.GetSingleKeyAloneRemap(it->second) && state.numpadKeyPressed[it->second])
+                {
+                    // An alone-mapped numpad key can arrive as its navigation twin after Shift or
+                    // NumLock changes while held. Restore the original VK so its pending/combination
+                    // state is resolved by the matching key-up.
+                    data->lParam->vkCode = it->second;
+                }
+
                 auto keyIt = state.GetSingleKeyRemap(it->second);
                 if (keyIt)
                 {
@@ -161,6 +169,8 @@ namespace KeyboardEventHandlers
         {
             return 0;
         }
+
+        UpdateNumpadWithShift(data, state);
 
         const DWORD vk = data->lParam->vkCode;
         const bool isKeyUp = (data->wParam == WM_KEYUP || data->wParam == WM_SYSKEYUP);

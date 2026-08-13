@@ -93,6 +93,14 @@ bool MappingConfiguration::AddSingleKeyAloneRemap(const DWORD& originalKey, cons
     }
 
     aloneSingleKeyReMap[originalKey] = aloneRemapKey;
+    if (Helpers::IsNumpadKeyThatIsAffectedByShift(originalKey))
+    {
+        const auto scanCode = MapVirtualKey(originalKey, MAPVK_VK_TO_VSC);
+        if (scanCode != 0)
+        {
+            scanMap[scanCode] = originalKey;
+        }
+    }
     return true;
 }
 
