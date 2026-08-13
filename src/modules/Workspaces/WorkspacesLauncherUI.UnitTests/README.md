@@ -37,7 +37,7 @@ If you get NuGet restore errors on first build:
 The output directory depends on your platform/config. For arm64 Debug:
 
 ```powershell
-& "<path-to-vstest.console.exe>" "arm64\Debug\tests\WorkspacesLauncherUI.Tests\PowerToys.WorkspacesLauncherUI.Tests.dll" /Platform:ARM64
+& "<path-to-vstest.console.exe>" "$env:RepoRoot\arm64\Debug\tests\WorkspacesLauncherUI.Tests\PowerToys.WorkspacesLauncherUI.Tests.dll" /Platform:ARM64
 ```
 
 ### Option 2: Visual Studio Test Explorer
