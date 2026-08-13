@@ -128,6 +128,14 @@ $fileLocksmithContextMenuAppManifest.Package.Identity.Version = $manifestVersion
 Write-Host "FileLocksmithContextMenu version" $fileLocksmithContextMenuAppManifest.Package.Identity.Version
 $fileLocksmithContextMenuAppManifest.Save($fileLocksmithContextMenuAppManifestWriteFileLocation);
 
+# Set FileConverterContextMenu package version in AppManifest.xml
+$fileConverterContextMenuAppManifestWriteFileLocation = $PSScriptRoot + '/../src/modules/FileConverter/FileConverterContextMenu/AppxManifest.xml';
+$fileConverterContextMenuAppManifestReadFileLocation = $fileConverterContextMenuAppManifestWriteFileLocation;
+
+[XML]$fileConverterContextMenuAppManifest = Get-Content $fileConverterContextMenuAppManifestReadFileLocation
+$fileConverterContextMenuAppManifest.Package.Identity.Version = $manifestVersionNumber;
+$fileConverterContextMenuAppManifest.Save($fileConverterContextMenuAppManifestWriteFileLocation);
+
 # Set NewPlusContextMenu package version in AppManifest.xml
 $newPlusContextMenuAppManifestWriteFileLocation = $PSScriptRoot + '/../src/modules/NewPlus/NewShellExtensionContextMenu/AppxManifest.xml';
 $newPlusContextMenuAppManifestReadFileLocation = $newPlusContextMenuAppManifestWriteFileLocation;
