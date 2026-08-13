@@ -42,6 +42,15 @@ public sealed class PasteFormat
             ProviderId = providerId ?? string.Empty,
         };
 
+    public static PasteFormat CreatePythonScriptFormat(string name, string scriptPath, string description, ClipboardFormat availableFormats) =>
+        new(PasteFormats.PythonScript, availableFormats, isAIServiceEnabled: false)
+        {
+            Name = name,
+            Prompt = scriptPath,
+            Description = description,
+            IsSavedQuery = true,
+        };
+
     public PasteFormatMetadataAttribute Metadata => MetadataDict[Format];
 
     public string IconGlyph => Metadata.IconGlyph;
@@ -52,6 +61,8 @@ public sealed class PasteFormat
 
     public string Prompt { get; private init; }
 
+    public string Description { get; private init; } = string.Empty;
+
     public string ProviderId { get; private init; } = string.Empty;
 
     public bool IsSavedQuery { get; private init; }
@@ -60,7 +71,9 @@ public sealed class PasteFormat
 
     public string AccessibleName => $"{Name} ({ShortcutText})";
 
-    public string ToolTip => string.IsNullOrEmpty(Prompt) ? $"{Name} ({ShortcutText})" : Prompt;
+    public string ToolTip => !string.IsNullOrWhiteSpace(Description)
+        ? Description
+        : string.IsNullOrEmpty(Prompt) ? $"{Name} ({ShortcutText})" : Prompt;
 
     public string Query => string.IsNullOrEmpty(Prompt) ? Name : Prompt;
 

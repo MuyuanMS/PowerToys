@@ -45,8 +45,26 @@ namespace AdvancedPaste.Settings
 
         public PasteAIConfiguration PasteAIConfiguration { get; }
 
+        public IReadOnlyList<AdvancedPastePythonScriptAction> PythonScriptActions { get; }
+
+        public bool IsPythonScriptsEnabled { get; }
+
+        public string PythonScriptsFolder { get; }
+
+        public string PythonExecutablePath { get; }
+
+        public bool PythonUseWsl { get; }
+
+        public string PythonWslDistribution { get; }
+
+        public int PythonScriptTimeoutSeconds { get; }
+
+        public IReadOnlyDictionary<string, string> TrustedScriptHashes { get; }
+
         public event EventHandler Changed;
 
         Task SetActiveAIProviderAsync(string providerId);
+
+        Task StoreTrustedScriptHashAsync(string scriptPath, string hash);
     }
 }

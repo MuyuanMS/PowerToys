@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.IO.Abstractions;
 using System.Linq;
 using System.Threading;
@@ -25,6 +26,10 @@ namespace AdvancedPaste.Settings
         private readonly Lock _loadingSettingsLock = new();
         private readonly List<PasteFormats> _additionalActions;
         private readonly List<AdvancedPasteCustomAction> _customActions;
+        private readonly List<AdvancedPastePythonScriptAction> _pythonScriptActions;
+        private FileSystemWatcher _scriptFolderWatcher;
+        private CancellationTokenSource _scriptFolderDebounce;
+        private string _watchedScriptsFolder = string.Empty;
 
         private const string AdvancedPasteModuleName = "AdvancedPaste";
         private const int MaxNumberOfRetry = 5;
@@ -66,6 +71,22 @@ namespace AdvancedPaste.Settings
 
         public PasteAIConfiguration PasteAIConfiguration { get; private set; }
 
+        public IReadOnlyList<AdvancedPastePythonScriptAction> PythonScriptActions => _pythonScriptActions;
+
+        public string PythonScriptsFolder { get; private set; }
+
+        public bool IsPythonScriptsEnabled { get; private set; }
+
+        public string PythonExecutablePath { get; private set; }
+
+        public bool PythonUseWsl { get; private set; }
+
+        public string PythonWslDistribution { get; private set; } = string.Empty;
+
+        public int PythonScriptTimeoutSeconds { get; private set; } = 30;
+
+        public IReadOnlyDictionary<string, string> TrustedScriptHashes { get; private set; } = new Dictionary<string, string>();
+
         public UserSettings(IFileSystem fileSystem)
         {
             _settingsUtils = new SettingsUtils(fileSystem);
@@ -76,14 +97,28 @@ namespace AdvancedPaste.Settings
             CloseAfterLosingFocus = false;
             EnableClipboardPreview = true;
             PasteAIConfiguration = new PasteAIConfiguration();
+            PythonScriptsFolder = GetDefaultScriptsFolder();
+            PythonExecutablePath = string.Empty;
+            PythonUseWsl = false;
+            PythonWslDistribution = string.Empty;
+            PythonScriptTimeoutSeconds = 30;
             _additionalActions = [];
             _customActions = [];
+            _pythonScriptActions = [];
             _taskScheduler = TaskScheduler.FromCurrentSynchronizationContext();
 
             LoadSettingsFromJson();
 
             _watcher = Helper.GetFileWatcher(AdvancedPasteModuleName, "settings.json", OnSettingsFileChanged, fileSystem);
         }
+
+        private static string GetDefaultScriptsFolder() =>
+            System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Microsoft",
+                "PowerToys",
+                "AdvancedPaste",
+                "Scripts");
 
         private void OnSettingsFileChanged()
         {
@@ -121,6 +156,7 @@ namespace AdvancedPaste.Settings
                         if (settings != null)
                         {
                             bool migratedLegacyEnablement = TryMigrateLegacyAIEnablement(settings);
+                            bool migratedLegacyPythonScripts = settings.Properties.PythonScripts?.MigrateLegacyIfNeeded() == true;
 
                             void UpdateSettings()
                             {
@@ -162,6 +198,51 @@ namespace AdvancedPaste.Settings
                                 _customActions.Clear();
                                 _customActions.AddRange(properties.CustomActions.Value.Where(customAction => customAction.IsShown && customAction.IsValid));
 
+                                var pythonScripts = properties.PythonScripts ?? new AdvancedPastePythonScriptSettings();
+
+                                var mode = pythonScripts.Mode ?? "disabled";
+
+                                // Enforce GPO: if Python scripts are disallowed by policy, force disabled.
+                                if (PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPastePythonScriptsValue() == PowerToys.GPOWrapper.GpoRuleConfigured.Disabled)
+                                {
+                                    mode = "disabled";
+                                }
+
+                                var isWindowsMode = string.Equals(mode, "windows", StringComparison.OrdinalIgnoreCase);
+                                PythonUseWsl = string.Equals(mode, "wsl", StringComparison.OrdinalIgnoreCase);
+                                IsPythonScriptsEnabled = isWindowsMode || PythonUseWsl;
+
+                                if (PythonUseWsl)
+                                {
+                                    var wslSettings = pythonScripts.WslSettings ?? new PythonScriptWslSettings();
+                                    PythonScriptsFolder = string.IsNullOrWhiteSpace(wslSettings.ScriptsFolder)
+                                        ? GetDefaultScriptsFolder()
+                                        : wslSettings.ScriptsFolder;
+                                    PythonExecutablePath = string.Empty;
+                                    PythonWslDistribution = wslSettings.Distribution ?? string.Empty;
+                                }
+                                else
+                                {
+                                    var winSettings = pythonScripts.WindowsSettings ?? new PythonScriptWindowsSettings();
+                                    PythonScriptsFolder = string.IsNullOrWhiteSpace(winSettings.ScriptsFolder)
+                                        ? GetDefaultScriptsFolder()
+                                        : winSettings.ScriptsFolder;
+                                    PythonExecutablePath = winSettings.PythonExecutablePath ?? string.Empty;
+                                    PythonWslDistribution = string.Empty;
+                                }
+
+                                PythonScriptTimeoutSeconds = pythonScripts.TimeoutSeconds > 0
+                                    ? Math.Min(pythonScripts.TimeoutSeconds, int.MaxValue / 1000)
+                                    : 30;
+                                TrustedScriptHashes = new Dictionary<string, string>(
+                                    pythonScripts.TrustedScriptHashes ?? new Dictionary<string, string>(),
+                                    StringComparer.OrdinalIgnoreCase);
+
+                                _pythonScriptActions.Clear();
+                                _pythonScriptActions.AddRange(pythonScripts.Value ?? []);
+
+                                UpdateScriptFolderWatcher(PythonScriptsFolder);
+
                                 Changed?.Invoke(this, EventArgs.Empty);
                             }
 
@@ -169,7 +250,7 @@ namespace AdvancedPaste.Settings
                                 .StartNew(UpdateSettings, CancellationToken.None, TaskCreationOptions.None, _taskScheduler)
                                 .Wait();
 
-                            if (migratedLegacyEnablement)
+                            if (migratedLegacyEnablement || migratedLegacyPythonScripts)
                             {
                                 settings.Save(_settingsUtils);
                             }
@@ -326,6 +407,106 @@ namespace AdvancedPaste.Settings
             return string.IsNullOrWhiteSpace(filtered) ? "default" : filtered.ToLowerInvariant();
         }
 
+        private void UpdateScriptFolderWatcher(string folderPath)
+        {
+            if (string.Equals(_watchedScriptsFolder, folderPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _scriptFolderWatcher?.Dispose();
+            _scriptFolderWatcher = null;
+            _watchedScriptsFolder = folderPath;
+
+            if (string.IsNullOrWhiteSpace(folderPath))
+            {
+                return;
+            }
+
+            try
+            {
+                if (!System.IO.Directory.Exists(folderPath))
+                {
+                    System.IO.Directory.CreateDirectory(folderPath);
+                }
+
+                _scriptFolderWatcher = new FileSystemWatcher(folderPath, "*.py")
+                {
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.CreationTime,
+                    EnableRaisingEvents = true,
+                    IncludeSubdirectories = false,
+                };
+
+                _scriptFolderWatcher.Changed += OnScriptFolderChanged;
+                _scriptFolderWatcher.Created += OnScriptFolderChanged;
+                _scriptFolderWatcher.Deleted += OnScriptFolderChanged;
+                _scriptFolderWatcher.Renamed += OnScriptFolderChanged;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to set up script folder watcher for {folderPath}", ex);
+            }
+        }
+
+        private void OnScriptFolderChanged(object sender, FileSystemEventArgs e)
+        {
+            lock (_loadingSettingsLock)
+            {
+                _scriptFolderDebounce?.Cancel();
+                _scriptFolderDebounce?.Dispose();
+                _scriptFolderDebounce = new CancellationTokenSource();
+
+                var token = _scriptFolderDebounce.Token;
+                Task.Delay(TimeSpan.FromMilliseconds(500), token)
+                    .ContinueWith(
+                        _ =>
+                        {
+                            Task.Factory
+                                .StartNew(
+                                    () => Changed?.Invoke(this, EventArgs.Empty),
+                                    CancellationToken.None,
+                                    TaskCreationOptions.None,
+                                    _taskScheduler);
+                        },
+                        token,
+                        TaskContinuationOptions.NotOnCanceled,
+                        TaskScheduler.Default);
+            }
+        }
+
+        public Task StoreTrustedScriptHashAsync(string scriptPath, string hash)
+        {
+            return Task.Run(() =>
+            {
+                lock (_loadingSettingsLock)
+                {
+                    try
+                    {
+                        var settings = _settingsUtils.GetSettingsOrDefault<AdvancedPasteSettings>(AdvancedPasteModuleName);
+                        if (settings?.Properties?.PythonScripts is null)
+                        {
+                            return;
+                        }
+
+                        settings.Properties.PythonScripts.TrustedScriptHashes ??= new Dictionary<string, string>();
+                        settings.Properties.PythonScripts.TrustedScriptHashes[scriptPath] = hash;
+                        settings.Save(_settingsUtils);
+
+                        // Update in-memory cache.
+                        var updated = new Dictionary<string, string>(TrustedScriptHashes, StringComparer.OrdinalIgnoreCase)
+                        {
+                            [scriptPath] = hash,
+                        };
+                        TrustedScriptHashes = updated;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError("Failed to store trusted script hash", ex);
+                    }
+                }
+            });
+        }
+
         public async Task SetActiveAIProviderAsync(string providerId)
         {
             if (string.IsNullOrWhiteSpace(providerId))
@@ -417,7 +598,11 @@ namespace AdvancedPaste.Settings
             {
                 if (disposing)
                 {
+                    _cancellationTokenSource?.Cancel();
+                    _scriptFolderDebounce?.Cancel();
                     _cancellationTokenSource?.Dispose();
+                    _scriptFolderDebounce?.Dispose();
+                    _scriptFolderWatcher?.Dispose();
                     _watcher?.Dispose();
                 }
 
