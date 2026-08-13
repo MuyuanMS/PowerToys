@@ -233,13 +233,7 @@ IFACEMETHODIMP SvgThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_A
                     std::filesystem::remove(fileNamePng, cleanupError);
                     if (cleanupError)
                     {
-                        if (thumbnail != nullptr)
-                        {
-                            DeleteObject(thumbnail);
-                        }
-
-                        Logger::error(L"Failed to remove temporary PNG thumbnail.");
-                        return E_FAIL;
+                        Logger::warn(L"Failed to remove temporary PNG thumbnail.");
                     }
 
                     if (thumbnail == nullptr)
