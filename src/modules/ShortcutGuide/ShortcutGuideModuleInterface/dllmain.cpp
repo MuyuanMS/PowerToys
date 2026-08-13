@@ -76,7 +76,7 @@ public:
     virtual void set_config(const wchar_t* config) override
     {
         Logger::trace("set_config()");
-                    try
+        try
         {
             // Parse the input JSON string.
             PowerToysSettings::PowerToyValues values =
