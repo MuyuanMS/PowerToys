@@ -862,10 +862,9 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
 
         foreach (var line in lines)
         {
-            var code = line.Split('#', 2)[0];
             if (tripleQuote is not null)
             {
-                if (CountOccurrences(code, tripleQuote) % 2 != 0)
+                if (CountOccurrences(line, tripleQuote) % 2 != 0)
                 {
                     tripleQuote = null;
                 }
@@ -873,6 +872,7 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
                 continue;
             }
 
+            var code = line.Split('#', 2)[0];
             var match = ApFunctionRegex.Match(code);
             if (match.Success)
             {
@@ -1904,7 +1904,8 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
             obj["html"] = ExtractHtmlFragment(rawHtml);
         }
 
-        if (clipboardData.Contains(StandardDataFormats.Bitmap))
+        if (detectedFormat.HasFlag(ClipboardFormat.Image) ||
+            clipboardData.Contains(StandardDataFormats.Bitmap))
         {
             var pngBytes = await clipboardData.GetImageAsPngBytesAsync();
             if (pngBytes != null)

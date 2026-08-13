@@ -62,10 +62,12 @@ public sealed class AdvancedPastePythonScriptSettings
     /// </summary>
     public bool MigrateLegacyIfNeeded()
     {
+        bool repairedNestedSettings = WindowsSettings is null || WslSettings is null;
         WindowsSettings ??= new();
         WslSettings ??= new();
 
-        bool changed = IsEnabled.HasValue ||
+        bool changed = repairedNestedSettings ||
+                       IsEnabled.HasValue ||
                        UseWsl.HasValue ||
                        ScriptsFolder is not null ||
                        PythonExecutablePath is not null ||

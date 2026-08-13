@@ -748,10 +748,9 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
             foreach (var line in lines)
             {
-                var code = line.Split('#', 2)[0];
                 if (tripleQuote is not null)
                 {
-                    if (CountOccurrences(code, tripleQuote) % 2 != 0)
+                    if (CountOccurrences(line, tripleQuote) % 2 != 0)
                     {
                         tripleQuote = null;
                     }
@@ -759,6 +758,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                     continue;
                 }
 
+                var code = line.Split('#', 2)[0];
                 var match = PythonActionFunctionRegex.Match(code);
                 if (match.Success)
                 {

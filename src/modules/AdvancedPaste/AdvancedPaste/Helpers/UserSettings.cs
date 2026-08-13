@@ -595,6 +595,8 @@ namespace AdvancedPaste.Settings
             {
                 if (disposing)
                 {
+                    _cancellationTokenSource?.Cancel();
+                    _scriptFolderDebounce?.Cancel();
                     _cancellationTokenSource?.Dispose();
                     _scriptFolderDebounce?.Dispose();
                     _scriptFolderWatcher?.Dispose();

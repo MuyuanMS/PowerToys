@@ -6625,6 +6625,18 @@ Text uses the current drawing color.</value>
   <data name="AdvancedPaste_ScriptsFolder_TextBox.PlaceholderText" xml:space="preserve">
     <value>Default (%LOCALAPPDATA%\Microsoft\PowerToys\AdvancedPaste\Scripts)</value>
   </data>
+  <data name="AdvancedPaste_BrowseScriptsFolder_Button.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Select scripts folder</value>
+  </data>
+  <data name="AdvancedPaste_BrowseScriptsFolder_Button.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Select scripts folder</value>
+  </data>
+  <data name="AdvancedPaste_OpenScriptsFolder_Button.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Open scripts folder</value>
+  </data>
+  <data name="AdvancedPaste_OpenScriptsFolder_Button.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Open scripts folder</value>
+  </data>
   <data name="AdvancedPaste_PythonExecutablePath_SettingsCard.Header" xml:space="preserve">
     <value>Python interpreter</value>
   </data>
@@ -6633,6 +6645,12 @@ Text uses the current drawing color.</value>
   </data>
   <data name="AdvancedPaste_PythonExecutablePath_TextBox.PlaceholderText" xml:space="preserve">
     <value>Auto-detect (e.g. C:\Users\&lt;user&gt;\anaconda3\python.exe)</value>
+  </data>
+  <data name="AdvancedPaste_BrowsePythonExecutable_Button.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Select Python executable</value>
+  </data>
+  <data name="AdvancedPaste_BrowsePythonExecutable_Button.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Select Python executable</value>
   </data>
   <data name="AdvancedPaste_UseWsl_SettingsCard.Header" xml:space="preserve">
     <value>Use WSL</value>

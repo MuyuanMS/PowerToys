@@ -553,6 +553,7 @@
                                     HorizontalAlignment="Stretch"
                                     Text="{x:Bind ViewModel.ScriptsFolder, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
                                 <Button
+                                    x:Uid="AdvancedPaste_BrowseScriptsFolder_Button"
                                     VerticalAlignment="Bottom"
                                     Click="BrowseScriptsFolder_Click"
                                     Content="{ui:FontIcon Glyph=&#xE8DA;,
@@ -560,6 +561,7 @@
                                     Style="{StaticResource SubtleButtonStyle}" />
                                 <Button
                                     x:Name="OpenScriptsFolderButton"
+                                    x:Uid="AdvancedPaste_OpenScriptsFolder_Button"
                                     VerticalAlignment="Bottom"
                                     Click="OpenScriptsFolder_Click"
                                     Content="{ui:FontIcon Glyph=&#xE838;,
@@ -581,6 +583,7 @@
                                     HorizontalAlignment="Stretch"
                                     Text="{x:Bind ViewModel.PythonExecutablePath, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
                                 <Button
+                                    x:Uid="AdvancedPaste_BrowsePythonExecutable_Button"
                                     VerticalAlignment="Bottom"
                                     Click="BrowsePythonExecutablePath_Click"
                                     Content="{ui:FontIcon Glyph=&#xE8DA;,

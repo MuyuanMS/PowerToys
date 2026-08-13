@@ -213,7 +213,8 @@ displays a user-friendly summary in the UI:
 
 - **ModuleNotFoundError** — identifies the missing module and suggests installing it.
 - **SyntaxError** — shows the file and line number.
-- **Timeout** — shows the configured timeout value (default 30 s; configurable in Settings).
+- **Timeout** — shows the configured timeout value (default 30 s; advanced users can change
+  `timeoutSeconds` in the Advanced Paste `settings.json` file).
 - **Other errors** — shows the last line of the traceback as a summary, with the full
   traceback available in the expandable *Details* section.
 

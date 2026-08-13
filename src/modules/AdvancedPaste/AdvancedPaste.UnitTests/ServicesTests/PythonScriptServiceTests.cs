@@ -188,7 +188,7 @@ public sealed class PythonScriptServiceTests
             "\"\"\"Module documentation.",
             "import requests",
             "from PIL import Image",
-            "\"\"\"",
+            "# documented example \"\"\"",
             "import numpy",
         };
 
@@ -534,7 +534,7 @@ public sealed class PythonScriptServiceTests
             "EXAMPLE = \"\"\"\n" +
             "def advanced_paste_from_html_to_text(html):\n" +
             "    return html\n" +
-            "\"\"\"\n" +
+            "# documented example \"\"\"\n" +
             "def advanced_paste_from_text_to_text(text):\n" +
             "    return text\n");
 
