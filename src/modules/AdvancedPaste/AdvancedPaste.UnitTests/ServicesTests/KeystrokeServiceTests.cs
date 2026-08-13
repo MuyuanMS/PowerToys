@@ -37,6 +37,22 @@ public sealed class KeystrokeServiceTests
 
         public IReadOnlyList<PasteFormats> AdditionalActions => Array.Empty<PasteFormats>();
 
+        public string FixSpellingAndGrammarPrompt => string.Empty;
+
+        public string FixSpellingAndGrammarSystemPrompt => string.Empty;
+
+        public string FixSpellingAndGrammarProviderId => string.Empty;
+
+        public bool FixSpellingAndGrammarCoachingEnabled => false;
+
+        public bool FixSpellingAndGrammarCoachingShortcutSet => false;
+
+        public string FixSpellingAndGrammarCoachingPrompt => string.Empty;
+
+        public string FixSpellingAndGrammarCoachingSystemPrompt => string.Empty;
+
+        public string FixSpellingAndGrammarCoachingProviderId => string.Empty;
+
         public PasteAIConfiguration PasteAIConfiguration { get; set; } = new();
 
         public event EventHandler Changed
