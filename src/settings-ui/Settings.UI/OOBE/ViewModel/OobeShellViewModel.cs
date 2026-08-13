@@ -24,6 +24,7 @@ namespace Microsoft.PowerToys.Settings.UI.OOBE.ViewModel
             (PowerToysModules.Awake, false),
             (PowerToysModules.CmdNotFound, false),
             (PowerToysModules.CmdPal, false),
+            (PowerToysModules.ClipPing, true),
             (PowerToysModules.ColorPicker, false),
             (PowerToysModules.CropAndLock, false),
             (PowerToysModules.EnvironmentVariables, false),
