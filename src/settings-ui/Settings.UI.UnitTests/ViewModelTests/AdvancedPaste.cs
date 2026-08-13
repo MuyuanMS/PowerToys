@@ -118,5 +118,25 @@ namespace ViewModelTests
             Assert.IsNull(settings.WslDistribution);
             Assert.IsFalse(settings.MigrateLegacyIfNeeded());
         }
+
+        [TestMethod]
+        public void PythonScriptSettings_MigrateLegacyIfNeeded_RepairsNullNestedSettings()
+        {
+            var settings = new AdvancedPastePythonScriptSettings
+            {
+                IsEnabled = true,
+                UseWsl = false,
+                ScriptsFolder = @"C:\scripts",
+                PythonExecutablePath = @"C:\Python\python.exe",
+                WindowsSettings = null,
+                WslSettings = null,
+            };
+
+            Assert.IsTrue(settings.MigrateLegacyIfNeeded());
+            Assert.IsNotNull(settings.WindowsSettings);
+            Assert.IsNotNull(settings.WslSettings);
+            Assert.AreEqual(@"C:\scripts", settings.WindowsSettings.ScriptsFolder);
+            Assert.AreEqual(@"C:\Python\python.exe", settings.WindowsSettings.PythonExecutablePath);
+        }
     }
 }

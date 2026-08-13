@@ -181,6 +181,24 @@ public sealed class PythonScriptServiceTests
     }
 
     [TestMethod]
+    public void MergeWithAutoDetectedImports_SkipsMultilineStrings()
+    {
+        var lines = new[]
+        {
+            "\"\"\"Module documentation.",
+            "import requests",
+            "from PIL import Image",
+            "\"\"\"",
+            "import numpy",
+        };
+
+        var result = PythonScriptService.MergeWithAutoDetectedImports(lines, []);
+
+        Assert.AreEqual(1, result.Count);
+        Assert.AreEqual("numpy", result[0].ImportName);
+    }
+
+    [TestMethod]
     public void ParsePythonError_ModuleNotFoundError()
     {
         var stderr = """

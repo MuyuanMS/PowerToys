@@ -43,6 +43,8 @@ namespace AdvancedPaste.Settings
 
         public bool ShowCustomPreview { get; private set; }
 
+        public bool ShowAIPaste { get; private set; }
+
         public bool CloseAfterLosingFocus { get; private set; }
 
         public bool EnableClipboardPreview { get; private set; }
@@ -91,6 +93,7 @@ namespace AdvancedPaste.Settings
 
             IsAIEnabled = false;
             ShowCustomPreview = true;
+            ShowAIPaste = true;
             CloseAfterLosingFocus = false;
             EnableClipboardPreview = true;
             PasteAIConfiguration = new PasteAIConfiguration();
@@ -161,6 +164,7 @@ namespace AdvancedPaste.Settings
 
                                 IsAIEnabled = properties.IsAIEnabled;
                                 ShowCustomPreview = properties.ShowCustomPreview;
+                                ShowAIPaste = properties.ShowAIPaste;
                                 CloseAfterLosingFocus = properties.CloseAfterLosingFocus;
                                 EnableClipboardPreview = properties.EnableClipboardPreview;
                                 PasteAIConfiguration = properties.PasteAIConfiguration ?? new PasteAIConfiguration();
@@ -227,13 +231,15 @@ namespace AdvancedPaste.Settings
                                     PythonWslDistribution = string.Empty;
                                 }
 
-                                PythonScriptTimeoutSeconds = pythonScripts.TimeoutSeconds > 0 ? pythonScripts.TimeoutSeconds : 30;
+                                PythonScriptTimeoutSeconds = pythonScripts.TimeoutSeconds > 0
+                                    ? Math.Min(pythonScripts.TimeoutSeconds, int.MaxValue / 1000)
+                                    : 30;
                                 TrustedScriptHashes = new Dictionary<string, string>(
                                     pythonScripts.TrustedScriptHashes ?? new Dictionary<string, string>(),
                                     StringComparer.OrdinalIgnoreCase);
 
                                 _pythonScriptActions.Clear();
-                                _pythonScriptActions.AddRange(pythonScripts.Value);
+                                _pythonScriptActions.AddRange(pythonScripts.Value ?? []);
 
                                 UpdateScriptFolderWatcher(PythonScriptsFolder);
 

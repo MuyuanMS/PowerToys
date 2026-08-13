@@ -46,6 +46,8 @@ namespace AdvancedPaste.ViewModels
         private readonly IPythonScriptService _pythonScriptService;
         private IReadOnlyList<PythonScriptMetadata> _pythonScriptMetadataCache;
         private string _cachedPythonScriptsFolder;
+        private string _discoveringPythonScriptsFolder;
+        private CancellationTokenSource _scriptDiscoveryCancellationTokenSource;
 
         private CancellationTokenSource _pasteActionCancellationTokenSource;
 
@@ -147,6 +149,8 @@ namespace AdvancedPaste.ViewModels
                 return _credentialsProvider.IsConfigured();
             }
         }
+
+        public bool ShowAIPasteSection => _userSettings.ShowAIPaste && IsAllowedByGPO;
 
         public ObservableCollection<PasteAIProviderDefinition> AIProviders => _userSettings?.PasteAIConfiguration?.Providers ?? new ObservableCollection<PasteAIProviderDefinition>();
 
@@ -333,6 +337,7 @@ namespace AdvancedPaste.ViewModels
             OnPropertyChanged(nameof(AIProviders));
             OnPropertyChanged(nameof(AllowedAIProviders));
             OnPropertyChanged(nameof(ShowClipboardPreview));
+            OnPropertyChanged(nameof(ShowAIPasteSection));
 
             NotifyActiveProviderChanged();
 
@@ -465,8 +470,8 @@ namespace AdvancedPaste.ViewModels
             if (_pythonScriptMetadataCache is null ||
                 !string.Equals(_cachedPythonScriptsFolder, folder, StringComparison.OrdinalIgnoreCase))
             {
-                _pythonScriptMetadataCache = _pythonScriptService.DiscoverScripts(folder);
-                _cachedPythonScriptsFolder = folder;
+                _ = StartPythonScriptDiscoveryAsync(folder);
+                yield break;
             }
 
             var scriptActions = _userSettings.PythonScriptActions;
@@ -491,7 +496,49 @@ namespace AdvancedPaste.ViewModels
                 }
 
                 var filteredFormats = availableFormats & meta.SupportedFormats;
-                yield return PasteFormat.CreatePythonScriptFormat(meta.Name, meta.ScriptPath, filteredFormats);
+                yield return PasteFormat.CreatePythonScriptFormat(meta.Name, meta.ScriptPath, meta.Description, filteredFormats);
+            }
+        }
+
+        private async Task StartPythonScriptDiscoveryAsync(string folder)
+        {
+            if (string.Equals(_discoveringPythonScriptsFolder, folder, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _scriptDiscoveryCancellationTokenSource?.Cancel();
+            _scriptDiscoveryCancellationTokenSource?.Dispose();
+            _scriptDiscoveryCancellationTokenSource = new CancellationTokenSource();
+            var cancellationToken = _scriptDiscoveryCancellationTokenSource.Token;
+            _discoveringPythonScriptsFolder = folder;
+
+            try
+            {
+                var metadata = await Task.Run(() => _pythonScriptService.DiscoverScripts(folder, cancellationToken), cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                _dispatcherQueue.TryEnqueue(() =>
+                {
+                    if (!cancellationToken.IsCancellationRequested &&
+                        string.Equals(_userSettings.PythonScriptsFolder, folder, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _pythonScriptMetadataCache = metadata;
+                        _cachedPythonScriptsFolder = folder;
+                        _discoveringPythonScriptsFolder = null;
+                        EnqueueRefreshPasteFormats();
+                    }
+                });
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to discover Python scripts in {folder}", ex);
+                if (string.Equals(_discoveringPythonScriptsFolder, folder, StringComparison.OrdinalIgnoreCase))
+                {
+                    _discoveringPythonScriptsFolder = null;
+                }
             }
         }
 
@@ -499,6 +546,8 @@ namespace AdvancedPaste.ViewModels
         {
             _clipboardTimer.Stop();
             _pasteActionCancellationTokenSource?.Dispose();
+            _scriptDiscoveryCancellationTokenSource?.Cancel();
+            _scriptDiscoveryCancellationTokenSource?.Dispose();
             GC.SuppressFinalize(this);
         }
 

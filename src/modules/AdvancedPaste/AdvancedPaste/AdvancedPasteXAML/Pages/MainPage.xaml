@@ -251,8 +251,9 @@
             Grid.Row="1"
             Margin="20,0,20,0"
             x:FieldModifier="public"
-            IsEnabled="True"
-            TabIndex="0">
+            IsEnabled="{x:Bind ViewModel.IsCustomAIServiceEnabled, Mode=OneWay}"
+            TabIndex="0"
+            Visibility="{x:Bind ViewModel.ShowAIPasteSection, Converter={StaticResource BoolToVisibilityConverter}, Mode=OneWay}">
             <controls:PromptBox.Footer>
                 <StackPanel Orientation="Horizontal" Visibility="{x:Bind ViewModel.IsCustomAIServiceEnabled, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
                     <TextBlock

@@ -41,7 +41,7 @@ public interface IPythonScriptService
     /// <summary>
     /// Discovers all .py scripts in <paramref name="folderPath"/> and returns their metadata.
     /// </summary>
-    IReadOnlyList<PythonScriptMetadata> DiscoverScripts(string folderPath);
+    IReadOnlyList<PythonScriptMetadata> DiscoverScripts(string folderPath, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Finds the Python executable to use. Returns null if none is found.

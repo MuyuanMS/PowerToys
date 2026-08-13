@@ -356,6 +356,10 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
                     RemoveFromFormatArray(formatArray, "image");
                 }
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 Logger.LogError("Failed to extract image from clipboard", ex);
@@ -1032,9 +1036,35 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
             StringComparer.OrdinalIgnoreCase);
 
         var autoDetected = new Dictionary<string, PythonRequirement>(StringComparer.OrdinalIgnoreCase);
+        string tripleQuote = null;
 
         foreach (var rawLine in lines)
         {
+            if (tripleQuote is not null)
+            {
+                if (CountOccurrences(rawLine, tripleQuote) % 2 != 0)
+                {
+                    tripleQuote = null;
+                }
+
+                continue;
+            }
+
+            var codeWithoutComment = rawLine.Split('#', 2)[0];
+            var doubleQuotes = CountOccurrences(codeWithoutComment, "\"\"\"");
+            var singleQuotes = CountOccurrences(codeWithoutComment, "'''");
+            if (doubleQuotes % 2 != 0)
+            {
+                tripleQuote = "\"\"\"";
+                continue;
+            }
+
+            if (singleQuotes % 2 != 0)
+            {
+                tripleQuote = "'''";
+                continue;
+            }
+
             var line = rawLine.Trim();
 
             // Skip comments and blank lines
@@ -1167,7 +1197,7 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
             : result;
     }
 
-    public IReadOnlyList<PythonScriptMetadata> DiscoverScripts(string folderPath)
+    public IReadOnlyList<PythonScriptMetadata> DiscoverScripts(string folderPath, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
         {
@@ -1179,6 +1209,7 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
         {
             foreach (var file in Directory.EnumerateFiles(folderPath, "*.py", SearchOption.TopDirectoryOnly))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
                     var metadata = ReadMetadata(file);
@@ -1295,6 +1326,11 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
             process.Kill(entireProcessTree: true);
             return false;
         }
+        catch (OperationCanceledException)
+        {
+            process.Kill(entireProcessTree: true);
+            throw;
+        }
 
         return process.ExitCode == 0;
     }
@@ -1330,6 +1366,11 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
         {
             process.Kill(entireProcessTree: true);
             return false;
+        }
+        catch (OperationCanceledException)
+        {
+            process.Kill(entireProcessTree: true);
+            throw;
         }
 
         return process.ExitCode == 0;
@@ -1385,6 +1426,11 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
                     packages,
                     _userSettings.PythonScriptTimeoutSeconds),
                 new TimeoutException());
+        }
+        catch (OperationCanceledException)
+        {
+            process.Kill(entireProcessTree: true);
+            throw;
         }
 
         if (process.ExitCode != 0)
@@ -1455,6 +1501,11 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
                     packages,
                     _userSettings.PythonScriptTimeoutSeconds),
                 new TimeoutException());
+        }
+        catch (OperationCanceledException)
+        {
+            process.Kill(entireProcessTree: true);
+            throw;
         }
 
         if (process.ExitCode != 0)

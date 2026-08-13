@@ -329,8 +329,9 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         {
             get
             {
-                var scripts = _advancedPasteSettings.Properties.PythonScripts;
-                return scripts != null && !string.Equals(scripts.Mode, "disabled", StringComparison.OrdinalIgnoreCase);
+                var mode = _advancedPasteSettings.Properties.PythonScripts?.Mode;
+                return string.Equals(mode, "windows", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(mode, "wsl", StringComparison.OrdinalIgnoreCase);
             }
         }
 
@@ -342,7 +343,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             get
             {
                 var scripts = _advancedPasteSettings.Properties.PythonScripts;
-                var mode = scripts?.Mode ?? "disabled";
+                var mode = scripts?.Mode?.ToLowerInvariant() ?? "disabled";
                 return mode switch
                 {
                     "windows" => 1,
@@ -1061,6 +1062,19 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 if (value != _advancedPasteSettings.Properties.ShowCustomPreview)
                 {
                     _advancedPasteSettings.Properties.ShowCustomPreview = value;
+                    NotifySettingsChanged();
+                }
+            }
+        }
+
+        public bool ShowAIPaste
+        {
+            get => _advancedPasteSettings.Properties.ShowAIPaste;
+            set
+            {
+                if (value != _advancedPasteSettings.Properties.ShowAIPaste)
+                {
+                    _advancedPasteSettings.Properties.ShowAIPaste = value;
                     NotifySettingsChanged();
                 }
             }
@@ -1796,6 +1810,12 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             {
                 target.ShowCustomPreview = source.ShowCustomPreview;
                 OnPropertyChanged(nameof(ShowCustomPreview));
+            }
+
+            if (target.ShowAIPaste != source.ShowAIPaste)
+            {
+                target.ShowAIPaste = source.ShowAIPaste;
+                OnPropertyChanged(nameof(ShowAIPaste));
             }
 
             if (target.CloseAfterLosingFocus != source.CloseAfterLosingFocus)

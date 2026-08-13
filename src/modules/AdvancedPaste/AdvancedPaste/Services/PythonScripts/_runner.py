@@ -137,6 +137,19 @@ def _discover_ap_function(module) -> tuple:
     return matches[0]
 
 
+@contextlib.contextmanager
+def _redirect_all_stdout_to_stderr():
+    """Redirect Python and native/subprocess stdout while user code runs."""
+    saved_stdout_fd = os.dup(sys.stdout.fileno())
+    try:
+        os.dup2(sys.stderr.fileno(), sys.stdout.fileno(), inheritable=True)
+        with contextlib.redirect_stdout(sys.stderr):
+            yield
+    finally:
+        os.dup2(saved_stdout_fd, sys.stdout.fileno(), inheritable=True)
+        os.close(saved_stdout_fd)
+
+
 def _format_output(result, output_type: str) -> dict:
     """
     Format the return value according to the declared output type from the function name.
@@ -181,7 +194,7 @@ def main():
         sys.exit(1)
 
     # Load the user script.
-    with contextlib.redirect_stdout(sys.stderr):
+    with _redirect_all_stdout_to_stderr():
         module = _load_user_module(script_path)
 
     # Discover the single advanced_paste_from_* function.
@@ -245,12 +258,11 @@ def main():
         )
         sys.exit(1)
 
-    # Call the function.
-    with contextlib.redirect_stdout(sys.stderr):
+    with _redirect_all_stdout_to_stderr():
         result = fn(input_value)
-    output = _format_output(result, output_type)
+        output = _format_output(result, output_type)
 
-    # Output JSON result.
+    # Output JSON result after restoring the protocol channel.
     json.dump(output, sys.stdout, ensure_ascii=False)
 
 
