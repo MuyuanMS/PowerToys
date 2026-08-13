@@ -1072,8 +1072,13 @@ LRESULT FancyZones::WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lpa
         else if (message == WM_PRIV_WHEEL_LAYOUT_SWITCH)
         {
             // wheel up cycles backwards, wheel down cycles forward
-            CycleLayoutByWheel(wparam != 0);
-
+            const bool reverse = wparam != 0;
+            if (m_draggingState.IsDragging() &&
+                FancyZonesSettings::settings().mouseWheelLayoutSwitch &&
+                CanCycleLayoutByWheel(reverse))
+            {
+                CycleLayoutByWheel(reverse);
+            }
         }
         else if (message == WM_PRIV_SETTINGS_CHANGED)
         {
