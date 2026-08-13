@@ -83,24 +83,32 @@ namespace WorkspacesLauncherUI.UnitTests
         [TestCategory("Model")]
         public void AutomationName_WhenSuccessful_AnnouncesSuccessfulState()
         {
-            var app = new AppLaunching { LaunchState = LaunchingState.LaunchedAndMoved };
-            Assert.AreEqual("Launch succeeded", app.StateAutomationName);
+            var app = new AppLaunching { Name = "Test Application", LaunchState = LaunchingState.LaunchedAndMoved };
+            Assert.AreEqual("Test Application: launch succeeded", app.StateAutomationName);
         }
 
         [TestMethod]
         [TestCategory("Model")]
         public void AutomationName_WhenFailed_AnnouncesFailedState()
         {
-            var app = new AppLaunching { LaunchState = LaunchingState.Failed };
-            Assert.AreEqual("Launch failed", app.StateAutomationName);
+            var app = new AppLaunching { Name = "Test Application", LaunchState = LaunchingState.Failed };
+            Assert.AreEqual("Test Application: launch failed", app.StateAutomationName);
         }
 
         [TestMethod]
         [TestCategory("Model")]
         public void AutomationName_WhenCanceled_AnnouncesCanceledState()
         {
-            var app = new AppLaunching { LaunchState = LaunchingState.Canceled };
-            Assert.AreEqual("Launch canceled", app.StateAutomationName);
+            var app = new AppLaunching { Name = "Test Application", LaunchState = LaunchingState.Canceled };
+            Assert.AreEqual("Test Application: launch canceled", app.StateAutomationName);
+        }
+
+        [TestMethod]
+        [TestCategory("Model")]
+        public void AutomationName_WhenWaiting_AnnouncesApplicationAndProgress()
+        {
+            var app = new AppLaunching { Name = "Test Application", LaunchState = LaunchingState.Waiting };
+            Assert.AreEqual("Test Application: launching", app.StateAutomationName);
         }
 
         [TestMethod]
