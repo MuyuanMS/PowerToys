@@ -100,6 +100,23 @@ public sealed class KbmProfileConverterTests
     }
 
     [TestMethod]
+    public void FromProfile_PreservesNonCanonicalChordOrder()
+    {
+        var profile = new KeyboardManagerProfile();
+        profile.RemapShortcuts.GlobalRemapShortcuts.Add(new KeysDataModel
+        {
+            OriginalKeys = "65;17;66",
+            NewRemapKeys = "17;86",
+        });
+
+        var model = KbmProfileConverter.FromProfile(profile);
+
+        Assert.AreEqual(1, model.Shortcuts.Count);
+        Assert.AreEqual("Ctrl+A, B", model.Shortcuts[0].From);
+        Assert.AreEqual("Ctrl+V", model.Shortcuts[0].To);
+    }
+
+    [TestMethod]
     public void ToProfile_ProducesEditorCompatibleShape()
     {
         // Arrange

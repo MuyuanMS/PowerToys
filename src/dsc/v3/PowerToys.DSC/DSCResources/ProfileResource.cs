@@ -27,17 +27,20 @@ public sealed class ProfileResource : BaseResource
     private static readonly CompositeFormat InvalidProfileError = CompositeFormat.Parse(Resources.InvalidProfileError);
     private static readonly CompositeFormat ApplyProfileError = CompositeFormat.Parse(Resources.ApplyProfileError);
 
+    private readonly Func<string?, ProfileFunctionData> _functionDataFactory;
+
     public const string ResourceName = "profile";
 
-    public ProfileResource(string? module)
+    public ProfileResource(string? module, Func<string?, ProfileFunctionData>? functionDataFactory = null)
         : base(ResourceName, module)
     {
+        _functionDataFactory = functionDataFactory ?? (input => new ProfileFunctionData(input));
     }
 
     /// <inheritdoc/>
     public override bool ExportState(string? input)
     {
-        var data = new ProfileFunctionData();
+        var data = _functionDataFactory(null);
         data.GetState();
         foreach (var warning in data.Warnings)
         {
@@ -118,7 +121,7 @@ public sealed class ProfileResource : BaseResource
     /// <inheritdoc/>
     public override bool Schema()
     {
-        var data = new ProfileFunctionData();
+        var data = _functionDataFactory(null);
         WriteJsonOutputLine(data.Schema());
         return true;
     }
@@ -177,7 +180,7 @@ public sealed class ProfileResource : BaseResource
         ProfileFunctionData data;
         try
         {
-            data = new ProfileFunctionData(input);
+            data = _functionDataFactory(input);
         }
         catch (JsonException ex)
         {

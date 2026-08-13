@@ -4,20 +4,19 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
+using System.IO.Abstractions.TestingHelpers;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Threading;
 using ManagedCommon;
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using PowerToys.DSC.Commands;
 using PowerToys.DSC.DSCResources;
 using PowerToys.DSC.Models;
 using PowerToys.DSC.Models.FunctionData;
 using PowerToys.DSC.Models.KeyboardManager;
 using PowerToys.DSC.Models.ResourceObjects;
+using PowerToys.DSC.UnitTests.Models;
 
 namespace PowerToys.DSC.UnitTests.ProfileResourceTests;
 
@@ -27,65 +26,37 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
     private const string DefaultProfileFileName = "default.json";
     private const string WorkProfileFileName = "work.json";
 
-    private static readonly SettingsUtils _settingsUtils = SettingsUtils.Default;
-
     private static readonly JsonSerializerOptions _profileSerializerOptions = new()
     {
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
     };
 
-    private readonly Dictionary<string, string> _originalFiles = [];
+    private MockFileSystem _fileSystem;
+    private SettingsUtils _settingsUtils;
+    private ProfileResource _resource;
+    private bool _settingsEventSignaled;
 
     private static string Module => nameof(ModuleType.KeyboardManager);
 
     [TestInitialize]
     public void TestInitialize()
     {
-        // Save the actual settings and profile files, then reset to defaults
-        foreach (var fileName in new[] { "settings.json", DefaultProfileFileName, WorkProfileFileName })
-        {
-            var path = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName, fileName);
-            _originalFiles[fileName] = File.Exists(path) ? File.ReadAllText(path) : null;
-        }
+        _fileSystem = new MockFileSystem();
+        _settingsUtils = new SettingsUtils(_fileSystem);
+        _resource = new ProfileResource(
+            Module,
+            input => new ProfileFunctionData(
+                input,
+                () => false,
+                _fileSystem,
+                () =>
+                {
+                    _settingsEventSignaled = true;
+                    return true;
+                }));
 
         _settingsUtils.SaveSettings(new KeyboardManagerSettings().ToJsonString(), KeyboardManagerSettings.ModuleName);
         _settingsUtils.SaveSettings(JsonSerializer.Serialize(new KeyboardManagerProfile()), KeyboardManagerSettings.ModuleName, DefaultProfileFileName);
-    }
-
-    [TestCleanup]
-    public void TestCleanup()
-    {
-        foreach (var (fileName, content) in _originalFiles)
-        {
-            var path = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName, fileName);
-            if (content != null)
-            {
-                File.WriteAllText(path, content);
-            }
-            else if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
-        }
-
-        // The `set` tests signal the real Keyboard Manager engine to load the
-        // temporary test profile. Now that the original files are restored,
-        // signal it again so a running engine reloads the user's real profile
-        // instead of keeping the test remappings in memory.
-        SignalSettingsChangedEvent();
-    }
-
-    private static void SignalSettingsChangedEvent()
-    {
-        try
-        {
-            using var settingsEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ProfileFunctionData.SettingsEventName);
-            settingsEvent.Set();
-        }
-        catch (Exception)
-        {
-            // Best-effort: nothing to reload when no engine is running.
-        }
     }
 
     [TestMethod]
@@ -96,7 +67,7 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
         SaveProfile(KbmProfileConverter.ToProfile(profile), DefaultProfileFileName);
 
         // Act
-        var result = ExecuteDscCommand<GetCommand>("--resource", ProfileResource.ResourceName, "--module", Module);
+        var result = ExecuteProfileResource(resource => resource.GetState(null));
         var state = result.OutputState<ProfileResourceObject>();
 
         // Assert
@@ -112,7 +83,7 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
         SaveProfile(KbmProfileConverter.ToProfile(profile), DefaultProfileFileName);
 
         // Act
-        var result = ExecuteDscCommand<ExportCommand>("--resource", ProfileResource.ResourceName, "--module", Module);
+        var result = ExecuteProfileResource(resource => resource.ExportState(null));
         var state = result.OutputState<ProfileResourceObject>();
 
         // Assert
@@ -134,7 +105,7 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
         SaveProfile(profile, DefaultProfileFileName);
 
         // Act
-        var result = ExecuteDscCommand<ExportCommand>("--resource", ProfileResource.ResourceName, "--module", Module);
+        var result = ExecuteProfileResource(resource => resource.ExportState(null));
         var messages = result.Messages();
 
         // Assert
@@ -151,7 +122,7 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
         var input = CreateInputResourceObject(CreateSampleProfileModel());
 
         // Act
-        var result = ExecuteDscCommand<SetCommand>("--resource", ProfileResource.ResourceName, "--module", Module, "--input", input);
+        var result = ExecuteProfileResource(resource => resource.SetState(input));
         var (state, diff) = result.OutputStateAndDiff<ProfileResourceObject>();
 
         // Assert
@@ -174,8 +145,8 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
         var input = CreateInputResourceObject(CreateSampleProfileModel());
 
         // Act
-        var firstResult = ExecuteDscCommand<SetCommand>("--resource", ProfileResource.ResourceName, "--module", Module, "--input", input);
-        var secondResult = ExecuteDscCommand<SetCommand>("--resource", ProfileResource.ResourceName, "--module", Module, "--input", input);
+        var firstResult = ExecuteProfileResource(resource => resource.SetState(input));
+        var secondResult = ExecuteProfileResource(resource => resource.SetState(input));
         var (_, firstDiff) = firstResult.OutputStateAndDiff<ProfileResourceObject>();
         var (_, secondDiff) = secondResult.OutputStateAndDiff<ProfileResourceObject>();
 
@@ -193,7 +164,7 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
         var input = CreateInputResourceObject(CreateSampleProfileModel());
 
         // Act
-        var result = ExecuteDscCommand<TestCommand>("--resource", ProfileResource.ResourceName, "--module", Module, "--input", input);
+        var result = ExecuteProfileResource(resource => resource.TestState(input));
         var (state, diff) = result.OutputStateAndDiff<ProfileResourceObject>();
 
         // Assert
@@ -214,7 +185,7 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
         var input = CreateInputResourceObject(profile);
 
         // Act
-        var result = ExecuteDscCommand<TestCommand>("--resource", ProfileResource.ResourceName, "--module", Module, "--input", input);
+        var result = ExecuteProfileResource(resource => resource.TestState(input));
         var (state, diff) = result.OutputStateAndDiff<ProfileResourceObject>();
 
         // Assert
@@ -230,7 +201,7 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
         var input = /*lang=json,strict*/ """{"profile":{"keys":[{"from":"InvalidKeyName","to":"Esc"}]}}""";
 
         // Act
-        var result = ExecuteDscCommand<SetCommand>("--resource", ProfileResource.ResourceName, "--module", Module, "--input", input);
+        var result = ExecuteProfileResource(resource => resource.SetState(input));
         var messages = result.Messages();
 
         // Assert
@@ -251,7 +222,7 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
         var input = CreateInputResourceObject(CreateSampleProfileModel());
 
         // Act
-        var result = ExecuteDscCommand<SetCommand>("--resource", ProfileResource.ResourceName, "--module", Module, "--input", input);
+        var result = ExecuteProfileResource(resource => resource.SetState(input));
 
         // Assert
         Assert.IsTrue(result.Success);
@@ -263,27 +234,35 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
     [TestMethod]
     public void Set_SignalsSettingsChangedEvent()
     {
-        // The settings event is a machine-wide auto-reset event. If the real
-        // Keyboard Manager engine is running it competes for the single signal
-        // and can consume it before this test observes it, so skip rather than
-        // fail nondeterministically. A proper fix injects the signaling
-        // mechanism so the test can observe it in isolation.
-        if (Process.GetProcessesByName("PowerToys.KeyboardManagerEngine").Length > 0)
-        {
-            Assert.Inconclusive("Keyboard Manager engine is running; skipping to avoid competing for the shared settings signal.");
-        }
-
         // Arrange
-        using var settingsEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ProfileFunctionData.SettingsEventName);
-        settingsEvent.Reset();
         var input = CreateInputResourceObject(CreateSampleProfileModel());
 
         // Act
-        var result = ExecuteDscCommand<SetCommand>("--resource", ProfileResource.ResourceName, "--module", Module, "--input", input);
+        var result = ExecuteProfileResource(resource => resource.SetState(input));
 
         // Assert
         Assert.IsTrue(result.Success);
-        Assert.IsTrue(settingsEvent.WaitOne(TimeSpan.FromSeconds(5)), "The Keyboard Manager settings event was not signaled");
+        Assert.IsTrue(_settingsEventSignaled);
+    }
+
+    private DscExecuteResult ExecuteProfileResource(Func<ProfileResource, bool> action)
+    {
+        var originalOut = Console.Out;
+        var originalErr = Console.Error;
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        try
+        {
+            Console.SetOut(output);
+            Console.SetError(error);
+            return new DscExecuteResult(action(_resource), output.ToString(), error.ToString());
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+            Console.SetError(originalErr);
+        }
     }
 
     /// <summary>
@@ -308,12 +287,12 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
         return JsonSerializer.Serialize(new ProfileResourceObject { Profile = profile });
     }
 
-    private static KeyboardManagerProfile GetProfile(string fileName)
+    private KeyboardManagerProfile GetProfile(string fileName)
     {
         return _settingsUtils.GetSettingsOrDefault<KeyboardManagerProfile>(KeyboardManagerSettings.ModuleName, fileName);
     }
 
-    private static void SaveProfile(KeyboardManagerProfile profile, string fileName)
+    private void SaveProfile(KeyboardManagerProfile profile, string fileName)
     {
         _settingsUtils.SaveSettings(JsonSerializer.Serialize(profile, _profileSerializerOptions), KeyboardManagerSettings.ModuleName, fileName);
     }

@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.IO.Abstractions;
 using System.Security.Principal;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -29,8 +30,10 @@ public sealed class ProfileFunctionData : BaseFunctionData
     // configuration; see SettingsEventName in KeyboardManagerConstants.h.
     public const string SettingsEventName = "PowerToys_KeyboardManager_Event_Settings";
 
-    private static readonly SettingsUtils _settingsUtils = SettingsUtils.Default;
+    private readonly SettingsUtils _settingsUtils;
+    private readonly IFile _file;
     private readonly Func<bool> _isProcessElevated;
+    private readonly Func<bool> _signalSettingsChangedEvent;
 
     // The stored profile is serialized without null properties to match the
     // shape written by the C++ editor; the engine's JSON reader throws on
@@ -63,9 +66,17 @@ public sealed class ProfileFunctionData : BaseFunctionData
     /// </summary>
     public IList<string> Warnings { get; } = [];
 
-    public ProfileFunctionData(string? input = null, Func<bool>? isProcessElevated = null)
+    public ProfileFunctionData(
+        string? input = null,
+        Func<bool>? isProcessElevated = null,
+        IFileSystem? fileSystem = null,
+        Func<bool>? signalSettingsChangedEvent = null)
     {
+        fileSystem ??= new FileSystem();
+        _settingsUtils = new SettingsUtils(fileSystem);
+        _file = fileSystem.File;
         _isProcessElevated = isProcessElevated ?? GetIsProcessElevated;
+        _signalSettingsChangedEvent = signalSettingsChangedEvent ?? SignalSettingsChangedEvent;
         Output = new();
 
         if (string.IsNullOrEmpty(input))
@@ -181,7 +192,7 @@ public sealed class ProfileFunctionData : BaseFunctionData
             throw new IOException($"Failed to write the profile file '{fileName}'.");
         }
 
-        return SignalSettingsChangedEvent();
+        return _signalSettingsChangedEvent();
     }
 
     private static bool GetIsProcessElevated()
@@ -197,12 +208,12 @@ public sealed class ProfileFunctionData : BaseFunctionData
     /// <param name="expectedJson">The JSON that was written.</param>
     /// <param name="fileName">The profile file name.</param>
     /// <returns>True if the file matches the expected content; otherwise false.</returns>
-    private static bool WriteSucceeded(string expectedJson, string fileName)
+    private bool WriteSucceeded(string expectedJson, string fileName)
     {
         try
         {
             var path = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName, fileName);
-            return File.Exists(path) && File.ReadAllText(path) == expectedJson;
+            return _file.Exists(path) && _file.ReadAllText(path) == expectedJson;
         }
         catch (Exception)
         {
@@ -268,7 +279,7 @@ public sealed class ProfileFunctionData : BaseFunctionData
     /// would do.
     /// </summary>
     /// <returns>The profile file name.</returns>
-    private static string GetProfileFileName(out bool needsNormalization)
+    private string GetProfileFileName(out bool needsNormalization)
     {
         string? activeConfiguration = null;
         var settingsReadable = false;
@@ -327,12 +338,12 @@ public sealed class ProfileFunctionData : BaseFunctionData
     /// keep the two paths in agreement.
     /// </summary>
     /// <returns>True when the raw file contains a non-empty active configuration value.</returns>
-    private static bool RawSettingsHasActiveConfiguration()
+    private bool RawSettingsHasActiveConfiguration()
     {
         try
         {
             var path = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName);
-            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            using var document = JsonDocument.Parse(_file.ReadAllText(path));
             return document.RootElement.ValueKind == JsonValueKind.Object
                 && document.RootElement.TryGetProperty("properties", out var properties)
                 && properties.ValueKind == JsonValueKind.Object
@@ -391,7 +402,7 @@ public sealed class ProfileFunctionData : BaseFunctionData
     /// would make it open ".json" rather than the file we write here.
     /// </summary>
     /// <returns>The profile file name to write, e.g. "default.json".</returns>
-    private static string EnsureActiveConfigurationAndGetFileName()
+    private string EnsureActiveConfigurationAndGetFileName()
     {
         KeyboardManagerSettings settings;
         var settingsExist = _settingsUtils.SettingsExists(KeyboardManagerSettings.ModuleName);
@@ -474,12 +485,12 @@ public sealed class ProfileFunctionData : BaseFunctionData
     /// </summary>
     /// <param name="expectedJson">The JSON that was written.</param>
     /// <returns>True if the file matches the expected content; otherwise false.</returns>
-    private static bool SettingsWriteSucceeded(string expectedJson)
+    private bool SettingsWriteSucceeded(string expectedJson)
     {
         try
         {
             var path = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName);
-            return File.Exists(path) && File.ReadAllText(path) == expectedJson;
+            return _file.Exists(path) && _file.ReadAllText(path) == expectedJson;
         }
         catch (Exception)
         {

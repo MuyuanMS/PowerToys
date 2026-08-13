@@ -616,7 +616,8 @@ public static class KbmProfileConverter
         // stored key string; detect it even when the secondKeyOfChord
         // property is absent (it is not written by the C++ editor).
         if (from.SecondKeyOfChord == 0 && from.Keys.Count >= 3 &&
-            !KbmKeyNames.IsModifier(from.Keys[^1]) && !KbmKeyNames.IsModifier(from.Keys[^2]))
+            !KbmKeyNames.IsModifier(from.Keys[^1]) &&
+            from.Keys.Take(from.Keys.Count - 1).Any(key => !KbmKeyNames.IsModifier(key)))
         {
             from = new KbmShortcutParser.ParsedKeys(from.Keys, from.Keys[^1]);
         }
