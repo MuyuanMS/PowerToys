@@ -131,6 +131,18 @@ namespace PTSettingsSvc
                 return HRESULT_FROM_WIN32(err);
             }
 
+            BY_HANDLE_FILE_INFORMATION fileInfo{};
+            const bool gotFileInfo =
+                GetFileInformationByHandle(outHandle, &fileInfo) != FALSE;
+            if (!gotFileInfo ||
+                fileInfo.nNumberOfLinks != 1)
+            {
+                DWORD err = gotFileInfo ? ERROR_ACCESS_DENIED : GetLastError();
+                CloseHandle(outHandle);
+                outHandle = INVALID_HANDLE_VALUE;
+                return HRESULT_FROM_WIN32(err);
+            }
+
             return S_OK;
         }
 
