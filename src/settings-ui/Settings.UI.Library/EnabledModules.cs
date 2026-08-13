@@ -512,6 +512,23 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             }
         }
 
+        private bool clipPing = true;
+
+        [JsonPropertyName("ClipPing")]
+        public bool ClipPing
+        {
+            get => clipPing;
+            set
+            {
+                if (clipPing != value)
+                {
+                    LogTelemetryEvent(value);
+                    clipPing = value;
+                    NotifyChange();
+                }
+            }
+        }
+
         private bool zoomIt;
 
         [JsonPropertyName("ZoomIt")]

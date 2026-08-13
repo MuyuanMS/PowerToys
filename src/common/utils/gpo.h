@@ -73,6 +73,7 @@ namespace powertoys_gpo
     const std::wstring POLICY_CONFIGURE_ENABLED_NEWPLUS = L"ConfigureEnabledUtilityNewPlus";
     const std::wstring POLICY_CONFIGURE_ENABLED_WORKSPACES = L"ConfigureEnabledUtilityWorkspaces";
     const std::wstring POLICY_CONFIGURE_ENABLED_ALT_WINDOW_CYCLE = L"ConfigureEnabledUtilityAltWindowCycle";
+    const std::wstring POLICY_CONFIGURE_ENABLED_CLIP_PING = L"ConfigureEnabledUtilityClipPing";
 
     // The registry value names for PowerToys installer and update policies.
     const std::wstring POLICY_DISABLE_PER_USER_INSTALLATION = L"PerUserInstallationDisabled";
@@ -519,6 +520,11 @@ namespace powertoys_gpo
     inline gpo_rule_configured_t getConfiguredNewPlusEnabledValue()
     {
         return getUtilityEnabledValue(POLICY_CONFIGURE_ENABLED_NEWPLUS);
+    }
+
+    inline gpo_rule_configured_t getConfiguredClipPingEnabledValue()
+    {
+        return getUtilityEnabledValue(POLICY_CONFIGURE_ENABLED_CLIP_PING);
     }
 #pragma endregion UtilityEnabledStatePolicies
 

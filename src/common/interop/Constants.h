@@ -81,6 +81,8 @@ namespace winrt::PowerToys::Interop::implementation
         static hstring MWBReconnectEvent();
         static hstring OpenNewKeyboardManagerEvent();
         static hstring KeyboardManagerEngineInstanceMutex();
+        static hstring ClipPingExitEvent();
+        static hstring ClipPingShowOverlayEvent();
     };
 }
 
@@ -90,4 +92,3 @@ namespace winrt::PowerToys::Interop::factory_implementation
     {
     };
 }
-
