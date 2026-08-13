@@ -256,8 +256,7 @@ try {
     Remove-Item $priConfig -Force
 
     $makeAppx = Get-MakeAppxPath
-    $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-    $timestampedPackage = Join-Path $outDir "FileConverterContextMenuPackage.$timestamp.msix"
+    $timestampedPackage = Join-Path $stagingRoot "FileConverterContextMenuPackage.msix"
     $stablePackage = Join-Path $outDir "FileConverterContextMenuPackage.msix"
 
     Write-Host "Using MakeAppx:" $makeAppx
@@ -318,13 +317,6 @@ try {
         Write-Warning "Stable package copy skipped because destination appears locked."
     }
 
-    $allPackages = Get-ChildItem -Path $outDir -Filter "FileConverterContextMenuPackage.*.msix" |
-        Sort-Object LastWriteTime -Descending
-
-    if ($allPackages.Count -gt $KeepRecent) {
-        $allPackages | Select-Object -Skip $KeepRecent | Remove-Item -Force -ErrorAction SilentlyContinue
-    }
-
     if ($RegisterPackage) {
         $installed = Get-AppxPackage | Where-Object { $_.Name -eq $manifestIdentity.Name }
         if ($null -eq $installed) {
@@ -335,7 +327,7 @@ try {
         $installed | Select-Object Name, PackageFullName, Publisher, Version, InstallLocation | Format-Table -AutoSize
     }
 
-    Write-Host "Timestamped package ready:" $timestampedPackage
+    Write-Host "Stable package ready:" $stablePackage
 }
 finally {
     Remove-Item -Path $stagingRoot -Recurse -Force -ErrorAction SilentlyContinue
