@@ -265,6 +265,10 @@
             "PowerToys.GrabAndMove.exe",
             "PowerToys.GrabAndMoveModuleInterface.dll",
 
+            "WinUI3Apps\\PowerToys.ClipPing.exe",
+            "WinUI3Apps\\PowerToys.ClipPing.dll",
+            "PowerToys.ClipPingModuleInterface.dll",
+
             "WinUI3Apps\\PowerToys.Settings.dll",
             "WinUI3Apps\\PowerToys.Settings.exe",
 
