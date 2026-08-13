@@ -61,6 +61,10 @@ KeyboardManager::KeyboardManager()
         if (!loadedSuccessfully)
             return;
 
+        // Runtime sets belong to the hook thread. Request a pending-state reset there instead of
+        // mutating them from EventWaiter's worker thread.
+        resetAlonePendingState = true;
+
         const bool newHasRemappings = HasRegisteredRemappingsUnchecked();
         // We didn't have any bindings before and we have now
         if (newHasRemappings && !hookHandle)
@@ -96,10 +100,6 @@ void KeyboardManager::LoadSettings()
         state.LoadSettings();
     }
 
-    // The reload above rebuilt the alone remap table. Discard pending tap candidates so they cannot be
-    // promoted after their mapping changed, but retain started combinations until their physical key-up
-    // releases the source key that was already injected.
-    state.ClearAlonePendingKeys();
     try
     {
         // Send telemetry about configured key/shortcut to key/shortcut mappings, OS an app specific level.
@@ -170,6 +170,8 @@ LRESULT CALLBACK KeyboardManager::MouseHookProc(int nCode, const WPARAM wParam, 
 
 void KeyboardManager::HandleMouseHookEvent() noexcept
 {
+    ApplyAloneStateReset();
+
     if (loadingSettings)
     {
         return;
@@ -197,6 +199,8 @@ void KeyboardManager::HandleMouseHookEvent() noexcept
 
 void KeyboardManager::StartLowlevelKeyboardHook()
 {
+    ApplyAloneStateReset();
+
 #if defined(DISABLE_LOWLEVEL_HOOKS_WHEN_DEBUGGED)
     if (IsDebuggerPresent())
     {
@@ -239,7 +243,23 @@ void KeyboardManager::StopLowlevelKeyboardHook()
     }
 
     StopLowlevelMouseHook();
-    state.ClearAllAloneKeyState();
+    // This may run on EventWaiter's worker thread. Defer runtime-set mutation until the hook thread
+    // starts or receives another event.
+    resetAllAloneState = true;
+    resetAlonePendingState = false;
+}
+
+void KeyboardManager::ApplyAloneStateReset() noexcept
+{
+    if (resetAllAloneState.exchange(false))
+    {
+        state.ClearAllAloneKeyState();
+        resetAlonePendingState = false;
+    }
+    else if (resetAlonePendingState.exchange(false))
+    {
+        state.ClearAlonePendingKeys();
+    }
 }
 
 void KeyboardManager::StartLowlevelMouseHook()
@@ -302,6 +322,8 @@ bool KeyboardManager::HasRegisteredRemappingsUnchecked() const
 
 intptr_t KeyboardManager::HandleKeyboardHookEvent(LowlevelKeyboardEvent* data) noexcept
 {
+    ApplyAloneStateReset();
+
     if (loadingSettings)
     {
         // Events pass through while settings reload. Forget pending keys, and clear a promoted key's

@@ -982,6 +982,16 @@ namespace RemappingLogicTests
             Assert::AreEqual(false, testState.IsAloneCombination(VK_NUMPAD1));
         }
 
+        // Navigation-cluster keys can share scan codes with numpad keys, but their identity never
+        // changes with NumLock. They must not be selected by numpad release recovery.
+        TEST_METHOD (AloneRemap_NumpadRecovery_IgnoresNavigationClusterCombination)
+        {
+            testState.SetAloneCombination(VK_END);
+            const DWORD numpad1ScanCode = MapVirtualKey(VK_NUMPAD1, MAPVK_VK_TO_VSC);
+
+            Assert::IsFalse(testState.GetAloneCombinationKeyForScanCode(numpad1ScanCode).has_value());
+        }
+
         // A numpad-originated alone key must be re-injected preserving its origin. Alone keys are tracked
         // by the numpad-origin-encoded vkCode (marker in bit 31); a bare WORD cast would drop it and turn
         // e.g. a NumLock-off numpad navigation key into its extended (arrow-cluster) twin. Verifies the

@@ -36,6 +36,7 @@ private:
     void StartLowlevelMouseHook();
     void StopLowlevelMouseHook();
     void HandleMouseHookEvent() noexcept;
+    void ApplyAloneStateReset() noexcept;
 
     // Contains the non localized module name
     std::wstring moduleName = KeyboardManagerConstants::ModuleName;
@@ -64,6 +65,8 @@ private:
     EventWaiter settingsEventWaiter;
 
     std::atomic_bool loadingSettings = false;
+    std::atomic_bool resetAlonePendingState = false;
+    std::atomic_bool resetAllAloneState = false;
 
     HANDLE editorIsRunningEvent = nullptr;
 
