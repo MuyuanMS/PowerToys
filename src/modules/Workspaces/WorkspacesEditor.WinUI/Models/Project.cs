@@ -8,6 +8,8 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -21,6 +23,8 @@ namespace WorkspacesEditor.Models
 {
     public partial class Project : ObservableObject
     {
+        private CancellationTokenSource _previewRenderCancellationTokenSource;
+
         [JsonIgnore]
         public string EditorWindowTitle { get; set; }
 
@@ -107,7 +111,7 @@ namespace WorkspacesEditor.Models
             }
         }
 
-        public bool CanBeSaved => !string.IsNullOrEmpty(Name) && Applications.Count > 0;
+        public bool CanBeSaved => !string.IsNullOrEmpty(Name) && Applications.Any(application => application.IsIncluded);
 
         [ObservableProperty]
         private bool _isRevertEnabled;
@@ -277,8 +281,18 @@ namespace WorkspacesEditor.Models
 
         public void InitializePreview()
         {
+            var request = new CancellationTokenSource();
+            CancellationTokenSource previousRequest = Interlocked.Exchange(ref _previewRenderCancellationTokenSource, request);
+            previousRequest?.Cancel();
+            _ = InitializePreviewAsync(request);
+        }
+
+        private async Task InitializePreviewAsync(CancellationTokenSource request)
+        {
             try
             {
+                await Task.Delay(150, request.Token);
+
                 if (Applications == null || Applications.Count == 0 || Monitors == null || Monitors.Count == 0)
                 {
                     return;
@@ -294,13 +308,28 @@ namespace WorkspacesEditor.Models
 
                 bool isDarkTheme = Helpers.ThemeHelper.IsDarkTheme();
 
-                PreviewImage = Utils.DrawHelper.DrawPreview(this, bounds, isDarkTheme);
+                var images = await Task.Run(
+                    () => (
+                        Preview: Utils.DrawHelper.DrawPreview(this, bounds, isDarkTheme),
+                        Icons: Utils.DrawHelper.DrawPreviewIcons(this)),
+                    request.Token);
+
+                request.Token.ThrowIfCancellationRequested();
+                PreviewImage = images.Preview;
                 PreviewImageWidth = bounds.Width * 0.1;
-                PreviewIcons = Utils.DrawHelper.DrawPreviewIcons(this);
+                PreviewIcons = images.Icons;
+            }
+            catch (OperationCanceledException)
+            {
             }
             catch (System.Exception ex)
             {
                 ManagedCommon.Logger.LogError("Preview render failed", ex);
+            }
+            finally
+            {
+                _ = Interlocked.CompareExchange(ref _previewRenderCancellationTokenSource, null, request);
+                request.Dispose();
             }
         }
 

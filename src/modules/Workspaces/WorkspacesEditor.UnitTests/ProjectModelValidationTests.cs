@@ -41,6 +41,20 @@ namespace WorkspacesEditor.UnitTests
 
         [TestMethod]
         [TestCategory("Model.Project")]
+        public void CanBeSaved_AllAppsExcluded_ReturnsFalseAndRaisesPropertyChanged()
+        {
+            var project = TestHelpers.CreateProject("Test Workspace", 0, 0, "Notepad");
+            var changedProps = new List<string>();
+            project.PropertyChanged += (s, e) => changedProps.Add(e.PropertyName);
+
+            project.Applications[0].IsIncluded = false;
+
+            Assert.IsFalse(project.CanBeSaved);
+            Assert.IsTrue(changedProps.Contains("CanBeSaved"));
+        }
+
+        [TestMethod]
+        [TestCategory("Model.Project")]
         public void Name_SetValue_RaisesPropertyChanged()
         {
             var project = TestHelpers.CreateProject("Initial", 0, 0, "App");

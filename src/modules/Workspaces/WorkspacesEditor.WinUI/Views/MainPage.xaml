@@ -99,9 +99,9 @@
                 <Grid Margin="24,0,24,24">
                     <ItemsRepeater
                         x:Name="WorkspacesList"
+                        x:Uid="WorkspacesList"
                         MaxWidth="1000"
                         AutomationProperties.AutomationId="WorkspacesItemsControl"
-                        AutomationProperties.Name="Workspace list"
                         ItemsSource="{x:Bind ViewModel.WorkspacesView, Mode=OneWay}">
                         <ItemsRepeater.Layout>
                             <StackLayout Spacing="4" />

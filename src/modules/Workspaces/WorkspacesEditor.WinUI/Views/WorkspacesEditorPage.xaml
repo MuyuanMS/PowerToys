@@ -255,12 +255,12 @@
 
                         <Grid
                             x:Name="Preview"
+                            x:Uid="Preview"
                             Width="160"
                             Height="120"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Top"
                             AutomationProperties.AutomationId="Preview"
-                            AutomationProperties.Name="Preview"
                             Background="{ThemeResource ControlAltFillColorTertiaryBrush}"
                             CornerRadius="8">
                             <Image
@@ -304,4 +304,3 @@
         </ScrollViewer>
     </Grid>
 </Page>
-

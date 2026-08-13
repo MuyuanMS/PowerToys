@@ -25,7 +25,7 @@ The following are explicitly out of scope:
 - New user-facing features or UX redesigns
 - Changes to workspace configuration format (`workspaces.json`)
 - Changes to the C++ engine components (Launcher, WindowArranger, SnapshotTool)
-- Changes to the Module Interface
+- Module Interface changes beyond the launch-path integration required to start the WinUI editor
 - Telemetry changes
 
 > The objective is functional parity, not feature expansion.

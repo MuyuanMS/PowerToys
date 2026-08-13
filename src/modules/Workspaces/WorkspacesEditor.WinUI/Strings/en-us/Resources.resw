@@ -111,6 +111,9 @@
   <data name="LastLaunched" xml:space="preserve">
     <value>Last launched</value>
   </data>
+  <data name="LoadingRing.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Loading</value>
+  </data>
   <data name="Launch" xml:space="preserve">
     <value>Launch</value>
   </data>
@@ -195,6 +198,9 @@
   <data name="PinToTaskbar" xml:space="preserve">
     <value>Pin Workspaces to taskbar</value>
   </data>
+  <data name="Preview.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Preview</value>
+  </data>
   <data name="WorkspaceName" xml:space="preserve">
     <value>Workspace name</value>
   </data>
@@ -209,6 +215,9 @@
   </data>
   <data name="WorkspacesHeaderBlock.Text" xml:space="preserve">
     <value>Workspaces</value>
+  </data>
+  <data name="WorkspacesList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Workspace list</value>
   </data>
   <data name="Recently" xml:space="preserve">
     <value>recently</value>

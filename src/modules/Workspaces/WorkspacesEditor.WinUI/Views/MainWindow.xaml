@@ -68,12 +68,12 @@
             <Frame x:Name="ContentFrame" />
             <ProgressRing
                 x:Name="LoadingRing"
+                x:Uid="LoadingRing"
                 Width="48"
                 Height="48"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 AutomationProperties.LiveSetting="Polite"
-                AutomationProperties.Name="Loading"
                 IsActive="False"
                 Visibility="Collapsed" />
         </Grid>

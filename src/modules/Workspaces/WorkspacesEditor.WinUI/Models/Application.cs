@@ -272,6 +272,8 @@ namespace WorkspacesEditor.Models
             {
                 IsExpanded = false;
             }
+
+            Parent?.NotifyApplicationsChanged();
         }
 
         private BitmapImage _iconImage;
