@@ -79,6 +79,7 @@ void PowertoyModule::update_hotkeys()
 void PowertoyModule::UpdateHotkeyEx()
 {
     CentralizedHotkeys::UnregisterHotkeysForModule(pt_module->get_key());
+    CentralizedKeyboardHook::ClearModulePressedKeyActions(pt_module->get_key());
 
     auto container = pt_module->GetHotkeyEx();
     if (container.has_value() && pt_module->is_enabled())
@@ -106,8 +107,7 @@ void PowertoyModule::UpdateHotkeyEx()
     {
         auto modulePtr = pt_module.get();
         auto action = [modulePtr] {
-            modulePtr->OnHotkeyEx();
-            return false;
+            return modulePtr->on_hotkey(PowertoyModuleIface::WinKeyHotkeyId);
         };
         CentralizedKeyboardHook::AddPressedKeyAction(pt_module->get_key(), VK_LWIN, pt_module->milliseconds_win_key_must_be_pressed(), action);
         CentralizedKeyboardHook::AddPressedKeyAction(pt_module->get_key(), VK_RWIN, pt_module->milliseconds_win_key_must_be_pressed(), action);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <compare>
+#include <limits>
 #include <common/utils/gpo.h>
 
 /*
@@ -37,6 +38,8 @@
 class PowertoyModuleIface
 {
 public:
+    static constexpr size_t WinKeyHotkeyId = (std::numeric_limits<size_t>::max)();
+
     /* Describes a hotkey which can trigger an action in the PowerToy */
     struct Hotkey
     {

@@ -50,6 +50,8 @@ namespace CommonSharedConstants
 
     const wchar_t SHORTCUT_GUIDE_TRIGGER_EVENT[] = L"Local\\ShortcutGuide-TriggerEvent-d4275ad3-2531-4d19-9252-c0becbd9b496";
 
+    const wchar_t SHORTCUT_GUIDE_WIN_KEY_TRIGGER_EVENT[] = L"Local\\ShortcutGuide-WinKeyTriggerEvent-4f8db1fd-4f14-4e31-9a6f-0c7f3d7a4d3d";
+
     const wchar_t SHORTCUT_GUIDE_EXIT_EVENT[] = L"Local\\ShortcutGuide-ExitEvent-35697cdd-a3d2-47d6-a246-34efcc73eac0";
 
     const wchar_t FANCY_ZONES_EDITOR_TOGGLE_EVENT[] = L"Local\\FancyZones-ToggleEditorEvent-1e174338-06a3-472b-874d-073b21c62f14";
@@ -192,4 +194,3 @@ namespace CommonSharedConstants
     // Max DWORD for key code to disable keys.
     const DWORD VK_DISABLED = 0x100;
 }
-

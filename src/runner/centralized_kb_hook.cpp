@@ -77,7 +77,15 @@ namespace CentralizedKeyboardHook
                 // This prevents ghost activations after the key was already released.
                 if (GetAsyncKeyState(static_cast<int>(it.virtualKey)) & 0x8000)
                 {
-                    it.action();
+                    if (it.action())
+                    {
+                        INPUT dummyEvent[1] = {};
+                        dummyEvent[0].type = INPUT_KEYBOARD;
+                        dummyEvent[0].ki.wVk = 0xFF;
+                        dummyEvent[0].ki.dwFlags = KEYEVENTF_KEYUP;
+                        dummyEvent[0].ki.dwExtraInfo = PowertoyModuleIface::CENTRALIZED_KEYBOARD_HOOK_DONT_TRIGGER_FLAG;
+                        SendInput(1, dummyEvent, sizeof(INPUT));
+                    }
                 }
             }
         }
@@ -212,6 +220,24 @@ namespace CentralizedKeyboardHook
         pressedKeyDescriptors.insert({ .virtualKey = vk, .moduleName = moduleName, .action = std::move(action), .idTimer = timerId, .millisecondsToPress = milliseconds });
     }
 
+    void ClearModulePressedKeyActions(const std::wstring& moduleName) noexcept
+    {
+        std::unique_lock lock{ pressedKeyMutex };
+        auto it = pressedKeyDescriptors.begin();
+        while (it != pressedKeyDescriptors.end())
+        {
+            if (it->moduleName == moduleName)
+            {
+                KillTimer(runnerWindow, it->idTimer);
+                it = pressedKeyDescriptors.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+    }
+
     void ClearModuleHotkeys(const std::wstring& moduleName) noexcept
     {
         Logger::trace(L"UnRegister hotkey action for {}", moduleName);
@@ -237,6 +263,7 @@ namespace CentralizedKeyboardHook
             {
                 if (it->moduleName == moduleName)
                 {
+                    KillTimer(runnerWindow, it->idTimer);
                     it = pressedKeyDescriptors.erase(it);
                 }
                 else

@@ -27,12 +27,12 @@ namespace ShortcutGuide
     {
         internal static Dictionary<string, List<ShortcutEntry>> PinnedShortcuts { get; private set; } = new Dictionary<string, List<ShortcutEntry>>();
 
-        internal static ShortcutGuideSettings ShortcutGuideSettings { get; private set; } = null!;
+        internal static ShortcutGuideSettings ShortcutGuideSettings => SettingsRepository<ShortcutGuideSettings>.GetInstance(SettingsUtils.Default).SettingsConfig;
 
-        internal static ShortcutGuideProperties ShortcutGuideProperties { get; private set; } = null!;
+        internal static ShortcutGuideProperties ShortcutGuideProperties => ShortcutGuideSettings.Properties;
 
         /// <summary>
-        /// The single transparent host that replaces the previous MainWindow +
+        /// Gets the single transparent host that replaces the previous MainWindow +
         /// TaskbarWindow pair. The two surfaces are now XAML pseudo-windows
         /// inside this one window.
         /// </summary>
@@ -43,6 +43,9 @@ namespace ShortcutGuide
         internal static string CurrentAppName { get; set; } = string.Empty;
 
         private EventWaitHandle? _launchedEvent;
+        private EventWaitHandle? _winKeyLaunchedEvent;
+        private bool _openedByWinKeyHold;
+        private bool _winKeyReleasePending;
 
         private Thread? _listenForLaunchedEventThread;
 
@@ -93,6 +96,15 @@ namespace ShortcutGuide
                     Logger.LogError($"Failed to open existing event '{Constants.ShortcutGuideTriggerEvent()}': {ex.Message}");
                 }
 
+                try
+                {
+                    _winKeyLaunchedEvent = EventWaitHandle.OpenExisting(Constants.ShortcutGuideWinKeyTriggerEvent());
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"Failed to open optional Windows-key trigger event '{Constants.ShortcutGuideWinKeyTriggerEvent()}': {ex.Message}");
+                }
+
                 _listenForLaunchedEventThread = new Thread(ListenForLaunchedEvents)
                 {
                     IsBackground = true,
@@ -102,27 +114,34 @@ namespace ShortcutGuide
                 _winKeyUpKeyboardHook = new HotkeySettingsControlHook(
                 (int key) =>
                 {
+                    _winKeyReleasePending = false;
                     SendSingleKeyboardInput((short)key, 0x0); // key down
                 },
                 (int key) =>
                 {
                     if (OverlayWindow.AppWindow.IsVisible)
                     {
-                        OverlayWindow.DispatcherQueue.TryEnqueue(() =>
+                        if (_openedByWinKeyHold && (ShortcutGuideProperties.WindowsKeyAction.Value != ((int)ShortcutGuideWindowsKeyAction.OpenShortcutGuide) || ShortcutGuideProperties.CloseOnWindowsKeyRelease.Value))
                         {
-                            OverlayWindow.CloseAnimated();
-                        });
+                            OverlayWindow.DispatcherQueue.TryEnqueue(() =>
+                            {
+                                OverlayWindow.CloseAnimated();
+                            });
+                            _openedByWinKeyHold = false;
+                        }
 
                         NativeMethods.SendInput(1, [new() { Type = 1, Data = new() { Keyboard = new NativeMethods.KEYBDINPUT { WVk = 0xFF, DwFlags = 0x2 } } }], Marshal.SizeOf<NativeMethods.INPUT>());
                         SendSingleKeyboardInput((short)key, 0x2); // key up
+                        _winKeyReleasePending = false;
                     }
                     else
                     {
+                        _winKeyReleasePending = true;
                         SendSingleKeyboardInput((short)key, 0x2); // key up
                     }
                 },
-                () => true,
-                (int key, nuint specialFlags) => key == 91 && specialFlags != _ignoreKeyEventFlag);
+                () => ShortcutGuideProperties.WindowsKeyAction.Value != (int)ShortcutGuideWindowsKeyAction.Off,
+                (int key, nuint specialFlags) => (key == 91 || key == 92) && specialFlags != _ignoreKeyEventFlag);
             }
             catch (Exception ex)
             {
@@ -183,32 +202,53 @@ namespace ShortcutGuide
                 return;
             }
 
-            var handles = new WaitHandle[] { _launchedEvent };
+            var handles = _winKeyLaunchedEvent is null
+                ? new WaitHandle[] { _launchedEvent! }
+                : new WaitHandle[] { _launchedEvent!, _winKeyLaunchedEvent };
             try
             {
                 Logger.LogInfo("Shortcut Guide show-event listener started.");
                 while (true)
                 {
                     var index = WaitHandle.WaitAny(handles);
-                    if (index == 0)
+                    if (index is 0 or 1)
                     {
                         Logger.LogInfo("Shortcut Guide trigger event signaled.");
+                        bool isWinKeyTrigger = _winKeyLaunchedEvent is not null && index == 1;
                         OverlayWindow.DispatcherQueue.TryEnqueue(async () =>
                         {
-                            // VK_LWIN long-press shows only the taskbar pane.
-                            // Use the Win32 key state directly: WPF's
-                            // System.Windows.Input.Keyboard is not initialized
-                            // on the WinUI UI thread.
                             const int VK_LWIN = 0x5B;
-                            bool winKeyDown = (NativeMethods.GetAsyncKeyState(VK_LWIN) & 0x8000) != 0;
-
-                            if (winKeyDown)
+                            const int VK_RWIN = 0x5C;
+                            bool winKeyStillDown = ((NativeMethods.GetAsyncKeyState(VK_LWIN) & 0x8000) != 0) ||
+                                                   ((NativeMethods.GetAsyncKeyState(VK_RWIN) & 0x8000) != 0);
+                            bool winKeyReleasedBeforeDispatch = isWinKeyTrigger && (_winKeyReleasePending || !winKeyStillDown);
+                            if (winKeyReleasedBeforeDispatch)
                             {
-                                if (OverlayWindow.AppWindow.IsVisible)
+                                _winKeyReleasePending = false;
+                                if (ShortcutGuideProperties.WindowsKeyAction.Value != (int)ShortcutGuideWindowsKeyAction.OpenShortcutGuide || ShortcutGuideProperties.CloseOnWindowsKeyRelease.Value)
                                 {
+                                    _openedByWinKeyHold = false;
                                     return;
                                 }
 
+                                NativeMethods.SendInput(1, [new() { Type = 1, Data = new() { Keyboard = new NativeMethods.KEYBDINPUT { WVk = 0xFF, DwFlags = 0x2 } } }], Marshal.SizeOf<NativeMethods.INPUT>());
+                            }
+
+                            if (isWinKeyTrigger && ShortcutGuideProperties.WindowsKeyAction.Value == (int)ShortcutGuideWindowsKeyAction.Off)
+                            {
+                                _openedByWinKeyHold = false;
+                                return;
+                            }
+
+                            if (isWinKeyTrigger && ShortcutGuideProperties.WindowsKeyAction.Value == (int)ShortcutGuideWindowsKeyAction.TaskbarIndicators)
+                            {
+                                if (OverlayWindow.AppWindow.IsVisible)
+                                {
+                                    _openedByWinKeyHold = false;
+                                    return;
+                                }
+
+                                _openedByWinKeyHold = true;
                                 OverlayWindow.MainPaneControl.Visibility = Visibility.Collapsed;
                                 OverlayWindow.ShowOverlay();
                                 OverlayWindow.UpdateTaskbarPaneLayout();
@@ -223,6 +263,7 @@ namespace ShortcutGuide
                             }
                             else
                             {
+                                _openedByWinKeyHold = isWinKeyTrigger;
                                 Program.ForegroundWindowHandle = NativeMethods.GetForegroundWindow();
                                 OverlayWindow.MainPaneControl.Visibility = Visibility.Collapsed;
                                 OverlayWindow.ShowOverlay();
@@ -270,8 +311,17 @@ namespace ShortcutGuide
                 }
             }
 
-            ShortcutGuideSettings = SettingsRepository<ShortcutGuideSettings>.GetInstance(settingsUtils).SettingsConfig;
-            ShortcutGuideProperties = ShortcutGuideSettings.Properties;
+            try
+            {
+#pragma warning disable CA1869 // Cache and reuse 'JsonSerializerOptions' instances
+                settingsUtils.SaveSettings(JsonSerializer.Serialize(App.ShortcutGuideSettings, new JsonSerializerOptions { WriteIndented = true }), "Shortcut Guide");
+#pragma warning restore CA1869 // Cache and reuse 'JsonSerializerOptions' instances
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Persisting the round-tripped settings is best-effort; the in-memory copy is still valid.
+                Logger.LogWarning($"Failed to persist Shortcut Guide settings on launch. Reason: {ex.Message}");
+            }
         }
 
         private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)

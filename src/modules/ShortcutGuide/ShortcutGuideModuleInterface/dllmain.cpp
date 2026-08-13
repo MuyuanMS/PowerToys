@@ -41,6 +41,12 @@ public:
             Logger::warn(L"Failed to create {} event. {}", CommonSharedConstants::SHORTCUT_GUIDE_TRIGGER_EVENT, get_last_error_or_default(GetLastError()));
         }
 
+        winKeyTriggerEvent = CreateEvent(nullptr, false, false, CommonSharedConstants::SHORTCUT_GUIDE_WIN_KEY_TRIGGER_EVENT);
+        if (!winKeyTriggerEvent)
+        {
+            Logger::warn(L"Failed to create {} event. {}", CommonSharedConstants::SHORTCUT_GUIDE_WIN_KEY_TRIGGER_EVENT, get_last_error_or_default(GetLastError()));
+        }
+
         InitSettings();
     }
 
@@ -132,6 +138,10 @@ public:
         {
             CloseHandle(triggerEvent);
         }
+        if (winKeyTriggerEvent)
+        {
+            CloseHandle(winKeyTriggerEvent);
+        }
 
         delete this;
     }
@@ -158,6 +168,29 @@ public:
         SetEvent(triggerEvent);
     }
 
+    virtual bool on_hotkey(size_t hotkeyId) override
+    {
+        if (hotkeyId != PowertoyModuleIface::WinKeyHotkeyId)
+        {
+            return false;
+        }
+
+        Logger::trace("Windows key hold invoked");
+        if (!_enabled)
+        {
+            return false;
+        }
+        if (!IsProcessActive())
+        {
+            if (!StartProcess())
+            {
+                return false;
+            }
+        }
+
+        return SetEvent(winKeyTriggerEvent) != 0;
+    }
+
     virtual void send_settings_telemetry() override
     {
         Logger::trace("Send settings telemetry");
@@ -166,8 +199,8 @@ public:
             Logger::error("Failed to create a process to send settings telemetry");
         }
     }
-    virtual bool keep_track_of_pressed_win_key() override { return true; }
-    virtual UINT milliseconds_win_key_must_be_pressed() override { return 900; }
+    virtual bool keep_track_of_pressed_win_key() override { return m_windowsKeyAction != 0; }
+    virtual UINT milliseconds_win_key_must_be_pressed() override { return m_millisecondsWinKeyPressTimeForGlobalWindowsShortcuts; }
 
 private:
     std::wstring app_name;
@@ -184,8 +217,10 @@ private:
     const UINT DEFAULT_MILLISECONDS_WIN_KEY_PRESS_TIME_FOR_TASKBAR_ICON_SHORTCUTS = 900;
     UINT m_millisecondsWinKeyPressTimeForGlobalWindowsShortcuts = DEFAULT_MILLISECONDS_WIN_KEY_PRESS_TIME_FOR_GLOBAL_WINDOWS_SHORTCUTS;
     UINT m_millisecondsWinKeyPressTimeForTaskbarIconShortcuts = DEFAULT_MILLISECONDS_WIN_KEY_PRESS_TIME_FOR_TASKBAR_ICON_SHORTCUTS;
+    int m_windowsKeyAction = 1;
 
     HANDLE triggerEvent;
+    HANDLE winKeyTriggerEvent;
     HANDLE exitEvent;
 
     bool StartProcess(std::wstring args = L"")
@@ -198,6 +233,10 @@ private:
         if (triggerEvent)
         {
             ResetEvent(triggerEvent);
+        }
+        if (winKeyTriggerEvent)
+        {
+            ResetEvent(winKeyTriggerEvent);
         }
 
         unsigned long powertoys_pid = GetCurrentProcessId();
@@ -271,6 +310,17 @@ private:
         {
             try
             {
+                auto jsonPropertiesObject = settingsObject.GetNamedObject(L"properties");
+                if (jsonPropertiesObject.HasKey(L"win_key_action"))
+                {
+                    auto jsonActionObject = jsonPropertiesObject.GetNamedObject(L"win_key_action");
+                    if (jsonActionObject.HasKey(L"value"))
+                    {
+                        auto action = jsonActionObject.GetNamedNumber(L"value");
+                        m_windowsKeyAction = action >= 0 && action <= 2 ? static_cast<int>(action) : 1;
+                    }
+                }
+
                 // Parse HotKey
                 auto jsonHotkeyObject = settingsObject.GetNamedObject(L"properties").GetNamedObject(L"open_shortcutguide");
                 auto hotkey = PowerToysSettings::HotkeyObject::from_json(jsonHotkeyObject);
@@ -301,6 +351,30 @@ private:
             {
                 Logger::warn("Failed to initialize Shortcut Guide start shortcut");
             }
+
+            try
+            {
+                auto propertiesObject = settingsObject.GetNamedObject(L"properties");
+                if (propertiesObject.HasKey(L"press_time"))
+                {
+                    auto jsonDurationObject = propertiesObject.GetNamedObject(L"press_time");
+                    if (jsonDurationObject.HasKey(L"value"))
+                    {
+                        auto pressTimeValue = jsonDurationObject.GetNamedNumber(L"value");
+                        if (pressTimeValue < 100)
+                        {
+                            pressTimeValue = 100;
+                        }
+                        else if (pressTimeValue > 5000)
+                        {
+                            pressTimeValue = 5000;
+                        }
+
+                        m_millisecondsWinKeyPressTimeForGlobalWindowsShortcuts = static_cast<UINT>(pressTimeValue);
+                    }
+                }
+            }
+            catch (...) { /* Keep defaults */ }
         }
         else
         {
