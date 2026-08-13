@@ -1413,7 +1413,7 @@ namespace KeyboardEventHandlers
 
                 for (DWORD pid : processIds)
                 {
-                    ShowProgram(pid, fileNamePart, false, false, 0);
+                    ShowProgram(pid, fileNamePart, false, false, 20);
                 }
 
                 //if (!ShowProgram(targetPid, fileNamePart, false, false, 0))
