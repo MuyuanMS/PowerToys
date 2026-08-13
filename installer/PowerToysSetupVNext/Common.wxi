@@ -53,7 +53,7 @@
         <?define InstallScope="perMachine" ?>
         <?define InstallPrivileges="elevated" ?>
         <?define UpgradeCodeGUID="42B84BF7-5FBF-473B-9C8B-049DC16F7708" ?>
-        <?define CliShimInstallCondition="INSTALLFOLDER ~&lt;&lt; ProgramFiles64Folder AND INSTALLFOLDER ~>> CliShimInstallSuffix" ?>
+        <?define CliShimInstallCondition="INSTALLFOLDER ~= CliShimDefaultInstallFolder" ?>
   <?endif?>
 
   <!--
