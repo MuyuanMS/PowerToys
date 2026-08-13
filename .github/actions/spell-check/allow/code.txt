@@ -454,6 +454,13 @@ WIDGETBOARD
 # URIs
 actioncenter
 
+# 3MF
+dmodel
+megapixels
+rels
+threemf
+XXE
+
 # New+ shell PIDL type names
 PCUITEMID
 PITEMID
