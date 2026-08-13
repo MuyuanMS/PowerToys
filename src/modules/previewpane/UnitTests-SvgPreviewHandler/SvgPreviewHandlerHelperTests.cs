@@ -1,7 +1,9 @@
-﻿// Copyright (c) Microsoft Corporation
+// Copyright (c) Microsoft Corporation
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
+using System.IO;
 using System.Text;
 
 using Common.Utilities;
@@ -124,6 +126,64 @@ namespace SvgPreviewHandlerUnitTests
 
             // Assert
             Assert.AreNotEqual(firstKey, secondKey);
+        }
+
+        [TestMethod]
+        public void BuildCacheKeyShouldDistinguishInputsContainingDelimiters()
+        {
+            var firstKey = SvgPreviewCacheHelper.BuildCacheKey("a\nb", string.Empty);
+            var secondKey = SvgPreviewCacheHelper.BuildCacheKey("a", "b\n");
+
+            Assert.AreNotEqual(firstKey, secondKey);
+        }
+
+        [TestMethod]
+        public void TryWriteCacheFileAtomicShouldCreateReusableEntry()
+        {
+            var cacheFolder = CreateTestCacheFolder();
+
+            try
+            {
+                var cacheKey = SvgPreviewCacheHelper.BuildCacheKey("atomic-write");
+
+                Assert.IsTrue(SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, "contents", out var writtenPath));
+                Assert.IsTrue(SvgPreviewCacheHelper.TryGetCacheFile(cacheFolder, cacheKey, out var reusedPath));
+                Assert.AreEqual(writtenPath, reusedPath);
+                Assert.AreEqual("contents", File.ReadAllText(reusedPath));
+                Assert.AreEqual(0, Directory.GetFiles(cacheFolder, "*.tmp").Length);
+            }
+            finally
+            {
+                Directory.Delete(cacheFolder, recursive: true);
+            }
+        }
+
+        [TestMethod]
+        public void PruneCacheShouldRemoveExpiredEntries()
+        {
+            var cacheFolder = CreateTestCacheFolder();
+
+            try
+            {
+                var expiredPath = Path.Combine(cacheFolder, "expired.html");
+                File.WriteAllText(expiredPath, "expired");
+                File.SetLastWriteTimeUtc(expiredPath, DateTime.UtcNow.AddDays(-31));
+
+                SvgPreviewCacheHelper.PruneCache(cacheFolder, DateTime.UtcNow);
+
+                Assert.IsFalse(File.Exists(expiredPath));
+            }
+            finally
+            {
+                Directory.Delete(cacheFolder, recursive: true);
+            }
+        }
+
+        private static string CreateTestCacheFolder()
+        {
+            var cacheFolder = Path.Combine(AppContext.BaseDirectory, $"SvgPreviewCacheTests-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(cacheFolder);
+            return cacheFolder;
         }
     }
 }

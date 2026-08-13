@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation
+// Copyright (c) Microsoft Corporation
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 using System.Drawing.Drawing2D;
@@ -184,17 +184,19 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
                         return;
                     }
 
-                    var cacheKey = SvgPreviewCacheHelper.BuildCacheKey("v1", VirtualHostName, SvgContents);
-                    var cacheFolder = Path.Combine(_webView2UserDataFolder, "Cache");
-                    var cacheFilePath = SvgPreviewCacheHelper.GetCacheFilePath(cacheFolder, cacheKey);
+                    var cacheKey = SvgPreviewCacheHelper.BuildCacheKey("v2", VirtualHostName, SvgContents);
+                    var cacheFolder = SvgPreviewCacheHelper.GetCacheFolderPath(_webView2UserDataFolder);
 
-                    if (!File.Exists(cacheFilePath) || new FileInfo(cacheFilePath).Length == 0)
+                    if (SvgPreviewCacheHelper.TryGetCacheFile(cacheFolder, cacheKey, out var cacheFilePath) ||
+                        SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, SvgContents, out cacheFilePath))
                     {
-                        File.WriteAllText(cacheFilePath, SvgContents);
+                        _localFileURI = new Uri(cacheFilePath);
+                        _browser.Source = _localFileURI;
                     }
-
-                    _localFileURI = new Uri(cacheFilePath);
-                    _browser.Source = _localFileURI;
+                    else
+                    {
+                        _browser.NavigateToString(SvgContents);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -339,17 +341,11 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
         }
 
         /// <summary>
-        /// Cleanup the previously created tmp html files from svg files bigger than 2MB.
+        /// Ensures the WebView2 user-data and SVG preview cache folders exist.
         /// </summary>
         private void EnsureWebView2UserDataFolder()
         {
-            try
-            {
-                Directory.CreateDirectory(_webView2UserDataFolder);
-            }
-            catch (Exception)
-            {
-            }
+            SvgPreviewCacheHelper.EnsureCacheFolder(_webView2UserDataFolder);
         }
     }
 }
