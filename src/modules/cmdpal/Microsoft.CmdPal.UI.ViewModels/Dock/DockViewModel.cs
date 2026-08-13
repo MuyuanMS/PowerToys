@@ -135,6 +135,7 @@ public sealed partial class DockViewModel : IDisposable
             {
                 var updatedConfig = config with
                 {
+                    HasExplicitBandCustomization = true,
                     StartBands = start,
                     CenterBands = center,
                     EndBands = end,
@@ -520,6 +521,7 @@ public sealed partial class DockViewModel : IDisposable
                     {
                         var updatedConfig = config with
                         {
+                            HasExplicitBandCustomization = true,
                             StartBands = myStart,
                             CenterBands = myCenter,
                             EndBands = myEnd,

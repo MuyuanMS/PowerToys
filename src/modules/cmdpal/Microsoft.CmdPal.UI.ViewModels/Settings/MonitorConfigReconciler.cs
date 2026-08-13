@@ -72,7 +72,7 @@ public static class MonitorConfigReconciler
             var monitor = currentMonitors[mi];
             if (configIndexById.TryGetValue(monitor.StableId, out var ci) && !matchedConfigIndices.Contains(ci))
             {
-                result.Add(existingConfigs[ci] with { IsPrimary = monitor.IsPrimary, LastSeen = utcNow });
+                result.Add(NormalizeEmptyCustomizedConfig(existingConfigs[ci]) with { IsPrimary = monitor.IsPrimary, LastSeen = utcNow });
                 matchedMonitorStableIds.Add(monitor.StableId);
                 matchedConfigIndices.Add(ci);
             }
@@ -92,7 +92,7 @@ public static class MonitorConfigReconciler
             if (configIndexById.TryGetValue(monitor.DeviceId, out var ci) && !matchedConfigIndices.Contains(ci))
             {
                 // Migrate: rewrite from GDI name to stable path
-                result.Add(existingConfigs[ci] with
+                result.Add(NormalizeEmptyCustomizedConfig(existingConfigs[ci]) with
                 {
                     MonitorDeviceId = monitor.StableId,
                     IsPrimary = monitor.IsPrimary,
@@ -125,7 +125,7 @@ public static class MonitorConfigReconciler
 
                 if (existingConfigs[ci].IsPrimary)
                 {
-                    result.Add(existingConfigs[ci] with
+                    result.Add(NormalizeEmptyCustomizedConfig(existingConfigs[ci]) with
                     {
                         MonitorDeviceId = monitor.StableId,
                         IsPrimary = monitor.IsPrimary,
@@ -139,9 +139,8 @@ public static class MonitorConfigReconciler
         }
 
         // Create defaults for new monitors with no matching config.
-        // Primary monitors inherit global bands (IsCustomized = false) for a seamless
-        // upgrade path. Secondary monitors start disabled with empty band lists;
-        // users opt-in via Settings when they want the dock on additional displays.
+        // New monitor configs inherit global bands (IsCustomized = false) until
+        // users opt in to per-monitor custom band lists.
         for (var mi = 0; mi < currentMonitors.Count; mi++)
         {
             var monitor = currentMonitors[mi];
@@ -167,10 +166,6 @@ public static class MonitorConfigReconciler
                     MonitorDeviceId = monitor.StableId,
                     Enabled = false,
                     IsPrimary = false,
-                    IsCustomized = true,
-                    StartBands = ImmutableList<DockBandSettings>.Empty,
-                    CenterBands = ImmutableList<DockBandSettings>.Empty,
-                    EndBands = ImmutableList<DockBandSettings>.Empty,
                     LastSeen = utcNow,
                 });
             }
@@ -189,7 +184,7 @@ public static class MonitorConfigReconciler
             var lastSeen = config.LastSeen ?? utcNow; // Treat legacy entries (no LastSeen) as fresh
             if ((utcNow - lastSeen) < StaleThreshold)
             {
-                result.Add(config);
+                result.Add(NormalizeEmptyCustomizedConfig(config));
             }
         }
 
@@ -214,5 +209,35 @@ public static class MonitorConfigReconciler
         }
 
         return ImmutableList.CreateRange(result);
+    }
+
+    private static DockMonitorConfig NormalizeEmptyCustomizedConfig(DockMonitorConfig config)
+    {
+        if (!config.IsCustomized)
+        {
+            return config;
+        }
+
+        if (config.IsPrimary)
+        {
+            return config with { HasExplicitBandCustomization = true };
+        }
+
+        if (config.HasExplicitBandCustomization ||
+            config.StartBands is not { Count: 0 } ||
+            config.CenterBands is not { Count: 0 } ||
+            config.EndBands is not { Count: 0 })
+        {
+            return config;
+        }
+
+        return config with
+        {
+            IsCustomized = false,
+            HasExplicitBandCustomization = false,
+            StartBands = null,
+            CenterBands = null,
+            EndBands = null,
+        };
     }
 }

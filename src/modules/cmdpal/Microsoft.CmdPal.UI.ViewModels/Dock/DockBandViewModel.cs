@@ -183,6 +183,7 @@ public sealed partial class DockBandViewModel : ExtensionObjectViewModel
                         {
                             configs = configs.SetItem(i, config with
                             {
+                                HasExplicitBandCustomization = true,
                                 StartBands = newStart,
                                 CenterBands = newCenter,
                                 EndBands = newEnd,

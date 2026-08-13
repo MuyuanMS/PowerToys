@@ -132,9 +132,10 @@ public partial class DockMonitorConfigViewModel : ObservableObject
                     updated = config with
                     {
                         IsCustomized = false,
-                        StartBands = ImmutableList<DockBandSettings>.Empty,
-                        CenterBands = ImmutableList<DockBandSettings>.Empty,
-                        EndBands = ImmutableList<DockBandSettings>.Empty,
+                        HasExplicitBandCustomization = false,
+                        StartBands = null,
+                        CenterBands = null,
+                        EndBands = null,
                     };
                 }
 
