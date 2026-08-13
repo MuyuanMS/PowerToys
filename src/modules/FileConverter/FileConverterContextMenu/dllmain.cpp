@@ -51,14 +51,12 @@ namespace
         GUID canonical_name;
     };
 
-    constexpr std::array<TargetFormatSpec, 8> TARGET_FORMATS = {
+    constexpr std::array<TargetFormatSpec, 6> TARGET_FORMATS = {
         TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Png", L"PNG", fc_constants::FormatPng, FormatGroup::Png, file_converter::ImageFormat::Png, { 0x0a4200f1, 0x74e5, 0x4f59, { 0xbb, 0x5d, 0x79, 0x8a, 0xfa, 0xf8, 0x01, 0x10 } } },
         TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Jpg", L"JPG", fc_constants::FormatJpg, FormatGroup::Jpeg, file_converter::ImageFormat::Jpeg, { 0x9f0adf10, 0x3fcb, 0x4a22, { 0x9e, 0x4a, 0x9c, 0x9c, 0x5e, 0xc1, 0x16, 0x4a } } },
-        TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Jpeg", L"JPEG", fc_constants::FormatJpeg, FormatGroup::Jpeg, file_converter::ImageFormat::Jpeg, { 0x6d94f15d, 0xa2ba, 0x4912, { 0xa8, 0xf6, 0xe3, 0x89, 0xe0, 0xf8, 0x50, 0x76 } } },
         TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Bmp", L"BMP", fc_constants::FormatBmp, FormatGroup::Bmp, file_converter::ImageFormat::Bmp, { 0x922d3030, 0x7fdb, 0x4de7, { 0x99, 0x39, 0x15, 0x95, 0x38, 0x0e, 0x81, 0x88 } } },
         TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Tiff", L"TIFF", fc_constants::FormatTiff, FormatGroup::Tiff, file_converter::ImageFormat::Tiff, { 0x91fc7a8a, 0x34b9, 0x4ddf, { 0x86, 0xe8, 0x9f, 0xbb, 0x84, 0xf3, 0x55, 0x65 } } },
         TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Heic", L"HEIC", fc_constants::FormatHeic, FormatGroup::Heif, file_converter::ImageFormat::Heif, { 0xd10be4f8, 0x6e5f, 0x4c6d, { 0xa1, 0x45, 0xbe, 0x57, 0x9f, 0x42, 0x75, 0x69 } } },
-        TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Heif", L"HEIF", fc_constants::FormatHeif, FormatGroup::Heif, file_converter::ImageFormat::Heif, { 0x7fce9037, 0x12fe, 0x40af, { 0x88, 0x95, 0x6e, 0x7f, 0xe6, 0x29, 0x2b, 0x45 } } },
         TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Webp", L"WebP", fc_constants::FormatWebp, FormatGroup::Webp, file_converter::ImageFormat::Webp, { 0x5fce9315, 0x3d7b, 0x4372, { 0xac, 0x17, 0x35, 0x57, 0x91, 0xcd, 0x17, 0x61 } } },
     };
 
