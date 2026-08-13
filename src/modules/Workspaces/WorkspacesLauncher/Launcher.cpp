@@ -158,17 +158,17 @@ void Launcher::Launch() // Launching thread
             {
                 break;
             }
-        }
 
-        if (launched)
-        {
-            m_launchingStatus.Update(app, LaunchingState::Launched);
-        }
-        else
-        {
-            Logger::error(L"Failed to launch {}", app.name);
-            m_launchingStatus.Update(app, LaunchingState::Failed);
-            m_launchedSuccessfully = false;
+            if (launched)
+            {
+                m_launchingStatus.Update(app, LaunchingState::Launched);
+            }
+            else
+            {
+                Logger::error(L"Failed to launch {}", app.name);
+                m_launchingStatus.Update(app, LaunchingState::Failed);
+                m_launchedSuccessfully = false;
+            }
         }
 
         auto status = m_launchingStatus.Get(app); // updated after launch status 
@@ -237,9 +237,9 @@ void Launcher::handleUIMessage(const std::wstring& msg) // UI IPC thread
             {
                 Logger::trace(L"Cancel requested while an application launch is already in progress");
             }
-        }
 
-        m_launchingStatus.Cancel();
+            m_launchingStatus.Cancel();
+        }
 
         std::lock_guard lock(m_uiHelperMutex);
         m_uiHelper->SendMessage(L"cancel_ack");
