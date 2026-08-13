@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <Aclapi.h>
+#include <appmodel.h>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -47,6 +48,7 @@ namespace
     constexpr wchar_t CONTEXT_MENU_HANDLER_CLSID[] = L"{57EC18F5-24D5-4DC6-AE2E-9D0F7A39F8BA}";
     constexpr size_t MAX_PIPE_PAYLOAD_BYTES = 1024 * 1024;
     constexpr wchar_t CONTEXT_MENU_ENABLED_VALUE[] = L"Enabled";
+    constexpr wchar_t CONTEXT_MENU_PACKAGE_NAME[] = L"Microsoft.PowerToys.FileConverterContextMenu_";
     std::wstring LoadLocalizedString(std::wstring_view key, std::wstring_view fallback)
     {
         UNREFERENCED_PARAMETER(key);
@@ -310,6 +312,9 @@ namespace
                 if (wait == WAIT_OBJECT_0)
                 {
                     CancelIoEx(pipe_handle, &overlapped);
+                    WaitForSingleObject(read_event, INFINITE);
+                    DWORD ignored = 0;
+                    GetOverlappedResult(pipe_handle, &overlapped, &ignored, FALSE);
                     CloseHandle(read_event);
                     return {};
                 }
@@ -337,6 +342,34 @@ namespace
         }
 
         return payload.size() <= MAX_PIPE_PAYLOAD_BYTES ? payload : std::string{};
+    }
+
+    bool IsExpectedPackagedSurrogate(HANDLE pipe_handle)
+    {
+        ULONG client_pid = 0;
+        if (!GetNamedPipeClientProcessId(pipe_handle, &client_pid))
+        {
+            return false;
+        }
+
+        HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, client_pid);
+        if (process == nullptr)
+        {
+            return false;
+        }
+
+        UINT32 length = 0;
+        LONG result = GetPackageFullName(process, &length, nullptr);
+        if (result != ERROR_INSUFFICIENT_BUFFER)
+        {
+            CloseHandle(process);
+            return false;
+        }
+
+        std::wstring package_name(length, L'\0');
+        result = GetPackageFullName(process, &length, package_name.data());
+        CloseHandle(process);
+        return result == ERROR_SUCCESS && package_name.rfind(CONTEXT_MENU_PACKAGE_NAME, 0) == 0;
     }
 
     bool TryParseFormatConvertRequest(
@@ -739,6 +772,9 @@ namespace
                     if (wait == WAIT_OBJECT_0)
                     {
                         CancelIoEx(pipe_handle, &connect_overlapped);
+                        WaitForSingleObject(connect_event, INFINITE);
+                        DWORD ignored = 0;
+                        GetOverlappedResult(pipe_handle, &connect_overlapped, &ignored, FALSE);
                         CloseHandle(connect_event);
                         CloseHandle(pipe_handle);
                         break;
@@ -766,13 +802,22 @@ namespace
 
                 interop_auth::CallerPolicy policy;
                 policy.enabled = true;
-                wchar_t windows_directory[MAX_PATH]{};
-                GetWindowsDirectoryW(windows_directory, ARRAYSIZE(windows_directory));
-                policy.expectedDirectory = windows_directory;
-                policy.allowedBasenames = { L"explorer.exe" };
+                wchar_t caller_directory[MAX_PATH]{};
+                if (package::IsWin11OrGreater())
+                {
+                    GetSystemDirectoryW(caller_directory, ARRAYSIZE(caller_directory));
+                    policy.allowedBasenames = { L"dllhost.exe" };
+                }
+                else
+                {
+                    GetWindowsDirectoryW(caller_directory, ARRAYSIZE(caller_directory));
+                    policy.allowedBasenames = { L"explorer.exe" };
+                }
+                policy.expectedDirectory = caller_directory;
                 policy.requireMicrosoftSignature = true;
                 const auto auth = interop_auth::AuthenticateClient(pipe_handle, policy, m_auth_cache);
-                const std::string payload = auth.accepted ? ReadPipeMessage(pipe_handle, m_stop_event) : std::string{};
+                const bool package_identity_valid = !package::IsWin11OrGreater() || IsExpectedPackagedSurrogate(pipe_handle);
+                const std::string payload = auth.accepted && package_identity_valid ? ReadPipeMessage(pipe_handle, m_stop_event) : std::string{};
 
                 // Inbound-only server pipes have no outbound data to flush.
                 // Skipping FlushFileBuffers avoids reconnect stalls on malformed-request sequences.
