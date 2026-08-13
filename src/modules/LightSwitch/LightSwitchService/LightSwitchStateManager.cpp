@@ -334,6 +334,12 @@ void LightSwitchStateManager::NotifyPowerDisplayThemeChanged(bool isLight)
 {
     try
     {
+        if (LightSwitchSettings::settings_snapshot().scheduleMode == ScheduleMode::FollowBrightness)
+        {
+            Logger::debug(L"[LightSwitchStateManager] Skipping PowerDisplay profile notification in Follow Brightness mode.");
+            return;
+        }
+
         // The event carries only the resulting theme. PowerDisplay owns profile
         // enablement, reference validation, and application.
         const wchar_t* eventName = isLight

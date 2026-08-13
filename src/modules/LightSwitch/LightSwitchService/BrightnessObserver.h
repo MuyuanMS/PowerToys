@@ -6,7 +6,6 @@
 #include <thread>
 #include <atomic>
 #include <optional>
-#include <logger/logger.h>
 
 #pragma comment(lib, "wbemuuid.lib")
 #pragma comment(lib, "comsuppw.lib") // _bstr_t / _com_util COM support
@@ -53,7 +52,7 @@ private:
     void Run()
     {
         HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-        bool coinitCalledHere = SUCCEEDED(hr);
+        bool coInitializeCalledHere = SUCCEEDED(hr);
 
         int lastBrightness = -1;
 
@@ -138,6 +137,6 @@ private:
 
         if (pSvc) pSvc->Release();
         if (pLoc) pLoc->Release();
-        if (coinitCalledHere) CoUninitialize();
+        if (coInitializeCalledHere) CoUninitialize();
     }
 };
