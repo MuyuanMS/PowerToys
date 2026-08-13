@@ -407,6 +407,7 @@ function Test-CoreFiles {
 
         # File Converter
         'PowerToys.FileConverterModuleInterface.dll',
+        'PowerToys.FileConverterWorker.exe',
         
         # Keyboard Manager
         'PowerToys.KeyboardManager.dll',
