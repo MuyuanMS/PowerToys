@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
+using System.Linq;
 using Microsoft.PowerToys.Settings.UI.Views;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -156,8 +157,7 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
                 return false;
             }
 
-            var set = new HashSet<object>(currentValue);
-            return set.SetEquals(newValue);
+            return currentValue.SequenceEqual(newValue);
         }
     }
 }
