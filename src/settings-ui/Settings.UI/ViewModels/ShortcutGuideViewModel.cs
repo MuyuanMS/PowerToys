@@ -55,19 +55,20 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             InitializeEnabledValue();
 
             _windowsKeyActionIndex = NormalizeWindowsKeyAction(Settings.Properties.WindowsKeyAction.Value);
-            bool settingsNormalized = Settings.Properties.WindowsKeyAction.Value != _windowsKeyActionIndex;
+            bool windowsKeyActionNormalized = Settings.Properties.WindowsKeyAction.Value != _windowsKeyActionIndex;
             Settings.Properties.WindowsKeyAction.Value = _windowsKeyActionIndex;
             _pressTime = Math.Clamp(
                 Settings.Properties.PressTime.Value,
                 ShortcutGuideProperties.MinimumPressTimeMs,
                 ShortcutGuideProperties.MaximumPressTimeMs);
+            bool pressTimeNormalized = Settings.Properties.PressTime.Value != _pressTime;
             Settings.Properties.PressTime.Value = _pressTime;
             _closeOnWindowsKeyRelease = Settings.Properties.CloseOnWindowsKeyRelease.Value;
             _disabledApps = Settings.Properties.DisabledApps.Value;
 
-            if (settingsNormalized)
+            if (windowsKeyActionNormalized || pressTimeNormalized)
             {
-                NotifyPropertyChanged(nameof(WindowsKeyActionIndex));
+                NotifyPropertyChanged(windowsKeyActionNormalized ? nameof(WindowsKeyActionIndex) : nameof(PressTime));
             }
 
             switch (Settings.Properties.Theme.Value)
