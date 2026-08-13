@@ -47,6 +47,8 @@ namespace
     constexpr wchar_t CONTEXT_MENU_PACKAGE_FILE_PREFIX[] = L"FileConverterContextMenuPackage";
     constexpr wchar_t CONTEXT_MENU_HANDLER_CLSID[] = L"{57EC18F5-24D5-4DC6-AE2E-9D0F7A39F8BA}";
     constexpr size_t MAX_PIPE_PAYLOAD_BYTES = 1024 * 1024;
+    constexpr size_t MAX_PENDING_PIPE_REQUESTS = 16;
+    constexpr size_t MAX_PENDING_PIPE_BYTES = 4 * MAX_PIPE_PAYLOAD_BYTES;
     constexpr wchar_t CONTEXT_MENU_ENABLED_VALUE[] = L"Enabled";
     constexpr wchar_t CONTEXT_MENU_PACKAGE_NAME[] = L"Microsoft.PowerToys.FileConverterContextMenu_";
     std::wstring LoadLocalizedString(std::wstring_view key, std::wstring_view fallback)
@@ -657,6 +659,7 @@ namespace
             {
                 std::scoped_lock lock(m_queue_mutex);
                 std::swap(m_pending_payloads, empty);
+                m_pending_payload_bytes = 0;
             }
         }
 
@@ -686,6 +689,14 @@ namespace
                     return;
                 }
 
+                if (m_pending_payloads.size() >= MAX_PENDING_PIPE_REQUESTS ||
+                    payload.size() > MAX_PENDING_PIPE_BYTES - m_pending_payload_bytes)
+                {
+                    Logger::warn(L"File Converter dropped a request because the conversion queue is full.");
+                    return;
+                }
+
+                m_pending_payload_bytes += payload.size();
                 m_pending_payloads.push(std::move(payload));
             }
 
@@ -751,6 +762,7 @@ namespace
 
                     payload = std::move(m_pending_payloads.front());
                     m_pending_payloads.pop();
+                    m_pending_payload_bytes -= payload.size();
                 }
 
                 ProcessPayload(payload);
@@ -889,6 +901,7 @@ namespace
         std::mutex m_queue_mutex;
         std::condition_variable m_queue_cv;
         std::queue<std::string> m_pending_payloads;
+        size_t m_pending_payload_bytes = 0;
     };
 }
 

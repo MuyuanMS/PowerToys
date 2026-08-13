@@ -9,6 +9,13 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$settingsPath = Join-Path $env:LOCALAPPDATA "Microsoft\PowerToys\settings.json"
+$settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+if ($null -eq $settings.enabled -or $settings.enabled.FileConverter -ne $true)
+{
+    throw "File Converter must be enabled in PowerToys Settings before running this shell-verb smoke test."
+}
+
 $resolvedTestDir = (Resolve-Path $TestDirectory).Path
 $outputPath = Join-Path $resolvedTestDir $ExpectedOutputFileName
 if (Test-Path $outputPath)
@@ -121,22 +128,34 @@ public static class ShellVerbRunner
 [ComImport, Guid("A08CE4D0-FA25-44AB-B57C-C7B1C323E0B9"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 interface IExplorerCommand
 {
+    [PreserveSig]
     int GetTitle(IShellItemArray psiItemArray, out IntPtr ppszName);
+    [PreserveSig]
     int GetIcon(IShellItemArray psiItemArray, out IntPtr ppszIcon);
+    [PreserveSig]
     int GetToolTip(IShellItemArray psiItemArray, out IntPtr ppszInfotip);
+    [PreserveSig]
     int GetCanonicalName(out Guid pguidCommandName);
+    [PreserveSig]
     int GetState(IShellItemArray psiItemArray, int fOkToBeSlow, out uint pCmdState);
+    [PreserveSig]
     int Invoke(IShellItemArray psiItemArray, [MarshalAs(UnmanagedType.Interface)] object pbc);
+    [PreserveSig]
     int GetFlags(out uint pFlags);
+    [PreserveSig]
     int EnumSubCommands(out IEnumExplorerCommand ppEnum);
 }
 
 [ComImport, Guid("A88826F8-186F-4987-AADE-EA0CEF8FBFE8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 interface IEnumExplorerCommand
 {
+    [PreserveSig]
     int Next(uint celt, out IExplorerCommand pUICommand, out uint pceltFetched);
+    [PreserveSig]
     int Skip(uint celt);
+    [PreserveSig]
     int Reset();
+    [PreserveSig]
     int Clone(out IEnumExplorerCommand ppenum);
 }
 
