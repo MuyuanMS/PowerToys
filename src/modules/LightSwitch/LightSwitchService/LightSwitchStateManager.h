@@ -36,6 +36,10 @@ public:
     // Called when manual override is toggled (via shortcut or system change).
     void OnManualOverride();
 
+    // Called when the service detects that Windows Settings changed the theme.
+    // If expectedTheme is empty, derive it from the current brightness sample.
+    void OnExternalThemeChange(std::optional<bool> expectedTheme);
+
     // Called when night light changes in windows settings
     void OnNightLightChange();
 
@@ -49,16 +53,9 @@ public:
     // Initial sync at startup to align internal state with system theme
     void SyncInitialThemeState();
 
-    // Accessor for current state (optional, for debugging or telemetry)
-    LightSwitchState GetState() const
-    {
-        std::lock_guard<std::mutex> lock(_stateMutex);
-        return _state;
-    }
-
 private:
     LightSwitchState _state;
-    mutable std::mutex _stateMutex;
+    std::mutex _stateMutex;
 
     void EvaluateAndApplyIfNeeded();
     bool CoordinatesAreValid(const std::wstring& lat, const std::wstring& lon);
