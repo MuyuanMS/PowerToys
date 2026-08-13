@@ -111,6 +111,7 @@ namespace FancyZonesUnitTests
         {
             //prepare data
             const Settings expected{
+                .cycleThroughAllZones = false,
                 .excludedApps = L"app\r\napp1\r\napp2\r\nanother app",
                 .excludedAppsArray = { L"APP", L"APP1", L"APP2", L"ANOTHER APP" },
             };
