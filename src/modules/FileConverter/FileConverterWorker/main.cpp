@@ -1,5 +1,6 @@
 #include "pch.h"
 
+#include "../FileConverterLib/Constants.h"
 #include "../FileConverterLib/FileConversionEngine.h"
 #include <common/logger/logger.h>
 #include <common/utils/logger_helper.h>
@@ -7,6 +8,7 @@
 namespace
 {
     constexpr auto ABANDONED_TEMP_AGE = std::chrono::minutes(5);
+    constexpr DWORD ENCODER_PROBE_TIMEOUT_MS = 10000;
 
     std::wstring ExtensionForFormat(file_converter::ImageFormat format)
     {
@@ -81,10 +83,112 @@ namespace
             }
         }
     }
+
+    bool ProbeFormatInChildProcess(
+        const std::filesystem::path& worker_path,
+        file_converter::ImageFormat format)
+    {
+        std::wstring command_line =
+            L"\"" + worker_path.wstring() + L"\" --probe " +
+            std::to_wstring(static_cast<int>(format));
+        STARTUPINFOW startup_info{};
+        startup_info.cb = sizeof(startup_info);
+        PROCESS_INFORMATION process_info{};
+        if (!CreateProcessW(
+                worker_path.c_str(),
+                command_line.data(),
+                nullptr,
+                nullptr,
+                FALSE,
+                CREATE_NO_WINDOW,
+                nullptr,
+                worker_path.parent_path().c_str(),
+                &startup_info,
+                &process_info))
+        {
+            return false;
+        }
+
+        CloseHandle(process_info.hThread);
+        const DWORD wait_result = WaitForSingleObject(process_info.hProcess, ENCODER_PROBE_TIMEOUT_MS);
+        if (wait_result == WAIT_TIMEOUT)
+        {
+            TerminateProcess(process_info.hProcess, ERROR_TIMEOUT);
+        }
+
+        DWORD exit_code = ERROR_GEN_FAILURE;
+        const bool supported =
+            wait_result == WAIT_OBJECT_0 &&
+            GetExitCodeProcess(process_info.hProcess, &exit_code) &&
+            SUCCEEDED(static_cast<HRESULT>(exit_code));
+        CloseHandle(process_info.hProcess);
+        return supported;
+    }
+
+    int CacheEncoderAvailability()
+    {
+        std::wstring worker_path(MAX_PATH, L'\0');
+        for (;;)
+        {
+            const DWORD length =
+                GetModuleFileNameW(nullptr, worker_path.data(), static_cast<DWORD>(worker_path.size()));
+            if (length == 0)
+            {
+                return static_cast<int>(HRESULT_FROM_WIN32(GetLastError()));
+            }
+            if (length < worker_path.size() - 1)
+            {
+                worker_path.resize(length);
+                break;
+            }
+            worker_path.resize(worker_path.size() * 2);
+        }
+
+        HKEY key = nullptr;
+        const LSTATUS create_result = RegCreateKeyExW(
+            HKEY_CURRENT_USER,
+            winrt::PowerToys::FileConverter::Constants::RegistryPath,
+            0,
+            nullptr,
+            0,
+            KEY_SET_VALUE,
+            nullptr,
+            &key,
+            nullptr);
+        if (create_result != ERROR_SUCCESS)
+        {
+            return static_cast<int>(HRESULT_FROM_WIN32(create_result));
+        }
+
+        for (int format = static_cast<int>(file_converter::ImageFormat::Png);
+             format <= static_cast<int>(file_converter::ImageFormat::Webp);
+             ++format)
+        {
+            const DWORD available =
+                ProbeFormatInChildProcess(worker_path, static_cast<file_converter::ImageFormat>(format)) ? 1 : 0;
+            const std::wstring value_name =
+                std::wstring(winrt::PowerToys::FileConverter::Constants::RegistryEncoderAvailabilityPrefix) +
+                std::to_wstring(format);
+            RegSetValueExW(
+                key,
+                value_name.c_str(),
+                0,
+                REG_DWORD,
+                reinterpret_cast<const BYTE*>(&available),
+                sizeof(available));
+        }
+        RegCloseKey(key);
+        return 0;
+    }
 }
 
 int wmain(int argc, wchar_t* argv[])
 {
+    if (argc == 2 && wcscmp(argv[1], L"--probe-cache-all") == 0)
+    {
+        return CacheEncoderAvailability();
+    }
+
     if (argc != 3)
     {
         return static_cast<int>(E_INVALIDARG);

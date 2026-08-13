@@ -103,6 +103,12 @@
   <data name="FileConverter_Engine_OpenInputFailed" xml:space="preserve">
     <value>Failed opening input image.</value>
   </data>
+  <data name="FileConverter_Engine_ReadFrameCountFailed" xml:space="preserve">
+    <value>Failed reading image frame count.</value>
+  </data>
+  <data name="FileConverter_Engine_MultiFrameUnsupported" xml:space="preserve">
+    <value>Multi-frame images are not supported.</value>
+  </data>
   <data name="FileConverter_Engine_ReadFirstFrameFailed" xml:space="preserve">
     <value>Failed reading first image frame.</value>
   </data>
