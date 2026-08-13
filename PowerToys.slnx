@@ -492,6 +492,7 @@
     <Project Path="src/modules/FileConverter/FileConverterContextMenu/FileConverterContextMenu.vcxproj" Id="f3610647-6f9f-45ee-987f-c9a89c23f7f0" />
     <Project Path="src/modules/FileConverter/FileConverterLib/FileConverterLib.vcxproj" Id="2d6e2c29-43ce-4be9-b0fd-2f6240d04ef4" />
     <Project Path="src/modules/FileConverter/FileConverterModuleInterface/FileConverterModuleInterface.vcxproj" Id="7f2a1e2c-3b84-4c84-9e8d-29ef6abf1d11" />
+    <Project Path="src/modules/FileConverter/FileConverterWorker/FileConverterWorker.vcxproj" Id="70f24a98-4d63-4df4-9b21-a3127b45f5cc" />
   </Folder>
   <Folder Name="/modules/Hosts/">
     <Project Path="src/modules/Hosts/Hosts/Hosts.csproj">
@@ -1244,6 +1245,7 @@
     <BuildDependency Project="src/modules/colorPicker/ColorPickerUI/ColorPickerUI.csproj" />
     <BuildDependency Project="src/modules/FileConverter/FileConverterContextMenu/FileConverterContextMenu.vcxproj" />
     <BuildDependency Project="src/modules/FileConverter/FileConverterModuleInterface/FileConverterModuleInterface.vcxproj" />
+    <BuildDependency Project="src/modules/FileConverter/FileConverterWorker/FileConverterWorker.vcxproj" />
     <BuildDependency Project="src/modules/fancyzones/editor/FancyZonesEditor/FancyZonesEditor.csproj" />
     <BuildDependency Project="src/modules/fancyzones/FancyZonesLib/FancyZonesLib.vcxproj" />
     <BuildDependency Project="src/modules/fancyzones/FancyZonesModuleInterface/FancyZonesModuleInterface.vcxproj" />
@@ -1268,4 +1270,3 @@
   <Project Path="src/runner/UnitTests/UnitTests-Runner.vcxproj" Id="97bdacf8-261d-4e23-a708-a27e0b60e444" />
   <Project Path="tools/project_template/ModuleTemplate/ModuleTemplateCompileTest.vcxproj" Id="64a80062-4d8b-4229-8a38-dfa1d7497749" />
 </Solution>
-
