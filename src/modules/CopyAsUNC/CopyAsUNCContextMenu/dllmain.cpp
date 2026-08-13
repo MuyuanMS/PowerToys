@@ -80,9 +80,6 @@ public:
         if (!CopyAsUNCSettingsInstance().GetEnabled())
             return S_OK;
 
-        if (CopyAsUNCSettingsInstance().GetShowInExtendedContextMenu())
-            return S_OK;
-
         // Only show for UNC paths or items on mapped network drives
         if (selection)
         {
