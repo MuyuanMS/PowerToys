@@ -22,7 +22,7 @@ namespace ClipPing;
 
 public partial class App : Application, IDisposable
 {
-    private static readonly SettingsUtils ModuleSettings = new();
+    private static readonly SettingsUtils ModuleSettings = SettingsUtils.Default;
     private readonly FileSystemWatcher _fileSystemWatcher;
     private readonly ETWTrace _etwTrace = new();
     private ClipPingSettings _currentSettings;
@@ -211,21 +211,44 @@ public partial class App : Application, IDisposable
             }
         }
 
+        if (dpi == 0)
+        {
+            Logger.LogWarning("Could not determine the foreground window DPI. Using 96 DPI.");
+            dpi = 96;
+        }
+
         double scale = 96.0 / dpi;
 
-        var rawColor = _currentSettings.Properties.OverlayColor;
-
-        // Convert #RRGGBB to Windows.UI.Color
-        var color = Windows.UI.Color.FromArgb(
-            255,
-            Convert.ToByte(rawColor.Value.Substring(1, 2), 16),
-            Convert.ToByte(rawColor.Value.Substring(3, 2), 16),
-            Convert.ToByte(rawColor.Value.Substring(5, 2), 16));
+        var rawColor = _currentSettings.Properties.OverlayColor.Value;
+        if (!TryParseOverlayColor(rawColor, out var color))
+        {
+            Logger.LogWarning($"Invalid overlay color in settings: {rawColor}. Using the default color.");
+            color = Windows.UI.Color.FromArgb(255, 255, 0, 0);
+        }
 
         var target = new Rect(rect.Left, rect.Top, windowWidth * scale, windowHeight * scale);
 
         Logger.LogDebug($"Showing overlay at {target} with color {color}.");
 
         GetOverlay()?.Show(target, color);
+    }
+
+    private static bool TryParseOverlayColor(string? value, out Windows.UI.Color color)
+    {
+        color = default;
+        if (value is not { Length: 7 } || value[0] != '#')
+        {
+            return false;
+        }
+
+        if (byte.TryParse(value.AsSpan(1, 2), System.Globalization.NumberStyles.HexNumber, null, out var red) &&
+            byte.TryParse(value.AsSpan(3, 2), System.Globalization.NumberStyles.HexNumber, null, out var green) &&
+            byte.TryParse(value.AsSpan(5, 2), System.Globalization.NumberStyles.HexNumber, null, out var blue))
+        {
+            color = Windows.UI.Color.FromArgb(255, red, green, blue);
+            return true;
+        }
+
+        return false;
     }
 }

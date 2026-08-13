@@ -82,6 +82,11 @@ public:
         return app_key.c_str();
     }
 
+    powertoys_gpo::gpo_rule_configured_t gpo_policy_enabled_configuration() override
+    {
+        return powertoys_gpo::getConfiguredClipPingEnabledValue();
+    }
+
     // Return JSON with the configuration options.
     bool get_config(wchar_t* buffer, int* buffer_size) override
     {
@@ -113,10 +118,20 @@ public:
     // Enable the powertoy
     void enable()
     {
-        m_enabled = true;
+        if (m_hProcess && WaitForSingleObject(m_hProcess, 0) == WAIT_TIMEOUT)
+        {
+            m_enabled = true;
+            Trace::Enable(true);
+            return;
+        }
 
-        // Log telemetry
-        Trace::Enable(true);
+        if (m_hProcess)
+        {
+            CloseHandle(m_hProcess);
+            m_hProcess = nullptr;
+        }
+
+        m_enabled = false;
 
         ResetEvent(m_exit_event_handle);
 
@@ -141,8 +156,9 @@ public:
         else
         {
             m_hProcess = sei.hProcess;
+            m_enabled = true;
+            Trace::Enable(true);
         }
-
     }
 
     // Disable the powertoy
@@ -171,13 +187,18 @@ public:
         // Tell the ClipPing process to exit.
         SetEvent(m_exit_event_handle);
 
-        // Wait for 1.5 seconds for the process to end correctly and stop etw tracer
-        WaitForSingleObject(m_hProcess, 1500);
-
-        // If process is still running, terminate it
         if (m_hProcess)
         {
-            TerminateProcess(m_hProcess, 0);
+            constexpr DWORD timeout_ms = 1500;
+            DWORD result = WaitForSingleObject(m_hProcess, timeout_ms);
+
+            if (result == WAIT_TIMEOUT)
+            {
+                Logger::warn("ClipPing: Process didn't exit in time. Forcing termination.");
+                TerminateProcess(m_hProcess, 0);
+            }
+
+            CloseHandle(m_hProcess);
             m_hProcess = nullptr;
         }
     }

@@ -18,7 +18,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         private bool _enabledStateIsGpoConfigured;
         private bool _isEnabled;
 
-        public ClipPingViewModel(ISettingsUtils settingsUtils, ISettingsRepository<GeneralSettings> settingsRepository, ISettingsRepository<ClipPingSettings> moduleSettingsRepository, Func<string, int> ipcMSGCallBackFunc)
+        public ClipPingViewModel(SettingsUtils settingsUtils, ISettingsRepository<GeneralSettings> settingsRepository, ISettingsRepository<ClipPingSettings> moduleSettingsRepository, Func<string, int> ipcMSGCallBackFunc)
         {
             ArgumentNullException.ThrowIfNull(settingsUtils);
 
@@ -40,7 +40,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             SendConfigMSG = ipcMSGCallBackFunc;
         }
 
-        private ISettingsUtils SettingsUtils { get; }
+        private SettingsUtils SettingsUtils { get; }
 
         private GeneralSettings GeneralSettingsConfig { get; }
 
