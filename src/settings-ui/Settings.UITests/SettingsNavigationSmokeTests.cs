@@ -52,6 +52,7 @@ public sealed class SettingsNavigationSmokeTests : UITestBase
         // System tools
         new NavigationCase("SystemToolsNavItem", "AdvancedPasteNavItem"),
         new NavigationCase("SystemToolsNavItem", "AwakeNavItem"),
+        new NavigationCase("SystemToolsNavItem", "ClipPingNavItem"),
         new NavigationCase("SystemToolsNavItem", "CmdPalNavItem"),
         new NavigationCase("SystemToolsNavItem", "ColorPickerNavItem"),
         new NavigationCase("SystemToolsNavItem", "LightSwitchNavItem"),
@@ -150,4 +151,3 @@ public sealed class SettingsNavigationSmokeTests : UITestBase
 
     private readonly record struct NavigationCase(string? ParentGroupSlug, string NavItemSlug);
 }
-

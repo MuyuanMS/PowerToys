@@ -250,7 +250,8 @@ public partial class App : Application, IDisposable
 
         double scale = 96.0 / dpi;
 
-        var target = new Rect(rect.Left, rect.Top, windowWidth * scale, windowHeight * scale);
+        // Keep the overlay one physical pixel short so Windows does not classify it as a fullscreen window and trigger Focus Assist.
+        var target = new Rect(rect.Left, rect.Top, windowWidth * scale, (windowHeight - 1) * scale);
 
         GetOverlay()?.Show(target, _overlayColor);
     }
