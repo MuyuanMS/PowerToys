@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <array>
 #include <cwctype>
+#include <filesystem>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -23,9 +24,12 @@ using namespace Microsoft::WRL;
 namespace json = winrt::Windows::Data::Json;
 namespace fc_constants = winrt::PowerToys::FileConverter::Constants;
 
+extern HINSTANCE g_module_instance;
+
 namespace
 {
     constexpr DWORD PIPE_CONNECT_TIMEOUT_MS = 1000;
+    constexpr DWORD ENCODER_PROBE_TIMEOUT_MS = 10000;
 
     enum class FormatGroup
     {
@@ -256,6 +260,64 @@ namespace
         return true;
     }
 
+    bool ProbeTargetSupport(file_converter::ImageFormat format)
+    {
+        std::wstring module_path(MAX_PATH, L'\0');
+        for (;;)
+        {
+            const DWORD length =
+                GetModuleFileNameW(g_module_instance, module_path.data(), static_cast<DWORD>(module_path.size()));
+            if (length == 0)
+            {
+                return false;
+            }
+            if (length < module_path.size() - 1)
+            {
+                module_path.resize(length);
+                break;
+            }
+            module_path.resize(module_path.size() * 2);
+        }
+
+        const std::filesystem::path worker_path =
+            std::filesystem::path(module_path).parent_path().parent_path() / L"PowerToys.FileConverterWorker.exe";
+        std::wstring command_line =
+            L"\"" + worker_path.wstring() + L"\" --probe " + std::to_wstring(static_cast<int>(format));
+
+        STARTUPINFOW startup_info{};
+        startup_info.cb = sizeof(startup_info);
+        PROCESS_INFORMATION process_info{};
+        if (!CreateProcessW(
+                worker_path.c_str(),
+                command_line.data(),
+                nullptr,
+                nullptr,
+                FALSE,
+                CREATE_NO_WINDOW,
+                nullptr,
+                worker_path.parent_path().c_str(),
+                &startup_info,
+                &process_info))
+        {
+            return false;
+        }
+
+        CloseHandle(process_info.hThread);
+        const DWORD wait_result = WaitForSingleObject(process_info.hProcess, ENCODER_PROBE_TIMEOUT_MS);
+        if (wait_result == WAIT_TIMEOUT)
+        {
+            TerminateProcess(process_info.hProcess, ERROR_TIMEOUT);
+        }
+
+        DWORD exit_code = ERROR_GEN_FAILURE;
+        const bool succeeded =
+            wait_result == WAIT_OBJECT_0 &&
+            GetExitCodeProcess(process_info.hProcess, &exit_code) &&
+            SUCCEEDED(static_cast<HRESULT>(exit_code));
+        CloseHandle(process_info.hProcess);
+        return succeeded;
+    }
+
     bool IsTargetSupported(const TargetFormatSpec& spec)
     {
         constexpr size_t format_count = static_cast<size_t>(file_converter::ImageFormat::Webp) + 1;
@@ -264,7 +326,7 @@ namespace
 
         const size_t index = static_cast<size_t>(spec.image_format);
         std::call_once(availability_flags[index], [&spec, index] {
-            availability[index] = file_converter::IsOutputFormatSupported(spec.image_format).succeeded();
+            availability[index] = ProbeTargetSupport(spec.image_format);
         });
         return availability[index];
     }

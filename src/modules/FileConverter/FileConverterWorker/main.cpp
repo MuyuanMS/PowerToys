@@ -50,6 +50,7 @@ int wmain(int argc, wchar_t* argv[])
         return static_cast<int>(E_INVALIDARG);
     }
 
+    const bool probe_only = wcscmp(argv[1], L"--probe") == 0;
     const auto format = ParseFormat(argv[2]);
     if (!format)
     {
@@ -59,6 +60,11 @@ int wmain(int argc, wchar_t* argv[])
     try
     {
         winrt::init_apartment(winrt::apartment_type::multi_threaded);
+        if (probe_only)
+        {
+            return static_cast<int>(file_converter::IsOutputFormatSupported(*format).hr);
+        }
+
         const std::filesystem::path input_path(argv[1]);
         std::error_code ec;
         if (input_path.empty())
