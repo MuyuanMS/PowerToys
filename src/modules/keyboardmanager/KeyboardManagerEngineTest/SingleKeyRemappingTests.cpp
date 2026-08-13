@@ -927,6 +927,28 @@ namespace RemappingLogicTests
             Assert::AreEqual(false, testState.IsAloneCombination(VK_RCONTROL));
         }
 
+        // Reloading settings can remove the alone mapping while a promoted source key is still held.
+        // Runtime combination state must still resolve its key-up independently of the new mapping table.
+        TEST_METHOD (AloneRemap_SettingsReloadAfterPromotion_StillReleasesSourceKey)
+        {
+            testState.AddSingleKeyAloneRemap(VK_RCONTROL, (DWORD)VK_IME_ON);
+
+            std::vector<INPUT> rctrlDown{ { .type = INPUT_KEYBOARD, .ki = { .wVk = VK_RCONTROL } } };
+            std::vector<INPUT> hDown{ { .type = INPUT_KEYBOARD, .ki = { .wVk = 0x48 } } };
+            mockedInputHandler.SendVirtualInput(rctrlDown);
+            mockedInputHandler.SendVirtualInput(hDown);
+            Assert::AreEqual(true, mockedInputHandler.GetVirtualKeyState(VK_RCONTROL));
+
+            testState.ClearSingleKeyAloneRemaps();
+            testState.ClearAlonePendingKeys();
+
+            std::vector<INPUT> rctrlUp{ { .type = INPUT_KEYBOARD, .ki = { .wVk = VK_RCONTROL, .dwFlags = KEYEVENTF_KEYUP } } };
+            mockedInputHandler.SendVirtualInput(rctrlUp);
+
+            Assert::AreEqual(false, mockedInputHandler.GetVirtualKeyState(VK_RCONTROL));
+            Assert::AreEqual(false, testState.IsAloneCombination(VK_RCONTROL));
+        }
+
         // A numpad-originated alone key must be re-injected preserving its origin. Alone keys are tracked
         // by the numpad-origin-encoded vkCode (marker in bit 31); a bare WORD cast would drop it and turn
         // e.g. a NumLock-off numpad navigation key into its extended (arrow-cluster) twin. Verifies the

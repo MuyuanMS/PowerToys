@@ -181,6 +181,21 @@ namespace KeyboardEventHandlers
             PromotePendingAloneKeysToCombination(ii, state, vk);
         }
 
+        // A settings reload can remove or change the mapping after this source key was promoted. Resolve
+        // the matching release from runtime state before consulting the current mapping table, otherwise
+        // a newly loaded remap could consume the physical key-up and leave the injected source stuck down.
+        if (isKeyUp && state.IsAloneCombination(vk))
+        {
+            std::vector<INPUT> keyEventList;
+            AppendAloneSourceKeyEvent(keyEventList, vk, /*keyUp*/ true);
+            const bool injected = ii.SendVirtualInput(keyEventList);
+
+            state.ClearAloneKeyState(vk);
+            // If injection is blocked (for example after focus moves to an elevated process), let the
+            // physical key-up through so the successfully promoted key-down is released.
+            return injected ? 1 : 0;
+        }
+
         // Step 2: handle the alone-mapped key's own events.
         const auto aloneRemap = state.GetSingleKeyAloneRemap(vk);
         if (aloneRemap)
@@ -262,20 +277,6 @@ namespace KeyboardEventHandlers
 
                     state.ClearAloneKeyState(vk);
                     return 1;
-                }
-
-                if (state.IsAloneCombination(vk))
-                {
-                    // Was used in combination: release the real key we injected on its key-down (matching
-                    // its numpad origin, so a numpad-originated key is released as the same key we pressed).
-                    std::vector<INPUT> keyEventList;
-                    AppendAloneSourceKeyEvent(keyEventList, vk, /*keyUp*/ true);
-                    const bool injected = ii.SendVirtualInput(keyEventList);
-
-                    state.ClearAloneKeyState(vk);
-                    // If injection is blocked (for example after focus moves to an elevated process),
-                    // let the physical key-up through so the successfully promoted key-down is released.
-                    return injected ? 1 : 0;
                 }
 
                 // Not tracked (already resolved): pass the key-up through.
