@@ -1,5 +1,6 @@
 <Project Sdk="WixToolset.Sdk/5.0.2">
   <Import Project="..\..\src\CmdPalVersion.props" Condition="Exists('..\..\src\CmdPalVersion.props')" />
+  <Import Project="..\..\tools\CliShim\CliShimManifest.props" />
   <PropertyGroup>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
@@ -181,4 +182,18 @@ call powershell.exe -NonInteractive -executionpolicy Unrestricted -File $(MSBuil
     </ItemGroup>
   </Target>
   <Target Name="Restore" />
+  <Target Name="ValidateCliShimTargetsExist"
+          BeforeTargets="CoreCompile"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <PropertyGroup>
+      <_CliShimBinDir>$(RepoRoot)$(Platform)\$(Configuration)\bin\</_CliShimBinDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <CliShim>
+        <ResolvedTarget>$([System.IO.Path]::GetFullPath('$(_CliShimBinDir)%(CliShim.RelativeTarget)'))</ResolvedTarget>
+      </CliShim>
+    </ItemGroup>
+    <Error Condition="!Exists('%(CliShim.ResolvedTarget)')"
+           Text="CLI shim '%(CliShim.Identity)' maps to '%(CliShim.RelativeTarget)', which resolves to '%(CliShim.ResolvedTarget)' and does not exist. Update tools\CliShim\CliShimManifest.props to match where that CLI is built." />
+  </Target>
 </Project>
