@@ -88,6 +88,13 @@ public:
         return instance().m_settings;
     }
 
+    static inline LightSwitchConfig settings_snapshot()
+    {
+        auto& instance = LightSwitchSettings::instance();
+        std::lock_guard<std::mutex> guard(instance.m_settingsMutex);
+        return instance.m_settings;
+    }
+
     void InitFileWatcher();
     static std::wstring GetSettingsFileName();
 
