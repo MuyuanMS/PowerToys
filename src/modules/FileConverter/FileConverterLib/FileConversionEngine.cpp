@@ -266,7 +266,7 @@ namespace file_converter
             hr = factory->CreateBitmapFlipRotator(&orientation_transform);
             if (FAILED(hr) || FAILED(hr = orientation_transform->Initialize(source_frame.Get(), orientation)))
             {
-                return { hr, HrMessage(L"Failed applying image orientation.", hr) };
+                return { hr, HrMessage(LoadLocalizedString(L"FileConverter_Engine_ApplyOrientationFailed", L"Failed applying image orientation."), hr) };
             }
             oriented_source = orientation_transform;
         }
@@ -396,7 +396,7 @@ namespace file_converter
         if (!MoveFileExW(temporary.path.c_str(), output_path.c_str(), MOVEFILE_WRITE_THROUGH))
         {
             hr = HRESULT_FROM_WIN32(GetLastError());
-            return { hr, HrMessage(L"Failed publishing converted image.", hr) };
+            return { hr, HrMessage(LoadLocalizedString(L"FileConverter_Engine_PublishOutputFailed", L"Failed publishing converted image."), hr) };
         }
 
         temporary.published = true;
