@@ -205,8 +205,10 @@ namespace ViewModelTests
         [TestMethod]
         public void CopyAsUNCIsEnabledShouldSendGeneralSettingsWhenSuccessful()
         {
+            bool callbackInvoked = false;
             Func<string, int> sendMockIPCConfigMSG = msg =>
             {
+                callbackInvoked = true;
                 OutGoingGeneralSettings snd = JsonSerializer.Deserialize<OutGoingGeneralSettings>(msg);
                 Assert.IsFalse(snd.GeneralSettings.Enabled.CopyAsUNC);
                 return 0;
@@ -215,6 +217,8 @@ namespace ViewModelTests
             PowerPreviewViewModel viewModel = new PowerPreviewViewModel(SettingsRepository<PowerPreviewSettings>.GetInstance(mockPowerPreviewSettingsUtils.Object), SettingsRepository<GeneralSettings>.GetInstance(mockGeneralSettingsUtils.Object), sendMockIPCConfigMSG, PowerPreviewSettings.ModuleName);
 
             viewModel.IsCopyAsUNCEnabled = false;
+
+            Assert.IsTrue(callbackInvoked);
         }
 
         [TestMethod]
