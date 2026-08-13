@@ -8,7 +8,7 @@
         "class": "ClipPing.FuzzTests.FuzzTests",
         "method": "FuzzSettings",
         "FuzzingTargetBinaries": [
-          "PowerToys.Settings.UI.Library.dll"
+          "PowerToys.Settings.UI.Lib.dll"
         ]
       },
       "adoTemplate": {
@@ -30,8 +30,8 @@
       "jobDependencies": [
         "ClipPing.FuzzTests.dll",
         "ClipPing.FuzzTests.pdb",
-        "PowerToys.Settings.UI.Library.dll",
-        "PowerToys.Settings.UI.Library.pdb",
+        "PowerToys.Settings.UI.Lib.dll",
+        "PowerToys.Settings.UI.Lib.pdb",
         "Microsoft.Windows.SDK.NET.dll",
         "WinRT.Runtime.dll"
       ],
