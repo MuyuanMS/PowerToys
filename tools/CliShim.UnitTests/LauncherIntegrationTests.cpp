@@ -324,6 +324,34 @@ namespace
         UniqueHandle handle;
     };
 
+    BOOL WINAPI IgnoreConsoleControlEvent(DWORD)
+    {
+        return TRUE;
+    }
+
+    class ScopedConsoleAttachment
+    {
+    public:
+        explicit ScopedConsoleAttachment(const DWORD processId)
+        {
+            FreeConsole();
+            Assert::IsTrue(AttachConsole(processId) != FALSE, L"Could not attach to the shim's console.");
+            Assert::IsTrue(
+                SetConsoleCtrlHandler(IgnoreConsoleControlEvent, TRUE) != FALSE,
+                L"Could not protect the test host from the console control event.");
+        }
+
+        ScopedConsoleAttachment(const ScopedConsoleAttachment&) = delete;
+        ScopedConsoleAttachment& operator=(const ScopedConsoleAttachment&) = delete;
+
+        ~ScopedConsoleAttachment()
+        {
+            SetConsoleCtrlHandler(IgnoreConsoleControlEvent, FALSE);
+            FreeConsole();
+            AttachConsole(ATTACH_PARENT_PROCESS);
+        }
+    };
+
     // Starts the executable without waiting for it. When either standard handle is supplied the
     // child is started with inherited handles so the shim's own redirection behaviour is
     // exercised; the handles left null keep whatever the test host is using.
@@ -331,7 +359,8 @@ namespace
         const std::filesystem::path& executable,
         const std::wstring& arguments,
         HANDLE standardInput,
-        HANDLE standardOutput)
+        HANDLE standardOutput,
+        const DWORD creationFlags = CREATE_NO_WINDOW)
     {
         std::wstring commandLine = L"\"" + executable.wstring() + L"\"";
         if (!arguments.empty())
@@ -360,7 +389,7 @@ namespace
                 nullptr,
                 nullptr,
                 redirect ? TRUE : FALSE,
-                CREATE_NO_WINDOW,
+                creationFlags,
                 nullptr,
                 nullptr,
                 &startupInfo,
@@ -452,6 +481,57 @@ namespace
         }
 
         return narrow;
+    }
+
+    void VerifyCtrlCIsForwarded()
+    {
+        TemporaryDirectory installation;
+        const std::filesystem::path shimPath = installation.GetPath() / L"bin" / L"PowerToys.FancyZones.CLI.exe";
+
+        CopyExecutable(GetShimUnderTest(), shimPath);
+        CopyExecutable(GetSystemDirectoryPath() / L"PING.EXE", installation.GetPath() / L"FancyZonesCLI.exe");
+
+        LaunchedProcess launchedShim = StartProcess(
+            shimPath,
+            L"-t 127.0.0.1",
+            nullptr,
+            nullptr,
+            CREATE_NEW_CONSOLE);
+        const DWORD shimProcessId = launchedShim.processId;
+        const ProcessKiller shim{ std::move(launchedShim.process) };
+
+        const ProcessKiller target{ WaitForProcessByImageName(
+            L"FancyZonesCLI.exe",
+            shimProcessId,
+            SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE,
+            10'000) };
+        Assert::IsTrue(target.Get() != nullptr, L"The shim did not start the target CLI.");
+        Assert::AreEqual(
+            static_cast<DWORD>(WAIT_TIMEOUT),
+            WaitForSingleObject(shim.Get(), 200),
+            L"The shim exited before the console control event was sent.");
+
+        {
+            const ScopedConsoleAttachment console{ shimProcessId };
+            Assert::IsTrue(
+                GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0) != FALSE,
+                L"Could not send the console control event.");
+
+            Assert::AreEqual(
+                static_cast<DWORD>(WAIT_OBJECT_0),
+                WaitForSingleObject(target.Get(), 10'000),
+                L"The target CLI did not receive the console control event.");
+            Assert::AreEqual(
+                static_cast<DWORD>(WAIT_OBJECT_0),
+                WaitForSingleObject(shim.Get(), 10'000),
+                L"The shim did not wait for the target CLI to exit.");
+        }
+
+        DWORD targetExitCode = 0;
+        DWORD shimExitCode = 0;
+        Assert::IsTrue(GetExitCodeProcess(target.Get(), &targetExitCode) != FALSE, L"Could not read the target exit code.");
+        Assert::IsTrue(GetExitCodeProcess(shim.Get(), &shimExitCode) != FALSE, L"Could not read the shim exit code.");
+        Assert::AreEqual(targetExitCode, shimExitCode, L"The shim did not return the target CLI's exit code.");
     }
 }
 
@@ -626,6 +706,11 @@ namespace CliShimUnitTests
                 static_cast<DWORD>(WAIT_TIMEOUT),
                 WaitForSingleObject(survivor.Get(), 1'000),
                 L"The process started by the target CLI did not outlive the shim.");
+        }
+
+        TEST_METHOD(CtrlCIsForwardedToTheTargetCli)
+        {
+            VerifyCtrlCIsForwarded();
         }
     };
 }

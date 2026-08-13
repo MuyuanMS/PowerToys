@@ -20,9 +20,9 @@ namespace
     // Match cmd.exe's "command not found" exit code for unmapped shim names.
     constexpr int ExitCommandNotMapped = 9009;
 
-    // Shim failures use codes outside the range the target CLIs use for themselves (see
-    // doc/devdocs/cli-conventions.md: 0 success, 1 general error, 2 invalid arguments) so that a
-    // caller can tell "the shim could not run the CLI" apart from "the CLI ran and failed".
+    // Reserve dedicated shim failure codes so callers can distinguish "the shim could not run the
+    // CLI" from "the CLI ran and failed". These values remain outside the target CLIs' current
+    // ranges, including PowerDisplay's 0-10 range.
     constexpr int ExitTargetNotFound = 9010;
     constexpr int ExitLaunchFailed = 9011;
 
