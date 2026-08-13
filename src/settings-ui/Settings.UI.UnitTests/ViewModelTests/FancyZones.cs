@@ -194,6 +194,24 @@ namespace ViewModelTests
         }
 
         [TestMethod]
+        public void CycleThroughAllZonesShouldSetValue2FalseWhenSuccessful()
+        {
+            Mock<SettingsUtils> mockSettingsUtils = new Mock<SettingsUtils>(new FileSystem(), null);
+
+            // arrange
+            FancyZonesViewModel viewModel = new FancyZonesViewModel(mockSettingsUtils.Object, SettingsRepository<GeneralSettings>.GetInstance(mockGeneralSettingsUtils.Object), SettingsRepository<FancyZonesSettings>.GetInstance(mockFancyZonesSettingsUtils.Object), sendMockIPCConfigMSG, FancyZonesTestFolderName);
+            Assert.IsTrue(viewModel.CycleThroughAllZones);
+
+            // act
+            viewModel.CycleThroughAllZones = false;
+
+            // assert
+            var expected = viewModel.CycleThroughAllZones;
+            var actual = SettingsRepository<FancyZonesSettings>.GetInstance(mockFancyZonesSettingsUtils.Object).SettingsConfig.Properties.FancyzonesCycleThroughAllZones.Value;
+            Assert.AreEqual(expected, actual);
+        }
+
+        [TestMethod]
         public void MoveWindowsBasedOnPositionShouldSetValue2TrueWhenSuccessful()
         {
             Mock<SettingsUtils> mockSettingsUtils = new Mock<SettingsUtils>(new FileSystem(), null);

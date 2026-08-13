@@ -33,13 +33,29 @@ namespace
 bool WindowKeyboardSnap::Snap(HWND window, HMONITOR monitor, DWORD vkCode, const std::unordered_map<HMONITOR, std::unique_ptr<WorkArea>>& activeWorkAreas, const std::vector<HMONITOR>& monitors)
 {
     const bool cycle = FancyZonesSettings::settings().cycleThroughAllZones;
-    const bool success = (vkCode == VK_LEFT || vkCode == VK_RIGHT) && SnapHotkeyBasedOnZoneNumber(window, vkCode, monitor, activeWorkAreas, monitors);
-    if (!success && !cycle && (vkCode == VK_UP || vkCode == VK_DOWN))
+    if (!cycle && (vkCode == VK_UP || vkCode == VK_DOWN))
     {
-        return SetWindowState(window, vkCode == VK_UP ? SW_SHOWMAXIMIZED : SW_SHOWMINIMIZED);
+        RECT windowRect{};
+        if (!GetWindowRect(window, &windowRect))
+        {
+            return false;
+        }
+
+        std::vector<std::pair<HMONITOR, RECT>> monitorRects;
+        monitorRects.reserve(activeWorkAreas.size());
+        for (const auto& [workAreaMonitor, workArea] : activeWorkAreas)
+        {
+            if (workArea)
+            {
+                const auto& workAreaRect = workArea->GetWorkAreaRect();
+                monitorRects.emplace_back(workAreaMonitor, RECT{ workAreaRect.left(), workAreaRect.top(), workAreaRect.right(), workAreaRect.bottom() });
+            }
+        }
+
+        return Snap(window, windowRect, monitor, vkCode, activeWorkAreas, monitorRects);
     }
 
-    return success;
+    return (vkCode == VK_LEFT || vkCode == VK_RIGHT) && SnapHotkeyBasedOnZoneNumber(window, vkCode, monitor, activeWorkAreas, monitors);
 }
 
 bool WindowKeyboardSnap::Snap(HWND window, RECT windowRect, HMONITOR monitor, DWORD vkCode, const std::unordered_map<HMONITOR, std::unique_ptr<WorkArea>>& activeWorkAreas, const std::vector<std::pair<HMONITOR, RECT>>& monitors)
