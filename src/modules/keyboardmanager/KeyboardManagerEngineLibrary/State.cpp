@@ -66,6 +66,13 @@ std::optional<DWORD> State::GetAloneCombinationKeyForScanCode(DWORD scanCode) co
     for (const DWORD key : aloneCombinationKeys)
     {
         const DWORD plainKey = Helpers::ClearKeyNumpadOrigin(key);
+        if (!Helpers::IsNumpadOriginated(key) &&
+            !Helpers::IsNumpadKeyThatIsAffectedByShift(plainKey) &&
+            plainKey != VK_CLEAR)
+        {
+            continue;
+        }
+
         if (MapVirtualKey(plainKey, MAPVK_VK_TO_VSC) == scanCode)
         {
             return key;
