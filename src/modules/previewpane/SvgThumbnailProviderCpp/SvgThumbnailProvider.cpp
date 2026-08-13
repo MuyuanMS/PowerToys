@@ -6,6 +6,7 @@
 #include <shellapi.h>
 #include <Shlwapi.h>
 #include <string>
+#include <wincodec.h>
 
 #include <wil/com.h>
 
@@ -16,6 +17,69 @@
 
 extern HINSTANCE g_hInst;
 extern long g_cDllRef;
+
+static HBITMAP LoadPngAsPremultipliedDib(const std::wstring& filePath)
+{
+    wil::com_ptr<IWICImagingFactory> factory;
+    if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(factory.put()))))
+    {
+        return nullptr;
+    }
+
+    wil::com_ptr<IWICBitmapDecoder> decoder;
+    if (FAILED(factory->CreateDecoderFromFilename(filePath.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, decoder.put())))
+    {
+        return nullptr;
+    }
+
+    wil::com_ptr<IWICBitmapFrameDecode> frame;
+    if (FAILED(decoder->GetFrame(0, frame.put())))
+    {
+        return nullptr;
+    }
+
+    wil::com_ptr<IWICFormatConverter> converter;
+    if (FAILED(factory->CreateFormatConverter(converter.put())) ||
+        FAILED(converter->Initialize(frame.get(), GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom)))
+    {
+        return nullptr;
+    }
+
+    UINT width = 0;
+    UINT height = 0;
+    if (FAILED(converter->GetSize(&width, &height)) || width == 0 || height == 0 || width > LONG_MAX || height > LONG_MAX)
+    {
+        return nullptr;
+    }
+
+    BITMAPINFO bitmapInfo{};
+    bitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bitmapInfo.bmiHeader.biWidth = static_cast<LONG>(width);
+    bitmapInfo.bmiHeader.biHeight = -static_cast<LONG>(height);
+    bitmapInfo.bmiHeader.biPlanes = 1;
+    bitmapInfo.bmiHeader.biBitCount = 32;
+    bitmapInfo.bmiHeader.biCompression = BI_RGB;
+
+    void* bits = nullptr;
+    HBITMAP bitmap = CreateDIBSection(nullptr, &bitmapInfo, DIB_RGB_COLORS, &bits, nullptr, 0);
+    if (bitmap == nullptr || bits == nullptr)
+    {
+        if (bitmap != nullptr)
+        {
+            DeleteObject(bitmap);
+        }
+
+        return nullptr;
+    }
+
+    if (FAILED(converter->CopyPixels(nullptr, width * 4, width * height * 4, static_cast<BYTE*>(bits))))
+    {
+        DeleteObject(bitmap);
+        return nullptr;
+    }
+
+    return bitmap;
+}
 
 SvgThumbnailProvider::SvgThumbnailProvider() :
     m_cRef(1), m_pStream(NULL), m_process(NULL)
@@ -160,17 +224,30 @@ IFACEMETHODIMP SvgThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_A
                 WaitForSingleObject(m_process, INFINITE);
                 std::filesystem::remove(fileName);
 
-                std::wstring fileNameBmp = filePath + guid + L".bmp";
+                std::wstring fileNamePng = filePath + guid + L".png";
 
-                if (std::filesystem::exists(fileNameBmp))
+                if (std::filesystem::exists(fileNamePng))
                 {
-                    *phbmp = static_cast<HBITMAP>(LoadImage(NULL, fileNameBmp.c_str(), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE));
+                    HBITMAP thumbnail = LoadPngAsPremultipliedDib(fileNamePng);
+                    std::error_code cleanupError;
+                    std::filesystem::remove(fileNamePng, cleanupError);
+                    if (cleanupError)
+                    {
+                        Logger::warn(L"Failed to remove temporary PNG thumbnail.");
+                    }
+
+                    if (thumbnail == nullptr)
+                    {
+                        Logger::info(L"Failed to decode PNG thumbnail.");
+                        return E_FAIL;
+                    }
+
+                    *phbmp = thumbnail;
                     *pdwAlpha = WTS_ALPHATYPE::WTSAT_ARGB;
-                    std::filesystem::remove(fileNameBmp);
                 }
                 else
                 {
-                    Logger::info(L"Bmp file not generated.");
+                    Logger::info(L"PNG file not generated.");
                     return E_FAIL;
                 }
             }
@@ -178,6 +255,7 @@ IFACEMETHODIMP SvgThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_A
             {
                 std::wstring errorMessage = std::wstring{ winrt::to_hstring(e.what()) };
                 Logger::error(L"Failed to start SvgThumbnailProvider.exe. Error: {}", errorMessage);
+                return E_FAIL;
             }
         }
     }
