@@ -156,7 +156,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
         if (workspaces.empty())
         {
             Logger::warn("Protected Workspaces settings are empty");
-            std::wstring formattedMessage = GET_RESOURCE_STRING(IDS_SERVICE_ACCESS_ERROR);
+            std::wstring formattedMessage = fmt::format(GET_RESOURCE_STRING(IDS_PROJECT_NOT_FOUND), cmdArgs.workspaceId);
             MessageBox(NULL, formattedMessage.c_str(), GET_RESOURCE_STRING(IDS_WORKSPACES).c_str(), MB_ICONERROR | MB_OK);
             return 1;
         }

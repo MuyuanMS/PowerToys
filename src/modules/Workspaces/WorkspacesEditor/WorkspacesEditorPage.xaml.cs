@@ -53,7 +53,15 @@ namespace WorkspacesEditor
         private void CancelButtonClicked(object sender, RoutedEventArgs e)
         {
             // delete the temp file created by the snapshot tool
-            TempProjectData.DeleteTempFile();
+            if (!TempProjectData.DeleteTempFile())
+            {
+                MessageBox.Show(
+                    "PowerToys couldn't clear the temporary workspace from protected storage. Please try again before closing this editor.",
+                    "Workspaces",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
 
             _mainViewModel.SwitchToMainView();
         }

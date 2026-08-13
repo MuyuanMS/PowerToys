@@ -12,13 +12,19 @@ namespace WorkspacesCsharpLibrary.Data
     {
         public static string File => FolderUtils.DataFolder() + "\\temp-workspaces.json";
 
-        public static void DeleteTempFile()
+        public static bool DeleteTempFile()
         {
-            PTSettingsClient.DeleteTransientBlob();
+            if (PTSettingsClient.DeleteTransientBlob() != PTSettingsClient.Result.Ok)
+            {
+                return false;
+            }
+
             if (System.IO.File.Exists(File))
             {
                 System.IO.File.Delete(File);
             }
+
+            return true;
         }
     }
 }
