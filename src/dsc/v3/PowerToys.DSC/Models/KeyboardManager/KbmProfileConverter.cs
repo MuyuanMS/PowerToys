@@ -30,7 +30,7 @@ public static class KbmProfileConverter
 
     // Friendly names for the Shortcut.h enums, indexed by their numeric value.
     private static readonly string[] _elevationNames = ["normal", "elevated", "differentUser"];
-    private static readonly string[] _ifRunningNames = ["showWindow", "startAnother", "doNothing", "close", "endTask"];
+    private static readonly string[] _ifRunningNames = ["showWindow", "startAnother", "doNothing", "close", "endTask", "closeAndEndTask"];
     private static readonly string[] _windowStyleNames = ["normal", "hidden", "minimized", "maximized"];
 
     /// <summary>

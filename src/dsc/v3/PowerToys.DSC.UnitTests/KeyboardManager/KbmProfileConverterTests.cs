@@ -34,7 +34,7 @@ public sealed class KbmProfileConverterTests
             "remapShortcuts": {
                 "global": [
                     { "originalKeys": "162;65", "exactMatch": false, "newRemapKeys": "163;86", "operationType": 0 },
-                    { "originalKeys": "260;79;75", "exactMatch": false, "runProgramElevationLevel": 1, "operationType": 1, "runProgramAlreadyRunningAction": 2, "runProgramStartWindowType": 3, "runProgramFilePath": "cmd.exe", "runProgramArgs": "", "runProgramStartInDir": "", "unicodeText": "*Unsupported*" },
+                    { "originalKeys": "260;79;75", "exactMatch": false, "runProgramElevationLevel": 1, "operationType": 1, "runProgramAlreadyRunningAction": 5, "runProgramStartWindowType": 3, "runProgramFilePath": "cmd.exe", "runProgramArgs": "", "runProgramStartInDir": "", "unicodeText": "*Unsupported*" },
                     { "originalKeys": "17;18;66", "exactMatch": false, "runProgramElevationLevel": 0, "operationType": 2, "openUri": "https://example.com", "unicodeText": "*Unsupported*" }
                 ],
                 "appSpecific": [
@@ -90,7 +90,7 @@ public sealed class KbmProfileConverterTests
         Assert.IsNull(runProgram.Args);
         Assert.IsNull(runProgram.StartInDir);
         Assert.AreEqual("elevated", runProgram.Elevation);
-        Assert.AreEqual("doNothing", runProgram.IfRunning);
+        Assert.AreEqual("closeAndEndTask", runProgram.IfRunning);
         Assert.AreEqual("maximized", runProgram.WindowStyle);
 
         Assert.AreEqual("Ctrl+Alt+N", model.Shortcuts[4].From);
@@ -155,7 +155,7 @@ public sealed class KbmProfileConverterTests
             Shortcuts =
             [
                 new() { From = "Ctrl+Shift+A", To = "Ctrl+V" },
-                new() { From = "Win+O, K", RunProgram = new() { FilePath = "cmd.exe", Elevation = "elevated" } },
+                new() { From = "Win+O, K", RunProgram = new() { FilePath = "cmd.exe", Elevation = "elevated", IfRunning = "closeAndEndTask" } },
                 new() { From = "Ctrl+Alt+B", OpenUri = "https://example.com" },
                 new() { From = "Ctrl+Alt+N", To = "Ctrl+S", TargetApp = "Notepad.exe", ExactMatch = true },
                 new() { From = "Ctrl+Alt+T", ToText = "typed" },
@@ -187,7 +187,7 @@ public sealed class KbmProfileConverterTests
         Assert.AreEqual(string.Empty, global[1].RunProgramArgs);
         Assert.AreEqual(string.Empty, global[1].RunProgramStartInDir);
         Assert.AreEqual(1, global[1].RunProgramElevationLevel);
-        Assert.AreEqual(0, global[1].RunProgramAlreadyRunningAction);
+        Assert.AreEqual(5, global[1].RunProgramAlreadyRunningAction);
         Assert.AreEqual(0, global[1].RunProgramStartWindowType);
         Assert.AreEqual("*Unsupported*", global[1].NewRemapString);
 
