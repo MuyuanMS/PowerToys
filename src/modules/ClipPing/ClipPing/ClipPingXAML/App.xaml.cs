@@ -25,7 +25,8 @@ public partial class App : Application, IDisposable
     private static readonly SettingsUtils ModuleSettings = SettingsUtils.Default;
     private readonly FileSystemWatcher _fileSystemWatcher;
     private readonly ETWTrace _etwTrace = new();
-    private ClipPingSettings _currentSettings;
+    private ClipPingSettings _currentSettings = new();
+    private Windows.UI.Color _overlayColor;
     private IOverlay? _overlay;
 
     private static readonly Dictionary<ClipPingOverlay, Type> OverlayTypes = new()
@@ -38,7 +39,7 @@ public partial class App : Application, IDisposable
     {
         InitializeComponent();
 
-        _currentSettings = NormalizeSettings(ModuleSettings.GetSettingsOrDefault<ClipPingSettings>(ClipPingSettings.ModuleName));
+        ApplySettings(ModuleSettings.GetSettingsOrDefault<ClipPingSettings>(ClipPingSettings.ModuleName));
 
         var settingsPath = ModuleSettings.GetSettingsFilePath(ClipPingSettings.ModuleName);
 
@@ -80,7 +81,7 @@ public partial class App : Application, IDisposable
 
             try
             {
-                _currentSettings = NormalizeSettings(ModuleSettings.GetSettings<ClipPingSettings>(ClipPingSettings.ModuleName));
+                ApplySettings(ModuleSettings.GetSettings<ClipPingSettings>(ClipPingSettings.ModuleName));
                 return;
             }
             catch (Exception ex) when (attempt < 5)
@@ -94,12 +95,26 @@ public partial class App : Application, IDisposable
         }
     }
 
-    private static ClipPingSettings NormalizeSettings(ClipPingSettings? settings)
+    private void ApplySettings(ClipPingSettings? settings)
     {
         settings ??= new ClipPingSettings();
         settings.Properties ??= new ClipPingProperties();
-        settings.Properties.OverlayColor ??= new StringProperty("#FF0000");
-        return settings;
+        settings.Properties.OverlayColor ??= new StringProperty(ClipPingProperties.DefaultOverlayColor);
+
+        string rawColor = settings.Properties.OverlayColor.Value;
+        string normalizedColor = ClipPingProperties.NormalizeOverlayColor(rawColor);
+        if (!string.Equals(rawColor, normalizedColor, StringComparison.OrdinalIgnoreCase))
+        {
+            Logger.LogWarning($"Invalid overlay color in settings: {rawColor}. Using the default color.");
+            settings.Properties.OverlayColor.Value = normalizedColor;
+        }
+
+        _currentSettings = settings;
+        _overlayColor = Windows.UI.Color.FromArgb(
+            255,
+            Convert.ToByte(normalizedColor.Substring(1, 2), 16),
+            Convert.ToByte(normalizedColor.Substring(3, 2), 16),
+            Convert.ToByte(normalizedColor.Substring(5, 2), 16));
     }
 
     public void Dispose()
@@ -235,34 +250,8 @@ public partial class App : Application, IDisposable
 
         double scale = 96.0 / dpi;
 
-        var rawColor = _currentSettings.Properties.OverlayColor.Value;
-        if (!TryParseOverlayColor(rawColor, out var color))
-        {
-            Logger.LogWarning($"Invalid overlay color in settings: {rawColor}. Using the default color.");
-            color = Windows.UI.Color.FromArgb(255, 255, 0, 0);
-        }
-
         var target = new Rect(rect.Left, rect.Top, windowWidth * scale, windowHeight * scale);
 
-        GetOverlay()?.Show(target, color);
-    }
-
-    private static bool TryParseOverlayColor(string? value, out Windows.UI.Color color)
-    {
-        color = default;
-        if (value is not { Length: 7 } || value[0] != '#')
-        {
-            return false;
-        }
-
-        if (byte.TryParse(value.AsSpan(1, 2), System.Globalization.NumberStyles.HexNumber, null, out var red) &&
-            byte.TryParse(value.AsSpan(3, 2), System.Globalization.NumberStyles.HexNumber, null, out var green) &&
-            byte.TryParse(value.AsSpan(5, 2), System.Globalization.NumberStyles.HexNumber, null, out var blue))
-        {
-            color = Windows.UI.Color.FromArgb(255, red, green, blue);
-            return true;
-        }
-
-        return false;
+        GetOverlay()?.Show(target, _overlayColor);
     }
 }
