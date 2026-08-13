@@ -8,7 +8,11 @@
 #include <optional>
 
 #pragma comment(lib, "wbemuuid.lib")
+#ifdef _DEBUG
+#pragma comment(lib, "comsuppwd.lib") // _bstr_t / _com_util COM support
+#else
 #pragma comment(lib, "comsuppw.lib") // _bstr_t / _com_util COM support
+#endif
 
 // Polls the WMI WmiMonitorBrightness class every few seconds and fires a callback
 // when the brightness value changes. Works for laptop/tablet integrated displays
@@ -74,7 +78,7 @@ private:
             }
 
             hr = pLoc->ConnectServer(_bstr_t(L"ROOT\\WMI"), nullptr, nullptr, nullptr,
-                                     0, nullptr, nullptr, &pSvc);
+                                     WBEM_FLAG_CONNECT_USE_MAX_WAIT, nullptr, nullptr, &pSvc);
             if (FAILED(hr))
             {
                 pLoc->Release();
