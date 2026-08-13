@@ -862,6 +862,7 @@ Inste
 Interlop
 intput
 INTRESOURCE
+IUnknown
 INVALIDARG
 invalidoperatioexception
 invokecommand
@@ -1989,6 +1990,7 @@ Ultrawide
 ums
 uncompilable
 UNCPRIORITY
+UNCW
 UNDNAME
 unescaped
 unforgeable

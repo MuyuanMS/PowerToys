@@ -203,7 +203,7 @@ namespace ViewModelTests
         }
 
         [TestMethod]
-        public void CopyAsUNCIsEnabledShouldSendGeneralSettingsWhenSuccessful()
+        public void CopyAsUNCEnabledShouldSendGeneralSettingsWhenSuccessful()
         {
             bool callbackInvoked = false;
             Func<string, int> sendMockIPCConfigMSG = msg =>
