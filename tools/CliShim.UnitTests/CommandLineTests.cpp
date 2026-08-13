@@ -48,7 +48,7 @@ namespace CliShimUnitTests
                 { LR"("C:\bin\PowerToys.FancyZones.CLI.exe" "a b")", LR"("a b")" },
                 { LR"(PowerToys.FancyZones.CLI --path "C:\a b\c.png")", LR"(--path "C:\a b\c.png")" },
 
-                { L"PowerToys.FancyZones.CLI\targ", L"arg" },
+                { L"PowerToys.FancyZones.CLI\t" L"arg", L"arg" },
                 { L"PowerToys.FancyZones.CLI \t arg", L"arg" },
 
                 // Non-shell CreateProcessW callers can prepend whitespace; the CRT treats argv[0]

@@ -22,7 +22,7 @@ namespace
     constexpr int ExitCommandNotMapped = 9009;
 
     // Reserve dedicated shim failure codes so callers can distinguish "the shim could not run the
-    // CLI" from "the CLI ran and failed". These values remain outside the target CLIs' current
+    // CLI" from "the CLI ran and failed". These values remain outside the target CLI tools' current
     // ranges, including PowerDisplay's 0-10 range.
     constexpr int ExitTargetNotFound = 9010;
     constexpr int ExitLaunchFailed = 9011;

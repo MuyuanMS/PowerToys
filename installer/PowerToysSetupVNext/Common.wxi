@@ -63,7 +63,7 @@
     (PowerToys.wxs InstallFolder), and a custom root such as C:\PowerToys inherits
     "Authenticated Users: Modify" from the drive root - which would let any standard user plant
     binaries in a folder that every process on the machine searches. SYSTEM and Administrators
-    keep full control; BUILTIN\Users keep read + execute so non-admins can still run the commands.
+    keep full control; BUILTIN\Users keep read + execute so non-administrators can still run the commands.
 
     Author this on the same component as the folder's Environment PATH entry, so a new
     PATH-visible folder cannot ship without it. Per-user installs live under %LOCALAPPDATA% and

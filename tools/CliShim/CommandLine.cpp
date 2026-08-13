@@ -27,7 +27,7 @@ namespace CommandLine
 
         // argv[0] is tokenized differently from every later argument, and the rule that matters is
         // the CRT's, because that is what every target ends up parsing: FileLocksmithCLI is a
-        // native wmain, and the .NET CLIs receive their string[] from the apphost's wmain. The CRT
+        // native wmain, and the .NET CLI tools receive their string[] from the apphost's wmain. The CRT
         // (ucrt\startup\argv_parsing.cpp, parse_command_line) toggles an in-quotes flag on every
         // quote while scanning argv[0] and ends the name at the first whitespace found outside
         // quotes; a quote never terminates the name and a backslash never escapes one.

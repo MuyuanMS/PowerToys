@@ -352,7 +352,9 @@ Storyboards
 DEFAULTTONEAREST
 INVOKEIDLIST
 LCMAP
+MAXDWORD
 MEMORYSTATUSEX
+STARTUPINFOEXW
 ABE
 Mdt
 HTCAPTION
@@ -445,6 +447,10 @@ Nonpaged
 Untargeted
 
 # Program names
+fancyzonescli
+filelocksmithcli
+imageresizercli
+powerdisplaycli
 SEARCHHOST
 SHELLEXPERIENCEHOST
 SHELLHOST

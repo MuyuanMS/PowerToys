@@ -3,7 +3,7 @@
   <?include $(sys.CURRENTDIR)\Common.wxi?>
 
   <!--
-    PATH-visible shims forward to the installed PowerToys CLIs. Every command is the same
+    PATH-visible shims forward to the installed PowerToys CLI tools. Every command is the same
     PowerToys.CliShim.exe payload installed under a different name; the shim resolves its target
     from that name. tools\CliShim\CliShimManifest.props is the source of truth for the list and
     the CliShim project fails the build if the two drift apart, so keep the File/@Name values and

@@ -20,7 +20,7 @@ On a per-machine install, the CLI shims are enabled only for a dedicated `PowerT
 
 ### Shim exit codes
 
-The shim returns the target CLI's exit code unchanged. It substitutes one of its own codes only when the CLI never ran, using values outside the range the CLIs use themselves:
+The shim returns the target CLI's exit code unchanged. It substitutes one of its own codes only when the CLI never ran, using values outside the range the CLI tools use themselves:
 
 | Code | Meaning |
 | --- | --- |
