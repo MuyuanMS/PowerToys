@@ -74,15 +74,23 @@ public partial class App : Application, IDisposable
 
     private async Task OnSettingsChanged()
     {
-        await Task.Delay(25);
+        for (int attempt = 1; attempt <= 5; attempt++)
+        {
+            await Task.Delay(100);
 
-        try
-        {
-            _currentSettings = ModuleSettings.GetSettings<ClipPingSettings>(ClipPingSettings.ModuleName);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError($"Failed to load ClipPing settings: {ex}.");
+            try
+            {
+                _currentSettings = ModuleSettings.GetSettings<ClipPingSettings>(ClipPingSettings.ModuleName);
+                return;
+            }
+            catch (Exception ex) when (attempt < 5)
+            {
+                Logger.LogWarning($"Failed to load ClipPing settings on attempt {attempt}: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to load ClipPing settings after {attempt} attempts: {ex}.");
+            }
         }
     }
 

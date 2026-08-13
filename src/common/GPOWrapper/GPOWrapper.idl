@@ -14,7 +14,6 @@ namespace PowerToys
             static GpoRuleConfigured GetConfiguredAlwaysOnTopEnabledValue();
             static GpoRuleConfigured GetConfiguredAltWindowCycleEnabledValue();
             static GpoRuleConfigured GetConfiguredAwakeEnabledValue();
-            static GpoRuleConfigured GetConfiguredClipPingEnabledValue();
             static GpoRuleConfigured GetConfiguredCmdNotFoundEnabledValue();
             static GpoRuleConfigured GetConfiguredCmdPalEnabledValue();
             static GpoRuleConfigured GetConfiguredColorPickerEnabledValue();
@@ -87,6 +86,7 @@ namespace PowerToys
             static GpoRuleConfigured GetConfiguredRunAtStartupValue();
             static GpoRuleConfigured GetConfiguredNewPlusReplaceVariablesValue();
             static GpoRuleConfigured GetConfiguredNewPlusHideBuiltInNewContextMenuValue();
+            static GpoRuleConfigured GetConfiguredClipPingEnabledValue();
         }
     }
 }
