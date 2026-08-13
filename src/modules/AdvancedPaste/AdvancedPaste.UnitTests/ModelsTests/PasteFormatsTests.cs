@@ -2,6 +2,9 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
+using System.Linq;
+
 using AdvancedPaste.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -26,5 +29,24 @@ public sealed class PasteFormatsTests
         Assert.AreEqual(10, (int)PasteFormats.KernelQuery);
         Assert.AreEqual(11, (int)PasteFormats.CustomTextTransformation);
         Assert.AreEqual(12, (int)PasteFormats.PasteAsKeystrokes);
+    }
+
+    [TestMethod]
+    public void CoreActions_HaveStableDisplayOrder()
+    {
+        var coreActions = Enum.GetValues<PasteFormats>()
+                              .Where(format => PasteFormat.MetadataDict[format].IsCoreAction)
+                              .OrderBy(format => PasteFormat.MetadataDict[format].DisplayOrder)
+                              .ToArray();
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                PasteFormats.PlainText,
+                PasteFormats.Markdown,
+                PasteFormats.Json,
+                PasteFormats.PasteAsKeystrokes,
+            },
+            coreActions);
     }
 }

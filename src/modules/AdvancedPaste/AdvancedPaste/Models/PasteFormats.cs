@@ -10,6 +10,7 @@ public enum PasteFormats
 {
     [PasteFormatMetadata(
         IsCoreAction = true,
+        DisplayOrder = 0,
         ResourceId = "PasteAsPlainText",
         IconGlyph = "\uE8E9",
         RequiresAIService = false,
@@ -20,6 +21,7 @@ public enum PasteFormats
 
     [PasteFormatMetadata(
         IsCoreAction = true,
+        DisplayOrder = 1,
         ResourceId = "PasteAsMarkdown",
         IconGlyph = "\ue8a5",
         RequiresAIService = false,
@@ -30,6 +32,7 @@ public enum PasteFormats
 
     [PasteFormatMetadata(
         IsCoreAction = true,
+        DisplayOrder = 2,
         ResourceId = "PasteAsJson",
         IconGlyph = "\uE943",
         RequiresAIService = false,
@@ -51,6 +54,7 @@ public enum PasteFormats
 
     [PasteFormatMetadata(
         IsCoreAction = true,
+        DisplayOrder = 3,
         ResourceId = "PasteAsKeystrokes",
         IconGlyph = "\uE765",
         RequiresAIService = false,

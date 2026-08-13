@@ -11,6 +11,8 @@ public sealed class PasteFormatMetadataAttribute : Attribute
 {
     public bool IsCoreAction { get; init; }
 
+    public int DisplayOrder { get; init; } = int.MaxValue;
+
     public string ResourceId { get; init; }
 
     public string IconGlyph { get; init; }

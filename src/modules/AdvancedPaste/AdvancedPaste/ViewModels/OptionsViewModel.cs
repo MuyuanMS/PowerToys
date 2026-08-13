@@ -434,6 +434,9 @@ namespace AdvancedPaste.ViewModels
 
             UpdateFormats(StandardPasteFormats, Enum.GetValues<PasteFormats>()
                                                     .Where(format => PasteFormat.MetadataDict[format].IsCoreAction || _userSettings.AdditionalActions.Contains(format))
+                                                    .OrderByDescending(format => PasteFormat.MetadataDict[format].IsCoreAction)
+                                                    .ThenBy(format => PasteFormat.MetadataDict[format].DisplayOrder)
+                                                    .ThenBy(format => (int)format)
                                                     .Select(CreateStandardPasteFormat));
 
             UpdateFormats(
