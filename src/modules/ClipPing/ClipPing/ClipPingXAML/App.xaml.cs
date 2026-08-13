@@ -38,7 +38,7 @@ public partial class App : Application, IDisposable
     {
         InitializeComponent();
 
-        _currentSettings = ModuleSettings.GetSettingsOrDefault<ClipPingSettings>(ClipPingSettings.ModuleName);
+        _currentSettings = NormalizeSettings(ModuleSettings.GetSettingsOrDefault<ClipPingSettings>(ClipPingSettings.ModuleName));
 
         var settingsPath = ModuleSettings.GetSettingsFilePath(ClipPingSettings.ModuleName);
 
@@ -80,7 +80,7 @@ public partial class App : Application, IDisposable
 
             try
             {
-                _currentSettings = ModuleSettings.GetSettings<ClipPingSettings>(ClipPingSettings.ModuleName);
+                _currentSettings = NormalizeSettings(ModuleSettings.GetSettings<ClipPingSettings>(ClipPingSettings.ModuleName));
                 return;
             }
             catch (Exception ex) when (attempt < 5)
@@ -92,6 +92,14 @@ public partial class App : Application, IDisposable
                 Logger.LogError($"Failed to load ClipPing settings after {attempt} attempts: {ex}.");
             }
         }
+    }
+
+    private static ClipPingSettings NormalizeSettings(ClipPingSettings? settings)
+    {
+        settings ??= new ClipPingSettings();
+        settings.Properties ??= new ClipPingProperties();
+        settings.Properties.OverlayColor ??= new StringProperty("#FF0000");
+        return settings;
     }
 
     public void Dispose()
