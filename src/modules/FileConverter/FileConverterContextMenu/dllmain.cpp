@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <array>
 #include <cwctype>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
@@ -257,7 +258,15 @@ namespace
 
     bool IsTargetSupported(const TargetFormatSpec& spec)
     {
-        return file_converter::IsOutputFormatSupported(spec.image_format).succeeded();
+        constexpr size_t format_count = static_cast<size_t>(file_converter::ImageFormat::Webp) + 1;
+        static std::array<std::once_flag, format_count> availability_flags;
+        static std::array<bool, format_count> availability{};
+
+        const size_t index = static_cast<size_t>(spec.image_format);
+        std::call_once(availability_flags[index], [&spec, index] {
+            availability[index] = file_converter::IsOutputFormatSupported(spec.image_format).succeeded();
+        });
+        return availability[index];
     }
 
     bool IsModuleEnabled()
@@ -496,8 +505,10 @@ namespace
 
         IFACEMETHODIMP Skip(ULONG celt)
         {
-            m_current_index = (std::min)(m_current_index + static_cast<size_t>(celt), m_commands.size());
-            return m_current_index < m_commands.size() ? S_OK : S_FALSE;
+            const size_t remaining = m_commands.size() - m_current_index;
+            const size_t skipped = (std::min)(static_cast<size_t>(celt), remaining);
+            m_current_index += skipped;
+            return skipped == celt ? S_OK : S_FALSE;
         }
 
         IFACEMETHODIMP Reset()

@@ -404,6 +404,9 @@ function Test-CoreFiles {
         'PowerToys.ImageResizer.dll',
         'PowerToys.ImageResizerExt.dll',
         'PowerToys.ImageResizerContextMenu.dll',
+
+        # File Converter
+        'PowerToys.FileConverterModuleInterface.dll',
         
         # Keyboard Manager
         'PowerToys.KeyboardManager.dll',
@@ -477,6 +480,7 @@ function Test-CoreFiles {
         'PowerToys.FileLocksmithUI.exe',
         'PowerToys.FileLocksmithUI.dll',
         'PowerToys.FileLocksmithContextMenu.dll',
+        'PowerToys.FileConverterContextMenu.dll',
         'Peek.Common.dll',
         'Peek.FilePreviewer.dll',
         'Powertoys.Peek.UI.dll',
@@ -739,6 +743,7 @@ function Test-ContextMenuPackages {
     $contextMenuPackages = @{
         "ImageResizerContextMenuPackage.msix" = @{ Name = "Image Resizer context menu package"; Location = "Root" }
         "FileLocksmithContextMenuPackage.msix" = @{ Name = "File Locksmith context menu package"; Location = "WinUI3Apps" }
+        "FileConverterContextMenuPackage.msix" = @{ Name = "File Converter context menu package"; Location = "WinUI3Apps" }
         "PowerRenameContextMenuPackage.msix" = @{ Name = "PowerRename context menu package"; Location = "WinUI3Apps" }
         "NewPlusPackage.msix" = @{ Name = "New+ context menu package"; Location = "WinUI3Apps" }
     }
