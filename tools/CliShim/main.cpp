@@ -11,6 +11,7 @@
 
 #include <cstdio>
 #include <filesystem>
+#include <memory>
 #include <string>
 
 #include "CommandLine.h"
@@ -73,6 +74,107 @@ namespace
         return job;
     }
 
+    class ProcessThreadAttributeList
+    {
+    public:
+        ProcessThreadAttributeList() = default;
+
+        ProcessThreadAttributeList(const ProcessThreadAttributeList&) = delete;
+        ProcessThreadAttributeList& operator=(const ProcessThreadAttributeList&) = delete;
+
+        ~ProcessThreadAttributeList()
+        {
+            if (attributeList != nullptr)
+            {
+                DeleteProcThreadAttributeList(attributeList);
+            }
+        }
+
+        bool InitializeWithJob(HANDLE job)
+        {
+            jobHandle = job;
+            SIZE_T requiredSize = 0;
+            InitializeProcThreadAttributeList(nullptr, 1, 0, &requiredSize);
+
+            storage = std::make_unique<unsigned char[]>(requiredSize);
+            attributeList = reinterpret_cast<PPROC_THREAD_ATTRIBUTE_LIST>(storage.get());
+            if (!InitializeProcThreadAttributeList(attributeList, 1, 0, &requiredSize))
+            {
+                attributeList = nullptr;
+                storage.reset();
+                return false;
+            }
+
+            if (!UpdateProcThreadAttribute(
+                    attributeList,
+                    0,
+                    PROC_THREAD_ATTRIBUTE_JOB_LIST,
+                    &jobHandle,
+                    sizeof(jobHandle),
+                    nullptr,
+                    nullptr))
+            {
+                DeleteProcThreadAttributeList(attributeList);
+                attributeList = nullptr;
+                storage.reset();
+                return false;
+            }
+
+            return true;
+        }
+
+        PPROC_THREAD_ATTRIBUTE_LIST Get() const noexcept
+        {
+            return attributeList;
+        }
+
+    private:
+        std::unique_ptr<unsigned char[]> storage;
+        PPROC_THREAD_ATTRIBUTE_LIST attributeList = nullptr;
+        HANDLE jobHandle = nullptr;
+    };
+
+    std::wstring BuildTargetCommandLine(
+        const std::filesystem::path& selfPath,
+        const std::wstring& forwardedArguments)
+    {
+        std::wstring commandLine = L'"' + selfPath.wstring() + L'"';
+        if (!forwardedArguments.empty())
+        {
+            commandLine.push_back(L' ');
+            commandLine.append(forwardedArguments);
+        }
+
+        return commandLine;
+    }
+
+    bool LaunchTarget(
+        const std::filesystem::path& targetPath,
+        const std::filesystem::path& selfPath,
+        const std::wstring& forwardedArguments,
+        PPROC_THREAD_ATTRIBUTE_LIST attributeList,
+        wil::unique_process_information& processInfo)
+    {
+        std::wstring commandLine = BuildTargetCommandLine(selfPath, forwardedArguments);
+
+        STARTUPINFOEXW startupInfo{};
+        startupInfo.StartupInfo.cb = sizeof(startupInfo);
+        startupInfo.lpAttributeList = attributeList;
+
+        const DWORD creationFlags = attributeList != nullptr ? EXTENDED_STARTUPINFO_PRESENT : 0;
+        return CreateProcessW(
+                   targetPath.c_str(),
+                   &commandLine[0],
+                   nullptr,
+                   nullptr,
+                   TRUE,
+                   creationFlags,
+                   nullptr,
+                   nullptr,
+                   &startupInfo.StartupInfo,
+                   &processInfo) != FALSE;
+    }
+
     const wchar_t* ResolveTarget(const std::wstring& commandName)
     {
         for (const ShimTarget& entry : ShimTargets)
@@ -120,51 +222,33 @@ int wmain()
     // Forward the raw tail so the caller's argument quoting remains unchanged.
     const std::wstring forwardedArguments = CommandLine::StripArgumentZero(GetCommandLineW());
 
-    // lpApplicationName selects the target while argv[0] preserves the invoked shim name for
-    // managed CLIs that derive their displayed command name from the process command line.
-    std::wstring commandLine = L'"' + selfPath.wstring() + L'"';
-    if (!forwardedArguments.empty())
-    {
-        commandLine.push_back(L' ');
-        commandLine.append(forwardedArguments);
-    }
-
-    STARTUPINFOW startupInfo{};
-    startupInfo.cb = sizeof(startupInfo);
     wil::unique_process_information processInfo;
 
     // Best effort, and silent on failure: an unprotected CLI beats a CLI that will not start, and
     // this process's stderr belongs to the CLI's caller.
     const wil::unique_handle shimJob = CreateShimJob();
+    ProcessThreadAttributeList attributeList;
+    const bool launchWithJob =
+        shimJob &&
+        attributeList.InitializeWithJob(shimJob.get());
 
-    if (!CreateProcessW(
-            targetPath.c_str(),
-            &commandLine[0], // CreateProcessW may write to the mutable command-line buffer.
-            nullptr,
-            nullptr,
-            TRUE, // Inherit handles: share stdin/stdout/stderr and stay in this console.
-            CREATE_SUSPENDED,
-            nullptr,
-            nullptr,
-            &startupInfo,
-            &processInfo))
+    // Assigning the job at process creation removes the window where terminating the shim could
+    // strand an unassigned suspended target. Some host jobs reject nested job assignment; retry
+    // without protection so those callers can still use the CLI.
+    bool launched = false;
+    if (launchWithJob)
+    {
+        launched = LaunchTarget(targetPath, selfPath, forwardedArguments, attributeList.Get(), processInfo);
+    }
+
+    if (!launched)
+    {
+        launched = LaunchTarget(targetPath, selfPath, forwardedArguments, nullptr, processInfo);
+    }
+
+    if (!launched)
     {
         std::fwprintf(stderr, L"cli-shim: failed to launch \"%s\" (error %lu).\n", targetPath.c_str(), GetLastError());
-        return ExitLaunchFailed;
-    }
-
-    if (shimJob && !AssignProcessToJobObject(shimJob.get(), processInfo.hProcess))
-    {
-        // Some hosts place child processes in an incompatible job. Preserve the best-effort
-        // policy: continue without the protection rather than making the CLI unusable.
-    }
-
-    if (ResumeThread(processInfo.hThread) == static_cast<DWORD>(-1))
-    {
-        const DWORD error = GetLastError();
-        TerminateProcess(processInfo.hProcess, ExitLaunchFailed);
-        WaitForSingleObject(processInfo.hProcess, INFINITE);
-        std::fwprintf(stderr, L"cli-shim: failed to start the launched process (error %lu).\n", error);
         return ExitLaunchFailed;
     }
 
