@@ -51,8 +51,8 @@ public class EditorMainWindowDesignTests : WorkspacesUiAutomationBase
     public void MainWindow_HasSortByDropdown()
     {
         Assert.IsTrue(
-            Has<ComboBox>(By.AccessibilityId("SortByComboBox")) || Has<ComboBox>(By.Name("SortBy")),
-            "Should have 'Sort by' dropdown");
+            Has<Button>("Sort by"),
+            "Should have a 'Sort by' menu button");
     }
 
     [TestMethod("MainWindow.Content.WorkspacesListPresent")]
@@ -61,7 +61,7 @@ public class EditorMainWindowDesignTests : WorkspacesUiAutomationBase
     {
         // The workspaces list container should exist even when empty
         Assert.IsTrue(
-            Has<Element>(By.AccessibilityId("WorkspacesList")),
+            Has<Element>(By.AccessibilityId("WorkspacesItemsControl")),
             "Should have workspace list container");
     }
 
@@ -73,8 +73,8 @@ public class EditorMainWindowDesignTests : WorkspacesUiAutomationBase
         var hasEmptyMessage = Has<TextBlock>(By.Name("There are no saved Workspaces"))
             || Has<TextBlock>(By.Name("No saved Workspaces"));
 
-        var workspacesList = Find<Element>(By.AccessibilityId("WorkspacesList"));
-        if (workspacesList.FindAll<Element>(By.ClassName("ListViewItem")).Count == 0)
+        var workspacesList = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
+        if (workspacesList.FindAll<Element>(By.ClassName("WorkspaceItem")).Count == 0)
         {
             Assert.IsTrue(hasEmptyMessage, "Empty state should show a message when no workspaces exist");
         }

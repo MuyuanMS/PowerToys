@@ -43,26 +43,25 @@ namespace WorkspacesEditorUITest
             CloseNotepad();
         }
 
-        // DO NOT USE UNTIL FRAMEWORK AVAILABLE, CAN'T FIND BUTTON FOR SECOND LOOP
         protected void ClearWorkspaces()
         {
             while (true)
             {
                 try
                 {
-                    var root = Find<Element>(By.AccessibilityId("WorkspacesList"));
-                    var buttons = root.FindAll<Button>(By.AccessibilityId("MoreButton"));
+                    AttachWorkspacesEditor();
+                    var root = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
+                    var items = root.FindAll<Element>(By.ClassName("WorkspaceItem"));
 
-                    Debug.WriteLine($"Found {buttons.Count} button");
+                    Debug.WriteLine($"Found {items.Count} workspace items");
 
-                    var button = buttons[^1];
-
-                    button.Click();
+                    items[^1].Click();
 
                     Task.Delay(500).Wait();
 
-                    var remove = Find<Button>(By.Name("Remove"));
-                    remove.Click();
+                    Find<Button>("Delete workspace").Click();
+                    Task.Delay(500).Wait();
+                    Find<Button>("Remove").Click();
 
                     Task.Delay(500).Wait();
                 }
