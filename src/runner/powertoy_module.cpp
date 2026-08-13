@@ -5,7 +5,38 @@
 #include <common/logger/logger.h>
 #include <common/utils/winapi_error.h>
 
+#include <algorithm>
 #include <filesystem>
+#include <vector>
+
+namespace
+{
+    std::wstring executable_path()
+    {
+        constexpr size_t max_path_capacity = 32768;
+        std::vector<wchar_t> buffer(MAX_PATH);
+        while (true)
+        {
+            const DWORD length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+            if (length == 0)
+            {
+                return {};
+            }
+
+            if (length < static_cast<DWORD>(buffer.size()))
+            {
+                return std::wstring(buffer.data(), length);
+            }
+
+            if (buffer.size() == max_path_capacity)
+            {
+                return {};
+            }
+
+            buffer.resize((std::min)(buffer.size() * 2, max_path_capacity));
+        }
+    }
+}
 
 std::map<std::wstring, PowertoyModule>& modules()
 {
@@ -22,10 +53,10 @@ PowertoyModule load_powertoy(const std::wstring_view filename)
     // Retry with an executable-relative full path to make module loading deterministic.
     if (!handle)
     {
-        wchar_t executable_path[MAX_PATH]{};
-        if (GetModuleFileNameW(nullptr, executable_path, MAX_PATH) > 0)
+        const auto runner_path = executable_path();
+        if (!runner_path.empty())
         {
-            const std::filesystem::path module_path = std::filesystem::path(executable_path).parent_path() / std::filesystem::path(module_name);
+            const std::filesystem::path module_path = std::filesystem::path(runner_path).parent_path() / std::filesystem::path(module_name);
             handle = LoadLibraryExW(module_path.c_str(), nullptr, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR);
         }
     }

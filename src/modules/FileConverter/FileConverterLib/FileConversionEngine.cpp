@@ -5,6 +5,7 @@
 
 #include "FileConversionEngine.h"
 
+#include <winrt/Windows.ApplicationModel.Resources.h>
 #include <wrl/client.h>
 
 #include <sstream>
@@ -13,7 +14,19 @@ namespace
 {
     std::wstring LoadLocalizedString(std::wstring_view key, std::wstring_view fallback)
     {
-        UNREFERENCED_PARAMETER(key);
+        try
+        {
+            static const auto loader = winrt::Windows::ApplicationModel::Resources::ResourceLoader::GetForViewIndependentUse(L"Resources");
+            const auto value = loader.GetString(winrt::hstring{ key });
+            if (!value.empty())
+            {
+                return value.c_str();
+            }
+        }
+        catch (...)
+        {
+        }
+
         return std::wstring{ fallback };
     }
 

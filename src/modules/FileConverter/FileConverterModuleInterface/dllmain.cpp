@@ -7,6 +7,7 @@
 #include <FileConversionEngine.h>
 #include <common/SettingsAPI/settings_objects.h>
 #include <common/interop/pipe_caller_auth.h>
+#include <winrt/Windows.ApplicationModel.Resources.h>
 #include <winrt/Windows.Data.Json.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/base.h>
@@ -53,7 +54,19 @@ namespace
     constexpr wchar_t CONTEXT_MENU_PACKAGE_NAME[] = L"Microsoft.PowerToys.FileConverterContextMenu_";
     std::wstring LoadLocalizedString(std::wstring_view key, std::wstring_view fallback)
     {
-        UNREFERENCED_PARAMETER(key);
+        try
+        {
+            static const auto loader = winrt::Windows::ApplicationModel::Resources::ResourceLoader::GetForViewIndependentUse(L"Resources");
+            const auto value = loader.GetString(winrt::hstring{ key });
+            if (!value.empty())
+            {
+                return value.c_str();
+            }
+        }
+        catch (...)
+        {
+        }
+
         return std::wstring{ fallback };
     }
 
