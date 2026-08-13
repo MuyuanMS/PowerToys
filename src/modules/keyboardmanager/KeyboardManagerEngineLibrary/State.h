@@ -24,8 +24,8 @@ public:
     // Stores the focused window/control associated with textReplacementBuffer.
     HWND textReplacementWindow = nullptr;
 
-    // Stores the trigger key whose key-down was suppressed after a replacement.
-    DWORD textReplacementSuppressedKey = 0;
+    // Stores trigger keys whose key-down was suppressed after a replacement.
+    std::unordered_set<DWORD> textReplacementSuppressedKeys;
 
     // Function to get the iterator of a single key remap given the source key. Returns nullopt if it isn't remapped
     std::optional<SingleKeyRemapTable::iterator> GetSingleKeyRemap(const DWORD& originalKey);

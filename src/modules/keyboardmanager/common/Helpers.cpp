@@ -316,7 +316,6 @@ namespace Helpers
     // when large batches of KEYEVENTF_UNICODE events are sent at once.
     bool SendTextInput(const std::wstring& text, KeyboardManagerInput::InputInterface& ii)
     {
-        bool sent = true;
         for (size_t i = 0; i < text.size(); ++i)
         {
             wchar_t c = text[i];
@@ -361,7 +360,10 @@ namespace Helpers
                 returnInputs[3].ki.wScan = static_cast<WORD>(MapVirtualKey(VK_SHIFT, MAPVK_VK_TO_VSC));
                 returnInputs[3].ki.dwExtraInfo = KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG;
 
-                sent = ii.SendVirtualInput(std::vector<INPUT>(returnInputs, returnInputs + ARRAYSIZE(returnInputs))) && sent;
+                if (!ii.SendVirtualInput(std::vector<INPUT>(returnInputs, returnInputs + ARRAYSIZE(returnInputs))))
+                {
+                    return false;
+                }
                 continue;
             }
 
@@ -376,9 +378,12 @@ namespace Helpers
             charInputs[1].ki.dwExtraInfo = KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG;
             charInputs[1].ki.wScan = c;
 
-            sent = ii.SendVirtualInput(std::vector<INPUT>(charInputs, charInputs + ARRAYSIZE(charInputs))) && sent;
+            if (!ii.SendVirtualInput(std::vector<INPUT>(charInputs, charInputs + ARRAYSIZE(charInputs))))
+            {
+                return false;
+            }
         }
-        return sent;
+        return true;
     }
 
     // Function to filter the key codes for artificial key codes

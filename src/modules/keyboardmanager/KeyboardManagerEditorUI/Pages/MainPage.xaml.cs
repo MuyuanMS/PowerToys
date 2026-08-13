@@ -842,6 +842,18 @@ namespace KeyboardManagerEditorUI.Pages
                 if (toggleSwitch.IsOn)
                 {
                     EnableShortcut(shortcut);
+                    if (!shortcut.IsActive)
+                    {
+                        LoadAllMappings();
+                        if (shortcut is TextMapping { TriggerText.Length: > 0 })
+                        {
+                            UnifiedMappingControl.ShowValidationErrorFromType(ValidationErrorType.ConflictingTextTrigger);
+                        }
+                        else
+                        {
+                            UnifiedMappingControl.ShowValidationError(ResourceHelper.GetString("Error_SaveFailed_Title"), ResourceHelper.GetString("Error_SaveFailed_Message"));
+                        }
+                    }
                 }
                 else
                 {

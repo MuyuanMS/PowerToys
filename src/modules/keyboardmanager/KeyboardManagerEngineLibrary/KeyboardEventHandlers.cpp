@@ -2117,9 +2117,8 @@ namespace KeyboardEventHandlers
         }
 
         const DWORD vkCode = Helpers::ClearKeyNumpadOrigin(data->lParam->vkCode);
-        if ((data->wParam == WM_KEYUP || data->wParam == WM_SYSKEYUP) && state.textReplacementSuppressedKey == vkCode)
+        if ((data->wParam == WM_KEYUP || data->wParam == WM_SYSKEYUP) && state.textReplacementSuppressedKeys.erase(vkCode) != 0)
         {
-            state.textReplacementSuppressedKey = 0;
             return 1;
         }
 
@@ -2179,11 +2178,11 @@ namespace KeyboardEventHandlers
                 if (!SendTextReplacementInput(ii, trigger.length() > text->length() ? trigger.length() - text->length() : 0, replacement->second))
                 {
                     state.textReplacementBuffer.clear();
-                    state.textReplacementSuppressedKey = vkCode;
+                    state.textReplacementSuppressedKeys.insert(vkCode);
                     return 1;
                 }
                 state.textReplacementBuffer.clear();
-                state.textReplacementSuppressedKey = vkCode;
+                state.textReplacementSuppressedKeys.insert(vkCode);
                 return 1;
             }
         }

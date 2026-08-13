@@ -653,10 +653,31 @@ namespace RemappingLogicTests
 
             Assert::AreEqual(1, static_cast<int>(result));
             Assert::AreEqual(std::wstring(), testState.textReplacementBuffer);
-            Assert::AreEqual(static_cast<DWORD>(VK_SPACE), testState.textReplacementSuppressedKey);
+            Assert::AreEqual(static_cast<size_t>(1), testState.textReplacementSuppressedKeys.count(VK_SPACE));
             Assert::AreEqual(static_cast<size_t>(1), attemptedInput.size());
             Assert::AreEqual(static_cast<size_t>(2), attemptedInput[0].size());
             Assert::AreEqual(static_cast<WORD>(VK_BACK), attemptedInput[0][0].ki.wVk);
+        }
+
+        TEST_METHOD (HandleTextReplacementEvent_ShouldSuppressOverlappingTriggerKeyUps)
+        {
+            testState.AddTextReplacement(L" ", L"hello");
+            testState.textReplacementSuppressedKeys.insert(0x41);
+            testState.textReplacementSuppressedKeys.insert(0x42);
+
+            KBDLLHOOKSTRUCT lParam{};
+            LowlevelKeyboardEvent keyEvent{};
+            keyEvent.wParam = WM_KEYUP;
+            keyEvent.lParam = &lParam;
+
+            lParam.vkCode = 0x41;
+            Assert::AreEqual(1, static_cast<int>(KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState)));
+            Assert::AreEqual(static_cast<size_t>(0), testState.textReplacementSuppressedKeys.count(0x41));
+            Assert::AreEqual(static_cast<size_t>(1), testState.textReplacementSuppressedKeys.count(0x42));
+
+            lParam.vkCode = 0x42;
+            Assert::AreEqual(1, static_cast<int>(KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState)));
+            Assert::AreEqual(static_cast<size_t>(0), testState.textReplacementSuppressedKeys.size());
         }
 
         TEST_METHOD (HandleTextReplacementEvent_ShouldProcessSingleKeyRemapOutput)
