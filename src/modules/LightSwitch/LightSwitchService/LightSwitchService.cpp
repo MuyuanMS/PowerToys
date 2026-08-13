@@ -128,7 +128,7 @@ VOID WINAPI ServiceCtrlHandler(DWORD dwCtrl)
 
 void ApplyTheme(bool shouldBeLight)
 {
-    const auto& s = LightSwitchSettings::settings();
+    const auto s = LightSwitchSettings::settings_snapshot();
 
     if (s.changeSystem)
     {
@@ -153,7 +153,7 @@ void ApplyTheme(bool shouldBeLight)
 
 static void DetectAndHandleExternalThemeChange(LightSwitchStateManager& stateManager)
 {
-    const auto& s = LightSwitchSettings::settings();
+    const auto s = LightSwitchSettings::settings_snapshot();
     if (s.scheduleMode == ScheduleMode::Off)
         return;
 
@@ -173,15 +173,17 @@ static void DetectAndHandleExternalThemeChange(LightSwitchStateManager& stateMan
 
     // Use shared helper (handles wraparound logic)
     bool shouldBeLight = false;
+    const auto state = stateManager.GetState();
     if (s.scheduleMode == ScheduleMode::FollowNightLight)
     {
         shouldBeLight = !IsNightLightEnabled();
     }
     else if (s.scheduleMode == ScheduleMode::FollowBrightness)
     {
-        // External theme change detection doesn't apply to brightness mode;
-        // the BrightnessObserver drives those transitions directly.
-        return;
+        if (state.lastBrightness < 0)
+            return;
+
+        shouldBeLight = state.lastBrightness >= s.brightnessThreshold;
     }
     else
     {
@@ -196,7 +198,7 @@ static void DetectAndHandleExternalThemeChange(LightSwitchStateManager& stateMan
     bool appsMismatch = s.changeApps && (currentAppsLight != shouldBeLight);
 
     // Trigger manual override only if mismatch and not already active
-    if ((systemMismatch || appsMismatch) && !stateManager.GetState().isManualOverride)
+    if ((systemMismatch || appsMismatch) && !state.isManualOverride)
     {
         Logger::info(L"[LightSwitchService] External theme change detected (Windows Settings). Entering manual override mode.");
         stateManager.OnManualOverride();
@@ -228,7 +230,7 @@ DWORD WINAPI ServiceWorkerThread(LPVOID lpParam)
     static std::unique_ptr<BrightnessObserver> g_brightnessWatcher;
 
     LightSwitchSettings::instance().LoadSettings();
-    const auto& settings = LightSwitchSettings::instance().settings();
+    const auto settings = LightSwitchSettings::settings_snapshot();
 
     // after loading settings:
     bool nightLightNeeded = (settings.scheduleMode == ScheduleMode::FollowNightLight);
@@ -336,7 +338,7 @@ DWORD WINAPI ServiceWorkerThread(LPVOID lpParam)
             LightSwitchSettings::instance().LoadSettings();
             stateManager.OnSettingsChanged();
 
-            const auto& settings = LightSwitchSettings::instance().settings();
+            const auto settings = LightSwitchSettings::settings_snapshot();
             bool nightLightNeeded = (settings.scheduleMode == ScheduleMode::FollowNightLight);
             bool brightnessNeeded = (settings.scheduleMode == ScheduleMode::FollowBrightness);
 

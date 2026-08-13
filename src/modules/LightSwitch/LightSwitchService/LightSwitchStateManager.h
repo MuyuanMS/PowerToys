@@ -50,11 +50,15 @@ public:
     void SyncInitialThemeState();
 
     // Accessor for current state (optional, for debugging or telemetry)
-    const LightSwitchState& GetState() const { return _state; }
+    LightSwitchState GetState() const
+    {
+        std::lock_guard<std::mutex> lock(_stateMutex);
+        return _state;
+    }
 
 private:
     LightSwitchState _state;
-    std::mutex _stateMutex;
+    mutable std::mutex _stateMutex;
 
     void EvaluateAndApplyIfNeeded();
     bool CoordinatesAreValid(const std::wstring& lat, const std::wstring& lon);
