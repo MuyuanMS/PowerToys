@@ -616,14 +616,14 @@ public:
         return S_OK;
     }
 
-    IFACEMETHODIMP QueryContextMenu(HMENU menu, UINT index_menu, UINT id_cmd_first, UINT, UINT flags)
+    IFACEMETHODIMP QueryContextMenu(HMENU menu, UINT index_menu, UINT id_cmd_first, UINT id_cmd_last, UINT flags)
     {
         if (menu == nullptr)
         {
             return E_INVALIDARG;
         }
 
-        if ((flags & CMF_DEFAULTONLY) != 0 || m_data_object == nullptr)
+        if ((flags & CMF_DEFAULTONLY) != 0 || m_data_object == nullptr || !IsModuleEnabled())
         {
             return MAKE_HRESULT(SEVERITY_SUCCESS, FACILITY_NULL, 0);
         }
@@ -649,6 +649,11 @@ public:
             if (!IsTargetSupported(format) || !CanConvertPaths(paths, format.destination_group))
             {
                 continue;
+            }
+
+            if (command_id > id_cmd_last)
+            {
+                break;
             }
 
             const auto target_label = GetTargetFormatLabel(format);

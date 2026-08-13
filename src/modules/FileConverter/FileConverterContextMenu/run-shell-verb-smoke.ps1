@@ -100,6 +100,7 @@ public static class ShellVerbRunner
         });
 
         thread.SetApartmentState(ApartmentState.STA);
+        thread.IsBackground = true;
         thread.Start();
         thread.Join(timeoutMs);
 
@@ -252,6 +253,7 @@ public static class FileConverterExplorerCommandRunner
         });
 
         thread.SetApartmentState(ApartmentState.STA);
+        thread.IsBackground = true;
         thread.Start();
         thread.Join(timeoutMs);
 

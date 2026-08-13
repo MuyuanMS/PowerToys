@@ -678,6 +678,11 @@ namespace
         {
             {
                 std::scoped_lock lock(m_queue_mutex);
+                if (!m_running.load())
+                {
+                    return;
+                }
+
                 m_pending_payloads.push(std::move(payload));
             }
 
@@ -731,13 +736,13 @@ namespace
                         return !m_running.load() || !m_pending_payloads.empty();
                     });
 
+                    if (!m_running.load())
+                    {
+                        break;
+                    }
+
                     if (m_pending_payloads.empty())
                     {
-                        if (!m_running.load())
-                        {
-                            break;
-                        }
-
                         continue;
                     }
 
