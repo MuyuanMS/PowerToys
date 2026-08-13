@@ -271,8 +271,7 @@ namespace
         const bool releasedShift = SendModifierInput(ii, pressedShiftKeys, KEYEVENTF_KEYUP, KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG);
         const bool removedTrigger = SendBackspaceInput(ii, backspaceCount);
         const bool sentReplacement = Helpers::SendTextInput(replacement, ii);
-        const bool restoredShift = SendModifierInput(ii, pressedShiftKeys, 0, KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG);
-        return releasedShift && removedTrigger && sentReplacement && restoredShift;
+        return releasedShift && removedTrigger && sentReplacement;
     }
 
 }
@@ -2099,7 +2098,7 @@ namespace KeyboardEventHandlers
 
     intptr_t HandleTextReplacementEvent(KeyboardManagerInput::InputInterface& ii, LowlevelKeyboardEvent* data, State& state)
     {
-        if (GeneratedByKBM(data) || state.textReplacements.empty())
+        if ((GeneratedByKBM(data) && data->lParam->dwExtraInfo != KeyboardManagerConstants::KEYBOARDMANAGER_SINGLEKEY_FLAG) || state.textReplacements.empty())
         {
             return 0;
         }
