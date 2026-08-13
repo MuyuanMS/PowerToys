@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -111,6 +112,56 @@ namespace
 
     private:
         HANDLE handle = nullptr;
+    };
+
+    class JobAttributeList
+    {
+    public:
+        explicit JobAttributeList(HANDLE job)
+        {
+            SIZE_T size = 0;
+            InitializeProcThreadAttributeList(nullptr, 1, 0, &size);
+            Assert::IsTrue(size != 0, L"Could not size the process attribute list.");
+
+            storage = std::make_unique<unsigned char[]>(size);
+            attributeList = reinterpret_cast<PPROC_THREAD_ATTRIBUTE_LIST>(storage.get());
+            Assert::IsTrue(
+                InitializeProcThreadAttributeList(attributeList, 1, 0, &size) != FALSE,
+                L"Could not initialize the process attribute list.");
+            if (!UpdateProcThreadAttribute(
+                    attributeList,
+                    0,
+                    PROC_THREAD_ATTRIBUTE_JOB_LIST,
+                    &job,
+                    sizeof(job),
+                    nullptr,
+                    nullptr))
+            {
+                DeleteProcThreadAttributeList(attributeList);
+                attributeList = nullptr;
+                Assert::Fail(L"Could not add the host job to the process attribute list.");
+            }
+        }
+
+        JobAttributeList(const JobAttributeList&) = delete;
+        JobAttributeList& operator=(const JobAttributeList&) = delete;
+
+        ~JobAttributeList()
+        {
+            if (attributeList != nullptr)
+            {
+                DeleteProcThreadAttributeList(attributeList);
+            }
+        }
+
+        PPROC_THREAD_ATTRIBUTE_LIST Get() const noexcept
+        {
+            return attributeList;
+        }
+
+    private:
+        std::unique_ptr<unsigned char[]> storage;
+        PPROC_THREAD_ATTRIBUTE_LIST attributeList = nullptr;
     };
 
     std::filesystem::path GetTestBinaryDirectory()
@@ -360,7 +411,8 @@ namespace
         const std::wstring& arguments,
         HANDLE standardInput,
         HANDLE standardOutput,
-        const DWORD creationFlags = CREATE_NO_WINDOW)
+        const DWORD creationFlags = CREATE_NO_WINDOW,
+        HANDLE job = nullptr)
     {
         std::wstring commandLine = L"\"" + executable.wstring() + L"\"";
         if (!arguments.empty())
@@ -383,7 +435,29 @@ namespace
 
         PROCESS_INFORMATION processInfo{};
 
-        if (!CreateProcessW(
+        BOOL created = FALSE;
+        if (job != nullptr)
+        {
+            JobAttributeList attributeList{ job };
+            STARTUPINFOEXW extendedStartupInfo{};
+            extendedStartupInfo.StartupInfo = startupInfo;
+            extendedStartupInfo.StartupInfo.cb = sizeof(extendedStartupInfo);
+            extendedStartupInfo.lpAttributeList = attributeList.Get();
+            created = CreateProcessW(
+                executable.c_str(),
+                commandLine.data(),
+                nullptr,
+                nullptr,
+                redirect ? TRUE : FALSE,
+                creationFlags | EXTENDED_STARTUPINFO_PRESENT,
+                nullptr,
+                nullptr,
+                &extendedStartupInfo.StartupInfo,
+                &processInfo);
+        }
+        else
+        {
+            created = CreateProcessW(
                 executable.c_str(),
                 commandLine.data(),
                 nullptr,
@@ -393,7 +467,10 @@ namespace
                 nullptr,
                 nullptr,
                 &startupInfo,
-                &processInfo))
+                &processInfo);
+        }
+
+        if (!created)
         {
             const std::wstring message = L"CreateProcessW failed with error " + std::to_wstring(GetLastError()) + L".";
             Assert::Fail(message.c_str());
@@ -618,6 +695,46 @@ namespace CliShimUnitTests
             CopyExecutable(GetShimUnderTest(), shimPath);
 
             Assert::AreEqual(ExitTargetNotFound, RunAndGetExitCode(shimPath));
+        }
+
+        TEST_METHOD(IncompatibleHostJobFallsBackToUnprotectedLaunch)
+        {
+            TemporaryDirectory installation;
+            const std::filesystem::path shimPath = installation.GetPath() / L"bin" / L"PowerToys.FancyZones.CLI.exe";
+
+            CopyExecutable(GetShimUnderTest(), shimPath);
+            CopyExecutable(GetSystemCommandInterpreter(), installation.GetPath() / L"FancyZonesCLI.exe");
+
+            const UniqueHandle hostJob{ CreateJobObjectW(nullptr, nullptr) };
+            Assert::IsTrue(hostJob.Get() != nullptr, L"Could not create the host job.");
+
+            JOBOBJECT_BASIC_UI_RESTRICTIONS restrictions{};
+            restrictions.UIRestrictionsClass = JOB_OBJECT_UILIMIT_READCLIPBOARD;
+            Assert::IsTrue(
+                SetInformationJobObject(
+                    hostJob.Get(),
+                    JobObjectBasicUIRestrictions,
+                    &restrictions,
+                    sizeof(restrictions)) != FALSE,
+                L"Could not configure the host job.");
+
+            LaunchedProcess launched = StartProcess(
+                shimPath,
+                L"/d /c exit " + std::to_wstring(ForwardedExitCode),
+                nullptr,
+                nullptr,
+                CREATE_NO_WINDOW,
+                hostJob.Get());
+            const ProcessKiller shim{ std::move(launched.process) };
+
+            Assert::AreEqual(
+                static_cast<DWORD>(WAIT_OBJECT_0),
+                WaitForSingleObject(shim.Get(), 30'000),
+                L"The shim did not complete through the unprotected fallback.");
+
+            DWORD exitCode = 0;
+            Assert::IsTrue(GetExitCodeProcess(shim.Get(), &exitCode) != FALSE, L"Could not read the shim exit code.");
+            Assert::AreEqual(ForwardedExitCode, exitCode, L"The target CLI exit code was not forwarded.");
         }
 
         // The shim is the only handle a caller holds on the CLI, so a single-process kill of the

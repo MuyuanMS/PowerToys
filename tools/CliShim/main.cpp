@@ -158,7 +158,8 @@ namespace
         std::wstring commandLine = BuildTargetCommandLine(selfPath, forwardedArguments);
 
         STARTUPINFOEXW startupInfo{};
-        startupInfo.StartupInfo.cb = sizeof(startupInfo);
+        startupInfo.StartupInfo.cb =
+            attributeList != nullptr ? sizeof(startupInfo) : sizeof(startupInfo.StartupInfo);
         startupInfo.lpAttributeList = attributeList;
 
         const DWORD creationFlags = attributeList != nullptr ? EXTENDED_STARTUPINFO_PRESENT : 0;
