@@ -53,7 +53,6 @@ namespace
     constexpr size_t MAX_PENDING_PIPE_REQUESTS = 16;
     constexpr size_t MAX_PENDING_PIPE_BYTES = 4 * MAX_PIPE_PAYLOAD_BYTES;
     constexpr DWORD CONVERSION_TIMEOUT_MS = 5 * 60 * 1000;
-    constexpr wchar_t CONTEXT_MENU_ENABLED_VALUE[] = L"Enabled";
     constexpr wchar_t CONTEXT_MENU_PACKAGE_IDENTITY_NAME[] = L"Microsoft.PowerToys.FileConverterContextMenu";
     constexpr wchar_t CONTEXT_MENU_PACKAGE_PUBLISHER[] =
         L"CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US";
@@ -246,6 +245,17 @@ namespace
         return std::wstring(fc_constants::PipeNamePrefix) + std::to_wstring(session_id);
     }
 
+    std::wstring GetEnabledEventNameForCurrentSession()
+    {
+        DWORD session_id = 0;
+        if (!ProcessIdToSessionId(GetCurrentProcessId(), &session_id))
+        {
+            session_id = 0;
+        }
+
+        return std::wstring(fc_constants::EnabledEventNamePrefix) + std::to_wstring(session_id);
+    }
+
     struct PipeSecurity
     {
         SECURITY_ATTRIBUTES attributes{ sizeof(SECURITY_ATTRIBUTES), nullptr, FALSE };
@@ -378,7 +388,7 @@ namespace
         }
 
         UINT32 package_id_buffer_length = 0;
-        result = PackageIdFromFullName(package_full_name.c_str(), 0, &package_id_buffer_length, nullptr);
+        result = PackageIdFromFullName(package_full_name.c_str(), PACKAGE_INFORMATION_FULL, &package_id_buffer_length, nullptr);
         if (result != ERROR_INSUFFICIENT_BUFFER)
         {
             return false;
@@ -387,7 +397,7 @@ namespace
         std::vector<BYTE> package_id_buffer(package_id_buffer_length);
         result = PackageIdFromFullName(
             package_full_name.c_str(),
-            0,
+            PACKAGE_INFORMATION_FULL,
             &package_id_buffer_length,
             package_id_buffer.data());
         if (result != ERROR_SUCCESS)
@@ -726,11 +736,52 @@ namespace
     void SetContextMenuEnabledState(bool enabled)
     {
         HKEY key = nullptr;
-        if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\PowerToys\\FileConverter", 0, nullptr, 0, KEY_SET_VALUE, nullptr, &key, nullptr) == ERROR_SUCCESS)
+        if (RegCreateKeyExW(HKEY_CURRENT_USER, fc_constants::RegistryPath, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &key, nullptr) == ERROR_SUCCESS)
         {
             const DWORD value = enabled ? 1 : 0;
-            RegSetValueExW(key, CONTEXT_MENU_ENABLED_VALUE, 0, REG_DWORD, reinterpret_cast<const BYTE*>(&value), sizeof(value));
+            RegSetValueExW(key, fc_constants::RegistryEnabledValue, 0, REG_DWORD, reinterpret_cast<const BYTE*>(&value), sizeof(value));
             RegCloseKey(key);
+        }
+    }
+
+    void StartEncoderAvailabilityRefresh()
+    {
+        HKEY key = nullptr;
+        if (RegCreateKeyExW(HKEY_CURRENT_USER, fc_constants::RegistryPath, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &key, nullptr) == ERROR_SUCCESS)
+        {
+            const DWORD unavailable = 0;
+            for (int format = static_cast<int>(file_converter::ImageFormat::Png);
+                 format <= static_cast<int>(file_converter::ImageFormat::Webp);
+                 ++format)
+            {
+                const std::wstring value_name =
+                    std::wstring(fc_constants::RegistryEncoderAvailabilityPrefix) + std::to_wstring(format);
+                RegSetValueExW(key, value_name.c_str(), 0, REG_DWORD, reinterpret_cast<const BYTE*>(&unavailable), sizeof(unavailable));
+            }
+            RegCloseKey(key);
+        }
+
+        const std::filesystem::path worker_path =
+            std::filesystem::path(get_module_folderpath(reinterpret_cast<HMODULE>(&__ImageBase))) /
+            L"PowerToys.FileConverterWorker.exe";
+        std::wstring command_line = L"\"" + worker_path.wstring() + L"\" --probe-cache-all";
+        STARTUPINFOW startup_info{};
+        startup_info.cb = sizeof(startup_info);
+        PROCESS_INFORMATION process_info{};
+        if (CreateProcessW(
+                worker_path.c_str(),
+                command_line.data(),
+                nullptr,
+                nullptr,
+                FALSE,
+                CREATE_NO_WINDOW,
+                nullptr,
+                worker_path.parent_path().c_str(),
+                &startup_info,
+                &process_info))
+        {
+            CloseHandle(process_info.hThread);
+            CloseHandle(process_info.hProcess);
         }
     }
 
@@ -1156,7 +1207,13 @@ public:
         if (can_convert_safely)
         {
             const bool listener_ready = m_pipe_orchestrator.Start(GetPipeNameForCurrentSession());
-            SetContextMenuEnabledState(listener_ready);
+            if (listener_ready)
+            {
+                m_context_menu_lifetime_event =
+                    CreateEventW(nullptr, TRUE, TRUE, GetEnabledEventNameForCurrentSession().c_str());
+                StartEncoderAvailabilityRefresh();
+            }
+            SetContextMenuEnabledState(listener_ready && m_context_menu_lifetime_event != nullptr);
             if (!listener_ready)
             {
                 Logger::error(L"File Converter is unavailable because its IPC listener could not start.");
@@ -1178,6 +1235,12 @@ public:
         }
 
         SetContextMenuEnabledState(false);
+        if (m_context_menu_lifetime_event != nullptr)
+        {
+            ResetEvent(m_context_menu_lifetime_event);
+            CloseHandle(m_context_menu_lifetime_event);
+            m_context_menu_lifetime_event = nullptr;
+        }
         m_pipe_orchestrator.Stop();
         UnregisterContextMenuRuntime();
         m_enabled = false;
@@ -1197,6 +1260,7 @@ private:
     bool m_enabled = false;
     std::wstring m_name;
     std::wstring m_key = MODULE_KEY;
+    HANDLE m_context_menu_lifetime_event = nullptr;
     FileConverterPipeOrchestrator m_pipe_orchestrator;
 };
 
