@@ -23,6 +23,11 @@ namespace
     const wchar_t JSON_KEY_CODE[] = L"code";
     const wchar_t JSON_KEY_TOGGLE_THEME_HOTKEY[] = L"toggle-theme-hotkey";
     const wchar_t JSON_KEY_VALUE[] = L"value";
+
+    constexpr int ClampBrightnessThreshold(int value)
+    {
+        return value < 0 ? 0 : (value > 100 ? 100 : value);
+    }
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
@@ -99,6 +104,7 @@ struct ModuleSettings
     int m_sunset_offset = 0;
     std::wstring m_latitude = L"0.0";
     std::wstring m_longitude = L"0.0";
+    int m_brightnessThreshold = 90;
 } g_settings;
 
 class LightSwitchInterface : public PowertoyModuleIface
@@ -226,6 +232,14 @@ public:
             1439,
             1);
 
+        settings.add_int_spinner(
+            L"brightnessThreshold",
+            L"Brightness threshold for switching to light theme.",
+            g_settings.m_brightnessThreshold,
+            0,
+            100,
+            1);
+
         // Strings for latitude and longitude
         settings.add_string(
             L"latitude",
@@ -347,6 +361,11 @@ public:
             if (auto v = values.get_int_value(L"sunset_offset"))
             {
                 g_settings.m_sunset_offset = *v;
+            }
+
+            if (auto v = values.get_int_value(L"brightnessThreshold"))
+            {
+                g_settings.m_brightnessThreshold = ClampBrightnessThreshold(*v);
             }
 
             if (auto v = values.get_string_value(L"latitude"))
@@ -695,6 +714,8 @@ void LightSwitchInterface::init_settings()
             g_settings.m_sunrise_offset = *v;
         if (auto v = settings.get_int_value(L"sunset_offset"))
             g_settings.m_sunset_offset = *v;
+        if (auto v = settings.get_int_value(L"brightnessThreshold"))
+            g_settings.m_brightnessThreshold = ClampBrightnessThreshold(*v);
         if (auto v = settings.get_string_value(L"latitude"))
             g_settings.m_latitude = *v;
         if (auto v = settings.get_string_value(L"longitude"))
