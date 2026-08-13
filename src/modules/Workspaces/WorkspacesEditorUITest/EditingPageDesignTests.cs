@@ -32,7 +32,7 @@ public class EditingPageDesignTests : WorkspacesUiAutomationBase
         // Ensure at least one workspace exists
         AttachWorkspacesEditor();
         var workspacesList = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
-        if (workspacesList.FindAll<Element>(By.ClassName("WorkspaceItem")).Count == 0)
+        if (workspacesList.FindAll<Element>(By.AccessibilityId("WorkspaceItem")).Count == 0)
         {
             CreateTestWorkspace("EditDesignTest");
             Task.Delay(2000).Wait();
@@ -119,7 +119,7 @@ public class EditingPageDesignTests : WorkspacesUiAutomationBase
     {
         AttachWorkspacesEditor();
         var root = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
-        var items = root.FindAll<Element>(By.ClassName("WorkspaceItem"));
+        var items = root.FindAll<Element>(By.AccessibilityId("WorkspaceItem"));
         Assert.IsTrue(items.Count > 0, "Expected a workspace item to edit.");
         items[0].Click();
         Task.Delay(1000).Wait();

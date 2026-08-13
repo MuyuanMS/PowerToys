@@ -17,11 +17,6 @@ namespace WorkspacesEditor
         {
             Logger.InitializeLogger("\\Workspaces\\WorkspacesEditor");
 
-            if (args.Length > 0 && int.TryParse(args[0], out int runnerPid))
-            {
-                RunnerHelper.WaitForPowerToysRunner(runnerPid, () => Environment.Exit(0));
-            }
-
             WinRT.ComWrappersSupport.InitializeComWrappers();
 
             if (PowerToys.GPOWrapper.GPOWrapper.GetConfiguredWorkspacesEnabledValue() == PowerToys.GPOWrapper.GpoRuleConfigured.Disabled)

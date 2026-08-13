@@ -33,6 +33,7 @@ namespace WorkspacesEditorUITest
             Task.Delay(5000).Wait();
 
             // Set name
+            AttachWorkspacesEditor();
             var nameTextBox = Find<TextBox>(By.AccessibilityId("EditNameTextBox"));
             nameTextBox.SetText(name);
 
@@ -51,7 +52,7 @@ namespace WorkspacesEditorUITest
                 {
                     AttachWorkspacesEditor();
                     var root = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
-                    var items = root.FindAll<Element>(By.ClassName("WorkspaceItem"));
+                    var items = root.FindAll<Element>(By.AccessibilityId("WorkspaceItem"));
 
                     Debug.WriteLine($"Found {items.Count} workspace items");
 

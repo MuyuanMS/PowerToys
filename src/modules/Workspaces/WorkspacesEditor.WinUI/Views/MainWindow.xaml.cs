@@ -143,6 +143,8 @@ namespace WorkspacesEditor
 
         private void SearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
         {
+            App.MainViewModel.SearchTerm = sender.Text;
+
             if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput)
             {
                 return;

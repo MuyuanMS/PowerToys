@@ -74,7 +74,7 @@ public class EditorMainWindowDesignTests : WorkspacesUiAutomationBase
             || Has<TextBlock>(By.Name("No saved Workspaces"));
 
         var workspacesList = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
-        if (workspacesList.FindAll<Element>(By.ClassName("WorkspaceItem")).Count == 0)
+        if (workspacesList.FindAll<Element>(By.AccessibilityId("WorkspaceItem")).Count == 0)
         {
             Assert.IsTrue(hasEmptyMessage, "Empty state should show a message when no workspaces exist");
         }
