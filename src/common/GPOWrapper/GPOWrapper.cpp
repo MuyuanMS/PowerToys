@@ -48,6 +48,10 @@ namespace winrt::PowerToys::GPOWrapper::implementation
     {
         return static_cast<GpoRuleConfigured>(powertoys_gpo::getConfiguredFancyZonesEnabledValue());
     }
+    GpoRuleConfigured GPOWrapper::GetConfiguredFileConverterEnabledValue()
+    {
+        return static_cast<GpoRuleConfigured>(powertoys_gpo::getConfiguredFileConverterEnabledValue());
+    }
     GpoRuleConfigured GPOWrapper::GetConfiguredFileLocksmithEnabledValue()
     {
         return static_cast<GpoRuleConfigured>(powertoys_gpo::getConfiguredFileLocksmithEnabledValue());

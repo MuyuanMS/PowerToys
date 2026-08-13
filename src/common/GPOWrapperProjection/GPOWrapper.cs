@@ -42,6 +42,11 @@ namespace PowerToys.GPOWrapperProjection
             return (GpoRuleConfigured)PowerToys.GPOWrapper.GPOWrapper.GetConfiguredImageResizerEnabledValue();
         }
 
+        public static GpoRuleConfigured GetConfiguredFileConverterEnabledValue()
+        {
+            return (GpoRuleConfigured)PowerToys.GPOWrapper.GPOWrapper.GetConfiguredFileConverterEnabledValue();
+        }
+
         public static GpoRuleConfigured GetConfiguredTextExtractorEnabledValue()
         {
             return (GpoRuleConfigured)PowerToys.GPOWrapper.GPOWrapper.GetConfiguredTextExtractorEnabledValue();
