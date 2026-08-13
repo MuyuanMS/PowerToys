@@ -97,6 +97,7 @@ try {
     $sourcePath = Join-Path $sampleDir "sample.bmp"
     $baseName = "sample_converted"
 
+    Ensure-FileConverterSmokeTestFixture -Path $sourcePath
     if (-not (Test-Path -LiteralPath $sourcePath)) {
         throw "Sample input file not found at: $sourcePath"
     }
