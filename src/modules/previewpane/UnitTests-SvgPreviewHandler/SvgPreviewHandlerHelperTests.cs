@@ -198,6 +198,29 @@ namespace SvgPreviewHandlerUnitTests
         }
 
         [TestMethod]
+        public void TryWriteCacheFileAtomicShouldEvictOlderEntryAtTotalSizeLimit()
+        {
+            var cacheFolder = CreateTestCacheFolder();
+
+            try
+            {
+                var firstKey = SvgPreviewCacheHelper.BuildCacheKey("first");
+                var secondKey = SvgPreviewCacheHelper.BuildCacheKey("second");
+
+                Assert.IsTrue(SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, firstKey, "123", out var firstPath, maxCacheSizeBytes: 3));
+                File.SetLastWriteTimeUtc(firstPath, DateTime.UtcNow.AddMinutes(-1));
+                Assert.IsTrue(SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, secondKey, "456", out var secondPath, maxCacheSizeBytes: 3));
+
+                Assert.IsFalse(File.Exists(firstPath));
+                Assert.IsTrue(File.Exists(secondPath));
+            }
+            finally
+            {
+                Directory.Delete(cacheFolder, recursive: true);
+            }
+        }
+
+        [TestMethod]
         public void TryWriteTransientFileShouldPersistOversizedFallback()
         {
             var userDataFolder = CreateTestCacheFolder();

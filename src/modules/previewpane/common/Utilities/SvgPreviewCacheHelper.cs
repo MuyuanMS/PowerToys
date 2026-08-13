@@ -103,12 +103,7 @@ namespace Common.Utilities
                 temporaryFilePath = Path.Combine(cacheRootFolder, $"{cacheKey}.{Guid.NewGuid():N}.tmp");
                 File.WriteAllText(temporaryFilePath, contents, Utf8NoBom);
                 File.Move(temporaryFilePath, cacheFilePath, overwrite: true);
-                var webView2UserDataFolder = Directory.GetParent(cacheRootFolder)?.FullName;
-                if (webView2UserDataFolder != null)
-                {
-                    RunMaintenanceIfNeeded(webView2UserDataFolder, DateTime.UtcNow);
-                }
-
+                PruneCache(cacheRootFolder, DateTime.UtcNow, maxCacheSizeBytes);
                 return TryGetCacheFile(cacheRootFolder, cacheKey, out cacheFilePath);
             }
             catch (Exception)
