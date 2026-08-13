@@ -24,6 +24,7 @@ namespace WorkspacesLauncherUI
 
             ExtendsContentIntoTitleBar = true;
             SetTitleBar(AppTitleBar);
+            WindowHelpers.ForceTopBorder1PixelInsetOnWindows10(WinRT.Interop.WindowNative.GetWindowHandle(this));
 
             // Configure window size and behavior
             var appWindow = this.AppWindow;
