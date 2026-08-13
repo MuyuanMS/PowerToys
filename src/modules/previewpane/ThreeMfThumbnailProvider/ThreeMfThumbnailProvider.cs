@@ -43,6 +43,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
         ///  The maximum dimension (width or height) thumbnail we will generate.
         /// </summary>
         private const uint MaxThumbnailSize = 10000;
+        private const long MaxPackageBytes = 256L * 1024 * 1024;
 
         /// <summary>
         /// Loads the ThreeMf model into a Viewport3D and renders a bitmap of it.
@@ -66,23 +67,26 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
             try
             {
-                if (stream.CanSeek)
+                using var bufferedStream = stream.CanSeek ? null : CopyToSeekableStream(stream);
+                var workingStream = bufferedStream ?? stream;
+
+                if (workingStream.CanSeek)
                 {
-                    stream.Position = 0;
+                    workingStream.Position = 0;
                 }
 
-                thumbnail = ThreeMfModelLoader.TryLoadEmbeddedThumbnail(stream, cx);
+                thumbnail = ThreeMfModelLoader.TryLoadEmbeddedThumbnail(workingStream, cx);
                 if (thumbnail != null)
                 {
                     return thumbnail;
                 }
 
-                if (stream.CanSeek)
+                if (workingStream.CanSeek)
                 {
-                    stream.Position = 0;
+                    workingStream.Position = 0;
                 }
 
-                var model = ThreeMfModelLoader.LoadModel(stream, DefaultMaterialColor);
+                var model = ThreeMfModelLoader.LoadModel(workingStream, DefaultMaterialColor);
                 if (model == null || model.Children.Count == 0 || model.Bounds == Rect3D.Empty)
                 {
                     return null;
@@ -134,6 +138,28 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             {
                 return null;
             }
+        }
+
+        private static MemoryStream CopyToSeekableStream(Stream stream)
+        {
+            var memoryStream = new MemoryStream();
+            var buffer = new byte[81920];
+            long totalBytes = 0;
+            int bytesRead;
+            while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                totalBytes += bytesRead;
+                if (totalBytes > MaxPackageBytes)
+                {
+                    memoryStream.Dispose();
+                    throw new InvalidDataException("3MF package exceeds the maximum supported size.");
+                }
+
+                memoryStream.Write(buffer, 0, bytesRead);
+            }
+
+            memoryStream.Position = 0;
+            return memoryStream;
         }
 
         /// <summary>
