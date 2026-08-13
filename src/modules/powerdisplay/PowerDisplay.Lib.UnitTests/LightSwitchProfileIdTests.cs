@@ -63,6 +63,7 @@ public class LightSwitchProfileIdTests
         Assert.AreEqual("Day", properties.LightModeProfile.Value);
         Assert.AreEqual(0, properties.DarkModeProfileId.Value);
         Assert.AreEqual(0, properties.LightModeProfileId.Value);
+        Assert.AreEqual(LightSwitchProperties.DefaultBrightnessThreshold, properties.BrightnessThreshold.Value);
     }
 
     [TestMethod]
@@ -90,8 +91,10 @@ public class LightSwitchProfileIdTests
         settings.Properties.LightModeProfile.Value = "Day";
         settings.Properties.DarkModeProfileId.Value = 7;
         settings.Properties.LightModeProfileId.Value = 3;
+        settings.Properties.BrightnessThreshold.Value = 73;
 
         var json = settings.ToJsonString();
+        using var document = JsonDocument.Parse(json);
         var roundTripped = JsonSerializer.Deserialize(
             json,
             SettingsSerializationContext.Default.LightSwitchSettings);
@@ -119,5 +122,12 @@ public class LightSwitchProfileIdTests
         Assert.AreEqual("Day", roundTripped.Properties.LightModeProfile.Value);
         Assert.AreEqual(7, roundTripped.Properties.DarkModeProfileId.Value);
         Assert.AreEqual(3, roundTripped.Properties.LightModeProfileId.Value);
+        var serializedThreshold = document.RootElement
+            .GetProperty("properties")
+            .GetProperty("brightnessThreshold")
+            .GetProperty("value")
+            .GetInt32();
+        Assert.AreEqual(73, serializedThreshold);
+        Assert.AreEqual(73, roundTripped.Properties.BrightnessThreshold.Value);
     }
 }
