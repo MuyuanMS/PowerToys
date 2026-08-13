@@ -18,6 +18,7 @@ internal static class ModuleGpoHelper
             ModuleType.AlwaysOnTop => GPOWrapper.GetConfiguredAlwaysOnTopEnabledValue(),
             ModuleType.Awake => GPOWrapper.GetConfiguredAwakeEnabledValue(),
             ModuleType.CmdPal => GPOWrapper.GetConfiguredCmdPalEnabledValue(),
+            ModuleType.ClipPing => GPOWrapper.GetConfiguredClipPingEnabledValue(),
             ModuleType.ColorPicker => GPOWrapper.GetConfiguredColorPickerEnabledValue(),
             ModuleType.CropAndLock => GPOWrapper.GetConfiguredCropAndLockEnabledValue(),
             ModuleType.CursorWrap => GPOWrapper.GetConfiguredCursorWrapEnabledValue(),
