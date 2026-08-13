@@ -60,6 +60,9 @@
   <data name="FileConverter_Error_ActionNotString" xml:space="preserve">
     <value>action is not a string</value>
   </data>
+  <data name="FileConverter_Error_DestinationNotString" xml:space="preserve">
+    <value>destination is not a string</value>
+  </data>
   <data name="FileConverter_Error_UnsupportedAction" xml:space="preserve">
     <value>unsupported action</value>
   </data>
@@ -106,6 +109,9 @@
   <data name="FileConverter_Engine_ReadPixelFormatFailed" xml:space="preserve">
     <value>Failed reading source pixel format.</value>
   </data>
+  <data name="FileConverter_Engine_ApplyOrientationFailed" xml:space="preserve">
+    <value>Failed applying image orientation.</value>
+  </data>
   <data name="FileConverter_Engine_CreateStreamFailed" xml:space="preserve">
     <value>Failed creating WIC stream.</value>
   </data>
@@ -147,5 +153,8 @@
   </data>
   <data name="FileConverter_Engine_CommitEncoderFailed" xml:space="preserve">
     <value>Failed committing encoder.</value>
+  </data>
+  <data name="FileConverter_Engine_PublishOutputFailed" xml:space="preserve">
+    <value>Failed publishing converted image.</value>
   </data>
 </root>
