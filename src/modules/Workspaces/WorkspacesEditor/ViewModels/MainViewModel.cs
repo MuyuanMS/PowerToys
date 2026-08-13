@@ -391,18 +391,18 @@ namespace WorkspacesEditor.ViewModels
 
             project.Applications.RemoveAll(app => !app.IsIncluded);
             project.Initialize(App.GetCurrentTheme());
-            var updatedWorkspaces = Workspaces.Append(project).ToList();
-            if (!TempProjectData.DeleteTempFile())
-            {
-                return false;
-            }
-
+            var updatedWorkspaces = Workspaces.Where(existing => existing.Id != project.Id).Append(project).ToList();
             if (!_workspacesEditorIO.SerializeWorkspaces(updatedWorkspaces))
             {
                 return false;
             }
 
             CommitPersistedWorkspaces(updatedWorkspaces);
+            if (!TempProjectData.DeleteTempFile())
+            {
+                return false;
+            }
+
             ApplyShortcut(project);
             SendCreateTelemetryEvent(project);
             return true;
