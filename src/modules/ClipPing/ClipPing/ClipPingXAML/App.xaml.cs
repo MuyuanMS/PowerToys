@@ -54,6 +54,7 @@ public partial class App : Application, IDisposable
         };
 
         _fileSystemWatcher.Changed += Settings_Changed;
+        _fileSystemWatcher.Created += Settings_Changed;
         _fileSystemWatcher.EnableRaisingEvents = true;
     }
 

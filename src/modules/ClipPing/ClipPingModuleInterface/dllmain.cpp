@@ -208,7 +208,14 @@ public:
             if (result == WAIT_TIMEOUT)
             {
                 Logger::warn("ClipPing: Process didn't exit in time. Forcing termination.");
-                TerminateProcess(m_hProcess, 0);
+                if (TerminateProcess(m_hProcess, 0))
+                {
+                    WaitForSingleObject(m_hProcess, INFINITE);
+                }
+                else
+                {
+                    Logger::error("ClipPing: Failed to terminate the process.");
+                }
             }
 
             CloseHandle(m_hProcess);
