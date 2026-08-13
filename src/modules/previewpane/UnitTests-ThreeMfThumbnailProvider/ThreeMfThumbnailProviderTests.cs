@@ -15,6 +15,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 using GeometryModel3D = System.Windows.Media.Media3D.GeometryModel3D;
 using MediaColors = System.Windows.Media.Colors;
+using MeshGeometry3D = System.Windows.Media.Media3D.MeshGeometry3D;
 using Model3DGroup = System.Windows.Media.Media3D.Model3DGroup;
 
 namespace ThreeMfThumbnailProviderUnitTests
@@ -36,7 +37,7 @@ namespace ThreeMfThumbnailProviderUnitTests
         }
 
         [TestMethod]
-        public void GetThumbnailInValidSizeThreeMf()
+        public void GetThumbnailInvalidSizeThreeMf()
         {
             // Act
             var filePath = "HelperFiles/sample.3mf";
@@ -49,7 +50,7 @@ namespace ThreeMfThumbnailProviderUnitTests
         }
 
         [TestMethod]
-        public void GetThumbnailToBigThreeMf()
+        public void GetThumbnailTooBigThreeMf()
         {
             // Act
             var filePath = "HelperFiles/sample.3mf";
@@ -166,6 +167,20 @@ namespace ThreeMfThumbnailProviderUnitTests
             Assert.AreEqual(25.4, geometry.Bounds.SizeX, 0.001);
             Assert.AreEqual(25.4, geometry.Bounds.SizeY, 0.001);
             Assert.AreEqual(25.4, geometry.Bounds.SizeZ, 0.001);
+        }
+
+        [TestMethod]
+        public void LoadModelPreservesIndexedMeshVertices()
+        {
+            using var stream = CreateMeshOnlyThreeMf();
+
+            Model3DGroup model = ThreeMfModelLoader.LoadModel(stream, MediaColors.Gold);
+
+            Assert.IsNotNull(model);
+            var geometry = model.Children.OfType<GeometryModel3D>().Single().Geometry as MeshGeometry3D;
+            Assert.IsNotNull(geometry);
+            Assert.AreEqual(4, geometry.Positions.Count);
+            Assert.AreEqual(12, geometry.TriangleIndices.Count);
         }
 
         [TestMethod]

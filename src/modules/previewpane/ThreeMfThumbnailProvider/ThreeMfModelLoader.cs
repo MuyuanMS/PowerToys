@@ -625,7 +625,12 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                     ParseDouble(element.Attribute("z")?.Value) * unitScale));
             }
 
-            var positions = new Point3DCollection();
+            var positions = new Point3DCollection(vertices.Count);
+            foreach (var vertex in vertices)
+            {
+                positions.Add(vertex);
+            }
+
             var triangleIndices = new Int32Collection();
 
             foreach (var triangle in meshElement.Descendants().Where(element => element.Name.LocalName == "triangle" && element.Name.Namespace == meshNamespace))
@@ -647,12 +652,9 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
                 budget.Triangles--;
 
-                triangleIndices.Add(positions.Count);
-                positions.Add(vertices[v1]);
-                triangleIndices.Add(positions.Count);
-                positions.Add(vertices[v2]);
-                triangleIndices.Add(positions.Count);
-                positions.Add(vertices[v3]);
+                triangleIndices.Add(v1);
+                triangleIndices.Add(v2);
+                triangleIndices.Add(v3);
             }
 
             return new MeshGeometry3D
