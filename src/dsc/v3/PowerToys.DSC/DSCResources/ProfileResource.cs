@@ -39,6 +39,11 @@ public sealed class ProfileResource : BaseResource
     {
         var data = new ProfileFunctionData();
         data.GetState();
+        foreach (var warning in data.Warnings)
+        {
+            WriteMessageOutputLine(DscMessageLevel.Warning, warning);
+        }
+
         WriteJsonOutputLine(data.Output.ToJson());
         return true;
     }

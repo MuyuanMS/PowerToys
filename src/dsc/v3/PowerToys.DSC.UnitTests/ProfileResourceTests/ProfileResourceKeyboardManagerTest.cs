@@ -121,6 +121,30 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
     }
 
     [TestMethod]
+    public void Export_SkippedMapping_WritesWarning()
+    {
+        // Arrange
+        var profile = new KeyboardManagerProfile();
+        profile.RemapShortcuts.AppSpecificRemapShortcuts.Add(new AppSpecificKeysDataModel
+        {
+            OriginalKeys = "17;65",
+            NewRemapKeys = "17;86",
+            TargetApp = " notepad.exe ",
+        });
+        SaveProfile(profile, DefaultProfileFileName);
+
+        // Act
+        var result = ExecuteDscCommand<ExportCommand>("--resource", ProfileResource.ResourceName, "--module", Module);
+        var messages = result.Messages();
+
+        // Assert
+        Assert.IsTrue(result.Success);
+        Assert.AreEqual(1, messages.Count);
+        Assert.AreEqual(DscMessageLevel.Warning, messages[0].Level);
+        StringAssert.Contains(messages[0].Message, "surrounding whitespace");
+    }
+
+    [TestMethod]
     public void SetWithDiff_Success()
     {
         // Arrange
