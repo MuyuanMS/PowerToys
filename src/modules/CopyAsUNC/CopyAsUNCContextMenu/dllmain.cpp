@@ -16,6 +16,7 @@
 #include "Generated Files/resource.h"
 
 #pragma comment(lib, "Mpr.lib")
+#pragma comment(lib, "Shlwapi.lib")
 
 using namespace Microsoft::WRL;
 

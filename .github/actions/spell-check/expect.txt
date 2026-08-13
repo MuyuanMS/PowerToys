@@ -291,6 +291,8 @@ cooldown
 copiedcolorrepresentation
 coppied
 copyable
+COPYASUNCCONTEXTMENU
+COPYASUNCEXT
 COPYPEN
 coreclr
 COREWINDOW
