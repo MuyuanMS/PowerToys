@@ -70,9 +70,12 @@ public:
         return S_OK;
     }
 
-    IFACEMETHODIMP GetState(_In_opt_ IShellItemArray* selection, _In_ BOOL /*okToBeSlow*/, _Out_ EXPCMDSTATE* cmdState)
+    IFACEMETHODIMP GetState(_In_opt_ IShellItemArray* selection, _In_ BOOL okToBeSlow, _Out_ EXPCMDSTATE* cmdState)
     {
         *cmdState = ECS_HIDDEN;
+
+        if (!okToBeSlow)
+            return E_PENDING;
 
         if (!CopyAsUNCSettingsInstance().GetEnabled())
             return S_OK;
