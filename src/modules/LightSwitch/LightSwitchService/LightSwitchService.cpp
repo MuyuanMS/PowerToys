@@ -172,37 +172,22 @@ static void DetectAndHandleExternalThemeChange(LightSwitchStateManager& stateMan
     }
 
     // Use shared helper (handles wraparound logic)
-    bool shouldBeLight = false;
-    const auto state = stateManager.GetState();
+    std::optional<bool> shouldBeLight;
     if (s.scheduleMode == ScheduleMode::FollowNightLight)
     {
         shouldBeLight = !IsNightLightEnabled();
     }
     else if (s.scheduleMode == ScheduleMode::FollowBrightness)
     {
-        if (state.lastBrightness < 0)
-            return;
-
-        shouldBeLight = state.lastBrightness >= s.brightnessThreshold;
+        stateManager.OnExternalThemeChange(std::nullopt);
+        return;
     }
     else
     {
         shouldBeLight = ShouldBeLight(nowMinutes, effectiveLight, effectiveDark);
     }
 
-    // Compare current system/apps theme
-    bool currentSystemLight = GetCurrentSystemTheme();
-    bool currentAppsLight = GetCurrentAppsTheme();
-
-    bool systemMismatch = s.changeSystem && (currentSystemLight != shouldBeLight);
-    bool appsMismatch = s.changeApps && (currentAppsLight != shouldBeLight);
-
-    // Trigger manual override only if mismatch and not already active
-    if ((systemMismatch || appsMismatch) && !state.isManualOverride)
-    {
-        Logger::info(L"[LightSwitchService] External theme change detected (Windows Settings). Entering manual override mode.");
-        stateManager.OnManualOverride();
-    }
+    stateManager.OnExternalThemeChange(shouldBeLight);
 }
 
 DWORD WINAPI ServiceWorkerThread(LPVOID lpParam)

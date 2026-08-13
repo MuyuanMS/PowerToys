@@ -64,83 +64,93 @@ private:
         // this keeps Stop()/join() responsive to _stop between polls.
         constexpr long kNextTimeoutMs = 1000;
 
-        IWbemLocator* pLoc = nullptr;
-        IWbemServices* pSvc = nullptr;
-
-        while (!_stop && !pSvc)
+        while (!_stop)
         {
-            hr = CoCreateInstance(CLSID_WbemLocator, nullptr, CLSCTX_INPROC_SERVER,
-                                  IID_IWbemLocator, reinterpret_cast<LPVOID*>(&pLoc));
-            if (FAILED(hr))
-            {
-                WaitForNextPoll();
-                continue;
-            }
+            IWbemLocator* pLoc = nullptr;
+            IWbemServices* pSvc = nullptr;
 
-            hr = pLoc->ConnectServer(_bstr_t(L"ROOT\\WMI"), nullptr, nullptr, nullptr,
-                                     WBEM_FLAG_CONNECT_USE_MAX_WAIT, nullptr, nullptr, &pSvc);
-            if (FAILED(hr))
+            while (!_stop && !pSvc)
             {
-                pLoc->Release();
-                pLoc = nullptr;
-                WaitForNextPoll();
-                continue;
-            }
-
-            hr = CoSetProxyBlanket(pSvc, RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE, nullptr,
-                                   RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE,
-                                   nullptr, EOAC_NONE);
-            if (FAILED(hr))
-            {
-                pSvc->Release();
-                pSvc = nullptr;
-                pLoc->Release();
-                pLoc = nullptr;
-                WaitForNextPoll();
-            }
-        }
-
-        while (!_stop && pSvc)
-        {
-            IEnumWbemClassObject* pEnum = nullptr;
-            hr = pSvc->ExecQuery(
-                _bstr_t(L"WQL"),
-                _bstr_t(L"SELECT CurrentBrightness FROM WmiMonitorBrightness WHERE Active = TRUE"),
-                WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
-                nullptr, &pEnum);
-
-            if (SUCCEEDED(hr) && pEnum)
-            {
-                IWbemClassObject* pObj = nullptr;
-                ULONG returned = 0;
-                if (pEnum->Next(kNextTimeoutMs, 1, &pObj, &returned) == WBEM_S_NO_ERROR && returned)
+                hr = CoCreateInstance(CLSID_WbemLocator, nullptr, CLSCTX_INPROC_SERVER,
+                                      IID_IWbemLocator, reinterpret_cast<LPVOID*>(&pLoc));
+                if (FAILED(hr))
                 {
-                    VARIANT vt;
-                    VariantInit(&vt);
-                    if (SUCCEEDED(pObj->Get(L"CurrentBrightness", 0, &vt, nullptr, nullptr)))
-                    {
-                        int brightness = static_cast<int>(vt.bVal);
-                        if (brightness != lastBrightness)
-                        {
-                            lastBrightness = brightness;
-                            try
-                            {
-                                _callback(lastBrightness);
-                            }
-                            catch (...) {}
-                        }
-                    }
-                    VariantClear(&vt);
-                    pObj->Release();
+                    WaitForNextPoll();
+                    continue;
                 }
-                pEnum->Release();
+
+                hr = pLoc->ConnectServer(_bstr_t(L"ROOT\\WMI"), nullptr, nullptr, nullptr,
+                                         WBEM_FLAG_CONNECT_USE_MAX_WAIT, nullptr, nullptr, &pSvc);
+                if (FAILED(hr))
+                {
+                    pLoc->Release();
+                    pLoc = nullptr;
+                    WaitForNextPoll();
+                    continue;
+                }
+
+                hr = CoSetProxyBlanket(pSvc, RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE, nullptr,
+                                       RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE,
+                                       nullptr, EOAC_NONE);
+                if (FAILED(hr))
+                {
+                    pSvc->Release();
+                    pSvc = nullptr;
+                    pLoc->Release();
+                    pLoc = nullptr;
+                    WaitForNextPoll();
+                }
             }
 
-            WaitForNextPoll();
+            while (!_stop && pSvc)
+            {
+                IEnumWbemClassObject* pEnum = nullptr;
+                hr = pSvc->ExecQuery(
+                    _bstr_t(L"WQL"),
+                    _bstr_t(L"SELECT CurrentBrightness FROM WmiMonitorBrightness WHERE Active = TRUE"),
+                    WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
+                    nullptr, &pEnum);
+
+                if (FAILED(hr))
+                {
+                    break;
+                }
+
+                if (pEnum)
+                {
+                    IWbemClassObject* pObj = nullptr;
+                    ULONG returned = 0;
+                    if (pEnum->Next(kNextTimeoutMs, 1, &pObj, &returned) == WBEM_S_NO_ERROR && returned)
+                    {
+                        VARIANT vt;
+                        VariantInit(&vt);
+                        if (SUCCEEDED(pObj->Get(L"CurrentBrightness", 0, &vt, nullptr, nullptr)))
+                        {
+                            int brightness = static_cast<int>(vt.bVal);
+                            if (brightness != lastBrightness)
+                            {
+                                lastBrightness = brightness;
+                                try
+                                {
+                                    _callback(lastBrightness);
+                                }
+                                catch (...) {}
+                            }
+                        }
+                        VariantClear(&vt);
+                        pObj->Release();
+                    }
+                    pEnum->Release();
+                }
+
+                WaitForNextPoll();
+            }
+
+            if (pSvc) pSvc->Release();
+            if (pLoc) pLoc->Release();
+            if (!_stop) WaitForNextPoll();
         }
 
-        if (pSvc) pSvc->Release();
-        if (pLoc) pLoc->Release();
         if (coInitializeCalledHere) CoUninitialize();
     }
 };
