@@ -18,23 +18,35 @@ function Send-PipePayload {
     param(
         [string]$PipeSimpleName,
         [string]$Payload,
-        [int]$ConnectTimeoutMs
+        [int]$ConnectTimeoutMs,
+        [int]$Attempts = 30,
+        [int]$RetryDelayMs = 100
     )
 
-    $client = [System.IO.Pipes.NamedPipeClientStream]::new(
-        ".",
-        $PipeSimpleName,
-        [System.IO.Pipes.PipeDirection]::Out
-    )
+    for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+        $client = [System.IO.Pipes.NamedPipeClientStream]::new(
+            ".",
+            $PipeSimpleName,
+            [System.IO.Pipes.PipeDirection]::Out
+        )
 
-    try {
-        $client.Connect($ConnectTimeoutMs)
-        $bytes = [System.Text.Encoding]::UTF8.GetBytes($Payload)
-        $client.Write($bytes, 0, $bytes.Length)
-        $client.Flush()
-    }
-    finally {
-        $client.Dispose()
+        try {
+            $client.Connect($ConnectTimeoutMs)
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($Payload)
+            $client.Write($bytes, 0, $bytes.Length)
+            $client.Flush()
+            return
+        }
+        catch {
+            if ($attempt -eq $Attempts) {
+                throw
+            }
+
+            Start-Sleep -Milliseconds $RetryDelayMs
+        }
+        finally {
+            $client.Dispose()
+        }
     }
 }
 

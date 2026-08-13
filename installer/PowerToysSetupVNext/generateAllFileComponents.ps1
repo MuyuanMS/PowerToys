@@ -33,6 +33,8 @@ Function Generate-FileList() {
     # Without them GetReadyState() reports NotReady and EnsureReadyAsync() fails with
     # RO_E_METADATA_NAME_NOT_FOUND (0x8000000F). The build already emits them into the app output
     # (e.g. WinUI3Apps); they were previously dropped here because the harvest didn't include them.
+    # The generic root and WinUI3 harvests also install File Converter's module DLL,
+    # context-menu DLL, and MSIX; a dedicated fragment would duplicate those files.
     $fileInclusionList = @("*.dll", "*.exe", "*.json", "*.msix", "*.png", "*.gif", "*.ico", "*.cur", "*.svg", "index.html", "reg.js", "gitignore.js", "srt.js", "monacoSpecialLanguages.js", "customTokenThemeRules.js", "*.pri", "*.yml", "*.winmd")
 
     # MFC DLLs leak into the output via WindowsAppSDKSelfContained but no PowerToys binary imports them.
