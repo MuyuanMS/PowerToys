@@ -81,6 +81,30 @@ namespace WorkspacesLauncherUI.UnitTests
 
         [TestMethod]
         [TestCategory("Model")]
+        public void AutomationName_WhenSuccessful_AnnouncesSuccessfulState()
+        {
+            var app = new AppLaunching { LaunchState = LaunchingState.LaunchedAndMoved };
+            Assert.AreEqual("Launch succeeded", app.StateAutomationName);
+        }
+
+        [TestMethod]
+        [TestCategory("Model")]
+        public void AutomationName_WhenFailed_AnnouncesFailedState()
+        {
+            var app = new AppLaunching { LaunchState = LaunchingState.Failed };
+            Assert.AreEqual("Launch failed", app.StateAutomationName);
+        }
+
+        [TestMethod]
+        [TestCategory("Model")]
+        public void AutomationName_WhenCanceled_AnnouncesCanceledState()
+        {
+            var app = new AppLaunching { LaunchState = LaunchingState.Canceled };
+            Assert.AreEqual("Launch canceled", app.StateAutomationName);
+        }
+
+        [TestMethod]
+        [TestCategory("Model")]
         public void LaunchStateInt_WhenSuccessful_ReturnsExpectedValue()
         {
             var app = new AppLaunching { LaunchState = LaunchingState.LaunchedAndMoved };
