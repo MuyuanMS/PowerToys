@@ -27,6 +27,7 @@ namespace
 {
     constexpr DWORD ExitCommandNotMapped = 9009;
     constexpr DWORD ExitTargetNotFound = 9010;
+    constexpr DWORD ExitLaunchFailed = 9011;
     constexpr DWORD ForwardedExitCode = 37;
 
     // How often the process-tree helpers re-scan while waiting for a process to appear.
@@ -695,6 +696,18 @@ namespace CliShimUnitTests
             CopyExecutable(GetShimUnderTest(), shimPath);
 
             Assert::AreEqual(ExitTargetNotFound, RunAndGetExitCode(shimPath));
+        }
+
+        TEST_METHOD(InvalidTargetReturnsLaunchFailed)
+        {
+            TemporaryDirectory installation;
+            const std::filesystem::path shimPath = installation.GetPath() / L"bin" / L"PowerToys.FancyZones.CLI.exe";
+            const std::filesystem::path targetPath = installation.GetPath() / L"FancyZonesCLI.exe";
+
+            CopyExecutable(GetShimUnderTest(), shimPath);
+            std::ofstream{ targetPath, std::ios::binary } << "not an executable";
+
+            Assert::AreEqual(ExitLaunchFailed, RunAndGetExitCode(shimPath));
         }
 
         TEST_METHOD(IncompatibleHostJobFallsBackToUnprotectedLaunch)
