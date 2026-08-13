@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using AdvancedPaste.Helpers;
 using AdvancedPaste.Models;
 using AdvancedPaste.Services;
@@ -245,6 +246,33 @@ public sealed class KeystrokeServiceTests
             _ => { });
 
         var completed = service.SendTextAsKeystrokes("ab");
+
+        Assert.IsFalse(completed);
+        Assert.AreEqual(1, sendCount);
+    }
+
+    [TestMethod]
+    public void SendTextAsKeystrokes_CancellationStopsFurtherInput()
+    {
+        var userSettings = new TestUserSettings
+        {
+            KeystrokeDelayMs = 50,
+            KeystrokeBatchSize = 1,
+        };
+        using var cancellationTokenSource = new CancellationTokenSource();
+        var sendCount = 0;
+        var service = new KeystrokeService(
+            userSettings,
+            () => new IntPtr(1),
+            inputs =>
+            {
+                sendCount++;
+                cancellationTokenSource.Cancel();
+                return (uint)inputs.Length;
+            },
+            _ => { });
+
+        var completed = service.SendTextAsKeystrokes("ab", cancellationTokenSource.Token);
 
         Assert.IsFalse(completed);
         Assert.AreEqual(1, sendCount);

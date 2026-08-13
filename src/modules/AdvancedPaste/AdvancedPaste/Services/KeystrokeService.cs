@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 using AdvancedPaste.Settings;
 using ManagedCommon;
@@ -71,10 +72,11 @@ public sealed class KeystrokeService : IKeystrokeService
     /// This is useful for applications that don't support standard clipboard paste operations.
     /// </summary>
     /// <param name="text">The text to send as keystrokes.</param>
+    /// <param name="cancellationToken">Token used to stop an in-progress keystroke paste.</param>
     /// <returns><see langword="true"/> when all text was sent; otherwise, <see langword="false"/>.</returns>
     /// <exception cref="ArgumentNullException">Thrown when text is null.</exception>
     /// <exception cref="InvalidOperationException">Thrown when SendInput fails to send all inputs.</exception>
-    public bool SendTextAsKeystrokes(string text)
+    public bool SendTextAsKeystrokes(string text, CancellationToken cancellationToken = default)
     {
         Logger.LogTrace();
 
@@ -83,6 +85,11 @@ public sealed class KeystrokeService : IKeystrokeService
         if (string.IsNullOrEmpty(text))
         {
             Logger.LogWarning("Attempted to send empty text as keystrokes");
+            return false;
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
             return false;
         }
 
@@ -100,6 +107,11 @@ public sealed class KeystrokeService : IKeystrokeService
 
         for (int i = 0; i < normalizedText.Length; i++)
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return false;
+            }
+
             var currentForeground = _getForegroundWindow();
             if (currentForeground != targetWindow)
             {
