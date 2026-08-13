@@ -116,8 +116,9 @@ namespace
 
     bool IsTextReplacementShortcutModifierPressed(KeyboardManagerInput::InputInterface& ii)
     {
-        return IsModifierPressed(ii, VK_CONTROL, VK_LCONTROL, VK_RCONTROL) ||
-               IsModifierPressed(ii, VK_MENU, VK_LMENU, VK_RMENU) ||
+        const bool isAltGrPressed = ii.GetVirtualKeyState(VK_LCONTROL) && ii.GetVirtualKeyState(VK_RMENU);
+        return (!isAltGrPressed && (IsModifierPressed(ii, VK_CONTROL, VK_LCONTROL, VK_RCONTROL) ||
+                                    IsModifierPressed(ii, VK_MENU, VK_LMENU, VK_RMENU))) ||
                ii.GetVirtualKeyState(VK_LWIN) ||
                ii.GetVirtualKeyState(VK_RWIN) ||
                ii.GetVirtualKeyState(CommonSharedConstants::VK_WIN_BOTH);
@@ -219,28 +220,34 @@ namespace
         return ii.SendVirtualInput(inputs);
     }
 
-    std::vector<DWORD> GetPressedShiftKeys(KeyboardManagerInput::InputInterface& ii)
+    std::vector<DWORD> GetTextReplacementModifiersToRelease(KeyboardManagerInput::InputInterface& ii)
     {
-        std::vector<DWORD> pressedShiftKeys;
+        std::vector<DWORD> pressedModifiers;
         const bool leftShiftPressed = ii.GetVirtualKeyState(VK_LSHIFT);
         const bool rightShiftPressed = ii.GetVirtualKeyState(VK_RSHIFT);
 
         if (leftShiftPressed)
         {
-            pressedShiftKeys.push_back(VK_LSHIFT);
+            pressedModifiers.push_back(VK_LSHIFT);
         }
 
         if (rightShiftPressed)
         {
-            pressedShiftKeys.push_back(VK_RSHIFT);
+            pressedModifiers.push_back(VK_RSHIFT);
         }
 
         if (!leftShiftPressed && !rightShiftPressed && ii.GetVirtualKeyState(VK_SHIFT))
         {
-            pressedShiftKeys.push_back(VK_SHIFT);
+            pressedModifiers.push_back(VK_SHIFT);
         }
 
-        return pressedShiftKeys;
+        if (ii.GetVirtualKeyState(VK_LCONTROL) && ii.GetVirtualKeyState(VK_RMENU))
+        {
+            pressedModifiers.push_back(VK_LCONTROL);
+            pressedModifiers.push_back(VK_RMENU);
+        }
+
+        return pressedModifiers;
     }
 
     bool SendModifierInput(KeyboardManagerInput::InputInterface& ii,
@@ -266,11 +273,18 @@ namespace
 
     bool SendTextReplacementInput(KeyboardManagerInput::InputInterface& ii, const size_t backspaceCount, const std::wstring& replacement)
     {
-        const auto pressedShiftKeys = GetPressedShiftKeys(ii);
-        const bool releasedShift = SendModifierInput(ii, pressedShiftKeys, KEYEVENTF_KEYUP, KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG);
-        const bool removedTrigger = SendBackspaceInput(ii, backspaceCount);
-        const bool sentReplacement = Helpers::SendTextInput(replacement, ii);
-        return releasedShift && removedTrigger && sentReplacement;
+        const auto pressedModifiers = GetTextReplacementModifiersToRelease(ii);
+        if (!SendModifierInput(ii, pressedModifiers, KEYEVENTF_KEYUP, KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG))
+        {
+            return false;
+        }
+
+        if (!SendBackspaceInput(ii, backspaceCount))
+        {
+            return false;
+        }
+
+        return Helpers::SendTextInput(replacement, ii);
     }
 
 }
@@ -2164,7 +2178,9 @@ namespace KeyboardEventHandlers
             {
                 if (!SendTextReplacementInput(ii, trigger.length() > text->length() ? trigger.length() - text->length() : 0, replacement->second))
                 {
-                    return 0;
+                    state.textReplacementBuffer.clear();
+                    state.textReplacementSuppressedKey = vkCode;
+                    return 1;
                 }
                 state.textReplacementBuffer.clear();
                 state.textReplacementSuppressedKey = vkCode;

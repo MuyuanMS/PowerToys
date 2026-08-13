@@ -237,6 +237,11 @@ namespace KeyboardManagerEditorUI.Settings
                     shortcutSettingsChanged = true;
                     shortcutSettings.IsActive = false;
                 }
+                else if (!shortcutSettings.IsActive)
+                {
+                    shortcutSettingsChanged = true;
+                    shortcutSettings.IsActive = true;
+                }
             }
 
             if (shortcutSettingsChanged)

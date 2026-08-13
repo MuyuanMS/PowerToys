@@ -551,5 +551,16 @@ namespace RemappingUITests
             Assert::AreEqual(static_cast<size_t>(1), testShortcuts.textReplacements.size());
             Assert::AreEqual(static_cast<size_t>(5), testShortcuts.maxTextReplacementTriggerLength);
         }
+
+        TEST_METHOD (AddTextReplacement_ShouldRejectPrefixConflicts)
+        {
+            MappingConfiguration testShortcuts;
+
+            Assert::AreEqual(true, testShortcuts.AddTextReplacement(L"sun", L"moon"));
+            Assert::AreEqual(false, testShortcuts.AddTextReplacement(L"sunny", L"bright"));
+            Assert::AreEqual(false, testShortcuts.AddTextReplacement(L"su", L"prefix"));
+            Assert::AreEqual(true, testShortcuts.AddTextReplacement(L"planet", L"world"));
+            Assert::AreEqual(static_cast<size_t>(2), testShortcuts.textReplacements.size());
+        }
     };
 }

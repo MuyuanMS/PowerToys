@@ -632,12 +632,16 @@ namespace RemappingLogicTests
             Assert::AreEqual(0, static_cast<int>(KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState)));
         }
 
-        TEST_METHOD (HandleTextReplacementEvent_ShouldClearBufferAndDeferWhileAltGrIsPressed)
+        TEST_METHOD (HandleTextReplacementEvent_ShouldSuppressTriggerAndStopAfterInjectionFailure)
         {
             testState.AddTextReplacement(L"a ", L"hi");
             testState.textReplacementBuffer = L"a";
-            mockedInputHandler.SetKeyboardState(VK_LCONTROL, true);
-            mockedInputHandler.SetKeyboardState(VK_RMENU, true);
+
+            std::vector<std::vector<INPUT>> attemptedInput;
+            mockedInputHandler.SetSendVirtualInputShouldFail([&attemptedInput](const std::vector<INPUT>& inputs) {
+                attemptedInput.push_back(inputs);
+                return true;
+            });
 
             KBDLLHOOKSTRUCT lParam{};
             lParam.vkCode = VK_SPACE;
@@ -647,8 +651,12 @@ namespace RemappingLogicTests
 
             intptr_t result = KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState);
 
-            Assert::AreEqual(0, static_cast<int>(result));
+            Assert::AreEqual(1, static_cast<int>(result));
             Assert::AreEqual(std::wstring(), testState.textReplacementBuffer);
+            Assert::AreEqual(static_cast<DWORD>(VK_SPACE), testState.textReplacementSuppressedKey);
+            Assert::AreEqual(static_cast<size_t>(1), attemptedInput.size());
+            Assert::AreEqual(static_cast<size_t>(2), attemptedInput[0].size());
+            Assert::AreEqual(static_cast<WORD>(VK_BACK), attemptedInput[0][0].ki.wVk);
         }
 
         TEST_METHOD (HandleTextReplacementEvent_ShouldProcessSingleKeyRemapOutput)

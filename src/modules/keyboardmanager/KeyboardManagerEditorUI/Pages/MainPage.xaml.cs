@@ -485,7 +485,7 @@ namespace KeyboardManagerEditorUI.Pages
                         {
                             if (shortcut is TextMapping { TriggerText.Length: > 0 } textReplacement)
                             {
-                                if (!_mappingService.DeleteTextReplacementMapping(textReplacement.TriggerText))
+                                if (shortcut.IsActive && !_mappingService.DeleteTextReplacementMapping(textReplacement.TriggerText))
                                 {
                                     return false;
                                 }

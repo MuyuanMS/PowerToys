@@ -106,6 +106,13 @@ bool MappingConfiguration::AddTextReplacement(const std::wstring& trigger, const
         return false;
     }
 
+    if (std::any_of(textReplacements.begin(), textReplacements.end(), [&trigger](const auto& replacement) {
+            return replacement.first.starts_with(trigger) || trigger.starts_with(replacement.first);
+        }))
+    {
+        return false;
+    }
+
     if (const auto [_, inserted] = textReplacements.emplace(trigger, text); inserted)
     {
         maxTextReplacementTriggerLength = (std::max)(maxTextReplacementTriggerLength, trigger.length());
