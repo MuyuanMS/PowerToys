@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -100,6 +101,32 @@ namespace WorkspacesLauncherUI.UnitTests
             Assert.AreEqual(LaunchingState.LaunchedAndMoved, vm.AppsListed[0].LaunchState);
             Assert.AreEqual(LaunchingState.Canceled, vm.AppsListed[1].LaunchState);
             Assert.AreEqual(LaunchingState.Canceled, vm.AppsListed[2].LaunchState);
+        }
+
+        [TestMethod]
+        [TestCategory("Scenario")]
+        public void UserCancelsLaunch_AcknowledgmentRequestsClose()
+        {
+            var sentMessages = new List<string>();
+            using var vm = new MainViewModel(sentMessages.Add);
+            bool closeRequested = false;
+            Action previousCallback = WorkspacesLauncherUI.App.CancelAcknowledgedCallback;
+
+            try
+            {
+                WorkspacesLauncherUI.App.CancelAcknowledgedCallback = () => closeRequested = true;
+
+                vm.CancelLaunchCommand.Execute(null);
+                WorkspacesLauncherUI.App.ProcessIPCMessage("cancel_ack", callback => callback(), () => Assert.Fail("The ready timer should not be stopped by a cancellation acknowledgment."));
+
+                Assert.AreEqual(1, sentMessages.Count);
+                Assert.AreEqual("cancel", sentMessages[0]);
+                Assert.IsTrue(closeRequested, "The window close callback should run after cancel_ack.");
+            }
+            finally
+            {
+                WorkspacesLauncherUI.App.CancelAcknowledgedCallback = previousCallback;
+            }
         }
 
         [TestMethod]
