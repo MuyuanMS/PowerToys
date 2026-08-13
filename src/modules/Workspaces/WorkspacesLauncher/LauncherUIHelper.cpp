@@ -71,3 +71,8 @@ void LauncherUIHelper::UpdateLaunchStatus(WorkspacesData::LaunchingAppStateMap l
 
     m_ipcHelper.send(WorkspacesData::AppLaunchDataJSON::ToJson(appData).ToString().c_str());
 }
+
+void LauncherUIHelper::SendMessage(const std::wstring& message) const
+{
+    m_ipcHelper.send(message);
+}

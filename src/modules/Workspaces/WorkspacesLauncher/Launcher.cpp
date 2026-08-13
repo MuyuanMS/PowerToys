@@ -198,5 +198,8 @@ void Launcher::handleUIMessage(const std::wstring& msg) // UI IPC thread
     if (msg == L"cancel")
     {
         m_launchingStatus.Cancel();
+
+        std::lock_guard lock(m_uiHelperMutex);
+        m_uiHelper->SendMessage(L"cancel_ack");
     }
 }

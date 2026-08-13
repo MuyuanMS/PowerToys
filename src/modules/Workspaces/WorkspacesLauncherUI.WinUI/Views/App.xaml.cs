@@ -23,6 +23,8 @@ namespace WorkspacesLauncherUI
 
         public static Action<string> IPCMessageReceivedCallback { get; set; }
 
+        public static Action CancelAcknowledgedCallback { get; set; }
+
         public static DispatcherQueue DispatcherQueue { get; private set; }
 
         public App()
@@ -56,11 +58,19 @@ namespace WorkspacesLauncherUI
         {
             DispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
 
+            _mainWindow = new StatusWindow();
+
             _ipcManager = new TwoWayPipeMessageIPCManaged(
                 "\\\\.\\pipe\\powertoys_workspaces_ui_",
                 "\\\\.\\pipe\\powertoys_workspaces_launcher_ui_",
                 (string message) =>
                 {
+                    if (message == "cancel_ack")
+                    {
+                        DispatcherQueue.TryEnqueue(() => CancelAcknowledgedCallback?.Invoke());
+                        return;
+                    }
+
                     if (IPCMessageReceivedCallback != null && message.Length > 0)
                     {
                         DispatcherQueue.TryEnqueue(() =>
@@ -71,7 +81,6 @@ namespace WorkspacesLauncherUI
                 });
             _ipcManager.Start();
 
-            _mainWindow = new StatusWindow();
             _mainWindow.Activate();
         }
 
