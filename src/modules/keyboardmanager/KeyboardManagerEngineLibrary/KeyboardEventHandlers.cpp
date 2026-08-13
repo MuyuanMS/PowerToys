@@ -270,10 +270,12 @@ namespace KeyboardEventHandlers
                     // its numpad origin, so a numpad-originated key is released as the same key we pressed).
                     std::vector<INPUT> keyEventList;
                     AppendAloneSourceKeyEvent(keyEventList, vk, /*keyUp*/ true);
-                    ii.SendVirtualInput(keyEventList);
+                    const bool injected = ii.SendVirtualInput(keyEventList);
 
                     state.ClearAloneKeyState(vk);
-                    return 1;
+                    // If injection is blocked (for example after focus moves to an elevated process),
+                    // let the physical key-up through so the successfully promoted key-down is released.
+                    return injected ? 1 : 0;
                 }
 
                 // Not tracked (already resolved): pass the key-up through.

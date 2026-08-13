@@ -280,17 +280,23 @@ namespace KeyboardManagerEditorUI.Settings
 
         // Removes editor-store entries whose mapping value is an exact duplicate of one already kept,
         // repairing stores that drifted before the duplicate guard existed. Returns true if anything
-        // was removed. The first occurrence of each distinct mapping is preserved.
+        // was removed. The first occurrence of each distinct mapping is preserved, but remains active
+        // if any duplicate was active.
         private static bool RemoveDuplicateMappings()
         {
-            var seen = new HashSet<ShortcutKeyMapping>();
+            var retainedMappings = new Dictionary<ShortcutKeyMapping, ShortcutSettings>();
             var duplicateIds = new List<string>();
 
             foreach (var kvp in EditorSettings.ShortcutSettingsDictionary)
             {
-                if (!seen.Add(kvp.Value.Shortcut))
+                if (retainedMappings.TryGetValue(kvp.Value.Shortcut, out ShortcutSettings? retained))
                 {
+                    retained.IsActive |= kvp.Value.IsActive;
                     duplicateIds.Add(kvp.Key);
+                }
+                else
+                {
+                    retainedMappings.Add(kvp.Value.Shortcut, kvp.Value);
                 }
             }
 

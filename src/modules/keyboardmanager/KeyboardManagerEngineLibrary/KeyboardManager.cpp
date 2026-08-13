@@ -179,6 +179,7 @@ void KeyboardManager::HandleMouseHookEvent() noexcept
     // HandleKeyboardHookEvent.
     if (editorIsRunningEvent != nullptr && WaitForSingleObject(editorIsRunningEvent, 0) == WAIT_OBJECT_0)
     {
+        state.ClearAllAloneKeyState();
         return;
     }
 
@@ -308,6 +309,7 @@ intptr_t KeyboardManager::HandleKeyboardHookEvent(LowlevelKeyboardEvent* data) n
     // Suspend remapping if remap key/shortcut window is opened
     if (editorIsRunningEvent != nullptr && WaitForSingleObject(editorIsRunningEvent, 0) == WAIT_OBJECT_0)
     {
+        state.ClearAllAloneKeyState();
         return 0;
     }
 

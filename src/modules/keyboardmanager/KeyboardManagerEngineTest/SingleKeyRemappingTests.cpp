@@ -901,6 +901,32 @@ namespace RemappingLogicTests
             Assert::AreEqual(2, mockedInputHandler.GetSendVirtualInputCallCount());
         }
 
+        // If the promoted key-down succeeded but its injected key-up is later blocked, the physical
+        // key-up must pass through. Suppressing it would leave the real modifier logically stuck down.
+        TEST_METHOD (AloneRemap_CombinationReleaseInjectionBlocked_PassesPhysicalKeyUp)
+        {
+            testState.AddSingleKeyAloneRemap(VK_RCONTROL, (DWORD)VK_IME_ON);
+
+            std::vector<INPUT> rctrlDown{ { .type = INPUT_KEYBOARD, .ki = { .wVk = VK_RCONTROL } } };
+            std::vector<INPUT> hDown{ { .type = INPUT_KEYBOARD, .ki = { .wVk = 0x48 } } };
+            mockedInputHandler.SendVirtualInput(rctrlDown);
+            mockedInputHandler.SendVirtualInput(hDown);
+            Assert::AreEqual(true, mockedInputHandler.GetVirtualKeyState(VK_RCONTROL));
+
+            mockedInputHandler.SetSendVirtualInputShouldFail([](const std::vector<INPUT>& inputs) {
+                return inputs.size() == 1 &&
+                       inputs[0].ki.wVk == VK_RCONTROL &&
+                       (inputs[0].ki.dwFlags & KEYEVENTF_KEYUP) != 0 &&
+                       inputs[0].ki.dwExtraInfo == KeyboardManagerConstants::KEYBOARDMANAGER_SINGLEKEY_FLAG;
+            });
+
+            std::vector<INPUT> rctrlUp{ { .type = INPUT_KEYBOARD, .ki = { .wVk = VK_RCONTROL, .dwFlags = KEYEVENTF_KEYUP } } };
+            mockedInputHandler.SendVirtualInput(rctrlUp);
+
+            Assert::AreEqual(false, mockedInputHandler.GetVirtualKeyState(VK_RCONTROL));
+            Assert::AreEqual(false, testState.IsAloneCombination(VK_RCONTROL));
+        }
+
         // A numpad-originated alone key must be re-injected preserving its origin. Alone keys are tracked
         // by the numpad-origin-encoded vkCode (marker in bit 31); a bare WORD cast would drop it and turn
         // e.g. a NumLock-off numpad navigation key into its extended (arrow-cluster) twin. Verifies the
