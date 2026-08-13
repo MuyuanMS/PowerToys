@@ -112,6 +112,11 @@ void WindowMouseSnap::MoveSizeUpdate(HMONITOR monitor, POINT const& ptScreen, bo
     SwitchSnappingMode(isSnapping);
 }
 
+void WindowMouseSnap::ResetHighlightedZones() noexcept
+{
+    m_highlightedZones.Reset();
+}
+
 void WindowMouseSnap::MoveSizeEnd()
 {
     if (m_snappingMode)

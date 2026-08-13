@@ -1742,6 +1742,10 @@ void FancyZones::CycleLayoutByWheel(bool reverse) noexcept
     if (AppliedLayouts::instance().ApplyLayout(workArea->UniqueId(), layout.value()))
     {
         RefreshLayouts();
+        if (m_windowMouseSnapper)
+        {
+            m_windowMouseSnapper->ResetHighlightedZones();
+        }
 
         POINT cursorPosition{};
         if (GetCursorPos(&cursorPosition))
