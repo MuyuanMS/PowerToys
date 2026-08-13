@@ -75,6 +75,7 @@ LRESULT CALLBACK MouseButtonsHook::MouseButtonsProc(int nCode, WPARAM wParam, LP
             }
 
             wheelDeltaAccumulator += delta;
+            bool handled = false;
 
             while (std::abs(wheelDeltaAccumulator) >= WHEEL_DELTA)
             {
@@ -82,12 +83,15 @@ LRESULT CALLBACK MouseButtonsHook::MouseButtonsProc(int nCode, WPARAM wParam, LP
                 if (!wheelCallback(up))
                 {
                     wheelDeltaAccumulator = 0;
-                    break;
+                    return handled ? 1 : CallNextHookEx(hHook, nCode, wParam, lParam);
                 }
 
+                handled = true;
                 wheelDeltaAccumulator += up ? -WHEEL_DELTA : WHEEL_DELTA;
             }
 
+            // Consume active sub-detent packets so a high-resolution gesture cannot
+            // partially scroll the target app before it switches the layout.
             return 1;
         }
     }

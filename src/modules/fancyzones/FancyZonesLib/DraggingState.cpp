@@ -51,6 +51,11 @@ void DraggingState::UpdateDraggingState() noexcept
 
 void DraggingState::OnSecondaryMouseDown()
 {
+    if (!FancyZonesSettings::settings().mouseSwitch)
+    {
+        return;
+    }
+
     m_secondaryMouseState = !m_secondaryMouseState;
     m_keyUpdateCallback();
 }
@@ -76,9 +81,13 @@ void DraggingState::OnMiddleMouseDown()
     {
         m_middleMouseState = !m_middleMouseState;
     }
-    else
+    else if (FancyZonesSettings::settings().mouseSwitch)
     {
         m_secondaryMouseState = !m_secondaryMouseState;
+    }
+    else
+    {
+        return;
     }
 
     m_keyUpdateCallback();

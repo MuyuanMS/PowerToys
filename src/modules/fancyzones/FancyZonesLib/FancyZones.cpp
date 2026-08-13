@@ -245,8 +245,7 @@ public:
             return CanCycleLayoutByWheel(up);
         },
         [this](bool up) {
-            PostMessageW(m_window, WM_PRIV_WHEEL_LAYOUT_SWITCH, up ? 1 : 0, NULL);
-            return true;
+            return PostMessageW(m_window, WM_PRIV_WHEEL_LAYOUT_SWITCH, up ? 1 : 0, NULL) != FALSE;
         })
     {
         if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL))
