@@ -1132,7 +1132,7 @@
       <Platform Solution="*|ARM64" Project="ARM64" />
       <Platform Solution="*|x64" Project="x64" />
     </Project>
-    <Project Path="src/modules/Workspaces/WorkspacesEditor/WorkspacesEditor.csproj">
+    <Project Path="src/modules/Workspaces/WorkspacesEditor.WinUI/WorkspacesEditor.WinUI.csproj">
       <Platform Solution="*|ARM64" Project="ARM64" />
       <Platform Solution="*|x64" Project="x64" />
     </Project>
@@ -1147,6 +1147,10 @@
     <Project Path="src/modules/Workspaces/WorkspacesWindowArranger/WorkspacesWindowArranger.vcxproj" Id="37d07516-4185-43a4-924f-3c7a5d95ecf6" />
   </Folder>
   <Folder Name="/modules/Workspaces/Tests/">
+    <Project Path="src/modules/Workspaces/WorkspacesEditor.UnitTests/WorkspacesEditor.UnitTests.csproj">
+      <Platform Solution="*|ARM64" Project="ARM64" />
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
     <Project Path="src/modules/Workspaces/WorkspacesEditorUITest/Workspaces.Editor.UITests.csproj">
       <Platform Solution="*|ARM64" Project="ARM64" />
       <Platform Solution="*|x64" Project="x64" />
@@ -1261,4 +1265,3 @@
   <Project Path="src/runner/UnitTests/UnitTests-Runner.vcxproj" Id="97bdacf8-261d-4e23-a708-a27e0b60e444" />
   <Project Path="tools/project_template/ModuleTemplate/ModuleTemplateCompileTest.vcxproj" Id="64a80062-4d8b-4229-8a38-dfa1d7497749" />
 </Solution>
-

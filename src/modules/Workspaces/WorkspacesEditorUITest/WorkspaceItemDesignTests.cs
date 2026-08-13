@@ -1,0 +1,162 @@
+// Copyright (c) Microsoft Corporation
+// The Microsoft Corporation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using Microsoft.PowerToys.UITest;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace WorkspacesEditorUITest;
+
+/// <summary>
+/// Design validation tests for workspace items in the list.
+/// When workspaces exist, each item must have: name, app count, launch button.
+/// Editing is initiated by clicking the card itself (no separate Edit button).
+///
+/// These define the per-item UI contract for the WinUI 3 editor.
+/// </summary>
+[TestClass]
+public class WorkspaceItemDesignTests : WorkspacesUiAutomationBase
+{
+    public WorkspaceItemDesignTests()
+        : base()
+    {
+    }
+
+    [TestInitialize]
+    public void Setup()
+    {
+        // Ensure at least one workspace exists for item-level tests
+        if (!HasWorkspaceItem())
+        {
+            CreateTestWorkspace("DesignTest");
+            Task.Delay(2000).Wait();
+        }
+    }
+
+    [TestMethod("WorkspaceItem.HasName")]
+    [TestCategory("Design.WorkspaceItem")]
+    public void WorkspaceItem_DisplaysName()
+    {
+        if (!HasWorkspaceItem())
+        {
+            Assert.Inconclusive("No workspace items available for testing");
+            return;
+        }
+
+        var item = GetFirstWorkspaceItem();
+        Assert.IsFalse(string.IsNullOrWhiteSpace(item.Name), "Workspace item should expose a nonempty accessible name.");
+    }
+
+    [TestMethod("WorkspaceItem.HasLaunchButton")]
+    [TestCategory("Design.WorkspaceItem")]
+    public void WorkspaceItem_HasLaunchButton()
+    {
+        if (!HasWorkspaceItem())
+        {
+            Assert.Inconclusive("No workspace items available for testing");
+            return;
+        }
+
+        var item = GetFirstWorkspaceItem();
+        var launchButton = item.Find<Button>(By.Name("Launch"));
+        Assert.IsNotNull(launchButton, "Workspace item should have a Launch button");
+    }
+
+    [TestMethod("WorkspaceItem.CardIsClickable")]
+    [TestCategory("Design.WorkspaceItem")]
+    public void WorkspaceItem_CardIsClickableForEditing()
+    {
+        if (!HasWorkspaceItem())
+        {
+            Assert.Inconclusive("No workspace items available for testing");
+            return;
+        }
+
+        var item = GetFirstWorkspaceItem();
+
+        // In the WinUI editor, clicking the card navigates to the editor page.
+        item.Click();
+        Task.Delay(500).Wait();
+
+        Assert.IsTrue(
+            Has<TextBox>(By.AccessibilityId("EditNameTextBox")),
+            "Clicking a workspace item should navigate to the editing page.");
+
+        Find<Button>("Back").Click();
+        Task.Delay(500).Wait();
+    }
+
+    [TestMethod("WorkspaceItem.HasSortButton")]
+    [TestCategory("Design.WorkspaceItem")]
+    public void WorkspaceItem_HasSortButton()
+    {
+        Assert.IsTrue(Has<Button>("Sort by"), "The main page should expose the global sort menu.");
+    }
+
+    [TestMethod("WorkspaceItem.HasAppCountText")]
+    [TestCategory("Design.WorkspaceItem")]
+    public void WorkspaceItem_DisplaysAppCount()
+    {
+        if (!HasWorkspaceItem())
+        {
+            Assert.Inconclusive("No workspace items available for testing");
+            return;
+        }
+
+        var item = GetFirstWorkspaceItem();
+
+        // App count text should contain a number followed by "App" or "Apps"
+        var textBlocks = item.FindAll<TextBlock>(By.ClassName("TextBlock"));
+        bool hasAppCount = textBlocks.Any(t =>
+        {
+            var text = t.GetAttribute("Name") ?? string.Empty;
+            return text.Contains("App", System.StringComparison.OrdinalIgnoreCase);
+        });
+
+        Assert.IsTrue(hasAppCount, "Workspace item should display app count");
+    }
+
+    [TestMethod("WorkspaceItem.HasLastLaunchedText")]
+    [TestCategory("Design.WorkspaceItem")]
+    public void WorkspaceItem_DisplaysLastLaunchedTime()
+    {
+        if (!HasWorkspaceItem())
+        {
+            Assert.Inconclusive("No workspace items available for testing");
+            return;
+        }
+
+        var item = GetFirstWorkspaceItem();
+
+        // Should contain "Last launched" text
+        var textBlocks = item.FindAll<TextBlock>(By.ClassName("TextBlock"));
+        bool hasLastLaunched = textBlocks.Any(t =>
+        {
+            var text = t.GetAttribute("Name") ?? string.Empty;
+            return text.Contains("Last", System.StringComparison.OrdinalIgnoreCase);
+        });
+
+        Assert.IsTrue(hasLastLaunched, "Workspace item should display last launched time");
+    }
+
+    private bool HasWorkspaceItem()
+    {
+        try
+        {
+            var root = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
+            return root.FindAll<Element>(By.AccessibilityId("WorkspaceItem")).Count > 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private Element GetFirstWorkspaceItem()
+    {
+        var root = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
+        var items = root.FindAll<Element>(By.AccessibilityId("WorkspaceItem"));
+        Assert.IsTrue(items.Count > 0, "Expected at least one workspace list item.");
+        return items[0];
+    }
+}

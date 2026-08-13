@@ -33,36 +33,36 @@ namespace WorkspacesEditorUITest
             Task.Delay(5000).Wait();
 
             // Set name
-            var nameTextBox = Find<TextBox>("EditNameTextBox");
+            AttachWorkspacesEditor();
+            var nameTextBox = Find<TextBox>(By.AccessibilityId("EditNameTextBox"));
             nameTextBox.SetText(name);
 
             // Save
-            Find<Button>("Save Workspace").Click();
+            Find<Button>("Save").Click();
 
             // Close notepad
             CloseNotepad();
         }
 
-        // DO NOT USE UNTIL FRAMEWORK AVAILABLE, CAN'T FIND BUTTON FOR SECOND LOOP
         protected void ClearWorkspaces()
         {
             while (true)
             {
                 try
                 {
+                    AttachWorkspacesEditor();
                     var root = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
-                    var buttons = root.FindAll<Button>(By.AccessibilityId("MoreButton"));
+                    var items = root.FindAll<Element>(By.AccessibilityId("WorkspaceItem"));
 
-                    Debug.WriteLine($"Found {buttons.Count} button");
+                    Debug.WriteLine($"Found {items.Count} workspace items");
 
-                    var button = buttons[^1];
-
-                    button.Click();
+                    items[^1].Click();
 
                     Task.Delay(500).Wait();
 
-                    var remove = Find<Button>(By.Name("Remove"));
-                    remove.Click();
+                    Find<Button>("Delete workspace").Click();
+                    Task.Delay(500).Wait();
+                    Find<Button>("Remove").Click();
 
                     Task.Delay(500).Wait();
                 }

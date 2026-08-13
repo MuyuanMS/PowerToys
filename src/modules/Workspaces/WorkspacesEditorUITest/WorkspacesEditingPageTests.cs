@@ -349,7 +349,7 @@ public class WorkspacesEditingPageTests : WorkspacesUiAutomationBase
 
         // Go back to editing
         var workspacesList = Find<Custom>("WorkspacesList");
-        var workspace = workspacesList.FindAll<Custom>(By.ClassName("WorkspaceItem"))[0];
+        var workspace = workspacesList.FindAll<Custom>(By.AccessibilityId("WorkspaceItem"))[0];
         workspace.Click();
         Thread.Sleep(1000);
 
@@ -563,12 +563,12 @@ public class WorkspacesEditingPageTests : WorkspacesUiAutomationBase
 
         // Click on first workspace to edit
         var workspacesList = Find<Custom>("WorkspacesList");
-        var workspaceItems = workspacesList.FindAll<Custom>(By.ClassName("WorkspaceItem"));
+        var workspaceItems = workspacesList.FindAll<Custom>(By.AccessibilityId("WorkspaceItem"));
 
         if (workspaceItems.Count == 0)
         {
             CreateTestWorkspace();
-            workspaceItems = workspacesList.FindAll<Custom>(By.ClassName("WorkspaceItem"));
+            workspaceItems = workspacesList.FindAll<Custom>(By.AccessibilityId("WorkspaceItem"));
         }
 
         workspaceItems[0].Click();
