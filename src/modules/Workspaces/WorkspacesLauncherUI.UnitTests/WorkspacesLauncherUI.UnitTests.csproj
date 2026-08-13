@@ -23,7 +23,6 @@
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Microsoft.WindowsAppSDK" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
-    <PackageReference Include="Moq" />
     <PackageReference Include="MSTest" />
   </ItemGroup>
 

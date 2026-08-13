@@ -55,15 +55,19 @@
     <value>Applications</value>
   </data>
   <data name="LaunchSucceededAutomationName" xml:space="preserve">
-    <value>Launch succeeded</value>
+    <value>{0}: launch succeeded</value>
+    <comment>{0} is the application name.</comment>
   </data>
   <data name="LaunchFailedAutomationName" xml:space="preserve">
-    <value>Launch failed</value>
+    <value>{0}: launch failed</value>
+    <comment>{0} is the application name.</comment>
   </data>
   <data name="LaunchCanceledAutomationName" xml:space="preserve">
-    <value>Launch canceled</value>
+    <value>{0}: launch canceled</value>
+    <comment>{0} is the application name.</comment>
   </data>
   <data name="LaunchInProgressAutomationName" xml:space="preserve">
-    <value>Launching</value>
+    <value>{0}: launching</value>
+    <comment>{0} is the application name.</comment>
   </data>
 </root>
