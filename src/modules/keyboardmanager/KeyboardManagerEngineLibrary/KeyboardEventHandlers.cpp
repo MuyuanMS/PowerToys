@@ -201,7 +201,7 @@ namespace KeyboardEventHandlers
         }
 
         // A settings reload can remove or change the mapping after this source key was promoted. Resolve
-        // the matching release from runtime state before consulting the current mapping table, otherwise
+        // the matching release from runtime state before consulting the current mapping table; otherwise
         // a newly loaded remap could consume the physical key-up and leave the injected source stuck down.
         if (isKeyUp && state.IsAloneCombination(vk))
         {
