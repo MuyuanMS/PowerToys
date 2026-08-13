@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "State.h"
+#include <keyboardmanager/common/Helpers.h>
 #include <optional>
 
 // Function to get the iterator of a single key remap given the source key. Returns nullopt if it isn't remapped
@@ -58,6 +59,20 @@ void State::SetAloneCombination(const DWORD key)
 bool State::IsAloneCombination(const DWORD key) const
 {
     return aloneCombinationKeys.find(key) != aloneCombinationKeys.end();
+}
+
+std::optional<DWORD> State::GetAloneCombinationKeyForScanCode(DWORD scanCode) const
+{
+    for (const DWORD key : aloneCombinationKeys)
+    {
+        const DWORD plainKey = Helpers::ClearKeyNumpadOrigin(key);
+        if (MapVirtualKey(plainKey, MAPVK_VK_TO_VSC) == scanCode)
+        {
+            return key;
+        }
+    }
+
+    return std::nullopt;
 }
 
 void State::ClearAloneKeyState(const DWORD key)

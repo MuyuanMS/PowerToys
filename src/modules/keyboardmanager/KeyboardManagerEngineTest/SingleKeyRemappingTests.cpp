@@ -961,6 +961,12 @@ namespace RemappingLogicTests
             mockedInputHandler.SendVirtualInput(shiftDown);
             Assert::AreEqual(true, mockedInputHandler.GetVirtualKeyState(VK_NUMPAD1));
 
+            // Simulate a settings reload that removes the mapping and rebuilds scanMap while the
+            // promoted source remains physically held.
+            testState.ClearSingleKeyRemaps();
+            testState.ClearSingleKeyAloneRemaps();
+            testState.ClearAlonePendingKeys();
+
             KBDLLHOOKSTRUCT keyData{
                 .vkCode = Helpers::EncodeKeyNumpadOrigin(VK_END, /*extended*/ false),
             };

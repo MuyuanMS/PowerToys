@@ -43,43 +43,52 @@ namespace
             DWORD decodedKey = Helpers::ClearKeyNumpadOrigin(data->lParam->vkCode);
             //check if we already have a stored scanID
             auto scanKey = MapVirtualKey(decodedKey, MAPVK_VK_TO_VSC);
-            auto it = state.scanMap.find(scanKey);
-            if (it != state.scanMap.end())
+            if (const auto combinationKey = state.GetAloneCombinationKeyForScanCode(scanKey))
             {
-                if (state.GetSingleKeyAloneRemap(it->second) && state.numpadKeyPressed[it->second])
+                // Runtime combination identity outlives the settings table, so a reload that removes
+                // the mapping cannot strand an already injected numpad source.
+                data->lParam->vkCode = *combinationKey;
+            }
+            else
+            {
+                auto it = state.scanMap.find(scanKey);
+                if (it != state.scanMap.end())
                 {
-                    // An alone-mapped numpad key can arrive as its navigation twin after Shift or
-                    // NumLock changes while held. Restore the original VK so its pending/combination
-                    // state is resolved by the matching key-up.
-                    data->lParam->vkCode = it->second;
-                }
-
-                auto keyIt = state.GetSingleKeyRemap(it->second);
-                if (keyIt)
-                {
-                    //if key is stored as shift replace it with the numpad key
-                    auto keyValue = keyIt.value();
-                    if (keyValue->second.index() == 0)
+                    if (state.GetSingleKeyAloneRemap(it->second) && state.numpadKeyPressed[it->second])
                     {
-                        auto key = std::get<DWORD>(keyValue->second);
-                        if (key == VK_LSHIFT || key == VK_RSHIFT || key == VK_SHIFT)
+                        // An alone-mapped numpad key can arrive as its navigation twin after Shift or
+                        // NumLock changes while held. Restore the original VK so its pending/combination
+                        // state is resolved by the matching key-up.
+                        data->lParam->vkCode = it->second;
+                    }
+
+                    auto keyIt = state.GetSingleKeyRemap(it->second);
+                    if (keyIt)
+                    {
+                        //if key is stored as shift replace it with the numpad key
+                        auto keyValue = keyIt.value();
+                        if (keyValue->second.index() == 0)
                         {
-                            if (state.numpadKeyPressed[it->second])
+                            auto key = std::get<DWORD>(keyValue->second);
+                            if (key == VK_LSHIFT || key == VK_RSHIFT || key == VK_SHIFT)
                             {
-                                //replace it with original numpad
-                                data->lParam->vkCode = it->second;
+                                if (state.numpadKeyPressed[it->second])
+                                {
+                                    //replace it with original numpad
+                                    data->lParam->vkCode = it->second;
+                                }
                             }
                         }
-                    }
-                    if (keyValue->second.index() == 1)
-                    {
-                        auto key = std::get<Shortcut>(keyValue->second);
-                        if (key.shiftKey != ModifierKey::Disabled)
+                        if (keyValue->second.index() == 1)
                         {
-                            if (state.numpadKeyPressed[it->second])
-                            { 
-                                //replace it with original numpad
-                                data->lParam->vkCode = it->second;
+                            auto key = std::get<Shortcut>(keyValue->second);
+                            if (key.shiftKey != ModifierKey::Disabled)
+                            {
+                                if (state.numpadKeyPressed[it->second])
+                                {
+                                    //replace it with original numpad
+                                    data->lParam->vkCode = it->second;
+                                }
                             }
                         }
                     }

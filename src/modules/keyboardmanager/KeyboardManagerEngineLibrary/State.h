@@ -39,6 +39,9 @@ public:
     // Promote a pending alone key into a started combination (its real key-down was injected).
     void SetAloneCombination(const DWORD key);
     bool IsAloneCombination(const DWORD key) const;
+    // Resolve a promoted key by hardware scan code so its key-up survives a settings reload that
+    // removed the original mapping/scanMap entry.
+    std::optional<DWORD> GetAloneCombinationKeyForScanCode(DWORD scanCode) const;
     // Forget all alone runtime state for a key (on its key-up, once resolved).
     void ClearAloneKeyState(const DWORD key);
     // Forget pending tap candidates while preserving started combinations until their key-up releases
