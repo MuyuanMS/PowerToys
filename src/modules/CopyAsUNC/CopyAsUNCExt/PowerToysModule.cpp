@@ -76,11 +76,11 @@ public:
 
         if (package::IsWin11OrGreater())
         {
-            std::wstring path = get_module_folderpath(globals::instance);
-            std::wstring packageUri = path + L"\\CopyAsUNCContextMenuPackage.msix";
+            std::wstring modulePath = get_module_folderpath(globals::instance);
+            std::wstring packageUri = modulePath + L"\\CopyAsUNCContextMenuPackage.msix";
             if (!package::IsPackageRegisteredWithPowerToysVersion(constants::nonlocalizable::ContextMenuPackageName))
             {
-                package::RegisterSparsePackage(path, packageUri);
+                package::RegisterSparsePackage(get_module_folderpath(), packageUri);
             }
         }
 
