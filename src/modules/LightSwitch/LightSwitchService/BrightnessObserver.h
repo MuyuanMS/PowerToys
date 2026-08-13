@@ -42,40 +42,18 @@ private:
     std::atomic<bool> _stop;
     std::thread _thread;
 
+    void WaitForNextPoll()
+    {
+        for (int i = 0; i < _pollInterval && !_stop; ++i)
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+    }
+
     void Run()
     {
         HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
         bool coinitCalledHere = SUCCEEDED(hr);
-
-        IWbemLocator* pLoc = nullptr;
-        hr = CoCreateInstance(CLSID_WbemLocator, nullptr, CLSCTX_INPROC_SERVER,
-                              IID_IWbemLocator, reinterpret_cast<LPVOID*>(&pLoc));
-        if (FAILED(hr))
-        {
-            if (coinitCalledHere) CoUninitialize();
-            return;
-        }
-
-        IWbemServices* pSvc = nullptr;
-        hr = pLoc->ConnectServer(_bstr_t(L"ROOT\\WMI"), nullptr, nullptr, nullptr,
-                                 0, nullptr, nullptr, &pSvc);
-        if (FAILED(hr))
-        {
-            pLoc->Release();
-            if (coinitCalledHere) CoUninitialize();
-            return;
-        }
-
-        hr = CoSetProxyBlanket(pSvc, RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE, nullptr,
-                               RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE,
-                               nullptr, EOAC_NONE);
-        if (FAILED(hr))
-        {
-            pSvc->Release();
-            pLoc->Release();
-            if (coinitCalledHere) CoUninitialize();
-            return;
-        }
 
         int lastBrightness = -1;
 
@@ -83,7 +61,43 @@ private:
         // this keeps Stop()/join() responsive to _stop between polls.
         constexpr long kNextTimeoutMs = 1000;
 
-        while (!_stop)
+        IWbemLocator* pLoc = nullptr;
+        IWbemServices* pSvc = nullptr;
+
+        while (!_stop && !pSvc)
+        {
+            hr = CoCreateInstance(CLSID_WbemLocator, nullptr, CLSCTX_INPROC_SERVER,
+                                  IID_IWbemLocator, reinterpret_cast<LPVOID*>(&pLoc));
+            if (FAILED(hr))
+            {
+                WaitForNextPoll();
+                continue;
+            }
+
+            hr = pLoc->ConnectServer(_bstr_t(L"ROOT\\WMI"), nullptr, nullptr, nullptr,
+                                     0, nullptr, nullptr, &pSvc);
+            if (FAILED(hr))
+            {
+                pLoc->Release();
+                pLoc = nullptr;
+                WaitForNextPoll();
+                continue;
+            }
+
+            hr = CoSetProxyBlanket(pSvc, RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE, nullptr,
+                                   RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE,
+                                   nullptr, EOAC_NONE);
+            if (FAILED(hr))
+            {
+                pSvc->Release();
+                pSvc = nullptr;
+                pLoc->Release();
+                pLoc = nullptr;
+                WaitForNextPoll();
+            }
+        }
+
+        while (!_stop && pSvc)
         {
             IEnumWbemClassObject* pEnum = nullptr;
             hr = pSvc->ExecQuery(
@@ -106,7 +120,6 @@ private:
                         if (brightness != lastBrightness)
                         {
                             lastBrightness = brightness;
-                            Logger::info(L"[BrightnessObserver] Brightness changed to {}%", lastBrightness);
                             try
                             {
                                 _callback(lastBrightness);
@@ -120,15 +133,11 @@ private:
                 pEnum->Release();
             }
 
-            // Sleep in 1-second increments so we can respond to _stop quickly.
-            for (int i = 0; i < _pollInterval && !_stop; ++i)
-            {
-                std::this_thread::sleep_for(std::chrono::seconds(1));
-            }
+            WaitForNextPoll();
         }
 
-        pSvc->Release();
-        pLoc->Release();
+        if (pSvc) pSvc->Release();
+        if (pLoc) pLoc->Release();
         if (coinitCalledHere) CoUninitialize();
     }
 };

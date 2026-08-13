@@ -56,7 +56,7 @@ void LightSwitchStateManager::OnManualOverride()
                   (_state.isSystemLightActive ? L"light" : L"dark"),
                   (_state.isAppsLightActive ? L"light" : L"dark"));
 
-    const auto& settings = LightSwitchSettings::settings();
+    const auto settings = LightSwitchSettings::settings_snapshot();
     if (settings.changeSystem)
     {
         NotifyPowerDisplayThemeChanged(_state.isSystemLightActive);
@@ -106,7 +106,7 @@ void LightSwitchStateManager::OnBrightnessChange(int brightness)
 
     if (_state.lastAppliedMode == ScheduleMode::FollowBrightness && _state.isManualOverride)
     {
-        int threshold = LightSwitchSettings::settings().brightnessThreshold;
+        int threshold = LightSwitchSettings::settings_snapshot().brightnessThreshold;
         bool wasLight = (_state.lastBrightness >= 0 && _state.lastBrightness >= threshold);
         bool willBeLight = (brightness >= threshold);
 
@@ -119,7 +119,6 @@ void LightSwitchStateManager::OnBrightnessChange(int brightness)
     }
 
     _state.lastBrightness = brightness;
-    Logger::info(L"[LightSwitchStateManager] Brightness changed to {}%", brightness);
     EvaluateAndApplyIfNeeded();
 }
 
@@ -196,7 +195,7 @@ static std::pair<int, int> update_sun_times(auto& settings)
 void LightSwitchStateManager::EvaluateAndApplyIfNeeded()
 {
     LightSwitchSettings::instance().LoadSettings();
-    const auto& _currentSettings = LightSwitchSettings::settings();
+    const auto _currentSettings = LightSwitchSettings::settings_snapshot();
     auto now = GetNowMinutes();
 
     // Early exit: OFF mode just pauses activity
