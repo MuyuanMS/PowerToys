@@ -1,9 +1,13 @@
 #include "pch.h"
 
 #include "../FileConverterLib/FileConversionEngine.h"
+#include <common/logger/logger.h>
+#include <common/utils/logger_helper.h>
 
 namespace
 {
+    constexpr auto ABANDONED_TEMP_AGE = std::chrono::minutes(5);
+
     std::wstring ExtensionForFormat(file_converter::ImageFormat format)
     {
         switch (format)
@@ -41,6 +45,42 @@ namespace
             return std::nullopt;
         }
     }
+
+    void RemoveAbandonedTempFiles(
+        const std::filesystem::path& input_path,
+        const std::wstring& output_extension)
+    {
+        const std::wstring output_prefix = input_path.stem().wstring() + L"_converted";
+        const std::wstring temp_marker = output_extension + L".tmp-";
+        const auto cutoff = std::filesystem::file_time_type::clock::now() - ABANDONED_TEMP_AGE;
+
+        std::error_code ec;
+        for (std::filesystem::directory_iterator iterator(input_path.parent_path(), ec), end;
+             !ec && iterator != end;
+             iterator.increment(ec))
+        {
+            const auto& candidate = iterator->path();
+            const std::wstring filename = candidate.filename().wstring();
+            if (!filename.starts_with(output_prefix) ||
+                filename.find(temp_marker) == std::wstring::npos)
+            {
+                continue;
+            }
+
+            const auto write_time = iterator->last_write_time(ec);
+            if (ec)
+            {
+                ec.clear();
+                continue;
+            }
+
+            if (write_time <= cutoff)
+            {
+                std::filesystem::remove(candidate, ec);
+                ec.clear();
+            }
+        }
+    }
 }
 
 int wmain(int argc, wchar_t* argv[])
@@ -65,6 +105,7 @@ int wmain(int argc, wchar_t* argv[])
             return static_cast<int>(file_converter::IsOutputFormatSupported(*format).hr);
         }
 
+        LoggerHelpers::init_logger(L"FileConverter", L"Worker", "fileconverter");
         const std::filesystem::path input_path(argv[1]);
         std::error_code ec;
         if (input_path.empty())
@@ -78,6 +119,7 @@ int wmain(int argc, wchar_t* argv[])
 
         std::filesystem::path output_path;
         const auto output_extension = ExtensionForFormat(*format);
+        RemoveAbandonedTempFiles(input_path, output_extension);
         for (unsigned int suffix = 0;; ++suffix)
         {
             output_path = input_path.parent_path() / input_path.stem();
@@ -95,6 +137,11 @@ int wmain(int argc, wchar_t* argv[])
         }
 
         const auto result = file_converter::ConvertImageFile(input_path.wstring(), output_path.wstring(), *format);
+        if (!result.succeeded())
+        {
+            Logger::error(L"Conversion failed for '{}': {}", input_path.wstring(), result.error_message);
+            Logger::flush();
+        }
         return static_cast<int>(result.hr);
     }
     catch (const winrt::hresult_error& error)

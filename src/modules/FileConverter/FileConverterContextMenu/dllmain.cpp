@@ -279,8 +279,19 @@ namespace
             module_path.resize(module_path.size() * 2);
         }
 
-        const std::filesystem::path worker_path =
-            std::filesystem::path(module_path).parent_path().parent_path() / L"PowerToys.FileConverterWorker.exe";
+        const auto module_directory = std::filesystem::path(module_path).parent_path();
+        std::filesystem::path worker_path =
+            module_directory.parent_path() / L"PowerToys.FileConverterWorker.exe";
+        std::error_code worker_path_error;
+        if (!std::filesystem::is_regular_file(worker_path, worker_path_error))
+        {
+            worker_path_error.clear();
+            worker_path = module_directory.parent_path().parent_path() / L"PowerToys.FileConverterWorker.exe";
+        }
+        if (!std::filesystem::is_regular_file(worker_path, worker_path_error))
+        {
+            return false;
+        }
         std::wstring command_line =
             L"\"" + worker_path.wstring() + L"\" --probe " + std::to_wstring(static_cast<int>(format));
 
