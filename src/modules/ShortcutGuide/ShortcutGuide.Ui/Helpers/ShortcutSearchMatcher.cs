@@ -4,12 +4,16 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using Common.Search.FuzzSearch;
 using ShortcutGuide.Models;
 
 namespace ShortcutGuide.Helpers
 {
     public static class ShortcutSearchMatcher
     {
+        private const int FuzzyMatchThreshold = (int)SearchPrecisionScore.Regular;
+
         public static bool Matches(ShortcutEntry shortcut, string? query)
         {
             string searchText = query?.Trim() ?? string.Empty;
@@ -18,16 +22,21 @@ namespace ShortcutGuide.Helpers
                 return true;
             }
 
-            if (Contains(shortcut.Name, searchText) || Contains(shortcut.Description, searchText))
+            if (MatchesText(shortcut.Name, searchText) || MatchesText(shortcut.Description, searchText))
             {
                 return true;
             }
 
             foreach (var description in shortcut.Shortcut ?? [])
             {
+                if (MatchesText(GetChordSearchLabel(description), searchText))
+                {
+                    return true;
+                }
+
                 foreach (string label in GetSearchLabels(description))
                 {
-                    if (Contains(label, searchText))
+                    if (MatchesText(label, searchText))
                     {
                         return true;
                     }
@@ -35,6 +44,33 @@ namespace ShortcutGuide.Helpers
             }
 
             return false;
+        }
+
+        private static string GetChordSearchLabel(ShortcutDescription description)
+        {
+            var labels = new List<string>();
+            if (description.Win)
+            {
+                labels.Add("Win Windows");
+            }
+
+            if (description.Ctrl)
+            {
+                labels.Add("Ctrl Control");
+            }
+
+            if (description.Alt)
+            {
+                labels.Add("Alt");
+            }
+
+            if (description.Shift)
+            {
+                labels.Add("Shift");
+            }
+
+            labels.AddRange((description.Keys ?? []).Select(GetKeySearchLabel));
+            return string.Join(' ', labels);
         }
 
         private static IEnumerable<string> GetSearchLabels(ShortcutDescription description)
@@ -99,9 +135,11 @@ namespace ShortcutGuide.Helpers
             };
         }
 
-        private static bool Contains(string? value, string searchText)
+        private static bool MatchesText(string? value, string searchText)
         {
-            return value?.Contains(searchText, StringComparison.OrdinalIgnoreCase) == true;
+            return value is not null &&
+                   (value.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                    StringMatcher.FuzzyMatch(searchText, value).RawScore >= FuzzyMatchThreshold);
         }
     }
 }
