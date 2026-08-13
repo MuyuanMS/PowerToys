@@ -51,6 +51,7 @@ namespace
     constexpr size_t MAX_PIPE_PAYLOAD_BYTES = 1024 * 1024;
     constexpr size_t MAX_PENDING_PIPE_REQUESTS = 16;
     constexpr size_t MAX_PENDING_PIPE_BYTES = 4 * MAX_PIPE_PAYLOAD_BYTES;
+    constexpr DWORD CONVERSION_TIMEOUT_MS = 5 * 60 * 1000;
     constexpr wchar_t CONTEXT_MENU_ENABLED_VALUE[] = L"Enabled";
     constexpr wchar_t CONTEXT_MENU_PACKAGE_NAME[] = L"Microsoft.PowerToys.FileConverterContextMenu_";
     std::wstring LoadLocalizedString(std::wstring_view key, std::wstring_view fallback)
@@ -540,7 +541,7 @@ namespace
 
         CloseHandle(process_info.hThread);
         const HANDLE wait_handles[] = { stop_event, process_info.hProcess };
-        const DWORD wait_result = WaitForMultipleObjects(2, wait_handles, FALSE, INFINITE);
+        const DWORD wait_result = WaitForMultipleObjects(2, wait_handles, FALSE, CONVERSION_TIMEOUT_MS);
 
         HRESULT result = E_FAIL;
         if (wait_result == WAIT_OBJECT_0)
@@ -557,6 +558,14 @@ namespace
             result = GetExitCodeProcess(process_info.hProcess, &exit_code) ?
                          static_cast<HRESULT>(exit_code) :
                          HRESULT_FROM_WIN32(GetLastError());
+        }
+        else if (wait_result == WAIT_TIMEOUT)
+        {
+            if (TerminateProcess(process_info.hProcess, ERROR_TIMEOUT))
+            {
+                WaitForSingleObject(process_info.hProcess, 5000);
+            }
+            result = HRESULT_FROM_WIN32(ERROR_TIMEOUT);
         }
         else
         {
@@ -595,6 +604,13 @@ namespace
             if (SUCCEEDED(conversion_result))
             {
                 ++summary.succeeded;
+                continue;
+            }
+
+            if (conversion_result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) ||
+                conversion_result == HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND))
+            {
+                ++summary.missing_inputs;
                 continue;
             }
 

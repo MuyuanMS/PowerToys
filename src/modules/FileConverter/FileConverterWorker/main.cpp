@@ -61,9 +61,13 @@ int wmain(int argc, wchar_t* argv[])
         winrt::init_apartment(winrt::apartment_type::multi_threaded);
         const std::filesystem::path input_path(argv[1]);
         std::error_code ec;
-        if (input_path.empty() || !std::filesystem::is_regular_file(input_path, ec) || ec)
+        if (input_path.empty())
         {
             return static_cast<int>(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
+        }
+        if (!std::filesystem::is_regular_file(input_path, ec))
+        {
+            return static_cast<int>(ec ? HRESULT_FROM_WIN32(ec.value()) : HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
         }
 
         std::filesystem::path output_path;

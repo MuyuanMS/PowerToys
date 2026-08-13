@@ -81,6 +81,9 @@
   <data name="FileConverter_Error_DestinationUnavailable" xml:space="preserve">
     <value>requested destination format is unavailable</value>
   </data>
+  <data name="FileConverter_Error_WorkerUnavailable" xml:space="preserve">
+    <value>conversion worker is unavailable</value>
+  </data>
 
   <data name="FileConverter_Engine_WicFactoryNull" xml:space="preserve">
     <value>WIC factory is null.</value>
