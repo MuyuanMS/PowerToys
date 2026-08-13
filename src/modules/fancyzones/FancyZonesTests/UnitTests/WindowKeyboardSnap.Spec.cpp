@@ -248,6 +248,10 @@ namespace FancyZonesUnitTests
         {
             WindowKeyboardSnap windowKeyboardSnap;
             const auto window = Mocks::WindowCreate(m_hInst);
+            m_workAreaMap.at(m_monitor)->Snap(window, { 0 }, true);
+            const auto zoneRect = m_workAreaMap.at(m_monitor)->GetLayout()->Zones().at(0).GetZoneRect();
+            Assert::IsTrue(SetWindowPos(window, nullptr, zoneRect.left, zoneRect.top, zoneRect.right - zoneRect.left, zoneRect.bottom - zoneRect.top, 0));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
             auto settings = FancyZonesSettings::settings();
             settings.cycleThroughAllZones = false;
@@ -262,6 +266,10 @@ namespace FancyZonesUnitTests
         {
             WindowKeyboardSnap windowKeyboardSnap;
             const auto window = Mocks::WindowCreate(m_hInst);
+            m_workAreaMap.at(m_monitor)->Snap(window, { 2 }, true);
+            const auto zoneRect = m_workAreaMap.at(m_monitor)->GetLayout()->Zones().at(2).GetZoneRect();
+            Assert::IsTrue(SetWindowPos(window, nullptr, zoneRect.left, zoneRect.top, zoneRect.right - zoneRect.left, zoneRect.bottom - zoneRect.top, 0));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
             auto settings = FancyZonesSettings::settings();
             settings.cycleThroughAllZones = false;
@@ -270,6 +278,20 @@ namespace FancyZonesUnitTests
             Assert::IsTrue(windowKeyboardSnap.Snap(window, m_monitor, VK_DOWN, m_workAreaMap, { m_monitor }));
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             Assert::IsTrue(IsIconic(window));
+        }
+
+        TEST_METHOD (WinUp_MovesUnsnappedWindowBeforeMaximizing)
+        {
+            WindowKeyboardSnap windowKeyboardSnap;
+            const auto window = Mocks::WindowCreate(m_hInst);
+
+            auto settings = FancyZonesSettings::settings();
+            settings.cycleThroughAllZones = false;
+            FancyZonesSettings::instance().SetSettings(settings);
+
+            Assert::IsTrue(windowKeyboardSnap.Snap(window, m_monitor, VK_UP, m_workAreaMap, { m_monitor }));
+            Assert::IsFalse(IsZoomed(window));
+            Assert::IsFalse(m_workAreaMap.at(m_monitor)->GetLayoutWindows().GetZoneIndexSetFromWindow(window).empty());
         }
     };
 
