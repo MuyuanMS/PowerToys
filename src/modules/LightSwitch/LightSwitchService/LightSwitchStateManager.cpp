@@ -69,6 +69,51 @@ void LightSwitchStateManager::OnManualOverride()
     EvaluateAndApplyIfNeeded();
 }
 
+void LightSwitchStateManager::OnExternalThemeChange(std::optional<bool> expectedTheme)
+{
+    std::lock_guard<std::mutex> lock(_stateMutex);
+    const auto settings = LightSwitchSettings::settings_snapshot();
+
+    bool shouldBeLight = false;
+    if (expectedTheme)
+    {
+        shouldBeLight = *expectedTheme;
+    }
+    else
+    {
+        if (settings.scheduleMode != ScheduleMode::FollowBrightness || _state.lastBrightness < 0)
+        {
+            return;
+        }
+
+        shouldBeLight = _state.lastBrightness >= settings.brightnessThreshold;
+    }
+
+    const bool currentSystemLight = GetCurrentSystemTheme();
+    const bool currentAppsLight = GetCurrentAppsTheme();
+    const bool systemMismatch = settings.changeSystem && currentSystemLight != shouldBeLight;
+    const bool appsMismatch = settings.changeApps && currentAppsLight != shouldBeLight;
+
+    if (!(systemMismatch || appsMismatch) || _state.isManualOverride)
+    {
+        return;
+    }
+
+    Logger::info(L"[LightSwitchStateManager] External theme change detected. Entering manual override mode.");
+    _state.isManualOverride = true;
+    _state.isSystemLightActive = currentSystemLight;
+    _state.isAppsLightActive = currentAppsLight;
+
+    if (settings.changeSystem)
+    {
+        NotifyPowerDisplayThemeChanged(currentSystemLight);
+    }
+    else if (settings.changeApps)
+    {
+        NotifyPowerDisplayThemeChanged(currentAppsLight);
+    }
+}
+
 // Runs with the registry observer detects a change in Night Light settings.
 void LightSwitchStateManager::OnNightLightChange()
 {
