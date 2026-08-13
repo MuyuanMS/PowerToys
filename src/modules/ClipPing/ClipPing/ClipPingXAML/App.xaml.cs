@@ -112,16 +112,16 @@ public partial class App : Application, IDisposable
                     Logger.LogInfo("PowerToys Runner exited. Exiting ClipPing");
                     dispatcher.TryEnqueue(App.Current.Exit);
                 });
-
-                NativeEventWaiter.WaitForEvents(
-                    (Constants.ClipPingExitEvent(), ExitEventSignaled),
-                    (Constants.ClipPingShowOverlayEvent(), ShowOverlay));
             }
         }
         else
         {
             Logger.LogInfo("ClipPing started detached from PowerToys Runner.");
         }
+
+        NativeEventWaiter.WaitForEvents(
+            (Constants.ClipPingExitEvent(), ExitEventSignaled),
+            (Constants.ClipPingShowOverlayEvent(), ShowOverlay));
 
         PowerToysTelemetry.Log.WriteEvent(new Telemetry.ClipPingOpenedEvent());
 
@@ -227,8 +227,6 @@ public partial class App : Application, IDisposable
         }
 
         var target = new Rect(rect.Left, rect.Top, windowWidth * scale, windowHeight * scale);
-
-        Logger.LogDebug($"Showing overlay at {target} with color {color}.");
 
         GetOverlay()?.Show(target, color);
     }
