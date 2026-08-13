@@ -211,7 +211,11 @@ namespace MonitorRotation
         }
 
         return (sourceIndex + 1) % monitorCount;
+    }
+}
 
+namespace
+{
     // Layouts the mouse wheel cycles through while dragging: the ones with quick-switch
     // hotkeys assigned (in hotkey order); when fewer than two of those exist, all custom
     // layouts in the order they appear in the editor.
@@ -224,9 +228,8 @@ namespace MonitorRotation
         {
             ids = CustomLayouts::instance().GetLayoutIdsInOrder();
         }
-
         return ids;
-
+        return ids;
     }
 }
 
@@ -1069,6 +1072,7 @@ LRESULT FancyZones::WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lpa
                     ShowMonitorRotationPreview();
                 }
             }
+        }
         else if (message == WM_PRIV_WHEEL_LAYOUT_SWITCH)
         {
             // wheel up cycles backwards, wheel down cycles forward
