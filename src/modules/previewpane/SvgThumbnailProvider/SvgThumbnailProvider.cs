@@ -109,6 +109,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
 
             Bitmap thumbnail = null;
             string transientFilePath = string.Empty;
+            FileStream cacheLease = null;
 
             var thumbnailDone = new ManualResetEventSlim(false);
 
@@ -188,8 +189,8 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
                     var cacheKey = SvgPreviewCacheHelper.BuildCacheKey("v2", VirtualHostName, SvgContents);
                     var cacheFolder = SvgPreviewCacheHelper.GetCacheFolderPath(_webView2UserDataFolder);
 
-                    if (SvgPreviewCacheHelper.TryGetCacheFile(cacheFolder, cacheKey, out var cacheFilePath) ||
-                        SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, SvgContents, out cacheFilePath))
+                    if (SvgPreviewCacheHelper.TryGetCacheFile(cacheFolder, cacheKey, out var cacheFilePath, out cacheLease) ||
+                        SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, SvgContents, out cacheFilePath, out cacheLease))
                     {
                         _localFileURI = new Uri(cacheFilePath);
                         _browser.Source = _localFileURI;
@@ -217,6 +218,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
             }
 
             _browser.Dispose();
+            cacheLease?.Dispose();
             SvgPreviewCacheHelper.DeleteTransientFile(transientFilePath);
 
             return thumbnail;

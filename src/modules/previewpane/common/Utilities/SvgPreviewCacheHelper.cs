@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
@@ -21,6 +22,7 @@ namespace Common.Utilities
         private static readonly UTF8Encoding Utf8NoBom = new(false);
         private static readonly object MaintenanceLock = new();
         private static readonly Dictionary<string, DateTime> LastMaintenanceByFolder = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, long> CacheSizeByFolder = new(StringComparer.OrdinalIgnoreCase);
 
         internal static string GetCacheFolderPath(string webView2UserDataFolder)
         {
@@ -47,10 +49,10 @@ namespace Common.Utilities
 
             foreach (var input in cacheInputs)
             {
-                var inputBytes = Encoding.UTF8.GetBytes(input ?? string.Empty);
-                BinaryPrimitives.WriteInt32LittleEndian(lengthPrefix, inputBytes.Length);
+                var value = input ?? string.Empty;
+                BinaryPrimitives.WriteInt32LittleEndian(lengthPrefix, Utf8NoBom.GetByteCount(value));
                 hash.AppendData(lengthPrefix);
-                hash.AppendData(inputBytes);
+                AppendUtf8(hash, value);
             }
 
             return Convert.ToHexString(hash.GetHashAndReset());
@@ -61,23 +63,35 @@ namespace Common.Utilities
             return Path.Combine(cacheRootFolder, $"{cacheKey}.html");
         }
 
-        internal static bool TryGetCacheFile(string cacheRootFolder, string cacheKey, out string cacheFilePath)
+        internal static bool TryGetCacheFile(string cacheRootFolder, string cacheKey, out string cacheFilePath, out FileStream? cacheLease)
         {
             cacheFilePath = GetCacheFilePath(cacheRootFolder, cacheKey);
+            cacheLease = null;
 
             try
             {
-                var cacheFile = new FileInfo(cacheFilePath);
-                if (!cacheFile.Exists || cacheFile.Length == 0)
+                cacheLease = new FileStream(cacheFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                if (cacheLease.Length == 0)
                 {
+                    cacheLease.Dispose();
+                    cacheLease = null;
                     return false;
                 }
 
-                cacheFile.LastWriteTimeUtc = DateTime.UtcNow;
+                try
+                {
+                    File.SetLastWriteTimeUtc(cacheFilePath, DateTime.UtcNow);
+                }
+                catch (Exception)
+                {
+                }
+
                 return true;
             }
             catch (Exception)
             {
+                cacheLease?.Dispose();
+                cacheLease = null;
                 return false;
             }
         }
@@ -87,9 +101,11 @@ namespace Common.Utilities
             string cacheKey,
             string contents,
             out string cacheFilePath,
+            out FileStream? cacheLease,
             long maxCacheSizeBytes = MaxCacheSizeBytes)
         {
             cacheFilePath = GetCacheFilePath(cacheRootFolder, cacheKey);
+            cacheLease = null;
             string? temporaryFilePath = null;
 
             try
@@ -100,15 +116,22 @@ namespace Common.Utilities
                 }
 
                 Directory.CreateDirectory(cacheRootFolder);
+                long previousLength = TryGetFileLength(cacheFilePath);
                 temporaryFilePath = Path.Combine(cacheRootFolder, $"{cacheKey}.{Guid.NewGuid():N}.tmp");
                 File.WriteAllText(temporaryFilePath, contents, Utf8NoBom);
                 File.Move(temporaryFilePath, cacheFilePath, overwrite: true);
-                PruneCache(cacheRootFolder, DateTime.UtcNow, maxCacheSizeBytes);
-                return TryGetCacheFile(cacheRootFolder, cacheKey, out cacheFilePath);
+                long currentLength = TryGetFileLength(cacheFilePath);
+
+                if (!EnsureCacheSizeLimit(cacheRootFolder, cacheFilePath, currentLength - previousLength, maxCacheSizeBytes))
+                {
+                    return false;
+                }
+
+                return TryGetCacheFile(cacheRootFolder, cacheKey, out cacheFilePath, out cacheLease);
             }
             catch (Exception)
             {
-                return TryGetCacheFile(cacheRootFolder, cacheKey, out cacheFilePath);
+                return TryGetCacheFile(cacheRootFolder, cacheKey, out cacheFilePath, out cacheLease);
             }
             finally
             {
@@ -144,7 +167,7 @@ namespace Common.Utilities
             TryDeleteFile(filePath);
         }
 
-        internal static void PruneCache(string cacheRootFolder, DateTime utcNow, long maxCacheSizeBytes = MaxCacheSizeBytes)
+        internal static long PruneCache(string cacheRootFolder, DateTime utcNow, long maxCacheSizeBytes = MaxCacheSizeBytes)
         {
             try
             {
@@ -156,7 +179,10 @@ namespace Common.Utilities
                         var cacheFile = new FileInfo(filePath);
                         if (cacheFile.Length == 0 || utcNow - cacheFile.LastWriteTimeUtc > MaxCacheEntryAge)
                         {
-                            TryDeleteFile(filePath);
+                            if (!TryDeleteFile(filePath))
+                            {
+                                cacheFiles.Add(cacheFile);
+                            }
                         }
                         else
                         {
@@ -173,16 +199,22 @@ namespace Common.Utilities
                 {
                     if (retainedBytes + cacheFile.Length > maxCacheSizeBytes)
                     {
-                        TryDeleteFile(cacheFile.FullName);
+                        if (!TryDeleteFile(cacheFile.FullName))
+                        {
+                            retainedBytes += cacheFile.Length;
+                        }
                     }
                     else
                     {
                         retainedBytes += cacheFile.Length;
                     }
                 }
+
+                return retainedBytes;
             }
             catch (Exception)
             {
+                return long.MaxValue;
             }
         }
 
@@ -204,7 +236,12 @@ namespace Common.Utilities
                 TryDeleteFile(legacyFile);
             }
 
-            PruneCache(GetCacheFolderPath(webView2UserDataFolder), utcNow);
+            var cacheRootFolder = GetCacheFolderPath(webView2UserDataFolder);
+            var retainedBytes = PruneCache(cacheRootFolder, utcNow);
+            lock (MaintenanceLock)
+            {
+                CacheSizeByFolder[cacheRootFolder] = retainedBytes;
+            }
 
             var transientFolder = Path.Combine(webView2UserDataFolder, "SvgPreviewTransient");
             if (Directory.Exists(transientFolder))
@@ -225,14 +262,89 @@ namespace Common.Utilities
             }
         }
 
-        private static void TryDeleteFile(string filePath)
+        private static void AppendUtf8(IncrementalHash hash, string value)
+        {
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(8192);
+
+            try
+            {
+                var encoder = Utf8NoBom.GetEncoder();
+                ReadOnlySpan<char> remaining = value.AsSpan();
+                bool completed;
+
+                do
+                {
+                    encoder.Convert(remaining, buffer, flush: true, out int charsUsed, out int bytesUsed, out completed);
+                    hash.AppendData(buffer.AsSpan(0, bytesUsed));
+                    remaining = remaining[charsUsed..];
+                }
+                while (!completed);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
+        }
+
+        private static bool EnsureCacheSizeLimit(string cacheRootFolder, string newFilePath, long sizeDelta, long maxCacheSizeBytes)
+        {
+            bool shouldPrune;
+            lock (MaintenanceLock)
+            {
+                if (CacheSizeByFolder.TryGetValue(cacheRootFolder, out var cachedSize))
+                {
+                    cachedSize = Math.Max(0, cachedSize + sizeDelta);
+                    CacheSizeByFolder[cacheRootFolder] = cachedSize;
+                    shouldPrune = cachedSize > maxCacheSizeBytes;
+                }
+                else
+                {
+                    shouldPrune = true;
+                }
+            }
+
+            if (!shouldPrune)
+            {
+                return true;
+            }
+
+            long retainedBytes = PruneCache(cacheRootFolder, DateTime.UtcNow, maxCacheSizeBytes);
+            if (retainedBytes > maxCacheSizeBytes)
+            {
+                TryDeleteFile(newFilePath);
+                retainedBytes = PruneCache(cacheRootFolder, DateTime.UtcNow, maxCacheSizeBytes);
+            }
+
+            lock (MaintenanceLock)
+            {
+                CacheSizeByFolder[cacheRootFolder] = retainedBytes;
+            }
+
+            return retainedBytes <= maxCacheSizeBytes && File.Exists(newFilePath);
+        }
+
+        private static long TryGetFileLength(string filePath)
+        {
+            try
+            {
+                return new FileInfo(filePath).Length;
+            }
+            catch (Exception)
+            {
+                return 0;
+            }
+        }
+
+        private static bool TryDeleteFile(string filePath)
         {
             try
             {
                 File.Delete(filePath);
+                return !File.Exists(filePath);
             }
             catch (Exception)
             {
+                return false;
             }
         }
     }

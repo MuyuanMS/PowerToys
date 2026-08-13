@@ -146,11 +146,13 @@ namespace SvgPreviewHandlerUnitTests
             {
                 var cacheKey = SvgPreviewCacheHelper.BuildCacheKey("atomic-write");
 
-                Assert.IsTrue(SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, "contents", out var writtenPath));
-                Assert.IsTrue(SvgPreviewCacheHelper.TryGetCacheFile(cacheFolder, cacheKey, out var reusedPath));
+                Assert.IsTrue(SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, "contents", out var writtenPath, out var writtenLease));
+                writtenLease!.Dispose();
+                Assert.IsTrue(SvgPreviewCacheHelper.TryGetCacheFile(cacheFolder, cacheKey, out var reusedPath, out var reusedLease));
                 Assert.AreEqual(writtenPath, reusedPath);
                 Assert.AreEqual("contents", File.ReadAllText(reusedPath));
                 Assert.AreEqual(0, Directory.GetFiles(cacheFolder, "*.tmp").Length);
+                reusedLease!.Dispose();
             }
             finally
             {
@@ -188,8 +190,9 @@ namespace SvgPreviewHandlerUnitTests
             {
                 var cacheKey = SvgPreviewCacheHelper.BuildCacheKey("oversized");
 
-                Assert.IsFalse(SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, "1234", out var cacheFilePath, maxCacheSizeBytes: 3));
+                Assert.IsFalse(SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, "1234", out var cacheFilePath, out var cacheLease, maxCacheSizeBytes: 3));
                 Assert.IsFalse(File.Exists(cacheFilePath));
+                Assert.IsNull(cacheLease);
             }
             finally
             {
@@ -207,12 +210,41 @@ namespace SvgPreviewHandlerUnitTests
                 var firstKey = SvgPreviewCacheHelper.BuildCacheKey("first");
                 var secondKey = SvgPreviewCacheHelper.BuildCacheKey("second");
 
-                Assert.IsTrue(SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, firstKey, "123", out var firstPath, maxCacheSizeBytes: 3));
+                Assert.IsTrue(SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, firstKey, "123", out var firstPath, out var firstLease, maxCacheSizeBytes: 3));
+                firstLease!.Dispose();
                 File.SetLastWriteTimeUtc(firstPath, DateTime.UtcNow.AddMinutes(-1));
-                Assert.IsTrue(SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, secondKey, "456", out var secondPath, maxCacheSizeBytes: 3));
+                Assert.IsTrue(SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, secondKey, "456", out var secondPath, out var secondLease, maxCacheSizeBytes: 3));
 
                 Assert.IsFalse(File.Exists(firstPath));
                 Assert.IsTrue(File.Exists(secondPath));
+                secondLease!.Dispose();
+            }
+            finally
+            {
+                Directory.Delete(cacheFolder, recursive: true);
+            }
+        }
+
+        [TestMethod]
+        public void CacheLeaseShouldPreventPruningUntilNavigationCompletes()
+        {
+            var cacheFolder = CreateTestCacheFolder();
+
+            try
+            {
+                var cacheKey = SvgPreviewCacheHelper.BuildCacheKey("leased");
+                Assert.IsTrue(SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, "contents", out var cacheFilePath, out var cacheLease));
+
+                var retainedBytes = SvgPreviewCacheHelper.PruneCache(cacheFolder, DateTime.UtcNow, maxCacheSizeBytes: 0);
+
+                Assert.IsTrue(File.Exists(cacheFilePath));
+                Assert.AreEqual(8, retainedBytes);
+
+                cacheLease!.Dispose();
+                retainedBytes = SvgPreviewCacheHelper.PruneCache(cacheFolder, DateTime.UtcNow, maxCacheSizeBytes: 0);
+
+                Assert.IsFalse(File.Exists(cacheFilePath));
+                Assert.AreEqual(0, retainedBytes);
             }
             finally
             {

@@ -268,16 +268,18 @@ namespace Microsoft.PowerToys.PreviewHandler.Svg
                         settings.CheckeredShade.ToString(CultureInfo.InvariantCulture));
 
                     var cacheFolder = SvgPreviewCacheHelper.GetCacheFolderPath(_webView2UserDataFolder);
-                    if (SvgPreviewCacheHelper.TryGetCacheFile(cacheFolder, cacheKey, out var cacheFilePath))
+                    if (SvgPreviewCacheHelper.TryGetCacheFile(cacheFolder, cacheKey, out var cacheFilePath, out var cacheLease))
                     {
+                        _browser.NavigationCompleted += (sender, args) => cacheLease?.Dispose();
                         _localFileURI = new Uri(cacheFilePath);
                         _browser.Source = _localFileURI;
                     }
                     else
                     {
                         string generatedPreview = _previewGenerator.GeneratePreview(svgData, settings);
-                        if (SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, generatedPreview, out cacheFilePath))
+                        if (SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, generatedPreview, out cacheFilePath, out cacheLease))
                         {
+                            _browser.NavigationCompleted += (sender, args) => cacheLease?.Dispose();
                             _localFileURI = new Uri(cacheFilePath);
                             _browser.Source = _localFileURI;
                         }
