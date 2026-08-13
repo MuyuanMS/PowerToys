@@ -2,6 +2,8 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Globalization;
+
 using CommunityToolkit.Mvvm.ComponentModel;
 
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -39,13 +41,21 @@ namespace WorkspacesLauncherUI.Models
 
         public int LaunchStateInt => (int)LaunchState;
 
-        public string StateAutomationName => LaunchState switch
+        public string StateAutomationName
         {
-            LaunchingState.LaunchedAndMoved => GetResourceOrDefault("LaunchSucceededAutomationName", "Launch succeeded"),
-            LaunchingState.Failed => GetResourceOrDefault("LaunchFailedAutomationName", "Launch failed"),
-            LaunchingState.Canceled => GetResourceOrDefault("LaunchCanceledAutomationName", "Launch canceled"),
-            _ => GetResourceOrDefault("LaunchInProgressAutomationName", "Launching"),
-        };
+            get
+            {
+                string format = LaunchState switch
+                {
+                    LaunchingState.LaunchedAndMoved => GetResourceOrDefault("LaunchSucceededAutomationName", "{0}: launch succeeded"),
+                    LaunchingState.Failed => GetResourceOrDefault("LaunchFailedAutomationName", "{0}: launch failed"),
+                    LaunchingState.Canceled => GetResourceOrDefault("LaunchCanceledAutomationName", "{0}: launch canceled"),
+                    _ => GetResourceOrDefault("LaunchInProgressAutomationName", "{0}: launching"),
+                };
+
+                return string.Format(CultureInfo.CurrentCulture, format, Name);
+            }
+        }
 
         private static string GetResourceOrDefault(string resourceName, string fallback)
         {
