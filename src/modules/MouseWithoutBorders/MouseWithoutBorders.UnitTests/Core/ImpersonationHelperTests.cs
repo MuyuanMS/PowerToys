@@ -65,4 +65,20 @@ public sealed class ImpersonationHelperTests
         Assert.IsTrue(failFastCalled);
         Assert.IsFalse(continued);
     }
+
+    [TestMethod]
+    public void RevertToSelfOrFailFast_FailsFastWhenRetryDelayThrows()
+    {
+        bool failFastCalled = false;
+
+        FatalImpersonationException exception = Assert.ThrowsException<FatalImpersonationException>(() =>
+            ImpersonationHelper.RevertToSelfOrFailFast(
+                () => false,
+                _ => throw new System.Threading.ThreadInterruptedException(),
+                _ => failFastCalled = true,
+                () => "Unable to restore the process identity."));
+
+        Assert.IsTrue(failFastCalled);
+        StringAssert.Contains(exception.Message, nameof(System.Threading.ThreadInterruptedException));
+    }
 }
