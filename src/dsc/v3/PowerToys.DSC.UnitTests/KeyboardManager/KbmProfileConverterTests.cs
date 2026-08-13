@@ -117,6 +117,31 @@ public sealed class KbmProfileConverterTests
     }
 
     [TestMethod]
+    public void FromProfile_RemovingInvalidEntryPreservesLaterOverlap()
+    {
+        var profile = new KeyboardManagerProfile();
+        profile.RemapShortcuts.GlobalRemapShortcuts.Add(new KeysDataModel
+        {
+            OriginalKeys = "17;65",
+            NewRemapKeys = "17;65",
+        });
+        profile.RemapShortcuts.GlobalRemapShortcuts.Add(new KeysDataModel
+        {
+            OriginalKeys = "162;65",
+            NewRemapKeys = "162;66",
+        });
+        var warnings = new System.Collections.Generic.List<string>();
+
+        var model = KbmProfileConverter.FromProfile(profile, warnings);
+
+        Assert.AreEqual(1, model.Shortcuts.Count);
+        Assert.AreEqual("LCtrl+A", model.Shortcuts[0].From);
+        Assert.AreEqual("LCtrl+B", model.Shortcuts[0].To);
+        Assert.AreEqual(1, warnings.Count);
+        StringAssert.Contains(warnings[0], "Ctrl+A");
+    }
+
+    [TestMethod]
     public void ToProfile_ProducesEditorCompatibleShape()
     {
         // Arrange

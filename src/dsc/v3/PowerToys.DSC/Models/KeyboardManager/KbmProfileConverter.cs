@@ -495,10 +495,10 @@ public static class KbmProfileConverter
     /// resource's own <see cref="Validate"/>, reusing its self-mapping,
     /// overlap, reserved-shortcut, and repeated-modifier rules rather than
     /// duplicating them. Validate reports errors keyed by "keys[i]" and
-    /// "shortcuts[i]" context; the offending entries are dropped (highest
-    /// index first so lower indices stay valid) and the model is re-validated
-    /// until it is clean. Overlap and duplicate errors reference the later,
-    /// conflicting entry, so the first occurrence of each source is preserved.
+    /// "shortcuts[i]" context. Remove only the first offending entry, then
+    /// revalidate: a later overlap error can disappear when an earlier invalid
+    /// entry is removed, so batching every reported index would discard valid
+    /// remappings.
     /// </summary>
     private static void RemoveNonImportableEntries(KbmProfileModel model, IList<string>? warnings)
     {
@@ -510,8 +510,8 @@ public static class KbmProfileConverter
                 return;
             }
 
-            var keyIndices = new SortedSet<int>();
-            var shortcutIndices = new SortedSet<int>();
+            string? entryType = null;
+            var entryIndex = -1;
             foreach (var error in errors)
             {
                 var match = EntryContextRegex.Match(error);
@@ -520,33 +520,26 @@ public static class KbmProfileConverter
                     continue;
                 }
 
-                var index = int.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture);
-                if (match.Groups[1].Value == "keys")
-                {
-                    keyIndices.Add(index);
-                }
-                else
-                {
-                    shortcutIndices.Add(index);
-                }
+                entryType = match.Groups[1].Value;
+                entryIndex = int.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture);
+                break;
             }
 
-            if (keyIndices.Count == 0 && shortcutIndices.Count == 0)
+            if (entryIndex < 0)
             {
                 // No entry-scoped error we can act on; stop to avoid looping.
                 return;
             }
 
-            foreach (var index in keyIndices.Reverse())
+            if (entryType == "keys")
             {
-                warnings?.Add($"Skipping key remap entry '{model.Keys[index].From}' that is not importable");
-                model.Keys.RemoveAt(index);
+                warnings?.Add($"Skipping key remap entry '{model.Keys[entryIndex].From}' that is not importable");
+                model.Keys.RemoveAt(entryIndex);
             }
-
-            foreach (var index in shortcutIndices.Reverse())
+            else
             {
-                warnings?.Add($"Skipping shortcut remap entry '{model.Shortcuts[index].From}' that is not importable");
-                model.Shortcuts.RemoveAt(index);
+                warnings?.Add($"Skipping shortcut remap entry '{model.Shortcuts[entryIndex].From}' that is not importable");
+                model.Shortcuts.RemoveAt(entryIndex);
             }
         }
     }
