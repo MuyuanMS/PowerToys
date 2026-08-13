@@ -57,6 +57,22 @@ namespace ViewModelTests
         }
 
         [TestMethod]
+        public void EnabledModuleChangeShouldNotifyQuickAccess()
+        {
+            var modules = new EnabledModules();
+            var notificationCount = 0;
+            var addNotification = typeof(EnabledModules).GetMethod(
+                "AddEnabledModuleChangeNotification",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(addNotification);
+            addNotification.Invoke(modules, new object[] { new Action(() => notificationCount++) });
+
+            modules.ClipPing = !modules.ClipPing;
+
+            Assert.AreEqual(1, notificationCount);
+        }
+
+        [TestMethod]
         public void GpoNotConfiguredShouldAllowUserControl()
         {
             var viewModel = CreateViewModel(new Mock<SettingsUtils>(new FileSystem(), null));

@@ -524,6 +524,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                 {
                     LogTelemetryEvent(value);
                     clipPing = value;
+                    NotifyChange();
                 }
             }
         }
