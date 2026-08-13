@@ -381,6 +381,15 @@ static void ConvertWorkspaceRectToScreen(HWND hwnd, RECT& rect)
 
     HMONITOR monitor = MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST);
     MONITORINFO monitorInfo = { sizeof(MONITORINFO) };
+    if (!GetMonitorInfoW(monitor, &monitorInfo))
+    {
+        return;
+    }
+
+    RECT referenceRect = rect;
+    OffsetRect(&referenceRect, monitorInfo.rcWork.left - monitorInfo.rcMonitor.left, monitorInfo.rcWork.top - monitorInfo.rcMonitor.top);
+
+    monitor = MonitorFromRect(&referenceRect, MONITOR_DEFAULTTONEAREST);
     if (GetMonitorInfoW(monitor, &monitorInfo))
     {
         OffsetRect(&rect, monitorInfo.rcWork.left - monitorInfo.rcMonitor.left, monitorInfo.rcWork.top - monitorInfo.rcMonitor.top);
@@ -1947,7 +1956,12 @@ static void HandleDragMove(POINT pt)
     UpdatePendingScreenEdgeSnap(pt);
     if (g_pendingSnapTarget != ScreenEdgeSnapTarget::None)
     {
-        const RECT previewRect = GetWindowRectForVisibleFrame(g_dragTarget, g_pendingSnapRect);
+        const RECT previewRect = {
+            g_pendingSnapRect.left - g_overlayMarginL,
+            g_pendingSnapRect.top - g_overlayMarginT,
+            g_pendingSnapRect.right + g_overlayMarginR,
+            g_pendingSnapRect.bottom + g_overlayMarginB,
+        };
         RepositionOverlay(
             previewRect.left,
             previewRect.top,
