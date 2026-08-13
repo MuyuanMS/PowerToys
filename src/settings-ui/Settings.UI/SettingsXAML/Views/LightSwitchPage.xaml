@@ -195,7 +195,7 @@
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <Slider
                                             AutomationProperties.AutomationId="BrightnessThreshold_LightSwitch"
-                                            Minimum="1"
+                                            Minimum="0"
                                             Maximum="100"
                                             Width="200"
                                             Value="{x:Bind ViewModel.BrightnessThreshold, Mode=TwoWay}" />
