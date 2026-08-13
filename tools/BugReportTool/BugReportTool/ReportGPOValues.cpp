@@ -49,6 +49,7 @@ void ReportGPOValues(const std::filesystem::path &tmpDir)
     report << "getConfiguredColorPickerEnabledValue: " << gpo_rule_configured_to_string(powertoys_gpo::getConfiguredColorPickerEnabledValue()) << std::endl;
     report << "getConfiguredCropAndLockEnabledValue: " << gpo_rule_configured_to_string(powertoys_gpo::getConfiguredCropAndLockEnabledValue()) << std::endl;
     report << "getConfiguredFancyZonesEnabledValue: " << gpo_rule_configured_to_string(powertoys_gpo::getConfiguredFancyZonesEnabledValue()) << std::endl;
+    report << "getConfiguredFileConverterEnabledValue: " << gpo_rule_configured_to_string(powertoys_gpo::getConfiguredFileConverterEnabledValue()) << std::endl;
     report << "getConfiguredFileLocksmithEnabledValue: " << gpo_rule_configured_to_string(powertoys_gpo::getConfiguredFileLocksmithEnabledValue()) << std::endl;
     report << "getConfiguredLightSwitchEnabledValue: " << gpo_rule_configured_to_string(powertoys_gpo::getConfiguredLightSwitchEnabledValue()) << std::endl;
     report << "getConfiguredGrabAndMoveEnabledValue: " << gpo_rule_configured_to_string(powertoys_gpo::getConfiguredGrabAndMoveEnabledValue()) << std::endl;

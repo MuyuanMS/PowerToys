@@ -15,6 +15,7 @@
 #include <common/utils/logger_helper.h>
 #include <common/utils/package.h>
 #include <common/utils/process_path.h>
+#include <common/utils/gpo.h>
 #include <common/utils/shell_ext_registration.h>
 #include <interface/powertoy_module_interface.h>
 
@@ -755,17 +756,26 @@ namespace
     class FileConverterPipeOrchestrator
     {
     public:
-        void Start(const std::wstring& pipe_name)
+        bool Start(const std::wstring& pipe_name)
         {
             if (m_running.exchange(true))
             {
-                return;
+                return m_start_succeeded.load();
             }
 
             m_pipe_name = pipe_name;
             ResetEvent(m_stop_event);
+            ResetEvent(m_start_event);
+            m_start_succeeded.store(false);
             m_listener_thread = std::thread(&FileConverterPipeOrchestrator::ListenerLoop, this);
+            if (WaitForSingleObject(m_start_event, 5000) != WAIT_OBJECT_0 || !m_start_succeeded.load())
+            {
+                Stop();
+                return false;
+            }
+
             m_worker_thread = std::thread(&FileConverterPipeOrchestrator::WorkerLoop, this);
+            return true;
         }
 
         void Stop()
@@ -809,6 +819,7 @@ namespace
         ~FileConverterPipeOrchestrator()
         {
             Stop();
+            CloseHandle(m_start_event);
             CloseHandle(m_stop_event);
         }
 
@@ -908,6 +919,7 @@ namespace
             if (!security.initialize())
             {
                 Logger::error(L"File Converter could not initialize pipe security.");
+                SetEvent(m_start_event);
                 return;
             }
 
@@ -924,8 +936,12 @@ namespace
             if (pipe_handle == INVALID_HANDLE_VALUE)
             {
                 Logger::error(L"File Converter could not create its named pipe. Error={}", GetLastError());
+                SetEvent(m_start_event);
                 return;
             }
+
+            m_start_succeeded.store(true);
+            SetEvent(m_start_event);
 
             while (m_running.load())
             {
@@ -1026,6 +1042,8 @@ namespace
         }
 
         std::atomic<bool> m_running = false;
+        std::atomic<bool> m_start_succeeded = false;
+        HANDLE m_start_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
         HANDLE m_stop_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
         interop_auth::VerificationCache m_auth_cache;
         std::wstring m_pipe_name;
@@ -1069,6 +1087,11 @@ public:
         return m_key.c_str();
     }
 
+    powertoys_gpo::gpo_rule_configured_t gpo_policy_enabled_configuration() override
+    {
+        return powertoys_gpo::getConfiguredFileConverterEnabledValue();
+    }
+
     bool get_config(wchar_t* buffer, int* buffer_size) override
     {
         HINSTANCE hinstance = reinterpret_cast<HINSTANCE>(&__ImageBase);
@@ -1103,13 +1126,18 @@ public:
         EnsureContextMenuPackageRegistered();
         EnsureContextMenuRuntimeRegistered();
         const bool can_convert_safely = !IsCurrentProcessElevated();
-        SetContextMenuEnabledState(can_convert_safely);
         if (can_convert_safely)
         {
-            m_pipe_orchestrator.Start(GetPipeNameForCurrentSession());
+            const bool listener_ready = m_pipe_orchestrator.Start(GetPipeNameForCurrentSession());
+            SetContextMenuEnabledState(listener_ready);
+            if (!listener_ready)
+            {
+                Logger::error(L"File Converter is unavailable because its IPC listener could not start.");
+            }
         }
         else
         {
+            SetContextMenuEnabledState(false);
             Logger::warn(L"File Converter is unavailable while PowerToys is running elevated.");
         }
         m_enabled = true;
@@ -1122,8 +1150,8 @@ public:
             return;
         }
 
-        m_pipe_orchestrator.Stop();
         SetContextMenuEnabledState(false);
+        m_pipe_orchestrator.Stop();
         UnregisterContextMenuRuntime();
         m_enabled = false;
     }
