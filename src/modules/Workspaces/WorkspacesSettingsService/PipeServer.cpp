@@ -270,7 +270,7 @@ namespace PTSettingsSvc
             SendStatus(pipe, Status::IoError);
         }
 
-        void HandleConnection(HANDLE pipe)
+        bool HandleConnection(HANDLE pipe)
         {
             CallerIdentity id;
             HRESULT hr = AuthenticateCaller(pipe, id);
@@ -282,7 +282,7 @@ namespace PTSettingsSvc
                                      ? Status::NamespaceUnknown
                                      : Status::AuthFailToken;
                 SendStatus(pipe, s);
-                return;
+                return false;
             }
 
             // ── Read request frame ─────────────────────────────────
@@ -292,19 +292,19 @@ namespace PTSettingsSvc
                 !ReadExact(pipe, &plen, sizeof(plen)))
             {
                 SendStatus(pipe, Status::BadRequest);
-                return;
+                return false;
             }
             if (plen > kMaxPayloadBytes)
             {
                 SendStatus(pipe, Status::PayloadTooLarge);
-                return;
+                return false;
             }
 
             std::vector<BYTE> payload(plen);
             if (plen > 0 && !ReadExact(pipe, payload.data(), plen))
             {
                 SendStatus(pipe, Status::BadRequest);
-                return;
+                return false;
             }
 
             // ── Dispatch ───────────────────────────────────────────
@@ -336,8 +336,10 @@ namespace PTSettingsSvc
 
             default:
                 SendStatus(pipe, Status::UnknownOpcode);
-                break;
+                return false;
             }
+
+            return true;
         }
 
         HANDLE CreateProtectedPipe()
@@ -471,8 +473,10 @@ namespace PTSettingsSvc
 
             if (connected)
             {
-                HandleConnection(pipe);
-                WaitForResponseAck(pipe);
+                if (HandleConnection(pipe))
+                {
+                    WaitForResponseAck(pipe);
+                }
                 DisconnectNamedPipe(pipe);
             }
         }
