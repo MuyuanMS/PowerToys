@@ -43,6 +43,7 @@
         <?define InstallScope="perUser" ?>
         <?define InstallPrivileges="limited" ?>
         <?define UpgradeCodeGUID="D8B559DB-4C98-487A-A33F-50A8EEE42726" ?>
+        <?define CliShimInstallCondition="1" ?>
    <?else?>
         <?define PerMachineYesNo="yes"?>
         <?define MSIPath="MachineSetup"?>
@@ -52,6 +53,7 @@
         <?define InstallScope="perMachine" ?>
         <?define InstallPrivileges="elevated" ?>
         <?define UpgradeCodeGUID="42B84BF7-5FBF-473B-9C8B-049DC16F7708" ?>
+        <?define CliShimInstallCondition="INSTALLFOLDER ~>> CLI_SHIMS_INSTALL_SUFFIX" ?>
   <?endif?>
 
   <!--

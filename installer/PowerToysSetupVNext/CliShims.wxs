@@ -11,28 +11,28 @@
   -->
   <Fragment>
     <DirectoryRef Id="CliFolder">
-      <Component Id="CliShim_PowerToys_FancyZones_CLI_exe" Guid="63800E2A-21B9-4A92-AD25-9C1DC7593F4F" Bitness="always64">
+      <Component Id="CliShim_PowerToys_FancyZones_CLI_exe" Guid="63800E2A-21B9-4A92-AD25-9C1DC7593F4F" Bitness="always64" Condition="$(var.CliShimInstallCondition)">
         <RegistryKey Root="$(var.RegistryScope)" Key="Software\Classes\powertoys\components">
           <RegistryValue Type="string" Name="CliShim_PowerToys_FancyZones_CLI_exe" Value="" KeyPath="yes" />
         </RegistryKey>
         <RemoveFile Id="RemoveExistingPowerToysFancyZonesCli" Name="PowerToys.FancyZones.CLI.exe" On="install" />
         <File Source="$(var.BinDir)CliShim\PowerToys.CliShim.exe" Name="PowerToys.FancyZones.CLI.exe" Id="CliShim_PowerToys.FancyZones.CLI.exe" Checksum="yes" />
       </Component>
-      <Component Id="CliShim_PowerToys_ImageResizer_CLI_exe" Guid="2BC274AA-FECD-4A85-BF70-06670A6B99A5" Bitness="always64">
+      <Component Id="CliShim_PowerToys_ImageResizer_CLI_exe" Guid="2BC274AA-FECD-4A85-BF70-06670A6B99A5" Bitness="always64" Condition="$(var.CliShimInstallCondition)">
         <RegistryKey Root="$(var.RegistryScope)" Key="Software\Classes\powertoys\components">
           <RegistryValue Type="string" Name="CliShim_PowerToys_ImageResizer_CLI_exe" Value="" KeyPath="yes" />
         </RegistryKey>
         <RemoveFile Id="RemoveExistingPowerToysImageResizerCli" Name="PowerToys.ImageResizer.CLI.exe" On="install" />
         <File Source="$(var.BinDir)CliShim\PowerToys.CliShim.exe" Name="PowerToys.ImageResizer.CLI.exe" Id="CliShim_PowerToys.ImageResizer.CLI.exe" Checksum="yes" />
       </Component>
-      <Component Id="CliShim_PowerToys_FileLocksmith_CLI_exe" Guid="2DD830DD-78D4-46EE-B23B-3EAB3D838EDF" Bitness="always64">
+      <Component Id="CliShim_PowerToys_FileLocksmith_CLI_exe" Guid="2DD830DD-78D4-46EE-B23B-3EAB3D838EDF" Bitness="always64" Condition="$(var.CliShimInstallCondition)">
         <RegistryKey Root="$(var.RegistryScope)" Key="Software\Classes\powertoys\components">
           <RegistryValue Type="string" Name="CliShim_PowerToys_FileLocksmith_CLI_exe" Value="" KeyPath="yes" />
         </RegistryKey>
         <RemoveFile Id="RemoveExistingPowerToysFileLocksmithCli" Name="PowerToys.FileLocksmith.CLI.exe" On="install" />
         <File Source="$(var.BinDir)CliShim\PowerToys.CliShim.exe" Name="PowerToys.FileLocksmith.CLI.exe" Id="CliShim_PowerToys.FileLocksmith.CLI.exe" Checksum="yes" />
       </Component>
-      <Component Id="CliShim_PowerToys_PowerDisplay_CLI_exe" Guid="E98A36C9-384E-48CB-A844-A6A49E4138D9" Bitness="always64">
+      <Component Id="CliShim_PowerToys_PowerDisplay_CLI_exe" Guid="E98A36C9-384E-48CB-A844-A6A49E4138D9" Bitness="always64" Condition="$(var.CliShimInstallCondition)">
         <RegistryKey Root="$(var.RegistryScope)" Key="Software\Classes\powertoys\components">
           <RegistryValue Type="string" Name="CliShim_PowerToys_PowerDisplay_CLI_exe" Value="" KeyPath="yes" />
         </RegistryKey>
@@ -49,7 +49,7 @@
         <Environment Id="AddCliToUserPath" Name="PATH" Action="set" Part="last" System="no" Value="[CliFolder]" />
       </Component>
       <?else?>
-      <Component Id="cli_env_path_machine" Guid="739F3916-2247-4F1B-8BBD-0949A5B870F7" Bitness="always64">
+      <Component Id="cli_env_path_machine" Guid="739F3916-2247-4F1B-8BBD-0949A5B870F7" Bitness="always64" Condition="$(var.CliShimInstallCondition)">
         <RegistryKey Root="$(var.RegistryScope)" Key="Software\Classes\powertoys\components">
           <RegistryValue Type="string" Name="cli_env_path_machine" Value="" KeyPath="yes" />
         </RegistryKey>
@@ -68,7 +68,7 @@
     </DirectoryRef>
 
     <ComponentGroup Id="CliShimsComponentGroup">
-      <Component Id="RemoveCliFolder" Guid="831C56D8-9FEB-41B2-8A8C-BD49487479BB" Directory="CliFolder">
+      <Component Id="RemoveCliFolder" Guid="831C56D8-9FEB-41B2-8A8C-BD49487479BB" Directory="CliFolder" Condition="$(var.CliShimInstallCondition)">
         <RegistryKey Root="$(var.RegistryScope)" Key="Software\Classes\powertoys\components">
           <RegistryValue Type="string" Name="RemoveCliFolder" Value="" KeyPath="yes" />
         </RegistryKey>
