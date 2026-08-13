@@ -314,7 +314,7 @@ try {
         }
     }
     catch {
-        Write-Warning "Stable package copy skipped because destination appears locked."
+        throw "Failed to update stable File Converter package '$stablePackage': $($_.Exception.Message)"
     }
 
     if ($RegisterPackage) {

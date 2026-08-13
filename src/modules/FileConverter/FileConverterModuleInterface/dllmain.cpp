@@ -26,6 +26,7 @@
 #include <condition_variable>
 #include <cwctype>
 #include <filesystem>
+#include <format>
 #include <mutex>
 #include <optional>
 #include <queue>
@@ -225,26 +226,6 @@ namespace
         }
 
         return std::nullopt;
-    }
-
-    std::wstring ExtensionForFormat(file_converter::ImageFormat format)
-    {
-        switch (format)
-        {
-        case file_converter::ImageFormat::Jpeg:
-            return fc_constants::ExtensionJpg;
-        case file_converter::ImageFormat::Bmp:
-            return fc_constants::ExtensionBmp;
-        case file_converter::ImageFormat::Tiff:
-            return fc_constants::ExtensionTiff;
-        case file_converter::ImageFormat::Heif:
-            return fc_constants::ExtensionHeic;
-        case file_converter::ImageFormat::Webp:
-            return fc_constants::ExtensionWebp;
-        case file_converter::ImageFormat::Png:
-        default:
-            return fc_constants::ExtensionPng;
-        }
     }
 
     std::wstring GetPipeNameForCurrentSession()
@@ -494,21 +475,112 @@ namespace
             return false;
         }
 
-        const auto support = file_converter::IsOutputFormatSupported(parsed_format.value());
-        if (FAILED(support.hr))
-        {
-            rejection_reason = support.error_message.empty() ? LoadLocalizedString(L"FileConverter_Error_DestinationUnavailable", L"requested destination format is unavailable") : support.error_message;
-            return false;
-        }
-
         request.format = parsed_format.value();
         return true;
     }
 
-    ConversionSummary ProcessFormatConvertRequest(const ConversionRequest& request)
+    std::wstring QuoteCommandLineArgument(std::wstring_view argument)
+    {
+        std::wstring result = L"\"";
+        size_t backslash_count = 0;
+        for (const wchar_t character : argument)
+        {
+            if (character == L'\\')
+            {
+                ++backslash_count;
+                continue;
+            }
+
+            if (character == L'"')
+            {
+                result.append(backslash_count * 2 + 1, L'\\');
+                result += character;
+            }
+            else
+            {
+                result.append(backslash_count, L'\\');
+                result += character;
+            }
+            backslash_count = 0;
+        }
+
+        result.append(backslash_count * 2, L'\\');
+        result += L'"';
+        return result;
+    }
+
+    HRESULT RunConversionWorker(
+        const std::filesystem::path& worker_path,
+        const std::wstring& input_path,
+        file_converter::ImageFormat format,
+        HANDLE stop_event)
+    {
+        std::wstring command_line =
+            QuoteCommandLineArgument(worker_path.wstring()) + L" " +
+            QuoteCommandLineArgument(input_path) + L" " +
+            std::to_wstring(static_cast<int>(format));
+
+        STARTUPINFOW startup_info{};
+        startup_info.cb = sizeof(startup_info);
+        PROCESS_INFORMATION process_info{};
+        if (!CreateProcessW(
+                worker_path.c_str(),
+                command_line.data(),
+                nullptr,
+                nullptr,
+                FALSE,
+                CREATE_NO_WINDOW,
+                nullptr,
+                worker_path.parent_path().c_str(),
+                &startup_info,
+                &process_info))
+        {
+            return HRESULT_FROM_WIN32(GetLastError());
+        }
+
+        CloseHandle(process_info.hThread);
+        const HANDLE wait_handles[] = { stop_event, process_info.hProcess };
+        const DWORD wait_result = WaitForMultipleObjects(2, wait_handles, FALSE, INFINITE);
+
+        HRESULT result = E_FAIL;
+        if (wait_result == WAIT_OBJECT_0)
+        {
+            if (TerminateProcess(process_info.hProcess, ERROR_CANCELLED))
+            {
+                WaitForSingleObject(process_info.hProcess, 5000);
+            }
+            result = HRESULT_FROM_WIN32(ERROR_CANCELLED);
+        }
+        else if (wait_result == WAIT_OBJECT_0 + 1)
+        {
+            DWORD exit_code = ERROR_GEN_FAILURE;
+            result = GetExitCodeProcess(process_info.hProcess, &exit_code) ?
+                         static_cast<HRESULT>(exit_code) :
+                         HRESULT_FROM_WIN32(GetLastError());
+        }
+        else
+        {
+            result = HRESULT_FROM_WIN32(GetLastError());
+            TerminateProcess(process_info.hProcess, ERROR_CANCELLED);
+        }
+
+        CloseHandle(process_info.hProcess);
+        return result;
+    }
+
+    ConversionSummary ProcessFormatConvertRequest(const ConversionRequest& request, HANDLE stop_event)
     {
         ConversionSummary summary;
-        const std::wstring output_extension = ExtensionForFormat(request.format);
+        const std::filesystem::path worker_path =
+            std::filesystem::path(get_module_folderpath(reinterpret_cast<HMODULE>(&__ImageBase))) /
+            L"PowerToys.FileConverterWorker.exe";
+        if (!std::filesystem::is_regular_file(worker_path))
+        {
+            summary.failed = request.files.size();
+            summary.first_failed_error = LoadLocalizedString(L"FileConverter_Error_WorkerUnavailable", L"conversion worker is unavailable");
+            return summary;
+        }
+
         std::unordered_set<std::wstring> seen_files;
 
         for (const auto& file : request.files)
@@ -518,36 +590,9 @@ namespace
                 continue;
             }
 
-            const std::filesystem::path input_path(file);
-            std::error_code ec;
-            if (input_path.empty() || !std::filesystem::exists(input_path, ec) || ec)
-            {
-                ++summary.missing_inputs;
-                continue;
-            }
-
-            ec.clear();
-            if (!std::filesystem::is_regular_file(input_path, ec) || ec)
-            {
-                ++summary.missing_inputs;
-                continue;
-            }
-
-            std::filesystem::path output_path;
-            for (unsigned int suffix = 0;; ++suffix)
-            {
-                output_path = input_path.parent_path() / input_path.stem();
-                output_path += suffix == 0 ? L"_converted" : L"_converted_" + std::to_wstring(suffix);
-                output_path += output_extension;
-                if (!std::filesystem::exists(output_path, ec))
-                {
-                    break;
-                }
-                ec.clear();
-            }
-
-            const auto conversion = file_converter::ConvertImageFile(input_path.wstring(), output_path.wstring(), request.format);
-            if (conversion.succeeded())
+            const HRESULT conversion_result =
+                RunConversionWorker(worker_path, file, request.format, stop_event);
+            if (SUCCEEDED(conversion_result))
             {
                 ++summary.succeeded;
                 continue;
@@ -556,8 +601,14 @@ namespace
             ++summary.failed;
             if (summary.first_failed_path.empty())
             {
-                summary.first_failed_path = input_path.wstring();
-                summary.first_failed_error = conversion.error_message;
+                summary.first_failed_path = file;
+                summary.first_failed_error =
+                    L"conversion worker failed with HRESULT 0x" + std::format(L"{:08X}", static_cast<unsigned long>(conversion_result));
+            }
+
+            if (conversion_result == HRESULT_FROM_WIN32(ERROR_CANCELLED))
+            {
+                break;
             }
         }
 
@@ -738,7 +789,7 @@ namespace
                 return;
             }
 
-            const auto summary = ProcessFormatConvertRequest(request);
+            const auto summary = ProcessFormatConvertRequest(request, m_stop_event);
 
             if (request.skipped_entries > 0)
             {
