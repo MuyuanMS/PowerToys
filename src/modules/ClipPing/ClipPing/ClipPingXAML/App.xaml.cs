@@ -25,8 +25,10 @@ public partial class App : Application, IDisposable
     private static readonly SettingsUtils ModuleSettings = SettingsUtils.Default;
     private readonly FileSystemWatcher _fileSystemWatcher;
     private readonly ETWTrace _etwTrace = new();
+    private readonly VirtualDesktopManager? _virtualDesktopManager = VirtualDesktopManager.TryCreate();
     private ClipPingSettings _currentSettings = new();
     private DispatcherQueue? _dispatcherQueue;
+    private Guid _overlayDesktopId;
     private Windows.UI.Color _overlayColor;
     private IOverlay? _overlay;
 
@@ -162,7 +164,7 @@ public partial class App : Application, IDisposable
         PowerToysTelemetry.Log.WriteEvent(new Telemetry.ClipPingOpenedEvent());
 
         Clipboard.ContentChanged += Clipboard_ContentChanged;
-        _ = GetOverlay(); // Preload the overlay to avoid delays when showing it.
+        _ = GetOverlay(NativeMethods.GetForegroundWindow()); // Preload the overlay to avoid delays when showing it.
     }
 
     private void ExitEventSignaled()
@@ -176,9 +178,14 @@ public partial class App : Application, IDisposable
         _dispatcherQueue?.TryEnqueue(ShowOverlay);
     }
 
-    private IOverlay? GetOverlay()
+    private IOverlay? GetOverlay(IntPtr targetWindow)
     {
-        if (_overlay?.GetType() != OverlayType)
+        Guid targetDesktopId = GetDesktopId(targetWindow);
+        bool desktopChanged = targetDesktopId != Guid.Empty &&
+                              _overlayDesktopId != Guid.Empty &&
+                              targetDesktopId != _overlayDesktopId;
+
+        if (_overlay?.GetType() != OverlayType || desktopChanged)
         {
             var oldOverlay = _overlay;
 
@@ -190,9 +197,21 @@ public partial class App : Application, IDisposable
             }
 
             _overlay = Activator.CreateInstance(OverlayType) as IOverlay;
+            _overlayDesktopId = targetDesktopId;
         }
 
         return _overlay;
+    }
+
+    private Guid GetDesktopId(IntPtr window)
+    {
+        if (window != IntPtr.Zero &&
+            _virtualDesktopManager?.TryGetWindowDesktopId(window, out Guid desktopId) == true)
+        {
+            return desktopId;
+        }
+
+        return Guid.Empty;
     }
 
     private void ShowOverlay()
@@ -258,6 +277,6 @@ public partial class App : Application, IDisposable
         // Keep the overlay one physical pixel short so Windows does not classify it as a fullscreen window and trigger Focus Assist.
         var target = new Rect(rect.Left, rect.Top, windowWidth * scale, (windowHeight - 1) * scale);
 
-        GetOverlay()?.Show(target, _overlayColor);
+        GetOverlay(hwnd)?.Show(target, _overlayColor);
     }
 }
