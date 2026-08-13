@@ -598,6 +598,22 @@ namespace
         }
     }
 
+    bool IsCurrentProcessElevated()
+    {
+        HANDLE token = nullptr;
+        if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
+        {
+            return false;
+        }
+
+        TOKEN_ELEVATION elevation{};
+        DWORD size = 0;
+        const bool elevated = GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size) &&
+                              elevation.TokenIsElevated != 0;
+        CloseHandle(token);
+        return elevated;
+    }
+
     class FileConverterPipeOrchestrator
     {
     public:
@@ -795,28 +811,48 @@ namespace
                     {
                         std::this_thread::sleep_for(std::chrono::milliseconds(50));
                     }
-                    CloseHandle(connect_event);
-
                     continue;
                 }
+                CloseHandle(connect_event);
 
                 interop_auth::CallerPolicy policy;
                 policy.enabled = true;
                 wchar_t caller_directory[MAX_PATH]{};
+                bool test_client_mode = false;
+#ifdef _DEBUG
+                wchar_t test_client_directory[MAX_PATH]{};
+                if (GetEnvironmentVariableW(L"POWERTOYS_FILECONVERTER_TEST_CLIENT_DIR", test_client_directory, ARRAYSIZE(test_client_directory)) > 0)
+                {
+                    test_client_mode = true;
+                    policy.expectedDirectory = test_client_directory;
+                    policy.allowedBasenames = { L"powershell.exe", L"pwsh.exe" };
+                    policy.requireMicrosoftSignature = false;
+                }
+                else
+#endif
                 if (package::IsWin11OrGreater())
                 {
                     GetSystemDirectoryW(caller_directory, ARRAYSIZE(caller_directory));
+                    policy.expectedDirectory = caller_directory;
                     policy.allowedBasenames = { L"dllhost.exe" };
+                    policy.requireMicrosoftSignature = true;
                 }
                 else
                 {
                     GetWindowsDirectoryW(caller_directory, ARRAYSIZE(caller_directory));
+                    policy.expectedDirectory = caller_directory;
                     policy.allowedBasenames = { L"explorer.exe" };
+                    policy.requireMicrosoftSignature = true;
                 }
-                policy.expectedDirectory = caller_directory;
-                policy.requireMicrosoftSignature = true;
+                policy.logReject = [](const interop_auth::AuthResult& result) {
+                    Logger::warn(L"File Converter rejected pipe caller pid={} path='{}' reason='{}'", result.pid, result.imagePath, result.reasonCode);
+                };
                 const auto auth = interop_auth::AuthenticateClient(pipe_handle, policy, m_auth_cache);
-                const bool package_identity_valid = !package::IsWin11OrGreater() || IsExpectedPackagedSurrogate(pipe_handle);
+                const bool package_identity_valid = test_client_mode || !package::IsWin11OrGreater() || IsExpectedPackagedSurrogate(pipe_handle);
+                if (auth.accepted && !package_identity_valid)
+                {
+                    Logger::warn(L"File Converter rejected pipe caller with an unexpected package identity.");
+                }
                 const std::string payload = auth.accepted && package_identity_valid ? ReadPipeMessage(pipe_handle, m_stop_event) : std::string{};
 
                 // Inbound-only server pipes have no outbound data to flush.
@@ -912,8 +948,16 @@ public:
 
         EnsureContextMenuPackageRegistered();
         EnsureContextMenuRuntimeRegistered();
-        SetContextMenuEnabledState(true);
-        m_pipe_orchestrator.Start(GetPipeNameForCurrentSession());
+        const bool can_convert_safely = !IsCurrentProcessElevated();
+        SetContextMenuEnabledState(can_convert_safely);
+        if (can_convert_safely)
+        {
+            m_pipe_orchestrator.Start(GetPipeNameForCurrentSession());
+        }
+        else
+        {
+            Logger::warn(L"File Converter is unavailable while PowerToys is running elevated.");
+        }
         m_enabled = true;
     }
 

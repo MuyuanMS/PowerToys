@@ -7,10 +7,12 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$env:POWERTOYS_FILECONVERTER_TEST_CLIENT_DIR = Split-Path -Parent (Get-Process -Id $PID).Path
+. (Join-Path $PSScriptRoot "FileConverterSmokeTestSettings.ps1")
 
 function Stop-PowerToysProcesses {
     Get-Process PowerToys, PowerToys.Settings, PowerToys.QuickAccess -ErrorAction SilentlyContinue |
-        Stop-Process -Force -ErrorAction SilentlyContinue
+        ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
 }
 
 function Start-PowerToys {
@@ -87,18 +89,21 @@ function Wait-ForFile {
     return (Test-Path -LiteralPath $Path)
 }
 
-$powerToysExe = Join-Path $RepoRoot "x64\Debug\PowerToys.exe"
-$sampleDir = Join-Path $RepoRoot "x64\Debug\WinUI3Apps\FileConverterSmokeTest"
-$sourcePath = Join-Path $sampleDir "sample.bmp"
-$baseName = "sample_converted"
+Stop-PowerToysProcesses
+$settingsSnapshot = Enable-FileConverterForSmokeTest
+try {
+    $powerToysExe = Join-Path $RepoRoot "x64\Debug\PowerToys.exe"
+    $sampleDir = Join-Path $RepoRoot "x64\Debug\WinUI3Apps\FileConverterSmokeTest"
+    $sourcePath = Join-Path $sampleDir "sample.bmp"
+    $baseName = "sample_converted"
 
-if (-not (Test-Path -LiteralPath $sourcePath)) {
-    throw "Sample input file not found at: $sourcePath"
-}
+    if (-not (Test-Path -LiteralPath $sourcePath)) {
+        throw "Sample input file not found at: $sourcePath"
+    }
 
-$escapedInput = $sourcePath -replace "\\", "\\\\"
+    $escapedInput = $sourcePath -replace "\\", "\\\\"
 
-$cases = @(
+    $cases = @(
     @{ Name = "png";  Destination = "png";  Extension = ".png";  Required = $true },
     @{ Name = "jpg";  Destination = "jpg";  Extension = ".jpg";  Required = $true },
     @{ Name = "jpeg"; Destination = "jpeg"; Extension = ".jpg";  Required = $true },
@@ -108,11 +113,11 @@ $cases = @(
     @{ Name = "webp"; Destination = "webp"; Extension = ".webp"; Required = $false },
     @{ Name = "heic"; Destination = "heic"; Extension = ".heic"; Required = $false },
     @{ Name = "heif"; Destination = "heif"; Extension = ".heic"; Required = $false }
-)
+    )
 
-$results = @()
+    $results = @()
 
-foreach ($case in $cases) {
+    foreach ($case in $cases) {
     Stop-PowerToysProcesses
     $pt = Start-PowerToys -ExePath $powerToysExe
     $pipeSimpleName = "powertoys_fileconverter_$($pt.SessionId)"
@@ -130,7 +135,7 @@ foreach ($case in $cases) {
         Output = $outputPath
         Created = $created
         Required = $case.Required
-    }
+        }
 
     if ($case.Required -and -not $created) {
         if (-not $LeavePowerToysRunning) {
@@ -175,9 +180,15 @@ $requiredTotal = ($results | Where-Object { $_.Required }).Count
 $optionalPassed = ($results | Where-Object { -not $_.Required -and $_.Created }).Count
 $optionalTotal = ($results | Where-Object { -not $_.Required }).Count
 
-"Phase 6 matrix smoke passed. Required=$requiredPassed/$requiredTotal Optional=$optionalPassed/$optionalTotal"
-$results | ForEach-Object {
-    " - $($_.Name): created=$($_.Created) output=$($_.Output)"
-}
+    "Phase 6 matrix smoke passed. Required=$requiredPassed/$requiredTotal Optional=$optionalPassed/$optionalTotal"
+    $results | ForEach-Object {
+        " - $($_.Name): created=$($_.Created) output=$($_.Output)"
+    }
 
-exit 0
+}
+finally {
+    if (-not $LeavePowerToysRunning) {
+        Stop-PowerToysProcesses
+    }
+    Restore-FileConverterSmokeTestSettings -Snapshot $settingsSnapshot
+}

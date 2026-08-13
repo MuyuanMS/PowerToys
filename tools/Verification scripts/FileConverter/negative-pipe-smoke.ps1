@@ -7,10 +7,12 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$env:POWERTOYS_FILECONVERTER_TEST_CLIENT_DIR = Split-Path -Parent (Get-Process -Id $PID).Path
+. (Join-Path $PSScriptRoot "FileConverterSmokeTestSettings.ps1")
 
 function Stop-PowerToysProcesses {
     Get-Process PowerToys, PowerToys.Settings, PowerToys.QuickAccess -ErrorAction SilentlyContinue |
-        Stop-Process -Force -ErrorAction SilentlyContinue
+        ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
 }
 
 function Start-PowerToys {
@@ -68,18 +70,21 @@ function Send-PipePayload {
     return $false
 }
 
-$powerToysExe = Join-Path $RepoRoot "x64\Debug\PowerToys.exe"
-$sampleInput = Join-Path $RepoRoot "x64\Debug\WinUI3Apps\FileConverterSmokeTest\sample.bmp"
-$outputFile = Join-Path $RepoRoot "x64\Debug\WinUI3Apps\FileConverterSmokeTest\sample_converted.png"
-$runnerLog = Join-Path $RepoRoot "src\runner\x64\Debug\runner.log"
+Stop-PowerToysProcesses
+$settingsSnapshot = Enable-FileConverterForSmokeTest
+try {
+    $powerToysExe = Join-Path $RepoRoot "x64\Debug\PowerToys.exe"
+    $sampleInput = Join-Path $RepoRoot "x64\Debug\WinUI3Apps\FileConverterSmokeTest\sample.bmp"
+    $outputFile = Join-Path $RepoRoot "x64\Debug\WinUI3Apps\FileConverterSmokeTest\sample_converted.png"
+    $runnerLog = Join-Path $RepoRoot "src\runner\x64\Debug\runner.log"
 
-if (-not (Test-Path $sampleInput)) {
-    throw "Sample input file not found at: $sampleInput"
-}
+    if (-not (Test-Path $sampleInput)) {
+        throw "Sample input file not found at: $sampleInput"
+    }
 
-$escapedInput = $sampleInput -replace "\\", "\\\\"
+    $escapedInput = $sampleInput -replace "\\", "\\\\"
 
-$cases = @(
+    $cases = @(
     [pscustomobject]@{
         Name = "invalid-json"
         Payload = "not-json"
@@ -96,11 +101,11 @@ $cases = @(
         Name = "bad-files-array"
         Payload = '{"action":"FormatConvert","destination":"png","files":[123,""]}'
     }
-)
+    )
 
-$results = @()
+    $results = @()
 
-for ($caseIndex = 0; $caseIndex -lt $cases.Count; $caseIndex++) {
+    for ($caseIndex = 0; $caseIndex -lt $cases.Count; $caseIndex++) {
     $case = $cases[$caseIndex]
 
     Stop-PowerToysProcesses
@@ -109,7 +114,7 @@ for ($caseIndex = 0; $caseIndex -lt $cases.Count; $caseIndex++) {
 
     if (Test-Path $outputFile) {
         Remove-Item $outputFile -Force
-    }
+        }
 
     $sent = Send-PipePayload `
         -PipeSimpleName $pipeSimpleName `
@@ -141,10 +146,10 @@ for ($caseIndex = 0; $caseIndex -lt $cases.Count; $caseIndex++) {
     }
 }
 
-"Negative FileConverter Pipe Smoke Results"
-$results | Format-Table -AutoSize | Out-String
+    "Negative FileConverter Pipe Smoke Results"
+    $results | Format-Table -AutoSize | Out-String
 
-if (Test-Path $runnerLog) {
+    if (Test-Path $runnerLog) {
     $interesting = Select-String -Path $runnerLog -Pattern "File Converter|malformed request|skipped|conversion failed" -CaseSensitive:$false -ErrorAction SilentlyContinue
     if ($interesting) {
         "Recent listener diagnostics from runner.log"
@@ -153,20 +158,25 @@ if (Test-Path $runnerLog) {
     else {
         "No matching listener diagnostics found in runner.log."
     }
-}
-else {
-    "runner.log not found; diagnostics may be routed through ETW."
-}
+    }
+    else {
+        "runner.log not found; diagnostics may be routed through ETW."
+    }
 
-if (-not $LeavePowerToysRunning) {
-    Stop-PowerToysProcesses
-}
+    if (-not $LeavePowerToysRunning) {
+        Stop-PowerToysProcesses
+    }
 
-$failed = @($results | Where-Object { -not $_.Passed })
-if ($failed.Count -gt 0) {
-    Write-Error "One or more negative smoke cases failed."
-    exit 1
-}
+    $failed = @($results | Where-Object { -not $_.Passed })
+    if ($failed.Count -gt 0) {
+        throw "One or more negative smoke cases failed."
+    }
 
-"All negative smoke cases passed."
-exit 0
+    "All negative smoke cases passed."
+}
+finally {
+    if (-not $LeavePowerToysRunning) {
+        Stop-PowerToysProcesses
+    }
+    Restore-FileConverterSmokeTestSettings -Snapshot $settingsSnapshot
+}
