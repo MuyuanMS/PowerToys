@@ -44,30 +44,11 @@ public:
     {
         HINSTANCE hinstance = reinterpret_cast<HINSTANCE>(&__ImageBase);
         PowerToysSettings::Settings settings(hinstance, get_name());
-        settings.add_bool_toggle(L"bool_show_extended_menu",
-                                 L"",
-                                 CopyAsUNCSettingsInstance().GetShowInExtendedContextMenu());
         return settings.serialize_to_buffer(buffer, buffer_size);
     }
 
-    virtual void set_config(PCWSTR config) override
+    virtual void set_config(PCWSTR) override
     {
-        try
-        {
-            PowerToysSettings::PowerToyValues values =
-                PowerToysSettings::PowerToyValues::from_json_string(config, get_key());
-
-            auto extendedMenu = values.get_bool_value(L"bool_show_extended_menu");
-            if (extendedMenu.has_value())
-            {
-                CopyAsUNCSettingsInstance().SetExtendedContextMenuOnly(extendedMenu.value());
-                CopyAsUNCSettingsInstance().Save();
-            }
-        }
-        catch (std::exception& e)
-        {
-            Logger::error("Configuration parsing failed: {}", std::string{ e.what() });
-        }
     }
 
     virtual void enable() override
