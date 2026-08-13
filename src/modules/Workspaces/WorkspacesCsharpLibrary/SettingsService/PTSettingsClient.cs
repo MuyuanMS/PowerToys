@@ -99,7 +99,13 @@ public static class PTSettingsClient
     /// <summary>Reads this caller's namespace blob.  Returns NotFound if none exists yet.</summary>
     public static Result GetBlob(out byte[] blob)
     {
-        var rc = RoundTrip(OpGetBlob, ReadOnlySpan<byte>.Empty, out var resp);
+        return GetBlob(out blob, ConnectTimeoutMs);
+    }
+
+    /// <summary>Reads this caller's namespace blob with a caller-selected connection timeout.</summary>
+    public static Result GetBlob(out byte[] blob, int connectTimeoutMs)
+    {
+        var rc = RoundTrip(OpGetBlob, ReadOnlySpan<byte>.Empty, out var resp, connectTimeoutMs);
         blob = rc == Result.Ok ? resp : Array.Empty<byte>();
         return rc;
     }
@@ -127,7 +133,7 @@ public static class PTSettingsClient
         return RoundTrip(OpDeleteTransientBlob, ReadOnlySpan<byte>.Empty, out _);
     }
 
-    private static Result RoundTrip(byte opcode, ReadOnlySpan<byte> payload, out byte[] response)
+    private static Result RoundTrip(byte opcode, ReadOnlySpan<byte> payload, out byte[] response, int connectTimeoutMs = ConnectTimeoutMs)
     {
         response = Array.Empty<byte>();
         if (payload.Length > MaxPayloadBytes)
@@ -147,7 +153,7 @@ public static class PTSettingsClient
                 PipeDirection.InOut,
                 PipeOptions.None,
                 TokenImpersonationLevel.Impersonation);
-            pipe.Connect(ConnectTimeoutMs);
+            pipe.Connect(connectTimeoutMs);
             if (!IsTrustedServer(pipe))
             {
                 pipe.Dispose();

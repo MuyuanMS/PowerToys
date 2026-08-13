@@ -82,6 +82,25 @@ namespace PTSettingsSvc
             return GetServiceBinRoot() + L"\\" + sid;
         }
 
+        bool IsPathUnderRoot(const std::filesystem::path& path, const std::filesystem::path& root)
+        {
+            std::error_code ec;
+            const auto normalizedPath = std::filesystem::absolute(path, ec).lexically_normal().wstring();
+            if (ec)
+            {
+                return false;
+            }
+
+            const auto normalizedRoot = std::filesystem::absolute(root, ec).lexically_normal().wstring();
+            if (ec || normalizedPath.size() <= normalizedRoot.size())
+            {
+                return false;
+            }
+
+            return _wcsnicmp(normalizedPath.c_str(), normalizedRoot.c_str(), normalizedRoot.size()) == 0 &&
+                   (normalizedPath[normalizedRoot.size()] == L'\\' || normalizedPath[normalizedRoot.size()] == L'/');
+        }
+
         // Per-user, per-version directory holding the service's runnable exe
         // copy.  Per-user isolation prevents one registration from replacing
         // another service account's execute ACL or pruning its active version.
@@ -650,9 +669,12 @@ namespace PTSettingsSvc
         // now-empty directories for deletion at reboot so direct/manual
         // unregister does not report permanent cleanup while retaining them.
         const std::filesystem::path currentExe(OwnExePath());
-        MoveFileExW(currentExe.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
-        MoveFileExW(currentExe.parent_path().c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
-        MoveFileExW(userBinRoot.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
+        if (IsPathUnderRoot(currentExe, userBinRoot))
+        {
+            MoveFileExW(currentExe.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
+            MoveFileExW(currentExe.parent_path().c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
+            MoveFileExW(userBinRoot.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
+        }
 
         return rc;
     }

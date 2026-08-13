@@ -128,7 +128,6 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
 
     if (projectToLaunch.id.empty())
     {
-        auto file = WorkspacesData::WorkspacesFile();
         auto res = JsonUtils::ReadWorkspacesFromService();
         if (res.isOk())
         {
@@ -140,10 +139,10 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
             switch (res.error())
             {
             case JsonUtils::WorkspacesFileError::FileReadingError:
-                formattedMessage = fmt::format(GET_RESOURCE_STRING(IDS_FILE_READING_ERROR), file);
+                formattedMessage = GET_RESOURCE_STRING(IDS_SERVICE_ACCESS_ERROR);
                 break;
             case JsonUtils::WorkspacesFileError::IncorrectFileError:
-                formattedMessage = fmt::format(GET_RESOURCE_STRING(IDS_INCORRECT_FILE_ERROR), file);
+                formattedMessage = GET_RESOURCE_STRING(IDS_SERVICE_ACCESS_ERROR);
                 break;
             case JsonUtils::WorkspacesFileError::ServiceAccessError:
                 formattedMessage = GET_RESOURCE_STRING(IDS_SERVICE_ACCESS_ERROR);
@@ -156,8 +155,8 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
 
         if (workspaces.empty())
         {
-            Logger::warn("Workspaces file is empty");
-            std::wstring formattedMessage = fmt::format(GET_RESOURCE_STRING(IDS_EMPTY_FILE), file);
+            Logger::warn("Protected Workspaces settings are empty");
+            std::wstring formattedMessage = GET_RESOURCE_STRING(IDS_SERVICE_ACCESS_ERROR);
             MessageBox(NULL, formattedMessage.c_str(), GET_RESOURCE_STRING(IDS_WORKSPACES).c_str(), MB_ICONERROR | MB_OK);
             return 1;
         }

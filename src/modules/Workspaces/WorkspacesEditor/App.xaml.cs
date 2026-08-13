@@ -102,7 +102,7 @@ namespace WorkspacesEditor
             // heal it.  First-run provisioning — UAC + MSIX deploy, which is
             // serialized machine-wide and can queue behind a PowerToys upgrade —
             // runs OFF the UI thread below so the editor never appears hung.
-            WorkspacesEditorIO.ParseWorkspaces(_mainViewModel, runBootstrap: false, showDialogs: false);
+            WorkspacesEditorIO.ParseWorkspaces(_mainViewModel, runBootstrap: false, showDialogs: false, immediateProbe: true);
 
             // If the fast load already produced workspaces, the service was up and
             // provisioning is a no-op — a later reload would only risk clobbering

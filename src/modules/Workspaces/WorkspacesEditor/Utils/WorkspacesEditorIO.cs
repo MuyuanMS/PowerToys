@@ -22,7 +22,7 @@ namespace WorkspacesEditor.Utils
         {
         }
 
-        public ParsingResult ParseWorkspaces(MainViewModel mainViewModel, bool runBootstrap = true, bool showDialogs = true)
+        public ParsingResult ParseWorkspaces(MainViewModel mainViewModel, bool runBootstrap = true, bool showDialogs = true, bool immediateProbe = false)
         {
             try
             {
@@ -47,7 +47,7 @@ namespace WorkspacesEditor.Utils
                 // v6: read the settings through the service (GetBlob).  There is
                 // no plaintext fallback — on Unavailable we surface a "set up
                 // protection" message instead of reading the stale legacy file.
-                var rc = PTSettingsClient.GetBlob(out var blob);
+                var rc = PTSettingsClient.GetBlob(out var blob, immediateProbe ? 0 : 3000);
                 switch (rc)
                 {
                     case PTSettingsClient.Result.Ok:
