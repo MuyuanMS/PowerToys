@@ -38,6 +38,7 @@ exa
 exabyte
 Gbits
 Gbps
+priconfig
 gcode
 Heatshrink
 Mbits
@@ -374,8 +375,13 @@ WAITTIMEOUT
 DEFAULTTONEAREST
 DWRITE
 LWIN
+MOVEFILE
+SQOS
 VCENTER
 VREDRAW
+
+# Windows packaging tool commands
+createconfig
 
 # COM/WinRT interface prefixes and type fragments
 BAlt
