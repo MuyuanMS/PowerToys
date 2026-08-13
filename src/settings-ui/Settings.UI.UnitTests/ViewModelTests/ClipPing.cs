@@ -10,6 +10,7 @@ using System.Text.Json;
 
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.PowerToys.Settings.UI.Library.Enumerations;
+using Microsoft.PowerToys.Settings.UI.Library.Interfaces;
 using Microsoft.PowerToys.Settings.UI.UnitTests.Mocks;
 using Microsoft.PowerToys.Settings.UI.ViewModels;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -111,6 +112,38 @@ namespace ViewModelTests
             Assert.AreEqual(ClipPingProperties.DefaultOverlayColor, viewModel.OverlayColor);
         }
 
+        [DataTestMethod]
+        [DataRow(0)]
+        [DataRow(1)]
+        [DataRow(2)]
+        public void ConstructorShouldNormalizeMalformedSettings(int malformedPart)
+        {
+            var settings = new ClipPingSettings();
+            switch (malformedPart)
+            {
+                case 0:
+                    settings.Properties = null;
+                    break;
+                case 1:
+                    settings.Properties.OverlayColor = null;
+                    break;
+                case 2:
+                    settings.Properties.OverlayColor.Value = null;
+                    settings.Properties.OverlayType = (ClipPingOverlay)int.MaxValue;
+                    break;
+            }
+
+            var moduleSettingsRepository = new Mock<ISettingsRepository<ClipPingSettings>>();
+            moduleSettingsRepository.SetupGet(repository => repository.SettingsConfig).Returns(settings);
+
+            var viewModel = CreateViewModel(
+                new Mock<SettingsUtils>(new FileSystem(), null),
+                moduleSettingsRepository.Object);
+
+            Assert.AreEqual(ClipPingProperties.DefaultOverlayColor, viewModel.OverlayColor);
+            Assert.AreEqual((int)ClipPingOverlay.Top, viewModel.OverlayType);
+        }
+
         [TestMethod]
         public void OverlayTypeWhenChangedShouldPersistSettings()
         {
@@ -130,10 +163,21 @@ namespace ViewModelTests
 
         private ClipPingViewModel CreateViewModel(Mock<SettingsUtils> settingsUtils, Func<string, int> ipcCallback = null)
         {
+            return CreateViewModel(
+                settingsUtils,
+                SettingsRepository<ClipPingSettings>.GetInstance(_clipPingSettingsUtils.Object),
+                ipcCallback);
+        }
+
+        private ClipPingViewModel CreateViewModel(
+            Mock<SettingsUtils> settingsUtils,
+            ISettingsRepository<ClipPingSettings> moduleSettingsRepository,
+            Func<string, int> ipcCallback = null)
+        {
             return new ClipPingViewModel(
                 settingsUtils.Object,
                 SettingsRepository<GeneralSettings>.GetInstance(_generalSettingsUtils.Object),
-                SettingsRepository<ClipPingSettings>.GetInstance(_clipPingSettingsUtils.Object),
+                moduleSettingsRepository,
                 ipcCallback ?? (_ => 0));
         }
     }

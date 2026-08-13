@@ -64,7 +64,6 @@ public partial class App : Application, IDisposable
                 return overlayType;
             }
 
-            Logger.LogWarning($"Unknown overlay type: {_currentSettings.Properties.OverlayType}. Defaulting to TopOverlay.");
             return typeof(TopOverlay);
         }
     }
@@ -108,6 +107,12 @@ public partial class App : Application, IDisposable
         {
             Logger.LogWarning($"Invalid overlay color in settings: {rawColor}. Using the default color.");
             settings.Properties.OverlayColor.Value = normalizedColor;
+        }
+
+        if (!OverlayTypes.ContainsKey(settings.Properties.OverlayType))
+        {
+            Logger.LogWarning($"Unknown overlay type: {settings.Properties.OverlayType}. Defaulting to TopOverlay.");
+            settings.Properties.OverlayType = ClipPingOverlay.Top;
         }
 
         _currentSettings = settings;
