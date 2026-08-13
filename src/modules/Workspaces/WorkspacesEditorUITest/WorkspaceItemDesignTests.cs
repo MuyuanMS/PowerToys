@@ -83,10 +83,7 @@ public class WorkspaceItemDesignTests : WorkspacesUiAutomationBase
     [TestCategory("Design.WorkspaceItem")]
     public void WorkspaceItem_HasSortButton()
     {
-        // The WinUI editor replaces per-item "More options" with a global sort button.
-        // This test verifies the sort control exists at the page level.
-        // Sort functionality is validated separately in EditorViewModelSortTests.
-        Assert.IsTrue(true, "Sort functionality replaced per-item More button — tested in ViewModel sort tests");
+        Assert.IsTrue(Has<Button>("Sort by"), "The main page should expose the global sort menu.");
     }
 
     [TestMethod("WorkspaceItem.HasAppCountText")]
@@ -139,8 +136,8 @@ public class WorkspaceItemDesignTests : WorkspacesUiAutomationBase
     {
         try
         {
-            var root = Find<Element>(By.AccessibilityId("WorkspacesList"));
-            return root.FindAll<Element>(By.ClassName("ListViewItem")).Count > 0;
+            var root = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
+            return root.FindAll<Element>(By.ClassName("WorkspaceItem")).Count > 0;
         }
         catch
         {
@@ -150,8 +147,8 @@ public class WorkspaceItemDesignTests : WorkspacesUiAutomationBase
 
     private Element GetFirstWorkspaceItem()
     {
-        var root = Find<Element>(By.AccessibilityId("WorkspacesList"));
-        var items = root.FindAll<Element>(By.ClassName("ListViewItem"));
+        var root = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
+        var items = root.FindAll<Element>(By.ClassName("WorkspaceItem"));
         Assert.IsTrue(items.Count > 0, "Expected at least one workspace list item.");
         return items[0];
     }
