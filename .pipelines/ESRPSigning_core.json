@@ -127,6 +127,10 @@
             "FileLocksmithContextMenuPackage.msix",
             "FileLocksmithCLI.exe",
 
+            "PowerToys.FileConverterModuleInterface.dll",
+            "WinUI3Apps\\PowerToys.FileConverterContextMenu.dll",
+            "WinUI3Apps\\FileConverterContextMenuPackage.msix",
+
             "WinUI3Apps\\Peek.Common.dll",
             "WinUI3Apps\\Peek.FilePreviewer.dll",
             "WinUI3Apps\\Powertoys.Peek.UI.dll",
