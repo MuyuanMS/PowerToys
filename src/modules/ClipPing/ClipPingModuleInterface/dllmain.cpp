@@ -9,6 +9,7 @@
 #include <common/utils/winapi_error.h>
 
 #include <shellapi.h>
+#include <tlhelp32.h>
 
 #include "trace.h"
 #include "common/interop/shared_constants.h"
@@ -51,6 +52,51 @@ private:
     HANDLE m_hProcess = nullptr;
     HANDLE m_exit_event_handle = nullptr;
     HANDLE m_show_overlay_event_handle = nullptr;
+
+    void stop_existing_instances()
+    {
+        SetEvent(m_exit_event_handle);
+
+        HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (snapshot == INVALID_HANDLE_VALUE)
+        {
+            Logger::error("ClipPing: Failed to enumerate existing processes.");
+            return;
+        }
+
+        PROCESSENTRY32W entry{ .dwSize = sizeof(entry) };
+        if (Process32FirstW(snapshot, &entry))
+        {
+            do
+            {
+                if (_wcsicmp(entry.szExeFile, L"PowerToys.ClipPing.exe") != 0)
+                {
+                    continue;
+                }
+
+                HANDLE process = OpenProcess(SYNCHRONIZE | PROCESS_TERMINATE, FALSE, entry.th32ProcessID);
+                if (!process)
+                {
+                    Logger::warn("ClipPing: Could not open an existing process.");
+                    continue;
+                }
+
+                constexpr DWORD timeout_ms = 1500;
+                if (WaitForSingleObject(process, timeout_ms) == WAIT_TIMEOUT)
+                {
+                    Logger::warn("ClipPing: Existing process didn't exit in time. Forcing termination.");
+                    if (TerminateProcess(process, 0))
+                    {
+                        WaitForSingleObject(process, INFINITE);
+                    }
+                }
+
+                CloseHandle(process);
+            } while (Process32NextW(snapshot, &entry));
+        }
+
+        CloseHandle(snapshot);
+    }
 
 public:
     ClipPingModuleInterface()
@@ -146,6 +192,7 @@ public:
 
         m_enabled = false;
 
+        stop_existing_instances();
         ResetEvent(m_exit_event_handle);
 
         unsigned long powertoys_pid = GetCurrentProcessId();
@@ -168,6 +215,14 @@ public:
         }
         else
         {
+            constexpr DWORD startup_timeout_ms = 500;
+            if (WaitForSingleObject(sei.hProcess, startup_timeout_ms) == WAIT_OBJECT_0)
+            {
+                Logger::error("ClipPing exited during startup. Another instance may still be running.");
+                CloseHandle(sei.hProcess);
+                return;
+            }
+
             m_hProcess = sei.hProcess;
             m_enabled = true;
             Trace::Enable(true);
