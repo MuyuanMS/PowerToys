@@ -252,8 +252,8 @@ Your WinGet manifest must declare a dependency on the Windows App SDK so it gets
 ```yaml
 Dependencies:
   PackageDependencies:
-  - PackageIdentifier: Microsoft.WindowsAppRuntime.1.7
-    MinimumVersion: 7001.632.252.0
+  - PackageIdentifier: Microsoft.WindowsAppRuntime.2
+    MinimumVersion: 2.3.1
 ```
 
 > **Note:** Update the version number to match the Windows App SDK version your project targets. Check your `.csproj` for the `WindowsAppSDK` package version.
