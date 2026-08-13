@@ -1500,12 +1500,12 @@ namespace KeyboardEventHandlers
                             expandedArgs,
                             &processId,
                             currentDirPtr,
-                            true);
+                            ProgramLauncher::GetExplorerShowCommand(shortcut.startWindowType));
                     }
                 }
                 else
                 {
-                    processStarted = run_non_elevated(fullExpandedFilePath, expandedArgs, &processId, currentDirPtr, false);
+                    processStarted = run_non_elevated(fullExpandedFilePath, expandedArgs, &processId, currentDirPtr, SW_HIDE);
                 }
             }
             else if (shortcut.elevationLevel == Shortcut::ElevationLevel::DifferentUser)
