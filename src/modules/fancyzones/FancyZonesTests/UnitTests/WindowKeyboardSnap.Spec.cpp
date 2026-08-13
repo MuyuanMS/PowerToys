@@ -870,6 +870,38 @@ namespace FancyZonesUnitTests
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             Assert::IsTrue(IsIconic(window));
         }
+
+        TEST_METHOD (WinDown_RestoresMaximizedWindowBeforeNavigating)
+        {
+            WindowKeyboardSnap windowKeyboardSnap;
+            const auto window = Mocks::WindowCreate(m_hInst);
+            m_workAreaMap.at(m_monitor)->Snap(window, { 0 }, true);
+            RECT windowRect = GetZoneRect(m_workAreaMap[m_monitor].get(), 0);
+
+            auto settings = FancyZonesSettings::settings();
+            settings.cycleThroughAllZones = false;
+            FancyZonesSettings::instance().SetSettings(settings);
+
+            Assert::IsTrue(windowKeyboardSnap.Snap(window, windowRect, m_monitor, VK_UP, m_workAreaMap, { { m_monitor, m_rect } }));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            Assert::IsTrue(IsZoomed(window));
+
+            windowRect = GetZoneRect(m_workAreaMap[m_monitor].get(), 0);
+            Assert::IsTrue(windowKeyboardSnap.Snap(window, windowRect, m_monitor, VK_DOWN, m_workAreaMap, { { m_monitor, m_rect } }));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            Assert::IsFalse(IsZoomed(window));
+            Assert::IsTrue(ZoneIndexSet{ 0 } == m_workAreaMap.at(m_monitor)->GetLayoutWindows().GetZoneIndexSetFromWindow(window));
+
+            windowRect = GetZoneRect(m_workAreaMap[m_monitor].get(), 0);
+            Assert::IsTrue(windowKeyboardSnap.Snap(window, windowRect, m_monitor, VK_DOWN, m_workAreaMap, { { m_monitor, m_rect } }));
+            Assert::IsTrue(ZoneIndexSet{ 2 } == m_workAreaMap.at(m_monitor)->GetLayoutWindows().GetZoneIndexSetFromWindow(window));
+            Assert::IsFalse(IsIconic(window));
+
+            windowRect = GetZoneRect(m_workAreaMap[m_monitor].get(), 2);
+            Assert::IsTrue(windowKeyboardSnap.Snap(window, windowRect, m_monitor, VK_DOWN, m_workAreaMap, { { m_monitor, m_rect } }));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            Assert::IsTrue(IsIconic(window));
+        }
     };
 
     TEST_CLASS (WindowKeyboardSnap_MoveAcrossMonitors_ByPosition_UnitTests)

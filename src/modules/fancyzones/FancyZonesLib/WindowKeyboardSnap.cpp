@@ -70,6 +70,10 @@ bool WindowKeyboardSnap::Snap(HWND window, RECT windowRect, HMONITOR monitor, DW
 
     bool success = false;
     bool cycle = FancyZonesSettings::settings().cycleThroughAllZones;
+    if (!cycle && vkCode == VK_DOWN && IsZoomed(window))
+    {
+        return SetWindowState(window, SW_SHOWNORMAL);
+    }
 
     const auto& currentWorkArea = activeWorkAreas.at(monitor);
     if (monitors.size() > 1 && FancyZonesSettings::settings().moveWindowAcrossMonitors)
