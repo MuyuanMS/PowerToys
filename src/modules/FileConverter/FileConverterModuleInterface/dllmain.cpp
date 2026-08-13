@@ -34,6 +34,7 @@
 #include <string>
 #include <thread>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 #include <sddl.h>
 
@@ -52,6 +53,7 @@ namespace
     constexpr size_t MAX_PIPE_PAYLOAD_BYTES = 1024 * 1024;
     constexpr size_t MAX_PENDING_PIPE_REQUESTS = 16;
     constexpr size_t MAX_PENDING_PIPE_BYTES = 4 * MAX_PIPE_PAYLOAD_BYTES;
+    constexpr DWORD PIPE_READ_TIMEOUT_MS = 5000;
     constexpr DWORD CONVERSION_TIMEOUT_MS = 5 * 60 * 1000;
     constexpr wchar_t CONTEXT_MENU_PACKAGE_IDENTITY_NAME[] = L"Microsoft.PowerToys.FileConverterContextMenu";
     constexpr wchar_t CONTEXT_MENU_PACKAGE_PUBLISHER[] =
@@ -82,6 +84,48 @@ namespace
         file_converter::ImageFormat format = file_converter::ImageFormat::Png;
         std::vector<std::wstring> files;
         size_t skipped_entries = 0;
+    };
+
+    struct UniqueHandle
+    {
+        HANDLE value = nullptr;
+
+        UniqueHandle() = default;
+        explicit UniqueHandle(HANDLE handle) :
+            value(handle)
+        {
+        }
+        ~UniqueHandle()
+        {
+            if (value != nullptr)
+            {
+                CloseHandle(value);
+            }
+        }
+        UniqueHandle(const UniqueHandle&) = delete;
+        UniqueHandle& operator=(const UniqueHandle&) = delete;
+        UniqueHandle(UniqueHandle&& other) noexcept :
+            value(std::exchange(other.value, nullptr))
+        {
+        }
+        UniqueHandle& operator=(UniqueHandle&& other) noexcept
+        {
+            if (this != &other)
+            {
+                if (value != nullptr)
+                {
+                    CloseHandle(value);
+                }
+                value = std::exchange(other.value, nullptr);
+            }
+            return *this;
+        }
+    };
+
+    struct PendingPayload
+    {
+        std::string payload;
+        UniqueHandle client_primary_token;
     };
 
     struct ConversionSummary
@@ -322,7 +366,7 @@ namespace
             if (!read_ok && read_error == ERROR_IO_PENDING)
             {
                 HANDLE events[] = { stop_event, read_event };
-                const DWORD wait = WaitForMultipleObjects(ARRAYSIZE(events), events, FALSE, INFINITE);
+                const DWORD wait = WaitForMultipleObjects(ARRAYSIZE(events), events, FALSE, PIPE_READ_TIMEOUT_MS);
                 if (wait == WAIT_OBJECT_0)
                 {
                     CancelIoEx(pipe_handle, &overlapped);
@@ -330,6 +374,16 @@ namespace
                     DWORD ignored = 0;
                     GetOverlappedResult(pipe_handle, &overlapped, &ignored, FALSE);
                     CloseHandle(read_event);
+                    return {};
+                }
+                if (wait == WAIT_TIMEOUT)
+                {
+                    CancelIoEx(pipe_handle, &overlapped);
+                    WaitForSingleObject(read_event, INFINITE);
+                    DWORD ignored = 0;
+                    GetOverlappedResult(pipe_handle, &overlapped, &ignored, FALSE);
+                    CloseHandle(read_event);
+                    Logger::warn(L"File Converter disconnected a pipe client that did not send a complete request.");
                     return {};
                 }
 
@@ -571,7 +625,8 @@ namespace
         const std::filesystem::path& worker_path,
         const std::wstring& input_path,
         file_converter::ImageFormat format,
-        HANDLE stop_event)
+        HANDLE stop_event,
+        HANDLE client_primary_token)
     {
         std::wstring command_line =
             QuoteCommandLineArgument(worker_path.wstring()) + L" " +
@@ -581,17 +636,29 @@ namespace
         STARTUPINFOW startup_info{};
         startup_info.cb = sizeof(startup_info);
         PROCESS_INFORMATION process_info{};
-        if (!CreateProcessW(
-                worker_path.c_str(),
-                command_line.data(),
-                nullptr,
-                nullptr,
-                FALSE,
-                CREATE_NO_WINDOW,
-                nullptr,
-                worker_path.parent_path().c_str(),
-                &startup_info,
-                &process_info))
+        const BOOL created = client_primary_token != nullptr ?
+                                 CreateProcessWithTokenW(
+                                     client_primary_token,
+                                     LOGON_WITH_PROFILE,
+                                     worker_path.c_str(),
+                                     command_line.data(),
+                                     CREATE_NO_WINDOW,
+                                     nullptr,
+                                     worker_path.parent_path().c_str(),
+                                     &startup_info,
+                                     &process_info) :
+                                 CreateProcessW(
+                                     worker_path.c_str(),
+                                     command_line.data(),
+                                     nullptr,
+                                     nullptr,
+                                     FALSE,
+                                     CREATE_NO_WINDOW,
+                                     nullptr,
+                                     worker_path.parent_path().c_str(),
+                                     &startup_info,
+                                     &process_info);
+        if (!created)
         {
             return HRESULT_FROM_WIN32(GetLastError());
         }
@@ -634,7 +701,10 @@ namespace
         return result;
     }
 
-    ConversionSummary ProcessFormatConvertRequest(const ConversionRequest& request, HANDLE stop_event)
+    ConversionSummary ProcessFormatConvertRequest(
+        const ConversionRequest& request,
+        HANDLE stop_event,
+        HANDLE client_primary_token)
     {
         ConversionSummary summary;
         const std::filesystem::path worker_path =
@@ -657,7 +727,7 @@ namespace
             }
 
             const HRESULT conversion_result =
-                RunConversionWorker(worker_path, file, request.format, stop_event);
+                RunConversionWorker(worker_path, file, request.format, stop_event, client_primary_token);
             if (SUCCEEDED(conversion_result))
             {
                 ++summary.succeeded;
@@ -786,6 +856,71 @@ namespace
         }
     }
 
+    bool IsCurrentProcessElevated()
+    {
+        HANDLE token = nullptr;
+        if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
+        {
+            return true;
+        }
+
+        TOKEN_ELEVATION elevation{};
+        DWORD size = 0;
+        bool elevated = true;
+        if (GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size))
+        {
+            elevated = elevation.TokenIsElevated != 0;
+        }
+        CloseHandle(token);
+        return elevated;
+    }
+
+    bool GetPipeClientPrimaryToken(HANDLE pipe_handle, UniqueHandle& primary_token)
+    {
+        if (!IsCurrentProcessElevated())
+        {
+            return true;
+        }
+
+        if (!ImpersonateNamedPipeClient(pipe_handle))
+        {
+            return false;
+        }
+
+        HANDLE impersonation_token = nullptr;
+        const bool opened =
+            OpenThreadToken(
+                GetCurrentThread(),
+                TOKEN_QUERY | TOKEN_DUPLICATE | TOKEN_ASSIGN_PRIMARY,
+                TRUE,
+                &impersonation_token) != FALSE;
+
+        HANDLE duplicated_token = nullptr;
+        const bool duplicated =
+            opened &&
+            DuplicateTokenEx(
+                impersonation_token,
+                MAXIMUM_ALLOWED,
+                nullptr,
+                SecurityImpersonation,
+                TokenPrimary,
+                &duplicated_token) != FALSE;
+
+        if (impersonation_token != nullptr)
+        {
+            CloseHandle(impersonation_token);
+        }
+        RevertToSelf();
+
+        if (!duplicated)
+        {
+            return false;
+        }
+
+        primary_token = UniqueHandle{ duplicated_token };
+        return true;
+    }
+
     class FileConverterPipeOrchestrator
     {
     public:
@@ -839,7 +974,7 @@ namespace
                 m_worker_thread.join();
             }
 
-            std::queue<std::string> empty;
+            std::queue<PendingPayload> empty;
             {
                 std::scoped_lock lock(m_queue_mutex);
                 std::swap(m_pending_payloads, empty);
@@ -854,7 +989,7 @@ namespace
                 return;
             }
 
-            EnqueuePayload(std::move(payload));
+            EnqueuePayload(PendingPayload{ std::move(payload), {} });
         }
 
         ~FileConverterPipeOrchestrator()
@@ -866,7 +1001,7 @@ namespace
         }
 
     private:
-        void EnqueuePayload(std::string payload)
+        void EnqueuePayload(PendingPayload pending)
         {
             {
                 std::scoped_lock lock(m_queue_mutex);
@@ -876,24 +1011,24 @@ namespace
                 }
 
                 if (m_pending_payloads.size() >= MAX_PENDING_PIPE_REQUESTS ||
-                    payload.size() > MAX_PENDING_PIPE_BYTES - m_pending_payload_bytes)
+                    pending.payload.size() > MAX_PENDING_PIPE_BYTES - m_pending_payload_bytes)
                 {
                     Logger::warn(L"File Converter dropped a request because the conversion queue is full.");
                     return;
                 }
 
-                m_pending_payload_bytes += payload.size();
-                m_pending_payloads.push(std::move(payload));
+                m_pending_payload_bytes += pending.payload.size();
+                m_pending_payloads.push(std::move(pending));
             }
 
             m_queue_cv.notify_one();
         }
 
-        void ProcessPayload(const std::string& payload)
+        void ProcessPayload(const PendingPayload& pending)
         {
             ConversionRequest request;
             std::wstring rejection_reason;
-            if (!TryParseFormatConvertRequest(payload, request, rejection_reason))
+            if (!TryParseFormatConvertRequest(pending.payload, request, rejection_reason))
             {
                 if (!rejection_reason.empty())
                 {
@@ -903,7 +1038,8 @@ namespace
                 return;
             }
 
-            const auto summary = ProcessFormatConvertRequest(request, m_stop_event);
+            const auto summary =
+                ProcessFormatConvertRequest(request, m_stop_event, pending.client_primary_token.value);
 
             if (request.skipped_entries > 0)
             {
@@ -943,7 +1079,7 @@ namespace
 
             while (true)
             {
-                std::string payload;
+                PendingPayload pending;
                 {
                     std::unique_lock lock(m_queue_mutex);
                     m_queue_cv.wait(lock, [this] {
@@ -960,12 +1096,12 @@ namespace
                         continue;
                     }
 
-                    payload = std::move(m_pending_payloads.front());
+                    pending = std::move(m_pending_payloads.front());
                     m_pending_payloads.pop();
-                    m_pending_payload_bytes -= payload.size();
+                    m_pending_payload_bytes -= pending.payload.size();
                 }
 
-                ProcessPayload(payload);
+                ProcessPayload(pending);
             }
 
             winrt::uninit_apartment();
@@ -1079,7 +1215,17 @@ namespace
                 {
                     Logger::warn(L"File Converter rejected pipe caller with an unexpected package identity.");
                 }
-                const std::string payload = auth.accepted && package_identity_valid ? ReadPipeMessage(pipe_handle, m_stop_event) : std::string{};
+                UniqueHandle client_primary_token;
+                const bool client_token_valid =
+                    auth.accepted &&
+                    package_identity_valid &&
+                    GetPipeClientPrimaryToken(pipe_handle, client_primary_token);
+                if (auth.accepted && package_identity_valid && !client_token_valid)
+                {
+                    Logger::warn(L"File Converter rejected a pipe caller because its medium-integrity token could not be captured.");
+                }
+                std::string payload =
+                    client_token_valid ? ReadPipeMessage(pipe_handle, m_stop_event) : std::string{};
 
                 // Inbound-only server pipes have no outbound data to flush.
                 // Skipping FlushFileBuffers avoids reconnect stalls on malformed-request sequences.
@@ -1092,7 +1238,7 @@ namespace
 
                 if (!payload.empty())
                 {
-                    EnqueuePayload(payload);
+                    EnqueuePayload(PendingPayload{ std::move(payload), std::move(client_primary_token) });
                 }
             }
 
@@ -1111,7 +1257,7 @@ namespace
         std::thread m_worker_thread;
         std::mutex m_queue_mutex;
         std::condition_variable m_queue_cv;
-        std::queue<std::string> m_pending_payloads;
+        std::queue<PendingPayload> m_pending_payloads;
         size_t m_pending_payload_bytes = 0;
     };
 }

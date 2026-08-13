@@ -28,12 +28,11 @@ function Ensure-SmokeTestFixture([string]$Path)
     [System.IO.File]::WriteAllBytes($Path, $bmp)
 }
 
-$settingsPath = Join-Path $env:LOCALAPPDATA "Microsoft\PowerToys\settings.json"
-$settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
-if ($null -eq $settings.enabled -or $settings.enabled.FileConverter -ne $true)
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..")).Path
+. (Join-Path $repoRoot "tools\Verification scripts\FileConverter\FileConverterSmokeTestSettings.ps1")
+$settingsSnapshot = Enable-FileConverterForSmokeTest
+try
 {
-    throw "File Converter must be enabled in PowerToys Settings before running this shell-verb smoke test."
-}
 
 $inputPath = Join-Path $TestDirectory $InputFileName
 Ensure-SmokeTestFixture -Path $inputPath
@@ -346,7 +345,6 @@ if ($invokeResult -eq "Verb not found")
         throw "The Explorer-hosted verb was not found. Re-run with -UseDirectComFallback to restart the Debug Runner in authenticated test-client mode before direct COM activation."
     }
 
-    $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..")).Path
     $runnerPath = Join-Path $repoRoot "x64\Debug\PowerToys.exe"
     if (-not (Test-Path -LiteralPath $runnerPath))
     {
@@ -391,3 +389,8 @@ if (-not (Test-Path $outputPath))
 $item = Get-Item $outputPath
 Write-Host "Created: $($item.FullName)"
 Write-Host "Size: $($item.Length)"
+}
+finally
+{
+    Restore-FileConverterSmokeTestSettings -Snapshot $settingsSnapshot
+}
