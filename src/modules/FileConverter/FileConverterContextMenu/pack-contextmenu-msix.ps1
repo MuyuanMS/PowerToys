@@ -103,26 +103,16 @@ function Ensure-CertificateTrustedForCurrentUser {
     $trustedPeople = Get-ChildItem -Path Cert:\CurrentUser\TrustedPeople |
         Where-Object { $_.Thumbprint -eq $Certificate.Thumbprint } |
         Select-Object -First 1
-    $trustedRoot = Get-ChildItem -Path Cert:\CurrentUser\Root |
-        Where-Object { $_.Thumbprint -eq $Certificate.Thumbprint } |
-        Select-Object -First 1
 
-    if (($null -ne $trustedPeople) -and ($null -ne $trustedRoot)) {
+    if ($null -ne $trustedPeople) {
         return
     }
 
     $tempCer = Join-Path ([System.IO.Path]::GetTempPath()) ("powertoys-dev-" + [System.Guid]::NewGuid().ToString("N") + ".cer")
     try {
         Export-Certificate -Cert $Certificate -FilePath $tempCer -Type CERT | Out-Null
-        if ($null -eq $trustedPeople) {
-            Import-Certificate -FilePath $tempCer -CertStoreLocation "Cert:\CurrentUser\TrustedPeople" | Out-Null
-            Write-Host "Imported certificate into CurrentUser\\TrustedPeople:" $Certificate.Thumbprint
-        }
-
-        if ($null -eq $trustedRoot) {
-            Import-Certificate -FilePath $tempCer -CertStoreLocation "Cert:\CurrentUser\Root" | Out-Null
-            Write-Host "Imported certificate into CurrentUser\\Root:" $Certificate.Thumbprint
-        }
+        Import-Certificate -FilePath $tempCer -CertStoreLocation "Cert:\CurrentUser\TrustedPeople" | Out-Null
+        Write-Host "Imported certificate into CurrentUser\\TrustedPeople:" $Certificate.Thumbprint
     }
     finally {
         Remove-Item -Path $tempCer -Force -ErrorAction SilentlyContinue
