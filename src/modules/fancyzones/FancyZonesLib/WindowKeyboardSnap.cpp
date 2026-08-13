@@ -97,7 +97,7 @@ bool WindowKeyboardSnap::Snap(HWND window, RECT windowRect, HMONITOR monitor, DW
     else
     {
         // Single monitor environment, or combined multi-monitor environment.
-        success = MoveByDirectionAndPosition(window, windowRect, vkCode, cycle, currentWorkArea.get());        
+        success = MoveByDirectionAndPosition(window, windowRect, vkCode, cycle, currentWorkArea.get());
     }
 
     if (!success && !cycle && (vkCode == VK_UP || vkCode == VK_DOWN))
