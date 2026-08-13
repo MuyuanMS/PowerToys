@@ -138,8 +138,8 @@ namespace MouseButtonLockEngineTests
 
         TEST_METHOD(DeferredTapReleaseFailureDoesNotSwallowPhysicalUp)
         {
-            FakeInjector inj;
-            Engine e(inj);
+            FakeInjector injector;
+            Engine e(injector);
             Settings s = DefaultSettings();
 
             e.OnButtonDown(MouseButton::Right, 0, PointL{ 0, 0 }, s);
@@ -147,7 +147,7 @@ namespace MouseButtonLockEngineTests
             Assert::IsTrue(e.IsLocked(MouseButton::Right));
 
             Assert::IsTrue(e.OnButtonDown(MouseButton::Right, 1000, PointL{ 0, 0 }, s));
-            inj.FailDeferred(MouseButton::Right);
+            injector.FailDeferred(MouseButton::Right);
 
             Assert::IsFalse(e.IsLocked(MouseButton::Right));
             Assert::IsFalse(e.OnButtonUp(MouseButton::Right, 1005, s));
@@ -155,8 +155,8 @@ namespace MouseButtonLockEngineTests
 
         TEST_METHOD(DeferredReleaseFailureRestoresLogicalLock)
         {
-            FakeInjector inj;
-            Engine e(inj);
+            FakeInjector injector;
+            Engine e(injector);
             Settings s = DefaultSettings();
 
             e.OnButtonDown(MouseButton::Right, 0, PointL{ 0, 0 }, s);
@@ -164,7 +164,7 @@ namespace MouseButtonLockEngineTests
             Assert::IsTrue(e.IsLocked(MouseButton::Right));
 
             e.OnButtonDown(MouseButton::Left, 1000, PointL{ 0, 0 }, s);
-            inj.FailDeferred(MouseButton::Right);
+            injector.FailDeferred(MouseButton::Right);
 
             Assert::IsTrue(e.IsLocked(MouseButton::Right));
         }
