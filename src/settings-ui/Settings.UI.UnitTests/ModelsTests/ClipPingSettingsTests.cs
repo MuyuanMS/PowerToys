@@ -52,5 +52,22 @@ namespace CommonLibTest
 
             Assert.IsNotNull(typeInfo);
         }
+
+        [DataTestMethod]
+        [DataRow(null)]
+        [DataRow("")]
+        [DataRow("#123")]
+        [DataRow("#GG0000")]
+        [DataRow("FF0000")]
+        public void NormalizeOverlayColorShouldUseDefaultForInvalidValues(string value)
+        {
+            Assert.AreEqual(ClipPingProperties.DefaultOverlayColor, ClipPingProperties.NormalizeOverlayColor(value));
+        }
+
+        [TestMethod]
+        public void NormalizeOverlayColorShouldPreserveValidValue()
+        {
+            Assert.AreEqual("#12abEF", ClipPingProperties.NormalizeOverlayColor("#12abEF"));
+        }
     }
 }

@@ -67,6 +67,19 @@ public:
     void destroy() override
     {
         Disable(false);
+
+        if (m_exit_event_handle)
+        {
+            CloseHandle(m_exit_event_handle);
+            m_exit_event_handle = nullptr;
+        }
+
+        if (m_show_overlay_event_handle)
+        {
+            CloseHandle(m_show_overlay_event_handle);
+            m_show_overlay_event_handle = nullptr;
+        }
+
         delete this;
     }
 
