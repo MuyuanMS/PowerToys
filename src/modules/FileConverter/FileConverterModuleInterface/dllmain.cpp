@@ -53,7 +53,12 @@ namespace
     constexpr size_t MAX_PENDING_PIPE_BYTES = 4 * MAX_PIPE_PAYLOAD_BYTES;
     constexpr DWORD CONVERSION_TIMEOUT_MS = 5 * 60 * 1000;
     constexpr wchar_t CONTEXT_MENU_ENABLED_VALUE[] = L"Enabled";
-    constexpr wchar_t CONTEXT_MENU_PACKAGE_NAME[] = L"Microsoft.PowerToys.FileConverterContextMenu_";
+    constexpr wchar_t CONTEXT_MENU_PACKAGE_IDENTITY_NAME[] = L"Microsoft.PowerToys.FileConverterContextMenu";
+    constexpr wchar_t CONTEXT_MENU_PACKAGE_PUBLISHER[] =
+        L"CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US";
+#ifdef _DEBUG
+    constexpr wchar_t CONTEXT_MENU_DEV_PACKAGE_PUBLISHER[] = L"CN=PowerToys-Dev";
+#endif
     std::wstring LoadLocalizedString(std::wstring_view key, std::wstring_view fallback)
     {
         try
@@ -363,10 +368,50 @@ namespace
             return false;
         }
 
-        std::wstring package_name(length, L'\0');
-        result = GetPackageFullName(process, &length, package_name.data());
+        std::wstring package_full_name(length, L'\0');
+        result = GetPackageFullName(process, &length, package_full_name.data());
         CloseHandle(process);
-        return result == ERROR_SUCCESS && package_name.rfind(CONTEXT_MENU_PACKAGE_NAME, 0) == 0;
+        if (result != ERROR_SUCCESS)
+        {
+            return false;
+        }
+
+        UINT32 package_id_buffer_length = 0;
+        result = PackageIdFromFullName(package_full_name.c_str(), 0, &package_id_buffer_length, nullptr);
+        if (result != ERROR_INSUFFICIENT_BUFFER)
+        {
+            return false;
+        }
+
+        std::vector<BYTE> package_id_buffer(package_id_buffer_length);
+        result = PackageIdFromFullName(
+            package_full_name.c_str(),
+            0,
+            &package_id_buffer_length,
+            package_id_buffer.data());
+        if (result != ERROR_SUCCESS)
+        {
+            return false;
+        }
+
+        const auto package_id = reinterpret_cast<const PACKAGE_ID*>(package_id_buffer.data());
+        if (package_id->name == nullptr ||
+            package_id->publisher == nullptr ||
+            wcscmp(package_id->name, CONTEXT_MENU_PACKAGE_IDENTITY_NAME) != 0)
+        {
+            return false;
+        }
+
+        if (wcscmp(package_id->publisher, CONTEXT_MENU_PACKAGE_PUBLISHER) == 0)
+        {
+            return true;
+        }
+
+#ifdef _DEBUG
+        return wcscmp(package_id->publisher, CONTEXT_MENU_DEV_PACKAGE_PUBLISHER) == 0;
+#else
+        return false;
+#endif
     }
 
     bool TryParseFormatConvertRequest(
