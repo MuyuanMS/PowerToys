@@ -144,6 +144,7 @@
       <Custom Action="UnApplyModulesRegistryChangeSets" Before="RemoveFiles" Condition="Installed AND (REMOVE=&quot;ALL&quot;)" />
       <Custom Action="UnRegisterContextMenuPackages" Before="RemoveFiles" Condition="Installed AND (REMOVE=&quot;ALL&quot;)" />
       <Custom Action="CleanImageResizerRuntimeRegistry" Before="RemoveFiles" Condition="Installed AND (REMOVE=&quot;ALL&quot;)" />
+      <Custom Action="CleanFileConverterRuntimeRegistry" Before="RemoveFiles" Condition="Installed AND (REMOVE=&quot;ALL&quot;)" />
       <Custom Action="CleanFileLocksmithRuntimeRegistry" Before="RemoveFiles" Condition="Installed AND (REMOVE=&quot;ALL&quot;)" />
       <Custom Action="CleanPowerRenameRuntimeRegistry" Before="RemoveFiles" Condition="Installed AND (REMOVE=&quot;ALL&quot;)" />
       <Custom Action="CleanNewPlusRuntimeRegistry" Before="RemoveFiles" Condition="Installed AND (REMOVE=&quot;ALL&quot;)" />
@@ -257,6 +258,7 @@
     <CustomAction Id="UnRegisterContextMenuPackages" Return="ignore" Impersonate="yes" Execute="deferred" DllEntry="UnRegisterContextMenuPackagesCA" BinaryRef="PTCustomActions" />
 
     <CustomAction Id="CleanImageResizerRuntimeRegistry" Return="ignore" Impersonate="yes" Execute="deferred" DllEntry="CleanImageResizerRuntimeRegistryCA" BinaryRef="PTCustomActions" />
+    <CustomAction Id="CleanFileConverterRuntimeRegistry" Return="ignore" Impersonate="yes" Execute="deferred" DllEntry="CleanFileConverterRuntimeRegistryCA" BinaryRef="PTCustomActions" />
 
     <CustomAction Id="CleanFileLocksmithRuntimeRegistry" Return="ignore" Impersonate="yes" Execute="deferred" DllEntry="CleanFileLocksmithRuntimeRegistryCA" BinaryRef="PTCustomActions" />
 

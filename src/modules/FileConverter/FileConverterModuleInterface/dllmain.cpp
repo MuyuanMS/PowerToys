@@ -756,31 +756,31 @@ namespace
 
         void ListenerLoop()
         {
+            PipeSecurity security;
+            if (!security.initialize())
+            {
+                Logger::error(L"File Converter could not initialize pipe security.");
+                return;
+            }
+
+            HANDLE pipe_handle = CreateNamedPipeW(
+                m_pipe_name.c_str(),
+                PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE,
+                PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
+                1,
+                0,
+                4096,
+                0,
+                &security.attributes);
+
+            if (pipe_handle == INVALID_HANDLE_VALUE)
+            {
+                Logger::error(L"File Converter could not create its named pipe. Error={}", GetLastError());
+                return;
+            }
+
             while (m_running.load())
             {
-                PipeSecurity security;
-                if (!security.initialize())
-                {
-                    Logger::error(L"File Converter could not initialize pipe security.");
-                    return;
-                }
-
-                HANDLE pipe_handle = CreateNamedPipeW(
-                    m_pipe_name.c_str(),
-                    PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE,
-                    PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
-                    1,
-                    0,
-                    4096,
-                    0,
-                    &security.attributes);
-
-                if (pipe_handle == INVALID_HANDLE_VALUE)
-                {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                    continue;
-                }
-
                 HANDLE connect_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
                 OVERLAPPED connect_overlapped{};
                 connect_overlapped.hEvent = connect_event;
@@ -797,7 +797,6 @@ namespace
                         DWORD ignored = 0;
                         GetOverlappedResult(pipe_handle, &connect_overlapped, &ignored, FALSE);
                         CloseHandle(connect_event);
-                        CloseHandle(pipe_handle);
                         break;
                     }
                     DWORD transferred = 0;
@@ -811,7 +810,7 @@ namespace
                 if (!connected)
                 {
                     CloseHandle(connect_event);
-                    CloseHandle(pipe_handle);
+                    DisconnectNamedPipe(pipe_handle);
                     if (m_running.load())
                     {
                         std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -863,7 +862,6 @@ namespace
                 // Inbound-only server pipes have no outbound data to flush.
                 // Skipping FlushFileBuffers avoids reconnect stalls on malformed-request sequences.
                 DisconnectNamedPipe(pipe_handle);
-                CloseHandle(pipe_handle);
 
                 if (!m_running.load())
                 {
@@ -875,6 +873,8 @@ namespace
                     EnqueuePayload(payload);
                 }
             }
+
+            CloseHandle(pipe_handle);
         }
 
         std::atomic<bool> m_running = false;
