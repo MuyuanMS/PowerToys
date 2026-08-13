@@ -676,6 +676,7 @@ namespace RemappingLogicTests
             Assert::AreEqual(static_cast<size_t>(1), testState.textReplacementSuppressedKeys.count(0x42));
 
             lParam.vkCode = 0x42;
+            testState.ClearTextReplacements();
             Assert::AreEqual(1, static_cast<int>(KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState)));
             Assert::AreEqual(static_cast<size_t>(0), testState.textReplacementSuppressedKeys.size());
         }

@@ -86,7 +86,6 @@ void KeyboardManager::LoadSettings()
     state.textReplacementBuffer.clear();
     state.textReplacementProcessId = 0;
     state.textReplacementWindow = nullptr;
-    state.textReplacementSuppressedKeys.clear();
     try
     {
         // Send telemetry about configured key/shortcut to key/shortcut mappings, OS an app specific level.
