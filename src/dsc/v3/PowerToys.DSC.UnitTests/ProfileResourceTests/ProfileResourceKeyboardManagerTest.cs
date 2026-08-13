@@ -245,6 +245,30 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
         Assert.IsTrue(_settingsEventSignaled);
     }
 
+    [TestMethod]
+    public void Set_AtomicWriteFailureLeavesExistingProfileUntouched()
+    {
+        var originalProfile = new KeyboardManagerProfile();
+        originalProfile.RemapKeys.InProcessRemapKeys.Add(new KeysDataModel
+        {
+            OriginalKeys = "20",
+            NewRemapKeys = "27",
+        });
+        SaveProfile(originalProfile, DefaultProfileFileName);
+        var profilePath = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName, DefaultProfileFileName);
+        var originalJson = _fileSystem.File.ReadAllText(profilePath);
+        var input = CreateInputResourceObject(CreateSampleProfileModel());
+        var data = new ProfileFunctionData(
+            input,
+            () => false,
+            _fileSystem,
+            () => true,
+            (_, _) => throw new IOException("Simulated write failure"));
+
+        Assert.ThrowsException<IOException>(() => data.SetState());
+        Assert.AreEqual(originalJson, _fileSystem.File.ReadAllText(profilePath));
+    }
+
     private DscExecuteResult ExecuteProfileResource(Func<ProfileResource, bool> action)
     {
         var originalOut = Console.Out;

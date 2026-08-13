@@ -117,6 +117,31 @@ public sealed class KbmProfileConverterTests
     }
 
     [TestMethod]
+    public void FromProfile_DecodesActionsIndependentOfStorageSection()
+    {
+        var profile = new KeyboardManagerProfile();
+        profile.RemapShortcuts.GlobalRemapShortcuts.Add(new KeysDataModel
+        {
+            OriginalKeys = "17;65",
+            NewRemapString = "typed",
+        });
+        profile.RemapShortcutsToText.GlobalRemapShortcuts.Add(new KeysDataModel
+        {
+            OriginalKeys = "17;66",
+            OperationType = 1,
+            RunProgramFilePath = "cmd.exe",
+        });
+
+        var model = KbmProfileConverter.FromProfile(profile);
+
+        Assert.AreEqual(2, model.Shortcuts.Count);
+        Assert.AreEqual("Ctrl+A", model.Shortcuts[0].From);
+        Assert.AreEqual("typed", model.Shortcuts[0].ToText);
+        Assert.AreEqual("Ctrl+B", model.Shortcuts[1].From);
+        Assert.AreEqual("cmd.exe", model.Shortcuts[1].RunProgram?.FilePath);
+    }
+
+    [TestMethod]
     public void FromProfile_RemovingInvalidEntryPreservesLaterOverlap()
     {
         var profile = new KeyboardManagerProfile();

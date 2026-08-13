@@ -34,6 +34,7 @@ public sealed class ProfileFunctionData : BaseFunctionData
     private readonly IFile _file;
     private readonly Func<bool> _isProcessElevated;
     private readonly Func<bool> _signalSettingsChangedEvent;
+    private readonly Action<string, string> _writeFileAtomically;
 
     // The stored profile is serialized without null properties to match the
     // shape written by the C++ editor; the engine's JSON reader throws on
@@ -70,13 +71,15 @@ public sealed class ProfileFunctionData : BaseFunctionData
         string? input = null,
         Func<bool>? isProcessElevated = null,
         IFileSystem? fileSystem = null,
-        Func<bool>? signalSettingsChangedEvent = null)
+        Func<bool>? signalSettingsChangedEvent = null,
+        Action<string, string>? writeFileAtomically = null)
     {
         fileSystem ??= new FileSystem();
         _settingsUtils = new SettingsUtils(fileSystem);
         _file = fileSystem.File;
         _isProcessElevated = isProcessElevated ?? GetIsProcessElevated;
         _signalSettingsChangedEvent = signalSettingsChangedEvent ?? SignalSettingsChangedEvent;
+        _writeFileAtomically = writeFileAtomically ?? WriteFileAtomically;
         Output = new();
 
         if (string.IsNullOrEmpty(input))
@@ -182,15 +185,8 @@ public sealed class ProfileFunctionData : BaseFunctionData
 
         var profile = KbmProfileConverter.ToProfile(Input.Profile);
         var profileJson = JsonSerializer.Serialize(profile, _profileSerializerOptions);
-        _settingsUtils.SaveSettings(profileJson, KeyboardManagerSettings.ModuleName, fileName);
-
-        // SettingsUtils.SaveSettings swallows IO exceptions and returns void, so
-        // verify the write actually landed before reporting the profile as
-        // applied or signaling a reload.
-        if (!WriteSucceeded(profileJson, fileName))
-        {
-            throw new IOException($"Failed to write the profile file '{fileName}'.");
-        }
+        var profilePath = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName, fileName);
+        _writeFileAtomically(profilePath, profileJson);
 
         return _signalSettingsChangedEvent();
     }
@@ -202,22 +198,27 @@ public sealed class ProfileFunctionData : BaseFunctionData
     }
 
     /// <summary>
-    /// Verifies that the profile file on disk matches the content that was
-    /// just written, compensating for the exception-swallowing write API.
+    /// Writes a complete profile beside the destination and atomically moves
+    /// it into place so an interrupted or failed write cannot damage the
+    /// existing profile.
     /// </summary>
-    /// <param name="expectedJson">The JSON that was written.</param>
-    /// <param name="fileName">The profile file name.</param>
-    /// <returns>True if the file matches the expected content; otherwise false.</returns>
-    private bool WriteSucceeded(string expectedJson, string fileName)
+    /// <param name="path">The destination profile path.</param>
+    /// <param name="content">The complete serialized profile.</param>
+    private void WriteFileAtomically(string path, string content)
     {
+        var temporaryPath = $"{path}.{Guid.NewGuid():N}.tmp";
+
         try
         {
-            var path = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName, fileName);
-            return _file.Exists(path) && _file.ReadAllText(path) == expectedJson;
+            _file.WriteAllText(temporaryPath, content);
+            _file.Move(temporaryPath, path, true);
         }
-        catch (Exception)
+        finally
         {
-            return false;
+            if (_file.Exists(temporaryPath))
+            {
+                _file.Delete(temporaryPath);
+            }
         }
     }
 

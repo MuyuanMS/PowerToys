@@ -388,85 +388,18 @@ public static class KbmProfileConverter
             }));
         }
 
-        foreach (var (stored, app) in EnumerateShortcuts(profile.RemapShortcuts, warnings))
+        foreach (var section in new[] { profile.RemapShortcuts, profile.RemapShortcutsToText })
         {
-            var entry = CreateShortcutEntry(stored, app, warnings);
-            if (entry == null)
+            foreach (var (stored, app) in EnumerateShortcuts(section, warnings))
             {
-                continue;
-            }
-
-            if (stored.OperationType == OperationTypeRunProgram)
-            {
-                if (string.IsNullOrWhiteSpace(stored.RunProgramFilePath))
+                var entry = CreateShortcutEntry(stored, app, warnings);
+                if (entry == null || !TrySetShortcutAction(entry, stored, warnings))
                 {
-                    warnings?.Add($"Skipping run-program remap entry '{stored.OriginalKeys}' without a program path");
                     continue;
                 }
 
-                entry.RunProgram = new KbmRunProgramAction
-                {
-                    FilePath = stored.RunProgramFilePath,
-                    Args = NullIfEmpty(stored.RunProgramArgs),
-                    StartInDir = NullIfEmpty(stored.RunProgramStartInDir),
-                    Elevation = FormatEnumValue(stored.RunProgramElevationLevel, _elevationNames, $"runProgram.elevation for '{stored.OriginalKeys}'", warnings),
-                    IfRunning = FormatEnumValue(stored.RunProgramAlreadyRunningAction, _ifRunningNames, $"runProgram.ifRunning for '{stored.OriginalKeys}'", warnings),
-                    WindowStyle = FormatEnumValue(stored.RunProgramStartWindowType, _windowStyleNames, $"runProgram.windowStyle for '{stored.OriginalKeys}'", warnings),
-                };
+                shortcuts.Add(entry);
             }
-            else if (stored.OperationType == OperationTypeOpenUri)
-            {
-                if (string.IsNullOrWhiteSpace(stored.OpenUri))
-                {
-                    warnings?.Add($"Skipping open-URI remap entry '{stored.OriginalKeys}' without a URI");
-                    continue;
-                }
-
-                entry.OpenUri = stored.OpenUri;
-            }
-            else
-            {
-                if (!KbmShortcutParser.TryParseVkString(stored.NewRemapKeys, 0, out var to))
-                {
-                    warnings?.Add($"Skipping unparsable shortcut remap entry '{stored.OriginalKeys}'");
-                    continue;
-                }
-
-                var target = KbmShortcutParser.Format(KbmShortcutParser.Canonicalize(to));
-
-                // Ensure the exported target is one that Validate accepts on a
-                // subsequent set (e.g. a numeric-only stored value like '17;18'
-                // would render as a modifier-only 'Ctrl+Alt', which is not a
-                // supported target); skip it with a warning otherwise so the
-                // exported state stays importable.
-                if (!TryParseTarget(target, out _, out _))
-                {
-                    warnings?.Add($"Skipping shortcut remap entry '{stored.OriginalKeys}' with an unsupported target '{target}'");
-                    continue;
-                }
-
-                entry.To = target;
-            }
-
-            shortcuts.Add(entry);
-        }
-
-        foreach (var (stored, app) in EnumerateShortcuts(profile.RemapShortcutsToText, warnings))
-        {
-            var entry = CreateShortcutEntry(stored, app, warnings);
-            if (entry == null)
-            {
-                continue;
-            }
-
-            if (string.IsNullOrEmpty(stored.NewRemapString))
-            {
-                warnings?.Add($"Skipping shortcut-to-text remap entry '{stored.OriginalKeys}' without text");
-                continue;
-            }
-
-            entry.ToText = stored.NewRemapString;
-            shortcuts.Add(entry);
         }
 
         var result = new KbmProfileModel
@@ -486,6 +419,75 @@ public static class KbmProfileConverter
         // a subsequent set.
         RemoveNonImportableEntries(result, warnings);
         return result;
+    }
+
+    private static bool TrySetShortcutAction(KbmShortcutRemapEntry entry, KeysDataModel stored, IList<string>? warnings)
+    {
+        if (stored.OperationType == OperationTypeRunProgram)
+        {
+            if (string.IsNullOrWhiteSpace(stored.RunProgramFilePath))
+            {
+                warnings?.Add($"Skipping run-program remap entry '{stored.OriginalKeys}' without a program path");
+                return false;
+            }
+
+            entry.RunProgram = new KbmRunProgramAction
+            {
+                FilePath = stored.RunProgramFilePath,
+                Args = NullIfEmpty(stored.RunProgramArgs),
+                StartInDir = NullIfEmpty(stored.RunProgramStartInDir),
+                Elevation = FormatEnumValue(stored.RunProgramElevationLevel, _elevationNames, $"runProgram.elevation for '{stored.OriginalKeys}'", warnings),
+                IfRunning = FormatEnumValue(stored.RunProgramAlreadyRunningAction, _ifRunningNames, $"runProgram.ifRunning for '{stored.OriginalKeys}'", warnings),
+                WindowStyle = FormatEnumValue(stored.RunProgramStartWindowType, _windowStyleNames, $"runProgram.windowStyle for '{stored.OriginalKeys}'", warnings),
+            };
+            return true;
+        }
+
+        if (stored.OperationType == OperationTypeOpenUri)
+        {
+            if (string.IsNullOrWhiteSpace(stored.OpenUri))
+            {
+                warnings?.Add($"Skipping open-URI remap entry '{stored.OriginalKeys}' without a URI");
+                return false;
+            }
+
+            entry.OpenUri = stored.OpenUri;
+            return true;
+        }
+
+        if (string.IsNullOrEmpty(stored.NewRemapKeys))
+        {
+            if (string.IsNullOrEmpty(stored.NewRemapString))
+            {
+                warnings?.Add($"Skipping shortcut remap entry '{stored.OriginalKeys}' without a target");
+                return false;
+            }
+
+            entry.ToText = stored.NewRemapString;
+            return true;
+        }
+
+        if (!KbmShortcutParser.TryParseVkString(stored.NewRemapKeys, 0, out var to))
+        {
+            warnings?.Add($"Skipping unparsable shortcut remap entry '{stored.OriginalKeys}'");
+            return false;
+        }
+
+        var target = KbmShortcutParser.Format(KbmShortcutParser.Canonicalize(to));
+
+        // Ensure the exported target is one that Validate accepts on a
+        // subsequent set (e.g. a numeric-only stored value like '17;18'
+        // would render as a modifier-only 'Ctrl+Alt', which is not a
+        // supported target); skip it with a warning otherwise so the
+        // exported state stays importable.
+        if (!TryParseTarget(target, out _, out _))
+        {
+            warnings?.Add($"Skipping shortcut remap entry '{stored.OriginalKeys}' with an unsupported target '{target}'");
+            return false;
+        }
+
+        entry.To = target;
+        return true;
     }
 
     private static readonly Regex EntryContextRegex = new(@"^(keys|shortcuts)\[(\d+)\]", RegexOptions.Compiled | RegexOptions.CultureInvariant);
