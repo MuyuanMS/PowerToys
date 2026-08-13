@@ -29,6 +29,10 @@ namespace WorkspacesCsharpLibrary.SettingsService;
 /// </summary>
 public static class ServiceProvisioner
 {
+    private const string SettingsServicePackageName = "Microsoft.PowerToys.SettingsService";
+    private const string SettingsServicePackageFamilyName = "Microsoft.PowerToys.SettingsService_8wekyb3d8bbwe";
+    private const string MicrosoftPublisher = "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US";
+
     /// <summary>Result of an attempt to provision the service for the current user.</summary>
     public enum Outcome
     {
@@ -231,9 +235,10 @@ public static class ServiceProvisioner
     /// <summary>
     /// Builds the elevated provisioning command.  In ONE
     /// elevation it (1) stages/updates the SIGNED service MSIX into immutable
-    /// WindowsApps via <c>Add-AppxPackage</c> (the OS verifies its signature on
-    /// deploy, so this cannot run attacker code), then (2) launches the staged,
-    /// signed service exe with <c>--register &lt;SID&gt;</c>, which self-registers
+    /// WindowsApps via <c>Add-AppxPackage</c>, then verifies the installed package
+    /// family, Microsoft publisher, executable location, Authenticode signer, and
+    /// file version before launching the staged service exe with
+    /// <c>--register &lt;SID&gt;</c>, which self-registers
     /// the per-user virtual-account service (NT SERVICE\PTSettingsSvc_&lt;SID&gt;),
     /// provisions the protected %ProgramData% store, and starts it.  The exe
     /// resolves its OWN path (never a caller argument), so a non-admin cannot aim
@@ -268,14 +273,22 @@ public static class ServiceProvisioner
         return "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "
              + "\""
              + "Add-AppxPackage -Path '" + PsLit(serviceMsix) + "' -ForceApplicationShutdown; "
-             + "$loc = (Get-AppxPackage -Name 'Microsoft.PowerToys.SettingsService' | Select-Object -First 1).InstallLocation; "
-             + "if (-not $loc) { exit 3 }; "
-             + "$exe = Join-Path $loc 'PowerToys.PTSettingsSvc.exe'; "
-             + "$actualVersion = (Get-Item $exe).VersionInfo.FileVersion; "
-             + "if ([version]$actualVersion -ne [version]'" + PsLit(expectedVersion) + "') { exit 4 }; "
+             + "$pkg = Get-AppxPackage -PackageFamilyName '" + SettingsServicePackageFamilyName + "' "
+             + "| Where-Object { $_.Name -eq '" + SettingsServicePackageName + "' -and $_.Publisher -eq '" + PsLit(MicrosoftPublisher) + "' } "
+             + "| Select-Object -First 1; "
+             + "if (-not $pkg) { exit 3 }; "
+             + "$loc = (Resolve-Path -LiteralPath $pkg.InstallLocation).Path.TrimEnd('\\'); "
+             + "$exe = (Resolve-Path -LiteralPath (Join-Path $loc 'PowerToys.PTSettingsSvc.exe')).Path; "
+             + "if (-not $exe.StartsWith($loc + '\\', [System.StringComparison]::OrdinalIgnoreCase)) { exit 4 }; "
+             + "$signature = Get-AuthenticodeSignature -LiteralPath $exe; "
+             + "if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid "
+             + "-or -not $signature.SignerCertificate "
+             + "-or $signature.SignerCertificate.Subject -ne '" + PsLit(MicrosoftPublisher) + "') { exit 5 }; "
+             + "$actualVersion = (Get-Item -LiteralPath $exe).VersionInfo.FileVersion; "
+             + "if ([version]$actualVersion -ne [version]'" + PsLit(expectedVersion) + "') { exit 6 }; "
              + "& $exe --register '" + PsLit(userSid) + "'; "
              + "$registerExit = $LASTEXITCODE; "
-             + "if ($registerExit -eq 0) { Get-AppxPackage -Name 'Microsoft.PowerToys.SettingsService' | Remove-AppxPackage }; "
+             + "if ($registerExit -eq 0) { Remove-AppxPackage -Package $pkg.PackageFullName }; "
              + "exit $registerExit"
              + "\"";
     }
