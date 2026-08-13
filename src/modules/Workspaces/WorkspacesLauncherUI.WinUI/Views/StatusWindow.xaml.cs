@@ -27,7 +27,6 @@ namespace WorkspacesLauncherUI
 
             // Configure window size and behavior
             var appWindow = this.AppWindow;
-            appWindow.Resize(new Windows.Graphics.SizeInt32(360, 360));
             appWindow.SetIcon("Assets/Workspaces/Workspaces.ico");
 
             if (appWindow.Presenter is OverlappedPresenter presenter)
@@ -59,10 +58,18 @@ namespace WorkspacesLauncherUI
 
             StatusPageView.CloseRequested += StatusPage_CloseRequested;
 
+            this.Activated += Window_Activated;
             this.Closed += Window_Closed;
+        }
 
-            // Center on screen
-            CenterOnScreen(appWindow);
+        private void Window_Activated(object sender, WindowActivatedEventArgs args)
+        {
+            this.Activated -= Window_Activated;
+
+            double rasterizationScale = Content.XamlRoot.RasterizationScale;
+            int windowSize = (int)Math.Round(360 * rasterizationScale);
+            AppWindow.Resize(new Windows.Graphics.SizeInt32(windowSize, windowSize));
+            CenterOnScreen(AppWindow);
         }
 
         private static void CenterOnScreen(AppWindow appWindow)
@@ -70,8 +77,8 @@ namespace WorkspacesLauncherUI
             var displayArea = DisplayArea.GetFromWindowId(appWindow.Id, DisplayAreaFallback.Nearest);
             if (displayArea != null)
             {
-                int centerX = (displayArea.WorkArea.Width - appWindow.Size.Width) / 2;
-                int centerY = (displayArea.WorkArea.Height - appWindow.Size.Height) / 2;
+                int centerX = displayArea.WorkArea.X + ((displayArea.WorkArea.Width - appWindow.Size.Width) / 2);
+                int centerY = displayArea.WorkArea.Y + ((displayArea.WorkArea.Height - appWindow.Size.Height) / 2);
                 appWindow.Move(new Windows.Graphics.PointInt32(centerX, centerY));
             }
         }
