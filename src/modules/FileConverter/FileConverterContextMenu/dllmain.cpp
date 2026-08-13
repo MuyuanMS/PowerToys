@@ -366,7 +366,7 @@ namespace
             0,
             nullptr,
             OPEN_EXISTING,
-            SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION,
+            SECURITY_SQOS_PRESENT | SECURITY_IMPERSONATION,
             nullptr);
 
         if (pipe_handle == INVALID_HANDLE_VALUE)

@@ -5,7 +5,7 @@ param(
     [string]$VerbName = "Convert to...",
     [int]$InvokeTimeoutMs = 20000,
     [int]$OutputWaitTimeoutMs = 10000,
-    [switch]$UseDirectComFallback
+    [switch]$UseDirectComFallback = $true
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,9 +30,28 @@ function Ensure-SmokeTestFixture([string]$Path)
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..")).Path
 . (Join-Path $repoRoot "tools\Verification scripts\FileConverter\FileConverterSmokeTestSettings.ps1")
+$previousRunner = Get-Process PowerToys -ErrorAction SilentlyContinue | Select-Object -First 1
+$previousRunnerPath = $previousRunner.Path
+$previousTestClientDirectory = $env:POWERTOYS_FILECONVERTER_TEST_CLIENT_DIR
+Get-Process PowerToys -ErrorAction SilentlyContinue |
+    ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
 $settingsSnapshot = Enable-FileConverterForSmokeTest
+$runnerPath = Join-Path $repoRoot "x64\Debug\PowerToys.exe"
+$smokeRunner = $null
 try
 {
+if (-not (Test-Path -LiteralPath $runnerPath))
+{
+    throw "Debug Runner not found at: $runnerPath"
+}
+
+Remove-Item Env:\POWERTOYS_FILECONVERTER_TEST_CLIENT_DIR -ErrorAction SilentlyContinue
+$smokeRunner = Start-Process -FilePath $runnerPath -PassThru
+Start-Sleep -Seconds 1
+if ($smokeRunner.HasExited)
+{
+    throw "Debug Runner exited before Explorer verb activation."
+}
 
 $inputPath = Join-Path $TestDirectory $InputFileName
 Ensure-SmokeTestFixture -Path $inputPath
@@ -345,18 +364,12 @@ if ($invokeResult -eq "Verb not found")
         throw "The Explorer-hosted verb was not found. Re-run with -UseDirectComFallback to restart the Debug Runner in authenticated test-client mode before direct COM activation."
     }
 
-    $runnerPath = Join-Path $repoRoot "x64\Debug\PowerToys.exe"
-    if (-not (Test-Path -LiteralPath $runnerPath))
-    {
-        throw "Debug Runner not found at: $runnerPath"
-    }
-
     Get-Process PowerToys -ErrorAction SilentlyContinue |
         ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
     $env:POWERTOYS_FILECONVERTER_TEST_CLIENT_DIR = Split-Path -Parent (Get-Process -Id $PID).Path
-    $runner = Start-Process -FilePath $runnerPath -PassThru
+    $smokeRunner = Start-Process -FilePath $runnerPath -PassThru
     Start-Sleep -Seconds 1
-    if ($runner.HasExited)
+    if ($smokeRunner.HasExited)
     {
         throw "Debug Runner exited before direct COM activation."
     }
@@ -392,5 +405,19 @@ Write-Host "Size: $($item.Length)"
 }
 finally
 {
+    Get-Process PowerToys -ErrorAction SilentlyContinue |
+        ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
     Restore-FileConverterSmokeTestSettings -Snapshot $settingsSnapshot
+    if ($null -eq $previousTestClientDirectory)
+    {
+        Remove-Item Env:\POWERTOYS_FILECONVERTER_TEST_CLIENT_DIR -ErrorAction SilentlyContinue
+    }
+    else
+    {
+        $env:POWERTOYS_FILECONVERTER_TEST_CLIENT_DIR = $previousTestClientDirectory
+    }
+    if (-not [string]::IsNullOrWhiteSpace($previousRunnerPath) -and (Test-Path -LiteralPath $previousRunnerPath))
+    {
+        Start-Process -FilePath $previousRunnerPath | Out-Null
+    }
 }

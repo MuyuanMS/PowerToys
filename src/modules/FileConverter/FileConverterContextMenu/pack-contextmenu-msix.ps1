@@ -208,6 +208,7 @@ if (-not (Test-Path $contextMenuDll)) {
 }
 
 $stagingRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("FileConverterContextMenuPackage_" + [System.Guid]::NewGuid().ToString("N"))
+$timestampedPackage = Join-Path ([System.IO.Path]::GetTempPath()) ("FileConverterContextMenuPackage_" + [System.Guid]::NewGuid().ToString("N") + ".msix")
 New-Item -Path $stagingRoot -ItemType Directory -Force | Out-Null
 
 try {
@@ -246,7 +247,6 @@ try {
     Remove-Item $priConfig -Force
 
     $makeAppx = Get-MakeAppxPath
-    $timestampedPackage = Join-Path $stagingRoot "FileConverterContextMenuPackage.msix"
     $stablePackage = Join-Path $outDir "FileConverterContextMenuPackage.msix"
 
     Write-Host "Using MakeAppx:" $makeAppx
@@ -321,4 +321,5 @@ try {
 }
 finally {
     Remove-Item -Path $stagingRoot -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path $timestampedPackage -Force -ErrorAction SilentlyContinue
 }
