@@ -137,7 +137,13 @@ namespace
 
         PROPVARIANT value;
         PropVariantInit(&value);
-        const HRESULT hr = reader->GetMetadataByName(L"/app1/ifd/{ushort=274}", &value);
+        HRESULT hr = reader->GetMetadataByName(L"/app1/ifd/{ushort=274}", &value);
+        if (FAILED(hr) || value.vt != VT_UI2)
+        {
+            PropVariantClear(&value);
+            PropVariantInit(&value);
+            hr = reader->GetMetadataByName(L"/ifd/{ushort=274}", &value);
+        }
         const unsigned short orientation = SUCCEEDED(hr) && value.vt == VT_UI2 ? value.uiVal : 1;
         PropVariantClear(&value);
 
@@ -267,14 +273,14 @@ namespace file_converter
             return { hr, HrMessage(LoadLocalizedString(L"FileConverter_Engine_ReadPixelFormatFailed", L"Failed reading source pixel format."), hr) };
         }
 
+        TemporaryFile temporary{ output_path + L".tmp-" + std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(GetTickCount64()) };
+
         Microsoft::WRL::ComPtr<IWICStream> output_stream;
         hr = factory->CreateStream(&output_stream);
         if (FAILED(hr))
         {
             return { hr, HrMessage(LoadLocalizedString(L"FileConverter_Engine_CreateStreamFailed", L"Failed creating WIC stream."), hr) };
         }
-
-        TemporaryFile temporary{ output_path + L".tmp-" + std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(GetTickCount64()) };
 
         hr = output_stream->InitializeFromFilename(temporary.path.c_str(), GENERIC_WRITE);
         if (FAILED(hr))
