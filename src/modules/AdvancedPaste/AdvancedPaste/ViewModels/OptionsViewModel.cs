@@ -901,6 +901,7 @@ namespace AdvancedPaste.ViewModels
             Logger.LogDebug($"Started executing PasteAsKeystrokes from source {source}");
 
             IsBusy = true;
+            _pasteActionCancellationTokenSource = new();
             PasteActionError = PasteActionError.None;
             var restoreWindowOnFailure = Visible;
 
@@ -930,7 +931,7 @@ namespace AdvancedPaste.ViewModels
                 await Task.Delay(100);
 
                 // Send the text as keystrokes on a background thread
-                var completed = await Task.Run(() => _keystrokeService.SendTextAsKeystrokes(text));
+                var completed = await Task.Run(() => _keystrokeService.SendTextAsKeystrokes(text, _pasteActionCancellationTokenSource.Token));
                 if (!completed)
                 {
                     PasteActionError = PasteActionError.FromResourceId("PasteActionCanceled");
@@ -956,6 +957,8 @@ namespace AdvancedPaste.ViewModels
             finally
             {
                 IsBusy = false;
+                _pasteActionCancellationTokenSource?.Dispose();
+                _pasteActionCancellationTokenSource = null;
             }
         }
 
