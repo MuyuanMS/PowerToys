@@ -47,7 +47,7 @@ public enum PasteFormats
         SupportedClipboardFormats = ClipboardFormat.Text,
         IPCKey = AdvancedPasteAdditionalActions.PropertyNames.FixSpellingAndGrammar,
         KernelFunctionDescription = "Fixes all spelling and grammar errors in the clipboard text and returns the corrected version.")]
-    FixSpellingAndGrammar,
+    FixSpellingAndGrammar = 3,
 
     [PasteFormatMetadata(
         IsCoreAction = true,
@@ -56,7 +56,7 @@ public enum PasteFormats
         RequiresAIService = false,
         CanPreview = false,
         SupportedClipboardFormats = ClipboardFormat.Text)]
-    PasteAsKeystrokes = 11,
+    PasteAsKeystrokes = 12,
 
     [PasteFormatMetadata(
         IsCoreAction = false,
@@ -67,7 +67,7 @@ public enum PasteFormats
         SupportedClipboardFormats = ClipboardFormat.Image,
         IPCKey = AdvancedPasteAdditionalActions.PropertyNames.ImageToText,
         KernelFunctionDescription = "Takes an image from the clipboard and extracts text using OCR. This function is intended only for explicit text extraction or OCR requests.")]
-    ImageToText = 3,
+    ImageToText = 4,
 
     [PasteFormatMetadata(
         IsCoreAction = false,
@@ -78,7 +78,7 @@ public enum PasteFormats
         SupportedClipboardFormats = ClipboardFormat.Text | ClipboardFormat.Html,
         IPCKey = AdvancedPastePasteAsFileAction.PropertyNames.PasteAsTxtFile,
         KernelFunctionDescription = "Takes text or HTML data in the clipboard and transforms it to a TXT file.")]
-    PasteAsTxtFile = 4,
+    PasteAsTxtFile = 5,
 
     [PasteFormatMetadata(
         IsCoreAction = false,
@@ -89,7 +89,7 @@ public enum PasteFormats
         SupportedClipboardFormats = ClipboardFormat.Image,
         IPCKey = AdvancedPastePasteAsFileAction.PropertyNames.PasteAsPngFile,
         KernelFunctionDescription = "Takes an image in the clipboard and transforms it to a PNG file.")]
-    PasteAsPngFile = 5,
+    PasteAsPngFile = 6,
 
     [PasteFormatMetadata(
         IsCoreAction = false,
@@ -100,7 +100,7 @@ public enum PasteFormats
         SupportedClipboardFormats = ClipboardFormat.Html,
         IPCKey = AdvancedPastePasteAsFileAction.PropertyNames.PasteAsHtmlFile,
         KernelFunctionDescription = "Takes HTML data in the clipboard and transforms it to an HTML file.")]
-    PasteAsHtmlFile = 6,
+    PasteAsHtmlFile = 7,
 
     [PasteFormatMetadata(
         IsCoreAction = false,
@@ -111,7 +111,7 @@ public enum PasteFormats
         SupportedClipboardFormats = ClipboardFormat.Audio | ClipboardFormat.Video,
         IPCKey = AdvancedPasteTranscodeAction.PropertyNames.TranscodeToMp3,
         KernelFunctionDescription = "Takes an audio or video file in the clipboard and transcodes it to MP3.")]
-    TranscodeToMp3 = 7,
+    TranscodeToMp3 = 8,
 
     [PasteFormatMetadata(
         IsCoreAction = false,
@@ -122,7 +122,7 @@ public enum PasteFormats
         SupportedClipboardFormats = ClipboardFormat.Video,
         IPCKey = AdvancedPasteTranscodeAction.PropertyNames.TranscodeToMp4,
         KernelFunctionDescription = "Takes a video file in the clipboard and transcodes it to MP4 (H.264/AAC).")]
-    TranscodeToMp4 = 8,
+    TranscodeToMp4 = 9,
 
     [PasteFormatMetadata(
         IsCoreAction = false,
@@ -131,7 +131,7 @@ public enum PasteFormats
         CanPreview = true,
         SupportedClipboardFormats = ClipboardFormat.Text | ClipboardFormat.Html | ClipboardFormat.Audio | ClipboardFormat.Video | ClipboardFormat.Image,
         RequiresPrompt = true)]
-    KernelQuery = 9,
+    KernelQuery = 10,
 
     [PasteFormatMetadata(
         IsCoreAction = false,
@@ -141,5 +141,5 @@ public enum PasteFormats
         SupportedClipboardFormats = ClipboardFormat.Text | ClipboardFormat.Image,
         KernelFunctionDescription = "Takes user instructions and applies them to the current clipboard content (text or image). Use this function for image analysis, description, or transformation tasks beyond simple OCR.",
         RequiresPrompt = true)]
-    CustomTextTransformation = 10,
+    CustomTextTransformation = 11,
 }
