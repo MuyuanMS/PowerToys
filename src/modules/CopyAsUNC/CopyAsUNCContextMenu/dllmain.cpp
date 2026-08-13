@@ -90,7 +90,7 @@ public:
                 {
                     // Check first 3 chars for drive root (e.g. "Z:\")
                     std::wstring root(filePath, min((size_t)3, wcslen(filePath)));
-                    if (GetDriveTypeW(root.c_str()) == DRIVE_REMOTE)
+                    if (PathIsUNCW(filePath) || GetDriveTypeW(root.c_str()) == DRIVE_REMOTE)
                     {
                         *cmdState = ECS_ENABLED;
                     }
@@ -104,6 +104,7 @@ public:
     }
 
     IFACEMETHODIMP Invoke(_In_opt_ IShellItemArray* selection, _In_opt_ IBindCtx*) noexcept
+    try
     {
         if (!selection)
             return S_OK;
@@ -156,7 +157,10 @@ public:
                         {
                             memcpy(locked, uncPath.c_str(), byteLen);
                             GlobalUnlock(hMem);
-                            SetClipboardData(CF_UNICODETEXT, hMem);
+                            if (SetClipboardData(CF_UNICODETEXT, hMem) == nullptr)
+                            {
+                                GlobalFree(hMem);
+                            }
                         }
                         else
                         {
@@ -172,6 +176,10 @@ public:
 
         item->Release();
         return S_OK;
+    }
+    catch (...)
+    {
+        return E_FAIL;
     }
 
     IFACEMETHODIMP GetFlags(_Out_ EXPCMDFLAGS* flags)

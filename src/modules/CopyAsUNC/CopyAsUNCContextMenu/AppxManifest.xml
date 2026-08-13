@@ -46,7 +46,7 @@
         <com:Extension Category="windows.comServer" uap10:RuntimeBehavior="packagedClassicApp">
           <com:ComServer>
             <com:SurrogateServer DisplayName="Context menu verb handler">
-              <com:Class Id="89A22F51-9ED6-48FE-81FE-5DFD36F8CD32" Path="PowerToys.CopyAsUNCContextMenu.dll" ThreadingModel="STA"/>
+              <com:Class Id="89A22F51-9ED6-48FE-81FE-5DFD36F8CD32" Path="WinUI3Apps\PowerToys.CopyAsUNCContextMenu.dll" ThreadingModel="STA"/>
             </com:SurrogateServer>
           </com:ComServer>
         </com:Extension>

@@ -203,6 +203,21 @@ namespace ViewModelTests
         }
 
         [TestMethod]
+        public void CopyAsUNCIsEnabledShouldSendGeneralSettingsWhenSuccessful()
+        {
+            Func<string, int> sendMockIPCConfigMSG = msg =>
+            {
+                OutGoingGeneralSettings snd = JsonSerializer.Deserialize<OutGoingGeneralSettings>(msg);
+                Assert.IsFalse(snd.GeneralSettings.Enabled.CopyAsUNC);
+                return 0;
+            };
+
+            PowerPreviewViewModel viewModel = new PowerPreviewViewModel(SettingsRepository<PowerPreviewSettings>.GetInstance(mockPowerPreviewSettingsUtils.Object), SettingsRepository<GeneralSettings>.GetInstance(mockGeneralSettingsUtils.Object), sendMockIPCConfigMSG, PowerPreviewSettings.ModuleName);
+
+            viewModel.IsCopyAsUNCEnabled = false;
+        }
+
+        [TestMethod]
         public void MDRenderIsEnabledShouldPrevHandlerWhenSuccessful()
         {
             // Assert

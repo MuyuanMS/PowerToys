@@ -53,8 +53,12 @@
       <ModuleDefinitionFile>Source.def</ModuleDefinitionFile>
     </Link>
     <PreBuildEvent>
-      <Command>del $(OutDir)\CopyAsUNCContextMenuPackage.msix /q
-MakeAppx.exe pack /d . /p $(OutDir)CopyAsUNCContextMenuPackage.msix /nv</Command>
+      <Command>if exist "$(IntDir)PackageLayout" rmdir /s /q "$(IntDir)PackageLayout"
+mkdir "$(IntDir)PackageLayout"
+copy /Y "$(ProjectDir)AppxManifest.xml" "$(IntDir)PackageLayout\AppxManifest.xml"
+xcopy /E /I /Y "$(ProjectDir)Assets" "$(IntDir)PackageLayout\Assets"
+if exist "$(OutDir)CopyAsUNCContextMenuPackage.msix" del "$(OutDir)CopyAsUNCContextMenuPackage.msix" /q
+MakeAppx.exe pack /d "$(IntDir)PackageLayout" /p "$(OutDir)CopyAsUNCContextMenuPackage.msix" /nv</Command>
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>if not exist "$(OutDir)Assets\CopyAsUNC\" mkdir "$(OutDir)Assets\CopyAsUNC\"
@@ -81,8 +85,12 @@ xcopy /Y "$(ProjectDir)Assets\CopyAsUNC\CopyAsUNC.ico" "$(OutDir)Assets\CopyAsUN
       <ModuleDefinitionFile>Source.def</ModuleDefinitionFile>
     </Link>
     <PreBuildEvent>
-      <Command>del $(OutDir)\CopyAsUNCContextMenuPackage.msix /q
-MakeAppx.exe pack /d . /p $(OutDir)CopyAsUNCContextMenuPackage.msix /nv</Command>
+      <Command>if exist "$(IntDir)PackageLayout" rmdir /s /q "$(IntDir)PackageLayout"
+mkdir "$(IntDir)PackageLayout"
+copy /Y "$(ProjectDir)AppxManifest.xml" "$(IntDir)PackageLayout\AppxManifest.xml"
+xcopy /E /I /Y "$(ProjectDir)Assets" "$(IntDir)PackageLayout\Assets"
+if exist "$(OutDir)CopyAsUNCContextMenuPackage.msix" del "$(OutDir)CopyAsUNCContextMenuPackage.msix" /q
+MakeAppx.exe pack /d "$(IntDir)PackageLayout" /p "$(OutDir)CopyAsUNCContextMenuPackage.msix" /nv</Command>
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>if not exist "$(OutDir)Assets\CopyAsUNC\" mkdir "$(OutDir)Assets\CopyAsUNC\"
@@ -147,14 +155,14 @@ xcopy /Y "$(ProjectDir)Assets\CopyAsUNC\CopyAsUNC.ico" "$(OutDir)Assets\CopyAsUN
   <Import Project="$(RepoRoot)deps\spdlog.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="$(RepoRoot)packages\Microsoft.Windows.ImplementationLibrary.1.0.231216.1\build\native\Microsoft.Windows.ImplementationLibrary.targets" Condition="Exists('$(RepoRoot)packages\Microsoft.Windows.ImplementationLibrary.1.0.231216.1\build\native\Microsoft.Windows.ImplementationLibrary.targets')" />
+    <Import Project="$(RepoRoot)packages\Microsoft.Windows.ImplementationLibrary.1.0.260126.7\build\native\Microsoft.Windows.ImplementationLibrary.targets" Condition="Exists('$(RepoRoot)packages\Microsoft.Windows.ImplementationLibrary.1.0.260126.7\build\native\Microsoft.Windows.ImplementationLibrary.targets')" />
     <Import Project="$(RepoRoot)packages\Microsoft.Windows.CppWinRT.2.0.250303.1\build\native\Microsoft.Windows.CppWinRT.targets" Condition="Exists('$(RepoRoot)packages\Microsoft.Windows.CppWinRT.2.0.250303.1\build\native\Microsoft.Windows.CppWinRT.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('$(RepoRoot)packages\Microsoft.Windows.ImplementationLibrary.1.0.231216.1\build\native\Microsoft.Windows.ImplementationLibrary.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(RepoRoot)packages\Microsoft.Windows.ImplementationLibrary.1.0.231216.1\build\native\Microsoft.Windows.ImplementationLibrary.targets'))" />
+    <Error Condition="!Exists('$(RepoRoot)packages\Microsoft.Windows.ImplementationLibrary.1.0.260126.7\build\native\Microsoft.Windows.ImplementationLibrary.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(RepoRoot)packages\Microsoft.Windows.ImplementationLibrary.1.0.260126.7\build\native\Microsoft.Windows.ImplementationLibrary.targets'))" />
     <Error Condition="!Exists('$(RepoRoot)packages\Microsoft.Windows.CppWinRT.2.0.250303.1\build\native\Microsoft.Windows.CppWinRT.props')" Text="$([System.String]::Format('$(ErrorText)', '$(RepoRoot)packages\Microsoft.Windows.CppWinRT.2.0.250303.1\build\native\Microsoft.Windows.CppWinRT.props'))" />
     <Error Condition="!Exists('$(RepoRoot)packages\Microsoft.Windows.CppWinRT.2.0.250303.1\build\native\Microsoft.Windows.CppWinRT.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(RepoRoot)packages\Microsoft.Windows.CppWinRT.2.0.250303.1\build\native\Microsoft.Windows.CppWinRT.targets'))" />
   </Target>
