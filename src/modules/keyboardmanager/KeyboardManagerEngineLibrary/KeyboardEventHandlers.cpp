@@ -2111,8 +2111,14 @@ namespace KeyboardEventHandlers
 
     intptr_t HandleTextReplacementEvent(KeyboardManagerInput::InputInterface& ii, LowlevelKeyboardEvent* data, State& state)
     {
-        if ((GeneratedByKBM(data) && data->lParam->dwExtraInfo != KeyboardManagerConstants::KEYBOARDMANAGER_SINGLEKEY_FLAG) || state.textReplacements.empty())
+        if (state.textReplacements.empty())
         {
+            return 0;
+        }
+
+        if (GeneratedByKBM(data) && data->lParam->dwExtraInfo != KeyboardManagerConstants::KEYBOARDMANAGER_SINGLEKEY_FLAG)
+        {
+            state.textReplacementBuffer.clear();
             return 0;
         }
 

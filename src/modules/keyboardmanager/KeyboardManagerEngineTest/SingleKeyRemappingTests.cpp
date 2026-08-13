@@ -697,6 +697,24 @@ namespace RemappingLogicTests
             Assert::AreEqual(std::wstring(), testState.textReplacementBuffer);
         }
 
+        TEST_METHOD (HandleTextReplacementEvent_ShouldClearBufferForInjectedText)
+        {
+            testState.AddTextReplacement(L"ab", L"hello");
+            testState.textReplacementBuffer = L"a";
+
+            KBDLLHOOKSTRUCT lParam{};
+            lParam.vkCode = 0;
+            lParam.dwExtraInfo = KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG;
+            LowlevelKeyboardEvent keyEvent{};
+            keyEvent.wParam = WM_KEYDOWN;
+            keyEvent.lParam = &lParam;
+
+            intptr_t result = KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState);
+
+            Assert::AreEqual(0, static_cast<int>(result));
+            Assert::AreEqual(std::wstring(), testState.textReplacementBuffer);
+        }
+
         TEST_METHOD (HandleTextReplacementEvent_ShouldClearBufferAndIgnoreInput_WhenShortcutModifierIsPressed)
         {
             testState.AddTextReplacement(L" ", L"hello");
