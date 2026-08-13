@@ -116,9 +116,8 @@ namespace
 
     bool IsTextReplacementShortcutModifierPressed(KeyboardManagerInput::InputInterface& ii)
     {
-        const bool isAltGrPressed = ii.GetVirtualKeyState(VK_LCONTROL) && ii.GetVirtualKeyState(VK_RMENU);
-        return (!isAltGrPressed && (IsModifierPressed(ii, VK_CONTROL, VK_LCONTROL, VK_RCONTROL) ||
-                                    IsModifierPressed(ii, VK_MENU, VK_LMENU, VK_RMENU))) ||
+        return IsModifierPressed(ii, VK_CONTROL, VK_LCONTROL, VK_RCONTROL) ||
+               IsModifierPressed(ii, VK_MENU, VK_LMENU, VK_RMENU) ||
                ii.GetVirtualKeyState(VK_LWIN) ||
                ii.GetVirtualKeyState(VK_RWIN) ||
                ii.GetVirtualKeyState(CommonSharedConstants::VK_WIN_BOTH);
@@ -2103,6 +2102,13 @@ namespace KeyboardEventHandlers
             return 0;
         }
 
+        const DWORD vkCode = Helpers::ClearKeyNumpadOrigin(data->lParam->vkCode);
+        if ((data->wParam == WM_KEYUP || data->wParam == WM_SYSKEYUP) && state.textReplacementSuppressedKey == vkCode)
+        {
+            state.textReplacementSuppressedKey = 0;
+            return 1;
+        }
+
         if (data->wParam != WM_KEYDOWN && data->wParam != WM_SYSKEYDOWN)
         {
             return 0;
@@ -2116,7 +2122,6 @@ namespace KeyboardEventHandlers
             state.textReplacementWindow = foregroundWindow;
         }
 
-        const DWORD vkCode = Helpers::ClearKeyNumpadOrigin(data->lParam->vkCode);
         if (IsTextReplacementShortcutModifierPressed(ii))
         {
             state.textReplacementBuffer.clear();
@@ -2162,6 +2167,7 @@ namespace KeyboardEventHandlers
                     return 0;
                 }
                 state.textReplacementBuffer.clear();
+                state.textReplacementSuppressedKey = vkCode;
                 return 1;
             }
         }

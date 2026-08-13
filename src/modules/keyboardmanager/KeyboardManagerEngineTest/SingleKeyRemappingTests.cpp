@@ -626,6 +626,29 @@ namespace RemappingLogicTests
             Assert::AreEqual(static_cast<size_t>(2), injectedInput[3].size());
             Assert::AreEqual(static_cast<wchar_t>(L'i'), static_cast<wchar_t>(injectedInput[3][0].ki.wScan));
             Assert::AreEqual(static_cast<wchar_t>(L'i'), static_cast<wchar_t>(injectedInput[3][1].ki.wScan));
+
+            keyEvent.wParam = WM_KEYUP;
+            Assert::AreEqual(1, static_cast<int>(KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState)));
+            Assert::AreEqual(0, static_cast<int>(KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState)));
+        }
+
+        TEST_METHOD (HandleTextReplacementEvent_ShouldClearBufferAndDeferWhileAltGrIsPressed)
+        {
+            testState.AddTextReplacement(L"a ", L"hi");
+            testState.textReplacementBuffer = L"a";
+            mockedInputHandler.SetKeyboardState(VK_LCONTROL, true);
+            mockedInputHandler.SetKeyboardState(VK_RMENU, true);
+
+            KBDLLHOOKSTRUCT lParam{};
+            lParam.vkCode = VK_SPACE;
+            LowlevelKeyboardEvent keyEvent{};
+            keyEvent.wParam = WM_KEYDOWN;
+            keyEvent.lParam = &lParam;
+
+            intptr_t result = KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState);
+
+            Assert::AreEqual(0, static_cast<int>(result));
+            Assert::AreEqual(std::wstring(), testState.textReplacementBuffer);
         }
 
         TEST_METHOD (HandleTextReplacementEvent_ShouldProcessSingleKeyRemapOutput)

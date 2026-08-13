@@ -395,7 +395,12 @@ namespace KeyboardManagerEditorUI.Pages
 
                 if (_isEditMode && _editingItem != null)
                 {
-                    DeleteExistingMapping();
+                    if (!DeleteExistingMapping())
+                    {
+                        UnifiedMappingControl.ShowValidationError(ResourceHelper.GetString("Error_SaveFailed_Title"), ResourceHelper.GetString("Error_SaveFailed_Message"));
+                        args.Cancel = true;
+                        return;
+                    }
                 }
 
                 bool saved = UnifiedMappingControl.CurrentActionType switch
@@ -460,11 +465,11 @@ namespace KeyboardManagerEditorUI.Pages
             };
         }
 
-        private void DeleteExistingMapping()
+        private bool DeleteExistingMapping()
         {
             if (_editingItem == null || _mappingService == null)
             {
-                return;
+                return false;
             }
 
             try
@@ -480,7 +485,10 @@ namespace KeyboardManagerEditorUI.Pages
                         {
                             if (shortcut is TextMapping { TriggerText.Length: > 0 } textReplacement)
                             {
-                                _mappingService.DeleteTextReplacementMapping(textReplacement.TriggerText);
+                                if (!_mappingService.DeleteTextReplacementMapping(textReplacement.TriggerText))
+                                {
+                                    return false;
+                                }
                             }
                             else
                             {
@@ -495,10 +503,13 @@ namespace KeyboardManagerEditorUI.Pages
 
                         break;
                 }
+
+                return true;
             }
             catch (Exception ex)
             {
                 Logger.LogError("Error deleting existing mapping: " + ex.Message);
+                return false;
             }
         }
 
@@ -608,13 +619,19 @@ namespace KeyboardManagerEditorUI.Pages
             };
 
             bool saved = _mappingService!.AddTextReplacementMapping(triggerText, textContent);
-            if (saved)
+            if (!saved)
             {
-                _mappingService.SaveSettings();
-                SettingsManager.AddShortcutKeyMappingToSettings(shortcutKeyMapping);
+                return false;
             }
 
-            return saved;
+            if (!_mappingService.SaveSettings())
+            {
+                _mappingService.DeleteTextReplacementMapping(triggerText);
+                return false;
+            }
+
+            SettingsManager.AddShortcutKeyMappingToSettings(shortcutKeyMapping);
+            return true;
         }
 
         private bool SaveSingleKeyToTextMapping(string keyName, string textContent, bool isAppSpecific, string appName)
