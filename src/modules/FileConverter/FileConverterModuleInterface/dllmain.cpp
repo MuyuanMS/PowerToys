@@ -603,13 +603,16 @@ namespace
         HANDLE token = nullptr;
         if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
         {
-            return false;
+            return true;
         }
 
         TOKEN_ELEVATION elevation{};
         DWORD size = 0;
-        const bool elevated = GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size) &&
-                              elevation.TokenIsElevated != 0;
+        bool elevated = true;
+        if (GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size))
+        {
+            elevated = elevation.TokenIsElevated != 0;
+        }
         CloseHandle(token);
         return elevated;
     }
