@@ -1220,6 +1220,10 @@
       <Platform Solution="*|ARM64" Project="ARM64" />
       <Platform Solution="*|x64" Project="x64" />
     </Project>
+    <Project Path="src/modules/Workspaces/WorkspacesLauncherUI.UnitTests/WorkspacesLauncherUI.UnitTests.csproj">
+      <Platform Solution="*|ARM64" Project="ARM64" />
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
     <Project Path="src/modules/Workspaces/WorkspacesLib.UnitTests/WorkspacesLibUnitTests.vcxproj" Id="a85d4d9f-9a39-4b5d-8b5a-9f2d5c9a8b4c" />
   </Folder>
   <Folder Name="/modules/Workspaces/WindowProperties/">
@@ -1294,14 +1298,6 @@
     <File Path="src/Monaco.props" />
     <File Path="src/Solution.props" />
     <File Path="src/Version.props" />
-  </Folder>
-  <Folder Name="/src/" />
-  <Folder Name="/src/modules/" />
-  <Folder Name="/src/modules/Workspaces/">
-    <Project Path="src/modules/Workspaces/WorkspacesLauncherUI.UnitTests/WorkspacesLauncherUI.UnitTests.csproj">
-      <Platform Solution="*|ARM64" Project="ARM64" />
-      <Platform Solution="*|x64" Project="x64" />
-    </Project>
   </Folder>
   <Project Path="src/ActionRunner/ActionRunner.vcxproj" Id="d29ddd63-e2cf-4657-9fd5-2aede4257e5d">
     <BuildDependency Project="src/common/updating/updating.vcxproj" />

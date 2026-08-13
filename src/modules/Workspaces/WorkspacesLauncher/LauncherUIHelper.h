@@ -11,6 +11,7 @@ public:
 
     void LaunchUI();
     void UpdateLaunchStatus(WorkspacesData::LaunchingAppStateMap launchedApps) const;
+    void SendMessage(const std::wstring& message) const;
 
 private:
     DWORD m_processId;
