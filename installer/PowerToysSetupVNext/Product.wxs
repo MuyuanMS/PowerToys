@@ -67,6 +67,7 @@
       <ComponentGroupRef Id="DscResourcesComponentGroup" />
       <ComponentGroupRef Id="WindowsAppSDKComponentGroup" />
       <ComponentGroupRef Id="ToolComponentGroup" />
+      <ComponentGroupRef Id="CliShimsComponentGroup" />
       <ComponentGroupRef Id="MonacoSRCHeatGenerated" />
       <ComponentGroupRef Id="WorkspacesComponentGroup" />
       <ComponentGroupRef Id="CmdPalComponentGroup" />
@@ -98,6 +99,7 @@
     <Property Id="WixShellExecTarget" Value="[#PowerToys_ActionRunner.exe]" />
 
     <SetProperty Action="SetDEFAULTBOOTSTRAPPERINSTALLFOLDER" Id="DEFAULTBOOTSTRAPPERINSTALLFOLDER" Value="[$(var.DefaultInstallDir)]PowerToys" Before="SetBOOTSTRAPPERINSTALLFOLDER" Sequence="execute"></SetProperty>
+    <SetProperty Id="CliShimDefaultInstallFolder" Value="[ProgramFiles64Folder]PowerToys\" After="SetDEFAULTBOOTSTRAPPERINSTALLFOLDER" Sequence="execute" />
 
     <!-- In case we didn't receive a value from the bootstrapper. -->
     <SetProperty Action="SetBOOTSTRAPPERINSTALLFOLDER" Id="BOOTSTRAPPERINSTALLFOLDER" Value="[DEFAULTBOOTSTRAPPERINSTALLFOLDER]" Before="DetectPrevInstallPath" Sequence="execute" Condition="BOOTSTRAPPERINSTALLFOLDER = &quot;&quot;" />
@@ -299,6 +301,7 @@
             </Directory>
           </Directory>
           <Directory Id="ToolsFolder" Name="Tools" />
+          <Directory Id="CliFolder" Name="bin" />
         </Directory>
       </StandardDirectory>
       <StandardDirectory Id="ProgramMenuFolder">

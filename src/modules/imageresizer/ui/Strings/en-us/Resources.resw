@@ -360,7 +360,7 @@
     <value>ImageResizer - PowerToys Image Resizer CLI</value>
   </data>
   <data name="CLI_UsageLine" xml:space="preserve">
-    <value>Usage: PowerToys.ImageResizerCLI.exe [options] [files...]</value>
+    <value>Usage: PowerToys.ImageResizer.CLI.exe [options] [files...]</value>
   </data>
   <data name="CLI_UsageOptions" xml:space="preserve">
     <value>Options:</value>
@@ -369,16 +369,16 @@
     <value>Examples:</value>
   </data>
   <data name="CLI_UsageExampleHelp" xml:space="preserve">
-    <value>  PowerToys.ImageResizerCLI.exe --help</value>
+    <value>  PowerToys.ImageResizer.CLI.exe --help</value>
   </data>
   <data name="CLI_UsageExampleDimensions" xml:space="preserve">
-    <value>  PowerToys.ImageResizerCLI.exe --width 800 --height 600 image.jpg</value>
+    <value>  PowerToys.ImageResizer.CLI.exe --width 800 --height 600 image.jpg</value>
   </data>
   <data name="CLI_UsageExamplePercent" xml:space="preserve">
-    <value>  PowerToys.ImageResizerCLI.exe -w 50 -h 50 -u Percent *.jpg</value>
+    <value>  PowerToys.ImageResizer.CLI.exe -w 50 -h 50 -u Percent *.jpg</value>
   </data>
   <data name="CLI_UsageExamplePreset" xml:space="preserve">
-    <value>  PowerToys.ImageResizerCLI.exe --size 0 -d "C:\Output" photo.png</value>
+    <value>  PowerToys.ImageResizer.CLI.exe --size 0 -d "C:\Output" photo.png</value>
   </data>
   <data name="CLI_Option_Destination" xml:space="preserve">
     <value>Set destination directory</value>

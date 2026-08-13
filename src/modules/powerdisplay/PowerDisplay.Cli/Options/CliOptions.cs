@@ -22,7 +22,7 @@ public static class CliOptions
         new[] { "--monitor-number", "-n" },
         ParseMonitorNumbers,
         isDefault: false,
-        description: "Index(es) of the monitor(s) (1-based), comma-separated for multiple (e.g. 1,2,3). Multiple monitors are applied together by set/up/down. Run 'PowerToys.PowerDisplay.Cli.exe list' to discover.")
+        description: "Index(es) of the monitor(s) (1-based), comma-separated for multiple (e.g. 1,2,3). Multiple monitors are applied together by set/up/down. Run 'PowerToys.PowerDisplay.CLI.exe list' to discover.")
     {
         Arity = ArgumentArity.ExactlyOne,
     };
@@ -104,21 +104,21 @@ public static class CliOptions
     // --- set: discrete ---
     public static readonly Option<string?> ColorTemperature = new(
         ["--color-temperature"],
-        "Hex VCP value (e.g. 0x05). Run 'PowerToys.PowerDisplay.Cli.exe capabilities --setting color-temperature' to list supported values.")
+        "Hex VCP value (e.g. 0x05). Run 'PowerToys.PowerDisplay.CLI.exe capabilities --setting color-temperature' to list supported values.")
     {
         Arity = ArgumentArity.ExactlyOne,
     };
 
     public static readonly Option<string?> InputSource = new(
         ["--input-source"],
-        "Hex VCP value (e.g. 0x11). Run 'PowerToys.PowerDisplay.Cli.exe capabilities --setting input-source' to list supported values.")
+        "Hex VCP value (e.g. 0x11). Run 'PowerToys.PowerDisplay.CLI.exe capabilities --setting input-source' to list supported values.")
     {
         Arity = ArgumentArity.ExactlyOne,
     };
 
     public static readonly Option<string?> PowerState = new(
         ["--power-state"],
-        "Hex VCP value (e.g. 0x01=On, 0x04=Off (DPM)). Run 'PowerToys.PowerDisplay.Cli.exe capabilities --setting power-state' to list supported values.")
+        "Hex VCP value (e.g. 0x01=On, 0x04=Off (DPM)). Run 'PowerToys.PowerDisplay.CLI.exe capabilities --setting power-state' to list supported values.")
     {
         Arity = ArgumentArity.ExactlyOne,
     };
@@ -155,7 +155,7 @@ public static class CliOptions
     // --- apply-profile ---
     public static readonly Argument<int> ProfileId = new(
         "id",
-        "Numeric id of the profile to apply. Run 'PowerToys.PowerDisplay.Cli.exe profiles' to list them.")
+        "Numeric id of the profile to apply. Run 'PowerToys.PowerDisplay.CLI.exe profiles' to list them.")
     {
         Arity = ArgumentArity.ExactlyOne,
     };

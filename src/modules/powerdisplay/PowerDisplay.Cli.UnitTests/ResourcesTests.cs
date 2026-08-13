@@ -11,7 +11,7 @@ namespace PowerDisplay.Cli.UnitTests;
 [TestClass]
 public class ResourcesTests
 {
-    private const string ExecutableName = "PowerToys.PowerDisplay.Cli.exe";
+    private const string ExecutableName = "PowerToys.PowerDisplay.CLI.exe";
 
     [TestMethod]
     public void CommandHints_ReferenceShippedExecutable()
