@@ -55,5 +55,68 @@ namespace ViewModelTests
                 }
             }
         }
+
+        [TestMethod]
+        public void CreateActionFromScript_IgnoresNestedAndDocumentedFunctions()
+        {
+            var scriptPath = Path.Combine(Path.GetTempPath(), $"AdvancedPaste-{Guid.NewGuid():N}.py");
+
+            try
+            {
+                File.WriteAllLines(
+                    scriptPath,
+                    [
+                        "\"\"\"",
+                        "def advanced_paste_from_html_to_text(value):",
+                        "    return value",
+                        "\"\"\"",
+                        "def helper():",
+                        "    def advanced_paste_from_image_to_text(value):",
+                        "        return value",
+                        "def advanced_paste_from_text_to_text(value):",
+                        "    return value",
+                    ]);
+
+                var createActionFromScript = typeof(AdvancedPasteViewModel)
+                    .GetMethod("CreateActionFromScript", BindingFlags.NonPublic | BindingFlags.Static);
+
+                Assert.IsNotNull(createActionFromScript);
+
+                var action = (AdvancedPastePythonScriptAction)createActionFromScript.Invoke(
+                    null, [scriptPath, new System.Collections.Generic.List<AdvancedPastePythonScriptAction>()]);
+
+                Assert.AreEqual("text", action.InputType);
+                Assert.AreEqual("text", action.OutputType);
+            }
+            finally
+            {
+                if (File.Exists(scriptPath))
+                {
+                    File.Delete(scriptPath);
+                }
+            }
+        }
+
+        [TestMethod]
+        public void PythonScriptSettings_MigrateLegacyIfNeeded_ReturnsChangeAndClearsLegacyFields()
+        {
+            var settings = new AdvancedPastePythonScriptSettings
+            {
+                IsEnabled = true,
+                UseWsl = true,
+                ScriptsFolder = @"C:\scripts",
+                WslDistribution = "Ubuntu",
+            };
+
+            Assert.IsTrue(settings.MigrateLegacyIfNeeded());
+            Assert.AreEqual("wsl", settings.Mode);
+            Assert.AreEqual(@"C:\scripts", settings.WslSettings.ScriptsFolder);
+            Assert.AreEqual("Ubuntu", settings.WslSettings.Distribution);
+            Assert.IsNull(settings.IsEnabled);
+            Assert.IsNull(settings.UseWsl);
+            Assert.IsNull(settings.ScriptsFolder);
+            Assert.IsNull(settings.WslDistribution);
+            Assert.IsFalse(settings.MigrateLegacyIfNeeded());
+        }
     }
 }

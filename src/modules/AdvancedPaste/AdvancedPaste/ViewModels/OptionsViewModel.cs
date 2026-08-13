@@ -44,6 +44,8 @@ namespace AdvancedPaste.ViewModels
         private readonly IAICredentialsProvider _credentialsProvider;
         private readonly ICustomActionTransformService _customActionTransformService;
         private readonly IPythonScriptService _pythonScriptService;
+        private IReadOnlyList<PythonScriptMetadata> _pythonScriptMetadataCache;
+        private string _cachedPythonScriptsFolder;
 
         private CancellationTokenSource _pasteActionCancellationTokenSource;
 
@@ -321,6 +323,8 @@ namespace AdvancedPaste.ViewModels
 
         private void UserSettings_Changed(object sender, EventArgs e)
         {
+            _pythonScriptMetadataCache = null;
+            _cachedPythonScriptsFolder = null;
             UpdateAIProviderActiveFlags();
             OnPropertyChanged(nameof(IsCustomAIServiceEnabled));
             OnPropertyChanged(nameof(ClipboardHasDataForCustomAI));
@@ -458,7 +462,13 @@ namespace AdvancedPaste.ViewModels
                 yield break;
             }
 
-            var discoveredScripts = _pythonScriptService.DiscoverScripts(folder);
+            if (_pythonScriptMetadataCache is null ||
+                !string.Equals(_cachedPythonScriptsFolder, folder, StringComparison.OrdinalIgnoreCase))
+            {
+                _pythonScriptMetadataCache = _pythonScriptService.DiscoverScripts(folder);
+                _cachedPythonScriptsFolder = folder;
+            }
+
             var scriptActions = _userSettings.PythonScriptActions;
 
             // Use metadata from discovered scripts, but apply IsShown from saved settings.
@@ -466,15 +476,21 @@ namespace AdvancedPaste.ViewModels
                 scriptActions.Where(a => !a.IsShown).Select(a => a.ScriptPath),
                 StringComparer.OrdinalIgnoreCase);
 
-            foreach (var meta in discoveredScripts)
+            foreach (var meta in _pythonScriptMetadataCache)
             {
                 if (hiddenPaths.Contains(meta.ScriptPath) || !meta.IsEnabled)
                 {
                     continue;
                 }
 
-                // Filter by intersection: only pass clipboard formats the script supports.
-                var filteredFormats = AvailableClipboardFormats & meta.SupportedFormats;
+                var availableFormats = AvailableClipboardFormats;
+                if ((meta.SupportedFormats & ClipboardFormat.File) != 0 &&
+                    ClipboardData?.Contains(StandardDataFormats.StorageItems) == true)
+                {
+                    availableFormats |= ClipboardFormat.File;
+                }
+
+                var filteredFormats = availableFormats & meta.SupportedFormats;
                 yield return PasteFormat.CreatePythonScriptFormat(meta.Name, meta.ScriptPath, filteredFormats);
             }
         }

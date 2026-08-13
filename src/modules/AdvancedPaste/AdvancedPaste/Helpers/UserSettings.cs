@@ -153,6 +153,7 @@ namespace AdvancedPaste.Settings
                         if (settings != null)
                         {
                             bool migratedLegacyEnablement = TryMigrateLegacyAIEnablement(settings);
+                            bool migratedLegacyPythonScripts = settings.Properties.PythonScripts?.MigrateLegacyIfNeeded() == true;
 
                             void UpdateSettings()
                             {
@@ -194,7 +195,6 @@ namespace AdvancedPaste.Settings
                                 _customActions.AddRange(properties.CustomActions.Value.Where(customAction => customAction.IsShown && customAction.IsValid));
 
                                 var pythonScripts = properties.PythonScripts ?? new AdvancedPastePythonScriptSettings();
-                                pythonScripts.MigrateLegacyIfNeeded();
 
                                 var mode = pythonScripts.Mode ?? "disabled";
 
@@ -244,7 +244,7 @@ namespace AdvancedPaste.Settings
                                 .StartNew(UpdateSettings, CancellationToken.None, TaskCreationOptions.None, _taskScheduler)
                                 .Wait();
 
-                            if (migratedLegacyEnablement)
+                            if (migratedLegacyEnablement || migratedLegacyPythonScripts)
                             {
                                 settings.Save(_settingsUtils);
                             }

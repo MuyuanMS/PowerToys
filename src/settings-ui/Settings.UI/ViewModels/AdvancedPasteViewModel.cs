@@ -31,6 +31,9 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
     public partial class AdvancedPasteViewModel : PageViewModelBase
     {
         private static readonly HashSet<string> WarnHotkeys = ["Ctrl + V", "Ctrl + Shift + V"];
+        private static readonly System.Text.RegularExpressions.Regex PythonActionFunctionRegex = new(
+            @"^def\s+advanced_paste_from_(text|html|image|audio|video|files)_to_(text|html|image|audio|video|file|files)\s*\(",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
 
         private bool _disposed;
         private PasteAIProviderDefinition _pasteAIProviderDraft;
@@ -98,13 +101,18 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             _advancedPasteSettings.Properties.AdditionalActions ??= new AdvancedPasteAdditionalActions();
             _advancedPasteSettings.Properties.CustomActions ??= new AdvancedPasteCustomActions();
 
-            AttachConfigurationHandlers();
-
             // set the callback functions value to handle outgoing IPC message.
             SendConfigMSG = ipcMSGCallBackFunc;
 
+            AttachConfigurationHandlers();
+
             _additionalActions = _advancedPasteSettings.Properties.AdditionalActions;
             _customActions = _advancedPasteSettings.Properties.CustomActions.Value ?? new ObservableCollection<AdvancedPasteCustomAction>();
+
+            if (_advancedPasteSettings.Properties.PythonScripts?.MigrateLegacyIfNeeded() == true)
+            {
+                SaveAndNotifySettings();
+            }
 
             SetupSettingsFileWatcher();
 
@@ -612,25 +620,33 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             var scripts = new ObservableCollection<AdvancedPastePythonScriptAction>();
             var savedActions = _advancedPasteSettings.Properties.PythonScripts?.Value ?? [];
 
-            foreach (var file in System.IO.Directory.EnumerateFiles(folder, "*.py", System.IO.SearchOption.TopDirectoryOnly))
+            try
             {
-                try
+                foreach (var file in System.IO.Directory.EnumerateFiles(folder, "*.py", System.IO.SearchOption.TopDirectoryOnly))
                 {
-                    var action = CreateActionFromScript(file, savedActions);
-
-                    // Only list scripts that define exactly one advanced_paste_from_*_to_*() function,
-                    // matching the runtime's discovery behavior in PythonScriptService.
-                    if (string.IsNullOrEmpty(action.InputType) || string.IsNullOrEmpty(action.OutputType))
+                    try
                     {
-                        continue;
-                    }
+                        var action = CreateActionFromScript(file, savedActions);
 
-                    scripts.Add(action);
+                        // Only list scripts that define exactly one advanced_paste_from_*_to_*() function,
+                        // matching the runtime's discovery behavior in PythonScriptService.
+                        if (string.IsNullOrEmpty(action.InputType) || string.IsNullOrEmpty(action.OutputType))
+                        {
+                            continue;
+                        }
+
+                        scripts.Add(action);
+                    }
+                    catch
+                    {
+                        // Skip scripts that can't be read
+                    }
                 }
-                catch
-                {
-                    // Skip scripts that can't be read
-                }
+            }
+            catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+            {
+                PythonScriptActions = [];
+                return;
             }
 
             PythonScriptActions = scripts;
@@ -650,29 +666,11 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             var hasExplicitRequires = false;
             var inputType = string.Empty;
             var outputType = string.Empty;
-            int matchingFunctionCount = 0;
+            var lines = System.IO.File.ReadAllLines(filePath, System.Text.Encoding.UTF8);
 
-            using var reader = new System.IO.StreamReader(filePath, System.Text.Encoding.UTF8);
-            string line;
-            while ((line = reader.ReadLine()) is not null)
+            foreach (var line in lines)
             {
                 var trimmed = line.Trim();
-
-                // Detect the function definition to extract input/output types
-                if (trimmed.StartsWith("def advanced_paste_from_", StringComparison.Ordinal))
-                {
-                    var match = System.Text.RegularExpressions.Regex.Match(
-                        trimmed,
-                        @"^def advanced_paste_from_(text|html|image|audio|video|files)_to_(text|html|image|audio|video|file|files)\s*\(");
-                    if (match.Success)
-                    {
-                        matchingFunctionCount++;
-                        inputType = match.Groups[1].Value;
-                        outputType = match.Groups[2].Value;
-                    }
-
-                    continue;
-                }
 
                 if (!trimmed.StartsWith('#'))
                 {
@@ -707,8 +705,15 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 }
             }
 
+            var functionMatches = FindTopLevelActionFunctions(lines);
+
             // Runtime rejects scripts with more than one matching function.
-            if (matchingFunctionCount != 1)
+            if (functionMatches.Count == 1)
+            {
+                inputType = functionMatches[0].Groups[1].Value;
+                outputType = functionMatches[0].Groups[2].Value;
+            }
+            else
             {
                 inputType = string.Empty;
                 outputType = string.Empty;
@@ -733,6 +738,58 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 IsShown = saved?.IsShown ?? true,
                 Shortcut = saved?.Shortcut ?? new HotkeySettings(),
             };
+        }
+
+        private static IReadOnlyList<System.Text.RegularExpressions.Match> FindTopLevelActionFunctions(IReadOnlyList<string> lines)
+        {
+            var matches = new List<System.Text.RegularExpressions.Match>();
+            string tripleQuote = null;
+
+            foreach (var line in lines)
+            {
+                var code = line.Split('#', 2)[0];
+                if (tripleQuote is not null)
+                {
+                    if (CountOccurrences(code, tripleQuote) % 2 != 0)
+                    {
+                        tripleQuote = null;
+                    }
+
+                    continue;
+                }
+
+                var match = PythonActionFunctionRegex.Match(code);
+                if (match.Success)
+                {
+                    matches.Add(match);
+                }
+
+                var doubleQuotes = CountOccurrences(code, "\"\"\"");
+                var singleQuotes = CountOccurrences(code, "'''");
+                if (doubleQuotes % 2 != 0)
+                {
+                    tripleQuote = "\"\"\"";
+                }
+                else if (singleQuotes % 2 != 0)
+                {
+                    tripleQuote = "'''";
+                }
+            }
+
+            return matches;
+        }
+
+        private static int CountOccurrences(string value, string token)
+        {
+            var count = 0;
+            var startIndex = 0;
+            while ((startIndex = value.IndexOf(token, startIndex, StringComparison.Ordinal)) >= 0)
+            {
+                count++;
+                startIndex += token.Length;
+            }
+
+            return count;
         }
 
         private static bool TryParseTag(string line, string tag, out string value, bool presenceBased = false)
@@ -1703,24 +1760,30 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 return;
             }
 
+            bool migratedLegacyPythonScripts = false;
             try
             {
                 _suppressSave = true;
-                ApplyExternalProperties(latestSettings.Properties);
+                migratedLegacyPythonScripts = ApplyExternalProperties(latestSettings.Properties);
             }
             finally
             {
                 _suppressSave = false;
             }
+
+            if (migratedLegacyPythonScripts)
+            {
+                SaveAndNotifySettings();
+            }
         }
 
-        private void ApplyExternalProperties(AdvancedPasteProperties source)
+        private bool ApplyExternalProperties(AdvancedPasteProperties source)
         {
             var target = _advancedPasteSettings?.Properties;
 
             if (target is null || source is null)
             {
-                return;
+                return false;
             }
 
             if (target.IsAIEnabled != source.IsAIEnabled)
@@ -1760,6 +1823,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
 
             target.PythonScripts = source.PythonScripts ?? new AdvancedPastePythonScriptSettings();
+            bool migratedLegacyPythonScripts = target.PythonScripts.MigrateLegacyIfNeeded();
             if (_pythonScriptsDisallowedByGPO)
             {
                 target.PythonScripts.Mode = "disabled";
@@ -1778,6 +1842,8 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             {
                 RefreshPythonScripts();
             }
+
+            return migratedLegacyPythonScripts;
         }
 
         private static bool ShouldReplacePasteAIConfiguration(PasteAIConfiguration current, PasteAIConfiguration incoming)

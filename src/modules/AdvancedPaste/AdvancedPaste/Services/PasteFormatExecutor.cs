@@ -73,7 +73,7 @@ public sealed class PasteFormatExecutor(
         string trustedHash;
         try
         {
-            trustedHash = _pythonScriptTrustService.ComputeHash(scriptPath);
+            trustedHash = await Task.Run(() => _pythonScriptTrustService.ComputeHash(scriptPath), cancellationToken);
         }
         catch (System.IO.FileNotFoundException)
         {
@@ -102,19 +102,25 @@ public sealed class PasteFormatExecutor(
 
         try
         {
-            foreach (var sourceFile in System.IO.Directory.EnumerateFiles(scriptRoot, "*.py", System.IO.SearchOption.AllDirectories))
-            {
-                var destinationFile = System.IO.Path.Combine(snapshotDirectory, System.IO.Path.GetRelativePath(scriptRoot, sourceFile));
-                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(destinationFile)!);
-                System.IO.File.Copy(sourceFile, destinationFile);
-            }
+            var metadata = await Task.Run(
+                () =>
+                {
+                    foreach (var sourceFile in System.IO.Directory.EnumerateFiles(scriptRoot, "*.py", System.IO.SearchOption.AllDirectories))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var destinationFile = System.IO.Path.Combine(snapshotDirectory, System.IO.Path.GetRelativePath(scriptRoot, sourceFile));
+                        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(destinationFile)!);
+                        System.IO.File.Copy(sourceFile, destinationFile);
+                    }
 
-            if (!string.Equals(_pythonScriptTrustService.ComputeHash(snapshotScriptPath), trustedHash, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException("The Python script changed while it was being prepared for execution. Please try again.");
-            }
+                    if (!string.Equals(_pythonScriptTrustService.ComputeHash(snapshotScriptPath), trustedHash, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException("The Python script changed while it was being prepared for execution. Please try again.");
+                    }
 
-            var metadata = _pythonScriptService.ReadMetadata(snapshotScriptPath);
+                    return _pythonScriptService.ReadMetadata(snapshotScriptPath);
+                },
+                cancellationToken);
 
             if (metadata is null)
             {

@@ -60,8 +60,14 @@ public sealed class AdvancedPastePythonScriptSettings
     /// <summary>
     /// Migrates legacy settings (isEnabled/useWsl) to new mode format on first load.
     /// </summary>
-    public void MigrateLegacyIfNeeded()
+    public bool MigrateLegacyIfNeeded()
     {
+        bool changed = IsEnabled.HasValue ||
+                       UseWsl.HasValue ||
+                       ScriptsFolder is not null ||
+                       PythonExecutablePath is not null ||
+                       WslDistribution is not null;
+
         // Only migrate if Mode hasn't been set by the new UI yet
         // (i.e., still at default "disabled") AND legacy fields are present.
         if (IsEnabled.HasValue && string.Equals(Mode, "disabled", System.StringComparison.OrdinalIgnoreCase))
@@ -109,5 +115,7 @@ public sealed class AdvancedPastePythonScriptSettings
         ScriptsFolder = null;
         PythonExecutablePath = null;
         WslDistribution = null;
+
+        return changed;
     }
 }
