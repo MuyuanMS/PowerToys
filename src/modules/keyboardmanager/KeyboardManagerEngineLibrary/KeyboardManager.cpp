@@ -96,10 +96,10 @@ void KeyboardManager::LoadSettings()
         state.LoadSettings();
     }
 
-    // The reload above rebuilt the alone remap table; discard any leftover alone runtime state so a key
-    // that was physically held across the reload can't leave a stale pending/combination entry (which a
-    // later event would promote, injecting an unmatched original key-down). No-op on the initial load.
-    state.ClearAllAloneKeyState();
+    // The reload above rebuilt the alone remap table. Discard pending tap candidates so they cannot be
+    // promoted after their mapping changed, but retain started combinations until their physical key-up
+    // releases the source key that was already injected.
+    state.ClearAlonePendingKeys();
     try
     {
         // Send telemetry about configured key/shortcut to key/shortcut mappings, OS an app specific level.
@@ -179,7 +179,7 @@ void KeyboardManager::HandleMouseHookEvent() noexcept
     // HandleKeyboardHookEvent.
     if (editorIsRunningEvent != nullptr && WaitForSingleObject(editorIsRunningEvent, 0) == WAIT_OBJECT_0)
     {
-        state.ClearAllAloneKeyState();
+        state.ClearAlonePendingKeys();
         return;
     }
 
@@ -309,7 +309,13 @@ intptr_t KeyboardManager::HandleKeyboardHookEvent(LowlevelKeyboardEvent* data) n
     // Suspend remapping if remap key/shortcut window is opened
     if (editorIsRunningEvent != nullptr && WaitForSingleObject(editorIsRunningEvent, 0) == WAIT_OBJECT_0)
     {
-        state.ClearAllAloneKeyState();
+        // Pending keys never injected a key-down and can be forgotten. A promoted key's physical key-up
+        // is passed through while the editor is active, so also forget its combination marker then.
+        state.ClearAlonePendingKeys();
+        if ((data->wParam == WM_KEYUP || data->wParam == WM_SYSKEYUP) && state.IsAloneCombination(data->lParam->vkCode))
+        {
+            state.ClearAloneKeyState(data->lParam->vkCode);
+        }
         return 0;
     }
 

@@ -41,9 +41,10 @@ public:
     bool IsAloneCombination(const DWORD key) const;
     // Forget all alone runtime state for a key (on its key-up, once resolved).
     void ClearAloneKeyState(const DWORD key);
-    // Forget ALL alone runtime state. Called when the mapping tables are reloaded so a key that was
-    // physically held across a settings reload can't leave a stale pending/combination entry that a
-    // later mouse/keyboard event would promote -- injecting an original key-down with no matching up.
+    // Forget pending tap candidates while preserving started combinations until their key-up releases
+    // the injected source key.
+    void ClearAlonePendingKeys();
+    // Forget ALL alone runtime state (used for full teardown/test reset).
     void ClearAllAloneKeyState();
     // Snapshot of currently pending (tap-candidate) alone keys, for flushing when another key arrives.
     std::vector<DWORD> GetPendingAloneKeys() const;

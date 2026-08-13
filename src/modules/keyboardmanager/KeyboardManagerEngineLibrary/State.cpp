@@ -66,6 +66,11 @@ void State::ClearAloneKeyState(const DWORD key)
     aloneCombinationKeys.erase(key);
 }
 
+void State::ClearAlonePendingKeys()
+{
+    alonePendingKeys.clear();
+}
+
 void State::ClearAllAloneKeyState()
 {
     alonePendingKeys.clear();
