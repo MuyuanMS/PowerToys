@@ -217,7 +217,11 @@ namespace ShortcutGuide
                         bool isWinKeyTrigger = _winKeyLaunchedEvent is not null && index == 1;
                         OverlayWindow.DispatcherQueue.TryEnqueue(async () =>
                         {
-                            bool winKeyReleasedBeforeDispatch = isWinKeyTrigger && _winKeyReleasePending;
+                            const int VK_LWIN = 0x5B;
+                            const int VK_RWIN = 0x5C;
+                            bool winKeyStillDown = ((NativeMethods.GetAsyncKeyState(VK_LWIN) & 0x8000) != 0) ||
+                                                   ((NativeMethods.GetAsyncKeyState(VK_RWIN) & 0x8000) != 0);
+                            bool winKeyReleasedBeforeDispatch = isWinKeyTrigger && (_winKeyReleasePending || !winKeyStillDown);
                             if (winKeyReleasedBeforeDispatch)
                             {
                                 _winKeyReleasePending = false;
