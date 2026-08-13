@@ -32,7 +32,7 @@
       <SubSystem>Windows</SubSystem>
       <EnableUAC>false</EnableUAC>
       <ModuleDefinitionFile>Source.def</ModuleDefinitionFile>
-      <AdditionalDependencies>runtimeobject.lib;shell32.lib;shlwapi.lib;windowscodecs.lib;ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>runtimeobject.lib;shell32.lib;shlwapi.lib;ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -44,11 +44,6 @@
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(UsePrecompiledHeaders)' != 'false'">Create</PrecompiledHeader>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\FileConverterLib\FileConverterLib.vcxproj">
-      <Project>{2d6e2c29-43ce-4be9-b0fd-2f6240d04ef4}</Project>
-    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="AppxManifest.xml" />
