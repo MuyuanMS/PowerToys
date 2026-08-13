@@ -20,6 +20,7 @@ namespace WorkspacesLauncherUI.UnitTests
     /// that the UI binds to.
     /// </summary>
     [TestClass]
+    [DoNotParallelize]
     public class LauncherViewModelStateManagementTests
     {
         [TestMethod]
