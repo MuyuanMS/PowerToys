@@ -4,6 +4,7 @@
 #include "pch.h"
 
 #include <Constants.h>
+#include <FileConversionEngine.h>
 #include <ShlObj.h>
 #include <winrt/Windows.ApplicationModel.Resources.h>
 #include <winrt/Windows.Data.Json.h>
@@ -33,6 +34,7 @@ namespace
         Tiff,
         Heif,
         Webp,
+        SourceOnly,
         Unknown,
     };
 
@@ -42,18 +44,19 @@ namespace
         const wchar_t* label_fallback;
         const wchar_t* destination;
         FormatGroup destination_group;
+        file_converter::ImageFormat image_format;
         GUID canonical_name;
     };
 
     constexpr std::array<TargetFormatSpec, 8> TARGET_FORMATS = {
-        TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Png", L"PNG", fc_constants::FormatPng, FormatGroup::Png, { 0x0a4200f1, 0x74e5, 0x4f59, { 0xbb, 0x5d, 0x79, 0x8a, 0xfa, 0xf8, 0x01, 0x10 } } },
-        TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Jpg", L"JPG", fc_constants::FormatJpg, FormatGroup::Jpeg, { 0x9f0adf10, 0x3fcb, 0x4a22, { 0x9e, 0x4a, 0x9c, 0x9c, 0x5e, 0xc1, 0x16, 0x4a } } },
-        TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Jpeg", L"JPEG", fc_constants::FormatJpeg, FormatGroup::Jpeg, { 0x6d94f15d, 0xa2ba, 0x4912, { 0xa8, 0xf6, 0xe3, 0x89, 0xe0, 0xf8, 0x50, 0x76 } } },
-        TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Bmp", L"BMP", fc_constants::FormatBmp, FormatGroup::Bmp, { 0x922d3030, 0x7fdb, 0x4de7, { 0x99, 0x39, 0x15, 0x95, 0x38, 0x0e, 0x81, 0x88 } } },
-        TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Tiff", L"TIFF", fc_constants::FormatTiff, FormatGroup::Tiff, { 0x91fc7a8a, 0x34b9, 0x4ddf, { 0x86, 0xe8, 0x9f, 0xbb, 0x84, 0xf3, 0x55, 0x65 } } },
-        TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Heic", L"HEIC", fc_constants::FormatHeic, FormatGroup::Heif, { 0xd10be4f8, 0x6e5f, 0x4c6d, { 0xa1, 0x45, 0xbe, 0x57, 0x9f, 0x42, 0x75, 0x69 } } },
-        TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Heif", L"HEIF", fc_constants::FormatHeif, FormatGroup::Heif, { 0x7fce9037, 0x12fe, 0x40af, { 0x88, 0x95, 0x6e, 0x7f, 0xe6, 0x29, 0x2b, 0x45 } } },
-        TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Webp", L"WebP", fc_constants::FormatWebp, FormatGroup::Webp, { 0x5fce9315, 0x3d7b, 0x4372, { 0xac, 0x17, 0x35, 0x57, 0x91, 0xcd, 0x17, 0x61 } } },
+        TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Png", L"PNG", fc_constants::FormatPng, FormatGroup::Png, file_converter::ImageFormat::Png, { 0x0a4200f1, 0x74e5, 0x4f59, { 0xbb, 0x5d, 0x79, 0x8a, 0xfa, 0xf8, 0x01, 0x10 } } },
+        TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Jpg", L"JPG", fc_constants::FormatJpg, FormatGroup::Jpeg, file_converter::ImageFormat::Jpeg, { 0x9f0adf10, 0x3fcb, 0x4a22, { 0x9e, 0x4a, 0x9c, 0x9c, 0x5e, 0xc1, 0x16, 0x4a } } },
+        TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Jpeg", L"JPEG", fc_constants::FormatJpeg, FormatGroup::Jpeg, file_converter::ImageFormat::Jpeg, { 0x6d94f15d, 0xa2ba, 0x4912, { 0xa8, 0xf6, 0xe3, 0x89, 0xe0, 0xf8, 0x50, 0x76 } } },
+        TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Bmp", L"BMP", fc_constants::FormatBmp, FormatGroup::Bmp, file_converter::ImageFormat::Bmp, { 0x922d3030, 0x7fdb, 0x4de7, { 0x99, 0x39, 0x15, 0x95, 0x38, 0x0e, 0x81, 0x88 } } },
+        TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Tiff", L"TIFF", fc_constants::FormatTiff, FormatGroup::Tiff, file_converter::ImageFormat::Tiff, { 0x91fc7a8a, 0x34b9, 0x4ddf, { 0x86, 0xe8, 0x9f, 0xbb, 0x84, 0xf3, 0x55, 0x65 } } },
+        TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Heic", L"HEIC", fc_constants::FormatHeic, FormatGroup::Heif, file_converter::ImageFormat::Heif, { 0xd10be4f8, 0x6e5f, 0x4c6d, { 0xa1, 0x45, 0xbe, 0x57, 0x9f, 0x42, 0x75, 0x69 } } },
+        TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Heif", L"HEIF", fc_constants::FormatHeif, FormatGroup::Heif, file_converter::ImageFormat::Heif, { 0x7fce9037, 0x12fe, 0x40af, { 0x88, 0x95, 0x6e, 0x7f, 0xe6, 0x29, 0x2b, 0x45 } } },
+        TargetFormatSpec{ L"FileConverter_ContextMenu_Format_Webp", L"WebP", fc_constants::FormatWebp, FormatGroup::Webp, file_converter::ImageFormat::Webp, { 0x5fce9315, 0x3d7b, 0x4372, { 0xac, 0x17, 0x35, 0x57, 0x91, 0xcd, 0x17, 0x61 } } },
     };
 
     std::wstring LoadLocalizedString(std::wstring_view key, std::wstring_view fallback)
@@ -174,12 +177,12 @@ namespace
             return FormatGroup::Png;
         }
 
-        if (lower == fc_constants::ExtensionJpg || lower == fc_constants::ExtensionJpeg)
+        if (lower == fc_constants::ExtensionJpg || lower == fc_constants::ExtensionJpeg || lower == L".jfif" || lower == L".jpe")
         {
             return FormatGroup::Jpeg;
         }
 
-        if (lower == fc_constants::ExtensionBmp)
+        if (lower == fc_constants::ExtensionBmp || lower == L".dib")
         {
             return FormatGroup::Bmp;
         }
@@ -197,6 +200,11 @@ namespace
         if (lower == fc_constants::ExtensionWebp)
         {
             return FormatGroup::Webp;
+        }
+
+        if (lower == L".gif" || lower == L".jxr" || lower == L".wdp")
+        {
+            return FormatGroup::SourceOnly;
         }
 
         return FormatGroup::Unknown;
@@ -247,11 +255,31 @@ namespace
         return true;
     }
 
+    bool IsTargetSupported(const TargetFormatSpec& spec)
+    {
+        return file_converter::IsOutputFormatSupported(spec.image_format).succeeded();
+    }
+
+    bool IsModuleEnabled()
+    {
+        DWORD value = 0;
+        DWORD size = sizeof(value);
+        return RegGetValueW(
+                   HKEY_CURRENT_USER,
+                   L"Software\\Microsoft\\PowerToys\\FileConverter",
+                   L"Enabled",
+                   RRF_RT_REG_DWORD,
+                   nullptr,
+                   &value,
+                   &size) == ERROR_SUCCESS &&
+               value != 0;
+    }
+
     bool HasAnyAvailableDestination(const std::vector<std::wstring>& paths)
     {
         for (const auto& spec : TARGET_FORMATS)
         {
-            if (CanConvertPaths(paths, spec.destination_group))
+            if (IsTargetSupported(spec) && CanConvertPaths(paths, spec.destination_group))
             {
                 return true;
             }
@@ -293,7 +321,7 @@ namespace
     HRESULT SendFormatConvertRequest(const std::vector<std::wstring>& paths, std::wstring_view destination)
     {
         const TargetFormatSpec* target = FindTargetFormat(destination);
-        if (target == nullptr || !CanConvertPaths(paths, target->destination_group))
+        if (target == nullptr || !IsTargetSupported(*target) || !CanConvertPaths(paths, target->destination_group))
         {
             return E_INVALIDARG;
         }
@@ -310,7 +338,7 @@ namespace
             0,
             nullptr,
             OPEN_EXISTING,
-            0,
+            SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION,
             nullptr);
 
         if (pipe_handle == INVALID_HANDLE_VALUE)
@@ -386,7 +414,7 @@ namespace
                 return S_OK;
             }
 
-            if (CanConvertPaths(paths, m_spec.destination_group))
+            if (IsModuleEnabled() && IsTargetSupported(m_spec) && CanConvertPaths(paths, m_spec.destination_group))
             {
                 *cmd_state = ECS_ENABLED;
             }
@@ -402,12 +430,13 @@ namespace
             }
 
             std::vector<std::wstring> paths;
-            if (SUCCEEDED(GetSelectedPaths(selection, paths)))
+            const HRESULT paths_hr = GetSelectedPaths(selection, paths);
+            if (FAILED(paths_hr))
             {
-                (void)SendFormatConvertRequest(paths, m_spec.destination);
+                return paths_hr;
             }
 
-            return S_OK;
+            return SendFormatConvertRequest(paths, m_spec.destination);
         }
 
         IFACEMETHODIMP GetFlags(_Out_ EXPCMDFLAGS* flags)
@@ -533,7 +562,7 @@ public:
     {
         *cmd_state = ECS_HIDDEN;
 
-        if (selection == nullptr)
+        if (selection == nullptr || !IsModuleEnabled())
         {
             return S_OK;
         }
@@ -617,7 +646,7 @@ public:
         for (size_t i = 0; i < TARGET_FORMATS.size(); ++i)
         {
             const auto& format = TARGET_FORMATS[i];
-            if (!CanConvertPaths(paths, format.destination_group))
+            if (!IsTargetSupported(format) || !CanConvertPaths(paths, format.destination_group))
             {
                 continue;
             }
@@ -687,8 +716,7 @@ public:
             return S_OK;
         }
 
-        (void)SendFormatConvertRequest(paths, target.destination);
-        return S_OK;
+        return SendFormatConvertRequest(paths, target.destination);
     }
 
     IFACEMETHODIMP GetCommandString(UINT_PTR, UINT, UINT*, LPSTR, UINT)

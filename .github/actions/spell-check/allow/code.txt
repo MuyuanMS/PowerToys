@@ -457,3 +457,9 @@ actioncenter
 # New+ shell PIDL type names
 PCUITEMID
 PITEMID
+COMPONENTNOTFOUND
+fileconverter
+Hmmss
+timestamped
+UNKNOWNIMAGEFORMAT
+WINCODEC

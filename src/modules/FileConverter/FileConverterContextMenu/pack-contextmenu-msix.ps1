@@ -57,6 +57,22 @@ function Get-SignToolPath {
     return $candidates[0].FullName
 }
 
+function Get-MakePriPath {
+    $command = Get-Command MakePri.exe -ErrorAction SilentlyContinue
+    if ($null -ne $command) {
+        return $command.Source
+    }
+
+    $kitsRoot = "C:\Program Files (x86)\Windows Kits\10\bin"
+    $candidates = Get-ChildItem -Path $kitsRoot -Recurse -Filter MakePri.exe -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -match "\\x64\\MakePri\.exe$" } |
+        Sort-Object FullName -Descending
+    if ($null -eq $candidates -or $candidates.Count -eq 0) {
+        throw "MakePri.exe was not found."
+    }
+    return $candidates[0].FullName
+}
+
 function Get-OrCreateDevCertificate {
     param(
         [string]$Subject,
@@ -216,6 +232,9 @@ try {
     }
 
     Copy-Item -Path (Join-Path $scriptDir "Assets") -Destination (Join-Path $stagingRoot "Assets") -Recurse -Force
+    $stringsDirectory = Join-Path $stagingRoot "Strings\en-us"
+    New-Item -Path $stringsDirectory -ItemType Directory -Force | Out-Null
+    Copy-Item -Path (Join-Path $scriptDir "..\Strings\en-us\Resources.resw") -Destination $stringsDirectory -Force
 
     $manifestComDllPath = Get-ManifestComDllPath -ManifestPath $stagedManifest
     if ([System.IO.Path]::GetFileName($manifestComDllPath) -ne "PowerToys.FileConverterContextMenu.dll") {
@@ -224,6 +243,17 @@ try {
 
     $stagedComDll = Join-Path $stagingRoot "PowerToys.FileConverterContextMenu.dll"
     Copy-Item -Path $contextMenuDll -Destination $stagedComDll -Force
+    $makePri = Get-MakePriPath
+    $priConfig = Join-Path $stagingRoot "priconfig.xml"
+    & $makePri createconfig /cf $priConfig /dq en-US /pv 10.0.0
+    if ($LASTEXITCODE -ne 0) {
+        throw "MakePri createconfig failed with exit code $LASTEXITCODE."
+    }
+    & $makePri new /pr $stagingRoot /cf $priConfig /mn $stagedManifest /of (Join-Path $stagingRoot "resources.pri")
+    if ($LASTEXITCODE -ne 0) {
+        throw "MakePri resource generation failed with exit code $LASTEXITCODE."
+    }
+    Remove-Item $priConfig -Force
 
     $makeAppx = Get-MakeAppxPath
     $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"

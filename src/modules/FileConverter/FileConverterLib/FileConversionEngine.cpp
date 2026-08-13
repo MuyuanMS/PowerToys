@@ -5,7 +5,6 @@
 
 #include "FileConversionEngine.h"
 
-#include <winrt/Windows.ApplicationModel.Resources.h>
 #include <wrl/client.h>
 
 #include <sstream>
@@ -14,19 +13,7 @@ namespace
 {
     std::wstring LoadLocalizedString(std::wstring_view key, std::wstring_view fallback)
     {
-        try
-        {
-            static const auto loader = winrt::Windows::ApplicationModel::Resources::ResourceLoader::GetForViewIndependentUse(L"Resources");
-            const auto value = loader.GetString(winrt::hstring{ key });
-            if (!value.empty())
-            {
-                return value.c_str();
-            }
-        }
-        catch (...)
-        {
-        }
-
+        UNREFERENCED_PARAMETER(key);
         return std::wstring{ fallback };
     }
 
@@ -115,6 +102,20 @@ namespace
         }
     };
 
+    struct TemporaryFile
+    {
+        std::wstring path;
+        bool published = false;
+
+        ~TemporaryFile()
+        {
+            if (!published)
+            {
+                DeleteFileW(path.c_str());
+            }
+        }
+    };
+
     HRESULT CreateWicFactory(Microsoft::WRL::ComPtr<IWICImagingFactory>& factory)
     {
         HRESULT hr = CoCreateInstance(CLSID_WICImagingFactory2, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory));
@@ -124,6 +125,33 @@ namespace
         }
 
         return hr;
+    }
+
+    WICBitmapTransformOptions ReadExifOrientation(IWICBitmapFrameDecode* frame)
+    {
+        Microsoft::WRL::ComPtr<IWICMetadataQueryReader> reader;
+        if (FAILED(frame->GetMetadataQueryReader(&reader)))
+        {
+            return WICBitmapTransformRotate0;
+        }
+
+        PROPVARIANT value;
+        PropVariantInit(&value);
+        const HRESULT hr = reader->GetMetadataByName(L"/app1/ifd/{ushort=274}", &value);
+        const unsigned short orientation = SUCCEEDED(hr) && value.vt == VT_UI2 ? value.uiVal : 1;
+        PropVariantClear(&value);
+
+        switch (orientation)
+        {
+        case 2: return WICBitmapTransformFlipHorizontal;
+        case 3: return WICBitmapTransformRotate180;
+        case 4: return WICBitmapTransformFlipVertical;
+        case 5: return static_cast<WICBitmapTransformOptions>(WICBitmapTransformRotate90 | WICBitmapTransformFlipHorizontal);
+        case 6: return WICBitmapTransformRotate90;
+        case 7: return static_cast<WICBitmapTransformOptions>(WICBitmapTransformRotate270 | WICBitmapTransformFlipHorizontal);
+        case 8: return WICBitmapTransformRotate270;
+        default: return WICBitmapTransformRotate0;
+        }
     }
 
     file_converter::ConversionResult EnsureOutputEncoderAvailable(IWICImagingFactory* factory, file_converter::ImageFormat format)
@@ -211,16 +239,29 @@ namespace file_converter
             return { hr, HrMessage(LoadLocalizedString(L"FileConverter_Engine_ReadFirstFrameFailed", L"Failed reading first image frame."), hr) };
         }
 
+        Microsoft::WRL::ComPtr<IWICBitmapSource> oriented_source = source_frame;
+        Microsoft::WRL::ComPtr<IWICBitmapFlipRotator> orientation_transform;
+        const auto orientation = ReadExifOrientation(source_frame.Get());
+        if (orientation != WICBitmapTransformRotate0)
+        {
+            hr = factory->CreateBitmapFlipRotator(&orientation_transform);
+            if (FAILED(hr) || FAILED(hr = orientation_transform->Initialize(source_frame.Get(), orientation)))
+            {
+                return { hr, HrMessage(L"Failed applying image orientation.", hr) };
+            }
+            oriented_source = orientation_transform;
+        }
+
         UINT width = 0;
         UINT height = 0;
-        hr = source_frame->GetSize(&width, &height);
+        hr = oriented_source->GetSize(&width, &height);
         if (FAILED(hr))
         {
             return { hr, HrMessage(LoadLocalizedString(L"FileConverter_Engine_ReadImageSizeFailed", L"Failed reading image size."), hr) };
         }
 
         WICPixelFormatGUID pixel_format = {};
-        hr = source_frame->GetPixelFormat(&pixel_format);
+        hr = oriented_source->GetPixelFormat(&pixel_format);
         if (FAILED(hr))
         {
             return { hr, HrMessage(LoadLocalizedString(L"FileConverter_Engine_ReadPixelFormatFailed", L"Failed reading source pixel format."), hr) };
@@ -233,7 +274,9 @@ namespace file_converter
             return { hr, HrMessage(LoadLocalizedString(L"FileConverter_Engine_CreateStreamFailed", L"Failed creating WIC stream."), hr) };
         }
 
-        hr = output_stream->InitializeFromFilename(output_path.c_str(), GENERIC_WRITE);
+        TemporaryFile temporary{ output_path + L".tmp-" + std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(GetTickCount64()) };
+
+        hr = output_stream->InitializeFromFilename(temporary.path.c_str(), GENERIC_WRITE);
         if (FAILED(hr))
         {
             return { hr, HrMessage(LoadLocalizedString(L"FileConverter_Engine_OpenOutputFailed", L"Failed opening output path."), hr) };
@@ -279,7 +322,7 @@ namespace file_converter
             return { hr, HrMessage(LoadLocalizedString(L"FileConverter_Engine_SetTargetPixelFormatFailed", L"Failed setting target pixel format."), hr) };
         }
 
-        Microsoft::WRL::ComPtr<IWICBitmapSource> source_for_write = source_frame;
+        Microsoft::WRL::ComPtr<IWICBitmapSource> source_for_write = oriented_source;
         Microsoft::WRL::ComPtr<IWICFormatConverter> format_converter;
 
         if (!InlineIsEqualGUID(pixel_format, target_pixel_format))
@@ -297,7 +340,7 @@ namespace file_converter
                 return { hr, HrMessage(LoadLocalizedString(L"FileConverter_Engine_UnsupportedPixelConversion", L"Source pixel format cannot be converted to target pixel format."), FAILED(hr) ? hr : E_FAIL) };
             }
 
-            hr = format_converter->Initialize(source_frame.Get(), target_pixel_format, WICBitmapDitherTypeNone, nullptr, 0.0f, WICBitmapPaletteTypeCustom);
+            hr = format_converter->Initialize(oriented_source.Get(), target_pixel_format, WICBitmapDitherTypeNone, nullptr, 0.0f, WICBitmapPaletteTypeCustom);
             if (FAILED(hr))
             {
                 return { hr, HrMessage(LoadLocalizedString(L"FileConverter_Engine_InitFormatConverterFailed", L"Failed initializing format converter."), hr) };
@@ -324,6 +367,19 @@ namespace file_converter
             return { hr, HrMessage(LoadLocalizedString(L"FileConverter_Engine_CommitEncoderFailed", L"Failed committing encoder."), hr) };
         }
 
+        source_for_write.Reset();
+        format_converter.Reset();
+        target_frame.Reset();
+        encoder.Reset();
+        output_stream.Reset();
+
+        if (!MoveFileExW(temporary.path.c_str(), output_path.c_str(), MOVEFILE_WRITE_THROUGH))
+        {
+            hr = HRESULT_FROM_WIN32(GetLastError());
+            return { hr, HrMessage(L"Failed publishing converted image.", hr) };
+        }
+
+        temporary.published = true;
         return { S_OK, L"" };
     }
 }

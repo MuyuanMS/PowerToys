@@ -62,4 +62,7 @@
     <None Include="Assets\FileConverter\Wide310x150Logo.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="PackFileConverterContextMenu" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)pack-contextmenu-msix.ps1&quot; -Platform &quot;$(Platform)&quot; -Configuration &quot;$(Configuration)&quot;" />
+  </Target>
 </Project>
