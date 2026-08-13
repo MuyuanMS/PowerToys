@@ -821,6 +821,10 @@ void ZonesOverlay::ShowLayoutName(const std::wstring& text, const LayoutNameLabe
     }
 
     std::unique_lock lock(m_mutex);
+    if (!m_shouldRender)
+    {
+        return;
+    }
 
     auto backgroundColor = ConvertColor(options.backgroundColor);
     backgroundColor.a = 0.9f;

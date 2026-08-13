@@ -7,13 +7,15 @@
 HHOOK MouseButtonsHook::hHook = {};
 std::function<void()> MouseButtonsHook::secondaryClickCallback = {};
 std::function<void()> MouseButtonsHook::middleClickCallback = {};
+std::function<bool()> MouseButtonsHook::wheelActiveCallback = {};
 std::function<bool(bool)> MouseButtonsHook::wheelCallback = {};
 int MouseButtonsHook::wheelDeltaAccumulator = 0;
 
-MouseButtonsHook::MouseButtonsHook(std::function<void()> extRightClickCallback, std::function<void()> extMiddleClickCallback, std::function<bool(bool)> extWheelCallback)
+MouseButtonsHook::MouseButtonsHook(std::function<void()> extRightClickCallback, std::function<void()> extMiddleClickCallback, std::function<bool()> extWheelActiveCallback, std::function<bool(bool)> extWheelCallback)
 {
     secondaryClickCallback = std::move(extRightClickCallback);
     middleClickCallback = std::move(extMiddleClickCallback);
+    wheelActiveCallback = std::move(extWheelActiveCallback);
     wheelCallback = std::move(extWheelCallback);
 }
 
@@ -60,6 +62,12 @@ LRESULT CALLBACK MouseButtonsHook::MouseButtonsProc(int nCode, WPARAM wParam, LP
         }
         else if (wParam == WM_MOUSEWHEEL)
         {
+            if (!wheelActiveCallback())
+            {
+                wheelDeltaAccumulator = 0;
+                return CallNextHookEx(hHook, nCode, wParam, lParam);
+            }
+
             const auto delta = GET_WHEEL_DELTA_WPARAM(reinterpret_cast<MSLLHOOKSTRUCT*>(lParam)->mouseData);
             wheelDeltaAccumulator += delta;
 

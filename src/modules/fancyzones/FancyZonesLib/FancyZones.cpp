@@ -229,7 +229,6 @@ namespace
             ids = CustomLayouts::instance().GetLayoutIdsInOrder();
         }
         return ids;
-        return ids;
     }
 }
 

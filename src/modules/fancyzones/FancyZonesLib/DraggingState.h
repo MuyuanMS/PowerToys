@@ -21,6 +21,7 @@ public:
 private:
     void OnSecondaryMouseDown();
     void OnMiddleMouseDown();
+    bool IsMouseWheelLayoutSwitchActive() const noexcept;
     bool OnMouseWheel(bool up);
 
     std::atomic<bool> m_secondaryMouseState;
