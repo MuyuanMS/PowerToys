@@ -46,6 +46,8 @@ static bool g_dragFirstMove = false; // true until first WM_MOUSEMOVE of a drag
 static HWND g_dragTarget = nullptr;
 static POINT g_dragStart = {};    // cursor pos at drag start
 static RECT g_dragWndRect = {};   // window rect at drag start
+static bool g_dragWasMaximized = false;
+static WINDOWPLACEMENT g_dragInitialPlacement = { sizeof(WINDOWPLACEMENT) };
 static HWND g_hOverlay = nullptr; // semi-transparent overlay during drag
 
 // Current target window rect for overlay info display
@@ -86,7 +88,9 @@ static DWORD g_absorbedFlags = 0;      // flags for replay (extended key, etc.)
 static bool g_showGeometry = false;            // true if we want to draw the X, Y, W and H on the overlay on move and resize
 static bool g_doNotActivateOnGameMode = true; // true if GrabAndMove is suppressed when Windows Game Mode is active
 
-static bool g_useAltResize = true;      // This can be toggled from the settings. If false, Alt + right click does nothing.
+static bool g_useAltResize = true;                  // This can be toggled from the settings. If false, Alt + right click does nothing.
+static std::atomic_bool g_useScreenEdgeMaximize = true; // If true, dragging to the top screen edge maximizes/restores the window.
+static std::atomic_bool g_useScreenEdgeSnap = true;     // If true, dragging to side/corner screen edges snaps the window.
 
 // Count of non-modifier keys currently held. Used to suppress GrabAndMove when the
 // modifier key is pressed while another key is already down (e.g. Q held, then modifier pressed).
@@ -111,12 +115,26 @@ enum ResizeHandle
     RESIZE_LEFT
 };
 
+enum class ScreenEdgeSnapTarget
+{
+    None,
+    Maximize,
+    LeftHalf,
+    RightHalf,
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+};
+
 static bool g_resizing = false;
 static bool g_resizeFirstMove = false;
 static HWND g_resizeTarget = nullptr;
 static POINT g_resizeLast = {};   // cursor pos from previous frame
 static RECT g_resizeWndRect = {}; // current window rect (updated each frame)
 static ResizeHandle g_currentHandle = RESIZE_NONE;
+static ScreenEdgeSnapTarget g_pendingSnapTarget = ScreenEdgeSnapTarget::None;
+static RECT g_pendingSnapRect = {};
 
 // Deferred activation state: a modifier+button press is held "pending" until the
 // cursor moves past the drag threshold (promoting it to a real drag/resize) or the
@@ -144,6 +162,7 @@ static bool g_activatedDuringHold = false;
 
 static const int MIN_WINDOW_WIDTH = 150;
 static const int MIN_WINDOW_HEIGHT = 50;
+static constexpr int SCREEN_EDGE_SNAP_THRESHOLD_PX = 16;
 
 // Minimum interval (ms) between move/resize updates.  Lower = snappier but
 // more CPU/GPU work.  0 = unlimited (every mouse event triggers an update).
@@ -175,6 +194,15 @@ static std::unordered_map<HWND, bool> g_excludedCache;
 // Custom message: posted from the settings thread to invalidate g_excludedCache
 // on the main thread (where all other accesses occur), avoiding a data race.
 static constexpr UINT WM_INVALIDATE_EXCLUDED_CACHE = WM_APP + 1;
+static constexpr UINT WM_APPLY_WINDOW_PLACEMENT = WM_APP + 2;
+
+struct WindowPlacementRequest
+{
+    HWND hwnd;
+    WINDOWPLACEMENT placement;
+    RECT targetRect;
+    bool maximize;
+};
 
 static const wchar_t* const CLASS_NAME = L"GrabAndMove_MsgWnd";
 static const wchar_t* const OVERLAY_CLASS_NAME = L"GrabAndMove_Overlay";
@@ -305,6 +333,289 @@ static void TraceShortcutUse(bool successful, GrabAndMoveShortcutAction action, 
         TraceLoggingWideString(reason, "Reason"));
 }
 
+static bool IsWindowResizable(HWND hwnd)
+{
+    return (GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_THICKFRAME) != 0;
+}
+
+static bool IsWindowMaximizable(HWND hwnd)
+{
+    return (GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_MAXIMIZEBOX) != 0;
+}
+
+static bool TryGetWorkAreaFromPoint(POINT pt, RECT& workArea)
+{
+    HMONITOR monitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+    if (!monitor)
+    {
+        return false;
+    }
+
+    MONITORINFO monitorInfo = {};
+    monitorInfo.cbSize = sizeof(monitorInfo);
+    if (!GetMonitorInfoW(monitor, &monitorInfo))
+    {
+        return false;
+    }
+
+    workArea = monitorInfo.rcWork;
+    return true;
+}
+
+static bool TryGetVisibleFrameBounds(HWND hwnd, RECT& frameRect)
+{
+    return SUCCEEDED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &frameRect, sizeof(frameRect))) && !IsRectEmpty(&frameRect);
+}
+
+static bool UsesWorkspaceCoordinates(HWND hwnd)
+{
+    return (GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOOLWINDOW) == 0;
+}
+
+static void ConvertWorkspaceRectToScreen(HWND hwnd, RECT& rect)
+{
+    if (!UsesWorkspaceCoordinates(hwnd))
+    {
+        return;
+    }
+
+    HMONITOR monitor = MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO monitorInfo = { sizeof(MONITORINFO) };
+    if (!GetMonitorInfoW(monitor, &monitorInfo))
+    {
+        return;
+    }
+
+    RECT referenceRect = rect;
+    OffsetRect(&referenceRect, monitorInfo.rcWork.left - monitorInfo.rcMonitor.left, monitorInfo.rcWork.top - monitorInfo.rcMonitor.top);
+
+    monitor = MonitorFromRect(&referenceRect, MONITOR_DEFAULTTONEAREST);
+    if (GetMonitorInfoW(monitor, &monitorInfo))
+    {
+        OffsetRect(&rect, monitorInfo.rcWork.left - monitorInfo.rcMonitor.left, monitorInfo.rcWork.top - monitorInfo.rcMonitor.top);
+    }
+}
+
+static void ConvertScreenRectToWorkspace(HWND hwnd, RECT& rect)
+{
+    if (!UsesWorkspaceCoordinates(hwnd))
+    {
+        return;
+    }
+
+    HMONITOR monitor = MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO monitorInfo = { sizeof(MONITORINFO) };
+    if (GetMonitorInfoW(monitor, &monitorInfo))
+    {
+        OffsetRect(&rect, monitorInfo.rcMonitor.left - monitorInfo.rcWork.left, monitorInfo.rcMonitor.top - monitorInfo.rcWork.top);
+    }
+}
+
+static RECT GetWindowRectForVisibleFrame(HWND hwnd, const RECT& desiredFrameRect)
+{
+    RECT windowRect = {};
+    RECT frameRect = {};
+    if (!GetWindowRect(hwnd, &windowRect) || !TryGetVisibleFrameBounds(hwnd, frameRect))
+    {
+        return desiredFrameRect;
+    }
+
+    return {
+        desiredFrameRect.left + (windowRect.left - frameRect.left),
+        desiredFrameRect.top + (windowRect.top - frameRect.top),
+        desiredFrameRect.right + (windowRect.right - frameRect.right),
+        desiredFrameRect.bottom + (windowRect.bottom - frameRect.bottom),
+    };
+}
+
+static bool SetWindowVisibleFrameToRect(HWND hwnd, const RECT& desiredFrameRect, UINT flags = 0)
+{
+    RECT adjustedRect = GetWindowRectForVisibleFrame(hwnd, desiredFrameRect);
+    const int w = adjustedRect.right - adjustedRect.left;
+    const int h = adjustedRect.bottom - adjustedRect.top;
+    if (w <= 0 || h <= 0)
+    {
+        return false;
+    }
+
+    return SetWindowPos(
+               hwnd,
+               nullptr,
+               adjustedRect.left,
+               adjustedRect.top,
+               w,
+               h,
+               SWP_NOZORDER | SWP_NOACTIVATE | flags) != FALSE;
+}
+
+static RECT GetScreenEdgeSnapRect(ScreenEdgeSnapTarget target, const RECT& workArea)
+{
+    const int midX = workArea.left + (workArea.right - workArea.left) / 2;
+    const int midY = workArea.top + (workArea.bottom - workArea.top) / 2;
+
+    switch (target)
+    {
+    case ScreenEdgeSnapTarget::Maximize:
+        return workArea;
+    case ScreenEdgeSnapTarget::LeftHalf:
+        return { workArea.left, workArea.top, midX, workArea.bottom };
+    case ScreenEdgeSnapTarget::RightHalf:
+        return { midX, workArea.top, workArea.right, workArea.bottom };
+    case ScreenEdgeSnapTarget::TopLeft:
+        return { workArea.left, workArea.top, midX, midY };
+    case ScreenEdgeSnapTarget::TopRight:
+        return { midX, workArea.top, workArea.right, midY };
+    case ScreenEdgeSnapTarget::BottomLeft:
+        return { workArea.left, midY, midX, workArea.bottom };
+    case ScreenEdgeSnapTarget::BottomRight:
+        return { midX, midY, workArea.right, workArea.bottom };
+    default:
+        return {};
+    }
+}
+
+static ScreenEdgeSnapTarget GetScreenEdgeSnapTarget(POINT pt, const RECT& workArea)
+{
+    const bool nearLeft = pt.x <= workArea.left + SCREEN_EDGE_SNAP_THRESHOLD_PX;
+    const bool nearRight = pt.x >= workArea.right - SCREEN_EDGE_SNAP_THRESHOLD_PX;
+    const bool nearTop = pt.y <= workArea.top + SCREEN_EDGE_SNAP_THRESHOLD_PX;
+    const bool nearBottom = pt.y >= workArea.bottom - SCREEN_EDGE_SNAP_THRESHOLD_PX;
+
+    if (nearTop && nearLeft)
+    {
+        return ScreenEdgeSnapTarget::TopLeft;
+    }
+
+    if (nearTop && nearRight)
+    {
+        return ScreenEdgeSnapTarget::TopRight;
+    }
+
+    if (nearBottom && nearLeft)
+    {
+        return ScreenEdgeSnapTarget::BottomLeft;
+    }
+
+    if (nearBottom && nearRight)
+    {
+        return ScreenEdgeSnapTarget::BottomRight;
+    }
+
+    if (nearTop)
+    {
+        return ScreenEdgeSnapTarget::Maximize;
+    }
+
+    if (nearLeft)
+    {
+        return ScreenEdgeSnapTarget::LeftHalf;
+    }
+
+    if (nearRight)
+    {
+        return ScreenEdgeSnapTarget::RightHalf;
+    }
+
+    return ScreenEdgeSnapTarget::None;
+}
+
+static bool IsScreenEdgeSnapTargetAllowed(HWND hwnd, ScreenEdgeSnapTarget target)
+{
+    if (target == ScreenEdgeSnapTarget::None)
+    {
+        return false;
+    }
+
+    if (target == ScreenEdgeSnapTarget::Maximize)
+    {
+        return IsWindowMaximizable(hwnd);
+    }
+
+    return IsWindowResizable(hwnd);
+}
+
+static bool IsScreenEdgeSnapTargetEnabled(ScreenEdgeSnapTarget target)
+{
+    if (target == ScreenEdgeSnapTarget::Maximize)
+    {
+        return g_useScreenEdgeMaximize.load();
+    }
+
+    return target != ScreenEdgeSnapTarget::None && g_useScreenEdgeSnap.load();
+}
+
+static void UpdatePendingScreenEdgeSnap(POINT pt)
+{
+    g_pendingSnapTarget = ScreenEdgeSnapTarget::None;
+    g_pendingSnapRect = {};
+
+    if (!g_dragTarget)
+    {
+        return;
+    }
+
+    RECT workArea = {};
+    if (!TryGetWorkAreaFromPoint(pt, workArea))
+    {
+        return;
+    }
+
+    ScreenEdgeSnapTarget target = GetScreenEdgeSnapTarget(pt, workArea);
+    if (!IsScreenEdgeSnapTargetEnabled(target) || !IsScreenEdgeSnapTargetAllowed(g_dragTarget, target))
+    {
+        return;
+    }
+
+    g_pendingSnapTarget = target;
+    g_pendingSnapRect = GetScreenEdgeSnapRect(target, workArea);
+
+    if (target == ScreenEdgeSnapTarget::Maximize && g_dragWasMaximized)
+    {
+        RECT restoreRect = g_dragInitialPlacement.rcNormalPosition;
+        ConvertWorkspaceRectToScreen(g_dragTarget, restoreRect);
+
+        g_pendingSnapRect = {
+            restoreRect.left + g_overlayMarginL,
+            restoreRect.top + g_overlayMarginT,
+            restoreRect.right - g_overlayMarginR,
+            restoreRect.bottom - g_overlayMarginB,
+        };
+    }
+}
+
+static bool ApplyPendingScreenEdgeSnap()
+{
+    if (!g_dragTarget || !IsScreenEdgeSnapTargetAllowed(g_dragTarget, g_pendingSnapTarget))
+    {
+        return false;
+    }
+
+    if (g_pendingSnapTarget == ScreenEdgeSnapTarget::Maximize)
+    {
+        auto request = std::make_unique<WindowPlacementRequest>(WindowPlacementRequest{
+            g_dragTarget,
+            g_dragInitialPlacement,
+            GetWindowRectForVisibleFrame(g_dragTarget, g_pendingSnapRect),
+            !g_dragWasMaximized,
+        });
+
+        if (!PostMessageW(g_hMsgWnd, WM_APPLY_WINDOW_PLACEMENT, 0, reinterpret_cast<LPARAM>(request.get())))
+        {
+            return false;
+        }
+
+        request.release();
+        return true;
+    }
+
+    if (IsZoomed(g_dragTarget))
+    {
+        ShowWindowAsync(g_dragTarget, SW_RESTORE);
+    }
+
+    return SetWindowVisibleFrameToRect(g_dragTarget, g_pendingSnapRect, SWP_ASYNCWINDOWPOS);
+}
+
 // ---------------------------------------------------------------------------
 // Settings file helpers
 // ---------------------------------------------------------------------------
@@ -332,6 +643,16 @@ static void LoadSettingsFromFile()
         if (auto v = values.get_bool_value(L"useAltResize"))
         {
             g_useAltResize = *v;
+        }
+
+        if (auto v = values.get_bool_value(L"useScreenEdgeMaximize"))
+        {
+            g_useScreenEdgeMaximize.store(*v);
+        }
+
+        if (auto v = values.get_bool_value(L"useScreenEdgeSnap"))
+        {
+            g_useScreenEdgeSnap.store(*v);
         }
 
         if (auto v = values.get_int_value(L"modifierKey"))
@@ -736,6 +1057,8 @@ static void StopDragging()
     g_dragging = false;
     g_dragFirstMove = false;
     g_dragTarget = nullptr;
+    g_pendingSnapTarget = ScreenEdgeSnapTarget::None;
+    g_pendingSnapRect = {};
     HideOverlay();
 }
 
@@ -832,8 +1155,13 @@ static void BeginDrag(HWND hwnd, POINT pt)
     g_dragConsumedAlt = true;
     g_activatedDuringHold = true;
     g_dragTarget = hwnd;
+    g_dragWasMaximized = IsZoomed(hwnd);
+    g_dragInitialPlacement = { sizeof(WINDOWPLACEMENT) };
+    GetWindowPlacement(hwnd, &g_dragInitialPlacement);
     g_dragStart = pt;
     GetWindowRect(hwnd, &g_dragWndRect);
+    g_pendingSnapTarget = ScreenEdgeSnapTarget::None;
+    g_pendingSnapRect = {};
     PrepareOverlayMetrics(hwnd);
     ShowOverlay(g_dragWndRect, g_curSizeAll);
     TraceShortcutUse(true, GrabAndMoveShortcutAction::Move, L"started");
@@ -1477,6 +1805,13 @@ static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
             int newY = g_dragWndRect.top + dy;
             int w = g_dragWndRect.right - g_dragWndRect.left;
             int h = g_dragWndRect.bottom - g_dragWndRect.top;
+            UpdatePendingScreenEdgeSnap(pt);
+            if (g_pendingSnapTarget != ScreenEdgeSnapTarget::None && ApplyPendingScreenEdgeSnap())
+            {
+                EndInteraction(true, false);
+                return 1;
+            }
+
             SetWindowPos(g_dragTarget, nullptr, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
             EndInteraction(true, false);
             return 1; // swallow the release
@@ -1618,10 +1953,28 @@ static void HandleDragMove(POINT pt)
     int w = g_dragWndRect.right - g_dragWndRect.left;
     int h = g_dragWndRect.bottom - g_dragWndRect.top;
 
+    UpdatePendingScreenEdgeSnap(pt);
+    if (g_pendingSnapTarget != ScreenEdgeSnapTarget::None)
+    {
+        const RECT previewRect = {
+            g_pendingSnapRect.left - g_overlayMarginL,
+            g_pendingSnapRect.top - g_overlayMarginT,
+            g_pendingSnapRect.right + g_overlayMarginR,
+            g_pendingSnapRect.bottom + g_overlayMarginB,
+        };
+        RepositionOverlay(
+            previewRect.left,
+            previewRect.top,
+            previewRect.right - previewRect.left,
+            previewRect.bottom - previewRect.top);
+        return;
+    }
+
     // Move target + overlay (separate SetWindowPos – DeferWindowPos doesn't
     // work reliably for cross-process target windows)
     SetWindowPos(g_dragTarget, nullptr, newX, newY, 0, 0,
                  SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
+
     RepositionOverlay(newX, newY, w, h);
 }
 
@@ -1725,6 +2078,40 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
     case WM_INVALIDATE_EXCLUDED_CACHE:
         g_excludedCache.clear();
         return 0;
+
+    case WM_APPLY_WINDOW_PLACEMENT:
+    {
+        std::unique_ptr<WindowPlacementRequest> request(reinterpret_cast<WindowPlacementRequest*>(lParam));
+        if (request && IsWindow(request->hwnd))
+        {
+            if (request->maximize)
+            {
+                WINDOWPLACEMENT targetPlacement = request->placement;
+                ConvertScreenRectToWorkspace(request->hwnd, request->targetRect);
+                targetPlacement.rcNormalPosition = request->targetRect;
+                targetPlacement.showCmd = SW_SHOWNORMAL;
+                targetPlacement.flags |= WPF_ASYNCWINDOWPLACEMENT;
+                SetWindowPlacement(request->hwnd, &targetPlacement);
+
+                targetPlacement.showCmd = SW_SHOWMAXIMIZED;
+                SetWindowPlacement(request->hwnd, &targetPlacement);
+
+                request->placement.showCmd = SW_SHOWMAXIMIZED;
+                request->placement.ptMaxPosition = {
+                    targetPlacement.rcNormalPosition.left,
+                    targetPlacement.rcNormalPosition.top,
+                };
+            }
+            else
+            {
+                request->placement.showCmd = SW_SHOWNORMAL;
+            }
+
+            request->placement.flags |= WPF_ASYNCWINDOWPLACEMENT;
+            SetWindowPlacement(request->hwnd, &request->placement);
+        }
+        return 0;
+    }
 
     case WM_TRAY_ICON:
         if (LOWORD(lParam) == WM_RBUTTONUP)
