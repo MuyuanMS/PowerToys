@@ -92,6 +92,7 @@ namespace WorkspacesLauncherUI
         private void Window_Closed(object sender, WindowEventArgs args)
         {
             StatusPageView.ViewModel?.Dispose();
+            App.CancelAcknowledgedCallback = null;
             (Application.Current as IDisposable)?.Dispose();
             Application.Current.Exit();
         }
