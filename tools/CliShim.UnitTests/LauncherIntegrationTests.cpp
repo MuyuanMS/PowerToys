@@ -712,6 +712,46 @@ namespace CliShimUnitTests
             Assert::AreEqual(ExitLaunchFailed, RunAndGetExitCode(shimPath));
         }
 
+        TEST_METHOD(NoConsoleInvocationDoesNotAllocateConsole)
+        {
+            TemporaryDirectory installation;
+            const std::filesystem::path shimPath = installation.GetPath() / L"bin" / L"PowerToys.FancyZones.CLI.exe";
+
+            CopyExecutable(GetShimUnderTest(), shimPath);
+            CopyExecutable(GetSystemDirectoryPath() / L"PING.EXE", installation.GetPath() / L"FancyZonesCLI.exe");
+
+            LaunchedProcess launchedShim = StartProcess(
+                shimPath,
+                L"-n 30 127.0.0.1",
+                nullptr,
+                nullptr,
+                DETACHED_PROCESS);
+            const DWORD shimProcessId = launchedShim.processId;
+            const ProcessKiller shim{ std::move(launchedShim.process) };
+
+            const ProcessKiller target{ WaitForProcessByImageName(
+                L"FancyZonesCLI.exe",
+                shimProcessId,
+                SYNCHRONIZE | PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION,
+                10'000) };
+            Assert::IsTrue(target.Get() != nullptr, L"The shim did not start the target CLI.");
+
+            const DWORD targetProcessId = GetProcessId(target.Get());
+            Assert::IsTrue(targetProcessId != 0, L"Could not read the target CLI process id.");
+            Sleep(500);
+
+            FreeConsole();
+            const BOOL attached = AttachConsole(targetProcessId);
+            const HWND consoleWindow = attached ? GetConsoleWindow() : nullptr;
+            if (attached)
+            {
+                FreeConsole();
+            }
+            AttachConsole(ATTACH_PARENT_PROCESS);
+
+            Assert::IsNull(consoleWindow, L"The target CLI was given a visible console window.");
+        }
+
         TEST_METHOD(IncompatibleHostJobFallsBackToUnprotectedLaunch)
         {
             TemporaryDirectory installation;

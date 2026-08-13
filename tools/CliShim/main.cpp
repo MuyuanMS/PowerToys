@@ -162,7 +162,33 @@ namespace
             attributeList != nullptr ? sizeof(startupInfo) : sizeof(startupInfo.StartupInfo);
         startupInfo.lpAttributeList = attributeList;
 
-        const DWORD creationFlags = attributeList != nullptr ? EXTENDED_STARTUPINFO_PRESENT : 0;
+        DWORD creationFlags = attributeList != nullptr ? EXTENDED_STARTUPINFO_PRESENT : 0;
+        if (GetConsoleWindow() == nullptr)
+        {
+            creationFlags |= CREATE_NO_WINDOW;
+
+            const HANDLE standardInput = GetStdHandle(STD_INPUT_HANDLE);
+            const HANDLE standardOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+            const HANDLE standardError = GetStdHandle(STD_ERROR_HANDLE);
+            const auto isInheritableHandle = [](HANDLE handle) {
+                DWORD flags = 0;
+                return handle != nullptr &&
+                       handle != INVALID_HANDLE_VALUE &&
+                       GetHandleInformation(handle, &flags) &&
+                       (flags & HANDLE_FLAG_INHERIT) != 0;
+            };
+
+            if (isInheritableHandle(standardInput) &&
+                isInheritableHandle(standardOutput) &&
+                isInheritableHandle(standardError))
+            {
+                startupInfo.StartupInfo.dwFlags |= STARTF_USESTDHANDLES;
+                startupInfo.StartupInfo.hStdInput = standardInput;
+                startupInfo.StartupInfo.hStdOutput = standardOutput;
+                startupInfo.StartupInfo.hStdError = standardError;
+            }
+        }
+
         return CreateProcessW(
                    targetPath.c_str(),
                    &commandLine[0],
