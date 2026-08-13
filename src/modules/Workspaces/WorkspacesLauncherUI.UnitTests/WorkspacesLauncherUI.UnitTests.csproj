@@ -14,6 +14,9 @@
     <UseWinUI>true</UseWinUI>
     <Platforms>x64;ARM64</Platforms>
     <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <!-- The referenced launcher assembly supplies the app-local initializer. -->
+    <WindowsAppSdkUndockedRegFreeWinRTInitialize>false</WindowsAppSdkUndockedRegFreeWinRTInitialize>
   </PropertyGroup>
 
   <ItemGroup>
