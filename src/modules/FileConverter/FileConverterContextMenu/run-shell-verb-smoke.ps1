@@ -4,7 +4,8 @@ param(
     [string]$ExpectedOutputFileName = "sample_converted.png",
     [string]$VerbName = "Convert to...",
     [int]$InvokeTimeoutMs = 20000,
-    [int]$OutputWaitTimeoutMs = 10000
+    [int]$OutputWaitTimeoutMs = 10000,
+    [switch]$UseDirectComFallback
 )
 
 $ErrorActionPreference = "Stop"
@@ -335,11 +336,33 @@ function Resolve-TargetSubCommandLabel([string]$ExpectedOutputName, [string]$Req
     }
 }
 
-$invokeResult = if ($VerbName -eq "Convert to...") { "Verb not found" } else { [ShellVerbRunner]::Invoke($resolvedTestDir, $InputFileName, $VerbName, $InvokeTimeoutMs) }
+$invokeResult = [ShellVerbRunner]::Invoke($resolvedTestDir, $InputFileName, $VerbName, $InvokeTimeoutMs)
 Write-Host "Invoke result: $invokeResult"
 
 if ($invokeResult -eq "Verb not found")
 {
+    if (-not $UseDirectComFallback)
+    {
+        throw "The Explorer-hosted verb was not found. Re-run with -UseDirectComFallback to restart the Debug Runner in authenticated test-client mode before direct COM activation."
+    }
+
+    $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..")).Path
+    $runnerPath = Join-Path $repoRoot "x64\Debug\PowerToys.exe"
+    if (-not (Test-Path -LiteralPath $runnerPath))
+    {
+        throw "Debug Runner not found at: $runnerPath"
+    }
+
+    Get-Process PowerToys -ErrorAction SilentlyContinue |
+        ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
+    $env:POWERTOYS_FILECONVERTER_TEST_CLIENT_DIR = Split-Path -Parent (Get-Process -Id $PID).Path
+    $runner = Start-Process -FilePath $runnerPath -PassThru
+    Start-Sleep -Seconds 1
+    if ($runner.HasExited)
+    {
+        throw "Debug Runner exited before direct COM activation."
+    }
+
     $inputPath = Join-Path $resolvedTestDir $InputFileName
     $subCommandLabel = Resolve-TargetSubCommandLabel -ExpectedOutputName $ExpectedOutputFileName -RequestedVerb $VerbName
     Write-Host "Shell verb fallback: trying IExplorerCommand subcommand '$subCommandLabel'"

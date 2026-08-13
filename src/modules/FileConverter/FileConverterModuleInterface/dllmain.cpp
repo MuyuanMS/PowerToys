@@ -293,7 +293,8 @@ namespace
                 return false;
             }
 
-            const std::wstring sddl = L"D:P(A;;GA;;;SY)(A;;GA;;;" + std::wstring(sid) + L")";
+            const std::wstring sddl =
+                L"D:P(A;;GA;;;SY)(A;;GA;;;" + std::wstring(sid) + L")S:(ML;;NW;;;ME)";
             LocalFree(sid);
             return ConvertStringSecurityDescriptorToSecurityDescriptorW(
                        sddl.c_str(),
@@ -785,25 +786,6 @@ namespace
         }
     }
 
-    bool IsCurrentProcessElevated()
-    {
-        HANDLE token = nullptr;
-        if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
-        {
-            return true;
-        }
-
-        TOKEN_ELEVATION elevation{};
-        DWORD size = 0;
-        bool elevated = true;
-        if (GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size))
-        {
-            elevated = elevation.TokenIsElevated != 0;
-        }
-        CloseHandle(token);
-        return elevated;
-    }
-
     class FileConverterPipeOrchestrator
     {
     public:
@@ -1203,26 +1185,32 @@ public:
 
         EnsureContextMenuPackageRegistered();
         EnsureContextMenuRuntimeRegistered();
-        const bool can_convert_safely = !IsCurrentProcessElevated();
-        if (can_convert_safely)
+        const bool listener_ready = m_pipe_orchestrator.Start(GetPipeNameForCurrentSession());
+        if (listener_ready)
         {
-            const bool listener_ready = m_pipe_orchestrator.Start(GetPipeNameForCurrentSession());
-            if (listener_ready)
+            PipeSecurity event_security;
+            if (event_security.initialize())
             {
                 m_context_menu_lifetime_event =
-                    CreateEventW(nullptr, TRUE, TRUE, GetEnabledEventNameForCurrentSession().c_str());
+                    CreateEventW(
+                        &event_security.attributes,
+                        TRUE,
+                        TRUE,
+                        GetEnabledEventNameForCurrentSession().c_str());
+            }
+            if (m_context_menu_lifetime_event != nullptr)
+            {
                 StartEncoderAvailabilityRefresh();
             }
-            SetContextMenuEnabledState(listener_ready && m_context_menu_lifetime_event != nullptr);
-            if (!listener_ready)
-            {
-                Logger::error(L"File Converter is unavailable because its IPC listener could not start.");
-            }
         }
-        else
+        SetContextMenuEnabledState(listener_ready && m_context_menu_lifetime_event != nullptr);
+        if (!listener_ready)
         {
-            SetContextMenuEnabledState(false);
-            Logger::warn(L"File Converter is unavailable while PowerToys is running elevated.");
+            Logger::error(L"File Converter is unavailable because its IPC listener could not start.");
+        }
+        else if (m_context_menu_lifetime_event == nullptr)
+        {
+            Logger::error(L"File Converter is unavailable because its lifetime event could not start.");
         }
         m_enabled = true;
     }
