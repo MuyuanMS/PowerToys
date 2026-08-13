@@ -8,7 +8,7 @@ using Microsoft.UI.Xaml.Data;
 
 namespace Microsoft.PowerToys.Settings.UI.Converters
 {
-    // Formats a millisecond value (int property binding, or the double a Slider passes to its
+    // Formats a millisecond value (int property binding, or the double value a Slider passes to its
     // ThumbToolTipValueConverter) as a localized label. One-way display only.
     public sealed partial class MillisecondsLabelConverter : IValueConverter
     {
