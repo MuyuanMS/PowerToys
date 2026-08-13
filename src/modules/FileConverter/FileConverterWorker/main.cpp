@@ -10,6 +10,56 @@ namespace
     constexpr auto ABANDONED_TEMP_AGE = std::chrono::minutes(5);
     constexpr DWORD ENCODER_PROBE_TIMEOUT_MS = 10000;
 
+    bool IsDecimalNumber(std::wstring_view value)
+    {
+        return !value.empty() &&
+               std::ranges::all_of(value, [](wchar_t character) {
+                   return character >= L'0' && character <= L'9';
+               });
+    }
+
+    bool IsConverterTempFilename(
+        std::wstring_view filename,
+        std::wstring_view output_prefix,
+        std::wstring_view output_extension)
+    {
+        if (!filename.starts_with(output_prefix))
+        {
+            return false;
+        }
+
+        filename.remove_prefix(output_prefix.size());
+        if (filename.starts_with(L"_"))
+        {
+            filename.remove_prefix(1);
+            const size_t extension_position = filename.find(output_extension);
+            if (extension_position == std::wstring_view::npos ||
+                !IsDecimalNumber(filename.substr(0, extension_position)))
+            {
+                return false;
+            }
+            filename.remove_prefix(extension_position);
+        }
+
+        if (!filename.starts_with(output_extension))
+        {
+            return false;
+        }
+        filename.remove_prefix(output_extension.size());
+
+        constexpr std::wstring_view temp_marker = L".tmp-";
+        if (!filename.starts_with(temp_marker))
+        {
+            return false;
+        }
+        filename.remove_prefix(temp_marker.size());
+
+        const size_t separator_position = filename.find(L'-');
+        return separator_position != std::wstring_view::npos &&
+               IsDecimalNumber(filename.substr(0, separator_position)) &&
+               IsDecimalNumber(filename.substr(separator_position + 1));
+    }
+
     std::wstring ExtensionForFormat(file_converter::ImageFormat format)
     {
         switch (format)
@@ -53,7 +103,6 @@ namespace
         const std::wstring& output_extension)
     {
         const std::wstring output_prefix = input_path.stem().wstring() + L"_converted";
-        const std::wstring temp_marker = output_extension + L".tmp-";
         const auto cutoff = std::filesystem::file_time_type::clock::now() - ABANDONED_TEMP_AGE;
 
         std::error_code ec;
@@ -63,8 +112,12 @@ namespace
         {
             const auto& candidate = iterator->path();
             const std::wstring filename = candidate.filename().wstring();
-            if (!filename.starts_with(output_prefix) ||
-                filename.find(temp_marker) == std::wstring::npos)
+            if (!iterator->is_regular_file(ec))
+            {
+                ec.clear();
+                continue;
+            }
+            if (!IsConverterTempFilename(filename, output_prefix, output_extension))
             {
                 continue;
             }
