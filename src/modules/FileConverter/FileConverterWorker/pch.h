@@ -5,6 +5,7 @@
 
 #include <winrt/base.h>
 
+#include <chrono>
 #include <filesystem>
 #include <optional>
 #include <string>

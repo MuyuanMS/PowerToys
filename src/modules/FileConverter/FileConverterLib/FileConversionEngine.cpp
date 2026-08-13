@@ -5,6 +5,7 @@
 
 #include "FileConversionEngine.h"
 
+#include <appmodel.h>
 #include <winrt/Windows.ApplicationModel.Resources.h>
 #include <wrl/client.h>
 
@@ -14,6 +15,12 @@ namespace
 {
     std::wstring LoadLocalizedString(std::wstring_view key, std::wstring_view fallback)
     {
+        UINT32 package_name_length = 0;
+        if (GetCurrentPackageFullName(&package_name_length, nullptr) != ERROR_INSUFFICIENT_BUFFER)
+        {
+            return std::wstring{ fallback };
+        }
+
         try
         {
             static const auto loader = winrt::Windows::ApplicationModel::Resources::ResourceLoader::GetForViewIndependentUse(L"Resources");
