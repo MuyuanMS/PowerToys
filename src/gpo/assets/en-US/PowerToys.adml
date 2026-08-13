@@ -257,6 +257,7 @@ If you don't configure this policy, the user will be able to control the setting
       <string id="ConfigureEnabledUtilityColorPicker">Color Picker: Configure enabled state</string>
       <string id="ConfigureEnabledUtilityCmdNotFound">Command Not Found: Configure enabled state</string>
       <string id="ConfigureEnabledUtilityCmdPal">CmdPal: Configure enabled state</string>
+      <string id="ConfigureEnabledUtilityClipPing">ClipPing: Configure enabled state</string>
       <string id="ConfigureEnabledUtilityCropAndLock">Crop And Lock: Configure enabled state</string>
       <string id="ConfigureEnabledUtilityLightSwitch">Light Switch: Configure enabled state</string>
       <string id="ConfigureEnabledUtilityPowerDisplay">PowerDisplay: Configure enabled state</string>
