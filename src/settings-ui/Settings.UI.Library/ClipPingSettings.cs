@@ -24,7 +24,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         [JsonPropertyName("properties")]
         public ClipPingProperties Properties { get; set; }
 
-        public static ClipPingSettings Normalize(ClipPingSettings? settings)
+        public static ClipPingSettings Normalize(ClipPingSettings settings)
         {
             settings ??= new ClipPingSettings();
             settings.Properties ??= new ClipPingProperties();
