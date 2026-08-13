@@ -118,7 +118,8 @@ namespace
     class JobAttributeList
     {
     public:
-        explicit JobAttributeList(HANDLE job)
+        explicit JobAttributeList(HANDLE job) :
+            jobHandle{ job }
         {
             SIZE_T size = 0;
             InitializeProcThreadAttributeList(nullptr, 1, 0, &size);
@@ -133,8 +134,8 @@ namespace
                     attributeList,
                     0,
                     PROC_THREAD_ATTRIBUTE_JOB_LIST,
-                    &job,
-                    sizeof(job),
+                    &jobHandle,
+                    sizeof(jobHandle),
                     nullptr,
                     nullptr))
             {
@@ -163,6 +164,7 @@ namespace
     private:
         std::unique_ptr<unsigned char[]> storage;
         PPROC_THREAD_ATTRIBUTE_LIST attributeList = nullptr;
+        HANDLE jobHandle = nullptr;
     };
 
     std::filesystem::path GetTestBinaryDirectory()
