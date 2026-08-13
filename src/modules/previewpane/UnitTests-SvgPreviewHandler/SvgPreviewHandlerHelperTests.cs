@@ -206,6 +206,10 @@ namespace SvgPreviewHandlerUnitTests
             {
                 Assert.IsTrue(SvgPreviewCacheHelper.TryWriteTransientFile(userDataFolder, "contents", out var transientFilePath));
                 Assert.AreEqual("contents", File.ReadAllText(transientFilePath));
+
+                SvgPreviewCacheHelper.DeleteTransientFile(transientFilePath);
+
+                Assert.IsFalse(File.Exists(transientFilePath));
             }
             finally
             {

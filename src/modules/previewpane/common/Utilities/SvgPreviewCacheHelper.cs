@@ -144,6 +144,11 @@ namespace Common.Utilities
             }
         }
 
+        internal static void DeleteTransientFile(string filePath)
+        {
+            TryDeleteFile(filePath);
+        }
+
         internal static void PruneCache(string cacheRootFolder, DateTime utcNow, long maxCacheSizeBytes = MaxCacheSizeBytes)
         {
             try

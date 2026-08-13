@@ -108,6 +108,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
             }
 
             Bitmap thumbnail = null;
+            string transientFilePath = string.Empty;
 
             var thumbnailDone = new ManualResetEventSlim(false);
 
@@ -193,7 +194,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
                         _localFileURI = new Uri(cacheFilePath);
                         _browser.Source = _localFileURI;
                     }
-                    else if (SvgPreviewCacheHelper.TryWriteTransientFile(_webView2UserDataFolder, SvgContents, out var transientFilePath))
+                    else if (SvgPreviewCacheHelper.TryWriteTransientFile(_webView2UserDataFolder, SvgContents, out transientFilePath))
                     {
                         _localFileURI = new Uri(transientFilePath);
                         _browser.Source = _localFileURI;
@@ -216,6 +217,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
             }
 
             _browser.Dispose();
+            SvgPreviewCacheHelper.DeleteTransientFile(transientFilePath);
 
             return thumbnail;
         }
