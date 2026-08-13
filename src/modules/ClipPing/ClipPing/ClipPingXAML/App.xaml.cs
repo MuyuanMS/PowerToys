@@ -97,22 +97,19 @@ public partial class App : Application, IDisposable
 
     private void ApplySettings(ClipPingSettings? settings)
     {
-        settings ??= new ClipPingSettings();
-        settings.Properties ??= new ClipPingProperties();
-        settings.Properties.OverlayColor ??= new StringProperty(ClipPingProperties.DefaultOverlayColor);
+        string? rawColor = settings?.Properties?.OverlayColor?.Value;
+        ClipPingOverlay? rawOverlayType = settings?.Properties?.OverlayType;
+        settings = ClipPingSettings.Normalize(settings);
+        string normalizedColor = settings.Properties.OverlayColor.Value;
 
-        string rawColor = settings.Properties.OverlayColor.Value;
-        string normalizedColor = ClipPingProperties.NormalizeOverlayColor(rawColor);
         if (!string.Equals(rawColor, normalizedColor, StringComparison.OrdinalIgnoreCase))
         {
             Logger.LogWarning($"Invalid overlay color in settings: {rawColor}. Using the default color.");
-            settings.Properties.OverlayColor.Value = normalizedColor;
         }
 
-        if (!OverlayTypes.ContainsKey(settings.Properties.OverlayType))
+        if (rawOverlayType.HasValue && rawOverlayType.Value != settings.Properties.OverlayType)
         {
-            Logger.LogWarning($"Unknown overlay type: {settings.Properties.OverlayType}. Defaulting to TopOverlay.");
-            settings.Properties.OverlayType = ClipPingOverlay.Top;
+            Logger.LogWarning($"Unknown overlay type: {rawOverlayType.Value}. Defaulting to TopOverlay.");
         }
 
         _currentSettings = settings;

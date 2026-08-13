@@ -118,6 +118,13 @@ Thank you for using PowerToys!
 | Microsoft.PowerToys.ColorPicker_Session | Occurs during a Color Picker usage session. |
 | Microsoft.PowerToys.ColorPicker_Settings | Triggered when the settings for the Color Picker are accessed or modified. |
 
+### ClipPing
+
+| Event Name | Description |
+| --- | --- |
+| Microsoft.PowerToys.ClipPing_Enabled | Indicates when ClipPing is enabled or disabled. |
+| Microsoft.PowerToys.ClipPingOpenedEvent | Indicates when the ClipPing process starts. |
+
 ### Command Not Found
 
 | Event Name | Description |

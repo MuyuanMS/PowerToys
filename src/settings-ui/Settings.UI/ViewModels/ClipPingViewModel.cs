@@ -34,16 +34,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             // To obtain the settings configurations of ClipPing.
             ArgumentNullException.ThrowIfNull(moduleSettingsRepository);
 
-            var settings = moduleSettingsRepository.SettingsConfig ?? new ClipPingSettings();
-            settings.Properties ??= new ClipPingProperties();
-            settings.Properties.OverlayColor ??= new StringProperty(ClipPingProperties.DefaultOverlayColor);
-            settings.Properties.OverlayColor.Value = ClipPingProperties.NormalizeOverlayColor(settings.Properties.OverlayColor.Value);
-            if (!Enum.IsDefined(settings.Properties.OverlayType))
-            {
-                settings.Properties.OverlayType = ClipPingOverlay.Top;
-            }
-
-            Settings = settings;
+            Settings = ClipPingSettings.Normalize(moduleSettingsRepository.SettingsConfig);
 
             // set the callback functions value to handle outgoing IPC message.
             SendConfigMSG = ipcMSGCallBackFunc;

@@ -15,6 +15,7 @@ Settings are stored in the standard PowerToys module settings file and exposed t
 
 - `src/modules/ClipPing/ClipPingModuleInterface/dllmain.cpp`: Runner integration and process lifecycle.
 - `src/modules/ClipPing/ClipPing/ClipPingXAML/App.xaml.cs`: Clipboard listener, settings reload, and overlay placement.
+- `src/modules/ClipPing/ClipPing.FuzzTests`: OneFuzz target for malformed settings input.
 - `src/settings-ui/Settings.UI.Library/ClipPingSettings.cs`: Serialized module settings.
 - `src/settings-ui/Settings.UI/ViewModels/ClipPingViewModel.cs`: Settings persistence and policy state.
 - `src/settings-ui/Settings.UI/SettingsXAML/Views/ClipPingPage.xaml`: Settings user interface.
@@ -27,7 +28,7 @@ Build the following projects for `x64 Debug`:
 2. `ClipPing`
 3. `Settings.UI`
 
-Run the ClipPing tests in `Settings.UI.UnitTests`, including `ClipPingSettingsTests` and the `ViewModelTests.ClipPing` test class.
+Run the ClipPing tests in `Settings.UI.UnitTests`, including `ClipPingSettingsTests` and the `ViewModelTests.ClipPing` test class. Build `ClipPing.FuzzTests` to validate the OneFuzz target and configuration.
 
 ## Debugging
 

@@ -15,7 +15,7 @@ public sealed partial class BorderOverlay : WindowEx, IOverlay
         InitializeComponent();
 
         this.SetWindowStyle(WindowStyle.Popup);
-        this.SetExtendedWindowStyle(ExtendedWindowStyle.Transparent | ExtendedWindowStyle.Layered);
+        this.SetExtendedWindowStyle(this.GetExtendedWindowStyle() | ExtendedWindowStyle.Transparent | ExtendedWindowStyle.Layered);
     }
 
     public void Show(Rect area, Color color)

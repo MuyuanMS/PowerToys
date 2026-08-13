@@ -1,0 +1,41 @@
+{
+  "configVersion": 3,
+  "entries": [
+    {
+      "fuzzer": {
+        "$type": "libfuzzerDotNet",
+        "dll": "ClipPing.FuzzTests.dll",
+        "class": "ClipPing.FuzzTests.FuzzTests",
+        "method": "FuzzSettings",
+        "FuzzingTargetBinaries": [
+          "PowerToys.Settings.UI.Library.dll"
+        ]
+      },
+      "adoTemplate": {
+        "org": "microsoft",
+        "project": "OS",
+        "AssignedTo": "leilzh@microsoft.com",
+        "AreaPath": "OS\\Windows Client and Services\\WinPD\\DFX-Developer Fundamentals and Experiences\\DEFT\\SALT",
+        "IterationPath": "OS\\Future"
+      },
+      "jobNotificationEmail": "PowerToys@microsoft.com",
+      "skip": false,
+      "rebootAfterSetup": false,
+      "oneFuzzJobs": [
+        {
+          "projectName": "ClipPing",
+          "targetName": "ClipPing-dotnet-settings-fuzzer"
+        }
+      ],
+      "jobDependencies": [
+        "ClipPing.FuzzTests.dll",
+        "ClipPing.FuzzTests.pdb",
+        "PowerToys.Settings.UI.Library.dll",
+        "PowerToys.Settings.UI.Library.pdb",
+        "Microsoft.Windows.SDK.NET.dll",
+        "WinRT.Runtime.dll"
+      ],
+      "SdlWorkItemId": 49911822
+    }
+  ]
+}
