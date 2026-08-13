@@ -64,24 +64,10 @@ namespace WorkspacesLauncherUI
             _ipcManager = new TwoWayPipeMessageIPCManaged(
                 "\\\\.\\pipe\\powertoys_workspaces_ui_",
                 "\\\\.\\pipe\\powertoys_workspaces_launcher_ui_",
-                (string message) =>
-                {
-                    if (message == "cancel_ack")
-                    {
-                        DispatcherQueue.TryEnqueue(() => CancelAcknowledgedCallback?.Invoke());
-                        return;
-                    }
-
-                    Action<string> callback = IPCMessageReceivedCallback;
-                    if (callback != null && message.Length > 0)
-                    {
-                        DispatcherQueue.TryEnqueue(() =>
-                        {
-                            _readyTimer?.Stop();
-                            callback(message);
-                        });
-                    }
-                });
+                (string message) => ProcessIPCMessage(
+                    message,
+                    callback => DispatcherQueue.TryEnqueue(() => callback()),
+                    () => _readyTimer?.Stop()));
             _ipcManager.Start();
 
             _readyTimer = DispatcherQueue.CreateTimer();
@@ -91,6 +77,25 @@ namespace WorkspacesLauncherUI
             SendIPCMessage("ready");
 
             _mainWindow.Activate();
+        }
+
+        internal static void ProcessIPCMessage(string message, Action<Action> enqueue, Action stopReadyTimer)
+        {
+            if (message == "cancel_ack")
+            {
+                enqueue(() => CancelAcknowledgedCallback?.Invoke());
+                return;
+            }
+
+            Action<string> callback = IPCMessageReceivedCallback;
+            if (callback != null && message.Length > 0)
+            {
+                enqueue(() =>
+                {
+                    stopReadyTimer();
+                    callback(message);
+                });
+            }
         }
 
         private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)

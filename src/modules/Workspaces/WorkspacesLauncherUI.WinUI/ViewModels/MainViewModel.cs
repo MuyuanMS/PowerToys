@@ -21,13 +21,20 @@ namespace WorkspacesLauncherUI.ViewModels
     {
         private readonly PwaHelper _pwaHelper;
         private readonly Action<string> _ipcMessageReceivedCallback;
+        private readonly Action<string> _sendIpcMessage;
         private bool _isDisposed;
 
         [ObservableProperty]
         private ObservableCollection<AppLaunching> _appsListed = new ObservableCollection<AppLaunching>();
 
         public MainViewModel()
+            : this(App.SendIPCMessage)
         {
+        }
+
+        internal MainViewModel(Action<string> sendIpcMessage)
+        {
+            _sendIpcMessage = sendIpcMessage ?? throw new ArgumentNullException(nameof(sendIpcMessage));
             _pwaHelper = new PwaHelper();
 
             _ipcMessageReceivedCallback = (string msg) =>
@@ -69,7 +76,7 @@ namespace WorkspacesLauncherUI.ViewModels
         [RelayCommand]
         private void CancelLaunch()
         {
-            App.SendIPCMessage("cancel");
+            _sendIpcMessage("cancel");
         }
 
         public void Dispose()
