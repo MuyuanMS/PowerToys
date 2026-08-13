@@ -135,9 +135,14 @@ void Launcher::Launch() // Launching thread
             Logger::info(L"Waiting time for launching next {} instance expired", app.name);
         }
 
-        if (m_cancelRequested)
         {
-            break;
+            std::lock_guard lock(m_launchStateMutex);
+            if (m_cancelRequested)
+            {
+                break;
+            }
+
+            m_launchInProgress = true;
         }
 
         bool launched{ false };
@@ -146,9 +151,13 @@ void Launcher::Launch() // Launching thread
             launched = AppLauncher::Launch(app, m_launchErrors);
         }
 
-        if (m_cancelRequested)
         {
-            break;
+            std::lock_guard lock(m_launchStateMutex);
+            m_launchInProgress = false;
+            if (m_cancelRequested)
+            {
+                break;
+            }
         }
 
         if (launched)
@@ -221,7 +230,15 @@ void Launcher::handleUIMessage(const std::wstring& msg) // UI IPC thread
     }
     else if (msg == L"cancel")
     {
-        m_cancelRequested = true;
+        {
+            std::lock_guard lock(m_launchStateMutex);
+            m_cancelRequested = true;
+            if (m_launchInProgress)
+            {
+                Logger::trace(L"Cancel requested while an application launch is already in progress");
+            }
+        }
+
         m_launchingStatus.Cancel();
 
         std::lock_guard lock(m_uiHelperMutex);
