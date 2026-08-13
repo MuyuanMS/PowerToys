@@ -260,7 +260,7 @@ bool WindowKeyboardSnap::SnapBasedOnPositionOnAnotherMonitor(HWND window, RECT w
 
     if (!cycle)
         return false;
-    
+
     // We reached the end of all monitors.
     // Try again, cycling on all monitors.
     // First, add zones from the origin monitor to zoneRects
