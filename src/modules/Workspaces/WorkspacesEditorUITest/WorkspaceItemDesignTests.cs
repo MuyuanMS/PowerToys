@@ -44,7 +44,7 @@ public class WorkspaceItemDesignTests : WorkspacesUiAutomationBase
         }
 
         var item = GetFirstWorkspaceItem();
-        Assert.IsNotNull(item, "Should have at least one workspace item");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(item.Name), "Workspace item should expose a nonempty accessible name.");
     }
 
     [TestMethod("WorkspaceItem.HasLaunchButton")]
@@ -82,7 +82,7 @@ public class WorkspaceItemDesignTests : WorkspacesUiAutomationBase
             Has<TextBox>(By.AccessibilityId("EditNameTextBox")),
             "Clicking a workspace item should navigate to the editing page.");
 
-        Find<Button>("Cancel").Click();
+        Find<Button>("Back").Click();
         Task.Delay(500).Wait();
     }
 
