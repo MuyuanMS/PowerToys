@@ -182,7 +182,6 @@ public partial class App : Application, IDisposable
     {
         Guid targetDesktopId = GetDesktopId(targetWindow);
         bool desktopChanged = targetDesktopId != Guid.Empty &&
-                              _overlayDesktopId != Guid.Empty &&
                               targetDesktopId != _overlayDesktopId;
 
         if (_overlay?.GetType() != OverlayType || desktopChanged)
