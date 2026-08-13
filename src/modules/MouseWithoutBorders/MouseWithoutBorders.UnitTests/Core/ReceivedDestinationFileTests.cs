@@ -95,10 +95,10 @@ public sealed class ReceivedDestinationFileTests
             return accepted;
         });
 
-        Assert.IsTrue(firstTransferCompleted.Wait(millisecondsTimeout: 1000));
-
         try
         {
+            Assert.IsTrue(firstTransferCompleted.Wait(millisecondsTimeout: 1000));
+
             var secondReceiveAccepted = await Task.Run(() => Clipboard.ExecuteClipboardReceive(
                 () => { },
                 waitMilliseconds: 1000));
@@ -126,10 +126,10 @@ public sealed class ReceivedDestinationFileTests
                 },
                 waitMilliseconds: 1000));
 
-        Assert.IsTrue(firstReceiveStarted.Wait(millisecondsTimeout: 1000));
-
         try
         {
+            Assert.IsTrue(firstReceiveStarted.Wait(millisecondsTimeout: 1000));
+
             var secondCallbackRan = false;
             var secondReceiveAccepted = await Task.Run(() => Clipboard.ExecuteClipboardReceive(
                 () => secondCallbackRan = true,

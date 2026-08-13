@@ -39,11 +39,16 @@ internal sealed class ReceivedDestinationFile : IDisposable
 
     public void Dispose()
     {
-        Stream.Dispose();
-
-        if (!completed)
+        try
         {
-            deleteFile(stagingPath);
+            Stream.Dispose();
+        }
+        finally
+        {
+            if (!completed)
+            {
+                deleteFile(stagingPath);
+            }
         }
     }
 }
