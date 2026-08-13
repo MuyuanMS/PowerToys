@@ -96,6 +96,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
     // read workspaces
     std::vector<WorkspacesData::WorkspacesProject> workspaces;
     WorkspacesData::WorkspacesProject projectToLaunch{};
+    bool loadedFromTransientHandoff = false;
     if (cmdArgs.invokePoint == InvokePoint::LaunchAndEdit)
     {
         // Check the protected transient handoff in case the project was just
@@ -104,6 +105,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
         if (res.isOk() && res.getValue().id == cmdArgs.workspaceId)
         {
             projectToLaunch = res.getValue();
+            loadedFromTransientHandoff = true;
         }
         else if (res.isError())
         {
@@ -197,16 +199,23 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
     // update the file before launching, so WorkspacesWindowArranger and WorkspacesLauncherUI could get updated app paths
     if (updatedApps || updatedIds)
     {
-        for (int i = 0; i < workspaces.size(); i++)
+        if (loadedFromTransientHandoff)
         {
-            if (workspaces[i].id == projectToLaunch.id)
-            {
-                workspaces[i] = projectToLaunch;
-                break;
-            }
+            JsonUtils::WriteTransientWorkspaceToService(projectToLaunch);
         }
+        else
+        {
+            for (int i = 0; i < workspaces.size(); i++)
+            {
+                if (workspaces[i].id == projectToLaunch.id)
+                {
+                    workspaces[i] = projectToLaunch;
+                    break;
+                }
+            }
 
-        JsonUtils::WriteWorkspacesToService(workspaces);
+            JsonUtils::WriteWorkspacesToService(workspaces);
+        }
     }
 
     // launch

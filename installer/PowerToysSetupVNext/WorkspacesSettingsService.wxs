@@ -144,8 +144,9 @@
       </Component>
     </DirectoryRef>
 
+    <?if $(var.PerUser) != "true" ?>
     <!--
-      Uninstall cleanup.  There is NO install-time
+      Per-machine uninstall cleanup.  There is NO install-time
       seeding: the per-user store is provisioned at register
       time and legacy data is migrated per-user by the runner through the service
      , so the removed Seed-PtSettingsStore.ps1 (which wrote all users' blobs
@@ -169,7 +170,7 @@
       </Component>
     </DirectoryRef>
 
-    <!-- Remove the service APP artifacts as SYSTEM on uninstall (data preserved). -->
+    <!-- Remove the service APP artifacts as SYSTEM on per-machine uninstall (data preserved). -->
     <CustomAction Id="PtCleanupStore"
                   Directory="WorkspacesSettingsServiceFolder"
                   ExeCommand="&quot;[SystemFolder]WindowsPowerShell\v1.0\powershell.exe&quot; -NonInteractive -NoProfile -ExecutionPolicy Bypass -File &quot;[#PtCleanupScript]&quot; -RemoveService:$false -RemoveAppArtifacts"
@@ -179,13 +180,16 @@
       <!-- While the script still exists; only on full uninstall. -->
       <Custom Action="PtCleanupStore" Before="RemoveFiles" Condition="Installed AND (NOT UPGRADINGPRODUCTCODE) AND (REMOVE=&quot;ALL&quot;)" />
     </InstallExecuteSequence>
+    <?endif?>
 
     <ComponentGroup Id="PTSettingsServiceComponentGroup">
       <ComponentRef Id="RegisterPTSettingsService" />
       <ComponentRef Id="RemovePTSettingsServiceFolder" />
       <ComponentRef Id="CreatePTSettingsDataRoot" />
       <ComponentRef Id="HardenInstallFolderDacl" />
+      <?if $(var.PerUser) != "true" ?>
       <ComponentRef Id="PTSettingsCustomActionScripts" />
+      <?endif?>
     </ComponentGroup>
   </Fragment>
 

@@ -184,7 +184,7 @@
       <Custom Action="SetUnRegisterPTSettingsSvcMachineParam" Before="UnRegisterPTSettingsSvcMachine" Condition="Installed AND (NOT UPGRADINGPRODUCTCODE) AND (REMOVE=&quot;ALL&quot;)" />
       <Custom Action="UnRegisterPTSettingsSvcMachine" Before="PtCleanupStore" Condition="Installed AND (NOT UPGRADINGPRODUCTCODE) AND (REMOVE=&quot;ALL&quot;)" />
       <?else?>
-      <Custom Action="UnRegisterPTSettingsSvcUser" Before="PtCleanupStore" Condition="Installed AND (NOT UPGRADINGPRODUCTCODE) AND (REMOVE=&quot;ALL&quot;)" />
+      <Custom Action="UnRegisterPTSettingsSvcUser" Before="RemoveFiles" Condition="Installed AND (NOT UPGRADINGPRODUCTCODE) AND (REMOVE=&quot;ALL&quot;)" />
       <?endif?>
       <Custom Action="UninstallServicesTask" After="InstallFinalize" Condition="Installed AND (NOT UPGRADINGPRODUCTCODE) AND (REMOVE=&quot;ALL&quot;)" />
         <!-- TODO: Use to activate embedded MSIX -->
