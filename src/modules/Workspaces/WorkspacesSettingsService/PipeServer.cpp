@@ -46,14 +46,27 @@ namespace PTSettingsSvc
         // no cross-thread sharing of an OVERLAPPED).
         HANDLE g_ioEvent = nullptr;   // manual-reset; owned by RunPipeServer
         HANDLE g_stopEvt = nullptr;   // borrowed from ServiceMain / console
+        ULONGLONG g_requestDeadline = 0;
+        constexpr DWORD RequestTimeoutMs = 10'000;
+
+        DWORD RemainingRequestTime()
+        {
+            const ULONGLONG now = GetTickCount64();
+            if (now >= g_requestDeadline)
+            {
+                return 0;
+            }
+
+            return static_cast<DWORD>(g_requestDeadline - now);
+        }
 
         // Wait for an overlapped op to complete OR for stop to be signalled.
-        // On stop, cancels the pending I/O and reaps it (so the OVERLAPPED is
-        // safe to leave scope) and returns false.
+        // On stop or request timeout, cancels the pending I/O and reaps it (so
+        // the OVERLAPPED is safe to leave scope) and returns false.
         bool WaitOverlapped(HANDLE pipe, OVERLAPPED& ov, DWORD& transferred)
         {
             HANDLE waits[2] = { g_ioEvent, g_stopEvt };
-            DWORD w = WaitForMultipleObjects(2, waits, FALSE, INFINITE);
+            DWORD w = WaitForMultipleObjects(2, waits, FALSE, RemainingRequestTime());
             if (w != WAIT_OBJECT_0)
             {
                 CancelIoEx(pipe, &ov);
@@ -70,6 +83,11 @@ namespace PTSettingsSvc
             DWORD remaining = len;
             while (remaining > 0)
             {
+                if (RemainingRequestTime() == 0)
+                {
+                    return false;
+                }
+
                 OVERLAPPED ov{};
                 ov.hEvent = g_ioEvent;
                 ResetEvent(g_ioEvent);
@@ -101,6 +119,11 @@ namespace PTSettingsSvc
             DWORD remaining = len;
             while (remaining > 0)
             {
+                if (RemainingRequestTime() == 0)
+                {
+                    return false;
+                }
+
                 OVERLAPPED ov{};
                 ov.hEvent = g_ioEvent;
                 ResetEvent(g_ioEvent);
@@ -272,6 +295,8 @@ namespace PTSettingsSvc
 
         bool HandleConnection(HANDLE pipe)
         {
+            g_requestDeadline = GetTickCount64() + RequestTimeoutMs;
+
             CallerIdentity id;
             HRESULT hr = AuthenticateCaller(pipe, id);
             if (FAILED(hr))
