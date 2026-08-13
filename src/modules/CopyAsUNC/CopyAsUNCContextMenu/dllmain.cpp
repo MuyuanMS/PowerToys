@@ -79,9 +79,13 @@ public:
         if (CopyAsUNCSettingsInstance().GetShowInExtendedContextMenu())
             return S_OK;
 
-        // Only show for items on mapped network drives
+        // Only show for UNC paths or items on mapped network drives
         if (selection)
         {
+            DWORD count = 0;
+            if (FAILED(selection->GetCount(&count)) || count != 1)
+                return S_OK;
+
             IShellItem* item = nullptr;
             if (SUCCEEDED(selection->GetItemAt(0, &item)))
             {
@@ -107,6 +111,10 @@ public:
     try
     {
         if (!selection)
+            return S_OK;
+
+        DWORD count = 0;
+        if (FAILED(selection->GetCount(&count)) || count != 1)
             return S_OK;
 
         IShellItem* item = nullptr;
@@ -145,29 +153,36 @@ public:
 
             if (!uncPath.empty())
             {
-                if (OpenClipboard(nullptr))
+                size_t byteLen = (uncPath.size() + 1) * sizeof(wchar_t);
+                HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, byteLen);
+                if (hMem)
                 {
-                    EmptyClipboard();
-                    size_t byteLen = (uncPath.size() + 1) * sizeof(wchar_t);
-                    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, byteLen);
-                    if (hMem)
+                    void* locked = GlobalLock(hMem);
+                    if (locked)
                     {
-                        void* locked = GlobalLock(hMem);
-                        if (locked)
+                        memcpy(locked, uncPath.c_str(), byteLen);
+                        GlobalUnlock(hMem);
+
+                        HWND clipboardOwner = nullptr;
+                        if (!m_site || FAILED(IUnknown_GetWindow(m_site.Get(), &clipboardOwner)))
                         {
-                            memcpy(locked, uncPath.c_str(), byteLen);
-                            GlobalUnlock(hMem);
-                            if (SetClipboardData(CF_UNICODETEXT, hMem) == nullptr)
-                            {
-                                GlobalFree(hMem);
-                            }
+                            clipboardOwner = GetForegroundWindow();
                         }
-                        else
+
+                        if (clipboardOwner && OpenClipboard(clipboardOwner))
                         {
-                            GlobalFree(hMem);
+                            if (EmptyClipboard() && SetClipboardData(CF_UNICODETEXT, hMem) != nullptr)
+                            {
+                                hMem = nullptr;
+                            }
+                            CloseClipboard();
                         }
                     }
-                    CloseClipboard();
+
+                    if (hMem)
+                    {
+                        GlobalFree(hMem);
+                    }
                 }
             }
 
