@@ -79,6 +79,11 @@
                     Icon="{ui:BitmapIcon Source=/Assets/Settings/Icons/CommandNotFound.png}"
                     Tag="CmdNotFound" />
                 <NavigationViewItem
+                    x:Uid="Shell_ClipPing"
+                    AutomationProperties.AutomationId="ClipPingOobeNavItem"
+                    Icon="{ui:BitmapIcon Source=/Assets/Settings/Icons/ClipPing.png}"
+                    Tag="ClipPing" />
+                <NavigationViewItem
                     x:Uid="Shell_CropAndLock"
                     Icon="{ui:BitmapIcon Source=/Assets/Settings/Icons/CropAndLock.png}"
                     Tag="CropAndLock" />

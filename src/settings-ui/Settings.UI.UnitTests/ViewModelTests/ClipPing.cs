@@ -101,6 +101,17 @@ namespace ViewModelTests
         }
 
         [TestMethod]
+        public void OverlayColorWhenNullShouldUseSharedDefault()
+        {
+            var settingsUtils = new Mock<SettingsUtils>(new FileSystem(), null);
+            var viewModel = CreateViewModel(settingsUtils);
+
+            viewModel.OverlayColor = null;
+
+            Assert.AreEqual(ClipPingProperties.DefaultOverlayColor, viewModel.OverlayColor);
+        }
+
+        [TestMethod]
         public void OverlayTypeWhenChangedShouldPersistSettings()
         {
             var settingsUtils = new Mock<SettingsUtils>(new FileSystem(), null);

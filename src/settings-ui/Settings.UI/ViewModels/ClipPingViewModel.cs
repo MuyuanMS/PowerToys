@@ -104,7 +104,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
             set
             {
-                value = (value != null) ? SettingsUtilities.ToRGBHex(value) : "#00FF00";
+                value = (value != null) ? SettingsUtilities.ToRGBHex(value) : ClipPingProperties.DefaultOverlayColor;
                 if (!value.Equals(Settings.Properties.OverlayColor.Value, StringComparison.OrdinalIgnoreCase))
                 {
                     Settings.Properties.OverlayColor.Value = value;

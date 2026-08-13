@@ -26,6 +26,7 @@ public partial class App : Application, IDisposable
     private readonly FileSystemWatcher _fileSystemWatcher;
     private readonly ETWTrace _etwTrace = new();
     private ClipPingSettings _currentSettings = new();
+    private DispatcherQueue? _dispatcherQueue;
     private Windows.UI.Color _overlayColor;
     private IOverlay? _overlay;
 
@@ -130,6 +131,9 @@ public partial class App : Application, IDisposable
     /// <param name="args">Details about the launch request and process.</param>
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        var dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+        _dispatcherQueue = dispatcherQueue;
+
         var cmdArgs = Environment.GetCommandLineArgs();
         if (cmdArgs.Length > 1)
         {
@@ -137,11 +141,10 @@ public partial class App : Application, IDisposable
             {
                 Logger.LogInfo($"ClipPing started from the PowerToys Runner. Runner pid={powerToysRunnerPid}.");
 
-                var dispatcher = DispatcherQueue.GetForCurrentThread();
                 RunnerHelper.WaitForPowerToysRunner(powerToysRunnerPid, () =>
                 {
                     Logger.LogInfo("PowerToys Runner exited. Exiting ClipPing");
-                    dispatcher.TryEnqueue(App.Current.Exit);
+                    dispatcherQueue.TryEnqueue(App.Current.Exit);
                 });
             }
         }
@@ -168,7 +171,7 @@ public partial class App : Application, IDisposable
 
     private void Clipboard_ContentChanged(object? sender, object e)
     {
-        ShowOverlay();
+        _dispatcherQueue?.TryEnqueue(ShowOverlay);
     }
 
     private IOverlay? GetOverlay()

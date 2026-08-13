@@ -25,5 +25,15 @@ namespace ViewModelTests
             Assert.IsTrue(altWindowCycleIndex >= 0);
             Assert.AreEqual(altWindowCycleIndex + 1, workspacesIndex);
         }
+
+        [TestMethod]
+        public void ModulesContainsClipPingAsNewModule()
+        {
+            var viewModel = new OobeShellViewModel();
+
+            var clipPing = viewModel.GetModule(PowerToysModules.ClipPing);
+
+            Assert.IsTrue(clipPing.IsNew);
+        }
     }
 }

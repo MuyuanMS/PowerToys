@@ -6650,4 +6650,17 @@ Text uses the current drawing color.</value>
   <data name="ClipPing_OverlayBorder.Content" xml:space="preserve">
     <value>Border</value>
   </data>
+  <data name="Oobe_ClipPing.Title" xml:space="preserve">
+    <value>ClipPing</value>
+    <comment>{Locked="ClipPing"}</comment>
+  </data>
+  <data name="Oobe_ClipPing.Description" xml:space="preserve">
+    <value>ClipPing confirms clipboard copies with a brief visual notification in the active window.</value>
+  </data>
+  <data name="Oobe_ClipPing_HowToUse.Text" xml:space="preserve">
+    <value>Copy text, an image, or a file. ClipPing displays a brief overlay in the active window when the clipboard changes.</value>
+  </data>
+  <data name="Oobe_ClipPing_TipsAndTricks.Text" xml:space="preserve">
+    <value>Choose a top-edge or border overlay and customize its color in ClipPing settings.</value>
+  </data>
 </root>

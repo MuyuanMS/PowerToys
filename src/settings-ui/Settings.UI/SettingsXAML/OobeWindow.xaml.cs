@@ -88,6 +88,7 @@ namespace Microsoft.PowerToys.Settings.UI
                     case "Awake": NavigationFrame.Navigate(typeof(OobeAwake)); break;
                     case "CmdNotFound": NavigationFrame.Navigate(typeof(OobeCmdNotFound)); break;
                     case "CmdPal": NavigationFrame.Navigate(typeof(OobeCmdPal)); break;
+                    case "ClipPing": NavigationFrame.Navigate(typeof(OobeClipPing)); break;
                     case "ColorPicker": NavigationFrame.Navigate(typeof(OobeColorPicker)); break;
                     case "CropAndLock": NavigationFrame.Navigate(typeof(OobeCropAndLock)); break;
                     case "EnvironmentVariables": NavigationFrame.Navigate(typeof(OobeEnvironmentVariables)); break;
