@@ -744,53 +744,17 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         private static IReadOnlyList<System.Text.RegularExpressions.Match> FindTopLevelActionFunctions(IReadOnlyList<string> lines)
         {
             var matches = new List<System.Text.RegularExpressions.Match>();
-            string tripleQuote = null;
 
-            foreach (var line in lines)
+            foreach (var code in PythonSourceParser.GetCodeLines(lines))
             {
-                if (tripleQuote is not null)
-                {
-                    if (CountOccurrences(line, tripleQuote) % 2 != 0)
-                    {
-                        tripleQuote = null;
-                    }
-
-                    continue;
-                }
-
-                var code = line.Split('#', 2)[0];
                 var match = PythonActionFunctionRegex.Match(code);
                 if (match.Success)
                 {
                     matches.Add(match);
                 }
-
-                var doubleQuotes = CountOccurrences(code, "\"\"\"");
-                var singleQuotes = CountOccurrences(code, "'''");
-                if (doubleQuotes % 2 != 0)
-                {
-                    tripleQuote = "\"\"\"";
-                }
-                else if (singleQuotes % 2 != 0)
-                {
-                    tripleQuote = "'''";
-                }
             }
 
             return matches;
-        }
-
-        private static int CountOccurrences(string value, string token)
-        {
-            var count = 0;
-            var startIndex = 0;
-            while ((startIndex = value.IndexOf(token, startIndex, StringComparison.Ordinal)) >= 0)
-            {
-                count++;
-                startIndex += token.Length;
-            }
-
-            return count;
         }
 
         private static bool TryParseTag(string line, string tag, out string value, bool presenceBased = false)

@@ -199,6 +199,20 @@ public sealed class PythonScriptServiceTests
     }
 
     [TestMethod]
+    public void MergeWithAutoDetectedImports_IgnoresTripleQuotesInsideOrdinaryStrings()
+    {
+        var result = PythonScriptService.MergeWithAutoDetectedImports(
+            [
+                "marker = '\\\"\\\"\\\"'",
+                "import requests",
+            ],
+            []);
+
+        Assert.AreEqual(1, result.Count);
+        Assert.AreEqual("requests", result[0].ImportName);
+    }
+
+    [TestMethod]
     public void ParsePythonError_ModuleNotFoundError()
     {
         var stderr = """
@@ -535,6 +549,21 @@ public sealed class PythonScriptServiceTests
             "def advanced_paste_from_html_to_text(html):\n" +
             "    return html\n" +
             "# documented example \"\"\"\n" +
+            "def advanced_paste_from_text_to_text(text):\n" +
+            "    return text\n");
+
+        var metadata = _service.ReadMetadata(scriptPath);
+
+        Assert.IsNotNull(metadata);
+        Assert.AreEqual(Models.ClipboardFormat.Text, metadata.SupportedFormats);
+        File.Delete(scriptPath);
+    }
+
+    [TestMethod]
+    public void ReadMetadata_IgnoresTripleQuotesInsideOrdinaryStrings()
+    {
+        var scriptPath = CreateTempScript(
+            "marker = '\\\"\\\"\\\"'\n" +
             "def advanced_paste_from_text_to_text(text):\n" +
             "    return text\n");
 

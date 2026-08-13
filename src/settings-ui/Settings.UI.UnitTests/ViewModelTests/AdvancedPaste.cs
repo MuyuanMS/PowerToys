@@ -70,6 +70,7 @@ namespace ViewModelTests
                         "def advanced_paste_from_html_to_text(value):",
                         "    return value",
                         "# documented example \"\"\"",
+                        "marker = '\\\"\\\"\\\"'",
                         "def helper():",
                         "    def advanced_paste_from_image_to_text(value):",
                         "        return value",
@@ -152,6 +153,21 @@ namespace ViewModelTests
             Assert.IsNotNull(settings.WindowsSettings);
             Assert.IsNotNull(settings.WslSettings);
             Assert.IsFalse(settings.MigrateLegacyIfNeeded());
+        }
+
+        [TestMethod]
+        public void PythonScriptSettings_MigrateLegacyDisabledWslFolderToWslSettings()
+        {
+            var settings = new AdvancedPastePythonScriptSettings
+            {
+                IsEnabled = false,
+                UseWsl = true,
+                ScriptsFolder = "/home/user/scripts",
+            };
+
+            Assert.IsTrue(settings.MigrateLegacyIfNeeded());
+            Assert.AreEqual("disabled", settings.Mode);
+            Assert.AreEqual("/home/user/scripts", settings.WslSettings.ScriptsFolder);
         }
     }
 }

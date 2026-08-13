@@ -18,6 +18,7 @@ using AdvancedPaste.Helpers;
 using AdvancedPaste.Models;
 using AdvancedPaste.Settings;
 using ManagedCommon;
+using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.Win32;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
@@ -206,20 +207,23 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
 
             // Write payload to file (UTF-8, no BOM) to avoid WSL stdin pipe BOM issues.
             var inputFilePath = Path.Combine(workDir, "ap_input.json");
+            var outputFilePath = Path.Combine(workDir, "ap_output.json");
             await File.WriteAllTextAsync(inputFilePath, inputJson, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), cancellationToken);
 
             var wslRunnerPath = ToWslPath(runnerPath);
             var wslScriptPath = ToWslPath(scriptPath);
             var wslInputPath = ToWslPath(inputFilePath);
+            var wslOutputPath = ToWslPath(outputFilePath);
 
             // Single-quote paths for bash; escape any embedded single quotes.
             var quotedRunner = "'" + wslRunnerPath.Replace("'", "'\\''") + "'";
             var quotedScript = "'" + wslScriptPath.Replace("'", "'\\''") + "'";
             var quotedInput = "'" + wslInputPath.Replace("'", "'\\''") + "'";
+            var quotedOutput = "'" + wslOutputPath.Replace("'", "'\\''") + "'";
 
-            // Use the runner with the script, feeding input JSON via shell redirect.
+            // Use files for the protocol channels so login-profile output cannot corrupt JSON.
             // -l (login shell) ensures PATH includes user-installed tools (pip, conda, etc.).
-            var bashCmd = $"python3 -X utf8 {quotedRunner} {quotedScript} < {quotedInput}";
+            var bashCmd = $"python3 -X utf8 {quotedRunner} {quotedScript} < {quotedInput} > {quotedOutput}";
             var wslArgs = BuildWslArgs($"bash -l -c \"{bashCmd.Replace("\"", "\\\"")}\"");
             var psi = new ProcessStartInfo("wsl.exe", wslArgs)
             {
@@ -240,7 +244,7 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(timeoutMs);
 
-            string stdout;
+            string shellStdout;
             string stderr;
 
             try
@@ -248,7 +252,7 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
                 var stdoutTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
                 var stderrTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
                 await process.WaitForExitAsync(timeoutCts.Token);
-                stdout = await stdoutTask;
+                shellStdout = await stdoutTask;
                 stderr = await stderrTask;
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -270,10 +274,12 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
 
             if (process.ExitCode != 0)
             {
-                var (summary, details) = ParsePythonError(stderr);
+                var diagnostics = string.IsNullOrWhiteSpace(shellStdout) ? stderr : $"{stderr}{Environment.NewLine}{shellStdout}";
+                var (summary, details) = ParsePythonError(diagnostics);
                 throw new PasteActionException(summary, new InvalidOperationException($"WSL script exited with code {process.ExitCode}."), aiServiceMessage: details);
             }
 
+            var stdout = await File.ReadAllTextAsync(outputFilePath, cancellationToken);
             return await ParseWslOutputAsync(stdout, workDir, cancellationToken);
         }
         finally
@@ -623,20 +629,23 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
             // The Windows→WSL stdin pipe inserts a UTF-8 BOM regardless of the .NET encoding
             // settings, which causes json.load(sys.stdin) to raise JSONDecodeError in Python.
             var inputFilePath = Path.Combine(workDir, "ap_input.json");
+            var outputFilePath = Path.Combine(workDir, "ap_output.json");
             await File.WriteAllTextAsync(inputFilePath, inputJson, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), cancellationToken);
 
             var wslScriptPath = ToWslPath(scriptPath);
             var wslInputPath = ToWslPath(inputFilePath);
+            var wslOutputPath = ToWslPath(outputFilePath);
 
             // Single-quote paths for bash; escape any embedded single quotes.
             var quotedScript = "'" + wslScriptPath.Replace("'", "'\\''") + "'";
             var quotedInput = "'" + wslInputPath.Replace("'", "'\\''") + "'";
+            var quotedOutput = "'" + wslOutputPath.Replace("'", "'\\''") + "'";
 
-            // bash redirects ap_input.json as stdin, so Python scripts can still use
-            // json.load(sys.stdin) unchanged. -X utf8 forces UTF-8 I/O in the Python process.
+            // File redirects isolate the JSON protocol from login-profile stdout.
+            // -X utf8 forces UTF-8 I/O in the Python process.
             // -l (login shell) sources /etc/profile and ~/.profile so that tools installed
             // via apt, conda, nvm, etc. are available in PATH just like in a normal terminal.
-            var bashCmd = $"python3 -X utf8 {quotedScript} < {quotedInput}";
+            var bashCmd = $"python3 -X utf8 {quotedScript} < {quotedInput} > {quotedOutput}";
             var wslArgs = BuildWslArgs($"bash -l -c \"{bashCmd.Replace("\"", "\\\"")}\"");
             var psi = new ProcessStartInfo("wsl.exe", wslArgs)
             {
@@ -657,7 +666,7 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(timeoutMs);
 
-            string stdout;
+            string shellStdout;
             string stderr;
 
             try
@@ -665,7 +674,7 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
                 var stdoutTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
                 var stderrTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
                 await process.WaitForExitAsync(timeoutCts.Token);
-                stdout = await stdoutTask;
+                shellStdout = await stdoutTask;
                 stderr = await stderrTask;
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -687,10 +696,12 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
 
             if (process.ExitCode != 0)
             {
-                var (summary, details) = ParsePythonError(stderr);
+                var diagnostics = string.IsNullOrWhiteSpace(shellStdout) ? stderr : $"{stderr}{Environment.NewLine}{shellStdout}";
+                var (summary, details) = ParsePythonError(diagnostics);
                 throw new PasteActionException(summary, new InvalidOperationException($"WSL script exited with code {process.ExitCode}."), aiServiceMessage: details);
             }
 
+            var stdout = await File.ReadAllTextAsync(outputFilePath, cancellationToken);
             return await ParseWslOutputAsync(stdout, workDir, cancellationToken);
         }
         finally
@@ -858,53 +869,17 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
     private static IReadOnlyList<Match> FindTopLevelActionFunctions(IReadOnlyList<string> lines)
     {
         var matches = new List<Match>();
-        string tripleQuote = null;
 
-        foreach (var line in lines)
+        foreach (var code in PythonSourceParser.GetCodeLines(lines))
         {
-            if (tripleQuote is not null)
-            {
-                if (CountOccurrences(line, tripleQuote) % 2 != 0)
-                {
-                    tripleQuote = null;
-                }
-
-                continue;
-            }
-
-            var code = line.Split('#', 2)[0];
             var match = ApFunctionRegex.Match(code);
             if (match.Success)
             {
                 matches.Add(match);
             }
-
-            var doubleQuotes = CountOccurrences(code, "\"\"\"");
-            var singleQuotes = CountOccurrences(code, "'''");
-            if (doubleQuotes % 2 != 0)
-            {
-                tripleQuote = "\"\"\"";
-            }
-            else if (singleQuotes % 2 != 0)
-            {
-                tripleQuote = "'''";
-            }
         }
 
         return matches;
-    }
-
-    private static int CountOccurrences(string value, string token)
-    {
-        var count = 0;
-        var startIndex = 0;
-        while ((startIndex = value.IndexOf(token, startIndex, StringComparison.Ordinal)) >= 0)
-        {
-            count++;
-            startIndex += token.Length;
-        }
-
-        return count;
     }
 
     /// <summary>
@@ -1036,36 +1011,9 @@ public sealed class PythonScriptService(IUserSettings userSettings) : IPythonScr
             StringComparer.OrdinalIgnoreCase);
 
         var autoDetected = new Dictionary<string, PythonRequirement>(StringComparer.OrdinalIgnoreCase);
-        string tripleQuote = null;
-
-        foreach (var rawLine in lines)
+        foreach (var codeLine in PythonSourceParser.GetCodeLines(lines))
         {
-            if (tripleQuote is not null)
-            {
-                if (CountOccurrences(rawLine, tripleQuote) % 2 != 0)
-                {
-                    tripleQuote = null;
-                }
-
-                continue;
-            }
-
-            var codeWithoutComment = rawLine.Split('#', 2)[0];
-            var doubleQuotes = CountOccurrences(codeWithoutComment, "\"\"\"");
-            var singleQuotes = CountOccurrences(codeWithoutComment, "'''");
-            if (doubleQuotes % 2 != 0)
-            {
-                tripleQuote = "\"\"\"";
-                continue;
-            }
-
-            if (singleQuotes % 2 != 0)
-            {
-                tripleQuote = "'''";
-                continue;
-            }
-
-            var line = rawLine.Trim();
+            var line = codeLine.Trim();
 
             // Skip comments and blank lines
             if (line.Length == 0 || line[0] == '#')

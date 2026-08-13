@@ -93,7 +93,7 @@ public sealed class AdvancedPastePythonScriptSettings
 
             if (!string.IsNullOrEmpty(ScriptsFolder))
             {
-                if (string.Equals(Mode, "wsl", System.StringComparison.OrdinalIgnoreCase))
+                if (UseWsl == true)
                 {
                     WslSettings.ScriptsFolder = ScriptsFolder;
                 }

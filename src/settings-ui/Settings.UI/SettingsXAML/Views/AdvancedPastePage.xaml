@@ -635,6 +635,7 @@
                                                 Style="{StaticResource CaptionTextBlockStyle}"
                                                 Text="{x:Bind ConversionSummary, Mode=OneWay}" />
                                             <Button
+                                                x:Uid="AdvancedPaste_PythonScripts_OpenScriptInEditorButton"
                                                 Click="OpenPythonScript_Click"
                                                 Content="&#xE8A7;"
                                                 FontFamily="{ThemeResource SymbolThemeFontFamily}"
