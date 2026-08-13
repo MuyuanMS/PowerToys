@@ -238,8 +238,9 @@ ZonesOverlay::RenderResult ZonesOverlay::Render()
     }
 
     float animationAlpha = GetAnimationAlpha();
+    float layoutNameLabelAlpha = GetLayoutNameLabelAlpha();
 
-    if (animationAlpha <= 0.f)
+    if (animationAlpha <= 0.f && layoutNameLabelAlpha <= 0.f)
     {
         return RenderResult::AnimationEnded;
     }
@@ -247,7 +248,8 @@ ZonesOverlay::RenderResult ZonesOverlay::Render()
     BOOL isEnabledAnimations = GetAnimationsEnabled();
     if (!isEnabledAnimations)
     {
-        animationAlpha = 1.f;
+        animationAlpha = animationAlpha > 0.f ? 1.f : 0.f;
+        layoutNameLabelAlpha = layoutNameLabelAlpha > 0.f ? 1.f : 0.f;
     }
     const bool animateRotation = m_animateRotation && isEnabledAnimations;
 
@@ -501,21 +503,18 @@ ZonesOverlay::RenderResult ZonesOverlay::Render()
 
     if (m_layoutNameLabel.has_value())
     {
-        float labelAlpha = GetLayoutNameLabelAlpha();
+        float labelAlpha = layoutNameLabelAlpha;
         if (labelAlpha <= 0.f)
         {
             m_layoutNameLabel.reset();
         }
         else if (writeFactory)
         {
-            if (!isEnabledAnimations)
+            if (animationAlpha > 0.f)
             {
-                // No fading, but the label still disappears once its lifetime is over
-                labelAlpha = 1.f;
+                // The label is part of the overlay, don't let it outshine a fading scene
+                labelAlpha *= animationAlpha;
             }
-
-            // The label is part of the overlay, don't let it outshine a fading scene
-            labelAlpha *= animationAlpha;
 
             IDWriteTextFormat* nameFormat = nullptr;
             writeFactory->CreateTextFormat(NonLocalizable::SegoeUiFont, nullptr, DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, m_layoutNameLabel->fontSize, L"en-US", &nameFormat);

@@ -242,11 +242,9 @@ public:
             PostMessageW(m_window, WM_PRIV_LOCATIONCHANGE, NULL, NULL);
         },
         [this](bool up) {
-            if (!CanCycleLayoutByWheel(up))
-            {
-                return false;
-            }
-
+            return CanCycleLayoutByWheel(up);
+        },
+        [this](bool up) {
             PostMessageW(m_window, WM_PRIV_WHEEL_LAYOUT_SWITCH, up ? 1 : 0, NULL);
             return true;
         })

@@ -4,12 +4,13 @@
 #include <FancyZonesLib/Settings.h>
 #include <FancyZonesLib/util.h>
 
-DraggingState::DraggingState(const std::function<void()>& keyUpdateCallback, const std::function<bool(bool)>& layoutSwitchByWheelCallback) :
+DraggingState::DraggingState(const std::function<void()>& keyUpdateCallback, const std::function<bool(bool)>& canSwitchLayoutByWheelCallback, const std::function<bool(bool)>& layoutSwitchByWheelCallback) :
     m_secondaryMouseState(false),
     m_middleMouseState(false),
-    m_mouseHook(std::bind(&DraggingState::OnSecondaryMouseDown, this), std::bind(&DraggingState::OnMiddleMouseDown, this), std::bind(&DraggingState::IsMouseWheelLayoutSwitchActive, this), std::bind(&DraggingState::OnMouseWheel, this, std::placeholders::_1)),
+    m_mouseHook(std::bind(&DraggingState::OnSecondaryMouseDown, this), std::bind(&DraggingState::OnMiddleMouseDown, this), std::bind(&DraggingState::IsMouseWheelLayoutSwitchActive, this, std::placeholders::_1), std::bind(&DraggingState::OnMouseWheel, this, std::placeholders::_1)),
     m_ctrlKeyState(keyUpdateCallback),
     m_keyUpdateCallback(keyUpdateCallback),
+    m_canSwitchLayoutByWheelCallback(canSwitchLayoutByWheelCallback),
     m_layoutSwitchByWheelCallback(layoutSwitchByWheelCallback)
 {
 }
@@ -56,7 +57,7 @@ void DraggingState::OnSecondaryMouseDown()
 
 bool DraggingState::OnMouseWheel(bool up)
 {
-    if (IsMouseWheelLayoutSwitchActive())
+    if (IsMouseWheelLayoutSwitchActive(up))
     {
         return m_layoutSwitchByWheelCallback(up);
     }
@@ -64,9 +65,9 @@ bool DraggingState::OnMouseWheel(bool up)
     return false;
 }
 
-bool DraggingState::IsMouseWheelLayoutSwitchActive() const noexcept
+bool DraggingState::IsMouseWheelLayoutSwitchActive(bool up) const noexcept
 {
-    return m_dragging && FancyZonesSettings::settings().mouseWheelLayoutSwitch;
+    return m_dragging && FancyZonesSettings::settings().mouseWheelLayoutSwitch && m_canSwitchLayoutByWheelCallback(up);
 }
 
 void DraggingState::OnMiddleMouseDown()

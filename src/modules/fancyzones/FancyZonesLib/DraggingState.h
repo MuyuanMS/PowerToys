@@ -6,7 +6,7 @@
 class DraggingState
 {
 public:
-    DraggingState(const std::function<void()>& keyUpdateCallback, const std::function<bool(bool)>& layoutSwitchByWheelCallback);
+    DraggingState(const std::function<void()>& keyUpdateCallback, const std::function<bool(bool)>& canSwitchLayoutByWheelCallback, const std::function<bool(bool)>& layoutSwitchByWheelCallback);
     ~DraggingState() = default;
 
     void Enable();
@@ -21,7 +21,7 @@ public:
 private:
     void OnSecondaryMouseDown();
     void OnMiddleMouseDown();
-    bool IsMouseWheelLayoutSwitchActive() const noexcept;
+    bool IsMouseWheelLayoutSwitchActive(bool up) const noexcept;
     bool OnMouseWheel(bool up);
 
     std::atomic<bool> m_secondaryMouseState;
@@ -32,6 +32,7 @@ private:
     bool m_shift{};
 
     std::function<void()> m_keyUpdateCallback;
+    std::function<bool(bool)> m_canSwitchLayoutByWheelCallback;
     std::function<bool(bool)> m_layoutSwitchByWheelCallback;
 
     bool m_dragging{}; // True if we should be showing zone hints while dragging
