@@ -939,7 +939,7 @@ opera.exe</value>
     <value>Layout name indicator</value>
   </data>
   <data name="FancyZones_LayoutNameLabel_GroupSettings.Description" xml:space="preserve">
-    <value>Appearance of the layout name shown when switching layouts while dragging a window</value>
+    <value>Appearance of the layout name shown when switching layouts while zones are visible</value>
   </data>
   <data name="FancyZones_LayoutNameLabelPlacement.Header" xml:space="preserve">
     <value>Position on screen</value>
