@@ -179,6 +179,40 @@ namespace SvgPreviewHandlerUnitTests
             }
         }
 
+        [TestMethod]
+        public void TryWriteCacheFileAtomicShouldRejectOversizedEntry()
+        {
+            var cacheFolder = CreateTestCacheFolder();
+
+            try
+            {
+                var cacheKey = SvgPreviewCacheHelper.BuildCacheKey("oversized");
+
+                Assert.IsFalse(SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, "1234", out var cacheFilePath, maxCacheSizeBytes: 3));
+                Assert.IsFalse(File.Exists(cacheFilePath));
+            }
+            finally
+            {
+                Directory.Delete(cacheFolder, recursive: true);
+            }
+        }
+
+        [TestMethod]
+        public void TryWriteTransientFileShouldPersistOversizedFallback()
+        {
+            var userDataFolder = CreateTestCacheFolder();
+
+            try
+            {
+                Assert.IsTrue(SvgPreviewCacheHelper.TryWriteTransientFile(userDataFolder, "contents", out var transientFilePath));
+                Assert.AreEqual("contents", File.ReadAllText(transientFilePath));
+            }
+            finally
+            {
+                Directory.Delete(userDataFolder, recursive: true);
+            }
+        }
+
         private static string CreateTestCacheFolder()
         {
             var cacheFolder = Path.Combine(AppContext.BaseDirectory, $"SvgPreviewCacheTests-{Guid.NewGuid():N}");

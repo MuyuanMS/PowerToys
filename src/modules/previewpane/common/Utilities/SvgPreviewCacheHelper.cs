@@ -16,7 +16,11 @@ namespace Common.Utilities
     {
         private const long MaxCacheSizeBytes = 100 * 1024 * 1024;
         private static readonly TimeSpan MaxCacheEntryAge = TimeSpan.FromDays(30);
+        private static readonly TimeSpan MaintenanceInterval = TimeSpan.FromMinutes(10);
+        private static readonly TimeSpan MaxTransientFileAge = TimeSpan.FromDays(1);
         private static readonly UTF8Encoding Utf8NoBom = new(false);
+        private static readonly object MaintenanceLock = new();
+        private static readonly Dictionary<string, DateTime> LastMaintenanceByFolder = new(StringComparer.OrdinalIgnoreCase);
 
         internal static string GetCacheFolderPath(string webView2UserDataFolder)
         {
@@ -29,13 +33,7 @@ namespace Common.Utilities
             {
                 Directory.CreateDirectory(webView2UserDataFolder);
                 Directory.CreateDirectory(GetCacheFolderPath(webView2UserDataFolder));
-
-                foreach (var legacyFile in Directory.EnumerateFiles(webView2UserDataFolder, "*.html", SearchOption.TopDirectoryOnly))
-                {
-                    TryDeleteFile(legacyFile);
-                }
-
-                PruneCache(GetCacheFolderPath(webView2UserDataFolder), DateTime.UtcNow);
+                RunMaintenanceIfNeeded(webView2UserDataFolder, DateTime.UtcNow);
             }
             catch (Exception)
             {
@@ -84,19 +82,34 @@ namespace Common.Utilities
             }
         }
 
-        internal static bool TryWriteCacheFileAtomic(string cacheRootFolder, string cacheKey, string contents, out string cacheFilePath)
+        internal static bool TryWriteCacheFileAtomic(
+            string cacheRootFolder,
+            string cacheKey,
+            string contents,
+            out string cacheFilePath,
+            long maxCacheSizeBytes = MaxCacheSizeBytes)
         {
             cacheFilePath = GetCacheFilePath(cacheRootFolder, cacheKey);
             string? temporaryFilePath = null;
 
             try
             {
+                if (Utf8NoBom.GetByteCount(contents) > maxCacheSizeBytes)
+                {
+                    return false;
+                }
+
                 Directory.CreateDirectory(cacheRootFolder);
                 temporaryFilePath = Path.Combine(cacheRootFolder, $"{cacheKey}.{Guid.NewGuid():N}.tmp");
                 File.WriteAllText(temporaryFilePath, contents, Utf8NoBom);
                 File.Move(temporaryFilePath, cacheFilePath, overwrite: true);
-                PruneCache(cacheRootFolder, DateTime.UtcNow);
-                return true;
+                var webView2UserDataFolder = Directory.GetParent(cacheRootFolder)?.FullName;
+                if (webView2UserDataFolder != null)
+                {
+                    RunMaintenanceIfNeeded(webView2UserDataFolder, DateTime.UtcNow);
+                }
+
+                return TryGetCacheFile(cacheRootFolder, cacheKey, out cacheFilePath);
             }
             catch (Exception)
             {
@@ -111,7 +124,27 @@ namespace Common.Utilities
             }
         }
 
-        internal static void PruneCache(string cacheRootFolder, DateTime utcNow)
+        internal static bool TryWriteTransientFile(string webView2UserDataFolder, string contents, out string filePath)
+        {
+            filePath = string.Empty;
+
+            try
+            {
+                var transientFolder = Path.Combine(webView2UserDataFolder, "SvgPreviewTransient");
+                Directory.CreateDirectory(transientFolder);
+                filePath = Path.Combine(transientFolder, $"{Guid.NewGuid():N}.html");
+                File.WriteAllText(filePath, contents, Utf8NoBom);
+                return true;
+            }
+            catch (Exception)
+            {
+                TryDeleteFile(filePath);
+                filePath = string.Empty;
+                return false;
+            }
+        }
+
+        internal static void PruneCache(string cacheRootFolder, DateTime utcNow, long maxCacheSizeBytes = MaxCacheSizeBytes)
         {
             try
             {
@@ -138,7 +171,7 @@ namespace Common.Utilities
                 long retainedBytes = 0;
                 foreach (var cacheFile in cacheFiles.OrderByDescending(file => file.LastWriteTimeUtc))
                 {
-                    if (retainedBytes + cacheFile.Length > MaxCacheSizeBytes)
+                    if (retainedBytes + cacheFile.Length > maxCacheSizeBytes)
                     {
                         TryDeleteFile(cacheFile.FullName);
                     }
@@ -150,6 +183,45 @@ namespace Common.Utilities
             }
             catch (Exception)
             {
+            }
+        }
+
+        private static void RunMaintenanceIfNeeded(string webView2UserDataFolder, DateTime utcNow)
+        {
+            lock (MaintenanceLock)
+            {
+                if (LastMaintenanceByFolder.TryGetValue(webView2UserDataFolder, out var lastMaintenance) &&
+                    utcNow - lastMaintenance < MaintenanceInterval)
+                {
+                    return;
+                }
+
+                LastMaintenanceByFolder[webView2UserDataFolder] = utcNow;
+            }
+
+            foreach (var legacyFile in Directory.EnumerateFiles(webView2UserDataFolder, "*.html", SearchOption.TopDirectoryOnly))
+            {
+                TryDeleteFile(legacyFile);
+            }
+
+            PruneCache(GetCacheFolderPath(webView2UserDataFolder), utcNow);
+
+            var transientFolder = Path.Combine(webView2UserDataFolder, "SvgPreviewTransient");
+            if (Directory.Exists(transientFolder))
+            {
+                foreach (var transientFile in Directory.EnumerateFiles(transientFolder, "*.html", SearchOption.TopDirectoryOnly))
+                {
+                    try
+                    {
+                        if (utcNow - File.GetLastWriteTimeUtc(transientFile) > MaxTransientFileAge)
+                        {
+                            TryDeleteFile(transientFile);
+                        }
+                    }
+                    catch (Exception)
+                    {
+                    }
+                }
             }
         }
 

@@ -281,6 +281,11 @@ namespace Microsoft.PowerToys.PreviewHandler.Svg
                             _localFileURI = new Uri(cacheFilePath);
                             _browser.Source = _localFileURI;
                         }
+                        else if (SvgPreviewCacheHelper.TryWriteTransientFile(_webView2UserDataFolder, generatedPreview, out var transientFilePath))
+                        {
+                            _localFileURI = new Uri(transientFilePath);
+                            _browser.Source = _localFileURI;
+                        }
                         else
                         {
                             _browser.NavigateToString(generatedPreview);
