@@ -949,6 +949,33 @@ namespace RemappingLogicTests
             Assert::AreEqual(false, testState.IsAloneCombination(VK_RCONTROL));
         }
 
+        // Shift/NumLock can make a held numpad source arrive as its encoded navigation twin on key-up.
+        // The scan-code mapping must restore the original VK so the promoted source is released.
+        TEST_METHOD (AloneRemap_NumpadIdentityChange_StillReleasesSourceKey)
+        {
+            testState.AddSingleKeyAloneRemap(VK_NUMPAD1, (DWORD)VK_IME_ON);
+
+            std::vector<INPUT> numpad1Down{ { .type = INPUT_KEYBOARD, .ki = { .wVk = VK_NUMPAD1 } } };
+            std::vector<INPUT> shiftDown{ { .type = INPUT_KEYBOARD, .ki = { .wVk = VK_SHIFT } } };
+            mockedInputHandler.SendVirtualInput(numpad1Down);
+            mockedInputHandler.SendVirtualInput(shiftDown);
+            Assert::AreEqual(true, mockedInputHandler.GetVirtualKeyState(VK_NUMPAD1));
+
+            KBDLLHOOKSTRUCT keyData{
+                .vkCode = Helpers::EncodeKeyNumpadOrigin(VK_END, /*extended*/ false),
+            };
+            LowlevelKeyboardEvent numpad1Up{
+                .lParam = &keyData,
+                .wParam = WM_KEYUP,
+            };
+
+            const intptr_t result = KeyboardEventHandlers::HandleSingleKeyAloneRemapEvent(mockedInputHandler, &numpad1Up, testState);
+
+            Assert::AreEqual((intptr_t)1, result);
+            Assert::AreEqual(false, mockedInputHandler.GetVirtualKeyState(VK_NUMPAD1));
+            Assert::AreEqual(false, testState.IsAloneCombination(VK_NUMPAD1));
+        }
+
         // A numpad-originated alone key must be re-injected preserving its origin. Alone keys are tracked
         // by the numpad-origin-encoded vkCode (marker in bit 31); a bare WORD cast would drop it and turn
         // e.g. a NumLock-off numpad navigation key into its extended (arrow-cluster) twin. Verifies the

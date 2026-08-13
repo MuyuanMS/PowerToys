@@ -239,6 +239,7 @@ void KeyboardManager::StopLowlevelKeyboardHook()
     }
 
     StopLowlevelMouseHook();
+    state.ClearAllAloneKeyState();
 }
 
 void KeyboardManager::StartLowlevelMouseHook()
@@ -303,6 +304,13 @@ intptr_t KeyboardManager::HandleKeyboardHookEvent(LowlevelKeyboardEvent* data) n
 {
     if (loadingSettings)
     {
+        // Events pass through while settings reload. Forget pending keys, and clear a promoted key's
+        // marker when its physical key-up passes through and releases the injected source key.
+        state.ClearAlonePendingKeys();
+        if ((data->wParam == WM_KEYUP || data->wParam == WM_SYSKEYUP) && state.IsAloneCombination(data->lParam->vkCode))
+        {
+            state.ClearAloneKeyState(data->lParam->vkCode);
+        }
         return 0;
     }
 
