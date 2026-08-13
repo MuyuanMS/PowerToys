@@ -774,7 +774,15 @@ namespace
                 return false;
             }
 
+            ResetEvent(m_worker_start_event);
+            m_worker_start_succeeded.store(false);
             m_worker_thread = std::thread(&FileConverterPipeOrchestrator::WorkerLoop, this);
+            if (WaitForSingleObject(m_worker_start_event, 5000) != WAIT_OBJECT_0 || !m_worker_start_succeeded.load())
+            {
+                Stop();
+                return false;
+            }
+
             return true;
         }
 
@@ -819,6 +827,7 @@ namespace
         ~FileConverterPipeOrchestrator()
         {
             Stop();
+            CloseHandle(m_worker_start_event);
             CloseHandle(m_start_event);
             CloseHandle(m_stop_event);
         }
@@ -885,6 +894,20 @@ namespace
 
         void WorkerLoop()
         {
+            try
+            {
+                winrt::init_apartment(winrt::apartment_type::multi_threaded);
+            }
+            catch (const winrt::hresult_error& error)
+            {
+                Logger::error(L"File Converter could not initialize its worker apartment. Error=0x{:08X}", static_cast<unsigned long>(error.code()));
+                SetEvent(m_worker_start_event);
+                return;
+            }
+
+            m_worker_start_succeeded.store(true);
+            SetEvent(m_worker_start_event);
+
             while (true)
             {
                 std::string payload;
@@ -911,6 +934,8 @@ namespace
 
                 ProcessPayload(payload);
             }
+
+            winrt::uninit_apartment();
         }
 
         void ListenerLoop()
@@ -1043,6 +1068,8 @@ namespace
 
         std::atomic<bool> m_running = false;
         std::atomic<bool> m_start_succeeded = false;
+        std::atomic<bool> m_worker_start_succeeded = false;
+        HANDLE m_worker_start_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
         HANDLE m_start_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
         HANDLE m_stop_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
         interop_auth::VerificationCache m_auth_cache;
