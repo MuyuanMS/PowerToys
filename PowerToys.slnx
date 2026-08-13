@@ -195,6 +195,12 @@
     </Project>
     <Project Path="src/modules/ClipPing/ClipPingModuleInterface/ClipPingModuleInterface.vcxproj" Id="ca7887fb-e6e2-498f-bad3-8f151806c217" />
   </Folder>
+  <Folder Name="/modules/ClipPing/Tests/">
+    <Project Path="src/modules/ClipPing/ClipPing.FuzzTests/ClipPing.FuzzTests.csproj">
+      <Platform Solution="*|ARM64" Project="ARM64" />
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+  </Folder>
   <Folder Name="/modules/colorpicker/">
     <Project Path="src/modules/colorPicker/ColorPicker.ModuleServices/ColorPicker.ModuleServices.csproj">
       <Platform Solution="*|ARM64" Project="ARM64" />

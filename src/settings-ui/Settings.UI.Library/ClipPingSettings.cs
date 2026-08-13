@@ -4,6 +4,7 @@
 
 using System.Text.Json.Serialization;
 
+using Microsoft.PowerToys.Settings.UI.Library.Enumerations;
 using Microsoft.PowerToys.Settings.UI.Library.Interfaces;
 
 namespace Microsoft.PowerToys.Settings.UI.Library
@@ -22,6 +23,21 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
         [JsonPropertyName("properties")]
         public ClipPingProperties Properties { get; set; }
+
+        public static ClipPingSettings Normalize(ClipPingSettings? settings)
+        {
+            settings ??= new ClipPingSettings();
+            settings.Properties ??= new ClipPingProperties();
+            settings.Properties.OverlayColor ??= new StringProperty(ClipPingProperties.DefaultOverlayColor);
+            settings.Properties.OverlayColor.Value = ClipPingProperties.NormalizeOverlayColor(settings.Properties.OverlayColor.Value);
+
+            if (!System.Enum.IsDefined(settings.Properties.OverlayType))
+            {
+                settings.Properties.OverlayType = ClipPingOverlay.Top;
+            }
+
+            return settings;
+        }
 
         public string GetModuleName()
         {
