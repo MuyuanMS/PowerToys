@@ -35,6 +35,7 @@ namespace powertoys_gpo
     const std::wstring POLICY_CONFIGURE_ENABLED_POWER_DISPLAY = L"ConfigureEnabledUtilityPowerDisplay";
     const std::wstring POLICY_CONFIGURE_ENABLED_GRAB_AND_MOVE = L"ConfigureEnabledUtilityGrabAndMove";
     const std::wstring POLICY_CONFIGURE_ENABLED_FANCYZONES = L"ConfigureEnabledUtilityFancyZones";
+    const std::wstring POLICY_CONFIGURE_ENABLED_FILE_CONVERTER = L"ConfigureEnabledUtilityFileConverter";
     const std::wstring POLICY_CONFIGURE_ENABLED_FILE_LOCKSMITH = L"ConfigureEnabledUtilityFileLocksmith";
     const std::wstring POLICY_CONFIGURE_ENABLED_SVG_PREVIEW = L"ConfigureEnabledUtilityFileExplorerSVGPreview";
     const std::wstring POLICY_CONFIGURE_ENABLED_MARKDOWN_PREVIEW = L"ConfigureEnabledUtilityFileExplorerMarkdownPreview";
@@ -339,6 +340,11 @@ namespace powertoys_gpo
     inline gpo_rule_configured_t getConfiguredFileLocksmithEnabledValue()
     {
         return getUtilityEnabledValue(POLICY_CONFIGURE_ENABLED_FILE_LOCKSMITH);
+    }
+
+    inline gpo_rule_configured_t getConfiguredFileConverterEnabledValue()
+    {
+        return getUtilityEnabledValue(POLICY_CONFIGURE_ENABLED_FILE_CONVERTER);
     }
 
     inline gpo_rule_configured_t getConfiguredSvgPreviewEnabledValue()
