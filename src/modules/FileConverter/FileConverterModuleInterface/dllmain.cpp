@@ -6,9 +6,9 @@
 #include <Constants.h>
 #include <FileConversionEngine.h>
 #include <common/SettingsAPI/settings_objects.h>
+#include <common/interop/pipe_caller_auth.h>
 #include <winrt/Windows.Data.Json.h>
 #include <winrt/Windows.Foundation.Collections.h>
-#include <winrt/Windows.ApplicationModel.Resources.h>
 #include <winrt/base.h>
 #include <common/logger/logger.h>
 #include <common/utils/logger_helper.h>
@@ -18,6 +18,7 @@
 #include <interface/powertoy_module_interface.h>
 
 #include <algorithm>
+#include <Aclapi.h>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -30,6 +31,7 @@
 #include <thread>
 #include <unordered_set>
 #include <vector>
+#include <sddl.h>
 
 extern "C" IMAGE_DOS_HEADER __ImageBase;
 namespace winrt_json = winrt::Windows::Data::Json;
@@ -43,21 +45,11 @@ namespace
     constexpr wchar_t CONTEXT_MENU_PACKAGE_FILE_NAME[] = L"FileConverterContextMenuPackage.msix";
     constexpr wchar_t CONTEXT_MENU_PACKAGE_FILE_PREFIX[] = L"FileConverterContextMenuPackage";
     constexpr wchar_t CONTEXT_MENU_HANDLER_CLSID[] = L"{57EC18F5-24D5-4DC6-AE2E-9D0F7A39F8BA}";
+    constexpr size_t MAX_PIPE_PAYLOAD_BYTES = 1024 * 1024;
+    constexpr wchar_t CONTEXT_MENU_ENABLED_VALUE[] = L"Enabled";
     std::wstring LoadLocalizedString(std::wstring_view key, std::wstring_view fallback)
     {
-        try
-        {
-            static const auto loader = winrt::Windows::ApplicationModel::Resources::ResourceLoader::GetForViewIndependentUse(L"Resources");
-            const auto value = loader.GetString(winrt::hstring{ key });
-            if (!value.empty())
-            {
-                return value.c_str();
-            }
-        }
-        catch (...)
-        {
-        }
-
+        UNREFERENCED_PARAMETER(key);
         return std::wstring{ fallback };
     }
 
@@ -249,43 +241,102 @@ namespace
         return std::wstring(fc_constants::PipeNamePrefix) + std::to_wstring(session_id);
     }
 
-    std::string ReadPipeMessage(HANDLE pipe_handle)
+    struct PipeSecurity
+    {
+        SECURITY_ATTRIBUTES attributes{ sizeof(SECURITY_ATTRIBUTES), nullptr, FALSE };
+
+        ~PipeSecurity()
+        {
+            if (attributes.lpSecurityDescriptor != nullptr)
+            {
+                LocalFree(attributes.lpSecurityDescriptor);
+            }
+        }
+
+        bool initialize()
+        {
+            HANDLE token = nullptr;
+            if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
+            {
+                return false;
+            }
+
+            DWORD size = 0;
+            GetTokenInformation(token, TokenUser, nullptr, 0, &size);
+            std::vector<BYTE> buffer(size);
+            if (!GetTokenInformation(token, TokenUser, buffer.data(), size, &size))
+            {
+                CloseHandle(token);
+                return false;
+            }
+            CloseHandle(token);
+
+            const auto token_user = reinterpret_cast<TOKEN_USER*>(buffer.data());
+            LPWSTR sid = nullptr;
+            if (!ConvertSidToStringSidW(token_user->User.Sid, &sid))
+            {
+                return false;
+            }
+
+            const std::wstring sddl = L"D:P(A;;GA;;;SY)(A;;GA;;;" + std::wstring(sid) + L")";
+            LocalFree(sid);
+            return ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                       sddl.c_str(),
+                       SDDL_REVISION_1,
+                       &attributes.lpSecurityDescriptor,
+                       nullptr) != FALSE;
+        }
+    };
+
+    std::string ReadPipeMessage(HANDLE pipe_handle, HANDLE stop_event)
     {
         constexpr DWORD BUFFER_SIZE = 4096;
         char buffer[BUFFER_SIZE] = {};
         std::string payload;
 
-        while (true)
+        while (payload.size() <= MAX_PIPE_PAYLOAD_BYTES)
         {
+            HANDLE read_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+            OVERLAPPED overlapped{};
+            overlapped.hEvent = read_event;
+
             DWORD bytes_read = 0;
-            const BOOL read_ok = ReadFile(pipe_handle, buffer, BUFFER_SIZE, &bytes_read, nullptr);
+            BOOL read_ok = ReadFile(pipe_handle, buffer, BUFFER_SIZE, &bytes_read, &overlapped);
+            DWORD read_error = read_ok ? ERROR_SUCCESS : GetLastError();
+            if (!read_ok && read_error == ERROR_IO_PENDING)
+            {
+                HANDLE events[] = { stop_event, read_event };
+                const DWORD wait = WaitForMultipleObjects(ARRAYSIZE(events), events, FALSE, INFINITE);
+                if (wait == WAIT_OBJECT_0)
+                {
+                    CancelIoEx(pipe_handle, &overlapped);
+                    CloseHandle(read_event);
+                    return {};
+                }
+
+                read_ok = GetOverlappedResult(pipe_handle, &overlapped, &bytes_read, FALSE);
+                read_error = read_ok ? ERROR_SUCCESS : GetLastError();
+            }
+
             if (bytes_read > 0)
             {
                 payload.append(buffer, bytes_read);
             }
+            CloseHandle(read_event);
 
-            if (read_ok)
+            if (read_ok || read_error == ERROR_BROKEN_PIPE || read_error == ERROR_PIPE_NOT_CONNECTED)
             {
                 break;
             }
 
-            const DWORD read_error = GetLastError();
-            if (read_error == ERROR_MORE_DATA)
+            if (read_error != ERROR_MORE_DATA)
             {
-                continue;
+                Logger::warn(L"File Converter pipe read failed. Error={}", read_error);
+                return {};
             }
-
-            if (read_error == ERROR_BROKEN_PIPE || read_error == ERROR_PIPE_NOT_CONNECTED)
-            {
-                break;
-            }
-
-            Logger::warn(L"File Converter pipe read failed. Error={}", read_error);
-            payload.clear();
-            break;
         }
 
-        return payload;
+        return payload.size() <= MAX_PIPE_PAYLOAD_BYTES ? payload : std::string{};
     }
 
     bool TryParseFormatConvertRequest(
@@ -333,10 +384,13 @@ namespace
         if (json_payload.HasKey(fc_constants::JsonDestinationKey))
         {
             const auto destination_value = json_payload.GetNamedValue(fc_constants::JsonDestinationKey);
-            if (destination_value.ValueType() == winrt_json::JsonValueType::String)
+            if (destination_value.ValueType() != winrt_json::JsonValueType::String)
             {
-                destination = json_payload.GetNamedString(fc_constants::JsonDestinationKey).c_str();
+                rejection_reason = LoadLocalizedString(L"FileConverter_Error_DestinationNotString", L"destination is not a string");
+                return false;
             }
+
+            destination = json_payload.GetNamedString(fc_constants::JsonDestinationKey).c_str();
         }
 
         if (!json_payload.HasKey(fc_constants::JsonFilesKey))
@@ -423,9 +477,18 @@ namespace
                 continue;
             }
 
-            std::filesystem::path output_path = input_path.parent_path() / input_path.stem();
-            output_path += L"_converted";
-            output_path += output_extension;
+            std::filesystem::path output_path;
+            for (unsigned int suffix = 0;; ++suffix)
+            {
+                output_path = input_path.parent_path() / input_path.stem();
+                output_path += suffix == 0 ? L"_converted" : L"_converted_" + std::to_wstring(suffix);
+                output_path += output_extension;
+                if (!std::filesystem::exists(output_path, ec))
+                {
+                    break;
+                }
+                ec.clear();
+            }
 
             const auto conversion = file_converter::ConvertImageFile(input_path.wstring(), output_path.wstring(), request.format);
             if (conversion.succeeded())
@@ -491,6 +554,17 @@ namespace
         runtime_shell_ext::Unregister(BuildWin10ContextMenuSpec());
     }
 
+    void SetContextMenuEnabledState(bool enabled)
+    {
+        HKEY key = nullptr;
+        if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\PowerToys\\FileConverter", 0, nullptr, 0, KEY_SET_VALUE, nullptr, &key, nullptr) == ERROR_SUCCESS)
+        {
+            const DWORD value = enabled ? 1 : 0;
+            RegSetValueExW(key, CONTEXT_MENU_ENABLED_VALUE, 0, REG_DWORD, reinterpret_cast<const BYTE*>(&value), sizeof(value));
+            RegCloseKey(key);
+        }
+    }
+
     class FileConverterPipeOrchestrator
     {
     public:
@@ -502,6 +576,7 @@ namespace
             }
 
             m_pipe_name = pipe_name;
+            ResetEvent(m_stop_event);
             m_listener_thread = std::thread(&FileConverterPipeOrchestrator::ListenerLoop, this);
             m_worker_thread = std::thread(&FileConverterPipeOrchestrator::WorkerLoop, this);
         }
@@ -513,7 +588,7 @@ namespace
                 return;
             }
 
-            WakeListener();
+            SetEvent(m_stop_event);
             m_queue_cv.notify_all();
 
             if (m_listener_thread.joinable())
@@ -546,31 +621,10 @@ namespace
         ~FileConverterPipeOrchestrator()
         {
             Stop();
+            CloseHandle(m_stop_event);
         }
 
     private:
-        void WakeListener() const
-        {
-            if (m_pipe_name.empty())
-            {
-                return;
-            }
-
-            HANDLE wake_handle = CreateFileW(
-                m_pipe_name.c_str(),
-                GENERIC_WRITE,
-                0,
-                nullptr,
-                OPEN_EXISTING,
-                0,
-                nullptr);
-
-            if (wake_handle != INVALID_HANDLE_VALUE)
-            {
-                CloseHandle(wake_handle);
-            }
-        }
-
         void EnqueuePayload(std::string payload)
         {
             {
@@ -650,15 +704,22 @@ namespace
         {
             while (m_running.load())
             {
+                PipeSecurity security;
+                if (!security.initialize())
+                {
+                    Logger::error(L"File Converter could not initialize pipe security.");
+                    return;
+                }
+
                 HANDLE pipe_handle = CreateNamedPipeW(
                     m_pipe_name.c_str(),
-                    PIPE_ACCESS_INBOUND,
-                    PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
-                    PIPE_UNLIMITED_INSTANCES,
+                    PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE,
+                    PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
+                    1,
                     0,
                     4096,
                     0,
-                    nullptr);
+                    &security.attributes);
 
                 if (pipe_handle == INVALID_HANDLE_VALUE)
                 {
@@ -666,19 +727,52 @@ namespace
                     continue;
                 }
 
-                const BOOL connected = ConnectNamedPipe(pipe_handle, nullptr) ? TRUE : (GetLastError() == ERROR_PIPE_CONNECTED);
+                HANDLE connect_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+                OVERLAPPED connect_overlapped{};
+                connect_overlapped.hEvent = connect_event;
+                BOOL connected = ConnectNamedPipe(pipe_handle, &connect_overlapped);
+                DWORD connect_error = connected ? ERROR_SUCCESS : GetLastError();
+                if (!connected && connect_error == ERROR_IO_PENDING)
+                {
+                    HANDLE events[] = { m_stop_event, connect_event };
+                    const DWORD wait = WaitForMultipleObjects(ARRAYSIZE(events), events, FALSE, INFINITE);
+                    if (wait == WAIT_OBJECT_0)
+                    {
+                        CancelIoEx(pipe_handle, &connect_overlapped);
+                        CloseHandle(connect_event);
+                        CloseHandle(pipe_handle);
+                        break;
+                    }
+                    DWORD transferred = 0;
+                    connected = GetOverlappedResult(pipe_handle, &connect_overlapped, &transferred, FALSE);
+                }
+                else if (!connected && connect_error == ERROR_PIPE_CONNECTED)
+                {
+                    connected = TRUE;
+                }
+
                 if (!connected)
                 {
+                    CloseHandle(connect_event);
                     CloseHandle(pipe_handle);
                     if (m_running.load())
                     {
                         std::this_thread::sleep_for(std::chrono::milliseconds(50));
                     }
+                    CloseHandle(connect_event);
 
                     continue;
                 }
 
-                const std::string payload = ReadPipeMessage(pipe_handle);
+                interop_auth::CallerPolicy policy;
+                policy.enabled = true;
+                wchar_t windows_directory[MAX_PATH]{};
+                GetWindowsDirectoryW(windows_directory, ARRAYSIZE(windows_directory));
+                policy.expectedDirectory = windows_directory;
+                policy.allowedBasenames = { L"explorer.exe" };
+                policy.requireMicrosoftSignature = true;
+                const auto auth = interop_auth::AuthenticateClient(pipe_handle, policy, m_auth_cache);
+                const std::string payload = auth.accepted ? ReadPipeMessage(pipe_handle, m_stop_event) : std::string{};
 
                 // Inbound-only server pipes have no outbound data to flush.
                 // Skipping FlushFileBuffers avoids reconnect stalls on malformed-request sequences.
@@ -698,6 +792,8 @@ namespace
         }
 
         std::atomic<bool> m_running = false;
+        HANDLE m_stop_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+        interop_auth::VerificationCache m_auth_cache;
         std::wstring m_pipe_name;
         std::thread m_listener_thread;
         std::thread m_worker_thread;
@@ -771,6 +867,7 @@ public:
 
         EnsureContextMenuPackageRegistered();
         EnsureContextMenuRuntimeRegistered();
+        SetContextMenuEnabledState(true);
         m_pipe_orchestrator.Start(GetPipeNameForCurrentSession());
         m_enabled = true;
     }
@@ -783,6 +880,7 @@ public:
         }
 
         m_pipe_orchestrator.Stop();
+        SetContextMenuEnabledState(false);
         UnregisterContextMenuRuntime();
         m_enabled = false;
     }
@@ -790,6 +888,11 @@ public:
     bool is_enabled() override
     {
         return m_enabled;
+    }
+
+    bool is_enabled_by_default() const override
+    {
+        return false;
     }
 
 private:

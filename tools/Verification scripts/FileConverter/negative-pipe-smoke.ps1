@@ -123,6 +123,7 @@ for ($caseIndex = 0; $caseIndex -lt $cases.Count; $caseIndex++) {
     }
 
     $createdOutput = Test-Path $outputFile
+    $runnerAlive = $null -ne (Get-Process -Id $pt.Id -ErrorAction SilentlyContinue)
     if ($createdOutput) {
         Remove-Item $outputFile -Force
     }
@@ -131,7 +132,8 @@ for ($caseIndex = 0; $caseIndex -lt $cases.Count; $caseIndex++) {
         Case = $case.Name
         SentToPipe = $sent
         OutputCreated = $createdOutput
-        Passed = ($sent -and -not $createdOutput)
+        RunnerAlive = $runnerAlive
+        Passed = ($sent -and -not $createdOutput -and $runnerAlive)
     }
 
     if (-not $LeavePowerToysRunning -or $caseIndex -lt ($cases.Count - 1)) {

@@ -29,7 +29,7 @@
       <AdditionalIncludeDirectories>..\FileConverterLib;$(RepoRoot)src\common\inc;$(RepoRoot)src\modules;$(RepoRoot)src\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>windowscodecs.lib;ole32.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>windowscodecs.lib;ole32.lib;shlwapi.lib;advapi32.lib;crypt32.lib;version.lib;wintrust.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
     </Link>
   </ItemDefinitionGroup>
@@ -37,10 +37,10 @@
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Strings\en-us\Resources.resw" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="$(RepoRoot)src\common\interop\pipe_caller_auth.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(UsePrecompiledHeaders)' != 'false'">Create</PrecompiledHeader>
     </ClCompile>
