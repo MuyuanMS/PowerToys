@@ -495,7 +495,7 @@ namespace KeyboardManagerEditorUI.Pages
                                 DeleteShortcutMapping(_editingItem.OriginalTriggerKeys, _editingItem.AppName ?? string.Empty);
                             }
 
-                            if (!string.IsNullOrEmpty(shortcut.Id))
+                            if (shortcut is not TextMapping && !string.IsNullOrEmpty(shortcut.Id))
                             {
                                 SettingsManager.RemoveShortcutKeyMappingFromSettings(shortcut.Id);
                             }
@@ -621,17 +621,34 @@ namespace KeyboardManagerEditorUI.Pages
             bool saved = _mappingService!.AddTextReplacementMapping(triggerText, textContent);
             if (!saved)
             {
+                RestoreOriginalTextReplacement();
                 return false;
             }
 
             if (!_mappingService.SaveSettings())
             {
                 _mappingService.DeleteTextReplacementMapping(triggerText);
+                RestoreOriginalTextReplacement();
                 return false;
+            }
+
+            if (_isEditMode && _editingItem?.Item is TextMapping { Id.Length: > 0 } originalMapping)
+            {
+                SettingsManager.RemoveShortcutKeyMappingFromSettings(originalMapping.Id);
             }
 
             SettingsManager.AddShortcutKeyMappingToSettings(shortcutKeyMapping);
             return true;
+        }
+
+        private void RestoreOriginalTextReplacement()
+        {
+            if (_mappingService != null &&
+                _isEditMode &&
+                _editingItem?.Item is TextMapping { IsActive: true, TriggerText.Length: > 0 } originalMapping)
+            {
+                _mappingService.AddTextReplacementMapping(originalMapping.TriggerText, originalMapping.Text);
+            }
         }
 
         private bool SaveSingleKeyToTextMapping(string keyName, string textContent, bool isAppSpecific, string appName)
