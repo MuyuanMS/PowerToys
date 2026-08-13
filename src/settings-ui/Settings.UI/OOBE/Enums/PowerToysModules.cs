@@ -38,6 +38,5 @@ namespace Microsoft.PowerToys.Settings.UI.OOBE.Enums
         NewPlus,
         ZoomIt,
         AltWindowCycle,
-        ClipPing,
     }
 }
