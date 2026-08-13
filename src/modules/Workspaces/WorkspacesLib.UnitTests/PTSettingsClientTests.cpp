@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "../WorkspacesSettingsClient/PTSettingsClient.h"
+#include "../WorkspacesSettingsService/Bindings.h"
 #include "../WorkspacesSettingsService/protocol/PipeName.h"
 
 #include <thread>
@@ -53,6 +54,14 @@ namespace WorkspacesLibUnitTests
                 PTSettingsSvc::CurrentProcessUserSidString()));
             Assert::IsFalse(PTSettingsSvc::IsValidSidString(
                 L"..\\attacker-controlled"));
+        }
+
+        TEST_METHOD(NamespaceValidationRejectsPathComponents)
+        {
+            Assert::IsTrue(PTSettingsSvc::IsValidNamespaceId(L"Workspaces"));
+            Assert::IsTrue(PTSettingsSvc::IsValidNamespaceId(L"Workspaces.v2"));
+            Assert::IsFalse(PTSettingsSvc::IsValidNamespaceId(L"."));
+            Assert::IsFalse(PTSettingsSvc::IsValidNamespaceId(L".."));
         }
     };
 }

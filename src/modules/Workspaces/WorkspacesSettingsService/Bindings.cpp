@@ -67,6 +67,12 @@ namespace PTSettingsSvc
     bool IsValidNamespaceId(const wchar_t* id)
     {
         if (!id || !*id) return false;
+        if (id[0] == L'.' &&
+            (id[1] == L'\0' || (id[1] == L'.' && id[2] == L'\0')))
+        {
+            return false;
+        }
+
         size_t len = 0;
         for (const wchar_t* p = id; *p; ++p, ++len)
         {
