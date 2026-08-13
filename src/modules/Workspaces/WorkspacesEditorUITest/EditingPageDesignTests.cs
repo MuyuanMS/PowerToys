@@ -15,7 +15,7 @@ namespace WorkspacesEditorUITest;
 /// UI elements that must be preserved:
 /// - Workspace name text box
 /// - App list with per-app controls
-/// - Save/Cancel buttons
+/// - Save button and title-bar Back button
 /// - Position controls (X, Y, Width, Height or Maximized/Minimized dropdown)
 /// </summary>
 [TestClass]
@@ -31,8 +31,8 @@ public class EditingPageDesignTests : WorkspacesUiAutomationBase
     {
         // Ensure at least one workspace exists
         AttachWorkspacesEditor();
-        var workspacesList = Find<Element>(By.AccessibilityId("WorkspacesList"));
-        if (workspacesList.FindAll<Element>(By.ClassName("ListViewItem")).Count == 0)
+        var workspacesList = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
+        if (workspacesList.FindAll<Element>(By.ClassName("WorkspaceItem")).Count == 0)
         {
             CreateTestWorkspace("EditDesignTest");
             Task.Delay(2000).Wait();
@@ -65,13 +65,13 @@ public class EditingPageDesignTests : WorkspacesUiAutomationBase
         CancelAndReturn();
     }
 
-    [TestMethod("EditingPage.HasCancelButton")]
+    [TestMethod("EditingPage.HasBackButton")]
     [TestCategory("Design.EditingPage")]
-    public void EditingPage_HasCancelButton()
+    public void EditingPage_HasBackButton()
     {
         NavigateToEditPage();
 
-        Assert.IsTrue(Has<Button>("Cancel"), "Editing page should have a Cancel button");
+        Assert.IsTrue(Has<Button>("Back"), "Editing page should have a title-bar Back button");
 
         CancelAndReturn();
     }
@@ -103,13 +103,13 @@ public class EditingPageDesignTests : WorkspacesUiAutomationBase
         CancelAndReturn();
     }
 
-    [TestMethod("EditingPage.Cancel_ReturnsToMainPage")]
+    [TestMethod("EditingPage.Back_ReturnsToMainPage")]
     [TestCategory("Design.EditingPage")]
-    public void EditingPage_Cancel_ReturnsToMainList()
+    public void EditingPage_Back_ReturnsToMainList()
     {
         NavigateToEditPage();
 
-        Find<Button>("Cancel").Click();
+        Find<Button>("Back").Click();
         Task.Delay(1000).Wait();
 
         Assert.IsTrue(Has<Button>("Create Workspace"), "After cancel, should return to main page");
@@ -118,8 +118,8 @@ public class EditingPageDesignTests : WorkspacesUiAutomationBase
     private void NavigateToEditPage()
     {
         AttachWorkspacesEditor();
-        var root = Find<Element>(By.AccessibilityId("WorkspacesList"));
-        var items = root.FindAll<Element>(By.ClassName("ListViewItem"));
+        var root = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
+        var items = root.FindAll<Element>(By.ClassName("WorkspaceItem"));
         Assert.IsTrue(items.Count > 0, "Expected a workspace item to edit.");
         items[0].Click();
         Task.Delay(1000).Wait();
@@ -129,7 +129,7 @@ public class EditingPageDesignTests : WorkspacesUiAutomationBase
     {
         try
         {
-            Find<Button>("Cancel").Click();
+            Find<Button>("Back").Click();
             Task.Delay(500).Wait();
         }
         catch
