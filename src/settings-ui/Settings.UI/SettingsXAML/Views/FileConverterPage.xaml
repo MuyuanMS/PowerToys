@@ -16,13 +16,15 @@
         ModuleImageSource="ms-appx:///Assets/Settings/Icons/FileManagement.png">
         <controls:SettingsPageControl.ModuleContent>
             <StackPanel ChildrenTransitions="{StaticResource SettingsCardsAnimations}" Orientation="Vertical">
-                <tkcontrols:SettingsCard
-                    x:Uid="FileConverter_EnableCard"
-                    HeaderIcon="{ui:FontIcon Glyph=&#xE8C3;}">
-                    <ToggleSwitch
-                        x:Uid="ToggleSwitch"
-                        IsOn="{x:Bind ViewModel.IsEnabled, Mode=TwoWay}" />
-                </tkcontrols:SettingsCard>
+                <controls:GPOInfoControl ShowWarning="{x:Bind ViewModel.IsEnabledGpoConfigured, Mode=OneWay}">
+                    <tkcontrols:SettingsCard
+                        x:Uid="FileConverter_EnableCard"
+                        HeaderIcon="{ui:FontIcon Glyph=&#xE8C3;}">
+                        <ToggleSwitch
+                            x:Uid="ToggleSwitch"
+                            IsOn="{x:Bind ViewModel.IsEnabled, Mode=TwoWay}" />
+                    </tkcontrols:SettingsCard>
+                </controls:GPOInfoControl>
             </StackPanel>
         </controls:SettingsPageControl.ModuleContent>
     </controls:SettingsPageControl>

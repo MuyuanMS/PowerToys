@@ -4,6 +4,7 @@
 
 using System;
 
+using global::PowerToys.GPOWrapper;
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.PowerToys.Settings.UI.Library.Helpers;
 using Microsoft.PowerToys.Settings.UI.Library.Interfaces;
@@ -18,6 +19,8 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         private bool _isEnabled;
 
+        private bool _enabledStateIsGpoConfigured;
+
         public FileConverterViewModel(
             SettingsUtils settingsUtils,
             ISettingsRepository<GeneralSettings> settingsRepository,
@@ -30,14 +33,21 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             _generalSettingsConfig = settingsRepository.SettingsConfig;
             _sendConfigMessage = ipcMessageCallback;
 
-            _isEnabled = _generalSettingsConfig.Enabled.FileConverter;
+            InitializeEnabledValue();
         }
+
+        public bool IsEnabledGpoConfigured => _enabledStateIsGpoConfigured;
 
         public bool IsEnabled
         {
             get => _isEnabled;
             set
             {
+                if (_enabledStateIsGpoConfigured)
+                {
+                    return;
+                }
+
                 if (_isEnabled != value)
                 {
                     _isEnabled = value;
@@ -53,8 +63,20 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         public void RefreshEnabledState()
         {
-            _isEnabled = _generalSettingsConfig.Enabled.FileConverter;
+            InitializeEnabledValue();
             OnPropertyChanged(nameof(IsEnabled));
+            OnPropertyChanged(nameof(IsEnabledGpoConfigured));
+        }
+
+        private void InitializeEnabledValue()
+        {
+            var gpoConfiguration = GPOWrapper.GetConfiguredFileConverterEnabledValue();
+            _enabledStateIsGpoConfigured =
+                gpoConfiguration == GpoRuleConfigured.Disabled ||
+                gpoConfiguration == GpoRuleConfigured.Enabled;
+            _isEnabled = _enabledStateIsGpoConfigured ?
+                gpoConfiguration == GpoRuleConfigured.Enabled :
+                _generalSettingsConfig.Enabled.FileConverter;
         }
     }
 }
