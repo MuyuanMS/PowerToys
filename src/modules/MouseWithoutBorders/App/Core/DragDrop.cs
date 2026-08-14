@@ -282,11 +282,13 @@ internal static class DragDrop
 
                 Logger.LogDebug("DragDropStep05: IsDropping == true, change drop machine...");
                 isDropping = false;
+                dragActivationNetworkInProgress = true;
+                dragActivationReleaseRequested = false;
                 Common.MainFormVisible = true; // WM_HIDE_DRAG_DROP
                 dropMachineId = MachineStuff.dropMachineID; // Set in DragDropStep03
             }
 
-            SendDropBegin(dropMachineId);
+            PublishDropBegin(dropMachineId);
         }
 
         MouseDown = false;
@@ -294,11 +296,24 @@ internal static class DragDrop
 
     private static void PublishDragActivation(ID dropMachineId)
     {
-        try
+        PublishDragNetwork(() =>
         {
             Logger.LogDebug("DragDropStep06: SendClipboardBeatDragDrop");
             SendClipboardBeatDragDrop();
             SendDropBegin(dropMachineId);
+        });
+    }
+
+    private static void PublishDropBegin(ID dropMachineId)
+    {
+        PublishDragNetwork(() => SendDropBegin(dropMachineId));
+    }
+
+    private static void PublishDragNetwork(Action publication)
+    {
+        try
+        {
+            publication();
         }
         finally
         {
