@@ -1747,7 +1747,16 @@ namespace MouseWithoutBorders.Class
                             }
                             else
                             {
-                                headerString = $"{leasedFileStream.Length}*{lastDragDropFile}";
+                                if (requiresLease && !Clipboard.IsClipboardFileSizeSupported(leasedFileStream.Length))
+                                {
+                                    leasedFileStream.Dispose();
+                                    leasedFileStream = null;
+                                    headerString = $"{0}*{lastDragDropFile} - File too big (greater than 100MB), please drag and drop the file instead!";
+                                }
+                                else
+                                {
+                                    headerString = $"{leasedFileStream.Length}*{lastDragDropFile}";
+                                }
                             }
                         }
                         else
