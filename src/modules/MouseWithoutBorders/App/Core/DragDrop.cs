@@ -7,6 +7,7 @@ using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 using Microsoft.PowerToys.Telemetry;
@@ -53,6 +54,8 @@ namespace MouseWithoutBorders.Core;
 internal static class DragDrop
 {
     private static readonly object DragActivationLock = new();
+    private static readonly object DragNetworkQueueLock = new();
+    private static Task dragNetworkQueue = Task.CompletedTask;
     private static bool isDragging;
     private static volatile bool mouseDown;
     private static long transientDragValidationGeneration;
@@ -274,7 +277,7 @@ internal static class DragDrop
                 Logger.LogDebug("DragDropStep05: IsDropping == true, change drop machine...");
                 isDropping = false;
                 Common.MainFormVisible = true; // WM_HIDE_DRAG_DROP
-                SendDropBegin(); // To dropMachineID set in DragDropStep03
+                QueueDropBegin(MachineStuff.dropMachineID); // To dropMachineID set in DragDropStep03
             }
         }
 
@@ -284,9 +287,13 @@ internal static class DragDrop
     private static void DragDropStep06()
     {
         IsDragging = true;
-        Logger.LogDebug("DragDropStep06: SendClipboardBeatDragDrop");
-        SendClipboardBeatDragDrop();
-        SendDropBegin();
+        ID dropMachineId = MachineStuff.dropMachineID;
+        QueueDragNetworkAction(() =>
+        {
+            Logger.LogDebug("DragDropStep06: SendClipboardBeatDragDrop");
+            SendClipboardBeatDragDrop();
+            SendDropBegin(dropMachineId);
+        });
     }
 
     internal static void DragDropStep08(DATA package)
@@ -370,7 +377,7 @@ internal static class DragDrop
             Clipboard.LastDragDropFile = null;
         }
 
-        SendClipboardBeatDragDropEnd();
+        QueueDragDropEnd(MachineStuff.desMachineID);
     }
 
     internal static void DragDropStep12()
@@ -418,7 +425,7 @@ internal static class DragDrop
         else
         {
             // Drag/Drop coming back
-            SendClipboardBeatDragDropEnd();
+            QueueDragDropEnd(MachineStuff.desMachineID);
         }
 
         // 2. SendClipboardBeatDragDrop to new drop machine
@@ -426,7 +433,7 @@ internal static class DragDrop
         if (MachineStuff.newDesMachineID != Common.MachineID)
         {
             MachineStuff.dropMachineID = MachineStuff.newDesMachineID;
-            SendDropBegin();
+            QueueDropBegin(MachineStuff.dropMachineID);
         }
 
         // New drop machine is me
@@ -441,17 +448,49 @@ internal static class DragDrop
         Common.SendPackage(ID.ALL, PackageType.ClipboardDragDrop);
     }
 
-    private static void SendDropBegin()
+    private static void QueueDropBegin(ID dropMachineId)
     {
-        Logger.LogDebug("SendDropBegin...");
-        Common.SendPackage(MachineStuff.dropMachineID, PackageType.ClipboardDragDropOperation);
+        QueueDragNetworkAction(() => SendDropBegin(dropMachineId));
     }
 
-    private static void SendClipboardBeatDragDropEnd()
+    private static void QueueDragDropEnd(ID destinationMachineId)
     {
-        if (MachineStuff.desMachineID != Common.MachineID)
+        QueueDragNetworkAction(() => SendClipboardBeatDragDropEnd(destinationMachineId));
+    }
+
+    private static void QueueDragNetworkAction(Action action)
+    {
+        lock (DragNetworkQueueLock)
         {
-            Common.SendPackage(MachineStuff.desMachineID, PackageType.ClipboardDragDropEnd);
+            dragNetworkQueue = dragNetworkQueue.ContinueWith(
+                _ =>
+                {
+                    try
+                    {
+                        action();
+                    }
+                    catch (Exception exception)
+                    {
+                        Logger.Log(exception);
+                    }
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.Default);
+        }
+    }
+
+    private static void SendDropBegin(ID dropMachineId)
+    {
+        Logger.LogDebug("SendDropBegin...");
+        Common.SendPackage(dropMachineId, PackageType.ClipboardDragDropOperation);
+    }
+
+    private static void SendClipboardBeatDragDropEnd(ID destinationMachineId)
+    {
+        if (destinationMachineId != Common.MachineID)
+        {
+            Common.SendPackage(destinationMachineId, PackageType.ClipboardDragDropEnd);
         }
     }
 
