@@ -59,7 +59,7 @@ internal static class DragDrop
     private static bool isDragging;
     private static volatile bool mouseDown;
     private static long transientDragValidationGeneration;
-    private static bool dragActivationNetworkInProgress;
+    private static int dragNetworkPublicationsPending;
     private static bool dragActivationReleaseRequested;
     private static ID dragActivationReleaseDestination;
 
@@ -275,8 +275,7 @@ internal static class DragDrop
                         }
 
                         isDragging = true;
-                        dragActivationNetworkInProgress = true;
-                        dragActivationReleaseRequested = false;
+                        BeginDragNetworkPublicationLocked();
                         dropMachineId = MachineStuff.dropMachineID;
                         activated = true;
                     }
@@ -316,8 +315,7 @@ internal static class DragDrop
 
                 Logger.LogDebug("DragDropStep05: IsDropping == true, change drop machine...");
                 isDropping = false;
-                dragActivationNetworkInProgress = true;
-                dragActivationReleaseRequested = false;
+                BeginDragNetworkPublicationLocked();
                 Common.MainFormVisible = true; // WM_HIDE_DRAG_DROP
                 dropMachineId = MachineStuff.dropMachineID; // Set in DragDropStep03
             }
@@ -343,6 +341,17 @@ internal static class DragDrop
         PublishDragNetwork(() => SendDropBegin(dropMachineId));
     }
 
+    private static void BeginDragNetworkPublicationLocked()
+    {
+        if (dragNetworkPublicationsPending == 0)
+        {
+            dragActivationReleaseRequested = false;
+            dragActivationReleaseDestination = ID.NONE;
+        }
+
+        dragNetworkPublicationsPending++;
+    }
+
     private static void PublishDragNetwork(Action publication)
     {
         QueueDragNetworkAction(() =>
@@ -357,11 +366,14 @@ internal static class DragDrop
                 ID releaseDestination;
                 lock (DragActivationLock)
                 {
-                    dragActivationNetworkInProgress = false;
-                    sendEnd = dragActivationReleaseRequested;
+                    dragNetworkPublicationsPending--;
+                    sendEnd = dragNetworkPublicationsPending == 0 && dragActivationReleaseRequested;
                     releaseDestination = dragActivationReleaseDestination;
-                    dragActivationReleaseRequested = false;
-                    dragActivationReleaseDestination = ID.NONE;
+                    if (dragNetworkPublicationsPending == 0)
+                    {
+                        dragActivationReleaseRequested = false;
+                        dragActivationReleaseDestination = ID.NONE;
+                    }
                 }
 
                 if (sendEnd)
@@ -410,11 +422,11 @@ internal static class DragDrop
                     isDragging = false;
                     Clipboard.LastIDWithClipboardData = ID.NONE;
                 }
-                else if (isDragging || dragActivationNetworkInProgress)
+                else if (isDragging || dragNetworkPublicationsPending > 0)
                 {
                     isDragging = false;
                     Clipboard.LastIDWithClipboardData = ID.NONE;
-                    if (dragActivationNetworkInProgress)
+                    if (dragNetworkPublicationsPending > 0)
                     {
                         dragActivationReleaseRequested = true;
                         dragActivationReleaseDestination = MachineStuff.desMachineID;
@@ -459,7 +471,7 @@ internal static class DragDrop
             Clipboard.CancelTransientDragFileValidation(validationGeneration);
             Clipboard.LastIDWithClipboardData = ID.NONE;
             Clipboard.LastDragDropFile = null;
-            sendEnd = !dragActivationNetworkInProgress;
+            sendEnd = dragNetworkPublicationsPending == 0;
             endDestination = MachineStuff.desMachineID;
             if (!sendEnd)
             {
@@ -536,8 +548,7 @@ internal static class DragDrop
                 MachineStuff.dropMachineID = MachineStuff.newDesMachineID;
                 sendBegin = true;
                 beginDestination = MachineStuff.dropMachineID;
-                dragActivationNetworkInProgress = true;
-                dragActivationReleaseRequested = false;
+                BeginDragNetworkPublicationLocked();
             }
 
             // New drop machine is me
