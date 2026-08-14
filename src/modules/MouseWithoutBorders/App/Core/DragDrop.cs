@@ -195,22 +195,22 @@ internal static class DragDrop
             return;
         }
 
+        bool isCurrentValidation = validationGeneration != 0
+            && Interlocked.CompareExchange(
+                ref transientDragValidationGeneration,
+                0,
+                validationGeneration) == validationGeneration;
+        if (!isCurrentValidation)
+        {
+            Clipboard.CancelTransientDragFileValidation(validationGeneration);
+            Logger.LogDebug("DragDropStep05: Ignoring a stale drag validation callback.");
+            return;
+        }
+
+        _ = Interlocked.Exchange(ref dragDropStep05ExCalledByIpc, 1);
+
         if (!IsDropping)
         {
-            bool isCurrentValidation = validationGeneration != 0
-                && Interlocked.CompareExchange(
-                    ref transientDragValidationGeneration,
-                    0,
-                    validationGeneration) == validationGeneration;
-            if (!isCurrentValidation)
-            {
-                Clipboard.CancelTransientDragFileValidation(validationGeneration);
-                Logger.LogDebug("DragDropStep05: Ignoring a stale drag validation callback.");
-                return;
-            }
-
-            _ = Interlocked.Exchange(ref dragDropStep05ExCalledByIpc, 1);
-
             if (!MouseDown)
             {
                 Clipboard.CancelTransientDragFileValidation(validationGeneration);
