@@ -314,15 +314,32 @@ internal sealed class LocalPathLease : IDisposable
 
         string deviceName = target[devicePrefix.Length..];
 
-        // Only direct volume-device roots are accepted. SUBST/custom DOS mappings,
+        // Only Windows volume-manager device roots used by ordinary local drive
+        // letters are accepted. SUBST/custom or third-party device mappings,
         // directory mount points, and cloud/symbolic-link/reparse-backed paths fail
-        // closed because retaining only the final handle cannot stabilize path
-        // components embedded inside the DOS-device target.
-        return deviceName.Length > 0
-            && !deviceName.Contains(Path.DirectorySeparatorChar)
-            && !deviceName.Equals("Mup", StringComparison.OrdinalIgnoreCase)
-            && !deviceName.Equals("LanmanRedirector", StringComparison.OrdinalIgnoreCase)
-            && !deviceName.Equals("WebDavRedirector", StringComparison.OrdinalIgnoreCase);
+        // closed because their locality and embedded components cannot be proven.
+        return !deviceName.Contains(Path.DirectorySeparatorChar)
+            && (IsNumberedDevice(deviceName, "HarddiskVolume")
+                || IsNumberedDevice(deviceName, "CdRom"));
+    }
+
+    private static bool IsNumberedDevice(string deviceName, string prefix)
+    {
+        if (!deviceName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            || deviceName.Length == prefix.Length)
+        {
+            return false;
+        }
+
+        for (int index = prefix.Length; index < deviceName.Length; index++)
+        {
+            if (deviceName[index] is < '0' or > '9')
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool TryOpenComponent(

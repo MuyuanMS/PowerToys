@@ -39,9 +39,26 @@ public sealed class ClipboardHelperTests
     [DataRow(@"\Device\Mup")]
     [DataRow(@"\Device\LanmanRedirector")]
     [DataRow(@"\Device\WebDavRedirector")]
+    [DataRow(@"\Device\ThirdPartyRedirector")]
+    [DataRow(@"\Device\HarddiskVolume")]
+    [DataRow(@"\Device\HarddiskVolume3Remote")]
     public void TryGetLocalDevicePath_RejectsNonVolumeRootTargets(string target)
     {
         Assert.IsFalse(LocalPathLease.TryGetLocalDevicePath(
+            @"C:\source\file.txt",
+            _ => DriveType.Fixed,
+            _ => target,
+            out _,
+            out _,
+            out _));
+    }
+
+    [DataTestMethod]
+    [DataRow(@"\Device\HarddiskVolume3")]
+    [DataRow(@"\Device\CdRom0")]
+    public void TryGetLocalDevicePath_AcceptsKnownLocalVolumeRoots(string target)
+    {
+        Assert.IsTrue(LocalPathLease.TryGetLocalDevicePath(
             @"C:\source\file.txt",
             _ => DriveType.Fixed,
             _ => target,
