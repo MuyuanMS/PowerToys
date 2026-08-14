@@ -16,13 +16,15 @@ namespace AdvancedPaste.UnitTests.ServicesTests;
 public sealed class SemanticKernelPasteProviderTests
 {
     // Guards against regression of #49838
-    [TestMethod]
-    public void CreateExecutionSettings_ForOpenAI_DoesNotSetReasoningEffort()
+    [DataTestMethod]
+    [DataRow(AIServiceType.OpenAI)]
+    [DataRow(AIServiceType.AzureOpenAI)]
+    public void CreateExecutionSettings_ForOpenAIProviders_DoesNotSetReasoningEffort(AIServiceType providerType)
     {
         // Arrange
         var config = new PasteAIConfig
         {
-            ProviderType = AIServiceType.OpenAI,
+            ProviderType = providerType,
             Model = "gpt-4o",
             ApiKey = "fake-key",
         };
