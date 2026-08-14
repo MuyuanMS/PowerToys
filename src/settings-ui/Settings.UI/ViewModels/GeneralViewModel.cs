@@ -27,6 +27,9 @@ using Microsoft.PowerToys.Settings.UI.Library.ViewModels.Commands;
 using Microsoft.PowerToys.Settings.UI.SerializationContext;
 using Microsoft.PowerToys.Telemetry;
 using Microsoft.Win32;
+
+using Settings.UI.Library;
+
 using Windows.System.Profile;
 
 namespace Microsoft.PowerToys.Settings.UI.ViewModels
@@ -1188,7 +1191,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                     return false;
                 }
 
-                global::PowerToys.ZoomItSettingsInterop.ZoomItSettings.SaveSettingsJson(File.ReadAllText(path));
+                global::PowerToys.ZoomItSettingsInterop.ZoomItSettings.SaveSettingsJson(File.ReadAllText(path).Trim('\0'));
                 return true;
             }
             catch (Exception ex)

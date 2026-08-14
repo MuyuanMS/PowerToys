@@ -297,8 +297,7 @@
                             <tkcontrols:SettingsExpander.Items>
                                 <tkcontrols:SettingsCard
                                     x:Name="ShowThemeAdaptiveTrayIconCard"
-                                    x:Uid="ShowThemeAdaptiveTrayIcon"
-                                    >
+                                    x:Uid="ShowThemeAdaptiveTrayIcon">
                                     <ToggleSwitch
                                         AutomationProperties.Name="{Binding ElementName=ShowThemeAdaptiveTrayIconCard, Path=Header}"
                                         IsOn="{x:Bind ViewModel.ShowThemeAdaptiveTrayIcon, Mode=TwoWay}" />

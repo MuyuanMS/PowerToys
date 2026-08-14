@@ -10,9 +10,9 @@
 HRESULT GetIconIndexFromPath(_In_ PCWSTR path, _Out_ int* index);
 HBITMAP CreateBitmapFromIcon(_In_ HICON hIcon, _In_opt_ UINT width = 0, _In_opt_ UINT height = 0);
 
-// Loads a tray icon handle. When themeAdaptive is true, loads whiteIconPath for dark shell
-// and darkIconPath for light shell. Returns an owned icon handle in all cases; the caller
-// must release it with DestroyIcon. Falls back to the embedded resource icon on failure.
+// Loads an owned tray icon handle. When themeAdaptive is true, loads whiteIconPath for dark
+// shell and darkIconPath for light shell. Falls back to the embedded resource icon on failure.
+// The caller must release a non-null result with DestroyIcon.
 HICON LoadThemeAdaptiveTrayIcon(
     bool themeAdaptive,
     _In_ PCWSTR whiteIconPath,
