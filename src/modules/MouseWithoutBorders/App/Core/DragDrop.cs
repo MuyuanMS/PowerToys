@@ -53,6 +53,7 @@ namespace MouseWithoutBorders.Core;
 internal static class DragDrop
 {
     private static readonly object DragActivationLock = new();
+    private static readonly object DragNetworkLock = new();
     private static bool isDragging;
     private static volatile bool mouseDown;
     private static long transientDragValidationGeneration;
@@ -342,26 +343,29 @@ internal static class DragDrop
 
     private static void PublishDragNetwork(Action publication)
     {
-        try
+        lock (DragNetworkLock)
         {
-            publication();
-        }
-        finally
-        {
-            bool sendEnd;
-            ID releaseDestination;
-            lock (DragActivationLock)
+            try
             {
-                dragActivationNetworkInProgress = false;
-                sendEnd = dragActivationReleaseRequested;
-                releaseDestination = dragActivationReleaseDestination;
-                dragActivationReleaseRequested = false;
-                dragActivationReleaseDestination = ID.NONE;
+                publication();
             }
-
-            if (sendEnd)
+            finally
             {
-                SendClipboardBeatDragDropEnd(releaseDestination);
+                bool sendEnd;
+                ID releaseDestination;
+                lock (DragActivationLock)
+                {
+                    dragActivationNetworkInProgress = false;
+                    sendEnd = dragActivationReleaseRequested;
+                    releaseDestination = dragActivationReleaseDestination;
+                    dragActivationReleaseRequested = false;
+                    dragActivationReleaseDestination = ID.NONE;
+                }
+
+                if (sendEnd)
+                {
+                    SendClipboardBeatDragDropEnd(releaseDestination);
+                }
             }
         }
     }
@@ -464,7 +468,10 @@ internal static class DragDrop
 
         if (sendEnd)
         {
-            SendClipboardBeatDragDropEnd(endDestination);
+            lock (DragNetworkLock)
+            {
+                SendClipboardBeatDragDropEnd(endDestination);
+            }
         }
     }
 
@@ -501,33 +508,36 @@ internal static class DragDrop
 
     internal static void ChangeDropMachine()
     {
-        // desMachineID = current drop machine
-        // newDesMachineID = new drop machine
+        lock (DragNetworkLock)
+        {
+            // desMachineID = current drop machine
+            // newDesMachineID = new drop machine
 
-        // 1. Cancelling dropping in current drop machine
-        if (MachineStuff.dropMachineID == Common.MachineID)
-        {
-            // Drag/Drop coming through me
-            IsDropping = false;
-        }
-        else
-        {
-            // Drag/Drop coming back
-            SendClipboardBeatDragDropEnd(MachineStuff.desMachineID);
-        }
+            // 1. Cancelling dropping in current drop machine
+            if (MachineStuff.dropMachineID == Common.MachineID)
+            {
+                // Drag/Drop coming through me
+                IsDropping = false;
+            }
+            else
+            {
+                // Drag/Drop coming back
+                SendClipboardBeatDragDropEnd(MachineStuff.desMachineID);
+            }
 
-        // 2. SendClipboardBeatDragDrop to new drop machine
-        // new drop machine is not me
-        if (MachineStuff.newDesMachineID != Common.MachineID)
-        {
-            MachineStuff.dropMachineID = MachineStuff.newDesMachineID;
-            SendDropBegin(MachineStuff.dropMachineID);
-        }
+            // 2. SendClipboardBeatDragDrop to new drop machine
+            // new drop machine is not me
+            if (MachineStuff.newDesMachineID != Common.MachineID)
+            {
+                MachineStuff.dropMachineID = MachineStuff.newDesMachineID;
+                SendDropBegin(MachineStuff.dropMachineID);
+            }
 
-        // New drop machine is me
-        else
-        {
-            IsDropping = true;
+            // New drop machine is me
+            else
+            {
+                IsDropping = true;
+            }
         }
     }
 
