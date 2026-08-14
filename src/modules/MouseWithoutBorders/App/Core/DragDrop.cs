@@ -347,13 +347,19 @@ internal static class DragDrop
     internal static void DragDropStep11()
     {
         Logger.LogDebug("DragDropStep11: Mouse drag coming back, canceling drag/drop");
+        lock (DragActivationLock)
+        {
+            long validationGeneration = Interlocked.Exchange(ref transientDragValidationGeneration, 0);
+            MouseDown = false;
+            IsDropping = false;
+            IsDragging = false;
+            DragMachine = (ID)1;
+            Clipboard.CancelTransientDragFileValidation(validationGeneration);
+            Clipboard.LastIDWithClipboardData = ID.NONE;
+            Clipboard.LastDragDropFile = null;
+        }
+
         SendClipboardBeatDragDropEnd();
-        IsDropping = false;
-        IsDragging = false;
-        DragMachine = (ID)1;
-        Clipboard.LastIDWithClipboardData = ID.NONE;
-        Clipboard.LastDragDropFile = null;
-        MouseDown = false;
     }
 
     internal static void DragDropStep12()
