@@ -224,7 +224,9 @@ internal static class DragDrop
                 bool activated = false;
                 lock (DragActivationLock)
                 {
-                    if (MouseDown && Clipboard.TrySetValidatedTransientDragFile(validationGeneration, dragFileName, lease))
+                    if (MouseDown
+                        && !isDropping
+                        && Clipboard.TrySetValidatedTransientDragFile(validationGeneration, dragFileName, lease))
                     {
                         /*
                          * possibleDropMachineID is used as desID sent in DragDropStep06();
@@ -261,10 +263,19 @@ internal static class DragDrop
         }
         else
         {
-            Logger.LogDebug("DragDropStep05: IsDropping == true, change drop machine...");
-            IsDropping = false;
-            Common.MainFormVisible = true; // WM_HIDE_DRAG_DROP
-            SendDropBegin(); // To dropMachineID set in DragDropStep03
+            lock (DragActivationLock)
+            {
+                if (!isDropping)
+                {
+                    Logger.LogDebug("DragDropStep05: Drop state changed before callback processing.");
+                    return;
+                }
+
+                Logger.LogDebug("DragDropStep05: IsDropping == true, change drop machine...");
+                isDropping = false;
+                Common.MainFormVisible = true; // WM_HIDE_DRAG_DROP
+                SendDropBegin(); // To dropMachineID set in DragDropStep03
+            }
         }
 
         MouseDown = false;
@@ -306,35 +317,35 @@ internal static class DragDrop
         }
         else if (wParam == WM.WM_LBUTTONUP)
         {
-            if (IsDropping)
+            bool completeDrop;
+            lock (DragActivationLock)
             {
-                // Hide form, get data
-                DragDropStep10();
+                completeDrop = isDropping;
+                if (completeDrop)
+                {
+                    isDropping = false;
+                    isDragging = false;
+                    Clipboard.LastIDWithClipboardData = ID.NONE;
+                }
+                else if (isDragging)
+                {
+                    isDragging = false;
+                    Clipboard.LastIDWithClipboardData = ID.NONE;
+                }
+
                 Clipboard.RequestLastDragDropFileReleaseAfterSend();
             }
-            else
-            {
-                lock (DragActivationLock)
-                {
-                    if (IsDragging)
-                    {
-                        IsDragging = false;
-                        Clipboard.LastIDWithClipboardData = ID.NONE;
-                    }
 
-                    Clipboard.RequestLastDragDropFileReleaseAfterSend();
-                }
+            if (completeDrop)
+            {
+                FinishDragDropStep10();
             }
         }
     }
 
-    private static void DragDropStep10()
+    private static void FinishDragDropStep10()
     {
         Logger.LogDebug("DragDropStep10: Hide the form and get data...");
-        IsDropping = false;
-        IsDragging = false;
-        Clipboard.LastIDWithClipboardData = ID.NONE;
-
         Common.DoSomethingInUIThread(() =>
         {
             _ = NativeMethods.PostMessage(Common.MainForm.Handle, NativeMethods.WM_HIDE_DRAG_DROP, (IntPtr)0, (IntPtr)0);
@@ -455,8 +466,21 @@ internal static class DragDrop
 
     internal static bool IsDropping
     {
-        get => DragDrop.isDropping;
-        set => DragDrop.isDropping = value;
+        get
+        {
+            lock (DragActivationLock)
+            {
+                return isDropping;
+            }
+        }
+
+        set
+        {
+            lock (DragActivationLock)
+            {
+                isDropping = value;
+            }
+        }
     }
 
     internal static bool MouseDown
