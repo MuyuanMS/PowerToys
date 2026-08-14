@@ -536,6 +536,8 @@ internal static class DragDrop
                 MachineStuff.dropMachineID = MachineStuff.newDesMachineID;
                 sendBegin = true;
                 beginDestination = MachineStuff.dropMachineID;
+                dragActivationNetworkInProgress = true;
+                dragActivationReleaseRequested = false;
             }
 
             // New drop machine is me
@@ -545,7 +547,7 @@ internal static class DragDrop
             }
         }
 
-        QueueDragNetworkAction(() =>
+        Action transition = () =>
         {
             if (sendEnd)
             {
@@ -556,7 +558,16 @@ internal static class DragDrop
             {
                 SendDropBegin(beginDestination);
             }
-        });
+        };
+
+        if (sendBegin)
+        {
+            PublishDragNetwork(transition);
+        }
+        else
+        {
+            QueueDragNetworkAction(transition);
+        }
     }
 
     private static void SendClipboardBeatDragDrop()
