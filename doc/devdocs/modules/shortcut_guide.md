@@ -18,6 +18,8 @@ Shortcut Guide is a PowerToy that displays an overlay of available keyboard shor
 - Press the user-defined hotkey to display the full overlay.
 - Optionally, hold either Windows key to show taskbar indicators or the full overlay after a configurable delay.
 - Press the hotkey again or press ESC to dismiss the overlay. A full overlay opened by holding the Windows key can either close on key release or remain open, depending on the setting.
+- Use the title-bar search box to filter shortcuts on the selected application page.
+- Press Ctrl+F to focus search. Escape clears an active search before dismissing the overlay.
 
 The **Hold Windows key** setting is independent of the activation shortcut:
 
