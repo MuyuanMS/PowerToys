@@ -62,8 +62,21 @@ internal static class DragDrop
 
     internal static bool IsDragging
     {
-        get => DragDrop.isDragging;
-        set => DragDrop.isDragging = value;
+        get
+        {
+            lock (DragActivationLock)
+            {
+                return isDragging;
+            }
+        }
+
+        set
+        {
+            lock (DragActivationLock)
+            {
+                isDragging = value;
+            }
+        }
     }
 
     internal static void DragDropStep01(int wParam)
@@ -75,17 +88,23 @@ internal static class DragDrop
 
         if (wParam == WM.WM_LBUTTONDOWN)
         {
-            _ = Interlocked.Exchange(
-                ref transientDragValidationGeneration,
-                Clipboard.BeginTransientDragFileValidation());
-            MouseDown = true;
-            DragMachine = MachineStuff.desMachineID;
-            MachineStuff.dropMachineID = ID.NONE;
+            lock (DragActivationLock)
+            {
+                transientDragValidationGeneration = Clipboard.BeginTransientDragFileValidation();
+                MouseDown = true;
+                DragMachine = MachineStuff.desMachineID;
+                MachineStuff.dropMachineID = ID.NONE;
+            }
+
             Logger.LogDebug("DragDropStep01: MouseDown");
         }
         else if (wParam == WM.WM_LBUTTONUP)
         {
-            MouseDown = false;
+            lock (DragActivationLock)
+            {
+                MouseDown = false;
+            }
+
             Logger.LogDebug("DragDropStep01: MouseUp");
         }
 
@@ -145,9 +164,15 @@ internal static class DragDrop
             if (h.ToInt32() > 0)
             {
                 _ = Interlocked.Exchange(ref dragDropStep05ExCalledByIpc, 0);
+                long validationGeneration;
+                lock (DragActivationLock)
+                {
+                    validationGeneration = transientDragValidationGeneration;
+                }
+
                 _ = Helper.SendMessageToHelper(
                     SharedConst.SET_DRAG_VALIDATION_GENERATION_CMD,
-                    checked((IntPtr)Interlocked.Read(ref transientDragValidationGeneration)),
+                    checked((IntPtr)validationGeneration),
                     IntPtr.Zero);
 
                 Common.MainForm.Hide();
@@ -198,11 +223,17 @@ internal static class DragDrop
             return;
         }
 
-        bool isCurrentValidation = validationGeneration != 0
-            && Interlocked.CompareExchange(
-                ref transientDragValidationGeneration,
-                0,
-                validationGeneration) == validationGeneration;
+        bool isCurrentValidation;
+        lock (DragActivationLock)
+        {
+            isCurrentValidation = validationGeneration != 0
+                && transientDragValidationGeneration == validationGeneration;
+            if (isCurrentValidation)
+            {
+                transientDragValidationGeneration = 0;
+            }
+        }
+
         if (!isCurrentValidation)
         {
             Clipboard.CancelTransientDragFileValidation(validationGeneration);
@@ -413,7 +444,8 @@ internal static class DragDrop
         ID endDestination;
         lock (DragActivationLock)
         {
-            long validationGeneration = Interlocked.Exchange(ref transientDragValidationGeneration, 0);
+            long validationGeneration = transientDragValidationGeneration;
+            transientDragValidationGeneration = 0;
             MouseDown = false;
             IsDropping = false;
             IsDragging = false;
