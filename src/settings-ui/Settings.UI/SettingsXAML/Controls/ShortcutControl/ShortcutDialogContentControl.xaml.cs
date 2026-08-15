@@ -66,7 +66,14 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
         public List<object> Keys
         {
             get => (List<object>)GetValue(KeysProperty);
-            set => SetValue(KeysProperty, value);
+
+            set
+            {
+                if (!JudgeIfKeyValueSame(value))
+                {
+                    SetValue(KeysProperty, value);
+                }
+            }
         }
 
         public bool IsError
@@ -149,7 +156,6 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
                 return false;
             }
 
-            var set = new HashSet<object>(currentValue);
             for (int index = 0; index < currentValue.Count; index++)
             {
                 if (!Equals(currentValue[index], newValue[index]))
@@ -159,5 +165,6 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
             }
 
             return true;
+        }
     }
 }
