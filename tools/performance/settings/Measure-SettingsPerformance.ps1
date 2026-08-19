@@ -24,13 +24,39 @@ if (-not ("SettingsPerformanceNativeMethods" -as [type]))
 {
     Add-Type @"
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 public static class SettingsPerformanceNativeMethods
 {
+    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool IsWindowVisible(IntPtr hWnd);
+
+    public static IntPtr[] GetProcessWindows(int processId)
+    {
+        var windows = new List<IntPtr>();
+        EnumWindows((hWnd, lParam) =>
+        {
+            GetWindowThreadProcessId(hWnd, out uint windowProcessId);
+            if (windowProcessId == processId)
+            {
+                windows.Add(hWnd);
+            }
+
+            return true;
+        }, IntPtr.Zero);
+
+        return windows.ToArray();
+    }
 }
 "@
 }
@@ -107,16 +133,32 @@ function Test-SettingsWindowVisible
 {
     foreach ($process in Get-ProcessByPath -Name "PowerToys.Settings" -Path $settingsPath)
     {
-        try
+        foreach ($windowHandle in [SettingsPerformanceNativeMethods]::GetProcessWindows($process.Id))
         {
-            $process.Refresh()
-            if ($process.MainWindowHandle -ne [IntPtr]::Zero -and [SettingsPerformanceNativeMethods]::IsWindowVisible($process.MainWindowHandle))
+            if ($windowHandle -eq [IntPtr]::Zero -or -not [SettingsPerformanceNativeMethods]::IsWindowVisible($windowHandle))
             {
-                return $true
+                continue
             }
-        }
-        catch
-        {
+
+            try
+            {
+                $root = [System.Windows.Automation.AutomationElement]::FromHandle($windowHandle)
+                if ($null -eq $root)
+                {
+                    continue
+                }
+
+                $dashboardNavCondition = [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+                    "DashboardNavItem")
+                if ($null -ne $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $dashboardNavCondition))
+                {
+                    return $true
+                }
+            }
+            catch
+            {
+            }
         }
     }
 
