@@ -45,6 +45,27 @@ namespace
     }
 
     constexpr size_t DefaultModulesResultSize = 512;
+    constexpr int MaxConcurrentHandleEnumerationWorkers = 4;
+    std::atomic<int> active_handle_enumeration_workers{ 0 };
+
+    bool try_reserve_handle_enumeration_worker()
+    {
+        int active_workers = active_handle_enumeration_workers.load();
+        while (active_workers < MaxConcurrentHandleEnumerationWorkers)
+        {
+            if (active_handle_enumeration_workers.compare_exchange_weak(active_workers, active_workers + 1))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    void release_handle_enumeration_worker()
+    {
+        active_handle_enumeration_workers--;
+    }
 
 #ifndef FILELOCKSMITH_LIB_STATIC
     struct ModuleLockGuard
@@ -210,6 +231,7 @@ std::vector<NtdllExtensions::HandleInfo> NtdllExtensions::handles() noexcept
         // for skipped handles too, so only a genuinely stuck query looks like a stall.
         std::atomic<ULONG_PTR> processed{ 0 };
 
+        std::mutex work_mutex;
         std::mutex result_mutex;
         std::vector<HandleInfo> result;
     };
@@ -258,7 +280,7 @@ std::vector<NtdllExtensions::HandleInfo> NtdllExtensions::handles() noexcept
     // Each worker owns its scratch buffer and its process-handle cache outright, so an
     // abandoned worker shares no mutable state. `result` is the one exception and is only
     // touched while holding `result_mutex`, never across a blocking call.
-    auto worker = [state, nt_query_object, worker_file_handle_to_kernel_name](std::shared_ptr<std::atomic_bool> abandon_requested) {
+    auto worker = [state, nt_query_object, worker_file_handle_to_kernel_name](std::shared_ptr<std::atomic_bool> abandon_requested, std::shared_ptr<std::atomic_bool> worker_slot_reserved) {
 #ifndef FILELOCKSMITH_LIB_STATIC
         ModuleLockGuard module_lock;
 #endif
@@ -267,15 +289,19 @@ std::vector<NtdllExtensions::HandleInfo> NtdllExtensions::handles() noexcept
 
         for (;;)
         {
-            if (abandon_requested->load())
+            ULONG_PTR index;
             {
-                break;
-            }
+                std::scoped_lock lock{ state->work_mutex };
+                if (abandon_requested->load())
+                {
+                    break;
+                }
 
-            const ULONG_PTR index = state->next_index++;
-            if (index >= state->handle_count)
-            {
-                break;
+                index = state->next_index++;
+                if (index >= state->handle_count)
+                {
+                    break;
+                }
             }
 
             auto handle_info = state->info_ptr->Handles + index;
@@ -345,6 +371,11 @@ std::vector<NtdllExtensions::HandleInfo> NtdllExtensions::handles() noexcept
         {
             CloseHandle(handle);
         }
+
+        if (worker_slot_reserved->exchange(false))
+        {
+            release_handle_enumeration_worker();
+        }
     };
 
     constexpr DWORD poll_interval_ms = 200;
@@ -352,16 +383,17 @@ std::vector<NtdllExtensions::HandleInfo> NtdllExtensions::handles() noexcept
     // all. The previous code treated a single missed 200 ms tick as a hang, so a merely slow
     // query on a busy machine was enough to trigger the recovery path.
     constexpr int stalled_polls_before_abandon = 10;
-    // Bounds how much we leak, and how long a pathological machine can keep us here. When
-    // exceeded we return what has been collected so far instead of spawning more workers.
-    constexpr int max_abandoned_workers = 4;
 
-    int abandoned_workers = 0;
-
-    while (state->next_index < state->handle_count && abandoned_workers < max_abandoned_workers)
+    while (state->next_index < state->handle_count)
     {
+        if (!try_reserve_handle_enumeration_worker())
+        {
+            break;
+        }
+
         auto abandon_requested = std::make_shared<std::atomic_bool>(false);
-        std::thread worker_thread(worker, abandon_requested);
+        auto worker_slot_reserved = std::make_shared<std::atomic_bool>(true);
+        std::thread worker_thread(worker, abandon_requested, worker_slot_reserved);
 
         ULONG_PTR last_processed = state->processed;
         int stalled_polls = 0;
@@ -389,10 +421,14 @@ std::vector<NtdllExtensions::HandleInfo> NtdllExtensions::handles() noexcept
             }
 
             // Stuck in a call we cannot interrupt. Let it go and continue with a fresh
-            // worker; `next_index` has already moved past the offending handle.
-            abandon_requested->store(true);
+            // worker; `next_index` has already moved past the offending handle. The flag and
+            // the next-index claim share a lock so a detached worker cannot claim more work
+            // after it has been abandoned.
+            {
+                std::scoped_lock lock{ state->work_mutex };
+                abandon_requested->store(true);
+            }
             worker_thread.detach();
-            abandoned_workers++;
             break;
         }
     }
