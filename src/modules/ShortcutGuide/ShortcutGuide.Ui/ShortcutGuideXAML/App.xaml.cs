@@ -233,6 +233,7 @@ namespace ShortcutGuide
                                     return;
                                 }
 
+                                Program.ForegroundWindowHandle = NativeMethods.GetForegroundWindow();
                                 OverlayWindow.MainPaneControl.Visibility = Visibility.Collapsed;
                                 OverlayWindow.ShowOverlay();
                                 await OverlayWindow.MainPaneControl.Open();
