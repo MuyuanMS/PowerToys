@@ -91,12 +91,20 @@ namespace ShortcutGuide
                 {
                     _regularHotkeyEvent = EventWaitHandle.OpenExisting(Constants.ShortcutGuideTriggerEvent());
                     Logger.LogInfo($"Opened Shortcut Guide trigger event '{Constants.ShortcutGuideTriggerEvent()}'.");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Failed to open Shortcut Guide trigger event '{Constants.ShortcutGuideTriggerEvent()}': {ex.Message}");
+                }
+
+                try
+                {
                     _winKeyHoldEvent = EventWaitHandle.OpenExisting(Constants.ShortcutGuideWinKeyHoldEvent());
                     Logger.LogInfo($"Opened Shortcut Guide trigger event '{Constants.ShortcutGuideWinKeyHoldEvent()}'.");
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError($"Failed to open Shortcut Guide trigger events: {ex.Message}");
+                    Logger.LogError($"Failed to open Shortcut Guide trigger event '{Constants.ShortcutGuideWinKeyHoldEvent()}': {ex.Message}");
                 }
 
                 _listenForActivationEventsThread = new Thread(ListenForActivationEvents)
@@ -193,21 +201,31 @@ namespace ShortcutGuide
 
         private void ListenForActivationEvents()
         {
-            if (_regularHotkeyEvent == null || _winKeyHoldEvent == null)
+            List<(WaitHandle Handle, ShortcutGuideActivationSource Source)> activationEvents = [];
+            if (_regularHotkeyEvent != null)
             {
+                activationEvents.Add((_regularHotkeyEvent, ShortcutGuideActivationSource.RegularHotkey));
+            }
+
+            if (_winKeyHoldEvent != null)
+            {
+                activationEvents.Add((_winKeyHoldEvent, ShortcutGuideActivationSource.WindowsKeyHold));
+            }
+
+            if (activationEvents.Count == 0)
+            {
+                Logger.LogError("Failed to open any Shortcut Guide activation trigger events.");
                 return;
             }
 
-            WaitHandle[] handles = [_regularHotkeyEvent, _winKeyHoldEvent];
+            WaitHandle[] handles = activationEvents.ConvertAll(item => item.Handle).ToArray();
             try
             {
                 Logger.LogInfo("Shortcut Guide activation-event listener started.");
                 while (true)
                 {
                     int eventIndex = WaitHandle.WaitAny(handles);
-                    var activationSource = eventIndex == 0
-                        ? ShortcutGuideActivationSource.RegularHotkey
-                        : ShortcutGuideActivationSource.WindowsKeyHold;
+                    var activationSource = activationEvents[eventIndex].Source;
                     Logger.LogInfo($"Shortcut Guide trigger event signaled by {activationSource}.");
                     OverlayWindow.DispatcherQueue.TryEnqueue(() => _ = HandleActivationAsync(activationSource));
                 }
