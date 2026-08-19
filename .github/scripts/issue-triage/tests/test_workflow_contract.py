@@ -8,6 +8,19 @@ WORKFLOW_SOURCE = GITHUB_DIR / "workflows" / "issue-triage.md"
 WORKFLOW_LOCK = GITHUB_DIR / "workflows" / "issue-triage.lock.yml"
 
 
+def label_call_arguments(workflow, method, argument):
+    calls = re.findall(
+        rf"github\.rest\.issues\.{method}\(\{{(.*?)\}}\);",
+        workflow,
+        re.DOTALL,
+    )
+    return [
+        match.strip().removeprefix("[").removesuffix("]").strip()
+        for call in calls
+        for match in re.findall(rf"{argument}:\s*([^,\r\n}}]+)", call)
+    ]
+
+
 class WorkflowContractTests(unittest.TestCase):
     def test_agent_evidence_uses_shared_runtime_directory(self):
         source = WORKFLOW_SOURCE.read_text(encoding="utf-8")
@@ -52,11 +65,11 @@ class WorkflowContractTests(unittest.TestCase):
             self.assertNotIn("versionLabels", workflow)
             self.assertNotIn("desiredVersionLabel", workflow)
             self.assertEqual(
-                sorted(re.findall(r"labels:\s*\[([^\]]+)\]", workflow)),
+                sorted(label_call_arguments(workflow, "addLabels", "labels")),
                 sorted(["'Needs-Author-Feedback'", "desiredProductLabel"]),
             )
             self.assertEqual(
-                re.findall(r"name:\s*('[^']+')", workflow),
+                label_call_arguments(workflow, "removeLabel", "name"),
                 ["'Needs-Author-Feedback'"],
             )
         self.assertRegex(source, r"never adds or removes\s+version labels")

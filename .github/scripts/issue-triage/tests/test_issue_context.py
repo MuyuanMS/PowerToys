@@ -168,6 +168,30 @@ class IssueContextTests(unittest.TestCase):
         )
         self.assertEqual(CONTEXT.reproduction_quality(body), "INSUFFICIENT")
 
+    def test_first_person_reproduction_steps_are_sufficient(self):
+        body = BUG_BODY.replace(
+            "1. Open Keyboard Manager.\n"
+            "2. Select Remap a shortcut.\n"
+            "3. Press a key and observe that the editor closes.",
+            "I open PowerToys Settings. Then I select Keyboard Manager.",
+        ).replace(
+            "The editor exits.",
+            "The Keyboard Manager page does not load.",
+        )
+        self.assertEqual(CONTEXT.reproduction_quality(body), "SUFFICIENT")
+
+    def test_semicolon_separated_reproduction_steps_are_sufficient(self):
+        body = BUG_BODY.replace(
+            "1. Open Keyboard Manager.\n"
+            "2. Select Remap a shortcut.\n"
+            "3. Press a key and observe that the editor closes.",
+            "Open Settings; then click Keyboard Manager.",
+        ).replace(
+            "The editor exits.",
+            "The Keyboard Manager page does not load.",
+        )
+        self.assertEqual(CONTEXT.reproduction_quality(body), "SUFFICIENT")
+
     def test_intermittent_failure_description_is_sufficient_for_intake(self):
         body = BUG_BODY.replace(
             "1. Open Keyboard Manager.\n"
