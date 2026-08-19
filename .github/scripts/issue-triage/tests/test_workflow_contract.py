@@ -1,3 +1,4 @@
+import re
 import unittest
 from pathlib import Path
 
@@ -50,6 +51,14 @@ class WorkflowContractTests(unittest.TestCase):
         for workflow in (source, generated):
             self.assertNotIn("versionLabels", workflow)
             self.assertNotIn("desiredVersionLabel", workflow)
+            self.assertEqual(
+                sorted(re.findall(r"labels:\s*\[([^\]]+)\]", workflow)),
+                sorted(["'Needs-Author-Feedback'", "desiredProductLabel"]),
+            )
+            self.assertEqual(
+                re.findall(r"name:\s*('[^']+')", workflow),
+                ["'Needs-Author-Feedback'"],
+            )
         self.assertRegex(source, r"never adds or removes\s+version labels")
 
 

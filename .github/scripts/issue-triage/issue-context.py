@@ -31,6 +31,17 @@ TECHNICAL_PATTERN = re.compile(
 VERSION_PATTERN = re.compile(
     r"\b(?:v)?(\d+(?:\.\d+){1,3}(?:-[A-Za-z0-9.-]+)?)\b"
 )
+ACTION_VERB_PATTERN = re.compile(
+    r"\b(?:open|launch|click|press|select|enable|disable|connect|disconnect|"
+    r"type|drag|run|choose|restart|create|make|configure|remap|hold|use)\b",
+    re.IGNORECASE,
+)
+ACTION_CLAUSE_PATTERN = re.compile(
+    r"^(?:now|then|next|after(?:wards| that)?|try(?:ing)?(?: to| and)?)?\s*"
+    r"(?:open|launch|click|press|select|enable|disable|connect|disconnect|"
+    r"type|drag|run|choose|restart|create|make|configure|remap|hold|use)\b",
+    re.IGNORECASE,
+)
 BUG_HEADINGS = (
     "Microsoft PowerToys version",
     "Installation method",
@@ -194,6 +205,28 @@ def is_bug_template(body):
     return sum(heading.lower() in lower for heading in BUG_HEADINGS) >= 5
 
 
+def actionable_step_count(steps):
+    count = 0
+    for line in (steps or "").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        listed = re.match(r"^(?:\d+[.)]|[-*])\s+", line)
+        line = re.sub(r"^(?:\d+[.)]|[-*])\s+", "", line).strip()
+        if not line:
+            continue
+        clauses = [
+            clause.strip()
+            for clause in re.split(r"(?:[.!?]+|\s+[;]\s+)", line)
+            if clause.strip()
+        ]
+        if listed and ACTION_VERB_PATTERN.search(line):
+            count += 1
+            continue
+        count += sum(1 for clause in clauses if ACTION_CLAUSE_PATTERN.search(clause))
+    return count
+
+
 def reproduction_quality(body):
     if not is_bug_template(body):
         return "NOT_APPLICABLE"
@@ -201,15 +234,7 @@ def reproduction_quality(body):
     normalized = compact(steps, 3000)
     if not normalized or normalized.lower() in {"_no response_", "no response", "n/a"}:
         return "INSUFFICIENT"
-    action_markers = len(
-        re.findall(
-            r"(?:^|\s)(?:\d+[.)]|[-*])\s+|\b(?:open|launch|click|press|select|"
-            r"enable|disable|connect|disconnect|type|drag|run|choose|restart|"
-            r"create|make|configure|remap|hold|use)\b",
-            steps,
-            re.IGNORECASE | re.MULTILINE,
-        )
-    )
+    action_markers = actionable_step_count(steps)
     actual_behavior = compact(extract_section(body, "Actual Behavior"), 1000)
     has_observed_result = (
         bool(actual_behavior)

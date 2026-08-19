@@ -155,6 +155,19 @@ class IssueContextTests(unittest.TestCase):
         )
         self.assertEqual(CONTEXT.reproduction_quality(body), "SUFFICIENT")
 
+    def test_generic_prose_with_repeated_action_words_is_insufficient(self):
+        body = BUG_BODY.replace(
+            "1. Open Keyboard Manager.\n"
+            "2. Select Remap a shortcut.\n"
+            "3. Press a key and observe that the editor closes.",
+            "I use Keyboard Manager every day and make shortcuts often. "
+            "It is useful when I use my keyboard.",
+        ).replace(
+            "The editor exits.",
+            "The shortcut does not work as expected.",
+        )
+        self.assertEqual(CONTEXT.reproduction_quality(body), "INSUFFICIENT")
+
     def test_intermittent_failure_description_is_sufficient_for_intake(self):
         body = BUG_BODY.replace(
             "1. Open Keyboard Manager.\n"
