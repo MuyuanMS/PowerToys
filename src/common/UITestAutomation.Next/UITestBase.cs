@@ -35,6 +35,7 @@ public class UITestBase : IDisposable
     // inherited ClassCleanup stops it once the owning class finishes.
     private static SessionHelper? keepAliveHelper;
     private static Type? keepAliveOwner;
+    private static IDisposable? keepAliveFirstRunSettingsSnapshot;
 
     private readonly PowerToysModule scope;
     private readonly WindowSize windowSize;
@@ -154,6 +155,8 @@ public class UITestBase : IDisposable
             {
                 keepAliveHelper = sessionHelper;
                 keepAliveOwner = GetType();
+                keepAliveFirstRunSettingsSnapshot = firstRunSettingsSnapshot;
+                firstRunSettingsSnapshot = null;
             }
         }
         catch
@@ -235,6 +238,11 @@ public class UITestBase : IDisposable
         }
         catch
         {
+        }
+        finally
+        {
+            keepAliveFirstRunSettingsSnapshot?.Dispose();
+            keepAliveFirstRunSettingsSnapshot = null;
         }
 
         keepAliveHelper = null;
