@@ -6,6 +6,10 @@
 #include <memory>
 #include <mutex>
 
+#ifndef FILELOCKSMITH_LIB_STATIC
+#include <winrt/base.h>
+#endif
+
 #define STATUS_INFO_LENGTH_MISMATCH ((LONG)0xC0000004)
 
 // Calls NtQuerySystemInformation and returns a buffer containing the result.
@@ -41,6 +45,24 @@ namespace
     }
 
     constexpr size_t DefaultModulesResultSize = 512;
+
+#ifndef FILELOCKSMITH_LIB_STATIC
+    struct ModuleLockGuard
+    {
+        ModuleLockGuard()
+        {
+            ++winrt::get_module_lock();
+        }
+
+        ~ModuleLockGuard()
+        {
+            --winrt::get_module_lock();
+        }
+
+        ModuleLockGuard(const ModuleLockGuard&) = delete;
+        ModuleLockGuard& operator=(const ModuleLockGuard&) = delete;
+    };
+#endif
 
     std::vector<std::wstring> process_modules(DWORD pid)
     {
@@ -236,12 +258,20 @@ std::vector<NtdllExtensions::HandleInfo> NtdllExtensions::handles() noexcept
     // Each worker owns its scratch buffer and its process-handle cache outright, so an
     // abandoned worker shares no mutable state. `result` is the one exception and is only
     // touched while holding `result_mutex`, never across a blocking call.
-    auto worker = [state, nt_query_object, worker_file_handle_to_kernel_name] {
+    auto worker = [state, nt_query_object, worker_file_handle_to_kernel_name](std::shared_ptr<std::atomic_bool> abandon_requested) {
+#ifndef FILELOCKSMITH_LIB_STATIC
+        ModuleLockGuard module_lock;
+#endif
         std::vector<BYTE> object_info_buffer(DefaultResultBufferSize);
         std::map<ULONG_PTR, HANDLE> pid_to_handle;
 
         for (;;)
         {
+            if (abandon_requested->load())
+            {
+                break;
+            }
+
             const ULONG_PTR index = state->next_index++;
             if (index >= state->handle_count)
             {
@@ -330,7 +360,8 @@ std::vector<NtdllExtensions::HandleInfo> NtdllExtensions::handles() noexcept
 
     while (state->next_index < state->handle_count && abandoned_workers < max_abandoned_workers)
     {
-        std::thread worker_thread(worker);
+        auto abandon_requested = std::make_shared<std::atomic_bool>(false);
+        std::thread worker_thread(worker, abandon_requested);
 
         ULONG_PTR last_processed = state->processed;
         int stalled_polls = 0;
@@ -359,6 +390,7 @@ std::vector<NtdllExtensions::HandleInfo> NtdllExtensions::handles() noexcept
 
             // Stuck in a call we cannot interrupt. Let it go and continue with a fresh
             // worker; `next_index` has already moved past the offending handle.
+            abandon_requested->store(true);
             worker_thread.detach();
             abandoned_workers++;
             break;
