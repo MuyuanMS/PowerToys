@@ -137,14 +137,15 @@ public class DeleteLayoutTests : FancyZonesEditorTestBase
 
         EditorUiTestHelper.OpenEditLayoutDialog(this, Session, FirstCustomLayoutName);
 
-        var hotkeyComboBox = Session.Find<Element>(By.AccessibilityId(EditorUiTestHelper.AccessibilityId.HotkeyComboBox));
-        Assert.IsNotNull(hotkeyComboBox);
+        var processSession = Session.FromProcess("PowerToys.FancyZonesEditor", PowerToysModule.FancyZonesEditor, timeoutMS: 10_000);
         EditorUiTestHelper.Step(this, "Opening the layout shortcut combo to verify free keys");
-        hotkeyComboBox.Click();
-
+        Session.Find<Element>(By.AccessibilityId(EditorUiTestHelper.AccessibilityId.HotkeyComboBox)).Invoke();
         for (var i = 0; i < 10; i++)
         {
-            Assert.IsNotNull(Session.Find<Element>(By.Name($"{i}")), $"Expected hotkey option '{i}' was not found.");
+            var key = $"{i}";
+            Assert.IsTrue(
+                processSession.WaitFor(() => processSession.FindAll<Element>(By.Name(key), 500).Any(), 5_000),
+                $"Expected hotkey option '{key}' was not found.");
         }
 
         EditorUiTestHelper.Step(this, "Dismissing the layout shortcut popup");

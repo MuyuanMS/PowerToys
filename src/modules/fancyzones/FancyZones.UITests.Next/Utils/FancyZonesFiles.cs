@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using FancyZonesEditorCommon.Data;
+using Microsoft.PowerToys.UITest.Next;
 
 namespace FancyZones.UITests.Utils;
 
@@ -20,6 +21,10 @@ public sealed class FancyZonesFiles
 {
     public FancyZonesFiles()
     {
+        Settings = new JsonFile(Path.Combine(
+            SettingsConfigHelper.PowerToysSettingsRoot,
+            FancyZonesSettingsSeed.ModuleName,
+            "settings.json"));
         Parameters = new JsonFile(new EditorParameters().File);
         AppliedLayouts = new JsonFile(new AppliedLayouts().File);
         CustomLayouts = new JsonFile(new CustomLayouts().File);
@@ -33,6 +38,8 @@ public sealed class FancyZonesFiles
             "FancyZones",
             "app-zone-history.json"));
     }
+
+    public JsonFile Settings { get; }
 
     public JsonFile Parameters { get; }
 
@@ -50,6 +57,7 @@ public sealed class FancyZonesFiles
 
     public void RestoreAll()
     {
+        Settings.Restore();
         Parameters.Restore();
         AppliedLayouts.Restore();
         CustomLayouts.Restore();

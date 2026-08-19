@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 
 namespace Microsoft.PowerToys.UITest.Next;
@@ -32,6 +33,7 @@ public sealed class WindowShowWatcher : IDisposable
     private readonly List<string> events = new();
     private readonly Lock sync = new();
     private readonly WinEventProc callback; // keep the delegate alive for the hook's lifetime
+    private Exception? startupException;
 
     private volatile bool stop;
 
@@ -42,7 +44,15 @@ public sealed class WindowShowWatcher : IDisposable
 
         pump = new Thread(Pump) { IsBackground = true };
         pump.Start();
-        ready.Wait(5_000);
+        if (!ready.Wait(5_000))
+        {
+            throw new TimeoutException($"Timed out installing a WinEvent hook for window class '{className}'.");
+        }
+
+        if (startupException is not null)
+        {
+            throw new InvalidOperationException($"Failed to install a WinEvent hook for window class '{className}'.", startupException);
+        }
     }
 
     private delegate void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint idEventThread, uint dwmsEventTime);
@@ -125,12 +135,14 @@ public sealed class WindowShowWatcher : IDisposable
             0,
             WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
 
-        ready.Set();
         if (hook == IntPtr.Zero)
         {
+            startupException = new Win32Exception(Marshal.GetLastPInvokeError());
+            ready.Set();
             return;
         }
 
+        ready.Set();
         try
         {
             while (!stop)

@@ -514,9 +514,10 @@ Two supporting rules, both learned the hard way here:
   single positive as necessary, not sufficient.
 
 > If you must poll something (a *stable* window, not a transient one), keep the probe cheap:
-> `WindowControl.IsAnyWindowOfClassVisible` / `AnyWindowOfClassExists` use `FindWindowEx` +
-> `IsWindowVisible`, whereas `EnumerateAllWindows()` reads every window's title through
-> `GetWindowTextW`, a cross-process `WM_GETTEXT` that blocks on a busy owner.
+> `WindowControl.IsAnyWindowOfClassVisible` / `AnyWindowOfClassExists` enumerate top-level
+> windows and compare class names directly, optionally checking `IsWindowVisible`, whereas
+> `EnumerateAllWindows()` reads every window's title through `GetWindowTextW`, a cross-process
+> `WM_GETTEXT` that blocks on a busy owner.
 
 > Existence is not readiness when the product **pools** windows. FancyZones' `WorkArea.cpp` keeps a
 > per-process pool (`FreeZonesOverlayWindow`/`Reusing ZonesOverlay window from pool`), so a window of

@@ -46,7 +46,7 @@ public sealed class JsonFile
     /// <summary>Put the file back the way the test found it (deleting it when the test created it).</summary>
     public void Restore()
     {
-        if (string.IsNullOrEmpty(originalContent))
+        if (originalContent is null)
         {
             Delete();
         }
@@ -75,18 +75,14 @@ public sealed class JsonFile
 
     private static void Retry(Action action)
     {
-        for (var attempt = 0; attempt < Attempts; attempt++)
+        for (var attempt = 1; attempt <= Attempts; attempt++)
         {
             try
             {
                 action();
                 return;
             }
-            catch (IOException)
-            {
-                Thread.Sleep(RetryDelayMs);
-            }
-            catch (UnauthorizedAccessException)
+            catch (Exception ex) when (attempt < Attempts && ex is IOException or UnauthorizedAccessException)
             {
                 Thread.Sleep(RetryDelayMs);
             }
