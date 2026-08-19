@@ -39,6 +39,9 @@ namespace Microsoft.AdvancedPaste.UITests
         private readonly string pasteAsMarkdownSrcFile = "PasteAsMarkdownFile.html";
         private readonly string pasteAsMarkdownResultFile = "PasteAsMarkdownResultFile.txt";
 
+        private readonly string pasteAsSingleLineSrcFile = "PasteAsSingleLineFile.txt";
+        private readonly string pasteAsSingleLineResultFile = "PasteAsSingleLineResultFile.txt";
+
         private readonly string pasteAsJsonFileName = "PasteAsJsonFile.xml";
         private readonly string pasteAsJsonResultFile = "PasteAsJsonResultFile.txt";
 
@@ -124,6 +127,25 @@ namespace Microsoft.AdvancedPaste.UITests
                 Path.Combine(testFilesFolderPath, pasteAsPlainTextPlainNoRepeatFileName),
                 compareFormatting: true);
             Assert.IsTrue(resultWithFormatting.IsConsistent, "RTF files should be identical without formatting");
+        }
+
+        [TestMethod]
+        [TestCategory("AdvancedPasteUITest")]
+        [TestCategory("PasteAsSingleLine")]
+        public void TestCasePasteAsSingleLine()
+        {
+            if (_notepadSettingsChanged == false)
+            {
+                ChangeNotePadSettings();
+            }
+
+            DeleteAndCopyFile(pasteAsSingleLineSrcFile, tempTxtFileName);
+            ContentCopyAndPasteAsSingleLine(tempTxtFileName);
+            var result = FileReader.CompareRtfFiles(
+                Path.Combine(testFilesFolderPath, tempTxtFileName),
+                Path.Combine(testFilesFolderPath, pasteAsSingleLineResultFile),
+                compareFormatting: true);
+            Assert.IsTrue(result.IsConsistent, "Paste as single line using popup shortcut failed.");
         }
 
         [TestMethod]
@@ -643,6 +665,41 @@ namespace Microsoft.AdvancedPaste.UITests
             Thread.Sleep(1000);
 
             process.Kill(true);
+        }
+
+        private void ContentCopyAndPasteAsSingleLine(string fileName, bool isRTF = false)
+        {
+            string tempFile = Path.Combine(testFilesFolderPath, fileName);
+
+            Process process = Process.Start(isRTF ? wordpadPath : "notepad.exe", tempFile);
+            if (process == null)
+            {
+                throw new InvalidOperationException($"Failed to start {(isRTF ? "WordPad" : "Notepad")}.");
+            }
+
+            Thread.Sleep(15000);
+            var window = FindWindowWithFlexibleTitle(Path.GetFileName(tempFile), isRTF);
+
+            window.Click();
+            Thread.Sleep(1000);
+
+            this.SendKeys(Key.LCtrl, Key.A);
+            Thread.Sleep(1000);
+            this.SendKeys(Key.LCtrl, Key.C);
+            Thread.Sleep(1000);
+            this.SendKeys(Key.Delete);
+            Thread.Sleep(1000);
+
+            this.SendKeys(Key.Win, Key.Shift, Key.V);
+            Thread.Sleep(15000);
+
+            this.SendKeys(Key.LCtrl, Key.Num2);
+            Thread.Sleep(1000);
+
+            this.SendKeys(Key.LCtrl, Key.S);
+            Thread.Sleep(1000);
+
+            window.Close();
         }
 
         private void ContentCopyAndPasteAsMarkdownCase1(string fileName, bool isRTF = false)
