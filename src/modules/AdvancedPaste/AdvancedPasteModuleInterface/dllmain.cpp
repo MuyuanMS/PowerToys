@@ -414,6 +414,7 @@ private:
 
                 m_additional_actions.clear();
                 m_custom_actions.clear();
+                m_paste_as_single_line_hotkey = {};
 
                 if (settingsObject.HasKey(JSON_KEY_PROPERTIES))
                 {

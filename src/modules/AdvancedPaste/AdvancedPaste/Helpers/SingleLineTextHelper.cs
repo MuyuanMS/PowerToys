@@ -10,7 +10,7 @@ namespace AdvancedPaste.Helpers;
 public static partial class SingleLineTextHelper
 {
     [GeneratedRegex(
-        "[ \\t]*(?:(?:\\r\\n|[\\n\\r\\u000B\\u000C\\u0085\\u2028\\u2029])[ \\t]*)+",
+        "[\\p{Zs}\\t]*(?:(?:\\r\\n|[\\n\\r\\u000B\\u000C\\u0085\\u2028\\u2029])[\\p{Zs}\\t]*)+",
         RegexOptions.CultureInvariant | RegexOptions.NonBacktracking)]
     private static partial Regex LineBreakRegex();
 
