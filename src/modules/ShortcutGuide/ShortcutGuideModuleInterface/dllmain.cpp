@@ -217,19 +217,22 @@ private:
             return true;
         }
 
-        if (exitEvent)
+        if (reuseExistingProcess)
         {
-            ResetEvent(exitEvent);
-        }
+            if (exitEvent)
+            {
+                ResetEvent(exitEvent);
+            }
 
-        if (triggerEvent)
-        {
-            ResetEvent(triggerEvent);
-        }
+            if (triggerEvent)
+            {
+                ResetEvent(triggerEvent);
+            }
 
-        if (winKeyTriggerEvent)
-        {
-            ResetEvent(winKeyTriggerEvent);
+            if (winKeyTriggerEvent)
+            {
+                ResetEvent(winKeyTriggerEvent);
+            }
         }
 
         unsigned long powertoys_pid = GetCurrentProcessId();
