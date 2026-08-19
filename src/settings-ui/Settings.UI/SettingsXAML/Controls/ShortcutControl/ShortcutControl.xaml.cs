@@ -39,6 +39,8 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
         private HotkeySettings hotkeySettings;
         private HotkeySettings internalSettings;
         private HotkeySettings lastValidSettings;
+        private HotkeySettings _lastKeyDownSettings;
+        private int _lastKeyDownVirtualKey = -1;
         private HotkeySettingsControlHook hook;
         private bool _isActive;
         private bool disposedValue;
@@ -504,6 +506,13 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
         private void Hotkey_KeyDown(int key)
         {
             KeyEventHandler(key, true, key);
+            if (ShouldSkipRepeatedKeyDown(key))
+            {
+                return;
+            }
+
+            RememberKeyDownState(key);
+
             List<object> newKeys = internalSettings.GetKeysList();
             if (c.Keys == null || !c.JudgeIfKeyValueSame(newKeys))
             {
@@ -625,6 +634,7 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
 
         private void Hotkey_KeyUp(int key)
         {
+            ResetLastKeyDownState();
             KeyEventHandler(key, false, 0);
         }
 
@@ -635,6 +645,8 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
 
         private void ShortcutDialog_Opened(ContentDialog sender, ContentDialogOpenedEventArgs args)
         {
+            ResetLastKeyDownState();
+
             if (!ComboIsValid(hotkeySettings))
             {
                 DisableKeys();
@@ -674,6 +686,36 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
             }
 
             _isActive = true;
+        }
+
+        private void RememberKeyDownState(int key)
+        {
+            _lastKeyDownVirtualKey = key;
+            _lastKeyDownSettings = internalSettings with { };
+        }
+
+        private void ResetLastKeyDownState()
+        {
+            _lastKeyDownVirtualKey = -1;
+            _lastKeyDownSettings = null;
+        }
+
+        private bool ShouldSkipRepeatedKeyDown(int key)
+        {
+            return _lastKeyDownSettings != null &&
+                   _lastKeyDownVirtualKey == key &&
+                   HasSameKeyState(_lastKeyDownSettings, internalSettings);
+        }
+
+        private static bool HasSameKeyState(HotkeySettings left, HotkeySettings right)
+        {
+            return left != null &&
+                   right != null &&
+                   left.Win == right.Win &&
+                   left.Ctrl == right.Ctrl &&
+                   left.Alt == right.Alt &&
+                   left.Shift == right.Shift &&
+                   left.Code == right.Code;
         }
 
         private async void OpenDialogButton_Click(object sender, RoutedEventArgs e)
