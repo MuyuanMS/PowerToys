@@ -106,7 +106,7 @@ void PowertoyModule::UpdateHotkeyEx()
     {
         auto modulePtr = pt_module.get();
         auto action = [modulePtr] {
-            modulePtr->OnHotkeyEx();
+            modulePtr->OnWindowsKeyHold();
             return false;
         };
         CentralizedKeyboardHook::AddPressedKeyAction(pt_module->get_key(), VK_LWIN, pt_module->milliseconds_win_key_must_be_pressed(), action);

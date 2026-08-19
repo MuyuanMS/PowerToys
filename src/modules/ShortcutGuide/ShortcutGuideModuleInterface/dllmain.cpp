@@ -41,6 +41,12 @@ public:
             Logger::warn(L"Failed to create {} event. {}", CommonSharedConstants::SHORTCUT_GUIDE_TRIGGER_EVENT, get_last_error_or_default(GetLastError()));
         }
 
+        winKeyTriggerEvent = CreateEvent(nullptr, false, false, CommonSharedConstants::SHORTCUT_GUIDE_WIN_KEY_TRIGGER_EVENT);
+        if (!winKeyTriggerEvent)
+        {
+            Logger::warn(L"Failed to create {} event. {}", CommonSharedConstants::SHORTCUT_GUIDE_WIN_KEY_TRIGGER_EVENT, get_last_error_or_default(GetLastError()));
+        }
+
         InitSettings();
     }
 
@@ -91,7 +97,7 @@ public:
         if (!_enabled)
         {
             _enabled = true;
-            StartProcess();
+            EnsureProcessRuns();
         }
         else
         {
@@ -132,6 +138,10 @@ public:
         {
             CloseHandle(triggerEvent);
         }
+        if (winKeyTriggerEvent)
+        {
+            CloseHandle(winKeyTriggerEvent);
+        }
 
         delete this;
     }
@@ -150,18 +160,28 @@ public:
             return;
         }
 
-        if (!IsProcessActive())
-        {
-            StartProcess();
-        }
+        EnsureProcessRuns();
 
         SetEvent(triggerEvent);
+    }
+
+    virtual void OnWindowsKeyHold() override
+    {
+        Logger::trace("OnWindowsKeyHold()");
+        if (!_enabled)
+        {
+            return;
+        }
+
+        EnsureProcessRuns();
+
+        SetEvent(winKeyTriggerEvent);
     }
 
     virtual void send_settings_telemetry() override
     {
         Logger::trace("Send settings telemetry");
-        if (!StartProcess(L"telemetry"))
+        if (!EnsureProcessRuns(L"telemetry", false))
         {
             Logger::error("Failed to create a process to send settings telemetry");
         }
@@ -186,18 +206,33 @@ private:
     UINT m_millisecondsWinKeyPressTimeForTaskbarIconShortcuts = DEFAULT_MILLISECONDS_WIN_KEY_PRESS_TIME_FOR_TASKBAR_ICON_SHORTCUTS;
 
     HANDLE triggerEvent;
+    HANDLE winKeyTriggerEvent;
     HANDLE exitEvent;
 
-    bool StartProcess(std::wstring args = L"")
+    bool EnsureProcessRuns(std::wstring args = L"", bool reuseExistingProcess = true)
     {
-        if (exitEvent)
+        if (reuseExistingProcess && IsProcessActive())
         {
-            ResetEvent(exitEvent);
+            Logger::trace(L"SG process is already running with pid={}", GetProcessId(m_hProcess));
+            return true;
         }
 
-        if (triggerEvent)
+        if (reuseExistingProcess)
         {
-            ResetEvent(triggerEvent);
+            if (exitEvent)
+            {
+                ResetEvent(exitEvent);
+            }
+
+            if (triggerEvent)
+            {
+                ResetEvent(triggerEvent);
+            }
+
+            if (winKeyTriggerEvent)
+            {
+                ResetEvent(winKeyTriggerEvent);
+            }
         }
 
         unsigned long powertoys_pid = GetCurrentProcessId();
@@ -227,7 +262,15 @@ private:
         }
 
         Logger::trace(L"Started SG process with pid={}", GetProcessId(sei.hProcess));
-        m_hProcess = sei.hProcess;
+        if (reuseExistingProcess)
+        {
+            m_hProcess = sei.hProcess;
+        }
+        else
+        {
+            CloseHandle(sei.hProcess);
+        }
+
         return true;
     }
 
@@ -302,7 +345,7 @@ private:
                 Logger::warn("Failed to initialize Shortcut Guide start shortcut");
             }
 
-try
+            try
             {
                 auto propertiesObject = settingsObject.GetNamedObject(L"properties");
                 if (propertiesObject.HasKey(L"press_time"))
@@ -324,7 +367,10 @@ try
                     }
                 }
             }
-            catch (...) { /* Keep defaults */ }
+            catch (...)
+            {
+                // Keep defaults when older or malformed settings omit press_time.
+            }
         }
         else
         {
@@ -336,14 +382,6 @@ try
             Logger::info("Shortcut Guide is going to use default shortcut");
             m_hotkey.modifiersMask = MOD_SHIFT | MOD_WIN;
             m_hotkey.vkCode = VK_OEM_2;
-        }
-    }
-
-    void WindowsKeyPressBehavior()
-    {
-        if (IsProcessActive())
-        {
-            TerminateProcess(m_hProcess, 0);
         }
     }
 };

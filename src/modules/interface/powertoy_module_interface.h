@@ -168,6 +168,12 @@ protected:
         sa.lpSecurityDescriptor = NULL;
         return CreateEventW(&sa, FALSE, FALSE, eventName);
     }
+
+public:
+    virtual void OnWindowsKeyHold()
+    {
+        OnHotkeyEx();
+    }
 };
 
 /*
