@@ -13,6 +13,7 @@
 #include <thread>
 #include <future>
 #include <chrono>
+#include <cwctype>
 
 #include <winrt/Windows.UI.Notifications.h>
 #include <winrt/Windows.Data.Xml.Dom.h>
@@ -84,6 +85,208 @@ namespace
             state.numpadKeyPressed[data->lParam->vkCode] = (data->wParam == WM_KEYDOWN || data->wParam == WM_SYSKEYDOWN);
         }
     }
+
+    void SetKeyboardStateKey(BYTE keyState[256], const int key, const bool pressed)
+    {
+        if (pressed)
+        {
+            keyState[key] |= 0x80;
+        }
+        else
+        {
+            keyState[key] &= ~0x80;
+        }
+    }
+
+    void SetKeyboardStateModifier(KeyboardManagerInput::InputInterface& ii, BYTE keyState[256], const int genericKey, const int leftKey, const int rightKey)
+    {
+        const bool leftPressed = ii.GetVirtualKeyState(leftKey);
+        const bool rightPressed = ii.GetVirtualKeyState(rightKey);
+        const bool pressed = ii.GetVirtualKeyState(genericKey) || leftPressed || rightPressed;
+
+        SetKeyboardStateKey(keyState, genericKey, pressed);
+        SetKeyboardStateKey(keyState, leftKey, leftPressed);
+        SetKeyboardStateKey(keyState, rightKey, rightPressed);
+    }
+
+    bool IsModifierPressed(KeyboardManagerInput::InputInterface& ii, const int genericKey, const int leftKey, const int rightKey)
+    {
+        return ii.GetVirtualKeyState(genericKey) || ii.GetVirtualKeyState(leftKey) || ii.GetVirtualKeyState(rightKey);
+    }
+
+    bool IsTextReplacementShortcutModifierPressed(KeyboardManagerInput::InputInterface& ii)
+    {
+        const bool isAltGrPressed = ii.GetVirtualKeyState(VK_LCONTROL) && ii.GetVirtualKeyState(VK_RMENU);
+        return (!isAltGrPressed && (IsModifierPressed(ii, VK_CONTROL, VK_LCONTROL, VK_RCONTROL) ||
+                                    IsModifierPressed(ii, VK_MENU, VK_LMENU, VK_RMENU))) ||
+               ii.GetVirtualKeyState(VK_LWIN) ||
+               ii.GetVirtualKeyState(VK_RWIN) ||
+               ii.GetVirtualKeyState(CommonSharedConstants::VK_WIN_BOTH);
+    }
+
+    HWND GetTextReplacementWindow()
+    {
+        GUITHREADINFO guiThreadInfo{};
+        guiThreadInfo.cbSize = sizeof(GUITHREADINFO);
+        if (GetGUIThreadInfo(0, &guiThreadInfo))
+        {
+            if (guiThreadInfo.hwndFocus != nullptr)
+            {
+                return guiThreadInfo.hwndFocus;
+            }
+
+            if (guiThreadInfo.hwndActive != nullptr)
+            {
+                return guiThreadInfo.hwndActive;
+            }
+        }
+
+        return GetForegroundWindow();
+    }
+
+    DWORD GetTextReplacementWindowProcessId(HWND window)
+    {
+        DWORD processId = 0;
+        if (window != nullptr)
+        {
+            GetWindowThreadProcessId(window, &processId);
+        }
+
+        return processId;
+    }
+
+    std::optional<std::wstring> GetTextFromKeyboardEvent(KeyboardManagerInput::InputInterface& ii, const LowlevelKeyboardEvent* data)
+    {
+        if (data->wParam != WM_KEYDOWN && data->wParam != WM_SYSKEYDOWN)
+        {
+            return std::nullopt;
+        }
+
+        const DWORD vkCode = Helpers::ClearKeyNumpadOrigin(data->lParam->vkCode);
+        BYTE keyState[256]{};
+        if (!GetKeyboardState(keyState))
+        {
+            return std::nullopt;
+        }
+
+        SetKeyboardStateModifier(ii, keyState, VK_SHIFT, VK_LSHIFT, VK_RSHIFT);
+        SetKeyboardStateModifier(ii, keyState, VK_CONTROL, VK_LCONTROL, VK_RCONTROL);
+        SetKeyboardStateModifier(ii, keyState, VK_MENU, VK_LMENU, VK_RMENU);
+        keyState[vkCode] |= 0x80;
+        const HWND foregroundWindow = GetForegroundWindow();
+        const DWORD foregroundThread = foregroundWindow ? GetWindowThreadProcessId(foregroundWindow, nullptr) : 0;
+        const HKL layout = GetKeyboardLayout(foregroundThread);
+        const UINT scanCode = data->lParam->scanCode ? data->lParam->scanCode : MapVirtualKeyExW(vkCode, MAPVK_VK_TO_VSC, layout);
+        wchar_t output[8]{};
+        constexpr UINT toUnicodeFlags = 1u << 2; // Do not change keyboard state.
+        const int result = ToUnicodeEx(vkCode, scanCode, keyState, output, static_cast<int>(std::size(output)), toUnicodeFlags, layout);
+        if (result == 0)
+        {
+            return std::nullopt;
+        }
+
+        if (result < 0)
+        {
+            return std::wstring{};
+        }
+
+        std::wstring text(output, output + (std::min)(result, static_cast<int>(std::size(output))));
+        std::vector<WORD> characterTypes(text.size());
+        if (!GetStringTypeW(CT_CTYPE1, text.data(), static_cast<int>(text.size()), characterTypes.data()) ||
+            std::any_of(characterTypes.begin(), characterTypes.end(), [](WORD type) { return (type & C1_DEFINED) == 0 || (type & C1_CNTRL) != 0; }))
+        {
+            return std::nullopt;
+        }
+
+        return text;
+    }
+
+    bool SendBackspaceInput(KeyboardManagerInput::InputInterface& ii, const size_t count)
+    {
+        if (count == 0)
+        {
+            return true;
+        }
+
+        std::vector<INPUT> inputs;
+        inputs.reserve(count * 2);
+
+        for (size_t i = 0; i < count; ++i)
+        {
+            Helpers::SetKeyEvent(inputs, INPUT_KEYBOARD, VK_BACK, 0, KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG);
+            Helpers::SetKeyEvent(inputs, INPUT_KEYBOARD, VK_BACK, KEYEVENTF_KEYUP, KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG);
+        }
+
+        return ii.SendVirtualInput(inputs);
+    }
+
+    std::vector<DWORD> GetTextReplacementModifiersToRelease(KeyboardManagerInput::InputInterface& ii)
+    {
+        std::vector<DWORD> pressedModifiers;
+        const bool leftShiftPressed = ii.GetVirtualKeyState(VK_LSHIFT);
+        const bool rightShiftPressed = ii.GetVirtualKeyState(VK_RSHIFT);
+
+        if (leftShiftPressed)
+        {
+            pressedModifiers.push_back(VK_LSHIFT);
+        }
+
+        if (rightShiftPressed)
+        {
+            pressedModifiers.push_back(VK_RSHIFT);
+        }
+
+        if (!leftShiftPressed && !rightShiftPressed && ii.GetVirtualKeyState(VK_SHIFT))
+        {
+            pressedModifiers.push_back(VK_SHIFT);
+        }
+
+        if (ii.GetVirtualKeyState(VK_LCONTROL) && ii.GetVirtualKeyState(VK_RMENU))
+        {
+            pressedModifiers.push_back(VK_LCONTROL);
+            pressedModifiers.push_back(VK_RMENU);
+        }
+
+        return pressedModifiers;
+    }
+
+    bool SendModifierInput(KeyboardManagerInput::InputInterface& ii,
+                           const std::vector<DWORD>& modifiers,
+                           const DWORD flags,
+                           const ULONG_PTR extraInfo = KeyboardManagerConstants::KEYBOARDMANAGER_SUPPRESS_FLAG)
+    {
+        if (modifiers.empty())
+        {
+            return true;
+        }
+
+        std::vector<INPUT> inputs;
+        inputs.reserve(modifiers.size());
+
+        for (const DWORD modifier : modifiers)
+        {
+            Helpers::SetKeyEvent(inputs, INPUT_KEYBOARD, static_cast<WORD>(modifier), flags, extraInfo);
+        }
+
+        return ii.SendVirtualInput(inputs);
+    }
+
+    bool SendTextReplacementInput(KeyboardManagerInput::InputInterface& ii, const size_t backspaceCount, const std::wstring& replacement)
+    {
+        const auto pressedModifiers = GetTextReplacementModifiersToRelease(ii);
+        if (!SendModifierInput(ii, pressedModifiers, KEYEVENTF_KEYUP, KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG))
+        {
+            return false;
+        }
+
+        if (!SendBackspaceInput(ii, backspaceCount))
+        {
+            return false;
+        }
+
+        return Helpers::SendTextInput(replacement, ii);
+    }
+
 }
 
 namespace KeyboardEventHandlers
@@ -1904,5 +2107,92 @@ namespace KeyboardEventHandlers
         // the modifier released is always safe: the user taps it again to re-engage.
 
         return 1;
+    }
+
+    intptr_t HandleTextReplacementEvent(KeyboardManagerInput::InputInterface& ii, LowlevelKeyboardEvent* data, State& state)
+    {
+        const DWORD vkCode = Helpers::ClearKeyNumpadOrigin(data->lParam->vkCode);
+        if ((data->wParam == WM_KEYUP || data->wParam == WM_SYSKEYUP) && state.textReplacementSuppressedKeys.erase(vkCode) != 0)
+        {
+            return 1;
+        }
+
+        if (state.textReplacements.empty())
+        {
+            return 0;
+        }
+
+        if (GeneratedByKBM(data) && data->lParam->dwExtraInfo != KeyboardManagerConstants::KEYBOARDMANAGER_SINGLEKEY_FLAG)
+        {
+            state.textReplacementBuffer.clear();
+            return 0;
+        }
+
+        if (data->wParam != WM_KEYDOWN && data->wParam != WM_SYSKEYDOWN)
+        {
+            return 0;
+        }
+        const HWND foregroundWindow = GetTextReplacementWindow();
+        const DWORD foregroundProcessId = GetTextReplacementWindowProcessId(foregroundWindow);
+        if (foregroundWindow != state.textReplacementWindow || foregroundProcessId != state.textReplacementProcessId)
+        {
+            state.textReplacementBuffer.clear();
+            state.textReplacementProcessId = foregroundProcessId;
+            state.textReplacementWindow = foregroundWindow;
+        }
+
+        if (IsTextReplacementShortcutModifierPressed(ii))
+        {
+            state.textReplacementBuffer.clear();
+            return 0;
+        }
+
+        if (vkCode == VK_BACK)
+        {
+            if (!state.textReplacementBuffer.empty())
+            {
+                state.textReplacementBuffer.pop_back();
+            }
+
+            return 0;
+        }
+
+        if (Helpers::IsModifierKey(vkCode))
+        {
+            return 0;
+        }
+
+        const auto text = GetTextFromKeyboardEvent(ii, data);
+        if (!text)
+        {
+            state.textReplacementBuffer.clear();
+            return 0;
+        }
+
+        state.textReplacementBuffer.append(*text);
+        if (state.textReplacementBuffer.length() > state.maxTextReplacementTriggerLength)
+        {
+            state.textReplacementBuffer.erase(0, state.textReplacementBuffer.length() - state.maxTextReplacementTriggerLength);
+        }
+
+        const std::wstring_view textReplacementBufferView{ state.textReplacementBuffer };
+        for (size_t length = (std::min)(textReplacementBufferView.length(), state.maxTextReplacementTriggerLength); length != 0; --length)
+        {
+            const std::wstring_view trigger = textReplacementBufferView.substr(textReplacementBufferView.length() - length);
+            if (const auto replacement = state.textReplacements.find(trigger); replacement != state.textReplacements.end())
+            {
+                if (!SendTextReplacementInput(ii, trigger.length() > text->length() ? trigger.length() - text->length() : 0, replacement->second))
+                {
+                    state.textReplacementBuffer.clear();
+                    state.textReplacementSuppressedKeys.insert(vkCode);
+                    return 1;
+                }
+                state.textReplacementBuffer.clear();
+                state.textReplacementSuppressedKeys.insert(vkCode);
+                return 1;
+            }
+        }
+
+        return 0;
     }
 }

@@ -572,4 +572,166 @@ namespace RemappingLogicTests
             Assert::AreEqual(false, mockedInputHandler.GetVirtualKeyState(VK_LMENU));
         }
     };
+
+    TEST_CLASS (TextReplacementTests)
+    {
+    private:
+        KeyboardManagerInput::MockedInput mockedInputHandler;
+        State testState;
+
+    public:
+        TEST_METHOD_INITIALIZE(InitializeTestEnv)
+        {
+            TestHelpers::ResetTestEnv(mockedInputHandler, testState);
+        }
+
+        TEST_METHOD (HandleTextReplacementEvent_ShouldReplaceMultiCharacterTriggerAndLeaveShiftReleased)
+        {
+            testState.AddTextReplacement(L"a ", L"hi");
+            testState.textReplacementBuffer = L"a";
+            mockedInputHandler.SetKeyboardState(VK_LSHIFT, true);
+
+            std::vector<std::vector<INPUT>> injectedInput;
+            mockedInputHandler.SetSendVirtualInputShouldFail([&injectedInput](const std::vector<INPUT>& inputs) {
+                injectedInput.push_back(inputs);
+                return false;
+            });
+
+            KBDLLHOOKSTRUCT lParam{};
+            lParam.vkCode = VK_SPACE;
+            LowlevelKeyboardEvent keyEvent{};
+            keyEvent.wParam = WM_KEYDOWN;
+            keyEvent.lParam = &lParam;
+
+            intptr_t result = KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState);
+
+            Assert::AreEqual(1, static_cast<int>(result));
+            Assert::AreEqual(std::wstring(), testState.textReplacementBuffer);
+            Assert::AreEqual(false, mockedInputHandler.GetVirtualKeyState(VK_LSHIFT));
+            Assert::AreEqual(static_cast<size_t>(4), injectedInput.size());
+
+            Assert::AreEqual(static_cast<size_t>(1), injectedInput[0].size());
+            Assert::AreEqual(static_cast<WORD>(VK_LSHIFT), injectedInput[0][0].ki.wVk);
+            Assert::IsTrue((injectedInput[0][0].ki.dwFlags & KEYEVENTF_KEYUP) != 0);
+
+            Assert::AreEqual(static_cast<size_t>(2), injectedInput[1].size());
+            Assert::AreEqual(static_cast<WORD>(VK_BACK), injectedInput[1][0].ki.wVk);
+            Assert::AreEqual(static_cast<WORD>(VK_BACK), injectedInput[1][1].ki.wVk);
+            Assert::IsTrue((injectedInput[1][0].ki.dwFlags & KEYEVENTF_KEYUP) == 0);
+            Assert::IsTrue((injectedInput[1][1].ki.dwFlags & KEYEVENTF_KEYUP) != 0);
+
+            Assert::AreEqual(static_cast<size_t>(2), injectedInput[2].size());
+            Assert::AreEqual(static_cast<wchar_t>(L'h'), static_cast<wchar_t>(injectedInput[2][0].ki.wScan));
+            Assert::AreEqual(static_cast<wchar_t>(L'h'), static_cast<wchar_t>(injectedInput[2][1].ki.wScan));
+            Assert::AreEqual(static_cast<size_t>(2), injectedInput[3].size());
+            Assert::AreEqual(static_cast<wchar_t>(L'i'), static_cast<wchar_t>(injectedInput[3][0].ki.wScan));
+            Assert::AreEqual(static_cast<wchar_t>(L'i'), static_cast<wchar_t>(injectedInput[3][1].ki.wScan));
+
+            keyEvent.wParam = WM_KEYUP;
+            Assert::AreEqual(1, static_cast<int>(KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState)));
+            Assert::AreEqual(0, static_cast<int>(KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState)));
+        }
+
+        TEST_METHOD (HandleTextReplacementEvent_ShouldSuppressTriggerAndStopAfterInjectionFailure)
+        {
+            testState.AddTextReplacement(L"a ", L"hi");
+            testState.textReplacementBuffer = L"a";
+
+            std::vector<std::vector<INPUT>> attemptedInput;
+            mockedInputHandler.SetSendVirtualInputShouldFail([&attemptedInput](const std::vector<INPUT>& inputs) {
+                attemptedInput.push_back(inputs);
+                return true;
+            });
+
+            KBDLLHOOKSTRUCT lParam{};
+            lParam.vkCode = VK_SPACE;
+            LowlevelKeyboardEvent keyEvent{};
+            keyEvent.wParam = WM_KEYDOWN;
+            keyEvent.lParam = &lParam;
+
+            intptr_t result = KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState);
+
+            Assert::AreEqual(1, static_cast<int>(result));
+            Assert::AreEqual(std::wstring(), testState.textReplacementBuffer);
+            Assert::AreEqual(static_cast<size_t>(1), testState.textReplacementSuppressedKeys.count(VK_SPACE));
+            Assert::AreEqual(static_cast<size_t>(1), attemptedInput.size());
+            Assert::AreEqual(static_cast<size_t>(2), attemptedInput[0].size());
+            Assert::AreEqual(static_cast<WORD>(VK_BACK), attemptedInput[0][0].ki.wVk);
+        }
+
+        TEST_METHOD (HandleTextReplacementEvent_ShouldSuppressOverlappingTriggerKeyUps)
+        {
+            testState.AddTextReplacement(L" ", L"hello");
+            testState.textReplacementSuppressedKeys.insert(0x41);
+            testState.textReplacementSuppressedKeys.insert(0x42);
+
+            KBDLLHOOKSTRUCT lParam{};
+            LowlevelKeyboardEvent keyEvent{};
+            keyEvent.wParam = WM_KEYUP;
+            keyEvent.lParam = &lParam;
+
+            lParam.vkCode = 0x41;
+            Assert::AreEqual(1, static_cast<int>(KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState)));
+            Assert::AreEqual(static_cast<size_t>(0), testState.textReplacementSuppressedKeys.count(0x41));
+            Assert::AreEqual(static_cast<size_t>(1), testState.textReplacementSuppressedKeys.count(0x42));
+
+            lParam.vkCode = 0x42;
+            testState.ClearTextReplacements();
+            Assert::AreEqual(1, static_cast<int>(KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState)));
+            Assert::AreEqual(static_cast<size_t>(0), testState.textReplacementSuppressedKeys.size());
+        }
+
+        TEST_METHOD (HandleTextReplacementEvent_ShouldProcessSingleKeyRemapOutput)
+        {
+            testState.AddTextReplacement(L" ", L"hello");
+
+            KBDLLHOOKSTRUCT lParam{};
+            lParam.vkCode = VK_SPACE;
+            lParam.dwExtraInfo = KeyboardManagerConstants::KEYBOARDMANAGER_SINGLEKEY_FLAG;
+            LowlevelKeyboardEvent keyEvent{};
+            keyEvent.wParam = WM_KEYDOWN;
+            keyEvent.lParam = &lParam;
+
+            intptr_t result = KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState);
+
+            Assert::AreEqual(1, static_cast<int>(result));
+            Assert::AreEqual(std::wstring(), testState.textReplacementBuffer);
+        }
+
+        TEST_METHOD (HandleTextReplacementEvent_ShouldClearBufferForInjectedText)
+        {
+            testState.AddTextReplacement(L"ab", L"hello");
+            testState.textReplacementBuffer = L"a";
+
+            KBDLLHOOKSTRUCT lParam{};
+            lParam.vkCode = 0;
+            lParam.dwExtraInfo = KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG;
+            LowlevelKeyboardEvent keyEvent{};
+            keyEvent.wParam = WM_KEYDOWN;
+            keyEvent.lParam = &lParam;
+
+            intptr_t result = KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState);
+
+            Assert::AreEqual(0, static_cast<int>(result));
+            Assert::AreEqual(std::wstring(), testState.textReplacementBuffer);
+        }
+
+        TEST_METHOD (HandleTextReplacementEvent_ShouldClearBufferAndIgnoreInput_WhenShortcutModifierIsPressed)
+        {
+            testState.AddTextReplacement(L" ", L"hello");
+            testState.textReplacementBuffer = L"partial";
+            mockedInputHandler.SetKeyboardState(VK_CONTROL, true);
+
+            KBDLLHOOKSTRUCT lParam{};
+            lParam.vkCode = VK_SPACE;
+            LowlevelKeyboardEvent keyEvent{};
+            keyEvent.wParam = WM_KEYDOWN;
+            keyEvent.lParam = &lParam;
+
+            intptr_t result = KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState);
+
+            Assert::AreEqual(0, static_cast<int>(result));
+            Assert::AreEqual(std::wstring(), testState.textReplacementBuffer);
+        }
+    };
 }

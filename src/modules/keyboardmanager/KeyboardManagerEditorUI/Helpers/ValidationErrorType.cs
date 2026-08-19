@@ -22,6 +22,8 @@ namespace KeyboardManagerEditorUI.Helpers
         ConflictingModifier,
         SelfMapping,
         EmptyTargetText,
+        EmptyTriggerText,
+        ConflictingTextTrigger,
         EmptyUrl,
         EmptyProgramPath,
         OneKeyMapping,

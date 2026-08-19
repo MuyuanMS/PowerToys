@@ -83,6 +83,9 @@ void KeyboardManager::LoadSettings()
         // retry once
         state.LoadSettings();
     }
+    state.textReplacementBuffer.clear();
+    state.textReplacementProcessId = 0;
+    state.textReplacementWindow = nullptr;
     try
     {
         // Send telemetry about configured key/shortcut to key/shortcut mappings, OS an app specific level.
@@ -181,7 +184,7 @@ bool KeyboardManager::HasRegisteredRemappings() const
 
 bool KeyboardManager::HasRegisteredRemappingsUnchecked() const
 {
-    return !(state.appSpecificShortcutReMap.empty() && state.appSpecificShortcutReMapSortedKeys.empty() && state.osLevelShortcutReMap.empty() && state.osLevelShortcutReMapSortedKeys.empty() && state.singleKeyReMap.empty() && state.singleKeyToTextReMap.empty());
+    return !(state.appSpecificShortcutReMap.empty() && state.appSpecificShortcutReMapSortedKeys.empty() && state.osLevelShortcutReMap.empty() && state.osLevelShortcutReMapSortedKeys.empty() && state.singleKeyReMap.empty() && state.singleKeyToTextReMap.empty() && state.textReplacements.empty());
 }
 
 intptr_t KeyboardManager::HandleKeyboardHookEvent(LowlevelKeyboardEvent* data) noexcept
@@ -233,6 +236,14 @@ intptr_t KeyboardManager::HandleKeyboardHookEvent(LowlevelKeyboardEvent* data) n
         return 1;
     }
 
-    // Handle an os-level shortcut remapping
-    return KeyboardEventHandlers::HandleOSLevelShortcutRemapEvent(inputHandler, data, state);
+    // OS-level shortcuts have priority over typed text replacement.
+    intptr_t OSLevelShortcutRemapResult = KeyboardEventHandlers::HandleOSLevelShortcutRemapEvent(inputHandler, data, state);
+
+    if (OSLevelShortcutRemapResult == 1)
+    {
+        return 1;
+    }
+
+    intptr_t TextReplacementResult = KeyboardEventHandlers::HandleTextReplacementEvent(inputHandler, data, state);
+    return TextReplacementResult == 1 ? 1 : OSLevelShortcutRemapResult;
 }

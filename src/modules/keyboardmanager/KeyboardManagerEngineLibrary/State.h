@@ -15,6 +15,18 @@ private:
     std::unordered_set<DWORD> singleKeyRemapInjectionFailedKeys;
 
 public:
+    // Stores typed characters for text replacement matching.
+    std::wstring textReplacementBuffer;
+
+    // Stores the foreground process id associated with textReplacementBuffer.
+    DWORD textReplacementProcessId = 0;
+
+    // Stores the focused window/control associated with textReplacementBuffer.
+    HWND textReplacementWindow = nullptr;
+
+    // Stores trigger keys whose key-down was suppressed after a replacement.
+    std::unordered_set<DWORD> textReplacementSuppressedKeys;
+
     // Function to get the iterator of a single key remap given the source key. Returns nullopt if it isn't remapped
     std::optional<SingleKeyRemapTable::iterator> GetSingleKeyRemap(const DWORD& originalKey);
 

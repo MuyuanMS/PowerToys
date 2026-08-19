@@ -314,7 +314,7 @@ namespace Helpers
     // Shift+Enter. Each character is sent individually to avoid a synchronization
     // error across key-down and key-up events that causes repeated or dropped characters
     // when large batches of KEYEVENTF_UNICODE events are sent at once.
-    void SendTextInput(const std::wstring& text, KeyboardManagerInput::InputInterface& ii)
+    bool SendTextInput(const std::wstring& text, KeyboardManagerInput::InputInterface& ii)
     {
         for (size_t i = 0; i < text.size(); ++i)
         {
@@ -360,7 +360,10 @@ namespace Helpers
                 returnInputs[3].ki.wScan = static_cast<WORD>(MapVirtualKey(VK_SHIFT, MAPVK_VK_TO_VSC));
                 returnInputs[3].ki.dwExtraInfo = KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG;
 
-                ii.SendVirtualInput(std::vector<INPUT>(returnInputs, returnInputs + ARRAYSIZE(returnInputs)));
+                if (!ii.SendVirtualInput(std::vector<INPUT>(returnInputs, returnInputs + ARRAYSIZE(returnInputs))))
+                {
+                    return false;
+                }
                 continue;
             }
 
@@ -375,8 +378,12 @@ namespace Helpers
             charInputs[1].ki.dwExtraInfo = KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG;
             charInputs[1].ki.wScan = c;
 
-            ii.SendVirtualInput(std::vector<INPUT>(charInputs, charInputs + ARRAYSIZE(charInputs)));
+            if (!ii.SendVirtualInput(std::vector<INPUT>(charInputs, charInputs + ARRAYSIZE(charInputs))))
+            {
+                return false;
+            }
         }
+        return true;
     }
 
     // Function to filter the key codes for artificial key codes

@@ -25,6 +25,8 @@ namespace KeyboardManagerEditorUI.Helpers
             { ValidationErrorType.ConflictingModifier, (ResourceHelper.GetString("Validation_ConflictingModifier_Title"), ResourceHelper.GetString("Validation_ConflictingModifier_Message")) },
             { ValidationErrorType.SelfMapping, (ResourceHelper.GetString("Validation_SelfMapping_Title"), ResourceHelper.GetString("Validation_SelfMapping_Message")) },
             { ValidationErrorType.EmptyTargetText, (ResourceHelper.GetString("Validation_EmptyTargetText_Title"), ResourceHelper.GetString("Validation_EmptyTargetText_Message")) },
+            { ValidationErrorType.EmptyTriggerText, (ResourceHelper.GetString("Validation_EmptyTriggerText_Title"), ResourceHelper.GetString("Validation_EmptyTriggerText_Message")) },
+            { ValidationErrorType.ConflictingTextTrigger, (ResourceHelper.GetString("Validation_ConflictingTextTrigger_Title"), ResourceHelper.GetString("Validation_ConflictingTextTrigger_Message")) },
             { ValidationErrorType.EmptyUrl, (ResourceHelper.GetString("Validation_EmptyUrl_Title"), ResourceHelper.GetString("Validation_EmptyUrl_Message")) },
             { ValidationErrorType.EmptyProgramPath, (ResourceHelper.GetString("Validation_EmptyProgramPath_Title"), ResourceHelper.GetString("Validation_EmptyProgramPath_Message")) },
             { ValidationErrorType.OneKeyMapping, (ResourceHelper.GetString("Validation_OneKeyMapping_Title"), ResourceHelper.GetString("Validation_OneKeyMapping_Message")) },
@@ -160,6 +162,45 @@ namespace KeyboardManagerEditorUI.Helpers
             if (IsDuplicateMapping(keys, isEditMode, mappingService, appName))
             {
                 return ValidationErrorType.DuplicateMapping;
+            }
+
+            return ValidationErrorType.NoError;
+        }
+
+        public static ValidationErrorType ValidateTextReplacementMapping(
+            string triggerText,
+            string textContent,
+            bool isEditMode = false,
+            string editingTriggerText = "")
+        {
+            if (string.IsNullOrEmpty(triggerText))
+            {
+                return ValidationErrorType.EmptyTriggerText;
+            }
+
+            if (string.IsNullOrEmpty(textContent))
+            {
+                return ValidationErrorType.EmptyTargetText;
+            }
+
+            var existingTriggers = SettingsManager.EditorSettings.ShortcutSettingsDictionary.Values
+                .Where(settings =>
+                    settings.IsActive &&
+                    settings.Shortcut.OperationType == ShortcutOperationType.RemapText &&
+                    !string.IsNullOrEmpty(settings.Shortcut.TriggerText) &&
+                    (!isEditMode || settings.Shortcut.TriggerText != editingTriggerText))
+                .Select(settings => settings.Shortcut.TriggerText);
+
+            if (existingTriggers.Any(existingTrigger => existingTrigger == triggerText))
+            {
+                return ValidationErrorType.DuplicateMapping;
+            }
+
+            if (existingTriggers.Any(existingTrigger =>
+                existingTrigger.StartsWith(triggerText, StringComparison.Ordinal) ||
+                triggerText.StartsWith(existingTrigger, StringComparison.Ordinal)))
+            {
+                return ValidationErrorType.ConflictingTextTrigger;
             }
 
             return ValidationErrorType.NoError;
