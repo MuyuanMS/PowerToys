@@ -197,10 +197,46 @@ std::vector<NtdllExtensions::HandleInfo> NtdllExtensions::handles() noexcept
     state->info_ptr = reinterpret_cast<SYSTEM_HANDLE_INFORMATION_EX*>(state->info.memory.data());
     state->handle_count = state->info_ptr->NumberOfHandles;
 
+    using NtQueryObject_t = NTSTATUS(NTAPI*)(
+        HANDLE ObjectHandle,
+        ULONG ObjectInformationClass,
+        PVOID ObjectInformation,
+        ULONG ObjectInformationLength,
+        PULONG ReturnLength);
+
+    const auto ntdll_module = GetModuleHandleW(L"ntdll.dll");
+    if (ntdll_module == nullptr)
+    {
+        return {};
+    }
+
+    const auto nt_query_object = reinterpret_cast<NtQueryObject_t>(GetProcAddress(ntdll_module, "NtQueryObject"));
+    if (nt_query_object == nullptr)
+    {
+        return {};
+    }
+
+    auto worker_file_handle_to_kernel_name = [nt_query_object](HANDLE file_handle, std::vector<BYTE>& buffer) -> std::wstring {
+        if (GetFileType(file_handle) != FILE_TYPE_DISK)
+        {
+            return L"";
+        }
+
+        ULONG return_length;
+        auto status = nt_query_object(file_handle, ObjectNameInformation, buffer.data(), static_cast<ULONG>(buffer.size()), &return_length);
+        if (NT_SUCCESS(status))
+        {
+            auto object_name_info = reinterpret_cast<UNICODE_STRING*>(buffer.data());
+            return unicode_to_str(*object_name_info);
+        }
+
+        return L"";
+    };
+
     // Each worker owns its scratch buffer and its process-handle cache outright, so an
     // abandoned worker shares no mutable state. `result` is the one exception and is only
     // touched while holding `result_mutex`, never across a blocking call.
-    auto worker = [this, state] {
+    auto worker = [state, nt_query_object, worker_file_handle_to_kernel_name] {
         std::vector<BYTE> object_info_buffer(DefaultResultBufferSize);
         std::map<ULONG_PTR, HANDLE> pid_to_handle;
 
@@ -251,7 +287,7 @@ std::vector<NtdllExtensions::HandleInfo> NtdllExtensions::handles() noexcept
             }
 
             ULONG return_length;
-            auto status = NtQueryObject(handle_copy, ObjectTypeInformation, object_info_buffer.data(), static_cast<ULONG>(object_info_buffer.size()), &return_length);
+            auto status = nt_query_object(handle_copy, ObjectTypeInformation, object_info_buffer.data(), static_cast<ULONG>(object_info_buffer.size()), &return_length);
             if (NT_ERROR(status))
             {
                 // Ignore this handle.
@@ -265,7 +301,7 @@ std::vector<NtdllExtensions::HandleInfo> NtdllExtensions::handles() noexcept
 
             if (type_name == L"File")
             {
-                auto file_name = file_handle_to_kernel_name(handle_copy, object_info_buffer);
+                auto file_name = worker_file_handle_to_kernel_name(handle_copy, object_info_buffer);
 
                 std::scoped_lock lock{ state->result_mutex };
                 state->result.push_back(HandleInfo{ pid, handle_info->HandleValue, type_name, file_name });
