@@ -67,9 +67,9 @@ namespace
         active_handle_enumeration_workers--;
     }
 
-#ifndef FILELOCKSMITH_LIB_STATIC
     struct ModuleLockGuard
     {
+#ifndef FILELOCKSMITH_LIB_STATIC
         ModuleLockGuard()
         {
             ++winrt::get_module_lock();
@@ -82,8 +82,8 @@ namespace
 
         ModuleLockGuard(const ModuleLockGuard&) = delete;
         ModuleLockGuard& operator=(const ModuleLockGuard&) = delete;
-    };
 #endif
+    };
 
     std::vector<std::wstring> process_modules(DWORD pid)
     {
@@ -280,10 +280,9 @@ std::vector<NtdllExtensions::HandleInfo> NtdllExtensions::handles() noexcept
     // Each worker owns its scratch buffer and its process-handle cache outright, so an
     // abandoned worker shares no mutable state. `result` is the one exception and is only
     // touched while holding `result_mutex`, never across a blocking call.
-    auto worker = [state, nt_query_object, worker_file_handle_to_kernel_name](std::shared_ptr<std::atomic_bool> abandon_requested, std::shared_ptr<std::atomic_bool> worker_slot_reserved) {
-#ifndef FILELOCKSMITH_LIB_STATIC
-        ModuleLockGuard module_lock;
-#endif
+    auto worker = [state, nt_query_object, worker_file_handle_to_kernel_name](std::shared_ptr<std::atomic_bool> abandon_requested, std::shared_ptr<std::atomic_bool> worker_slot_reserved, std::shared_ptr<ModuleLockGuard> module_lock) {
+        (void)module_lock;
+
         std::vector<BYTE> object_info_buffer(DefaultResultBufferSize);
         std::map<ULONG_PTR, HANDLE> pid_to_handle;
 
@@ -393,7 +392,8 @@ std::vector<NtdllExtensions::HandleInfo> NtdllExtensions::handles() noexcept
 
         auto abandon_requested = std::make_shared<std::atomic_bool>(false);
         auto worker_slot_reserved = std::make_shared<std::atomic_bool>(true);
-        std::thread worker_thread(worker, abandon_requested, worker_slot_reserved);
+        auto module_lock = std::make_shared<ModuleLockGuard>();
+        std::thread worker_thread(worker, abandon_requested, worker_slot_reserved, module_lock);
 
         ULONG_PTR last_processed = state->processed;
         int stalled_polls = 0;
