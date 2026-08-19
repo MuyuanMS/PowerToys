@@ -154,6 +154,26 @@ namespace ShortcutGuide
             };
         }
 
+        private static bool IsKeyDown(int virtualKey)
+        {
+            return (NativeMethods.GetAsyncKeyState(virtualKey) & 0x8000) != 0;
+        }
+
+        private static bool IsActivationHotkeyDown(bool winKeyDown)
+        {
+            var hotkey = ShortcutGuideProperties.OpenShortcutGuide;
+            if (hotkey.Code <= 0)
+            {
+                return false;
+            }
+
+            return (!hotkey.Win || winKeyDown) &&
+                   (!hotkey.Ctrl || IsKeyDown(0x11)) &&
+                   (!hotkey.Alt || IsKeyDown(0x12)) &&
+                   (!hotkey.Shift || IsKeyDown(0x10)) &&
+                   IsKeyDown(hotkey.Code);
+        }
+
         private static void SendSingleKeyboardInput(short keyCode, uint keyStatus)
         {
             if (IsExtendedVirtualKey(keyCode))
@@ -205,14 +225,14 @@ namespace ShortcutGuide
                             // on the WinUI UI thread.
                             const int VK_LWIN = 0x5B;
                             const int VK_RWIN = 0x5C;
-                            bool winKeyDown = ((NativeMethods.GetAsyncKeyState(VK_LWIN) & 0x8000) != 0) ||
-                                              ((NativeMethods.GetAsyncKeyState(VK_RWIN) & 0x8000) != 0);
-                            if (winKeyDown && ShortcutGuideProperties.WindowsKeyAction.Value == (int)ShortcutGuideWindowsKeyAction.Off)
+                            bool winKeyDown = IsKeyDown(VK_LWIN) || IsKeyDown(VK_RWIN);
+                            bool winKeyHold = winKeyDown && !IsActivationHotkeyDown(winKeyDown);
+                            if (winKeyHold && ShortcutGuideProperties.WindowsKeyAction.Value == (int)ShortcutGuideWindowsKeyAction.Off)
                             {
                                 return;
                             }
 
-                            if (winKeyDown && ShortcutGuideProperties.WindowsKeyAction.Value == (int)ShortcutGuideWindowsKeyAction.TaskbarIndicators)
+                            if (winKeyHold && ShortcutGuideProperties.WindowsKeyAction.Value == (int)ShortcutGuideWindowsKeyAction.TaskbarIndicators)
                             {
                                 if (OverlayWindow.AppWindow.IsVisible)
                                 {
@@ -226,7 +246,7 @@ namespace ShortcutGuide
                                 return;
                             }
 
-                            if (winKeyDown && ShortcutGuideProperties.WindowsKeyAction.Value == (int)ShortcutGuideWindowsKeyAction.OpenShortcutGuide)
+                            if (winKeyHold && ShortcutGuideProperties.WindowsKeyAction.Value == (int)ShortcutGuideWindowsKeyAction.OpenShortcutGuide)
                             {
                                 if (OverlayWindow.AppWindow.IsVisible)
                                 {
