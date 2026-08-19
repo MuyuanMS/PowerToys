@@ -1,3 +1,4 @@
+import re
 import unittest
 from pathlib import Path
 
@@ -5,6 +6,19 @@ from pathlib import Path
 GITHUB_DIR = Path(__file__).resolve().parents[3]
 WORKFLOW_SOURCE = GITHUB_DIR / "workflows" / "issue-triage.md"
 WORKFLOW_LOCK = GITHUB_DIR / "workflows" / "issue-triage.lock.yml"
+
+
+def label_call_arguments(workflow, method, argument):
+    calls = re.findall(
+        rf"github\.rest\.issues\.{method}\(\{{(.*?)\}}\);",
+        workflow,
+        re.DOTALL,
+    )
+    return [
+        match.strip().removeprefix("[").removesuffix("]").strip()
+        for call in calls
+        for match in re.findall(rf"{argument}:\s*([^,\r\n}}]+)", call)
+    ]
 
 
 class WorkflowContractTests(unittest.TestCase):
@@ -42,6 +56,23 @@ class WorkflowContractTests(unittest.TestCase):
             "yq",
         ):
             self.assertIn(f"--deny-tool '\\''shell({command})'\\''", generated)
+
+    def test_workflow_never_manages_version_labels(self):
+        source = WORKFLOW_SOURCE.read_text(encoding="utf-8")
+        generated = WORKFLOW_LOCK.read_text(encoding="utf-8")
+
+        for workflow in (source, generated):
+            self.assertNotIn("versionLabels", workflow)
+            self.assertNotIn("desiredVersionLabel", workflow)
+            self.assertEqual(
+                sorted(label_call_arguments(workflow, "addLabels", "labels")),
+                sorted(["'Needs-Author-Feedback'", "desiredProductLabel"]),
+            )
+            self.assertEqual(
+                label_call_arguments(workflow, "removeLabel", "name"),
+                ["'Needs-Author-Feedback'"],
+            )
+        self.assertRegex(source, r"never adds or removes\s+version labels")
 
 
 if __name__ == "__main__":
