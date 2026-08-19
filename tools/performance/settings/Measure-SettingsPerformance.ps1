@@ -67,8 +67,7 @@ $outputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 $tracePath = Join-Path $outputDirectory "PowerToys-Settings.etl"
 $traceStarted = $false
 $startedTargetRunner = $false
-$priorRunnerPaths = @()
-$hadSettingsWindow = $false
+$runnerRestoreStates = @()
 
 function Get-ProcessByPath
 {
@@ -131,7 +130,12 @@ function Stop-Processes
 
 function Test-SettingsWindowVisible
 {
-    foreach ($process in Get-ProcessByPath -Name "PowerToys.Settings" -Path $settingsPath)
+    param(
+        [Parameter(Mandatory)]
+        [string]$SettingsExePath
+    )
+
+    foreach ($process in Get-ProcessByPath -Name "PowerToys.Settings" -Path $SettingsExePath)
     {
         foreach ($windowHandle in [SettingsPerformanceNativeMethods]::GetProcessWindows($process.Id))
         {
@@ -434,22 +438,39 @@ New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 
 $allExistingRunners = @(Get-Process -Name "PowerToys" -ErrorAction SilentlyContinue)
 $targetRunner = Get-ProcessByPath -Name "PowerToys" -Path $runnerPath | Select-Object -First 1
-$hadSettingsWindow = Test-SettingsWindowVisible
+$runnerRestoreStates = @(
+    if ($null -ne $targetRunner)
+    {
+        [pscustomobject]@{
+            Path = $runnerPath
+            HadSettingsWindow = Test-SettingsWindowVisible -SettingsExePath $settingsPath
+        }
+    }
+)
 
 try
 {
     if ($null -eq $targetRunner)
     {
-        $priorRunnerPaths = @($allExistingRunners | ForEach-Object {
+        $runnerRestoreStates = @($allExistingRunners | ForEach-Object {
+            $existingRunnerPath = $null
             try
             {
-                $_.Path
+                $existingRunnerPath = $_.Path
             }
             catch
             {
-                $null
             }
-        } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+
+            if (-not [string]::IsNullOrWhiteSpace($existingRunnerPath))
+            {
+                $existingSettingsPath = Join-Path (Split-Path -Parent $existingRunnerPath) "WinUI3Apps\PowerToys.Settings.exe"
+                [pscustomobject]@{
+                    Path = $existingRunnerPath
+                    HadSettingsWindow = Test-SettingsWindowVisible -SettingsExePath $existingSettingsPath
+                }
+            }
+        } | Sort-Object Path -Unique)
 
         Stop-Processes -Processes $allExistingRunners
         Start-Sleep -Seconds 2
@@ -658,8 +679,6 @@ try
 }
 finally
 {
-    $restoreRunnerPath = $null
-
     if ($traceStarted)
     {
         & wpr -cancel *> $null
@@ -671,24 +690,24 @@ finally
     {
         Stop-Processes -Processes @(Get-ProcessByPath -Name "PowerToys" -Path $runnerPath)
 
-        foreach ($priorRunnerPath in $priorRunnerPaths)
+        foreach ($runnerRestoreState in $runnerRestoreStates)
         {
-            if (Test-Path -LiteralPath $priorRunnerPath)
+            if (Test-Path -LiteralPath $runnerRestoreState.Path)
             {
-                Start-Process $priorRunnerPath | Out-Null
+                if ($runnerRestoreState.HadSettingsWindow)
+                {
+                    Start-Process $runnerRestoreState.Path -ArgumentList "--open-settings=Dashboard" | Out-Null
+                }
+                else
+                {
+                    Start-Process $runnerRestoreState.Path | Out-Null
+                }
             }
         }
-
-        $restoreRunnerPath = $priorRunnerPaths | Select-Object -First 1
     }
-    else
-    {
-        $restoreRunnerPath = $runnerPath
-    }
-
-    if ($hadSettingsWindow -and -not [string]::IsNullOrWhiteSpace($restoreRunnerPath))
+    elseif ($runnerRestoreStates.Count -gt 0 -and $runnerRestoreStates[0].HadSettingsWindow)
     {
         Start-Sleep -Seconds 5
-        Start-Process $restoreRunnerPath -ArgumentList "--open-settings=Dashboard" | Out-Null
+        Start-Process $runnerRestoreStates[0].Path -ArgumentList "--open-settings=Dashboard" | Out-Null
     }
 }
