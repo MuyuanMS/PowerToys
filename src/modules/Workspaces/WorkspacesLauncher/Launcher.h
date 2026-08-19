@@ -25,6 +25,11 @@ private:
     std::unique_ptr<LauncherUIHelper> m_uiHelper;
     std::mutex m_uiHelperMutex;
 
+    bool m_cancelRequested{};
+    std::mutex m_launchCancellationMutex;
+    std::once_flag m_launchOnce;
+    std::thread m_launchThread;
+
     std::unique_ptr<WindowArrangerHelper> m_windowArrangerHelper;
     std::mutex m_windowArrangerHelperMutex;
     

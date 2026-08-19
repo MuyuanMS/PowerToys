@@ -25,7 +25,6 @@ Launcher::Launcher(const WorkspacesData::WorkspacesProject& project,
     Logger::info(L"Launch Workspace {} : {}", m_project.name, m_project.id);
 
     m_uiHelper->LaunchUI();
-    m_uiHelper->UpdateLaunchStatus(m_launchingStatus.Get());
 
     bool launchElevated = std::find_if(m_project.apps.begin(), m_project.apps.end(), [](const WorkspacesData::WorkspacesProject::Application& app) { return app.isElevated; }) != m_project.apps.end();
     m_windowArrangerHelper->Launch(m_project.id, launchElevated, [&]() -> bool
@@ -52,6 +51,14 @@ Launcher::Launcher(const WorkspacesData::WorkspacesProject& project,
 
 Launcher::~Launcher()
 {
+    m_uiHelper->StopReceiving();
+    m_windowArrangerHelper->StopReceiving();
+
+    if (m_launchThread.joinable())
+    {
+        m_launchThread.join();
+    }
+
     // main thread, will wait until arranger is finished
     Logger::trace(L"Finalizing launch");
 
@@ -130,19 +137,27 @@ void Launcher::Launch() // Launching thread
 
         bool launched{ false };
         {
-            std::lock_guard lock(m_launchErrorsMutex);
-            launched = AppLauncher::Launch(app, m_launchErrors);
-        }
+            std::lock_guard cancellationLock(m_launchCancellationMutex);
+            if (m_cancelRequested)
+            {
+                break;
+            }
 
-        if (launched)
-        {
-            m_launchingStatus.Update(app, LaunchingState::Launched);
-        }
-        else
-        {
-            Logger::error(L"Failed to launch {}", app.name);
-            m_launchingStatus.Update(app, LaunchingState::Failed);
-            m_launchedSuccessfully = false;
+            {
+                std::lock_guard errorsLock(m_launchErrorsMutex);
+                launched = AppLauncher::Launch(app, m_launchErrors);
+            }
+
+            if (launched)
+            {
+                m_launchingStatus.Update(app, LaunchingState::Launched);
+            }
+            else
+            {
+                Logger::error(L"Failed to launch {}", app.name);
+                m_launchingStatus.Update(app, LaunchingState::Failed);
+                m_launchedSuccessfully = false;
+            }
         }
 
         auto status = m_launchingStatus.Get(app); // updated after launch status 
@@ -165,7 +180,9 @@ void Launcher::handleWindowArrangerMessage(const std::wstring& msg) // Workspace
 {
     if (msg == L"ready")
     {
-        std::thread([&]() { Launch(); }).detach();
+        std::call_once(m_launchOnce, [this]() {
+            m_launchThread = std::thread([this]() { Launch(); });
+        });
     }
     else
     {
@@ -195,8 +212,21 @@ void Launcher::handleWindowArrangerMessage(const std::wstring& msg) // Workspace
 
 void Launcher::handleUIMessage(const std::wstring& msg) // UI IPC thread
 {
-    if (msg == L"cancel")
+    if (msg == L"ready")
     {
+        std::lock_guard lock(m_uiHelperMutex);
+        m_uiHelper->UpdateLaunchStatus(m_launchingStatus.Get());
+    }
+    else if (msg == L"cancel")
+    {
+        {
+            std::lock_guard lock(m_launchCancellationMutex);
+            m_cancelRequested = true;
+        }
+
         m_launchingStatus.Cancel();
+
+        std::lock_guard lock(m_uiHelperMutex);
+        m_uiHelper->SendMessage(L"cancel_ack");
     }
 }
