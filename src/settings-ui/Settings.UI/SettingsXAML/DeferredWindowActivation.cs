@@ -61,12 +61,18 @@ namespace Microsoft.PowerToys.Settings.UI
 
         public void OnInitialContentLoaded()
         {
-            ActivatePreparedWindow();
+            if (ActivationPending)
+            {
+                ActivatePreparedWindow();
+            }
         }
 
         public void OnFallbackTimer()
         {
-            ActivatePreparedWindow();
+            if (ActivationPending)
+            {
+                ActivatePreparedWindow();
+            }
         }
 
         public void OnWindowClosed()

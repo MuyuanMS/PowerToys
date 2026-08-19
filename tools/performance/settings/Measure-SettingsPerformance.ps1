@@ -454,8 +454,8 @@ try
         Stop-Processes -Processes $allExistingRunners
         Start-Sleep -Seconds 2
 
-        $targetRunner = Start-Process $runnerPath -PassThru
         $startedTargetRunner = $true
+        $targetRunner = Start-Process $runnerPath -PassThru
         Start-Sleep -Seconds 8
     }
 

@@ -59,6 +59,34 @@ namespace SettingsXAML
         }
 
         [TestMethod]
+        public void RequestActivation_IgnoresStaleAsyncCompletion_AfterFallbackWins()
+        {
+            var state = new ActivationState();
+            var activation = state.CreateActivation();
+
+            activation.RequestActivation(canActivateImmediately: false, isInitialContentLoaded: false, bringToForeground: false);
+            activation.OnFallbackTimer();
+            activation.OnInitialContentLoaded();
+
+            Assert.AreEqual(1, state.ActivateCount);
+            Assert.IsFalse(activation.ActivationPending);
+        }
+
+        [TestMethod]
+        public void RequestActivation_IgnoresStaleAsyncCompletion_AfterContentLoadedWins()
+        {
+            var state = new ActivationState();
+            var activation = state.CreateActivation();
+
+            activation.RequestActivation(canActivateImmediately: false, isInitialContentLoaded: false, bringToForeground: false);
+            activation.OnInitialContentLoaded();
+            activation.OnFallbackTimer();
+
+            Assert.AreEqual(1, state.ActivateCount);
+            Assert.IsFalse(activation.ActivationPending);
+        }
+
+        [TestMethod]
         public void CloseHiddenWindow_DoesNotCloseWhileActivationIsPending()
         {
             var state = new ActivationState();
