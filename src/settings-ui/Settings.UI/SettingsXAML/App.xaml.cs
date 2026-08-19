@@ -122,6 +122,7 @@ namespace Microsoft.PowerToys.Settings.UI
             {
                 settingsWindow.BeginWindowSession();
             }
+
             if (type != null)
             {
                 settingsWindow.NavigateToSection(type);

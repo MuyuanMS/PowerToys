@@ -107,7 +107,6 @@ namespace Microsoft.PowerToys.Settings.UI.Views
         private CancellationTokenSource _searchDebounceCts;
         private const int SearchDebounceMs = 500;
         private bool _disposed;
-        private IFileSystemWatcher _updateStateWatcher;
         private FrameworkElement _initialPageContent;
 
         // Removed trace id counter per cleanup
@@ -715,22 +714,6 @@ namespace Microsoft.PowerToys.Settings.UI.Views
 
             IsInitialContentLoaded = true;
             InitialContentLoaded?.Invoke(this, EventArgs.Empty);
-        }
-
-        private void UpdateGeneralInfoBadge()
-        {
-            try
-            {
-                var config = UpdatingSettings.LoadSettings();
-                bool updateAvailable = config != null &&
-                    (config.State == UpdatingSettings.UpdatingState.ReadyToDownload ||
-                     config.State == UpdatingSettings.UpdatingState.ReadyToInstall);
-                UpdateInfoBadge.Visibility = updateAvailable ? Visibility.Visible : Visibility.Collapsed;
-            }
-            catch (Exception)
-            {
-                UpdateInfoBadge.Visibility = Visibility.Collapsed;
-            }
         }
     }
 }

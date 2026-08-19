@@ -26,9 +26,7 @@ namespace Microsoft.PowerToys.Settings.UI
         private const bool WaitForInitialContentBeforeActivation = true;
 
         private DispatcherQueueTimer _activationFallbackTimer;
-        private bool _bringToForegroundOnActivation;
-        private bool _activationPending;
-        private bool _closed;
+        private DeferredWindowActivation _deferredActivation;
 
         public MainWindow()
         {
@@ -110,6 +108,13 @@ namespace Microsoft.PowerToys.Settings.UI
 
             this.InitializeComponent();
             SetTitleBar();
+            _deferredActivation = new DeferredWindowActivation(
+                ActivatePreparedWindowCore,
+                StartActivationFallbackTimer,
+                StopActivationFallbackTimer,
+                SubscribeInitialContentLoaded,
+                UnsubscribeInitialContentLoaded,
+                Close);
 
             // receive IPC Message
             App.IPCMessageReceivedCallback = (string msg) =>
@@ -156,37 +161,17 @@ namespace Microsoft.PowerToys.Settings.UI
 
         public void ActivateWhenReady(bool bringToForeground = false)
         {
-            _bringToForegroundOnActivation |= bringToForeground;
-
             var hWnd = WindowNative.GetWindowHandle(this);
-            if (!WaitForInitialContentBeforeActivation || NativeMethods.IsWindowVisible(hWnd) || shellPage.IsInitialContentLoaded)
-            {
-                ActivatePreparedWindow();
-                return;
-            }
-
-            shellPage.InitialContentLoaded -= ShellPage_InitialContentLoaded;
-            shellPage.InitialContentLoaded += ShellPage_InitialContentLoaded;
-            _activationPending = true;
-
-            _activationFallbackTimer ??= DispatcherQueue.CreateTimer();
-            if (!_activationFallbackTimer.IsRunning)
-            {
-                _activationFallbackTimer.Interval = TimeSpan.FromSeconds(2);
-                _activationFallbackTimer.IsRepeating = false;
-                _activationFallbackTimer.Tick -= ActivationFallbackTimer_Tick;
-                _activationFallbackTimer.Tick += ActivationFallbackTimer_Tick;
-                _activationFallbackTimer.Start();
-            }
+            _deferredActivation.RequestActivation(
+                !WaitForInitialContentBeforeActivation || NativeMethods.IsWindowVisible(hWnd),
+                shellPage.IsInitialContentLoaded,
+                bringToForeground);
         }
 
         public void CloseHiddenWindow()
         {
             var hWnd = WindowNative.GetWindowHandle(this);
-            if (!NativeMethods.IsWindowVisible(hWnd) && !_activationPending)
-            {
-                Close();
-            }
+            _deferredActivation.CloseHiddenWindow(NativeMethods.IsWindowVisible(hWnd));
         }
 
         private void Window_Closed(object sender, WindowEventArgs args)
@@ -196,13 +181,10 @@ namespace Microsoft.PowerToys.Settings.UI
 
             if (!App.IsSecondaryWindowOpen())
             {
-                _closed = true;
-                _activationPending = false;
+                _deferredActivation.OnWindowClosed();
                 shellPage.Dispose();
                 App.ClearSettingsWindow();
 
-                shellPage.InitialContentLoaded -= ShellPage_InitialContentLoaded;
-                _activationFallbackTimer?.Stop();
                 App.ThemeService.ThemeChanged -= OnThemeChanged;
             }
             else
@@ -214,35 +196,45 @@ namespace Microsoft.PowerToys.Settings.UI
 
         private void ShellPage_InitialContentLoaded(object sender, EventArgs e)
         {
-            if (_closed)
-            {
-                return;
-            }
-
-            DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, ActivatePreparedWindow);
+            _deferredActivation.OnInitialContentLoaded();
         }
 
         private void ActivationFallbackTimer_Tick(DispatcherQueueTimer sender, object args)
         {
-            if (_closed)
-            {
-                return;
-            }
-
-            ActivatePreparedWindow();
+            _deferredActivation.OnFallbackTimer();
         }
 
-        private void ActivatePreparedWindow()
+        private void StartActivationFallbackTimer()
         {
-            if (_closed)
+            _activationFallbackTimer ??= DispatcherQueue.CreateTimer();
+            if (!_activationFallbackTimer.IsRunning)
             {
-                return;
+                _activationFallbackTimer.Interval = TimeSpan.FromSeconds(2);
+                _activationFallbackTimer.IsRepeating = false;
+                _activationFallbackTimer.Tick -= ActivationFallbackTimer_Tick;
+                _activationFallbackTimer.Tick += ActivationFallbackTimer_Tick;
+                _activationFallbackTimer.Start();
             }
+        }
 
-            shellPage.InitialContentLoaded -= ShellPage_InitialContentLoaded;
+        private void StopActivationFallbackTimer()
+        {
             _activationFallbackTimer?.Stop();
-            _activationPending = false;
+        }
 
+        private void SubscribeInitialContentLoaded()
+        {
+            shellPage.InitialContentLoaded -= ShellPage_InitialContentLoaded;
+            shellPage.InitialContentLoaded += ShellPage_InitialContentLoaded;
+        }
+
+        private void UnsubscribeInitialContentLoaded()
+        {
+            shellPage.InitialContentLoaded -= ShellPage_InitialContentLoaded;
+        }
+
+        private void ActivatePreparedWindowCore()
+        {
             var hWnd = WindowNative.GetWindowHandle(this);
             if (!NativeMethods.IsWindowVisible(hWnd))
             {
@@ -251,10 +243,8 @@ namespace Microsoft.PowerToys.Settings.UI
             }
 
             Activate();
-            if (_bringToForegroundOnActivation)
+            if (_deferredActivation.ConsumeBringToForeground())
             {
-                _bringToForegroundOnActivation = false;
-
                 // https://github.com/microsoft/microsoft-ui-xaml/issues/7595 - Activate doesn't bring window to the foreground
                 WindowHelpers.BringToForeground(hWnd);
             }

@@ -20,6 +20,20 @@ param(
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+if (-not ("SettingsPerformanceNativeMethods" -as [type]))
+{
+    Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class SettingsPerformanceNativeMethods
+{
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsWindowVisible(IntPtr hWnd);
+}
+"@
+}
 
 $runnerPath = Join-Path $PowerToysRoot "PowerToys.exe"
 $settingsPath = Join-Path $PowerToysRoot "WinUI3Apps\PowerToys.Settings.exe"
@@ -87,6 +101,26 @@ function Stop-Processes
         {
         }
     }
+}
+
+function Test-SettingsWindowVisible
+{
+    foreach ($process in Get-ProcessByPath -Name "PowerToys.Settings" -Path $settingsPath)
+    {
+        try
+        {
+            $process.Refresh()
+            if ($process.MainWindowHandle -ne [IntPtr]::Zero -and [SettingsPerformanceNativeMethods]::IsWindowVisible($process.MainWindowHandle))
+            {
+                return $true
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    return $false
 }
 
 function Get-ModuleProfile
@@ -358,7 +392,7 @@ New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 
 $allExistingRunners = @(Get-Process -Name "PowerToys" -ErrorAction SilentlyContinue)
 $targetRunner = Get-ProcessByPath -Name "PowerToys" -Path $runnerPath | Select-Object -First 1
-$hadSettingsWindow = @(Get-Process -Name "PowerToys.Settings" -ErrorAction SilentlyContinue).Count -gt 0
+$hadSettingsWindow = Test-SettingsWindowVisible
 
 try
 {
