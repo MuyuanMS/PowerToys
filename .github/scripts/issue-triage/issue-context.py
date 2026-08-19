@@ -42,7 +42,7 @@ ACTION_CLAUSE_PATTERN = re.compile(
     r"type|drag|run|choose|restart|create|make|configure|remap|hold|use)"
     r"|(?:i|we|you|users?|the user)\s+(?:can\s+|will\s+|try\s+to\s+)?"
     r"(?:open|launch|click|press|select|enable|disable|connect|disconnect|"
-    r"type|drag|run|choose|restart|create|configure|remap|hold))\b",
+    r"type|drag|run|choose|restart|create|make|configure|remap|hold|use))\b",
     re.IGNORECASE,
 )
 BUG_HEADINGS = (

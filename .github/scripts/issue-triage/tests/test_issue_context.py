@@ -192,6 +192,18 @@ class IssueContextTests(unittest.TestCase):
         )
         self.assertEqual(CONTEXT.reproduction_quality(body), "SUFFICIENT")
 
+    def test_first_person_make_and_use_sequence_is_sufficient(self):
+        body = BUG_BODY.replace(
+            "1. Open Keyboard Manager.\n"
+            "2. Select Remap a shortcut.\n"
+            "3. Press a key and observe that the editor closes.",
+            "I make a key remap. Then I use it.",
+        ).replace(
+            "The editor exits.",
+            "The remapped shortcut does not activate.",
+        )
+        self.assertEqual(CONTEXT.reproduction_quality(body), "SUFFICIENT")
+
     def test_intermittent_failure_description_is_sufficient_for_intake(self):
         body = BUG_BODY.replace(
             "1. Open Keyboard Manager.\n"
