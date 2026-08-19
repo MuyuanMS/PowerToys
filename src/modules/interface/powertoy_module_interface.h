@@ -142,6 +142,10 @@ public:
      */
     virtual bool keep_track_of_pressed_win_key() { return false; }
     virtual UINT milliseconds_win_key_must_be_pressed() { return 0; }
+    virtual void OnWindowsKeyHold()
+    {
+        OnHotkeyEx();
+    }
 
     virtual void send_settings_telemetry()
     {

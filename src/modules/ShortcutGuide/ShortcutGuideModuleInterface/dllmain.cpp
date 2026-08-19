@@ -41,6 +41,12 @@ public:
             Logger::warn(L"Failed to create {} event. {}", CommonSharedConstants::SHORTCUT_GUIDE_TRIGGER_EVENT, get_last_error_or_default(GetLastError()));
         }
 
+        winKeyTriggerEvent = CreateEvent(nullptr, false, false, CommonSharedConstants::SHORTCUT_GUIDE_WIN_KEY_TRIGGER_EVENT);
+        if (!winKeyTriggerEvent)
+        {
+            Logger::warn(L"Failed to create {} event. {}", CommonSharedConstants::SHORTCUT_GUIDE_WIN_KEY_TRIGGER_EVENT, get_last_error_or_default(GetLastError()));
+        }
+
         InitSettings();
     }
 
@@ -132,6 +138,10 @@ public:
         {
             CloseHandle(triggerEvent);
         }
+        if (winKeyTriggerEvent)
+        {
+            CloseHandle(winKeyTriggerEvent);
+        }
 
         delete this;
     }
@@ -153,6 +163,19 @@ public:
         EnsureProcessRuns();
 
         SetEvent(triggerEvent);
+    }
+
+    virtual void OnWindowsKeyHold() override
+    {
+        Logger::trace("OnWindowsKeyHold()");
+        if (!_enabled)
+        {
+            return;
+        }
+
+        EnsureProcessRuns();
+
+        SetEvent(winKeyTriggerEvent);
     }
 
     virtual void send_settings_telemetry() override
@@ -183,6 +206,7 @@ private:
     UINT m_millisecondsWinKeyPressTimeForTaskbarIconShortcuts = DEFAULT_MILLISECONDS_WIN_KEY_PRESS_TIME_FOR_TASKBAR_ICON_SHORTCUTS;
 
     HANDLE triggerEvent;
+    HANDLE winKeyTriggerEvent;
     HANDLE exitEvent;
 
     bool EnsureProcessRuns(std::wstring args = L"", bool reuseExistingProcess = true)
@@ -201,6 +225,11 @@ private:
         if (triggerEvent)
         {
             ResetEvent(triggerEvent);
+        }
+
+        if (winKeyTriggerEvent)
+        {
+            ResetEvent(winKeyTriggerEvent);
         }
 
         unsigned long powertoys_pid = GetCurrentProcessId();
