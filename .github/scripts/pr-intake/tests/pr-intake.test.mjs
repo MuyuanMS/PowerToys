@@ -165,10 +165,14 @@ test('docs-only changes do not require visual evidence', () => {
 test('path product labels use longest prefixes and suppress Settings side effects', () => {
   assert.deepEqual(
     deriveProductLabelsFromPaths([
-      'src/modules/MouseUtils/MouseJump/MouseJump.Common/Helpers.cs',
+      'src/modules/MouseUtils/MouseJump.Common/Helpers.cs',
       'src/settings-ui/Settings.UI/SettingsXAML/Views/MouseJumpPage.xaml',
     ]),
     ['Product-Mouse Jump'],
+  );
+  assert.deepEqual(
+    deriveProductLabelsFromPaths(['src/modules/MouseUtils/CursorWrap/CursorWrap.vcxproj']),
+    ['Product-Cursor Wrap'],
   );
   assert.deepEqual(
     deriveProductLabelsFromPaths(['src/modules/cmdpal/src/App/App.xaml']),

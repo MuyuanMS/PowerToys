@@ -45,9 +45,10 @@ const VISUAL_PRODUCT_PREFIXES = [
 ];
 
 export const PRODUCT_PATH_LABEL_MAP = [
+  ['src/modules/MouseUtils/CursorWrap/', 'Product-Cursor Wrap'],
   ['src/modules/MouseUtils/FindMyMouse/', 'Product-Find My Mouse'],
   ['src/modules/MouseUtils/MouseHighlighter/', 'Product-Mouse Highlighter'],
-  ['src/modules/MouseUtils/MouseJump/', 'Product-Mouse Jump'],
+  ['src/modules/MouseUtils/MouseJump', 'Product-Mouse Jump'],
   ['src/modules/MouseUtils/MousePointerCrosshairs/', 'Product-Mouse Pointer Crosshairs'],
   ['src/modules/MouseUtils/', 'Product-Mouse Utilities'],
   ['src/modules/AdvancedPaste/', 'Product-Advanced Paste'],
