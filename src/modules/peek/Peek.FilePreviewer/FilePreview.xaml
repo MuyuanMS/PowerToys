@@ -13,14 +13,6 @@
     mc:Ignorable="d">
 
     <Grid Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
-        <ProgressRing
-            x:Name="LoadingIndicator"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center"
-            AutomationProperties.AutomationId="LoadingIndicator"
-            IsActive="{x:Bind MatchPreviewState(Previewer.State, previewers:PreviewState.Loading), Mode=OneWay}"
-            Visibility="{x:Bind IsLoadingIndicatorVisible(Previewer.State), Mode=OneWay}" />
-
         <TextBlock
             x:Name="PreviewStateAutomationPeer"
             Width="1"
@@ -43,6 +35,7 @@
             x:Name="ImagePreview"
             MaxWidth="{x:Bind ImagePreviewer.MaxImageSize.Width, Mode=OneWay}"
             MaxHeight="{x:Bind ImagePreviewer.MaxImageSize.Height, Mode=OneWay}"
+            Opacity="{x:Bind GetImagePreviewOpacity(IsLoadingIndicatorVisible), Mode=OneWay}"
             PointerMoved="ToolTipParentControl_PointerMoved"
             Source="{x:Bind ImagePreviewer.Preview, Mode=OneWay}"
             Visibility="{x:Bind IsPreviewVisible(ImagePreviewer, Previewer.State), Mode=OneWay}">
@@ -141,6 +134,15 @@
             Foreground="{StaticResource TextFillColorSecondaryBrush}"
             TextWrapping="Wrap"
             Visibility="Collapsed" />
+
+        <ProgressRing
+            x:Name="LoadingIndicator"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            AutomationProperties.AutomationId="LoadingIndicator"
+            Canvas.ZIndex="1"
+            IsActive="{x:Bind IsLoadingIndicatorVisible, Mode=OneWay}"
+            Visibility="{x:Bind IsLoadingIndicatorVisible, Mode=OneWay}" />
     </Grid>
     <UserControl.KeyboardAccelerators>
         <KeyboardAccelerator
