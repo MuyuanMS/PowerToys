@@ -196,7 +196,7 @@ namespace Microsoft.PowerToys.Settings.UI
 
         private void ShellPage_InitialContentLoaded(object sender, EventArgs e)
         {
-            _deferredActivation.OnInitialContentLoaded();
+            DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, _deferredActivation.OnInitialContentLoaded);
         }
 
         private void ActivationFallbackTimer_Tick(DispatcherQueueTimer sender, object args)
