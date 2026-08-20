@@ -36,7 +36,7 @@ namespace Peek.Common.UnitTests
         [TestMethod]
         public void PreviewerFactory_GetCompatiblePreviewerType_SelectsNonReusablePreviewerType()
         {
-            var item = new TestFileSystemItem("sample.nonreuse");
+            var item = new TestFileSystemItem("sample.single-use");
             var factory = CreateTestFactory();
 
             var compatibleType = factory.GetCompatiblePreviewerType(item);
@@ -68,7 +68,7 @@ namespace Peek.Common.UnitTests
                     item => new ReusableTestPreviewer(item)),
                 new PreviewerFactory.PreviewerDefinition(
                     typeof(NonReusableTestPreviewer),
-                    item => string.Equals(item.Extension, ".nonreuse", StringComparison.OrdinalIgnoreCase),
+                    item => string.Equals(item.Extension, ".single-use", StringComparison.OrdinalIgnoreCase),
                     item => new NonReusableTestPreviewer(item)),
                 new PreviewerFactory.PreviewerDefinition(
                     typeof(NonReusableTestPreviewer),

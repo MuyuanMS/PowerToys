@@ -42,8 +42,6 @@ namespace Peek.FilePreviewer.Previewers
         [ObservableProperty]
         private double scalingFactor;
 
-        private Size? _pendingImageSize;
-
         public ImagePreviewer(IFileSystemItem file)
         {
             Item = file;
@@ -56,11 +54,12 @@ namespace Peek.FilePreviewer.Previewers
         {
             Item = item;
             ScalingFactor = scalingFactor;
+            State = PreviewState.Loading;
         }
 
-        private bool IsPng() => Item.Extension == ".png";
+        private static bool IsPng(IFileSystemItem item) => item.Extension == ".png";
 
-        private bool IsQoi() => Item.Extension == ".qoi";
+        private static bool IsQoi(IFileSystemItem item) => item.Extension == ".qoi";
 
         private DispatcherQueue Dispatcher { get; }
 
@@ -79,16 +78,19 @@ namespace Peek.FilePreviewer.Previewers
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            var item = Item;
             Size? size;
-            if (IsQoi())
+            if (IsQoi(item))
             {
-                size = await Task.Run(Item.GetQoiSize);
+                size = await Task.Run(item.GetQoiSize);
             }
             else
             {
-                size = await Task.Run(Item.GetImageSize)
-                    ?? await WICHelper.GetImageSize(Item.Path);
+                size = await Task.Run(item.GetImageSize)
+                    ?? await WICHelper.GetImageSize(item.Path);
             }
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             // If an image is already loaded (e.g. scaling factor changed on the current item),
             // update ImageSize immediately so MaxImageSize matches the new DPI scale.
@@ -97,7 +99,6 @@ namespace Peek.FilePreviewer.Previewers
                 ImageSize = size;
             }
 
-            _pendingImageSize = size;
             return new PreviewSize { MonitorSize = size };
         }
 
@@ -106,20 +107,18 @@ namespace Peek.FilePreviewer.Previewers
             cancellationToken.ThrowIfCancellationRequested();
 
             State = PreviewState.Loading;
+            var item = Item;
 
-            bool loaded = await LoadFullQualityImageAsync(cancellationToken);
+            bool loaded = await LoadFullQualityImageAsync(item, cancellationToken);
 
-            if (!loaded && Preview is null)
+            if (!loaded)
             {
-                loaded = await LoadThumbnailAsync(cancellationToken);
+                loaded = await LoadThumbnailAsync(item, cancellationToken);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
             if (loaded)
             {
-                // Only commit ImageSize once loaded so MaxImageSize does not resize the
-                // visible front-buffer image prematurely.
-                ImageSize = _pendingImageSize;
                 State = PreviewState.Loaded;
             }
             else
@@ -157,7 +156,7 @@ namespace Peek.FilePreviewer.Previewers
                 new Size(imageWidth, imageHeight);
         }
 
-        private Task<bool> LoadThumbnailAsync(CancellationToken cancellationToken)
+        private Task<bool> LoadThumbnailAsync(IFileSystemItem item, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -165,12 +164,12 @@ namespace Peek.FilePreviewer.Previewers
             {
                 await Dispatcher.RunOnUiThread(async () =>
                 {
-                    Preview = await ThumbnailHelper.GetCachedThumbnailAsync(Item.Path, IsPng(), cancellationToken);
+                    Preview = await ThumbnailHelper.GetCachedThumbnailAsync(item.Path, IsPng(item), cancellationToken);
                 });
             });
         }
 
-        private Task<bool> LoadFullQualityImageAsync(CancellationToken cancellationToken)
+        private Task<bool> LoadFullQualityImageAsync(IFileSystemItem item, CancellationToken cancellationToken)
         {
             return TaskExtension.RunSafe(async () =>
             {
@@ -180,9 +179,9 @@ namespace Peek.FilePreviewer.Previewers
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (IsQoi())
+                    if (IsQoi(item))
                     {
-                        using FileStream stream = ReadHelper.OpenReadOnly(Item.Path);
+                        using FileStream stream = ReadHelper.OpenReadOnly(item.Path);
                         using var bitmap = QoiImage.FromStream(stream);
 
                         var source = await BitmapHelper.BitmapToImageSource(bitmap, true, cancellationToken);
@@ -191,7 +190,7 @@ namespace Peek.FilePreviewer.Previewers
                     }
                     else
                     {
-                        using FileStream stream = ReadHelper.OpenReadOnly(Item.Path);
+                        using FileStream stream = ReadHelper.OpenReadOnly(item.Path);
                         var bmp = new BitmapImage();
 
                         await bmp.SetSourceAsync(stream.AsRandomAccessStream());

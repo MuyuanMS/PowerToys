@@ -53,6 +53,8 @@ namespace Peek.FilePreviewer.Previewers
         [ObservableProperty]
         private PreviewState state;
 
+        private int _bindingGeneration;
+
         static UnsupportedFilePreviewer()
         {
             FolderEnumerationOptions = new() { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint };
@@ -62,6 +64,7 @@ namespace Peek.FilePreviewer.Previewers
         {
             Item = file;
             Dispatcher = DispatcherQueue.GetForCurrentThread();
+            Preview = CreatePreviewData(file);
         }
 
         public IFileSystemItem Item { get; private set; }
@@ -69,28 +72,29 @@ namespace Peek.FilePreviewer.Previewers
         public void Rebind(IFileSystemItem item, double scalingFactor)
         {
             Item = item;
-
-            // Update immediately-available metadata and clear async properties so stale
-            // values from the previous item are not displayed during navigation.
-            Preview.FileName = item.Name;
-            Preview.DateModified = item.DateModified?.ToString(CultureInfo.CurrentCulture);
-            Preview.FileType = null;
-            Preview.FileSize = null;
-            Preview.IconPreview = DefaultIcon;
+            Interlocked.Increment(ref _bindingGeneration);
+            Preview = CreatePreviewData(item);
+            State = PreviewState.Loading;
         }
 
         private DispatcherQueue Dispatcher { get; }
+
+        private int BindingGeneration => Volatile.Read(ref _bindingGeneration);
 
         public Task<PreviewSize> GetPreviewSizeAsync(CancellationToken cancellationToken) =>
             Task.FromResult(new PreviewSize { MonitorSize = new Size(680, 500), UseEffectivePixels = true });
 
         public async Task LoadPreviewAsync(CancellationToken cancellationToken)
         {
+            var bindingGeneration = BindingGeneration;
+            var item = Item;
+            var previewData = Preview;
+
             try
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                ThrowIfStale(bindingGeneration, cancellationToken);
 
-                if (Item is not FolderItem)
+                if (item is not FolderItem)
                 {
                     PowerToysTelemetry.Log.WriteEvent(
                         new ErrorEvent() { Failure = ErrorEvent.FailureType.FileNotSupported });
@@ -98,23 +102,17 @@ namespace Peek.FilePreviewer.Previewers
 
                 await Dispatcher.RunOnUiThread(async () =>
                 {
-                    Preview.FileName = Item.Name;
-                    Preview.DateModified = Item.DateModified?.ToString(CultureInfo.CurrentCulture);
-
+                    ThrowIfStale(bindingGeneration, cancellationToken);
                     State = PreviewState.Loaded;
-
-                    await LoadIconPreviewAsync(cancellationToken);
+                    await LoadIconPreviewAsync(item, previewData, bindingGeneration, cancellationToken);
                 });
 
                 var progress = new Progress<string>(update =>
                 {
-                    Dispatcher.TryEnqueue(() =>
-                    {
-                        Preview.FileSize = update;
-                    });
+                    EnqueueIfCurrent(bindingGeneration, () => previewData.FileSize = update);
                 });
 
-                await LoadDisplayInfoAsync(progress, cancellationToken);
+                await LoadDisplayInfoAsync(item, previewData, progress, bindingGeneration, cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -135,27 +133,68 @@ namespace Peek.FilePreviewer.Previewers
             });
         }
 
-        private async Task LoadIconPreviewAsync(CancellationToken cancellationToken)
+        private async Task LoadIconPreviewAsync(IFileSystemItem item, UnsupportedFilePreviewData previewData, int bindingGeneration, CancellationToken cancellationToken)
         {
-            Preview.IconPreview = await ThumbnailHelper.GetThumbnailAsync(Item.Path, cancellationToken) ??
-                await ThumbnailHelper.GetIconAsync(Item.Path, cancellationToken) ??
+            var iconPreview = await ThumbnailHelper.GetThumbnailAsync(item.Path, cancellationToken) ??
+                await ThumbnailHelper.GetIconAsync(item.Path, cancellationToken) ??
                 DefaultIcon;
+
+            ThrowIfStale(bindingGeneration, cancellationToken);
+            previewData.IconPreview = iconPreview;
         }
 
-        private async Task LoadDisplayInfoAsync(IProgress<string> sizeProgress, CancellationToken cancellationToken)
+        private async Task LoadDisplayInfoAsync(IFileSystemItem item, UnsupportedFilePreviewData previewData, IProgress<string> sizeProgress, int bindingGeneration, CancellationToken cancellationToken)
         {
-            string type = await Item.GetContentTypeAsync();
+            string type = await item.GetContentTypeAsync();
 
-            Dispatcher.TryEnqueue(() => Preview.FileType = type);
+            ThrowIfStale(bindingGeneration, cancellationToken);
+            EnqueueIfCurrent(bindingGeneration, () => previewData.FileType = type);
 
-            if (Item is FolderItem folderItem)
+            if (item is FolderItem)
             {
-                await Task.Run(() => CalculateFolderSizeWithProgress(Item.Path, sizeProgress, cancellationToken), cancellationToken);
+                await Task.Run(() => CalculateFolderSizeWithProgress(item.Path, sizeProgress, cancellationToken), cancellationToken);
             }
             else
             {
-                ReportProgress(sizeProgress, Item.FileSizeBytes);
+                ThrowIfStale(bindingGeneration, cancellationToken);
+                ReportProgress(sizeProgress, item.FileSizeBytes);
             }
+        }
+
+        private static UnsupportedFilePreviewData CreatePreviewData(IFileSystemItem item)
+        {
+            return new UnsupportedFilePreviewData
+            {
+                FileName = item.Name,
+                DateModified = item.DateModified?.ToString(CultureInfo.CurrentCulture),
+                IconPreview = DefaultIcon,
+            };
+        }
+
+        private void ThrowIfStale(int bindingGeneration, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (bindingGeneration != BindingGeneration)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+        }
+
+        private void EnqueueIfCurrent(int bindingGeneration, Action action)
+        {
+            if (bindingGeneration != BindingGeneration)
+            {
+                return;
+            }
+
+            Dispatcher.TryEnqueue(() =>
+            {
+                if (bindingGeneration == BindingGeneration)
+                {
+                    action();
+                }
+            });
         }
 
         private void CalculateFolderSizeWithProgress(string path, IProgress<string> progress, CancellationToken cancellationToken)

@@ -233,11 +233,6 @@ namespace Peek.FilePreviewer
             return value == stateToMatch;
         }
 
-        public Visibility IsLoadingIndicatorVisible(PreviewState? state)
-        {
-            return MatchPreviewState(state, PreviewState.Loading) ? Visibility.Visible : Visibility.Collapsed;
-        }
-
         public string GetPreviewStateText(PreviewState? state)
         {
             return (state ?? PreviewState.Uninitialized).ToString();
@@ -338,6 +333,7 @@ namespace Peek.FilePreviewer
 
             if (Item is null)
             {
+                StopLoadingProgressTimer();
                 ClearAllPreviews();
                 return;
             }
@@ -377,11 +373,16 @@ namespace Peek.FilePreviewer
         {
             if (Previewer is IImagePreviewer imagePreviewer)
             {
-                var previewSize = await Previewer.GetPreviewSizeAsync(cancellationToken);
+                var previewSize = await imagePreviewer.GetPreviewSizeAsync(cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                await Previewer.LoadPreviewAsync(cancellationToken);
+                await imagePreviewer.LoadPreviewAsync(cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
+
+                if (imagePreviewer.State == PreviewState.Loaded)
+                {
+                    imagePreviewer.ImageSize = previewSize.MonitorSize;
+                }
 
                 // Apply resize and image swap atomically on the UI thread once the image is ready.
                 PreviewSizeChanged?.Invoke(this, new PreviewSizeChangedArgs(previewSize));

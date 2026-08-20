@@ -11,6 +11,8 @@ namespace Peek.FilePreviewer.Previewers.Interfaces
     {
         public ImageSource? Preview { get; }
 
+        public Size? ImageSize { get; set; }
+
         public double ScalingFactor { get; set; }
 
         public Size MaxImageSize { get; set; }
