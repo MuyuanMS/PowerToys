@@ -350,8 +350,18 @@ public sealed record JSExtensionManifest
 
         var trimmed = icon.Trim();
 
-        // Only a relative file path is resolved; a glyph, emoji, absolute path, or URI is left
-        // exactly as authored so existing behavior for those forms is unchanged.
+        if (trimmed.Contains("://", StringComparison.Ordinal))
+        {
+            return trimmed;
+        }
+
+        if (Path.IsPathRooted(trimmed))
+        {
+            return string.Empty;
+        }
+
+        // Only a relative file path is resolved; a glyph, emoji, or other non-path value is
+        // left exactly as authored so existing behavior for those forms is unchanged.
         if (!LooksLikeRelativeFilePath(trimmed))
         {
             return trimmed;
@@ -400,17 +410,12 @@ public sealed record JSExtensionManifest
 
     /// <summary>
     /// Determines whether an icon value should be treated as a relative file path (rather than a
-    /// glyph, emoji, absolute path, or URI). A relative path either has a known image extension or
-    /// contains a directory separator, and is neither rooted nor a URI.
+    /// glyph, emoji, or URI). A relative path either has a known image extension or contains a
+    /// directory separator, and is not a URI.
     /// </summary>
     private static bool LooksLikeRelativeFilePath(string icon)
     {
         if (icon.Contains("://", StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        if (Path.IsPathRooted(icon))
         {
             return false;
         }
