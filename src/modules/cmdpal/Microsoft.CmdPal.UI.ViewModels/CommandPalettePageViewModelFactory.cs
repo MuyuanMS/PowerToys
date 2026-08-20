@@ -26,6 +26,11 @@ public class CommandPalettePageViewModelFactory
             MainListPage listPage => new ListViewModel(listPage, _scheduler, host, providerContext, _contextMenuFactory) { IsRootPage = !nested, IsMainPage = true },
             IListPage listPage => new ListViewModel(listPage, _scheduler, host, providerContext, _contextMenuFactory) { IsRootPage = !nested },
 
+            // Nested tabbed pages are intentionally unsupported in v1. Return
+            // null so the outer tabbed-page host shows its placeholder instead
+            // of navigating to an inner tab shell with no mapped view.
+            ITabbedPage when nested => null,
+
             // ITabbedPage must be matched before IContentPage: the Toolkit
             // TabbedPage base implements both, and only newer hosts render the
             // tab strip (older hosts fall back to the IContentPage message).

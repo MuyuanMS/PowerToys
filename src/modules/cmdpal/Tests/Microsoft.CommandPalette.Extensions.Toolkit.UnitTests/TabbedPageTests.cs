@@ -39,6 +39,7 @@ public class TabbedPageTests
     {
         var tab = new Tab();
 
+        Assert.AreEqual(string.Empty, tab.Id);
         Assert.AreEqual(string.Empty, tab.Title);
         Assert.AreEqual(string.Empty, tab.Badge);
         Assert.IsNull(tab.Icon);
@@ -48,9 +49,16 @@ public class TabbedPageTests
     [TestMethod]
     public void Tab_TitleAndPageConstructor_SetsBoth()
     {
-        var page = new TestContentPage();
-        var tab = new Tab("Issues", page);
+        var page = new TestContentPage()
+        {
+            Id = "issues-page",
+        };
+        var tab = new Tab("Issues", page)
+        {
+            Id = "issues-tab",
+        };
 
+        Assert.AreEqual("issues-tab", tab.Id);
         Assert.AreEqual("Issues", tab.Title);
         Assert.AreSame(page, tab.Page);
     }
