@@ -21,8 +21,9 @@ public partial class TabViewModel : ExtensionObjectViewModel
 
     /// <summary>
     /// Gets the stable identity for this tab, used to preserve the active tab
-    /// across dynamic tab-set updates. This is the hosted page's <c>Id</c> when
-    /// available; otherwise it falls back to the tab title.
+    /// across dynamic tab-set updates. Prefer the explicit <see cref="ITab.Id"/>
+    /// contract; fall back to the hosted page's <c>Id</c> and finally the title
+    /// only for older tab implementations that do not set a stable tab ID yet.
     /// </summary>
     public string TabId { get; private set; } = string.Empty;
 
@@ -75,7 +76,7 @@ public partial class TabViewModel : ExtensionObjectViewModel
         Badge = tab.Badge ?? string.Empty;
 
         var pageId = Page?.Id;
-        TabId = string.IsNullOrEmpty(pageId) ? Title : pageId;
+        TabId = !string.IsNullOrEmpty(tab.Id) ? tab.Id : (string.IsNullOrEmpty(pageId) ? Title : pageId);
 
         Icon = new(tab.Icon);
         Icon.InitializeProperties();

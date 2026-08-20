@@ -389,6 +389,7 @@ namespace Microsoft.CommandPalette.Extensions
     // PropChanged("Badge")) without forcing the page to initialize.
     [contract(Microsoft.CommandPalette.Extensions.ExtensionsContract, 1)]
     interface ITab requires INotifyPropChanged {
+        String Id { get; };
         String Title { get; };
         IIconInfo Icon { get; };
         String Badge { get; };

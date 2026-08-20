@@ -51,11 +51,11 @@ public partial class TabbedPageViewModelTests
 
     private sealed partial class TestContentPage : ContentPage
     {
-        public TestContentPage(string id)
+        public TestContentPage(string id, string? title = null)
         {
             Id = id;
-            Name = id;
-            Title = id;
+            Name = title ?? id;
+            Title = title ?? id;
         }
 
         public override IContent[] GetContent() => [];
@@ -83,8 +83,8 @@ public partial class TabbedPageViewModelTests
     {
         var page = new TestTabbedPage(
         [
-            new Tab("Issues", new TestListPage("issues")),
-            new Tab("Docs", new TestContentPage("docs")),
+            new Tab("Issues", new TestListPage("issues")) { Id = "issues-tab" },
+            new Tab("Docs", new TestContentPage("docs")) { Id = "docs-tab" },
         ]);
 
         var viewModel = CreateViewModel(page);
@@ -106,8 +106,8 @@ public partial class TabbedPageViewModelTests
     {
         var page = new TestTabbedPage(
         [
-            new Tab("Issues", new TestListPage("issues")),
-            new Tab("Docs", new TestContentPage("docs")),
+            new Tab("Issues", new TestListPage("issues")) { Id = "issues-tab" },
+            new Tab("Docs", new TestContentPage("docs")) { Id = "docs-tab" },
         ]);
 
         var viewModel = CreateViewModel(page);
@@ -126,8 +126,8 @@ public partial class TabbedPageViewModelTests
     {
         var page = new TestTabbedPage(
         [
-            new Tab("Docs", new TestContentPage("docs")),
-            new Tab("Issues", new TestListPage("issues")),
+            new Tab("Docs", new TestContentPage("docs")) { Id = "docs-tab" },
+            new Tab("Issues", new TestListPage("issues")) { Id = "issues-tab" },
         ]);
 
         var viewModel = CreateViewModel(page);
@@ -146,8 +146,8 @@ public partial class TabbedPageViewModelTests
     {
         var page = new TestTabbedPage(
         [
-            new Tab("Docs", new TestContentPage("docs")),
-            new Tab("Issues", new TestListPage("issues")),
+            new Tab("Docs", new TestContentPage("docs")) { Id = "docs-tab" },
+            new Tab("Issues", new TestListPage("issues")) { Id = "issues-tab" },
         ]);
 
         var viewModel = CreateViewModel(page);
@@ -174,8 +174,8 @@ public partial class TabbedPageViewModelTests
     {
         var page = new TestTabbedPage(
         [
-            new Tab("Issues", new TestListPage("issues")),
-            new Tab("Docs", new TestContentPage("docs")),
+            new Tab("Issues", new TestListPage("issues")) { Id = "issues-tab" },
+            new Tab("Docs", new TestContentPage("docs")) { Id = "docs-tab" },
         ]);
 
         var viewModel = CreateViewModel(page);
@@ -194,7 +194,7 @@ public partial class TabbedPageViewModelTests
     {
         var page = new TestTabbedPage(
         [
-            new Tab("Bare", new Page() { Id = "bare", Name = "Bare", Title = "Bare" }),
+            new Tab("Bare", new Page() { Id = "bare", Name = "Bare", Title = "Bare" }) { Id = "bare-tab" },
         ]);
 
         var viewModel = CreateViewModel(page);
@@ -212,7 +212,7 @@ public partial class TabbedPageViewModelTests
     [TestMethod]
     public async Task Badge_PropChangedPropagatesToTabViewModel()
     {
-        var tab = new Tab("Issues", new TestContentPage("issues"));
+        var tab = new Tab("Issues", new TestContentPage("issues")) { Id = "issues-tab" };
         var page = new TestTabbedPage([tab]);
 
         var viewModel = CreateViewModel(page);
@@ -234,7 +234,7 @@ public partial class TabbedPageViewModelTests
     {
         var page = new TestTabbedPage(
         [
-            new Tab("Issues", new TestListPage("issues")),
+            new Tab("Issues", new TestListPage("issues")) { Id = "issues-tab" },
         ]);
 
         var viewModel = CreateViewModel(page);
@@ -255,8 +255,8 @@ public partial class TabbedPageViewModelTests
     {
         var page = new TestTabbedPage(
         [
-            new Tab("Issues", new TestListPage("issues")),
-            new Tab("Docs", new TestContentPage("docs")),
+            new Tab("Issues", new TestListPage("issues")) { Id = "issues-tab" },
+            new Tab("Docs", new TestContentPage("docs")) { Id = "docs-tab" },
         ]);
 
         var viewModel = CreateViewModel(page);
@@ -265,19 +265,75 @@ public partial class TabbedPageViewModelTests
         await WaitFor(() => viewModel.Tabs.Count == 2 && viewModel.SelectedTab is not null, "Tabs did not populate");
 
         viewModel.SelectedTab = viewModel.Tabs[1];
-        Assert.AreEqual("docs", viewModel.SelectedTab!.TabId);
+        Assert.AreEqual("docs-tab", viewModel.SelectedTab!.TabId);
 
         // Dynamic update: the extension re-publishes the tabs (new instances) and
         // adds a third. The active tab identity ("docs") must be preserved.
         page.SetTabs(
         [
-            new Tab("Issues", new TestListPage("issues")),
-            new Tab("Docs", new TestContentPage("docs")),
-            new Tab("Actions", new TestContentPage("actions")),
+            new Tab("Issues", new TestListPage("issues")) { Id = "issues-tab" },
+            new Tab("Docs", new TestContentPage("docs")) { Id = "docs-tab" },
+            new Tab("Actions", new TestContentPage("actions")) { Id = "actions-tab" },
         ]);
 
         await WaitFor(() => viewModel.Tabs.Count == 3, "Tabs did not update");
-        await WaitFor(() => viewModel.SelectedTab?.TabId == "docs", "Active tab was not preserved");
+        await WaitFor(() => viewModel.SelectedTab?.TabId == "docs-tab", "Active tab was not preserved");
+
+        viewModel.SafeCleanup();
+    }
+
+    [TestMethod]
+    public async Task ItemsChanged_ReplacesCachedChildWhenTabIdKeepsSameButPageChanges()
+    {
+        var firstDocsPage = new TestContentPage("docs-page", "Original docs");
+        var page = new TestTabbedPage(
+        [
+            new Tab("Docs", firstDocsPage) { Id = "docs-tab" },
+        ]);
+
+        var viewModel = CreateViewModel(page);
+        viewModel.InitializeProperties();
+
+        await WaitFor(() => viewModel.ActiveChild is not null, "Initial active child was not created");
+        var originalChild = viewModel.ActiveChild;
+        Assert.AreEqual("Original docs", viewModel.ActiveChild!.Title);
+
+        page.SetTabs(
+        [
+            new Tab("Docs", new TestContentPage("docs-page", "Replacement docs")) { Id = "docs-tab" },
+        ]);
+
+        await WaitFor(() => viewModel.SelectedTab?.TabId == "docs-tab", "Tab identity was not preserved");
+        await WaitFor(() => viewModel.ActiveChild?.Title == "Replacement docs", "Replacement tab page was not activated");
+        Assert.AreNotSame(originalChild, viewModel.ActiveChild);
+
+        viewModel.SafeCleanup();
+    }
+
+    [TestMethod]
+    public async Task NestedTabbedChild_ShowsUnsupportedPlaceholder()
+    {
+        var nestedPage = new TestTabbedPage(
+        [
+            new Tab("Inner", new TestContentPage("inner-page")) { Id = "inner-tab" },
+        ])
+        {
+            Id = "nested-page",
+            Name = "Nested",
+            Title = "Nested",
+        };
+
+        var page = new TestTabbedPage(
+        [
+            new Tab("Nested", nestedPage) { Id = "nested-tab" },
+        ]);
+
+        var viewModel = CreateViewModel(page);
+        viewModel.InitializeProperties();
+
+        await WaitFor(() => viewModel.SelectedTab is not null, "Nested tab was not selected");
+        await WaitFor(() => viewModel.ShowUnsupportedPlaceholder, "Placeholder was not shown for nested tabbed page");
+        Assert.IsNull(viewModel.ActiveChild);
 
         viewModel.SafeCleanup();
     }

@@ -28,6 +28,7 @@ public partial class TabbedPageViewModel : PageViewModel
     private readonly ExtensionObject<ITabbedPage> _model;
     private readonly IPageViewModelFactoryService _factory;
     private readonly Dictionary<string, PageViewModel> _childCache = [];
+    private readonly Dictionary<string, IPage> _childPages = [];
 
     private static readonly string _fallbackPlaceholder = "Type here to search...";
 
@@ -149,8 +150,16 @@ public partial class TabbedPageViewModel : PageViewModel
                 var staleIds = _childCache.Keys.Where(id => !keepIds.Contains(id)).ToList();
                 foreach (var id in staleIds)
                 {
-                    DisposeChild(_childCache[id]);
-                    _childCache.Remove(id);
+                    RemoveCachedChild(id);
+                }
+
+                foreach (var tab in newTabs)
+                {
+                    if (_childPages.TryGetValue(tab.TabId, out var cachedPage) &&
+                        !ReferenceEquals(cachedPage, tab.Page))
+                    {
+                        RemoveCachedChild(tab.TabId);
+                    }
                 }
 
                 foreach (var old in Tabs)
@@ -245,10 +254,14 @@ public partial class TabbedPageViewModel : PageViewModel
 
     private PageViewModel? GetOrCreateChild(TabViewModel tab)
     {
-        if (_childCache.TryGetValue(tab.TabId, out var cached))
+        if (_childCache.TryGetValue(tab.TabId, out var cached) &&
+            _childPages.TryGetValue(tab.TabId, out var cachedPage) &&
+            ReferenceEquals(cachedPage, tab.Page))
         {
             return cached;
         }
+
+        RemoveCachedChild(tab.TabId);
 
         var page = tab.Page;
         if (page is null)
@@ -267,6 +280,7 @@ public partial class TabbedPageViewModel : PageViewModel
         child.IsRootPage = false;
         child.HasBackButton = false;
         _childCache[tab.TabId] = child;
+        _childPages[tab.TabId] = page;
 
         InitializeChild(child);
         return child;
@@ -344,6 +358,17 @@ public partial class TabbedPageViewModel : PageViewModel
         }
     }
 
+    private void RemoveCachedChild(string tabId)
+    {
+        if (_childCache.TryGetValue(tabId, out var cachedChild))
+        {
+            DisposeChild(cachedChild);
+            _childCache.Remove(tabId);
+        }
+
+        _childPages.Remove(tabId);
+    }
+
     protected override void UnsafeCleanup()
     {
         base.UnsafeCleanup();
@@ -368,6 +393,7 @@ public partial class TabbedPageViewModel : PageViewModel
         }
 
         _childCache.Clear();
+        _childPages.Clear();
 
         foreach (var tab in Tabs)
         {
