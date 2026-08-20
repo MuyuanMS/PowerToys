@@ -166,31 +166,69 @@ namespace WorkspacesEditor.ViewModels
             OnPropertyChanged(new PropertyChangedEventArgs(nameof(WorkspacesView)));
         }
 
+        /// <summary>
+        /// True while the user is actively editing a project (edit page open) — used
+        /// to suppress the background provisioning reload so it never clobbers
+        /// in-progress edits.
+        /// </summary>
+        public bool IsEditInProgress => editedProject != null || editPage != null;
+
+        private bool _isProvisioning;
+
+        /// <summary>
+        /// True while first-run service provisioning (UAC + MSIX deploy) is running
+        /// in the background.  Bindable so the UI can show a "Setting up
+        /// protection…" affordance and (optionally) gate destructive actions.
+        /// </summary>
+        public bool IsProvisioning
+        {
+            get => _isProvisioning;
+            set
+            {
+                if (_isProvisioning != value)
+                {
+                    _isProvisioning = value;
+                    OnPropertyChanged(new PropertyChangedEventArgs(nameof(IsProvisioning)));
+                }
+            }
+        }
+
+        public bool ProtectedLoadSucceeded { get; set; }
+
         public void SetEditedProject(Project editedProject)
         {
             this.editedProject = editedProject;
         }
 
-        public void SaveProject(Project projectToSave)
+        public bool SaveProject(Project projectToSave)
         {
-            SendEditTelemetryEvent(projectToSave, editedProject);
+            if (!CanModifyWorkspaces())
+            {
+                return false;
+            }
+
+            projectToSave.Applications =
+                projectToSave.Applications.Where(x => x.IsIncluded).ToList();
+            var updatedWorkspaces = Workspaces
+                .Select(project => project.Id == editedProject.Id ? projectToSave : project)
+                .ToList();
+            if (!_workspacesEditorIO.SerializeWorkspaces(updatedWorkspaces))
+            {
+                return false;
+            }
 
             if (editedProject.Name != projectToSave.Name)
             {
                 RemoveShortcut(editedProject);
             }
 
-            editedProject.Name = projectToSave.Name;
-            editedProject.IsShortcutNeeded = projectToSave.IsShortcutNeeded;
-            editedProject.MoveExistingWindows = projectToSave.MoveExistingWindows;
-            editedProject.PreviewIcons = projectToSave.PreviewIcons;
-            editedProject.PreviewImage = projectToSave.PreviewImage;
-            editedProject.Applications = projectToSave.Applications.Where(x => x.IsIncluded).ToList();
+            projectToSave.OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs("AppsCountString"));
+            projectToSave.Initialize(App.GetCurrentTheme());
 
-            editedProject.OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs("AppsCountString"));
-            editedProject.Initialize(App.GetCurrentTheme());
-            _workspacesEditorIO.SerializeWorkspaces(Workspaces.ToList());
-            ApplyShortcut(editedProject);
+            CommitPersistedWorkspaces(updatedWorkspaces);
+            ApplyShortcut(projectToSave);
+            SendEditTelemetryEvent(projectToSave, editedProject);
+            return true;
         }
 
         private string GetDesktopShortcutAddress(Project project) => Path.Combine(FolderUtils.Desktop(), project.Name + ".lnk");
@@ -288,6 +326,11 @@ namespace WorkspacesEditor.ViewModels
 
         public void EditProject(Project selectedProject, bool isNewlyCreated = false)
         {
+            if (!CanModifyWorkspaces())
+            {
+                return;
+            }
+
             editPage = new ProjectEditor(this);
 
             SetEditedProject(selectedProject);
@@ -339,25 +382,74 @@ namespace WorkspacesEditor.ViewModels
             project.IsShortcutNeeded = File.Exists(shortcutAddress);
         }
 
-        public void AddNewProject(Project project)
+        public bool AddNewProject(Project project)
         {
+            if (!CanModifyWorkspaces())
+            {
+                return false;
+            }
+
             project.Applications.RemoveAll(app => !app.IsIncluded);
             project.Initialize(App.GetCurrentTheme());
-            Workspaces.Add(project);
-            _workspacesEditorIO.SerializeWorkspaces(Workspaces.ToList());
-            TempProjectData.DeleteTempFile();
-            OnPropertyChanged(new PropertyChangedEventArgs(nameof(WorkspacesView)));
+            var updatedWorkspaces = Workspaces.Where(existing => existing.Id != project.Id).Append(project).ToList();
+            if (!_workspacesEditorIO.SerializeWorkspaces(updatedWorkspaces))
+            {
+                return false;
+            }
+
+            CommitPersistedWorkspaces(updatedWorkspaces);
+            if (!TempProjectData.DeleteTempFile())
+            {
+                return false;
+            }
+
             ApplyShortcut(project);
             SendCreateTelemetryEvent(project);
+            return true;
         }
 
-        public void DeleteProject(Project selectedProject)
+        public bool DeleteProject(Project selectedProject)
         {
-            Workspaces.Remove(selectedProject);
-            _workspacesEditorIO.SerializeWorkspaces(Workspaces.ToList());
+            if (!CanModifyWorkspaces())
+            {
+                return false;
+            }
+
+            var updatedWorkspaces = Workspaces.Where(project => project != selectedProject).ToList();
+            if (!_workspacesEditorIO.SerializeWorkspaces(
+                    updatedWorkspaces,
+                    removedIds: new HashSet<string>(StringComparer.Ordinal) { selectedProject.Id }))
+            {
+                return false;
+            }
+
+            CommitPersistedWorkspaces(updatedWorkspaces);
             RemoveShortcut(selectedProject);
-            OnPropertyChanged(new PropertyChangedEventArgs(nameof(WorkspacesView)));
             SendDeleteTelemetryEvent();
+            return true;
+        }
+
+        private void CommitPersistedWorkspaces(List<Project> persistedWorkspaces)
+        {
+            Workspaces = new ObservableCollection<Project>(persistedWorkspaces);
+            Initialize();
+        }
+
+        private bool CanModifyWorkspaces()
+        {
+            if (!IsProvisioning && ProtectedLoadSucceeded)
+            {
+                return true;
+            }
+
+            System.Windows.MessageBox.Show(
+                IsProvisioning
+                    ? "Workspaces is still finishing protected settings setup. Please wait a moment for your existing workspaces to load before making changes."
+                    : "PowerToys couldn't safely load the protected workspace list. Restart PowerToys or reopen the Workspaces editor, and wait for your saved workspaces to appear before making changes.",
+                "Workspaces",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Information);
+            return false;
         }
 
         private void RemoveShortcut(Project selectedProject)
@@ -388,6 +480,7 @@ namespace WorkspacesEditor.ViewModels
             OnPropertyChanged(new PropertyChangedEventArgs(nameof(SearchTerm)));
             lastUpdatedTimer.Start();
             editedProject = null;
+            editPage = null;
         }
 
         public void LaunchProject(string projectId)

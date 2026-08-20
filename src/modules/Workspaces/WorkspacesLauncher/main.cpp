@@ -96,14 +96,16 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
     // read workspaces
     std::vector<WorkspacesData::WorkspacesProject> workspaces;
     WorkspacesData::WorkspacesProject projectToLaunch{};
+    bool loadedFromTransientHandoff = false;
     if (cmdArgs.invokePoint == InvokePoint::LaunchAndEdit)
     {
-        // check the temp file in case the project is just created and not saved to the workspaces.json yet
-        auto file = WorkspacesData::TempWorkspacesFile();
-        auto res = JsonUtils::ReadSingleWorkspace(file);
-        if (res.isOk() && projectToLaunch.id == cmdArgs.workspaceId)
+        // Check the protected transient handoff in case the project was just
+        // created and is not yet present in the main protected list.
+        auto res = JsonUtils::ReadTransientWorkspaceFromService();
+        if (res.isOk() && res.getValue().id == cmdArgs.workspaceId)
         {
             projectToLaunch = res.getValue();
+            loadedFromTransientHandoff = true;
         }
         else if (res.isError())
         {
@@ -111,10 +113,13 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
             switch (res.error())
             {
             case JsonUtils::WorkspacesFileError::FileReadingError:
-                formattedMessage = fmt::format(GET_RESOURCE_STRING(IDS_FILE_READING_ERROR), file);
+                formattedMessage = GET_RESOURCE_STRING(IDS_SERVICE_ACCESS_ERROR);
                 break;
             case JsonUtils::WorkspacesFileError::IncorrectFileError:
-                formattedMessage = fmt::format(GET_RESOURCE_STRING(IDS_INCORRECT_FILE_ERROR), file);
+                formattedMessage = GET_RESOURCE_STRING(IDS_SERVICE_ACCESS_ERROR);
+                break;
+            case JsonUtils::WorkspacesFileError::ServiceAccessError:
+                formattedMessage = GET_RESOURCE_STRING(IDS_SERVICE_ACCESS_ERROR);
                 break;
             }
 
@@ -125,8 +130,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
 
     if (projectToLaunch.id.empty())
     {
-        auto file = WorkspacesData::WorkspacesFile();
-        auto res = JsonUtils::ReadWorkspaces(file);
+        auto res = JsonUtils::ReadWorkspacesFromService();
         if (res.isOk())
         {
             workspaces = res.getValue();
@@ -137,10 +141,13 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
             switch (res.error())
             {
             case JsonUtils::WorkspacesFileError::FileReadingError:
-                formattedMessage = fmt::format(GET_RESOURCE_STRING(IDS_FILE_READING_ERROR), file);
+                formattedMessage = GET_RESOURCE_STRING(IDS_SERVICE_ACCESS_ERROR);
                 break;
             case JsonUtils::WorkspacesFileError::IncorrectFileError:
-                formattedMessage = fmt::format(GET_RESOURCE_STRING(IDS_INCORRECT_FILE_ERROR), file);
+                formattedMessage = GET_RESOURCE_STRING(IDS_SERVICE_ACCESS_ERROR);
+                break;
+            case JsonUtils::WorkspacesFileError::ServiceAccessError:
+                formattedMessage = GET_RESOURCE_STRING(IDS_SERVICE_ACCESS_ERROR);
                 break;
             }
 
@@ -150,8 +157,8 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
 
         if (workspaces.empty())
         {
-            Logger::warn("Workspaces file is empty");
-            std::wstring formattedMessage = fmt::format(GET_RESOURCE_STRING(IDS_EMPTY_FILE), file);
+            Logger::warn("Protected Workspaces settings are empty");
+            std::wstring formattedMessage = fmt::format(GET_RESOURCE_STRING(IDS_PROJECT_NOT_FOUND), cmdArgs.workspaceId);
             MessageBox(NULL, formattedMessage.c_str(), GET_RESOURCE_STRING(IDS_WORKSPACES).c_str(), MB_ICONERROR | MB_OK);
             return 1;
         }
@@ -192,16 +199,23 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
     // update the file before launching, so WorkspacesWindowArranger and WorkspacesLauncherUI could get updated app paths
     if (updatedApps || updatedIds)
     {
-        for (int i = 0; i < workspaces.size(); i++)
+        if (loadedFromTransientHandoff)
         {
-            if (workspaces[i].id == projectToLaunch.id)
-            {
-                workspaces[i] = projectToLaunch;
-                break;
-            }
+            JsonUtils::WriteTransientWorkspaceToService(projectToLaunch);
         }
+        else
+        {
+            for (int i = 0; i < workspaces.size(); i++)
+            {
+                if (workspaces[i].id == projectToLaunch.id)
+                {
+                    workspaces[i] = projectToLaunch;
+                    break;
+                }
+            }
 
-        json::to_file(WorkspacesData::WorkspacesFile(), WorkspacesData::WorkspacesListJSON::ToJson(workspaces));
+            JsonUtils::WriteWorkspacesToService(workspaces);
+        }
     }
 
     // launch

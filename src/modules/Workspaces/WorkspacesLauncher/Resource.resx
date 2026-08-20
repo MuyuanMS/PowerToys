@@ -129,6 +129,9 @@
   <data name="Incorrect_file_error" xml:space="preserve">
     <value>Incorrect {0} file.</value>
   </data>
+  <data name="Service_access_error" xml:space="preserve">
+    <value>PowerToys couldn't access the protected Workspaces settings. Open the Workspaces editor (or restart PowerToys) to finish settings-service setup, then try again.</value>
+  </data>
   <data name="Workspaces" xml:space="preserve">
     <value>Workspaces</value>
     <comment>Name of the module</comment>

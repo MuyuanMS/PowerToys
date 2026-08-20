@@ -45,26 +45,26 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
     std::vector<WorkspacesData::WorkspacesProject> workspaces;
     WorkspacesData::WorkspacesProject projectToLaunch{};
 
-    // check the temp file in case the project is just created and not saved to the workspaces.json yet
-    if (std::filesystem::exists(WorkspacesData::TempWorkspacesFile()))
+    // Check the protected transient handoff in case the project was just
+    // created and not saved to the main protected list yet.
+    auto transient = JsonUtils::ReadTransientWorkspaceFromService();
+    if (transient.isOk() && !transient.getValue().id.empty())
     {
-        auto file = WorkspacesData::TempWorkspacesFile();
-        auto res = JsonUtils::ReadSingleWorkspace(file);
-        if (res.isOk() && res.value().id == args.workspaceId)
+        if (transient.getValue().id == args.workspaceId)
         {
-            projectToLaunch = res.getValue();
+            projectToLaunch = transient.getValue();
         }
-        else if (res.isError())
-        {
-            Logger::error(L"Error reading temp file");
-            return 1;
-        }
+    }
+    else if (transient.isError())
+    {
+        Logger::error(L"Error reading protected transient workspace");
+        return 1;
     }
     
     if (projectToLaunch.id.empty())
     {
         auto file = WorkspacesData::WorkspacesFile();
-        auto res = JsonUtils::ReadWorkspaces(file);
+        auto res = JsonUtils::ReadWorkspacesFromService();
         if (res.isOk())
         {
             workspaces = res.getValue();
