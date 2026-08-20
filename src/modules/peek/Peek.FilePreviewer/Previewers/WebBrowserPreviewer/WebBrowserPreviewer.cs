@@ -174,9 +174,9 @@ namespace Peek.FilePreviewer.Previewers
         /// recognize, whose content is sniffed to be text. Should only be consulted after every
         /// other previewer (including the shell preview handler) has declined the item.
         /// </summary>
-        public static bool IsTextFallbackSupported(IFileSystemItem item)
+        public static Task<bool> IsTextFallbackSupportedAsync(IFileSystemItem item, CancellationToken cancellationToken)
         {
-            return item is FileItem && !IsItemSupported(item) && TextFileHelper.IsTextFile(item.Path);
+            return item is FileItem && !IsItemSupported(item) ? TextFileHelper.IsTextFileAsync(item.Path, cancellationToken) : Task.FromResult(false);
         }
 
         private bool HasFailedLoadingPreview()

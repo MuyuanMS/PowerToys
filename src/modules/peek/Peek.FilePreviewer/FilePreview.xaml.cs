@@ -254,7 +254,15 @@ namespace Peek.FilePreviewer
                 return;
             }
 
-            Previewer = previewerFactory.Create(Item);
+            try
+            {
+                Previewer = await previewerFactory.CreateAsync(Item, _cancellationTokenSource.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
             if (Previewer is IImagePreviewer imagePreviewer)
             {
                 imagePreviewer.ScalingFactor = ScalingFactor;

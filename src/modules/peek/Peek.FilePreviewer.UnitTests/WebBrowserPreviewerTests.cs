@@ -5,6 +5,8 @@
 using System;
 using System.IO;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Peek.Common.Models;
 using Peek.FilePreviewer.Previewers;
@@ -49,48 +51,48 @@ namespace Peek.FilePreviewer.UnitTests
         }
 
         [TestMethod]
-        public void IsTextFallbackSupported_UnrecognizedExtensionWithTextContent_ShouldReturnTrue()
+        public async Task IsTextFallbackSupported_UnrecognizedExtensionWithTextContent_ShouldReturnTrue()
         {
             string path = CreateTempFile(".zzzzunknown", Encoding.UTF8.GetBytes("plain text content"));
             var item = new FileItem(path, Path.GetFileName(path));
 
-            Assert.IsTrue(WebBrowserPreviewer.IsTextFallbackSupported(item));
+            Assert.IsTrue(await WebBrowserPreviewer.IsTextFallbackSupportedAsync(item, CancellationToken.None));
         }
 
         [TestMethod]
-        public void IsTextFallbackSupported_UnrecognizedExtensionWithBinaryContent_ShouldReturnFalse()
+        public async Task IsTextFallbackSupported_UnrecognizedExtensionWithBinaryContent_ShouldReturnFalse()
         {
             string path = CreateTempFile(".zzzzunknown", new byte[] { 0x00, 0x01, 0x02, 0x03 });
             var item = new FileItem(path, Path.GetFileName(path));
 
-            Assert.IsFalse(WebBrowserPreviewer.IsTextFallbackSupported(item));
+            Assert.IsFalse(await WebBrowserPreviewer.IsTextFallbackSupportedAsync(item, CancellationToken.None));
         }
 
         // IsItemSupported should short-circuit the fallback for extensions Peek already recognizes.
         [TestMethod]
-        public void IsTextFallbackSupported_AlreadySupportedExtension_ShouldReturnFalse()
+        public async Task IsTextFallbackSupported_AlreadySupportedExtension_ShouldReturnFalse()
         {
             string path = CreateTempFile(".md", Encoding.UTF8.GetBytes("# heading"));
             var item = new FileItem(path, Path.GetFileName(path));
 
-            Assert.IsFalse(WebBrowserPreviewer.IsTextFallbackSupported(item));
+            Assert.IsFalse(await WebBrowserPreviewer.IsTextFallbackSupportedAsync(item, CancellationToken.None));
         }
 
         [TestMethod]
-        public void IsTextFallbackSupported_FolderItem_ShouldReturnFalse()
+        public async Task IsTextFallbackSupported_FolderItem_ShouldReturnFalse()
         {
             var item = new FolderItem(@"C:\some\folder", "folder", "folder");
 
-            Assert.IsFalse(WebBrowserPreviewer.IsTextFallbackSupported(item));
+            Assert.IsFalse(await WebBrowserPreviewer.IsTextFallbackSupportedAsync(item, CancellationToken.None));
         }
 
         [TestMethod]
-        public void IsTextFallbackSupported_MissingFile_ShouldReturnFalse()
+        public async Task IsTextFallbackSupported_MissingFile_ShouldReturnFalse()
         {
             string missingPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".zzzzunknown");
             var item = new FileItem(missingPath, Path.GetFileName(missingPath));
 
-            Assert.IsFalse(WebBrowserPreviewer.IsTextFallbackSupported(item));
+            Assert.IsFalse(await WebBrowserPreviewer.IsTextFallbackSupportedAsync(item, CancellationToken.None));
         }
     }
 }

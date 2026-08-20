@@ -2,6 +2,9 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Threading;
+using System.Threading.Tasks;
+
 using Microsoft.PowerToys.Telemetry;
 using Microsoft.UI.Xaml;
 using Peek.Common.Extensions;
@@ -23,7 +26,28 @@ namespace Peek.FilePreviewer.Previewers
             _previewSettings = Application.Current.GetService<IPreviewSettings>();
         }
 
+        public async Task<IPreviewer> CreateAsync(IFileSystemItem item, CancellationToken cancellationToken)
+        {
+            var previewer = CreateKnownPreviewer(item);
+            if (previewer != null)
+            {
+                return previewer;
+            }
+
+            if (await WebBrowserPreviewer.IsTextFallbackSupportedAsync(item, cancellationToken))
+            {
+                return new WebBrowserPreviewer(item, _previewSettings);
+            }
+
+            return CreateDefaultPreviewer(item);
+        }
+
         public IPreviewer Create(IFileSystemItem item)
+        {
+            return CreateKnownPreviewer(item) ?? CreateDefaultPreviewer(item);
+        }
+
+        private IPreviewer? CreateKnownPreviewer(IFileSystemItem item)
         {
             if (ImagePreviewer.IsItemSupported(item))
             {
@@ -57,14 +81,8 @@ namespace Peek.FilePreviewer.Previewers
             {
                 return new SpecialFolderPreviewer(item);
             }
-            else if (WebBrowserPreviewer.IsTextFallbackSupported(item))
-            {
-                // No recognized extension, but the content was sniffed as text - preview it as plain text.
-                return new WebBrowserPreviewer(item, _previewSettings);
-            }
 
-            // Other previewer types check their supported file types here
-            return CreateDefaultPreviewer(item);
+            return null;
         }
 
         public IPreviewer CreateDefaultPreviewer(IFileSystemItem file)
