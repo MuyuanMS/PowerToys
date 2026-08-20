@@ -20,7 +20,6 @@ namespace winrt::PowerToys::Interop::implementation
         static hstring AdvancedPasteShowUIMessage();
         static hstring AdvancedPasteMarkdownMessage();
         static hstring AdvancedPasteJsonMessage();
-        static hstring AdvancedPasteSingleLineMessage();
         static hstring AdvancedPasteAdditionalActionMessage();
         static hstring AdvancedPasteCustomActionMessage();
         static hstring AdvancedPasteTerminateAppMessage();
@@ -83,6 +82,7 @@ namespace winrt::PowerToys::Interop::implementation
         static hstring MWBReconnectEvent();
         static hstring OpenNewKeyboardManagerEvent();
         static hstring KeyboardManagerEngineInstanceMutex();
+        static hstring AdvancedPasteSingleLineMessage();
     };
 }
 
