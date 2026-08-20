@@ -61,10 +61,10 @@ Each item is annotated with two metadata tags:
 
 ### New / updated since v0.96 (PR-derived)
 
-- [ ] **[ADMIN: NO]** (#49647) Open Settings, set the Paste-as-Single-Line direct hotkey - chord saved to settings.json
-- [ ] **[ADMIN: NO]** (#49647) Copy multiline text; paste with the set hotkey - line breaks and surrounding line whitespace are replaced with single spaces
-- [ ] **[ADMIN: NO]** (#49647) Copy multiline text; open AP, click "Paste as single line" - text is pasted on one line
-- [ ] **[ADMIN: NO]** (#49647) Copy multiline text; open AP, press Ctrl+2 - text is pasted on one line
+- [ ] **[ADMIN: NO]** ([microsoft/PowerToys PR 49647](https://github.com/microsoft/PowerToys/pull/49647)) Open Settings, set the Paste-as-Single-Line direct hotkey - chord saved to settings.json
+- [ ] **[ADMIN: NO]** ([microsoft/PowerToys PR 49647](https://github.com/microsoft/PowerToys/pull/49647)) Copy multiline text; paste with the set hotkey - line breaks and surrounding line whitespace are replaced with single spaces
+- [ ] **[ADMIN: NO]** ([microsoft/PowerToys PR 49647](https://github.com/microsoft/PowerToys/pull/49647)) Copy multiline text; open AP, click "Paste as single line" - text is pasted on one line
+- [ ] **[ADMIN: NO]** ([microsoft/PowerToys PR 49647](https://github.com/microsoft/PowerToys/pull/49647)) Copy multiline text; open AP, press Ctrl+2 - text is pasted on one line
 
 - [ ] **[ADMIN: NO]** (#43990) Copy a hex color string (e.g. `#3478F6`), open Clipboard history in AP - that entry shows an RGB color-swatch preview next to the value
 - [ ] **[ADMIN: NO]** (#44021) Copy an image to the clipboard, open AP - image is accepted as input (image-input handling); a custom/AI action can run on it (image preview shown, no error)
