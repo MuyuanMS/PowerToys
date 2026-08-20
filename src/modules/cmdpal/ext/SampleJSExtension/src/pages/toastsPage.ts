@@ -3,7 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 import { DynamicListPageBase, InvokableCommandBase, ListItemBase, NoOpCommand } from '@microsoft/cmdpal-sdk';
-import type { CommandResult, IListItem } from '@microsoft/cmdpal-sdk';
+import type { CommandResult, ICommand, IconInfo, IListItem } from '@microsoft/cmdpal-sdk';
 import { icon } from '../util.js';
 import { ShowToastCommand, StatusMessageCommand } from '../commands/statusCommands.js';
 
@@ -11,20 +11,38 @@ import { ShowToastCommand, StatusMessageCommand } from '../commands/statusComman
 class KeepOpenToastCommand extends InvokableCommandBase {
   readonly id: string;
   readonly name: string;
+  override icon: IconInfo | null = null;
 
   private readonly message: string;
+  private readonly toastIcon?: IconInfo | null;
+  private readonly actionCommand?: ICommand;
 
-  constructor(id: string, name: string, message: string) {
+  constructor(
+    id: string,
+    name: string,
+    message: string,
+    options?: {
+      toastIcon?: IconInfo | null;
+      actionCommand?: ICommand;
+    },
+  ) {
     super();
     this.id = id;
     this.name = name;
     this.message = message;
+    this.toastIcon = options?.toastIcon;
+    this.actionCommand = options?.actionCommand;
   }
 
   override invoke(): CommandResult {
     return {
       kind: 'showToast',
-      args: { message: this.message, result: { kind: 'keepOpen' } },
+      args: {
+        message: this.message,
+        result: { kind: 'keepOpen' },
+        icon: this.toastIcon,
+        command: this.actionCommand,
+      },
     };
   }
 }
@@ -32,11 +50,6 @@ class KeepOpenToastCommand extends InvokableCommandBase {
 /**
  * Demonstrates `showToast` command results and lets the user send a custom
  * toast typed into the search box. Mirrors the C# `SampleToastsPage`.
- *
- * Not-yet-supported in the JS protocol: `ToastArgs` carries a `message` and an
- * optional follow-up `result` only. The C# toast icon and action button
- * (`IToastArgs2.Icon` / `IToastArgs2.Command`) have no JS equivalent, so those
- * variants are omitted.
  */
 export class SampleToastsPage extends DynamicListPageBase {
   readonly id = 'sample-toasts-page';
@@ -53,6 +66,26 @@ export class SampleToastsPage extends DynamicListPageBase {
 
   override getItems(): IListItem[] {
     const query = (this.searchText ?? '').trim();
+    const iconToast = new KeepOpenToastCommand(
+      'icon-toast',
+      'Show toast with icon',
+      'This toast has an icon next to its message.',
+      { toastIcon: icon('\uE73E') },
+    );
+    iconToast.icon = icon('\uE73E');
+
+    const undoCommand = new KeepOpenToastCommand('toast-undo', 'Undo', 'Delete undone!');
+    undoCommand.icon = icon('\uE7A7');
+    const actionToast = new KeepOpenToastCommand(
+      'action-toast',
+      'Show toast with action',
+      'Item deleted.',
+      {
+        toastIcon: icon('\uE74D'),
+        actionCommand: undoCommand,
+      },
+    );
+    actionToast.icon = icon('\uE74D');
 
     const customItem =
       query.length > 0
@@ -96,6 +129,18 @@ export class SampleToastsPage extends DynamicListPageBase {
         title: 'Long, wrapping toast',
         subtitle: 'Verifies multi-line wrapping inside the banner',
         icon: icon('\uE7C3'),
+      }),
+      new ListItemBase({
+        command: iconToast,
+        title: 'Toast with an icon',
+        subtitle: 'ToastArgs.icon is serialized and rendered by the host',
+        icon: icon('\uE73E'),
+      }),
+      new ListItemBase({
+        command: actionToast,
+        title: 'Toast with an action button',
+        subtitle: 'ToastArgs.command renders an action button (for example Undo)',
+        icon: icon('\uE7A7'),
       }),
       new ListItemBase({
         command: new StatusMessageCommand(

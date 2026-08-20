@@ -762,7 +762,7 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
     {
         _id = ReadHandshakeString(metadata, "id", "Id") ?? _manifest.Name ?? "unknown";
         _displayName = ReadHandshakeString(metadata, "displayName", "DisplayName") ?? _manifest.EffectiveDisplayName;
-        _icon = ReadHandshakeIcon(metadata) ?? new IconInfo(_manifest.Icon ?? string.Empty);
+        _icon = ReadHandshakeIcon(metadata) ?? new IconInfo(_manifest.IconPath ?? _manifest.Icon ?? string.Empty);
     }
 
     // Reads a string field declared in the initialize handshake metadata, accepting

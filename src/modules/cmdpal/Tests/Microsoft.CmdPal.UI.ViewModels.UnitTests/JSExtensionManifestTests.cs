@@ -634,6 +634,25 @@ public class JSExtensionManifestTests
     }
 
     [TestMethod]
+    public void TryParse_AbsoluteIconPath_ResolvesToEmpty()
+    {
+        CreateEntryPoint("dist/index.js");
+        var iconPath = Path.Combine(_testDirectory, "assets", "icon.png");
+        var json = $$"""
+        {
+            "name": "absolute-icon",
+            "main": "dist/index.js",
+            "cmdpal": { "icon": {{System.Text.Json.JsonSerializer.Serialize(iconPath)}} }
+        }
+        """;
+
+        var result = JSExtensionManifest.TryParse(json, _testDirectory);
+
+        Assert.IsTrue(result.IsValid, result.FailureReason);
+        Assert.AreEqual(string.Empty, result.Manifest!.IconPath);
+    }
+
+    [TestMethod]
     public void TryParse_GlyphIcon_IsPreservedUnchanged()
     {
         CreateEntryPoint("dist/index.js");

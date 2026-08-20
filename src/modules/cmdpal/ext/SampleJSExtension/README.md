@@ -44,10 +44,9 @@ inventing protocol methods:
 - Parameter pages (`SimpleParameterTest`, `ButtonParameterTest`,
   `MixedParamTestPage`) and the create-note list-parameter page. No parameter
   run protocol.
-- Drag and drop via `DataPackage`. `IListItem` has no `DataPackage`, so the
-  clipboard demo copies to the clipboard instead.
-- Toast icon and toast action button (`IToastArgs2`). `ToastArgs` carries a
-  message and an optional follow-up result only.
+- Drag and drop via `DataPackage`. The C# sample uses `DataPackage`, but the JS
+  protocol still has no `IListItem.dataPackage`, so the clipboard demo copies
+  to the clipboard instead.
 - Details size (Small/Medium/Large). The JS `Details` type has no size, so the
   variants collapse to the default.
 - Live-updating details through targeted property change. Approximated with a

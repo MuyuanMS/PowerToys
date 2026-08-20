@@ -186,6 +186,23 @@ public partial class JSAdapterRemediationTests
         Assert.AreEqual("Test Extension", provider.DisplayName);
     }
 
+    [TestMethod]
+    public void Provider_ManifestIconPath_IsUsedForManifestFallback()
+    {
+        using var fake = new JSFakeExtension();
+        var provider = new JSCommandProviderProxy(
+            fake.Connection,
+            new JSExtensionManifest
+            {
+                Name = "test.ext",
+                DisplayName = "Test Extension",
+                Icon = "assets/icon.png",
+                IconPath = @"C:\extensions\sample\assets\icon.png",
+            });
+
+        Assert.AreEqual(@"C:\extensions\sample\assets\icon.png", provider.Icon.Light.Icon);
+    }
+
     // r3-p3-05: a pending show holds the status lock, so a dispose-triggered hide
     // cannot run until the show has been dispatched. The recorded order is always
     // show then hide, never hide before show.

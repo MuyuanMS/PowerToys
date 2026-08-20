@@ -96,6 +96,7 @@ export class SingleMessageCommand extends InvokableCommandBase {
     }
 
     this.name = this.statusId !== null ? 'Hide' : 'Show';
+    this.notifyPropChanged('name');
     return { kind: 'keepOpen' };
   }
 }
