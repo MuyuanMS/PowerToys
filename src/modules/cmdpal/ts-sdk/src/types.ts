@@ -350,10 +350,10 @@ export interface Details {
   metadata?: DetailsElement[];
   /**
    * Size of the details pane. Accepts the string names 'small', 'medium', or
-   * 'large', or the numeric `ContentSize` value the host uses (0, 1, 2).
+   * 'large', or the numeric `ContentSize` value the host uses (0, 1, or 2).
    * Defaults to 'small' when omitted.
    */
-  size?: DetailsSize | number;
+  size?: DetailsSize | 0 | 1 | 2;
 }
 
 // === Filters ===
