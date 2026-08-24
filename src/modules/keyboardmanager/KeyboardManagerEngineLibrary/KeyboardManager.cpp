@@ -17,6 +17,8 @@
 
 HHOOK KeyboardManager::hookHandleCopy;
 HHOOK KeyboardManager::hookHandle;
+HHOOK KeyboardManager::mouseHookHandle;
+HHOOK KeyboardManager::mouseHookHandleCopy;
 KeyboardManager* KeyboardManager::keyboardManagerObjectPtr;
 
 namespace
@@ -59,6 +61,10 @@ KeyboardManager::KeyboardManager()
         if (!loadedSuccessfully)
             return;
 
+        // Runtime sets belong to the hook thread. Request a pending-state reset there instead of
+        // mutating them from EventWaiter's worker thread.
+        resetAlonePendingState = true;
+
         const bool newHasRemappings = HasRegisteredRemappingsUnchecked();
         // We didn't have any bindings before and we have now
         if (newHasRemappings && !hookHandle)
@@ -67,6 +73,16 @@ KeyboardManager::KeyboardManager()
         // All bindings were removed
         if (!newHasRemappings && hookHandle)
             StopLowlevelKeyboardHook();
+
+        // The set of "Alone" (dual-key) remaps may have changed without changing whether ANY binding
+        // exists, so reconcile the companion mouse hook. Route an install through the same StartHook
+        // message (SetWindowsHookEx must run on the hook thread); a removal is safe inline, mirroring
+        // the StopLowlevelKeyboardHook call above.
+        const bool needMouseHook = !state.aloneSingleKeyReMap.empty();
+        if (needMouseHook && hookHandle && !mouseHookHandle)
+            PostThreadMessageW(mainThreadId, StartHookMessageID, 0, 0);
+        else if (!needMouseHook && mouseHookHandle)
+            StopLowlevelMouseHook();
     };
 
     editorIsRunningEvent = CreateEvent(nullptr, true, false, KeyboardManagerConstants::EditorWindowEventName.c_str());
@@ -83,6 +99,7 @@ void KeyboardManager::LoadSettings()
         // retry once
         state.LoadSettings();
     }
+
     try
     {
         // Send telemetry about configured key/shortcut to key/shortcut mappings, OS an app specific level.
@@ -126,8 +143,64 @@ LRESULT CALLBACK KeyboardManager::HookProc(int nCode, const WPARAM wParam, const
     return CallNextHookEx(hookHandleCopy, nCode, wParam, lParam);
 }
 
+LRESULT CALLBACK KeyboardManager::MouseHookProc(int nCode, const WPARAM wParam, const LPARAM lParam)
+{
+    if (nCode == HC_ACTION)
+    {
+        // Only a deliberate button-press or wheel means a held alone key is being used in
+        // combination. Mouse MOVE must NOT count, or an incidental move would swallow the tap.
+        // Mouse events are never suppressed here — we only promote the held key, then pass through.
+        switch (wParam)
+        {
+        case WM_LBUTTONDOWN:
+        case WM_RBUTTONDOWN:
+        case WM_MBUTTONDOWN:
+        case WM_XBUTTONDOWN:
+        case WM_MOUSEWHEEL:
+        case WM_MOUSEHWHEEL:
+            keyboardManagerObjectPtr->HandleMouseHookEvent();
+            break;
+        default:
+            break;
+        }
+    }
+
+    return CallNextHookEx(mouseHookHandleCopy, nCode, wParam, lParam);
+}
+
+void KeyboardManager::HandleMouseHookEvent() noexcept
+{
+    ApplyAloneStateReset();
+
+    if (loadingSettings)
+    {
+        return;
+    }
+
+    // Suspend while the remap key/shortcut editor window is capturing input, mirroring
+    // HandleKeyboardHookEvent.
+    if (editorIsRunningEvent != nullptr && WaitForSingleObject(editorIsRunningEvent, 0) == WAIT_OBJECT_0)
+    {
+        state.ClearAlonePendingKeys();
+        return;
+    }
+
+    // Common path: no alone key is held, so a click/scroll is none of our business.
+    if (!state.HasPendingAloneKeys())
+    {
+        return;
+    }
+
+    // An alone-mapped key is held and the user clicked/scrolled: promote it to a real modifier so
+    // the mouse action is seen in combination (e.g. Ctrl+Click, Ctrl+Wheel). The matching real
+    // key-up is injected by the keyboard handler when the alone key is released.
+    KeyboardEventHandlers::PromotePendingAloneKeysToCombination(inputHandler, state);
+}
+
 void KeyboardManager::StartLowlevelKeyboardHook()
 {
+    ApplyAloneStateReset();
+
 #if defined(DISABLE_LOWLEVEL_HOOKS_WHEN_DEBUGGED)
     if (IsDebuggerPresent())
     {
@@ -147,6 +220,18 @@ void KeyboardManager::StartLowlevelKeyboardHook()
             Trace::Error(errorCode, errorMessage.has_value() ? errorMessage.value() : L"", L"StartLowlevelKeyboardHook::SetWindowsHookEx");
         }
     }
+
+    // The "Alone" (dual-key) feature also needs a mouse hook so a click/scroll while an alone key is
+    // held counts as a combination. Only install it when alone remaps exist; keep it in sync with the
+    // keyboard hook (this runs on the hook message-loop thread, where SetWindowsHookEx must be called).
+    if (!state.aloneSingleKeyReMap.empty())
+    {
+        StartLowlevelMouseHook();
+    }
+    else
+    {
+        StopLowlevelMouseHook();
+    }
 }
 
 void KeyboardManager::StopLowlevelKeyboardHook()
@@ -155,6 +240,57 @@ void KeyboardManager::StopLowlevelKeyboardHook()
     {
         UnhookWindowsHookEx(hookHandle);
         hookHandle = nullptr;
+    }
+
+    StopLowlevelMouseHook();
+    // This may run on EventWaiter's worker thread. Defer runtime-set mutation until the hook thread
+    // starts or receives another event.
+    resetAllAloneState = true;
+    resetAlonePendingState = false;
+}
+
+void KeyboardManager::ApplyAloneStateReset() noexcept
+{
+    if (resetAllAloneState.exchange(false))
+    {
+        state.ClearAllAloneKeyState();
+        resetAlonePendingState = false;
+    }
+    else if (resetAlonePendingState.exchange(false))
+    {
+        state.ClearAlonePendingKeys();
+    }
+}
+
+void KeyboardManager::StartLowlevelMouseHook()
+{
+#if defined(DISABLE_LOWLEVEL_HOOKS_WHEN_DEBUGGED)
+    if (IsDebuggerPresent())
+    {
+        return;
+    }
+#endif
+
+    if (!mouseHookHandle)
+    {
+        mouseHookHandle = SetWindowsHookEx(WH_MOUSE_LL, MouseHookProc, GetModuleHandle(NULL), NULL);
+        mouseHookHandleCopy = mouseHookHandle;
+        if (!mouseHookHandle)
+        {
+            DWORD errorCode = GetLastError();
+            show_last_error_message(L"SetWindowsHookEx", errorCode, L"PowerToys - Keyboard Manager");
+            auto errorMessage = get_last_error_message(errorCode);
+            Trace::Error(errorCode, errorMessage.has_value() ? errorMessage.value() : L"", L"StartLowlevelMouseHook::SetWindowsHookEx");
+        }
+    }
+}
+
+void KeyboardManager::StopLowlevelMouseHook()
+{
+    if (mouseHookHandle)
+    {
+        UnhookWindowsHookEx(mouseHookHandle);
+        mouseHookHandle = nullptr;
     }
 }
 
@@ -181,24 +317,48 @@ bool KeyboardManager::HasRegisteredRemappings() const
 
 bool KeyboardManager::HasRegisteredRemappingsUnchecked() const
 {
-    return !(state.appSpecificShortcutReMap.empty() && state.appSpecificShortcutReMapSortedKeys.empty() && state.osLevelShortcutReMap.empty() && state.osLevelShortcutReMapSortedKeys.empty() && state.singleKeyReMap.empty() && state.singleKeyToTextReMap.empty());
+    return !(state.appSpecificShortcutReMap.empty() && state.appSpecificShortcutReMapSortedKeys.empty() && state.osLevelShortcutReMap.empty() && state.osLevelShortcutReMapSortedKeys.empty() && state.singleKeyReMap.empty() && state.aloneSingleKeyReMap.empty() && state.singleKeyToTextReMap.empty());
 }
 
 intptr_t KeyboardManager::HandleKeyboardHookEvent(LowlevelKeyboardEvent* data) noexcept
 {
+    ApplyAloneStateReset();
+
     if (loadingSettings)
     {
+        // Events pass through while settings reload. Forget pending keys, and clear a promoted key's
+        // marker when its physical key-up passes through and releases the injected source key.
+        state.ClearAlonePendingKeys();
+        if ((data->wParam == WM_KEYUP || data->wParam == WM_SYSKEYUP) && state.IsAloneCombination(data->lParam->vkCode))
+        {
+            state.ClearAloneKeyState(data->lParam->vkCode);
+        }
         return 0;
     }
 
     // Suspend remapping if remap key/shortcut window is opened
     if (editorIsRunningEvent != nullptr && WaitForSingleObject(editorIsRunningEvent, 0) == WAIT_OBJECT_0)
     {
+        // Pending keys never injected a key-down and can be forgotten. A promoted key's physical key-up
+        // is passed through while the editor is active, so also forget its combination marker then.
+        state.ClearAlonePendingKeys();
+        if ((data->wParam == WM_KEYUP || data->wParam == WM_SYSKEYUP) && state.IsAloneCombination(data->lParam->vkCode))
+        {
+            state.ClearAloneKeyState(data->lParam->vkCode);
+        }
         return 0;
     }
 
     // If key has suppress flag, then suppress it
     if (data->lParam->dwExtraInfo == KeyboardManagerConstants::KEYBOARDMANAGER_SUPPRESS_FLAG)
+    {
+        return 1;
+    }
+
+    // Remap a key tapped alone (dual-key). Runs before the regular single-key remap so it can hold
+    // the key-down (lazy) and decide tap-vs-combination; if it handles the event, suppress the original.
+    intptr_t SingleKeyAloneRemapResult = KeyboardEventHandlers::HandleSingleKeyAloneRemapEvent(inputHandler, data, state);
+    if (SingleKeyAloneRemapResult == 1)
     {
         return 1;
     }

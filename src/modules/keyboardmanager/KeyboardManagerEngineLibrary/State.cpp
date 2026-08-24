@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "State.h"
+#include <keyboardmanager/common/Helpers.h>
 #include <optional>
 
 // Function to get the iterator of a single key remap given the source key. Returns nullopt if it isn't remapped
@@ -24,6 +25,109 @@ std::optional<std::wstring> State::GetSingleKeyToTextRemapEvent(const DWORD orig
     {
         return std::nullopt;
     }
+}
+
+// Function to get the iterator of an "Alone" single key remap given the source key. Returns nullopt if it isn't remapped
+std::optional<SingleKeyRemapTable::iterator> State::GetSingleKeyAloneRemap(const DWORD& originalKey)
+{
+    auto it = aloneSingleKeyReMap.find(originalKey);
+    if (it != aloneSingleKeyReMap.end())
+    {
+        return it;
+    }
+
+    return std::nullopt;
+}
+
+void State::SetAlonePending(const DWORD key)
+{
+    aloneCombinationKeys.erase(key);
+    alonePendingKeys.insert(key);
+}
+
+bool State::IsAlonePending(const DWORD key) const
+{
+    return alonePendingKeys.find(key) != alonePendingKeys.end();
+}
+
+void State::SetAloneCombination(const DWORD key)
+{
+    alonePendingKeys.erase(key);
+    aloneCombinationKeys.insert(key);
+}
+
+bool State::IsAloneCombination(const DWORD key) const
+{
+    return aloneCombinationKeys.find(key) != aloneCombinationKeys.end();
+}
+
+std::optional<DWORD> State::GetAloneCombinationKeyForScanCode(DWORD scanCode) const
+{
+    for (const DWORD key : aloneCombinationKeys)
+    {
+        const DWORD plainKey = Helpers::ClearKeyNumpadOrigin(key);
+        if (!Helpers::IsNumpadOriginated(key) &&
+            !Helpers::IsNumpadKeyThatIsAffectedByShift(plainKey) &&
+            plainKey != VK_CLEAR)
+        {
+            continue;
+        }
+
+        if (MapVirtualKey(plainKey, MAPVK_VK_TO_VSC) == scanCode)
+        {
+            return key;
+        }
+    }
+
+    return std::nullopt;
+}
+
+void State::ClearAloneKeyState(const DWORD key)
+{
+    alonePendingKeys.erase(key);
+    aloneCombinationKeys.erase(key);
+}
+
+void State::ClearAlonePendingKeys()
+{
+    alonePendingKeys.clear();
+}
+
+void State::ClearAllAloneKeyState()
+{
+    alonePendingKeys.clear();
+    aloneCombinationKeys.clear();
+}
+
+std::vector<DWORD> State::GetPendingAloneKeys() const
+{
+    return std::vector<DWORD>(alonePendingKeys.begin(), alonePendingKeys.end());
+}
+
+bool State::HasPendingAloneKeys() const
+{
+    return !alonePendingKeys.empty();
+}
+
+bool State::HasOtherHeldAloneKey(const DWORD except) const
+{
+    for (const DWORD key : alonePendingKeys)
+    {
+        if (key != except)
+        {
+            return true;
+        }
+    }
+
+    for (const DWORD key : aloneCombinationKeys)
+    {
+        if (key != except)
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 bool State::CheckShortcutRemapInvoked(const std::optional<std::wstring>& appName)
