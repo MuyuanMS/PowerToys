@@ -411,6 +411,8 @@ export interface IListPage extends IPage {
   gridProperties?: GridProperties | null;
   /** Whether more items can be loaded (infinite scroll). */
   hasMoreItems?: boolean;
+  /** Handles a filter selection change from the host. */
+  setFilter?(filterId: string): void | Promise<void>;
   /** Item shown when the list is empty, or `null` for none. */
   emptyContent?: ICommandItem | null;
   /**

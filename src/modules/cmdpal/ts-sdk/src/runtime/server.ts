@@ -139,6 +139,11 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
       try {
         parsed = JSON.parse(body);
       } catch {
+        writeMessage({
+          jsonrpc: JSONRPC_VERSION,
+          id: null,
+          error: { code: -32700, message: 'Parse error' },
+        });
         continue;
       }
       enqueue(parsed);
@@ -183,7 +188,8 @@ const ExtensionHostBridgeProxy: IExtensionHost = {
   log: (message, state) => {
     ExtensionHost.log(message, state);
   },
-  showStatus: (message, state, progress, context) => ExtensionHost.showStatus(message, state, progress, context),
+  showStatus: (message, state, progress, context) =>
+    ExtensionHost.showStatus(message, state, progress, context),
   updateStatus: (statusId, message, state, progress) => {
     ExtensionHost.updateStatus(statusId, message, state, progress);
   },

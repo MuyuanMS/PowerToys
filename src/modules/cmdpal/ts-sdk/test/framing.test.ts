@@ -86,4 +86,14 @@ describe('MessageFramer round-trip', () => {
     const good = encodeMessage({ ok: true });
     expect(decodeAll(framer, Buffer.concat([garbage, good]))).toEqual([{ ok: true }]);
   });
+
+  it.each(['12junk', '1.5', '-1', '01', '9007199254740992'])(
+    'rejects malformed Content-Length value %s and resynchronizes',
+    (length) => {
+      const framer = new MessageFramer();
+      const malformed = Buffer.from(`Content-Length: ${length}\r\n\r\n`, 'ascii');
+      const good = encodeMessage({ ok: true });
+      expect(decodeAll(framer, Buffer.concat([malformed, good]))).toEqual([{ ok: true }]);
+    },
+  );
 });

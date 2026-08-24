@@ -54,7 +54,7 @@ export function resolveCliEntry(argv: readonly string[], env: NodeJS.ProcessEnv)
   if (raw === undefined || raw.length === 0) {
     return null;
   }
-  if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(raw)) {
+  if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(raw) && !/^[a-zA-Z]:[\\/]/.test(raw)) {
     // Already a URL (for example a file: URL); import it as-is.
     return raw;
   }

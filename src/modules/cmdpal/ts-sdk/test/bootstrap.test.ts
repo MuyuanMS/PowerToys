@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 import { afterEach, describe, expect, it } from 'vitest';
+import { pathToFileURL } from 'node:url';
 import { bootstrap, resolveCliEntry } from '../src/runtime/bootstrap.js';
 import { claimProtocolStdout } from '../src/runtime/stdio.js';
 import { encodeMessage } from '../src/runtime/framing.js';
@@ -105,5 +106,10 @@ describe('resolveCliEntry', () => {
     const resolved = resolveCliEntry(['node', 'bootstrap.js', '/abs/entry.js'], {});
     expect(resolved?.startsWith('file://')).toBe(true);
     expect(resolved).toContain('/abs/entry.js');
+  });
+
+  it('converts an absolute Windows filesystem path to a file URL', () => {
+    const entry = 'C:\\extensions\\main.js';
+    expect(resolveCliEntry(['node', 'bootstrap.js', entry], {})).toBe(pathToFileURL(entry).href);
   });
 });

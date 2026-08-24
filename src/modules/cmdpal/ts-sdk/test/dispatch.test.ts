@@ -65,6 +65,7 @@ const listPage: IListPage = {
   id: 'list',
   name: 'List',
   title: 'List',
+  setFilter: vi.fn(),
   getItems() {
     return [{ command: { id: 'item-cmd', name: 'Item' }, title: 'Item One' }];
   },
@@ -176,6 +177,21 @@ describe('ExtensionRuntime request dispatch', () => {
     const result = responseFor(sent, 4)?.result as { items: Array<Record<string, unknown>> };
     expect(result.items).toHaveLength(1);
     expect(result.items[0]).toMatchObject({ id: 'item-cmd', title: 'Item One' });
+  });
+
+  it('passes a filter identifier to a list page filter callback', async () => {
+    const { runtime, sent } = createHarness();
+    await runtime.setProvider(provider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 9,
+      method: 'listPage/setFilter',
+      params: { pageId: 'list', filterId: 'recent' },
+    });
+
+    expect(listPage.setFilter).toHaveBeenLastCalledWith('recent');
+    expect(responseFor(sent, 9)?.result).toBeNull();
   });
 
   it('reports method not found for unknown methods', async () => {
