@@ -463,7 +463,7 @@
     <value>Custom date format for the Clock dock band</value>
   </data>
   <data name="Microsoft_plugin_timedate_SettingClockBandCustomFormat_Description" xml:space="preserve">
-    <value>Only used when 'Custom format' is selected above. Date format syntax plus WOY for the week of the year, e.g. 'ddd dd.MM \KW WOY' shows 'Mon 06.07 KW 28'. WOY follows the week settings above. IWOY (week, two digits), IWYR / IWYY (week-based year, four or two digits) and IDOW (day, 1-7) always use ISO 8601: 'IWYR-\WIWOY-IDOW' shows the ISO week date '2026-W28-2' and 'IWYY \WIWOY' the compact '26 W28'.</value>
+    <value>Only used when 'Custom format' is selected above. Date format syntax plus WOY for the week of the year, e.g. 'ddd dd.MM \KW WOY' shows 'Mon 06.07 KW 28'. WOY follows the week settings above. IWOY (week, two digits), IWYR / IWYY (week-based year, four or two digits) and IDOW (day, 1-7) always use ISO 8601: 'IWYR-\WIWOY-IDOW' shows the ISO week date '2026-W28-1' and 'IWYY \WIWOY' the compact '26 W28'.</value>
   </data>
   <data name="Microsoft_plugin_timedate_SettingClockBandOpensNotificationCenter" xml:space="preserve">
     <value>Open notification center when clicking the Clock dock band</value>
