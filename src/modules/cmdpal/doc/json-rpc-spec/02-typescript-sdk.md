@@ -286,6 +286,7 @@ interface Details {
   title?: string;
   body?: string;              // Markdown-formatted body text
   metadata?: DetailsElement[];
+  size?: 'small' | 'medium' | 'large' | 0 | 1 | 2;
 }
 
 interface DetailsElement {
@@ -300,6 +301,10 @@ type DetailsData =
   | DetailsCommands    // { type: 'commands', commands: ICommand[] }
   | DetailsSeparator;  // { type: 'separator' }
 ```
+
+`size` controls the details pane width. It accepts `'small'`, `'medium'`, or
+`'large'`, or the equivalent numeric `ContentSize` values `0`, `1`, and `2`.
+When omitted, the host uses `'small'`.
 
 ---
 

@@ -246,6 +246,7 @@ Fetches items for a list page.
       "details": {
         "title": "Item One Details",
         "body": "**Rich** markdown description",
+        "size": "large",
         "metadata": [
           { "key": "Author", "data": { "type": "tags", "tags": [{ "text": "mjolley" }] } },
           { "key": "Link", "data": { "type": "link", "link": "https://github.com", "text": "GitHub" } }
@@ -263,6 +264,10 @@ Fetches items for a list page.
   "hasMoreItems": false
 }
 ```
+
+The optional `details.size` field controls the details pane width. It accepts
+`"small"`, `"medium"`, or `"large"`, or the equivalent numeric `ContentSize`
+values `0`, `1`, and `2`; it defaults to `"small"` when omitted.
 
 `hasMoreItems` is a boolean on the response envelope (it defaults to `false` when the extension omits it). `true` tells the host that more pages remain, so the host may issue a [`listPage/loadMore`](#listpageloadmore) request when the user scrolls to the end; `false` means the current items are the full set. The value comes straight from the list page's `hasMoreItems` property.
 
