@@ -2862,6 +2862,9 @@ static HookDisposition HandleMouseEvent(WPARAM message, const MSLLHOOKSTRUCT& mo
         }
         else
         {
+            // Mouse-up may arrive before the next throttled mouse move. Apply its
+            // position so the final rectangle reaches the release coordinate.
+            HandleDragResize(mouse.pt);
             RequestTargetUpdate(
                 g_interaction.target,
                 g_interaction.windowRect,
