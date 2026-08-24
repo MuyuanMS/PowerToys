@@ -13,9 +13,9 @@ public class Settings : ISettingsInterface
     private readonly int firstDayOfWeek;
     private readonly bool enableFallbackItems;
     private readonly bool timeWithSecond;
-    private readonly bool dockClockWithSecond;
+    private bool dockClockWithSecond;
     private readonly bool dateWithWeekday;
-    private readonly int clockBandDateMode;
+    private int clockBandDateMode;
     private readonly string customDateFormatInClockBand;
     private readonly bool clockBandOpensNotificationCenter;
     private readonly List<string> customFormats;
@@ -52,11 +52,19 @@ public class Settings : ISettingsInterface
 
     public bool TimeWithSecond => timeWithSecond;
 
-    public bool DockClockWithSecond => dockClockWithSecond;
+    public bool DockClockWithSecond
+    {
+        get => dockClockWithSecond;
+        set => dockClockWithSecond = value;
+    }
 
     public bool DateWithWeekday => dateWithWeekday;
 
-    public int ClockBandDateMode => clockBandDateMode;
+    public int ClockBandDateMode
+    {
+        get => clockBandDateMode;
+        set => clockBandDateMode = value;
+    }
 
     public string CustomDateFormatInClockBand => customDateFormatInClockBand;
 

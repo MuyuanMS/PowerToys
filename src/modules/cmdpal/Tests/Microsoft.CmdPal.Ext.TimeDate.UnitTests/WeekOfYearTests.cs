@@ -231,18 +231,36 @@ namespace Microsoft.CmdPal.Ext.TimeDate.UnitTests
         }
 
         [TestMethod]
-        public void InvalidFormatsRenderAsRawTextInsteadOfBeingDropped()
+        public void InvalidFormatsFailInsteadOfRenderingAsRawText()
         {
-            // Same recovery as the custom format search results: the raw pattern in
-            // the dock tells the user their format is broken, a silent fallback
-            // would be indistinguishable from an ignored setting.
             var date = new DateTime(2026, 7, 6);
             var weekOfYear = TimeAndDateHelper.GetWeekOfYear(date, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
 
             var success = TimeAndDateHelper.TryFormatCustomString(date, "'unclosed", weekOfYear, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday, out var result);
 
+            Assert.IsFalse(success);
+            Assert.AreEqual(string.Empty, result);
+        }
+
+        [TestMethod]
+        public void UtcWeekOfYearUsesTheUtcDate()
+        {
+            var localDate = DateTime.SpecifyKind(new DateTime(2026, 1, 4, 0, 30, 0), DateTimeKind.Local);
+            var firstWeekRule = CalendarWeekRule.FirstDay;
+            var firstDayOfWeek = DayOfWeek.Sunday;
+            var localWeek = TimeAndDateHelper.GetWeekOfYear(localDate, firstWeekRule, firstDayOfWeek);
+            var expectedUtcWeek = TimeAndDateHelper.GetWeekOfYear(localDate.ToUniversalTime(), firstWeekRule, firstDayOfWeek);
+
+            var success = TimeAndDateHelper.TryFormatCustomString(
+                localDate,
+                "UTC:WOY",
+                localWeek,
+                firstWeekRule,
+                firstDayOfWeek,
+                out var result);
+
             Assert.IsTrue(success);
-            Assert.AreEqual("'unclosed", result);
+            Assert.AreEqual(expectedUtcWeek.ToString(CultureInfo.CurrentCulture), result);
         }
     }
 }
