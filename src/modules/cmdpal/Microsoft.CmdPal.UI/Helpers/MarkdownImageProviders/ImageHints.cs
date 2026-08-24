@@ -20,15 +20,17 @@ internal sealed class ImageHints
 
     public string? FitMode { get; init; } // fit=fit
 
-    public static ImageHints ParseHintsFromUri(Uri? uri)
+    public static ImageHints ParseHintsFromUri(Uri? uri) => ParseHintsFromQueryString(uri?.Query);
+
+    public static ImageHints ParseHintsFromQueryString(string? query)
     {
-        if (uri is null || string.IsNullOrEmpty(uri.Query))
+        if (string.IsNullOrEmpty(query))
         {
             return Empty;
         }
 
         var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var p in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        foreach (var p in query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
         {
             var kv = p.Split('=', 2);
             var k = Uri.UnescapeDataString(kv[0]);

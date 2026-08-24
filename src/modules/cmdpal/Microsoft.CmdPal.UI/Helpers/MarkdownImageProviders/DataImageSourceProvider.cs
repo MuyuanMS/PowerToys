@@ -24,15 +24,20 @@ internal sealed partial class DataImageSourceProvider : IImageSourceProvider
             throw new ArgumentException("URL is not a data: URI.", nameof(url));
         }
 
+        // Data URI hints use a fragment because the payload may contain query characters.
+        var hash = url.IndexOf('#');
+        var hintsQuery = hash >= 0 ? url[(hash + 1)..] : null;
+        var uriWithoutHints = hash >= 0 ? url[..hash] : url;
+
         // data:[<media type>][;base64],<data>
-        var comma = url.IndexOf(',');
+        var comma = uriWithoutHints.IndexOf(',');
         if (comma < 0)
         {
             throw new FormatException("Invalid data URI: missing comma separator.");
         }
 
-        var header = url[5..comma]; // after "data:"
-        var payload = url[(comma + 1)..]; // after comma
+        var header = uriWithoutHints[5..comma]; // after "data:"
+        var payload = uriWithoutHints[(comma + 1)..]; // after comma
 
         // Parse header
         string? contentType = null;
@@ -66,9 +71,15 @@ internal sealed partial class DataImageSourceProvider : IImageSourceProvider
 
         var imagePayload = new ImageSourceFactory.ImagePayload(mem, contentType, null);
         var imageSource = await ImageSourceFactory.CreateAsync(imagePayload, _decodeOptions);
+        var parsedHints = ImageHints.ParseHintsFromQueryString(hintsQuery);
         return new ImageSourceInfo(imageSource, new ImageHints
         {
-            DownscaleOnly = true,
+            DesiredPixelWidth = parsedHints.DesiredPixelWidth,
+            DesiredPixelHeight = parsedHints.DesiredPixelHeight,
+            MaxPixelWidth = parsedHints.MaxPixelWidth,
+            MaxPixelHeight = parsedHints.MaxPixelHeight,
+            DownscaleOnly = parsedHints.DownscaleOnly ?? true,
+            FitMode = parsedHints.FitMode,
         });
     }
 }
