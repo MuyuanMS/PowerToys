@@ -1563,7 +1563,7 @@ internal sealed partial class SystemTemperatureWidgetPage : WidgetPage, IDisposa
 
             ContentData["temperatureSource"] = Resources.GetResource("Temperature_Source_Acpi");
 
-            if (stats.TemperatureCelsius < 0)
+            if (!stats.HasReading)
             {
                 _hasReading = false;
                 ContentData["thermalZoneTemperature"] = Resources.GetResource("Temperature_Usage_Unknown");

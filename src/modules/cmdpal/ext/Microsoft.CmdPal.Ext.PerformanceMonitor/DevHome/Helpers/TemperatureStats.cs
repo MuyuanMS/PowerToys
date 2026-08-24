@@ -28,7 +28,10 @@ internal sealed partial class TemperatureStats : PerformanceCounterSourceBase, I
 
     public bool IsAvailable => _thermalCounter is not null;
 
-    /// <summary>Gets the last sampled thermal zone temperature in °C, or -1 if unavailable or out of range.</summary>
+    /// <summary>Gets whether the last sampled thermal zone temperature is valid.</summary>
+    public bool HasReading { get; private set; }
+
+    /// <summary>Gets the last sampled thermal zone temperature in °C.</summary>
     public double TemperatureCelsius { get; private set; } = -1;
 
     public TemperatureStats()
@@ -63,6 +66,7 @@ internal sealed partial class TemperatureStats : PerformanceCounterSourceBase, I
     {
         if (_thermalCounter is null)
         {
+            HasReading = false;
             TemperatureCelsius = -1;
             return;
         }
@@ -72,13 +76,13 @@ internal sealed partial class TemperatureStats : PerformanceCounterSourceBase, I
             var raw = _thermalCounter.NextValue();
             var celsius = (raw - TenthsKelvinOffset) / 10.0;
 
-            TemperatureCelsius = celsius >= MinPlausibleCelsius && celsius <= MaxPlausibleCelsius
-                ? celsius
-                : -1;
+            HasReading = celsius >= MinPlausibleCelsius && celsius <= MaxPlausibleCelsius;
+            TemperatureCelsius = HasReading ? celsius : -1;
         }
         catch (Exception ex)
         {
             LogFailureOnce(ref _readFailureLogged, $"Failed to read {CategoryName}\\{CounterName}.", ex);
+            HasReading = false;
             TemperatureCelsius = -1;
         }
     }
