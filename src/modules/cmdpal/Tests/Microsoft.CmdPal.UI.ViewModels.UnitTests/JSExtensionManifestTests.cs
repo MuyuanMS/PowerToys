@@ -689,6 +689,24 @@ public class JSExtensionManifestTests
     }
 
     [TestMethod]
+    public void TryParse_FileUriIcon_ResolvesToEmpty()
+    {
+        CreateEntryPoint("dist/index.js");
+        const string Json = """
+        {
+            "name": "file-uri-icon",
+            "main": "dist/index.js",
+            "cmdpal": { "icon": "file:///C:/outside/icon.png" }
+        }
+        """;
+
+        var result = JSExtensionManifest.TryParse(Json, _testDirectory);
+
+        Assert.IsTrue(result.IsValid, result.FailureReason);
+        Assert.AreEqual(string.Empty, result.Manifest!.IconPath);
+    }
+
+    [TestMethod]
     public void TryParse_IconThroughJunction_ResolvesToEmpty()
     {
         // An icon whose lexical path stays inside the package but traverses a junction that

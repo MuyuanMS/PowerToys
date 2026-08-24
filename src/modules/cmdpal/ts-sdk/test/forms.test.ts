@@ -241,6 +241,7 @@ describe('form identity and routing', () => {
               for (let i = 0; i < replies.length; i += 1) {
                 children.push({ type: 'markdown', body: replies[i] ?? '' });
               }
+              children.push(formContent(undefined, () => ({ kind: 'keepOpen' })));
               children.push(formContent('reply-form', submit));
               return children;
             },
@@ -264,8 +265,8 @@ describe('form identity and routing', () => {
       params: { pageId: 'page', formId: 'reply-form', inputs: 'first reply', data: '{}' },
     });
 
-    // Re-serialize: the form is now preceded by a markdown child, so a positional
-    // fallback id would drift, but the stable formId must not.
+    // Re-serialize: an anonymous form now precedes the explicit form, so a
+    // positional fallback id would drift, but the stable formId must not.
     await runtime.handleRequest({
       jsonrpc: JSONRPC_VERSION,
       id: 3,

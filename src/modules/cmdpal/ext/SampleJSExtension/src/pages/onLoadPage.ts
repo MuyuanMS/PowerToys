@@ -31,6 +31,7 @@ export class OnLoadPage extends ListPageBase {
   private readonly items: IListItem[] = [];
 
   override getItems(): IListItem[] {
+    const itemsAtLoad = [...this.items];
     const now = new Date().toLocaleTimeString();
     this.items.push(
       new ListItemBase({
@@ -39,6 +40,6 @@ export class OnLoadPage extends ListPageBase {
         icon: icon('\uECCB'),
       }),
     );
-    return [...this.items];
+    return itemsAtLoad;
   }
 }

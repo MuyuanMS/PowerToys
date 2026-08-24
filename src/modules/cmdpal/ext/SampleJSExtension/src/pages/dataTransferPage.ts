@@ -2,9 +2,19 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-import { CopyTextCommand, ListItemBase, ListPageBase, NoOpCommand } from '@microsoft/cmdpal-sdk';
-import type { IListItem } from '@microsoft/cmdpal-sdk';
+import { CopyTextCommand, ExtensionHost, InvokableCommandBase, ListItemBase, ListPageBase, NoOpCommand } from '@microsoft/cmdpal-sdk';
+import type { CommandResult, IListItem } from '@microsoft/cmdpal-sdk';
 import { icon } from '../util.js';
+
+class CopyCurrentTimestampCommand extends InvokableCommandBase {
+  readonly id = 'copy-current-timestamp';
+  readonly name = 'Copy timestamp';
+
+  override invoke(): CommandResult {
+    ExtensionHost.copyToClipboard(new Date().toLocaleString());
+    return { kind: 'showToast', args: { message: 'Copied timestamp' } };
+  }
+}
 
 /**
  * A demo of clipboard integration. Mirrors the C# `SampleDataTransferPage`.
@@ -29,7 +39,7 @@ export class SampleDataTransferPage extends ListPageBase {
         subtitle: 'Copy plain text to the clipboard (drag and drop is not supported from JS)',
       }),
       new ListItemBase({
-        command: new CopyTextCommand(new Date().toLocaleString(), 'Copy timestamp', 'Copied timestamp'),
+        command: new CopyCurrentTimestampCommand(),
         title: 'Item with a lazily rendered plain text',
         subtitle: 'The C# sample renders this lazily on drag; here it is copied when invoked',
       }),
