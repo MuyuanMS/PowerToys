@@ -476,8 +476,7 @@ internal static class TimeAndDateHelper
                 return string.Format(CultureInfo.CurrentCulture, _dockDateWeekFormat, dateString, weekString);
             case 2: // ISO 8601 week date (e.g. "2026-W28-1"), always ISO compliant
                 return GetIsoWeekDateString(dateTimeNow);
-            case 3: // Custom format; an empty format falls back to the system date, an
-                    // invalid one renders as raw text (same recovery as the search results)
+            case 3: // Custom format; empty or invalid formats fall back to the system date.
                 // WOY uses the first week/first day settings here, matching the
                 // behavior of the 'Custom formats' search results. The IWOY, IWYR,
                 // IWYY and IDOW tokens are always ISO 8601.
@@ -523,11 +522,13 @@ internal static class TimeAndDateHelper
             {
                 dtObject = dateTimeNowUtc;
                 syntax = syntax.Substring(4);
+                weekOfYear = GetWeekOfYear(dtObject, firstWeekRule, firstDayOfTheWeek);
             }
 
             var unixTimestamp = ((DateTimeOffset)dateTimeNowUtc).ToUnixTimeSeconds();
             var unixTimestampMilliseconds = ((DateTimeOffset)dateTimeNowUtc).ToUnixTimeMilliseconds();
             var eraShort = DateTimeFormatInfo.CurrentInfo.GetAbbreviatedEraName(calendar.GetEra(dateTimeNow));
+            var hasCustomSyntax = StringContainsCustomFormatSyntax(syntax);
             var value = ConvertToCustomFormat(dtObject, unixTimestamp, unixTimestampMilliseconds, weekOfYear, eraShort, syntax, firstWeekRule, firstDayOfTheWeek);
             try
             {
@@ -535,14 +536,15 @@ internal static class TimeAndDateHelper
             }
             catch (Exception ex)
             {
-                // Same recovery as the custom format search results: a single token
-                // like 'IDOW' can replace to a string that no longer parses as a
-                // .NET date format (a lone digit is read as a standard format
-                // specifier and throws), and for genuinely broken formats showing
-                // the raw pattern in the dock tells the user their format is wrong
-                // instead of being indistinguishable from an ignored setting. Fix
-                // the escape backslashes and use the replaced string as-is.
-                Logger.LogWarning($"Showing the custom Clock band format '{formatSyntax}' as text: {ex.Message}");
+                // A bare custom token can reduce to a value that .NET interprets as
+                // an invalid standard format. Preserve that expanded value, but
+                // reject malformed user formats so the caller can use its fallback.
+                if (!hasCustomSyntax)
+                {
+                    Logger.LogWarning($"Failed to apply the custom Clock band format '{formatSyntax}': {ex.Message}");
+                    return false;
+                }
+
                 value = Regex.Replace(value, @"(?<!\\)\\", string.Empty).Replace("\\\\", "\\");
             }
 

@@ -13,11 +13,19 @@ namespace Microsoft.CmdPal.Ext.TimeDate.UnitTests
     [TestClass]
     public class NowDockBandTests
     {
+        private static readonly DateTime FixedTime = new(2025, 7, 1, 14, 5, 32);
+        private CultureInfo _originalCulture = null!;
+        private CultureInfo _originalUiCulture = null!;
+        private NowDockBand? _band;
+
+        [TestInitialize]
+        public void Setup()
+        {
         _originalCulture = CultureInfo.CurrentCulture;
         _originalUiCulture = CultureInfo.CurrentUICulture;
         CultureInfo.CurrentCulture = new CultureInfo("en-US", false);
         CultureInfo.CurrentUICulture = new CultureInfo("en-US", false);
-    }
+        }
 
     [TestCleanup]
     public void Cleanup()
@@ -299,16 +307,14 @@ namespace Microsoft.CmdPal.Ext.TimeDate.UnitTests
     }
 
     [TestMethod]
-    public void CustomFormatModeShowsInvalidFormatsAsRawText()
+    public void CustomFormatModeWithInvalidFormatFallsBackToDefaultDate()
     {
-        // An unclosed literal quote is an invalid .NET date format; the dock shows
-        // the raw pattern so the user can see their format is broken (same
-        // recovery as the custom format search results).
+        // An invalid .NET date format must not be displayed permanently.
         var settings = new Settings(clockBandDateMode: 3, customDateFormatInClockBand: "'unclosed");
 
         _band = new NowDockBand(settings, clock: () => FixedTime);
 
-        Assert.AreEqual("'unclosed", _band.Subtitle);
+        Assert.AreEqual("7/1/2025", _band.Subtitle);
     }
 
     [TestMethod]
