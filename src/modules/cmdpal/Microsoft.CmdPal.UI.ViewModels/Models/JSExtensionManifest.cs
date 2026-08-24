@@ -350,8 +350,13 @@ public sealed record JSExtensionManifest
 
         var trimmed = icon.Trim();
 
-        if (trimmed.Contains("://", StringComparison.Ordinal))
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
         {
+            if (uri.IsFile)
+            {
+                return string.Empty;
+            }
+
             return trimmed;
         }
 

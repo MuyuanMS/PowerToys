@@ -45,12 +45,13 @@ Called once after the Node.js process starts. The extension should initialize it
 **Parameters:**
 ```json
 {
-  "extensionId": "my-extension"
+  "protocolVersion": 1,
+  "hostVersion": "0.90.0"
 }
 ```
 
-`context` is optional for backward compatibility. It accepts `page` or
-`extension` and defaults to `extension` when omitted or unknown.
+`protocolVersion` is optional for legacy hosts. When present, it must be an
+integer compatible with the SDK. `hostVersion` is optional host metadata.
 
 **Response:**
 ```json
@@ -404,7 +405,7 @@ Submits form data from a content page or form content.
 }
 ```
 
-`formId` identifies the specific form to submit and is required whenever a page can serialize more than one form (for example multiple forms on a content page, or forms nested inside a `tree`). Each serialized `form` content block carries a `formId`: the extension author's explicit value when set, otherwise a stable id the serializer assigns in traversal order. The host echoes that `formId` back on submit, and the extension routes the submission to the matching form by `(pageId, formId)`. When `formId` is omitted (a host that does not yet send it), the extension falls back to the first form on the page, so single-form pages keep working without it.
+`formId` identifies the specific form to submit and is required whenever a page can serialize more than one form (for example multiple forms on a content page, or forms nested inside a `tree`). Each serialized `form` content block carries a `formId`: the extension author's explicit value when set, otherwise an id the serializer assigns in traversal order. Generated ids can change when preceding anonymous forms are added or removed, so extensions that need stable routing should declare `formId` explicitly. The host echoes that `formId` back on submit, and the extension routes the submission to the matching form by `(pageId, formId)`. When `formId` is omitted (a host that does not yet send it), the extension falls back to the first top-level form on the page; nested single-form pages therefore need the host to send `formId`.
 
 **Response:** Command result (same format as `command/invoke`).
 
