@@ -577,7 +577,7 @@ public sealed partial class JsonRpcConnection : IDisposable
                     break;
                 }
 
-                var json = Encoding.UTF8.GetString(body);
+                var json = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true).GetString(body);
 
                 // Dispatch synchronously so the reader never awaits bounded work. Responses are routed
                 // immediately, which keeps correlation alive even when inbound queues are saturated.
@@ -705,7 +705,7 @@ public sealed partial class JsonRpcConnection : IDisposable
         using (document)
         {
             var root = document.RootElement;
-            var hasId = root.TryGetProperty("id", out var idElement) && idElement.ValueKind != JsonValueKind.Null;
+            var hasId = root.TryGetProperty("id", out var idElement);
             var hasMethod = root.TryGetProperty("method", out var methodElement) && methodElement.ValueKind == JsonValueKind.String;
 
             if (hasMethod && !hasId)
@@ -973,7 +973,7 @@ public sealed partial class JsonRpcConnection : IDisposable
             Logger.LogError($"The JSON-RPC request handler for '{method}' threw an exception.", ex);
             try
             {
-                await SendErrorResponseAsync(id, JsonRpcError.InternalError, ex.Message).ConfigureAwait(false);
+                await SendErrorResponseAsync(id, JsonRpcError.InternalError, "The request could not be completed.").ConfigureAwait(false);
             }
             catch (Exception sendEx)
             {

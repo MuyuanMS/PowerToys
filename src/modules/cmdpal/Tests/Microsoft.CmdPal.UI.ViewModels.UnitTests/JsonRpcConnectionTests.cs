@@ -116,6 +116,31 @@ public partial class JsonRpcConnectionTests
     }
 
     [TestMethod]
+    public async Task Inbound_InvalidUtf8Body_RaisesDecoderFallbackError()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var harness = CreateHarness();
+        var errorRaised = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Host.Error += (_, e) => errorRaised.TrySetResult(e.Exception);
+
+        try
+        {
+            var body = new byte[] { (byte)'{', 0xff, (byte)'}' };
+            var header = Encoding.ASCII.GetBytes($"Content-Length: {body.Length}\r\n\r\n");
+            await harness.ExtensionWrites.WriteAsync(header, cts.Token);
+            await harness.ExtensionWrites.WriteAsync(body, cts.Token);
+            await harness.ExtensionWrites.FlushAsync(cts.Token);
+
+            var exception = await errorRaised.Task.WaitAsync(cts.Token);
+            Assert.IsInstanceOfType(exception, typeof(DecoderFallbackException));
+        }
+        finally
+        {
+            harness.Host.Dispose();
+        }
+    }
+
+    [TestMethod]
     public async Task ConcurrentRequests_AreCorrelatedIndependently()
     {
         using var cts = new CancellationTokenSource(TestTimeout);
@@ -323,6 +348,55 @@ public partial class JsonRpcConnectionTests
             using var document = JsonDocument.Parse(body);
             Assert.AreEqual(7, document.RootElement.GetProperty("id").GetInt32());
             Assert.AreEqual(42, document.RootElement.GetProperty("result").GetProperty("pong").GetInt32());
+        }
+        finally
+        {
+            harness.Host.Dispose();
+        }
+    }
+
+    [TestMethod]
+    public async Task InboundRequest_NullId_IsDispatchedAndRespondsWithNullId()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var harness = CreateHarness();
+        try
+        {
+            harness.Host.RegisterRequestHandler("ping", (_, _) => Task.FromResult<JsonNode?>(new JsonObject { ["pong"] = true }));
+
+            await WriteFramedAsync(
+                harness.ExtensionWrites,
+                """{"jsonrpc":"2.0","id":null,"method":"ping"}""",
+                cts.Token);
+
+            var (_, body) = await ReadFramedAsync(harness.ExtensionReads, cts.Token);
+            using var document = JsonDocument.Parse(body);
+            Assert.AreEqual(JsonValueKind.Null, document.RootElement.GetProperty("id").ValueKind);
+            Assert.IsTrue(document.RootElement.GetProperty("result").GetProperty("pong").GetBoolean());
+        }
+        finally
+        {
+            harness.Host.Dispose();
+        }
+    }
+
+    [TestMethod]
+    public async Task InboundRequest_HandlerException_ReturnsGenericInternalError()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var harness = CreateHarness();
+        try
+        {
+            harness.Host.RegisterRequestHandler("fail", (_, _) => throw new InvalidOperationException(@"C:\secret\host-detail"));
+
+            await WriteFramedAsync(harness.ExtensionWrites, BuildRequest(10, "fail", null), cts.Token);
+
+            var (_, body) = await ReadFramedAsync(harness.ExtensionReads, cts.Token);
+            using var document = JsonDocument.Parse(body);
+            var error = document.RootElement.GetProperty("error");
+            Assert.AreEqual(JsonRpcError.InternalError, error.GetProperty("code").GetInt32());
+            Assert.AreEqual("The request could not be completed.", error.GetProperty("message").GetString());
+            Assert.IsFalse(body.Contains(@"C:\secret\host-detail", StringComparison.Ordinal));
         }
         finally
         {

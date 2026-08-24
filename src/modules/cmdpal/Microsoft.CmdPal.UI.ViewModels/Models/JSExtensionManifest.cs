@@ -14,6 +14,7 @@ namespace Microsoft.CmdPal.UI.ViewModels.Models;
 /// </summary>
 public sealed record JSExtensionManifest
 {
+    private const long MaxManifestBytes = 1024 * 1024;
     /// <summary>
     /// Gets the extension identifier (package.json "name").
     /// </summary>
@@ -97,6 +98,11 @@ public sealed record JSExtensionManifest
         if (!File.Exists(packageJsonPath))
         {
             return JSExtensionManifestParseResult.Failure($"No package.json was found at '{packageJsonPath}'.");
+        }
+
+        if (new FileInfo(packageJsonPath).Length > MaxManifestBytes)
+        {
+            return JSExtensionManifestParseResult.Failure($"The package.json at '{packageJsonPath}' exceeds the maximum supported size.");
         }
 
         string json;
