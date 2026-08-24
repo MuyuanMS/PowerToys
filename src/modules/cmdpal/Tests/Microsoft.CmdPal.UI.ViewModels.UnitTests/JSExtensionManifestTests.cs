@@ -256,6 +256,21 @@ public class JSExtensionManifestTests
     }
 
     [TestMethod]
+    public void TryParseFile_ManifestLargerThanLimit_IsInvalidWithoutReadingContents()
+    {
+        var packageJsonPath = Path.Combine(_testDirectory, "package.json");
+        using (var stream = File.Create(packageJsonPath))
+        {
+            stream.SetLength((1024 * 1024) + 1);
+        }
+
+        var result = JSExtensionManifest.TryParseFile(packageJsonPath);
+
+        Assert.IsFalse(result.IsValid);
+        StringAssert.Contains(result.FailureReason, "maximum supported size");
+    }
+
+    [TestMethod]
     public void TryParse_AbsoluteEntryPoint_IsInvalid()
     {
         // Create a real file outside the extension directory so rejection comes from the rooted-path
