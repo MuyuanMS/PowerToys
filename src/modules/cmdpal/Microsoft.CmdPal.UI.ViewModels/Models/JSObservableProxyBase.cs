@@ -32,6 +32,9 @@ internal abstract class JSObservableProxyBase : BaseObservable, IJSPropertyChang
 
     protected JsonElement Data => Volatile.Read(ref _data).Element;
 
+    protected void ReplaceData(JsonElement data) =>
+        Volatile.Write(ref _data, new DataBox(data));
+
     protected abstract bool SupportsProperty(string propertyName);
 
     public void ApplyPropertyChanges(JsonElement properties)

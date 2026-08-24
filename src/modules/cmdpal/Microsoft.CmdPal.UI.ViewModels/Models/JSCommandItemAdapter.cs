@@ -13,17 +13,14 @@ namespace Microsoft.CmdPal.UI.ViewModels.Models;
 /// Adapts a JSON command item payload to <see cref="ICommandItem"/>.
 /// The nested command is resolved lazily so page proxies are created only when needed.
 /// </summary>
-internal sealed partial class JSCommandItemAdapter : BaseObservable, ICommandItem
+internal sealed partial class JSCommandItemAdapter : JSObservableProxyBase, ICommandItem
 {
-    private readonly JsonElement _data;
-    private readonly JsonRpcConnection _connection;
     private ICommand? _command;
     private bool _commandResolved;
 
     public JSCommandItemAdapter(JsonElement data, JsonRpcConnection connection)
+        : base(GetNotificationId(data), connection, data)
     {
-        _data = data;
-        _connection = connection;
     }
 
     public ICommand? Command
@@ -34,27 +31,44 @@ internal sealed partial class JSCommandItemAdapter : BaseObservable, ICommandIte
             {
                 _commandResolved = true;
 
-                var commandData = _data;
-                if (JSModelMapper.TryGetAnyCase(_data, "command", "Command", out var commandElement) &&
+                var commandData = Data;
+                if (JSModelMapper.TryGetAnyCase(Data, "command", "Command", out var commandElement) &&
                     commandElement.ValueKind == JsonValueKind.Object)
                 {
                     commandData = commandElement;
                 }
 
-                _command = JSCommandFactory.CreateCommandFromJson(commandData, _connection);
+                _command = JSCommandFactory.CreateCommandFromJson(commandData, Connection);
             }
 
             return _command;
         }
     }
 
-    public IContextItem[] MoreCommands => JSModelMapper.ParseContextItems(_data, "moreCommands", "MoreCommands", _connection);
+    public IContextItem[] MoreCommands => JSModelMapper.ParseContextItems(Data, "moreCommands", "MoreCommands", Connection);
 
-    public IIconInfo Icon => JSModelMapper.TryGetIcon(_data, "icon", "Icon", out var icon)
+    public IIconInfo Icon => JSModelMapper.TryGetIcon(Data, "icon", "Icon", out var icon)
         ? icon
         : Command?.Icon ?? new IconInfo(string.Empty);
 
-    public string Title => JSModelMapper.GetString(_data, "displayName") ?? JSModelMapper.GetString(_data, "title") ?? string.Empty;
+    public string Title => JSModelMapper.GetString(Data, "displayName") ?? JSModelMapper.GetString(Data, "title") ?? string.Empty;
 
-    public string Subtitle => JSModelMapper.GetString(_data, "description") ?? JSModelMapper.GetString(_data, "subtitle") ?? string.Empty;
+    public string Subtitle => JSModelMapper.GetString(Data, "description") ?? JSModelMapper.GetString(Data, "subtitle") ?? string.Empty;
+
+    protected override bool SupportsProperty(string propertyName) => propertyName switch
+    {
+        "command" or "moreCommands" or "icon" or "title" or "subtitle" => true,
+        _ => false,
+    };
+
+    private static string GetNotificationId(JsonElement data)
+    {
+        if (JSModelMapper.TryGetAnyCase(data, "command", "Command", out var commandElement) &&
+            commandElement.ValueKind == JsonValueKind.Object)
+        {
+            return JSModelMapper.GetString(commandElement, "id") ?? string.Empty;
+        }
+
+        return JSModelMapper.GetString(data, "id") ?? string.Empty;
+    }
 }

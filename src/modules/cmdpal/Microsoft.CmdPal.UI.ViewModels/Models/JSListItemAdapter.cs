@@ -24,20 +24,15 @@ namespace Microsoft.CmdPal.UI.ViewModels.Models;
 /// background fetch thread can swap it without a UI-thread reader seeing a torn
 /// <see cref="JsonElement"/> struct.
 /// </remarks>
-internal sealed partial class JSListItemAdapter : BaseObservable, IListItem
+internal sealed partial class JSListItemAdapter : JSObservableProxyBase, IListItem
 {
-    private readonly JsonRpcConnection _connection;
-    private DataBox _dataBox;
     private ICommand? _command;
     private bool _commandResolved;
 
     public JSListItemAdapter(JsonElement data, JsonRpcConnection connection)
+        : base(GetNotificationId(data), connection, data)
     {
-        _dataBox = new DataBox(data);
-        _connection = connection;
     }
-
-    private JsonElement Data => Volatile.Read(ref _dataBox).Element;
 
     public ICommand? Command
     {
@@ -50,7 +45,7 @@ internal sealed partial class JSListItemAdapter : BaseObservable, IListItem
                 if (JSModelMapper.TryGetAnyCase(Data, "command", "Command", out var commandElement) &&
                     commandElement.ValueKind == JsonValueKind.Object)
                 {
-                    _command = JSCommandFactory.CreateCommandFromJson(commandElement, _connection);
+                    _command = JSCommandFactory.CreateCommandFromJson(commandElement, Connection);
                 }
             }
 
@@ -58,7 +53,7 @@ internal sealed partial class JSListItemAdapter : BaseObservable, IListItem
         }
     }
 
-    public IContextItem[] MoreCommands => JSModelMapper.ParseContextItems(Data, "moreCommands", "MoreCommands", _connection);
+    public IContextItem[] MoreCommands => JSModelMapper.ParseContextItems(Data, "moreCommands", "MoreCommands", Connection);
 
     public IIconInfo Icon => JSModelMapper.TryGetIcon(Data, "icon", "Icon", out var icon)
         ? icon
@@ -70,7 +65,7 @@ internal sealed partial class JSListItemAdapter : BaseObservable, IListItem
 
     public ITag[] Tags => JSModelMapper.ParseTags(Data);
 
-    public IDetails? Details => JSModelMapper.ParseDetails(Data, _connection);
+    public IDetails? Details => JSModelMapper.ParseDetails(Data, Connection);
 
     public string Section => JSModelMapper.GetString(Data, "section") ?? string.Empty;
 
@@ -114,14 +109,14 @@ internal sealed partial class JSListItemAdapter : BaseObservable, IListItem
     /// </summary>
     internal void UpdateData(JsonElement data)
     {
-        var current = Volatile.Read(ref _dataBox).Element;
+        var current = Data;
         if (current.ValueKind != JsonValueKind.Undefined &&
             string.Equals(current.GetRawText(), data.GetRawText(), StringComparison.Ordinal))
         {
             return;
         }
 
-        Volatile.Write(ref _dataBox, new DataBox(data));
+        ReplaceData(data);
         _commandResolved = false;
         _command = null;
 
@@ -136,10 +131,21 @@ internal sealed partial class JSListItemAdapter : BaseObservable, IListItem
         OnPropertyChanged(nameof(Command));
     }
 
-    private sealed class DataBox
+    protected override bool SupportsProperty(string propertyName) => propertyName switch
     {
-        internal DataBox(JsonElement element) => Element = element;
+        "command" or "moreCommands" or "icon" or "title" or "subtitle" or "tags" or
+        "details" or "section" or "textToSuggest" => true,
+        _ => false,
+    };
 
-        internal JsonElement Element { get; }
+    private static string GetNotificationId(JsonElement data)
+    {
+        if (JSModelMapper.TryGetAnyCase(data, "command", "Command", out var commandElement) &&
+            commandElement.ValueKind == JsonValueKind.Object)
+        {
+            return JSModelMapper.GetString(commandElement, "id") ?? string.Empty;
+        }
+
+        return JSModelMapper.GetString(data, "id") ?? string.Empty;
     }
 }

@@ -20,16 +20,10 @@ namespace Microsoft.CmdPal.UI.ViewModels.Services;
 /// <summary>
 /// Extension service that manages JavaScript/TypeScript extensions. Each extension
 /// runs as its own Node.js process communicating over JSON-RPC 2.0 via stdio.
-<<<<<<< HEAD
-/// The service discovers extensions in a well-known directory, watches that directory
-/// for install/uninstall, and hot-reloads an extension (debounced) when its source
-/// files change.
-=======
 /// The service owns every discovered extension directory: it discovers extensions in a
 /// well-known root, watches that root for install/uninstall, and maintains exactly one
 /// per-extension-directory source watcher that hot-reloads an extension (debounced) when
 /// its source files change.
->>>>>>> upstream-pr-49326
 /// </summary>
 /// <remarks>
 /// All lifecycle transitions for a single extension directory (initial load, refresh,
@@ -38,11 +32,6 @@ namespace Microsoft.CmdPal.UI.ViewModels.Services;
 /// duplicate processes for the same extension. The synchronous <see cref="_extensionsLock"/>
 /// only guards in-memory collection mutations and is never held across an await or a
 /// process launch.
-<<<<<<< HEAD
-/// </remarks>
-public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExtensionHost, IDisposable
-{
-=======
 ///
 /// The same one-per-directory ownership applies to source watchers: <see cref="_extensionSourceWatchers"/>
 /// holds at most one live <see cref="FileSystemWatcher"/> per extension directory, guarded by
@@ -68,19 +57,12 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
 {
     internal const string GalleryInstallMarkerFileName = ".cmdpal-gallery-installing";
 
->>>>>>> upstream-pr-49326
     // Consecutive crashes above this threshold disable an extension instead of restarting it.
     private const int MaxRestartAttempts = 3;
 
     // Source-file extensions that trigger a hot-reload, per the manifest contract.
     private static readonly string[] WatchedSourceExtensions = [".js", ".mjs", ".cjs"];
 
-<<<<<<< HEAD
-    // Path segments that never carry a relevant manifest or source change. Churn under
-    // these (npm writing hundreds of files under node_modules during an install, or git
-    // metadata) must not drive discovery or hot-reload, or it causes a restart storm.
-    private static readonly string[] IgnoredDirectorySegments = ["node_modules", ".git"];
-=======
     // Path segments that never carry a relevant manifest or source change. node_modules is
     // the one directory the host still excludes unconditionally: npm writing hundreds of
     // files under it during an install is an operational hazard that causes a restart storm
@@ -90,7 +72,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
     // <see cref="ResolveWatchRoot"/>), so those directories are excluded by not being in
     // scope rather than by the host maintaining a growing blocklist of directory names.
     private static readonly string[] IgnoredDirectorySegments = ["node_modules"];
->>>>>>> upstream-pr-49326
 
     // How many times a newly appeared package is re-checked for a parseable manifest
     // before giving up, and how long to wait between checks. This lets a slow install
@@ -117,10 +98,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
     // or source hot-reload).
     private readonly Dictionary<string, int> _crashCounts = new(StringComparer.OrdinalIgnoreCase);
 
-<<<<<<< HEAD
-    private readonly Lock _sourceWatcherLock = new();
-    private readonly Dictionary<string, FileSystemWatcher> _sourceFileWatchers = new(StringComparer.OrdinalIgnoreCase);
-=======
     // This service owns every extension directory it discovers, and maintains exactly one
     // source watcher per extension directory, keyed by that directory. The dictionary value
     // pairs the live FileSystemWatcher with the watch root it is currently rooted at, so
@@ -129,7 +106,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
     // of silently continuing to watch a now-stale root or leaking a second watcher.
     private readonly Lock _extensionSourceWatchersLock = new();
     private readonly Dictionary<string, ExtensionSourceWatcher> _extensionSourceWatchers = new(StringComparer.OrdinalIgnoreCase);
->>>>>>> upstream-pr-49326
     private readonly HotReloadDebouncer _hotReloadDebouncer;
 
     // Reusable cancellation for the current load cycle. A single CancellationTokenSource
@@ -139,8 +115,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
 
     private readonly DirectoryLifecycleGate _directoryGate = new();
 
-<<<<<<< HEAD
-=======
     // Crash recovery is kicked off from a process-exit event, so the code that raises it
     // cannot await it. Every recovery task is owned by this tracker instead of a detached
     // Task.Run, keyed by extension directory, so an uninstall, a service stop, or disposal
@@ -148,7 +122,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
     // already-torn-down state.
     private readonly CrashRecoveryTracker _recovery = new();
 
->>>>>>> upstream-pr-49326
     // Single ordered dispatch path for OnProviderAdded/OnProviderRemoved so consumers can
     // never observe a provider addition before a removal that was raised ahead of it, even
     // when the two originate on different threads.
@@ -188,11 +161,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
     public string ExtensionsRootPath => ExtensionsPath;
 
     /// <inheritdoc />
-<<<<<<< HEAD
-    public void StopExtension(string extensionDirectory, CancellationToken cancellationToken = default)
-=======
     public async Task StopExtensionAsync(string extensionDirectory, CancellationToken cancellationToken = default)
->>>>>>> upstream-pr-49326
     {
         if (string.IsNullOrEmpty(extensionDirectory))
         {
@@ -201,15 +170,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
 
         // Use the lifecycle gate so uninstall waits behind any load, refresh, restart, or hot reload
         // for this directory and cleans every owned resource. The gallery calls this before deleting
-<<<<<<< HEAD
-        // files, so wait synchronously. Awaited work on this path uses ConfigureAwait(false), and we
-        // never enter while holding the same gate, so we avoid a reentrant deadlock. The token lets
-        // Cancel stop waiting for a busy gate.
-        var removed = RemoveExtensionByDirectoryGatedAsync(extensionDirectory, cancellationToken).GetAwaiter().GetResult();
-        if (removed is not null)
-        {
-            OnProviderRemoved?.Invoke(this, [removed]);
-=======
         // files. Awaited work on this path uses ConfigureAwait(false), and we never enter while holding
         // the same gate, so we avoid a reentrant deadlock. The token lets Cancel stop waiting for a
         // busy gate.
@@ -217,7 +177,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
         if (removed is not null)
         {
             RaiseProviderRemoved(removed);
->>>>>>> upstream-pr-49326
         }
     }
 
@@ -283,11 +242,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
             var added = await AddDiscoveredNotLoadedAsync(timeoutCts.Token).ConfigureAwait(false);
             foreach (var wrapper in added)
             {
-<<<<<<< HEAD
-                OnProviderAdded?.Invoke(this, [wrapper]);
-=======
                 RaiseProviderAdded(wrapper);
->>>>>>> upstream-pr-49326
             }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -337,13 +292,10 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
         // canceled, so a load after a stop actually runs.
         _reload.BeginCycle();
 
-<<<<<<< HEAD
-=======
         // Re-open crash recovery, which a previous stop closed, so a crash in this cycle is
         // recovered instead of being dropped as post-shutdown work.
         _recovery.BeginCycle();
 
->>>>>>> upstream-pr-49326
         // A new load cycle clears the shutting-down guard so registrations are accepted
         // again after a previous SignalStopAsync.
         lock (_extensionsLock)
@@ -388,24 +340,17 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
         return wrappers;
     }
 
-<<<<<<< HEAD
-    public Task SignalStopAsync()
-=======
     public async Task SignalStopAsync()
->>>>>>> upstream-pr-49326
     {
         // Request cancellation first so any in-flight, delayed watcher handlers bail out
         // before they start an extension after we have already begun shutting down.
         _reload.Stop();
 
-<<<<<<< HEAD
-=======
         // Close crash recovery in the same breath: cancel what is running and refuse new
         // recovery, so the process exits we are about to cause below cannot queue restart
         // work behind the shutdown.
         _recovery.CancelAll();
 
->>>>>>> upstream-pr-49326
         StopDirectoryWatcher();
         StopAllSourceFileWatchers();
 
@@ -433,14 +378,10 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
             }
         }
 
-<<<<<<< HEAD
-        return Task.CompletedTask;
-=======
         // Everything was canceled above, so this only waits for already-running recovery to
         // unwind. It cannot deadlock on the directory gate: no gate is held here, and the
         // recovery tasks' tokens are already canceled.
         await _recovery.DrainAllAsync().ConfigureAwait(false);
->>>>>>> upstream-pr-49326
     }
 
     public Task<IEnumerable<IExtensionWrapper>> GetInstalledExtensionsAsync(bool includeDisabledExtensions = false)
@@ -459,21 +400,9 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
     {
         if (EnsureExtensionsDirectory())
         {
-<<<<<<< HEAD
-            // Add newly installed extensions.
-            var added = await AddDiscoveredNotLoadedAsync(CancellationToken.None).ConfigureAwait(false);
-            foreach (var wrapper in added)
-            {
-                RaiseProviderAdded(wrapper);
-            }
-
-            // Reconcile out extensions whose directory no longer exists or no longer
-            // holds a valid manifest.
-=======
             // Reconcile out extensions whose directory no longer exists or no longer
             // holds a valid manifest. Remove them before adding newly accepted extensions
             // so a duplicate ID winner can take over from the loaded loser in one refresh.
->>>>>>> upstream-pr-49326
             var accepted = DiscoverAcceptedManifests(ExtensionsPath);
             List<string> loadedDirectories;
             lock (_extensionsLock)
@@ -491,15 +420,12 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
                 }
             }
 
-<<<<<<< HEAD
-=======
             var added = await AddDiscoveredNotLoadedAsync(CancellationToken.None).ConfigureAwait(false);
             foreach (var wrapper in added)
             {
                 RaiseProviderAdded(wrapper);
             }
 
->>>>>>> upstream-pr-49326
             // Reload any still-present extension whose manifest changed on disk since it
             // was loaded. A plain re-enumeration only adds/removes directories, so a manifest
             // edit (new entry point, version, icon, and so on) would otherwise be ignored by
@@ -586,14 +512,11 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
         StopAllSourceFileWatchers();
         _hotReloadDebouncer.Dispose();
 
-<<<<<<< HEAD
-=======
         // Cancel and (briefly) await crash recovery before the collections, dispatcher, and
         // directory gate it uses are torn down, so no recovery task is left running against
         // disposed state. The wait is bounded, so disposal on the UI thread cannot hang.
         _recovery.Dispose();
 
->>>>>>> upstream-pr-49326
         List<JSExtensionWrapper> toDispose;
         lock (_extensionsLock)
         {
@@ -882,10 +805,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
     private static bool PathsEqual(string a, string b) =>
         string.Equals(Path.TrimEndingDirectorySeparator(a), Path.TrimEndingDirectorySeparator(b), StringComparison.OrdinalIgnoreCase);
 
-<<<<<<< HEAD
-    private static string CanonicalKey(string directory) => DirectoryLifecycleGate.Canonicalize(directory);
-
-=======
     /// <summary>
     /// Decides whether a live per-extension source watcher, currently rooted at
     /// <paramref name="existingWatchRoot"/>, must be repaired (stopped and recreated at the
@@ -936,7 +855,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
         return string.IsNullOrEmpty(entryPointDirectory) ? directory : entryPointDirectory;
     }
 
->>>>>>> upstream-pr-49326
     private static bool IsManifestPath(string path) =>
         string.Equals(Path.GetFileName(path), "package.json", StringComparison.OrdinalIgnoreCase);
 
@@ -956,16 +874,11 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
 
     /// <summary>
     /// Returns true when any directory segment of <paramref name="path"/> is one the
-<<<<<<< HEAD
-    /// watchers must ignore (for example <c>node_modules</c> or <c>.git</c>). This is a
-    /// segment-aware check, so a directory named "node_modules_backup" is not matched.
-=======
     /// watchers must unconditionally ignore (currently just <c>node_modules</c>, kept only
     /// to prevent a dependency-install write storm from driving discovery or hot-reload).
     /// This is a segment-aware check, so a directory named "node_modules_backup" is not
     /// matched. Other directories (VCS metadata, generated output, and so on) are excluded
     /// by watch scope (<see cref="ResolveWatchRoot"/>), not by a name added here.
->>>>>>> upstream-pr-49326
     /// Extracted as a pure helper so it can be tested without a live watcher.
     /// </summary>
     /// <param name="path">The path reported by a watcher.</param>
@@ -1129,11 +1042,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
         {
             gate = await _directoryGate.AcquireAsync(directory, ct).ConfigureAwait(false);
         }
-<<<<<<< HEAD
-        catch (OperationCanceledException)
-=======
         catch (OperationCanceledException) when (_disposed || _reload.IsStopRequested)
->>>>>>> upstream-pr-49326
         {
             return null;
         }
@@ -1185,11 +1094,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
         {
             extensionWrapper = new JSExtensionWrapper(manifest, directory);
 
-<<<<<<< HEAD
-            await extensionWrapper.StartExtensionAsync().ConfigureAwait(false);
-=======
             await extensionWrapper.StartExtensionAsync(ct).ConfigureAwait(false);
->>>>>>> upstream-pr-49326
 
             if (!extensionWrapper.IsRunning())
             {
@@ -1214,11 +1119,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
                 return null;
             }
 
-<<<<<<< HEAD
-            var wrapper = new CommandProviderWrapper(extensionWrapper, provider, _taskScheduler);
-            return new StartedInstance(extensionWrapper, wrapper);
-        }
-=======
             var wrapper = CommandProviderWrapper.CreateForJsonRpcExtension(extensionWrapper, provider, _taskScheduler);
             return new StartedInstance(extensionWrapper, wrapper);
         }
@@ -1227,7 +1127,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
             extensionWrapper?.SignalDispose();
             throw;
         }
->>>>>>> upstream-pr-49326
         catch (Exception ex)
         {
             Logger.LogError($"Failed to load JS extension from {directory}: {ex.Message}");
@@ -1303,25 +1202,15 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
             return null;
         }
 
-<<<<<<< HEAD
-        StartSourceFileWatcher(directory);
-=======
         EnsureSourceFileWatcher(directory, manifest);
->>>>>>> upstream-pr-49326
 
         // A process can exit immediately after init (for example a provider that faults
         // on first use). If that exit fired before we subscribed to ProcessExited above,
         // the event was missed; detect the dead process here and drive the same crash
         // path so an immediate post-init crash is handled (restart or disable) instead
-<<<<<<< HEAD
-        // of being registered as healthy. The handler runs on a separate task so it
-        // acquires the directory gate only after this registration releases it, and it is
-        // idempotent, so racing the real event is harmless.
-=======
         // of being registered as healthy. The handler runs on a separate, tracked recovery
         // task so it acquires the directory gate only after this registration releases it,
         // and it is idempotent, so racing the real event is harmless.
->>>>>>> upstream-pr-49326
         if (!extensionWrapper.IsRunning())
         {
             OnExtensionProcessExited(extensionWrapper, EventArgs.Empty);
@@ -1338,19 +1227,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
     /// </summary>
     private sealed record StartedInstance(JSExtensionWrapper Extension, CommandProviderWrapper Wrapper);
 
-<<<<<<< HEAD
-    private void OnExtensionProcessExited(object? sender, EventArgs e)
-    {
-        if (sender is JSExtensionWrapper wrapper)
-        {
-            _ = Task.Run(() => HandleExtensionCrashAsync(wrapper));
-        }
-    }
-
-    private async Task HandleExtensionCrashAsync(JSExtensionWrapper wrapper)
-    {
-        if (_disposed || _reload.IsStopRequested)
-=======
     /// <summary>
     /// The process-exit event is where a crash is established: by the time this handler
     /// runs, the extension's process is already gone. Everything from here on, including
@@ -1384,7 +1260,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
     private async Task RecoverCrashedExtensionAsync(JSExtensionWrapper wrapper, CancellationToken ct)
     {
         if (IsStopping(ct))
->>>>>>> upstream-pr-49326
         {
             return;
         }
@@ -1394,13 +1269,9 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
         IDisposable gate;
         try
         {
-<<<<<<< HEAD
-            gate = await _directoryGate.AcquireAsync(directory, _reload.Token).ConfigureAwait(false);
-=======
             // Wait our turn behind any uninstall or hot-reload already running for this
             // directory. The crash is already a fact; this only serializes what we do about it.
             gate = await _directoryGate.AcquireAsync(directory, ct).ConfigureAwait(false);
->>>>>>> upstream-pr-49326
         }
         catch (OperationCanceledException)
         {
@@ -1413,8 +1284,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
 
         using (gate)
         {
-<<<<<<< HEAD
-=======
             // An uninstall, stop, or disposal that started while this was queued behind the
             // gate owns the teardown now; leave the extension to it instead of restarting
             // something that is on its way out.
@@ -1423,7 +1292,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
                 return;
             }
 
->>>>>>> upstream-pr-49326
             CommandProviderWrapper? removed;
             int crashCount;
             lock (_extensionsLock)
@@ -1479,11 +1347,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
             }
 
             // Preserve the crash count across the restart so repeated crashes eventually disable it.
-<<<<<<< HEAD
-            var restarted = await StartAndRegisterAsync(directory, parseResult.Manifest, resetCrashCount: false, _reload.Token).ConfigureAwait(false);
-=======
             var restarted = await StartAndRegisterAsync(directory, parseResult.Manifest, resetCrashCount: false, ct).ConfigureAwait(false);
->>>>>>> upstream-pr-49326
             if (restarted is not null)
             {
                 RaiseProviderAdded(restarted);
@@ -1527,10 +1391,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
             || !string.Equals(loaded.Publisher, current.Publisher, StringComparison.Ordinal)
             || !string.Equals(loaded.Main, current.Main, StringComparison.Ordinal)
             || !string.Equals(loaded.EntryPointPath, current.EntryPointPath, StringComparison.OrdinalIgnoreCase)
-<<<<<<< HEAD
-=======
             || !string.Equals(loaded.WatchDirectory, current.WatchDirectory, StringComparison.OrdinalIgnoreCase)
->>>>>>> upstream-pr-49326
             || loaded.Debug != current.Debug
             || loaded.DebugPort != current.DebugPort;
     }
@@ -1595,13 +1456,8 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
 
     private void OnDirectoryWatcherUpsert(object sender, FileSystemEventArgs e)
     {
-<<<<<<< HEAD
-        // Ignore churn under node_modules/.git (for example npm writing many package.json
-        // files during an install) so it cannot drive a discovery or hot-reload storm.
-=======
         // Ignore churn under node_modules (npm writing many package.json files during an
         // install) so it cannot drive a discovery or hot-reload storm.
->>>>>>> upstream-pr-49326
         if (HasIgnoredDirectorySegment(e.FullPath))
         {
             return;
@@ -1638,11 +1494,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
             HandleDirectoryEntryUpsert(e.FullPath);
         }
 
-<<<<<<< HEAD
-        if (!HasIgnoredDirectorySegment(e.OldFullPath))
-=======
         if (ShouldRouteDirectoryRemoval(ExtensionsPath, e.OldFullPath))
->>>>>>> upstream-pr-49326
         {
             HandleDirectoryEntryRemoved(e.OldFullPath);
         }
@@ -1650,11 +1502,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
 
     private void OnDirectoryWatcherDeleted(object sender, FileSystemEventArgs e)
     {
-<<<<<<< HEAD
-        if (HasIgnoredDirectorySegment(e.FullPath))
-=======
         if (!ShouldRouteDirectoryRemoval(ExtensionsPath, e.FullPath))
->>>>>>> upstream-pr-49326
         {
             return;
         }
@@ -1662,15 +1510,12 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
         HandleDirectoryEntryRemoved(e.FullPath);
     }
 
-<<<<<<< HEAD
-=======
     internal static bool ShouldRouteDirectoryRemoval(string root, string fullPath)
     {
         return !HasIgnoredDirectorySegment(fullPath)
             && IsTopLevelExtensionChange(root, fullPath);
     }
 
->>>>>>> upstream-pr-49326
     private void OnDirectoryWatcherError(object sender, ErrorEventArgs e)
     {
         var error = e.GetException();
@@ -1705,14 +1550,11 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
             return;
         }
 
-<<<<<<< HEAD
-=======
         if (File.Exists(Path.Combine(extensionDirectory, GalleryInstallMarkerFileName)))
         {
             return;
         }
 
->>>>>>> upstream-pr-49326
         var token = _reload.Token;
         _ = Task.Run(
             async () =>
@@ -1819,8 +1661,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
 
     private async Task<CommandProviderWrapper?> RemoveExtensionByDirectoryGatedAsync(string directory, CancellationToken cancellationToken = default)
     {
-<<<<<<< HEAD
-=======
         // Cancel and await this directory's crash recovery before taking the gate. Order
         // matters both ways: canceling first releases recovery that is waiting on (or
         // holding) the gate, and awaiting before the gate is taken means the removal is
@@ -1828,7 +1668,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
         // new recovery for the duration, so an uninstall cannot race a restart.
         await _recovery.CancelAndDrainAsync(directory).ConfigureAwait(false);
 
->>>>>>> upstream-pr-49326
         IDisposable? gate = null;
         try
         {
@@ -1838,12 +1677,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
         {
             // The gate is being torn down; fall through and remove best-effort.
         }
-<<<<<<< HEAD
-
-        try
-        {
-            return RemoveExtensionByDirectoryCore(directory);
-=======
         catch (OperationCanceledException)
         {
             // The uninstall never acquired the lifecycle gate, so this directory is staying put.
@@ -1855,7 +1688,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
         try
         {
             return await RemoveExtensionByDirectoryCoreAsync(directory).ConfigureAwait(false);
->>>>>>> upstream-pr-49326
         }
         finally
         {
@@ -1863,18 +1695,11 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
 
             // Release the gate entry for the directory now that it is fully removed.
             _directoryGate.Remove(directory);
-<<<<<<< HEAD
-        }
-    }
-
-    private CommandProviderWrapper? RemoveExtensionByDirectoryCore(string directory)
-=======
             _recovery.CompleteDirectoryRemoval(directory);
         }
     }
 
     private async Task<CommandProviderWrapper?> RemoveExtensionByDirectoryCoreAsync(string directory)
->>>>>>> upstream-pr-49326
     {
         JSExtensionWrapper? extensionToRemove;
         CommandProviderWrapper? wrapperToRemove;
@@ -1909,79 +1734,12 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
         if (extensionToRemove is not null)
         {
             extensionToRemove.ProcessExited -= OnExtensionProcessExited;
-<<<<<<< HEAD
-            extensionToRemove.SignalDispose();
-=======
             await extensionToRemove.SignalDisposeAsync().ConfigureAwait(false);
->>>>>>> upstream-pr-49326
         }
 
         return wrapperToRemove;
     }
 
-<<<<<<< HEAD
-    private void StartSourceFileWatcher(string directory)
-    {
-        lock (_sourceWatcherLock)
-        {
-            if (_sourceFileWatchers.ContainsKey(directory))
-            {
-                return;
-            }
-
-            try
-            {
-                // Watch all files and filter to the source extensions in the handler so
-                // that .js, .mjs, and .cjs edits all trigger a hot-reload.
-                var watcher = new FileSystemWatcher(directory)
-                {
-                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName,
-                    IncludeSubdirectories = true,
-
-                    // A source extension recursively watches its own node_modules, so a
-                    // dependency install can flood the default 8 KB buffer. Enlarge it and
-                    // recover from any overflow in the Error handler.
-                    InternalBufferSize = 64 * 1024,
-                };
-
-                watcher.Changed += OnSourceFileChanged;
-                watcher.Created += OnSourceFileChanged;
-
-                // Editors commonly save atomically (write a temp file, then rename it over
-                // the target) and also delete/recreate files. Subscribe to Renamed and
-                // Deleted as well so those changes reload instead of being missed.
-                watcher.Renamed += OnSourceFileRenamed;
-                watcher.Deleted += OnSourceFileChanged;
-                watcher.Error += OnSourceWatcherError;
-
-                // Enable events only after every handler is attached so an edit that lands
-                // during setup is not dropped.
-                watcher.EnableRaisingEvents = true;
-
-                _sourceFileWatchers[directory] = watcher;
-                Logger.LogDebug($"Started source file watcher at {directory}");
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError($"Failed to start source file watcher at {directory}: {ex.Message}");
-            }
-        }
-    }
-
-    private void StopSourceFileWatcher(string directory)
-    {
-        lock (_sourceWatcherLock)
-        {
-            if (_sourceFileWatchers.TryGetValue(directory, out var watcher))
-            {
-                watcher.Changed -= OnSourceFileChanged;
-                watcher.Created -= OnSourceFileChanged;
-                watcher.Renamed -= OnSourceFileRenamed;
-                watcher.Deleted -= OnSourceFileChanged;
-                watcher.Error -= OnSourceWatcherError;
-                watcher.Dispose();
-                _sourceFileWatchers.Remove(directory);
-=======
     /// <summary>
     /// Immutable pairing of a live <see cref="FileSystemWatcher"/> and the watch root
     /// (per <see cref="ResolveWatchRoot"/>) it is currently rooted at. Tracking the watch
@@ -2112,7 +1870,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
             {
                 DetachAndDisposeSourceFileWatcher(existing.Watcher);
                 _extensionSourceWatchers.Remove(directory);
->>>>>>> upstream-pr-49326
             }
         }
 
@@ -2121,21 +1878,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
 
     private void StopAllSourceFileWatchers()
     {
-<<<<<<< HEAD
-        lock (_sourceWatcherLock)
-        {
-            foreach (var watcher in _sourceFileWatchers.Values)
-            {
-                watcher.Changed -= OnSourceFileChanged;
-                watcher.Created -= OnSourceFileChanged;
-                watcher.Renamed -= OnSourceFileRenamed;
-                watcher.Deleted -= OnSourceFileChanged;
-                watcher.Error -= OnSourceWatcherError;
-                watcher.Dispose();
-            }
-
-            _sourceFileWatchers.Clear();
-=======
         lock (_extensionSourceWatchersLock)
         {
             foreach (var existing in _extensionSourceWatchers.Values)
@@ -2144,7 +1886,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
             }
 
             _extensionSourceWatchers.Clear();
->>>>>>> upstream-pr-49326
         }
 
         // Advance the debounce generation so a pending hot-reload callback that was already
@@ -2171,15 +1912,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
         var error = e.GetException();
 
         // Find the directory this watcher belongs to so the recovery targets the right
-<<<<<<< HEAD
-        // extension. The watcher instance is the dictionary value, so match on reference.
-        string? directory = null;
-        lock (_sourceWatcherLock)
-        {
-            foreach (var pair in _sourceFileWatchers)
-            {
-                if (ReferenceEquals(pair.Value, sender))
-=======
         // extension. The watcher instance is nested in the dictionary value, so match on
         // reference.
         string? directory = null;
@@ -2188,7 +1920,6 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
             foreach (var pair in _extensionSourceWatchers)
             {
                 if (ReferenceEquals(pair.Value.Watcher, sender))
->>>>>>> upstream-pr-49326
                 {
                     directory = pair.Key;
                     break;
@@ -2222,15 +1953,9 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
 
     private string? FindWatchedDirectory(string changedPath)
     {
-<<<<<<< HEAD
-        lock (_sourceWatcherLock)
-        {
-            foreach (var directory in _sourceFileWatchers.Keys)
-=======
         lock (_extensionSourceWatchersLock)
         {
             foreach (var directory in _extensionSourceWatchers.Keys)
->>>>>>> upstream-pr-49326
             {
                 if (IsUnderDirectory(changedPath, directory))
                 {
@@ -2389,15 +2114,10 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
             }
 
             // The source watcher for this directory was never stopped, so it is preserved
-<<<<<<< HEAD
-            // across the reload; ensure one exists for the case where the incumbent had none.
-            StartSourceFileWatcher(directory);
-=======
             // across the reload; ensure one exists for the case where the incumbent had
             // none, and repair it in place if the manifest's watch root moved (see
             // EnsureSourceFileWatcher) since the incumbent's watcher was created.
             EnsureSourceFileWatcher(directory, parseResult.Manifest);
->>>>>>> upstream-pr-49326
 
             // Dispose the incumbent only after the replacement is registered, so there is
             // never a window with no provider for this directory.
