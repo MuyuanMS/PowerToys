@@ -757,6 +757,24 @@ public class JSExtensionManifestTests
     }
 
     [TestMethod]
+    public void TryParse_MissingRelativeIconWithUnlistedExtension_ResolvesToEmpty()
+    {
+        CreateEntryPoint("dist/index.js");
+        const string Json = """
+        {
+            "name": "missing-relative-icon-tiff",
+            "main": "dist/index.js",
+            "cmdpal": { "icon": "icon.tiff" }
+        }
+        """;
+
+        var result = JSExtensionManifest.TryParse(Json, _testDirectory);
+
+        Assert.IsTrue(result.IsValid, result.FailureReason);
+        Assert.AreEqual(string.Empty, result.Manifest!.IconPath);
+    }
+
+    [TestMethod]
     public void TryParse_RootDirectory_IsResolvedToPackageRoot()
     {
         CreateEntryPoint("dist/index.js");

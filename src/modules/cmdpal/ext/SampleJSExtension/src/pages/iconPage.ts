@@ -78,7 +78,7 @@ function buildIconItem(glyph: string, title: string, description: string): IList
   };
 
   return new ListItemBase({
-    command: new CopyTextCommand(glyph, `Action with ${glyph}`),
+    command: new CopyTextCommand(glyph, `Action with ${glyph}`, undefined, `icon:${title}`),
     title,
     subtitle: description,
     icon: iconInfo,

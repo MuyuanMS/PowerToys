@@ -425,8 +425,8 @@ public sealed record JSExtensionManifest
     /// <summary>
     /// Determines whether an icon value should be treated as a relative file path (rather than a
     /// glyph, emoji, or URI). Existing contained files are resolved before this heuristic is used;
-    /// otherwise, a relative path either has a known image extension or contains a directory
-    /// separator, and is not a URI.
+    /// otherwise, a relative path either has a file extension or contains a directory separator,
+    /// and is not a URI.
     /// </summary>
     private static bool LooksLikeRelativeFilePath(string icon)
     {
@@ -440,29 +440,8 @@ public sealed record JSExtensionManifest
             return true;
         }
 
-        var extension = Path.GetExtension(icon.AsSpan());
-        foreach (var imageExtension in ImageFileExtensions)
-        {
-            if (extension.Equals(imageExtension, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return Path.GetExtension(icon.AsSpan()).Length > 0;
     }
-
-    private static readonly string[] ImageFileExtensions =
-    [
-        ".png",
-        ".jpg",
-        ".jpeg",
-        ".gif",
-        ".bmp",
-        ".ico",
-        ".svg",
-        ".webp",
-    ];
 
     private static string? ResolveEntryPoint(string extensionDirectory, string entryPoint, out string? error)
     {
