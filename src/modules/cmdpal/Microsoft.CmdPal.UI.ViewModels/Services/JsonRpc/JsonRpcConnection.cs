@@ -494,7 +494,8 @@ public sealed partial class JsonRpcConnection : IDisposable
 
         try
         {
-            await _writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            using var waitCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _shutdownToken);
+            await _writeLock.WaitAsync(waitCts.Token).ConfigureAwait(false);
         }
         catch (ObjectDisposedException)
         {
