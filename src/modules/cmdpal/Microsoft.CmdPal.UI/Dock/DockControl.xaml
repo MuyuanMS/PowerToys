@@ -36,6 +36,7 @@
                     <ItemsRepeater.ItemTemplate>
                         <DataTemplate x:DataType="dockVm:DockItemViewModel">
                             <local:DockItemControl
+                                AutomationProperties.Name="{x:Bind Title, Mode=OneWay}"
                                 Title="{x:Bind Title, Mode=OneWay}"
                                 KeyDown="BandItem_KeyDown"
                                 RightTapped="BandItem_RightTapped"
