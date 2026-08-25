@@ -1543,9 +1543,9 @@ internal sealed partial class SystemTemperatureWidgetPage : WidgetPage, IDisposa
         {
             ContentData.Clear();
 
-            var stats = _dataManager.GetTemperatureStats();
+            var reading = _dataManager.GetTemperatureReading();
 
-            if (!stats.IsAvailable)
+            if (!reading.IsAvailable)
             {
                 _hasReading = false;
                 ContentData["thermalZoneTemperature"] = Resources.GetResource("Temperature_Usage_Unknown");
@@ -1555,7 +1555,7 @@ internal sealed partial class SystemTemperatureWidgetPage : WidgetPage, IDisposa
 
             ContentData["temperatureSource"] = Resources.GetResource("Temperature_Source_Acpi");
 
-            if (!stats.HasReading)
+            if (!reading.HasReading)
             {
                 _hasReading = false;
                 ContentData["thermalZoneTemperature"] = Resources.GetResource("Temperature_Usage_Unknown");
@@ -1563,7 +1563,7 @@ internal sealed partial class SystemTemperatureWidgetPage : WidgetPage, IDisposa
             }
 
             _hasReading = true;
-            _lastTemperatureString = $"{stats.TemperatureCelsius:F1} \u00b0C";
+            _lastTemperatureString = $"{reading.TemperatureCelsius:F1} \u00b0C";
             ContentData["thermalZoneTemperature"] = _lastTemperatureString;
         }
         catch (Exception e)

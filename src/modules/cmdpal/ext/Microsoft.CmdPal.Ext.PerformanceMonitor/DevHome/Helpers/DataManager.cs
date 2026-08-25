@@ -230,11 +230,11 @@ internal sealed partial class DataManager : IDisposable
         }
     }
 
-    internal TemperatureStats GetTemperatureStats()
+    internal TemperatureReading GetTemperatureReading()
     {
         lock (_systemData.TemperatureStats)
         {
-            return _systemData.TemperatureStats;
+            return _systemData.TemperatureStats.GetReading();
         }
     }
 

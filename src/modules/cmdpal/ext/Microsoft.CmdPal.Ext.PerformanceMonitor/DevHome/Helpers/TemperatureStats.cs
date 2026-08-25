@@ -34,6 +34,21 @@ internal sealed partial class TemperatureStats : PerformanceCounterSourceBase, I
     /// <summary>Gets the last sampled thermal zone temperature in °C.</summary>
     public double TemperatureCelsius { get; private set; } = -1;
 
+    internal TemperatureReading GetReading()
+    {
+        return new(IsAvailable, HasReading, TemperatureCelsius);
+    }
+
+    internal static TemperatureReading CreateReading(double raw)
+    {
+        var celsius = (raw - TenthsKelvinOffset) / 10.0;
+        var hasReading = double.IsFinite(celsius)
+            && celsius >= MinPlausibleCelsius
+            && celsius <= MaxPlausibleCelsius;
+
+        return new(true, hasReading, hasReading ? celsius : -1);
+    }
+
     public TemperatureStats()
     {
         try
@@ -74,10 +89,10 @@ internal sealed partial class TemperatureStats : PerformanceCounterSourceBase, I
         try
         {
             var raw = _thermalCounter.NextValue();
-            var celsius = (raw - TenthsKelvinOffset) / 10.0;
+            var reading = CreateReading(raw);
 
-            HasReading = celsius >= MinPlausibleCelsius && celsius <= MaxPlausibleCelsius;
-            TemperatureCelsius = HasReading ? celsius : -1;
+            HasReading = reading.HasReading;
+            TemperatureCelsius = reading.TemperatureCelsius;
         }
         catch (Exception ex)
         {
@@ -86,6 +101,8 @@ internal sealed partial class TemperatureStats : PerformanceCounterSourceBase, I
             TemperatureCelsius = -1;
         }
     }
+
+    internal readonly record struct TemperatureReading(bool IsAvailable, bool HasReading, double TemperatureCelsius);
 
     public void Dispose()
     {
