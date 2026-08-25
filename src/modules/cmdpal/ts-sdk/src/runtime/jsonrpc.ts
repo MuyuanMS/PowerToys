@@ -52,7 +52,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 /** Narrows a parsed value to a JSON-RPC request (has both `id` and `method`). */
 export function isRequest(message: unknown): message is JsonRpcRequest {
-  if (!isObject(message)) {
+  if (!isObject(message) || message.jsonrpc !== JSONRPC_VERSION) {
     return false;
   }
   const hasId = typeof message.id === 'number' || typeof message.id === 'string';
@@ -61,7 +61,7 @@ export function isRequest(message: unknown): message is JsonRpcRequest {
 
 /** Narrows a parsed value to a JSON-RPC notification (has `method`, no `id`). */
 export function isNotification(message: unknown): message is JsonRpcNotification {
-  if (!isObject(message)) {
+  if (!isObject(message) || message.jsonrpc !== JSONRPC_VERSION) {
     return false;
   }
   return message.id === undefined && typeof message.method === 'string';
