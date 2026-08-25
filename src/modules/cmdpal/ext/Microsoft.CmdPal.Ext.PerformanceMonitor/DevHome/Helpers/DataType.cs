@@ -43,5 +43,8 @@ public enum DataType
     /// </summary>
     Disk,
 
+    /// <summary>
+    /// System thermal zone temperature data.
+    /// </summary>
     Temperature,
 }
