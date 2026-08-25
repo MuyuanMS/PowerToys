@@ -60,19 +60,7 @@ public partial class TabViewModel : ExtensionObjectViewModel
 
         Page = tab.Page;
 
-        var title = tab.Title;
-        if (string.IsNullOrEmpty(title))
-        {
-            // Fall back to the hosted page's own name/title so the strip is
-            // never blank when the extension didn't set a tab title.
-            title = Page?.Title;
-            if (string.IsNullOrEmpty(title))
-            {
-                title = Page?.Name;
-            }
-        }
-
-        Title = title ?? string.Empty;
+        Title = ResolveTitle(tab);
         Badge = tab.Badge ?? string.Empty;
 
         var pageId = Page?.Id;
@@ -108,7 +96,7 @@ public partial class TabViewModel : ExtensionObjectViewModel
                     UpdateProperty(nameof(HasBadge));
                     break;
                 case nameof(Title):
-                    Title = string.IsNullOrEmpty(tab.Title) ? Title : tab.Title;
+                    Title = ResolveTitle(tab);
                     UpdateProperty(nameof(Title));
                     break;
                 case nameof(Icon):
@@ -123,6 +111,16 @@ public partial class TabViewModel : ExtensionObjectViewModel
         {
             ShowException(ex);
         }
+    }
+
+    private string ResolveTitle(ITab tab)
+    {
+        if (!string.IsNullOrEmpty(tab.Title))
+        {
+            return tab.Title;
+        }
+
+        return Page?.Title ?? Page?.Name ?? string.Empty;
     }
 
     protected override void UnsafeCleanup()
