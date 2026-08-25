@@ -150,4 +150,29 @@ public class BasicTests : CommandPaletteTestBase
         autoHideToggle.Toggle(initialState);
         Assert.AreEqual(initialState, autoHideToggle.IsOn);
     }
+
+    [TestMethod]
+    public void DockItemEnterKeyActivatesTest()
+    {
+        AssertDockItemKeyboardActivation("{ENTER}");
+    }
+
+    [TestMethod]
+    public void DockItemSpaceKeyActivatesTest()
+    {
+        AssertDockItemKeyboardActivation(" ");
+    }
+
+    private void AssertDockItemKeyboardActivation(string key)
+    {
+        OpenSettingsWindow();
+        NavigateToDockSettings();
+
+        this.Find<ToggleSwitch>(By.AccessibilityId("CmdPal_DockSettingsPage_EnableDock")).Toggle();
+
+        var homeDockItem = this.Find<Custom>("Home", global: true);
+        homeDockItem.SendKeys(key);
+
+        Assert.IsTrue(this.Find<TextBox>(By.AccessibilityId("MainSearchBox"), global: true).Displayed);
+    }
 }
