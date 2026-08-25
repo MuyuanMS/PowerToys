@@ -122,6 +122,7 @@ public sealed partial class TabbedPage : Page
             // Unsupported tab: the placeholder is shown via binding.
             TabFrame.Visibility = Visibility.Collapsed;
             _currentChild = null;
+            ClearShellState();
             return;
         }
 
@@ -143,17 +144,26 @@ public sealed partial class TabbedPage : Page
         {
             TabFrame.Visibility = Visibility.Collapsed;
             _currentChild = null;
+            ClearShellState();
             return;
         }
 
         _currentChild = child;
         TabFrame.Visibility = Visibility.Visible;
 
-        // Clear the command bar before swapping; the newly loaded tab page
-        // re-populates it as if it had been opened on its own.
-        WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(null));
+        // Cached child pages do not reinitialize on every activation, so
+        // preserve the existing command-bar context when the active child
+        // already knows how to populate it.
+        WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(child as ICommandBarContext));
 
         TabFrame.Navigate(viewType, new AsyncNavigationRequest(child, CancellationToken.None), _noAnimation);
+        TabFrame.BackStack.Clear();
+    }
+
+    private static void ClearShellState()
+    {
+        WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(null));
+        WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
     }
 
     private void NextTab_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)

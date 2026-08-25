@@ -230,6 +230,23 @@ public partial class TabbedPageViewModelTests
     }
 
     [TestMethod]
+    public async Task Title_PropChangedFallsBackToPageTitleWhenCleared()
+    {
+        var tab = new Tab("Explicit title", new TestContentPage("docs", "Page title")) { Id = "docs-tab" };
+        var page = new TestTabbedPage([tab]);
+        var viewModel = CreateViewModel(page);
+        viewModel.InitializeProperties();
+
+        await WaitFor(() => viewModel.Tabs.Count == 1, "Tabs did not populate");
+        Assert.AreEqual("Explicit title", viewModel.Tabs[0].Title);
+
+        tab.Title = string.Empty;
+
+        await WaitFor(() => viewModel.Tabs[0].Title == "Page title", "Page-title fallback was not restored");
+        viewModel.SafeCleanup();
+    }
+
+    [TestMethod]
     public async Task SearchText_ForwardsToActiveListTab()
     {
         var page = new TestTabbedPage(
