@@ -126,6 +126,12 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
             }
           }
           await runtime.handleNotification(message);
+        } else {
+          writeMessage({
+            jsonrpc: JSONRPC_VERSION,
+            id: null,
+            error: { code: -32600, message: 'Invalid Request' },
+          });
         }
       })
       .catch((error: unknown) => {

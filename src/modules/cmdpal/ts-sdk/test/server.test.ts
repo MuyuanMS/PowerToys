@@ -4,7 +4,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ICommandProvider } from '../src/types.js';
-import { MessageFramer } from '../src/runtime/framing.js';
+import { encodeMessage, MessageFramer } from '../src/runtime/framing.js';
 import { startJsonRpcServer } from '../src/runtime/server.js';
 
 type Writer = typeof process.stdout.write;
@@ -14,7 +14,9 @@ const originalStderrWrite = process.stderr.write;
 const initialDataListeners = process.stdin.listeners('data');
 const initialEndListeners = process.stdin.listeners('end');
 
-afterEach(() => {
+afterEach(async () => {
+  process.stdin.emit('end');
+  await new Promise<void>((resolve) => setImmediate(resolve));
   for (const listener of process.stdin.listeners('data')) {
     if (!initialDataListeners.includes(listener)) {
       process.stdin.removeListener('data', listener as () => void);
@@ -59,6 +61,31 @@ describe('startJsonRpcServer', () => {
         jsonrpc: '2.0',
         id: null,
         error: { code: -32700, message: 'Parse error' },
+      },
+    ]);
+  });
+
+  it('returns an invalid request error for unsupported protocol messages', async () => {
+    const output = captureStdout();
+    const provider: ICommandProvider = {
+      id: 'test',
+      displayName: 'Test',
+      topLevelCommands: () => [],
+    };
+    startJsonRpcServer(() => provider);
+
+    process.stdin.emit('data', encodeMessage({ jsonrpc: '1.0', id: 1, method: 'initialize' }));
+    await new Promise<void>((resolve) => setTimeout(resolve, 10));
+
+    const framer = new MessageFramer();
+    const messages = framer
+      .push(Buffer.from(output.join(''), 'utf8'))
+      .map((body) => JSON.parse(body));
+    expect(messages).toEqual([
+      {
+        jsonrpc: '2.0',
+        id: null,
+        error: { code: -32600, message: 'Invalid Request' },
       },
     ]);
   });

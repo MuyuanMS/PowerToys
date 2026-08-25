@@ -251,12 +251,6 @@ export class Settings implements ICommandSettings {
     const body: unknown[] = [];
 
     for (const setting of this.items) {
-      body.push({
-        type: 'TextBlock',
-        text: setting.label,
-        weight: 'bolder',
-        spacing: 'medium',
-      });
       if (setting.description) {
         body.push({
           type: 'TextBlock',
@@ -271,7 +265,7 @@ export class Settings implements ICommandSettings {
         const input: Record<string, unknown> = {
           type: 'Input.Toggle',
           id: setting.key,
-          title: '',
+          title: setting.label,
           value: String(setting.value),
           valueOn: 'true',
           valueOff: 'false',
@@ -282,6 +276,7 @@ export class Settings implements ICommandSettings {
         const input: Record<string, unknown> = {
           type: 'Input.Text',
           id: setting.key,
+          label: setting.label,
           placeholder: setting.placeholder ?? '',
           value: setting.value,
           isMultiline: setting.multiline ?? false,
@@ -292,6 +287,7 @@ export class Settings implements ICommandSettings {
         const input: Record<string, unknown> = {
           type: 'Input.ChoiceSet',
           id: setting.key,
+          label: setting.label,
           value: setting.value,
           choices: setting.choices.map((choice) => ({
             title: choice.title,

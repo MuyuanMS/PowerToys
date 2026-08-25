@@ -195,6 +195,51 @@ describe('bounded command registry eviction', () => {
     expect((await invoke('fb-2'))?.result).toEqual({ Kind: 4 });
     expect((await invoke('fb-1'))?.error?.code).toBe(JsonRpcErrorCode.MethodNotFound);
   });
+
+  it('retires fallback commands when the provider stops returning fallbacks', async () => {
+    const provider: ICommandProvider = {
+      id: 'ext',
+      displayName: 'Ext',
+      topLevelCommands() {
+        return [];
+      },
+      fallbackCommands() {
+        return [{ command: item('fb').command, title: 'Fallback' }];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(provider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'provider/getFallbackCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'command/invoke',
+      params: { commandId: 'fb' },
+    });
+    expect(responseFor(sent, 2)?.result).toEqual({ Kind: 4 });
+
+    // JavaScript extensions can return an undefined fallback result despite
+    // the TypeScript declaration requiring an array.
+    Object.defineProperty(provider, 'fallbackCommands', { value: () => undefined });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 3,
+      method: 'provider/getFallbackCommands',
+    });
+    expect(responseFor(sent, 3)?.result).toBeNull();
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 4,
+      method: 'command/invoke',
+      params: { commandId: 'fb' },
+    });
+    expect(responseFor(sent, 4)?.error?.code).toBe(JsonRpcErrorCode.MethodNotFound);
+  });
 });
 
 describe('recursive scope retirement', () => {

@@ -430,6 +430,10 @@ export class ExtensionRuntime {
     }
     const items = (await provider.fallbackCommands?.()) ?? null;
     if (!items) {
+      const previous = this.fallbackScope;
+      this.fallbackScope = new Map<string, ICommand>();
+      this.fallbacks.clear();
+      this.retireMissing(previous.keys(), this.fallbackScope);
       this.respond(id, null);
       return;
     }
