@@ -151,13 +151,26 @@ public sealed partial class TabbedPage : Page
         _currentChild = child;
         TabFrame.Visibility = Visibility.Visible;
 
-        // Cached child pages do not reinitialize on every activation, so
-        // preserve the existing command-bar context when the active child
-        // already knows how to populate it.
-        WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(child as ICommandBarContext));
+        RestoreShellState(child);
 
         TabFrame.Navigate(viewType, new AsyncNavigationRequest(child, CancellationToken.None), _noAnimation);
         TabFrame.BackStack.Clear();
+    }
+
+    private static void RestoreShellState(PageViewModel child)
+    {
+        // Cached child pages do not reinitialize on every activation, so
+        // republish the shell state that ContentPageViewModel otherwise sends
+        // only while it initializes or its model changes.
+        WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(child as ICommandBarContext));
+        if (child is ContentPageViewModel { Details: { } details })
+        {
+            WeakReferenceMessenger.Default.Send<ShowDetailsMessage>(new(details));
+        }
+        else
+        {
+            WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+        }
     }
 
     private static void ClearShellState()
