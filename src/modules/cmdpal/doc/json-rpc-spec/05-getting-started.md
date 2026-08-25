@@ -104,8 +104,13 @@ import type {
 
 // A command that shows a toast. `invoke` returns a CommandResult object.
 class GreetCommand extends InvokableCommandBase {
-  readonly id = 'greet';
+  readonly id: string;
   readonly name = 'Say Hello';
+
+  constructor(id = 'greet') {
+    super();
+    this.id = id;
+  }
 
   override invoke(): CommandResult {
     return { kind: 'showToast', args: { message: 'Hello from my extension!' } };
@@ -214,7 +219,7 @@ class SearchablePage extends DynamicListPageBase {
       .map(
         (item) =>
           new ListItemBase({
-            command: new GreetCommand(),
+            command: new GreetCommand(`greet:${item.title.toLowerCase().replaceAll(' ', '-')}`),
             title: `${item.emoji} ${item.title}`,
             subtitle: 'A delicious fruit',
           }),

@@ -172,18 +172,24 @@ command is shown outside the extension's top-level results.
 
 ### `provider/getSettings`
 
-Fetches the extension's settings page ID.
+Fetches the extension's serialized settings-page command.
 
 **Parameters:** `null`
 
 **Response:**
 ```json
 {
-  "id": "settings-page-id"
+  "id": "settings-page-id",
+  "name": "Settings",
+  "displayName": "Settings",
+  "pageType": "contentPage",
+  "title": "Extension Settings",
+  "isLoading": false
 }
 ```
 
-Or `null` if the extension has no settings.
+The response contains the full serialized command object, including the page metadata
+needed by the host to render it. It is `null` if the extension has no settings.
 
 ---
 

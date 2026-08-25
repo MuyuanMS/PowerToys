@@ -93,7 +93,7 @@ CmdPal parses each `package.json` and only loads the directory as an extension w
 4. **Entry point stays inside the extension.** The entry point must be a **relative** path (a rooted or absolute path is rejected) that resolves to a location **inside** the extension directory. A path that escapes the directory with `..` is rejected so an extension cannot point its entry point at a file outside its own folder.
 5. **Entry point is a JavaScript module.** The resolved entry point must end in `.js`, `.mjs`, or `.cjs`. Any other extension (for example an uncompiled `.ts` source) is rejected, because the host runs the file directly with `node`.
 6. **Entry point exists.** The resolved entry point must be an existing file on disk. A `main` that points at a file that was never built or shipped is rejected.
-7. **No symlink or junction escape.** After confirming the file exists, the resolved entry point is re-checked against the real filesystem: a symbolic link, junction, or other reparse point that redirects the entry point outside the extension directory is rejected, even when the lexical path (rule 4) stayed inside it.
+7. **No symlink or junction traversal.** After confirming the file exists, the resolved entry point is re-checked against the real filesystem. A symbolic link, junction, or other reparse point anywhere in the entry-point path is rejected, even when its target remains inside the extension directory.
 
 A resolved relative icon (`cmdpal.icon`) is subject to the same containment rules; see [Icon resolution](#icon-resolution).
 
@@ -112,8 +112,7 @@ rejected (and the extension shows no icon rather than loading an out-of-package 
 when:
 
 - it escapes the package with `..`,
-- it is redirected outside the package by a symbolic link, junction, or other reparse
-  point, or
+- its path traverses a symbolic link, junction, or other reparse point, or
 - the target file does not exist.
 
 Keep icon files inside your package (and list them in `files`) so they are present in
@@ -290,8 +289,9 @@ only** (see [Development Setup](#development-setup)); bundle the SDK instead.
 
 ### npm Package Structure
 
-Extensions are distributed as standard npm packages. The recommended `package.json`
-for a bundled production build:
+Extensions are distributed as standard npm packages. Build with a development manifest
+that can reference the local SDK, then package a separate production manifest with no
+dependencies. The production `package.json` for a bundled build is:
 
 ```json
 {
@@ -305,19 +305,10 @@ for a bundled production build:
     "icon": "icon.png",
     "publisher": "your-name"
   },
-  "scripts": {
-    "build": "tsc && esbuild dist/index.js --bundle --platform=node --format=esm --outfile=dist/index.js --allow-overwrite",
-    "prepack": "npm run build"
-  },
   "files": [
     "dist/",
     "icon.png"
   ],
-  "devDependencies": {
-    "@microsoft/cmdpal-sdk": "file:../../ts-sdk",
-    "esbuild": "^0.23.0",
-    "typescript": "^5.8.0"
-  },
   "keywords": ["cmdpal", "powertoys", "command-palette"],
   "engines": {
     "node": ">=22.0.0"
@@ -325,29 +316,32 @@ for a bundled production build:
 }
 ```
 
-The SDK appears only under `devDependencies` because the build step inlines it into
-`dist/`. The shipped package therefore lists no runtime dependency on
-`@microsoft/cmdpal-sdk`.
-
-The build is wired to the **`prepack`** lifecycle hook, not `prepublishOnly`, on
-purpose. `npm pack` (which produces the tarball the gallery ultimately installs, and
-the tarball you validate below) runs `prepack` but does **not** run `prepublishOnly`;
-only `npm publish` runs `prepublishOnly`. Using `prepack` guarantees `dist/` is
-rebuilt whenever the tarball is assembled, whether you are validating locally or
-publishing, so a clean checkout can never pack a stale or missing `dist/`. The SDK
-itself takes the equivalent belt-and-suspenders approach: its `verify:pack` script
-runs `npm run build` explicitly before `npm pack` rather than trusting a publish-only
-hook.
+The development manifest can keep `@microsoft/cmdpal-sdk` and build tools under
+`devDependencies` while it builds the bundled `dist/` directory. Before packing,
+copy the built files and this production manifest into a staging directory, then run
+`npm shrinkwrap --ignore-scripts` and `npm pack --ignore-scripts` there. The
+resulting tarball has a dependency-free `npm-shrinkwrap.json` and no `file:`
+reference, so the gallery's `npm ci` installation does not attempt to resolve
+development-only dependencies.
 
 ### Validating a clean install
 
-To confirm your package installs without the PowerToys repository present, pack it
-and install it into a throwaway directory:
+To confirm your package installs without the PowerToys repository present, first
+build from the development project, then stage the production manifest and built
+files before packing:
 
 ```powershell
-npm pack                     # runs the prepack build, then produces publisher-cmdpal-my-extension-1.0.0.tgz with dist/ inside
+New-Item -ItemType Directory -Path .\package-stage | Out-Null
+Copy-Item -Recurse .\dist .\package-stage\dist
+Copy-Item .\icon.png .\package-stage\icon.png
+Copy-Item .\package.production.json .\package-stage\package.json
+Push-Location .\package-stage
+npm install --package-lock-only --ignore-scripts
+npm shrinkwrap --ignore-scripts
+npm pack --ignore-scripts
+Pop-Location
 $temp = New-Item -ItemType Directory -Path (Join-Path $env:TEMP ("cmdpal-smoke-" + [guid]::NewGuid()))
-Copy-Item .\publisher-cmdpal-my-extension-1.0.0.tgz $temp
+Copy-Item .\package-stage\publisher-cmdpal-my-extension-1.0.0.tgz $temp
 Push-Location $temp
 npm init -y | Out-Null
 npm install .\publisher-cmdpal-my-extension-1.0.0.tgz
