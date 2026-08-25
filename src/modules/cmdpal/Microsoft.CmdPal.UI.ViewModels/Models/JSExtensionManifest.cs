@@ -365,16 +365,25 @@ public sealed record JSExtensionManifest
             return string.Empty;
         }
 
-        // Only a relative file path is resolved; a glyph, emoji, or other non-path value is
-        // left exactly as authored so existing behavior for those forms is unchanged.
-        if (!LooksLikeRelativeFilePath(trimmed))
+        // Resolve an existing package-contained file before applying the path heuristic. This
+        // supports valid icon formats without requiring the manifest parser to maintain an
+        // exhaustive allow-list of image extensions.
+        var resolvedIconPath = TryResolveContainedIconPath(extensionDirectory, trimmed);
+        if (resolvedIconPath is not null)
         {
-            return trimmed;
+            return resolvedIconPath;
         }
 
+        // Preserve glyph, emoji, and other non-path values. Values that look like paths but do
+        // not resolve to an existing contained file intentionally produce no icon.
+        return LooksLikeRelativeFilePath(trimmed) ? string.Empty : trimmed;
+    }
+
+    private static string? TryResolveContainedIconPath(string extensionDirectory, string icon)
+    {
         if (string.IsNullOrEmpty(extensionDirectory))
         {
-            return string.Empty;
+            return null;
         }
 
         string baseDirectory;
@@ -382,11 +391,11 @@ public sealed record JSExtensionManifest
         try
         {
             baseDirectory = Path.GetFullPath(extensionDirectory);
-            resolved = Path.GetFullPath(Path.Combine(baseDirectory, trimmed));
+            resolved = Path.GetFullPath(Path.Combine(baseDirectory, icon));
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
         {
-            return string.Empty;
+            return null;
         }
 
         // String path check: the resolved icon must stay within the package directory.
@@ -395,19 +404,19 @@ public sealed record JSExtensionManifest
             : baseDirectory + Path.DirectorySeparatorChar;
         if (!resolved.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
         {
-            return string.Empty;
+            return null;
         }
 
         if (!File.Exists(resolved))
         {
-            return string.Empty;
+            return null;
         }
 
         // Real file system check: a symbolic link or junction must not redirect the icon out
         // of the package, even when the string path stays within it.
         if (!IsEntryPointContainmentTrusted(extensionDirectory, resolved, out _))
         {
-            return string.Empty;
+            return null;
         }
 
         return resolved;
@@ -415,8 +424,9 @@ public sealed record JSExtensionManifest
 
     /// <summary>
     /// Determines whether an icon value should be treated as a relative file path (rather than a
-    /// glyph, emoji, or URI). A relative path either has a known image extension or contains a
-    /// directory separator, and is not a URI.
+    /// glyph, emoji, or URI). Existing contained files are resolved before this heuristic is used;
+    /// otherwise, a relative path either has a known image extension or contains a directory
+    /// separator, and is not a URI.
     /// </summary>
     private static bool LooksLikeRelativeFilePath(string icon)
     {

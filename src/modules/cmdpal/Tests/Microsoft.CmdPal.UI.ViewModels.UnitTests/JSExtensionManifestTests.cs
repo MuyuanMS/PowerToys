@@ -737,6 +737,26 @@ public class JSExtensionManifestTests
     }
 
     [TestMethod]
+    public void TryParse_RelativeIconWithUnlistedExtension_ResolvesToContainedAbsolutePath()
+    {
+        CreateEntryPoint("dist/index.js");
+        CreateEntryPoint("icon.tiff");
+        const string Json = """
+        {
+            "name": "relative-icon-tiff",
+            "main": "dist/index.js",
+            "cmdpal": { "icon": "icon.tiff" }
+        }
+        """;
+
+        var result = JSExtensionManifest.TryParse(Json, _testDirectory);
+
+        Assert.IsTrue(result.IsValid, result.FailureReason);
+        var expected = Path.GetFullPath(Path.Combine(_testDirectory, "icon.tiff"));
+        Assert.AreEqual(expected, result.Manifest!.IconPath);
+    }
+
+    [TestMethod]
     public void TryParse_RootDirectory_IsResolvedToPackageRoot()
     {
         CreateEntryPoint("dist/index.js");
