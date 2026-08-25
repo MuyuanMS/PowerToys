@@ -15,11 +15,11 @@ internal static class TimeAndDateHelper
     /* htcfreek:Currently not used.
      * private static readonly Regex _regexSpecialInputFormats = new Regex(@"^.*(u|ums|ft|oa|exc|exf)\d"); */
 
-    private static readonly Regex _regexCustomDateTimeFormats = new Regex(@"(?<!\\)(DOW|DIM|WOM|WOY|IWOY|IWYR|IWYY|IDOW|EAB|WFT|UXT|UMS|OAD|EXC|EXF)");
+    private static readonly Regex _regexCustomDateTimeFormats = new Regex(@"(?<!\\)(IWOY|IWYR|IWYY|IDOW|DIM|WOM|EAB|WFT|UXT|UMS|OAD|EXC|EXF)|(?<![\\I])(DOW|WOY)");
     private static readonly Regex _regexCustomDateTimeDim = new Regex(@"(?<!\\)DIM");
-    private static readonly Regex _regexCustomDateTimeDow = new Regex(@"(?<!\\)DOW");
+    private static readonly Regex _regexCustomDateTimeDow = new Regex(@"(?<![\\I])DOW");
     private static readonly Regex _regexCustomDateTimeWom = new Regex(@"(?<!\\)WOM");
-    private static readonly Regex _regexCustomDateTimeWoy = new Regex(@"(?<!\\)WOY");
+    private static readonly Regex _regexCustomDateTimeWoy = new Regex(@"(?<![\\I])WOY");
     private static readonly Regex _regexCustomDateTimeIwoy = new Regex(@"(?<!\\)IWOY");
     private static readonly Regex _regexCustomDateTimeIwyr = new Regex(@"(?<!\\)IWYR");
     private static readonly Regex _regexCustomDateTimeIwyy = new Regex(@"(?<!\\)IWYY");
@@ -412,6 +412,13 @@ internal static class TimeAndDateHelper
         return _regexCustomDateTimeFormats.IsMatch(str);
     }
 
+    private static bool IsBareCustomFormatSyntax(string syntax)
+    {
+        return Regex.IsMatch(
+            syntax,
+            @"^(?:(?<!\\)(?:IWOY|IWYR|IWYY|IDOW|DOW|DIM|WOM|WOY|EAB|WFT|UXT|UMS|OAD|EXC|EXF)|\\.)+$");
+    }
+
     /// <summary>
     /// Returns the week of the year for the given first week rule and first day of the
     /// week. When the combination amounts to ISO 8601 (first four-day week, Monday) the
@@ -539,7 +546,7 @@ internal static class TimeAndDateHelper
                 // A bare custom token can reduce to a value that .NET interprets as
                 // an invalid standard format. Preserve that expanded value, but
                 // reject malformed user formats so the caller can use its fallback.
-                if (!hasCustomSyntax)
+                if (!hasCustomSyntax || !IsBareCustomFormatSyntax(syntax))
                 {
                     Logger.LogWarning($"Failed to apply the custom Clock band format '{formatSyntax}': {ex.Message}");
                     return false;

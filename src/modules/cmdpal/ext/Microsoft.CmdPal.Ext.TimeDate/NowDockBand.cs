@@ -73,20 +73,31 @@ internal sealed partial class NowDockBand : ListItem, IDisposable
     internal void UpdateSettings()
     {
         var settings = ReadSettings();
-        if (_appliedSettings == settings)
+        var updated = false;
+
+        lock (_updateLock)
         {
-            return;
+            if (_disposed || _appliedSettings == settings)
+            {
+                return;
+            }
+
+            var secondsChanged = _appliedSettings.Seconds != settings.Seconds;
+            _appliedSettings = settings;
+            _timeWithSeconds = settings.Seconds;
+            if (secondsChanged)
+            {
+                ConfigureTimerCore();
+            }
+
+            UpdateTextCore();
+            updated = true;
         }
 
-        var secondsChanged = _appliedSettings.Seconds != settings.Seconds;
-        _appliedSettings = settings;
-        _timeWithSeconds = settings.Seconds;
-        if (secondsChanged)
+        if (updated)
         {
-            ConfigureTimer();
+            _onUpdated?.Invoke();
         }
-
-        UpdateText();
     }
 
     internal void Refresh() => UpdateSettings();
@@ -100,6 +111,14 @@ internal sealed partial class NowDockBand : ListItem, IDisposable
          _settings.FirstDayOfWeek);
 
     private void ConfigureTimer()
+    {
+        lock (_updateLock)
+        {
+            ConfigureTimerCore();
+        }
+    }
+
+    private void ConfigureTimerCore()
     {
         _timer.Stop();
         _timer.Elapsed -= Timer_Elapsed;
@@ -124,14 +143,24 @@ internal sealed partial class NowDockBand : ListItem, IDisposable
 
     private void Timer_ElapsedFirstMinuteTick(object? sender, System.Timers.ElapsedEventArgs e)
     {
-        if (sender is System.Timers.Timer timer)
+        lock (_updateLock)
         {
-            timer.Interval = PerMinuteUpdateInterval.TotalMilliseconds;
-            timer.Elapsed -= Timer_ElapsedFirstMinuteTick;
-            timer.Elapsed += Timer_Elapsed;
+            if (_disposed)
+            {
+                return;
+            }
+
+            if (sender is System.Timers.Timer timer)
+            {
+                timer.Interval = PerMinuteUpdateInterval.TotalMilliseconds;
+                timer.Elapsed -= Timer_ElapsedFirstMinuteTick;
+                timer.Elapsed += Timer_Elapsed;
+            }
+
+            UpdateTextCore();
         }
 
-        Timer_Elapsed(sender, e);
+        _onUpdated?.Invoke();
     }
 
     private void Timer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e)
@@ -209,10 +238,14 @@ internal sealed partial class NowDockBand : ListItem, IDisposable
     {
         lock (_updateLock)
         {
-            _disposed = true;
-        }
+            if (_disposed)
+            {
+                return;
+            }
 
-        _timer.Stop();
-        _timer.Dispose();
+            _disposed = true;
+            _timer.Stop();
+            _timer.Dispose();
+        }
     }
 }

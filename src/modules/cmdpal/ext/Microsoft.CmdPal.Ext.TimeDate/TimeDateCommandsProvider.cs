@@ -23,6 +23,8 @@ public sealed partial class TimeDateCommandsProvider : CommandProvider
 
     private readonly NowDockBand _bandItem;
     private readonly ListItem _notificationCenterBandItem;
+    private readonly WrappedDockItem _clockDockBand;
+    private readonly WrappedDockItem _notificationCenterDockBand;
     private readonly TypedEventHandler<object, Settings> _settingsChangedHandler;
 
     public TimeDateCommandsProvider()
@@ -41,6 +43,17 @@ public sealed partial class TimeDateCommandsProvider : CommandProvider
 
         _bandItem = new NowDockBand(_settingsManager);
         _notificationCenterBandItem = new NotificationCenterDockBand();
+        _clockDockBand = new WrappedDockItem(
+            [_bandItem],
+            "com.microsoft.cmdpal.timedate.clock",
+            Resources.Microsoft_plugin_timedate_dock_band_title)
+        {
+            Icon = _timeDateExtensionPage.Icon,
+        };
+        _notificationCenterDockBand = new WrappedDockItem(
+            [_notificationCenterBandItem],
+            "com.microsoft.cmdpal.timedate.notificationCenter",
+            Resources.timedate_notification_center_band_title);
 
         // Update the band immediately when the user changes a setting (e.g. the week
         // number mode). Stored as a field so Dispose can unsubscribe from the static
@@ -71,7 +84,7 @@ public sealed partial class TimeDateCommandsProvider : CommandProvider
 
     public override ICommandItem[] GetDockBands()
     {
-        return [_bandItem, _notificationCenterBandItem];
+        return [_clockDockBand, _notificationCenterDockBand];
     }
 }
 

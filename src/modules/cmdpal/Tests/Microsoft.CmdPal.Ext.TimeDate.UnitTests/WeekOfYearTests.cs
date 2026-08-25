@@ -242,6 +242,32 @@ namespace Microsoft.CmdPal.Ext.TimeDate.UnitTests
             Assert.AreEqual(string.Empty, result);
         }
 
+        [DataTestMethod]
+        [DataRow(@"\IWOY", "IWOY")]
+        [DataRow(@"\IDOW", "IDOW")]
+        public void EscapedIsoTokensRemainLiteral(string format, string expected)
+        {
+            var date = new DateTime(2026, 7, 6);
+            var weekOfYear = TimeAndDateHelper.GetWeekOfYear(date, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
+
+            var success = TimeAndDateHelper.TryFormatCustomString(date, format, weekOfYear, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday, out var result);
+
+            Assert.IsTrue(success);
+            Assert.AreEqual(expected, result);
+        }
+
+        [TestMethod]
+        public void MalformedFormatWithCustomTokenFallsBack()
+        {
+            var date = new DateTime(2026, 7, 6);
+            var weekOfYear = TimeAndDateHelper.GetWeekOfYear(date, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
+
+            var success = TimeAndDateHelper.TryFormatCustomString(date, "WOY 'unclosed", weekOfYear, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday, out var result);
+
+            Assert.IsFalse(success);
+            Assert.AreEqual(string.Empty, result);
+        }
+
         [TestMethod]
         public void UtcWeekOfYearUsesTheUtcDate()
         {
