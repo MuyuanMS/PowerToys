@@ -14,7 +14,6 @@ using Microsoft.CmdPal.Common.WinGet.Models;
 using Microsoft.CmdPal.Common.WinGet.Services;
 using Microsoft.CmdPal.UI.ViewModels.Gallery;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Management.Deployment;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
@@ -239,8 +238,17 @@ public class ExtensionGalleryViewModelTests
         winGetService
             .Setup(s => s.GetStorePackagesByIdAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(
-                new WinGetQueryResult<IReadOnlyDictionary<string, CatalogPackage>>(
-                    new Dictionary<string, CatalogPackage>(StringComparer.OrdinalIgnoreCase),
+                new WinGetQueryResult<IReadOnlyDictionary<string, WinGetPackageInfo>>(
+                    new Dictionary<string, WinGetPackageInfo>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["9NZ06M9CNV77"] = new(
+                            new WinGetPackageStatus(
+                                IsInstalled: true,
+                                IsInstalledStateKnown: true,
+                                IsUpdateAvailable: false,
+                                IsUpdateStateKnown: true),
+                            Details: null),
+                    },
                     false,
                     null));
 
@@ -264,7 +272,8 @@ public class ExtensionGalleryViewModelTests
                         It.Is<IEnumerable<string>>(ids => ids.SequenceEqual(["9NZ06M9CNV77"])),
                         It.IsAny<CancellationToken>()),
                     Times.Once);
-                return true;
+                return viewModel.FilteredEntries.Single().IsInstalled
+                    && viewModel.FilteredEntries.Single().IsInstalledStateKnown;
             }
             catch
             {

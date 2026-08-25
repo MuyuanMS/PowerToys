@@ -193,21 +193,21 @@ public sealed class WinGetPackageManagerService : IWinGetPackageManagerService
         }
     }
 
-    public async Task<WinGetQueryResult<IReadOnlyDictionary<string, CatalogPackage>>> GetStorePackagesByIdAsync(
+    public async Task<WinGetQueryResult<IReadOnlyDictionary<string, WinGetPackageInfo>>> GetStorePackagesByIdAsync(
         IEnumerable<string> storeIds,
         CancellationToken cancellationToken = default)
     {
         var normalizedIds = NormalizePackageIds(storeIds);
         if (normalizedIds.Count == 0)
         {
-            return new WinGetQueryResult<IReadOnlyDictionary<string, CatalogPackage>>(
-                new Dictionary<string, CatalogPackage>(OrdinalIgnoreCase), false, null);
+            return new WinGetQueryResult<IReadOnlyDictionary<string, WinGetPackageInfo>>(
+                new Dictionary<string, WinGetPackageInfo>(OrdinalIgnoreCase), false, null);
         }
 
         var initialization = _initialization.Value;
         if (!initialization.State.IsAvailable || initialization.Factory is null)
         {
-            return new WinGetQueryResult<IReadOnlyDictionary<string, CatalogPackage>>(null, true, initialization.State.Message);
+            return new WinGetQueryResult<IReadOnlyDictionary<string, WinGetPackageInfo>>(null, true, initialization.State.Message);
         }
 
         try
@@ -217,11 +217,11 @@ public sealed class WinGetPackageManagerService : IWinGetPackageManagerService
             var catalogResult = await GetCompositeCatalogResultAsync(includeStoreCatalog: true, CompositeSearchBehavior.AllCatalogs, cancellationToken).ConfigureAwait(false);
             if (!catalogResult.IsSuccess || catalogResult.Value is null)
             {
-                return new WinGetQueryResult<IReadOnlyDictionary<string, CatalogPackage>>(null, catalogResult.IsUnavailable, catalogResult.ErrorMessage);
+                return new WinGetQueryResult<IReadOnlyDictionary<string, WinGetPackageInfo>>(null, catalogResult.IsUnavailable, catalogResult.ErrorMessage);
             }
 
             var catalog = catalogResult.Value;
-            Dictionary<string, CatalogPackage> results = new(OrdinalIgnoreCase);
+            Dictionary<string, WinGetPackageInfo> results = new(OrdinalIgnoreCase);
 
             // A batched FindPackages query did not reliably resolve all requested
             // Store IDs, so each Store ID is queried independently.
@@ -269,21 +269,22 @@ public sealed class WinGetPackageManagerService : IWinGetPackageManagerService
             {
                 if (package is not null)
                 {
-                    results[id] = package;
+                    var status = await WinGetPackageMetadataHelper.InspectPackageStatusAsync(package).ConfigureAwait(false);
+                    results[id] = new WinGetPackageInfo(status, Details: null);
                 }
             }
 
-            return new WinGetQueryResult<IReadOnlyDictionary<string, CatalogPackage>>(results, false, null);
+            return new WinGetQueryResult<IReadOnlyDictionary<string, WinGetPackageInfo>>(results, false, null);
         }
         catch (OperationCanceledException ex)
         {
             CoreLogger.LogWarning($"Microsoft Store package lookup canceled: {ex.Message}");
-            return new WinGetQueryResult<IReadOnlyDictionary<string, CatalogPackage>>(null, false, ex.Message);
+            return new WinGetQueryResult<IReadOnlyDictionary<string, WinGetPackageInfo>>(null, false, ex.Message);
         }
         catch (Exception ex) when (ex is COMException or InvalidOperationException)
         {
             CoreLogger.LogWarning($"Microsoft Store package lookup failed: {ex.Message}");
-            return new WinGetQueryResult<IReadOnlyDictionary<string, CatalogPackage>>(null, false, ex.Message);
+            return new WinGetQueryResult<IReadOnlyDictionary<string, WinGetPackageInfo>>(null, false, ex.Message);
         }
     }
 

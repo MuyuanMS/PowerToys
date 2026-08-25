@@ -490,17 +490,9 @@ public sealed partial class ExtensionGalleryViewModel : ObservableObject, IDispo
                                 continue;
                             }
 
-                            if (results.Value.TryGetValue(entry.StoreId, out var catalogPackage))
+                            if (results.Value.TryGetValue(entry.StoreId, out var packageInfo))
                             {
-                                var isInstalled = await RunInBackgroundAsync(
-                                    async () =>
-                                    {
-                                        await catalogPackage.CheckInstalledStatusAsync();
-                                        return catalogPackage.InstalledVersion is not null;
-                                    },
-                                    storeCts.Token);
-                                entry.IsInstalled = isInstalled;
-                                entry.IsInstalledStateKnown = true;
+                                entry.ApplyWinGetPackageInfo(packageInfo);
                             }
                         }
                     }

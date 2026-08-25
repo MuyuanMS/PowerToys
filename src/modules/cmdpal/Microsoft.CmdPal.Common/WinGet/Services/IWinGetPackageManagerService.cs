@@ -48,7 +48,7 @@ public interface IWinGetPackageManagerService
     /// <param name="storeIds">The store ids to resolve.</param>
     /// <param name="cancellationToken">A token that cancels the lookup.</param>
     /// <returns>A query result containing the resolved packages keyed by store id.</returns>
-    Task<WinGetQueryResult<IReadOnlyDictionary<string, CatalogPackage>>> GetStorePackagesByIdAsync(
+    Task<WinGetQueryResult<IReadOnlyDictionary<string, WinGetPackageInfo>>> GetStorePackagesByIdAsync(
         IEnumerable<string> storeIds,
         CancellationToken cancellationToken = default);
 
