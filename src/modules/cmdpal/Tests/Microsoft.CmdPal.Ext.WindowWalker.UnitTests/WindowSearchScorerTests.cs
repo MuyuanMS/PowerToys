@@ -125,6 +125,30 @@ public class WindowSearchScorerTests
         Assert.AreEqual(expected, WindowSearchScorer.Score("word\u00A0budget", WordTitle, WordProcess));
     }
 
+    [TestMethod]
+    public void ScoreAll_MatchesIndividualScoresAcrossWindowSet()
+    {
+        var windows = new[]
+        {
+            new TestWindow(WordTitle, WordProcess),
+            new TestWindow("resume.docx - Word", WordProcess),
+            new TestWindow("Inbox (12) - Gmail - Google Chrome", "chrome"),
+        };
+
+        var scores = WindowSearchScorer.ScoreAll(
+            "word budget",
+            windows,
+            static window => window.Title,
+            static window => window.ProcessName);
+
+        for (var index = 0; index < windows.Length; index++)
+        {
+            Assert.AreEqual(
+                WindowSearchScorer.Score("word budget", windows[index].Title, windows[index].ProcessName),
+                scores[index]);
+        }
+    }
+
     [DataTestMethod]
     [DataRow(null)]
     [DataRow("")]
@@ -143,4 +167,6 @@ public class WindowSearchScorerTests
         // A window with no title can still be found by its process name alone.
         Assert.IsTrue(WindowSearchScorer.Score("winword", null, WordProcess) > 0);
     }
+
+    private sealed record TestWindow(string Title, string ProcessName);
 }

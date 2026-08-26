@@ -62,6 +62,83 @@ internal static class WindowSearchScorer
         return Math.Max(wholeQueryScore, total / words.Length);
     }
 
+    /// <summary>
+    /// Scores a collection of windows against the same query.
+    /// </summary>
+    /// <remarks>
+    /// Each query component is scored across the full window collection before moving to the
+    /// next component. This lets <see cref="FuzzyStringMatcher"/> reuse its prepared query
+    /// while Window Walker filters a large window list.
+    /// </remarks>
+    internal static int[] ScoreAll<T>(
+        string? query,
+        IReadOnlyList<T> candidates,
+        Func<T, string?> titleSelector,
+        Func<T, string?> processNameSelector)
+    {
+        ArgumentNullException.ThrowIfNull(candidates);
+        ArgumentNullException.ThrowIfNull(titleSelector);
+        ArgumentNullException.ThrowIfNull(processNameSelector);
+
+        var scores = new int[candidates.Count];
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return scores;
+        }
+
+        var words = query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        ScoreAcrossCandidates(query, candidates, titleSelector, processNameSelector, scores);
+        if (words.Length < 2)
+        {
+            return scores;
+        }
+
+        var totals = new int[candidates.Count];
+        var allWordsMatched = new bool[candidates.Count];
+        Array.Fill(allWordsMatched, true);
+
+        foreach (var word in words)
+        {
+            for (var index = 0; index < candidates.Count; index++)
+            {
+                var candidate = candidates[index];
+                var wordScore = ScoreBothFields(word, titleSelector(candidate) ?? string.Empty, processNameSelector(candidate) ?? string.Empty);
+                if (wordScore == 0)
+                {
+                    allWordsMatched[index] = false;
+                }
+                else
+                {
+                    totals[index] += wordScore;
+                }
+            }
+        }
+
+        for (var index = 0; index < candidates.Count; index++)
+        {
+            if (allWordsMatched[index])
+            {
+                scores[index] = Math.Max(scores[index], totals[index] / words.Length);
+            }
+        }
+
+        return scores;
+    }
+
+    private static void ScoreAcrossCandidates<T>(
+        string query,
+        IReadOnlyList<T> candidates,
+        Func<T, string?> titleSelector,
+        Func<T, string?> processNameSelector,
+        int[] scores)
+    {
+        for (var index = 0; index < candidates.Count; index++)
+        {
+            var candidate = candidates[index];
+            scores[index] = ScoreBothFields(query, titleSelector(candidate) ?? string.Empty, processNameSelector(candidate) ?? string.Empty);
+        }
+    }
+
     private static int ScoreBothFields(string needle, string title, string processName)
         => Math.Max(
             FuzzyStringMatcher.ScoreFuzzy(needle, title),
