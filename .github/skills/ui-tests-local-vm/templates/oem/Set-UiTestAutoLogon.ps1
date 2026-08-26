@@ -3,10 +3,6 @@
 # See the LICENSE file in the project root for more information.
 
 [CmdletBinding()]
-[Diagnostics.CodeAnalysis.SuppressMessageAttribute(
-    'PSAvoidUsingConvertToSecureStringWithPlainText',
-    '',
-    Justification = 'The generated plaintext password is required by LogonUser and LSA APIs; SecureString is only needed for local-user cmdlets.')]
 param(
     [Parameter(Mandatory)]
     [string]$StandardUser,
@@ -169,17 +165,26 @@ if (-not $credentialValid) {
         $random.Dispose()
     }
     $plainPassword = ([BitConverter]::ToString($passwordBytes) -replace '-', '') + 'aA1!'
-    $securePassword = ConvertTo-SecureString $plainPassword -AsPlainText -Force
-    if ($null -eq $localUser) {
-        New-LocalUser `
-            -Name $StandardUser `
-            -Password $securePassword `
-            -AccountNeverExpires `
-            -PasswordNeverExpires `
-            -Description $Description | Out-Null
+    $securePassword = [Security.SecureString]::new()
+    foreach ($character in $plainPassword.ToCharArray()) {
+        $securePassword.AppendChar($character)
     }
-    else {
-        Set-LocalUser -Name $StandardUser -Password $securePassword
+    $securePassword.MakeReadOnly()
+    try {
+        if ($null -eq $localUser) {
+            New-LocalUser `
+                -Name $StandardUser `
+                -Password $securePassword `
+                -AccountNeverExpires `
+                -PasswordNeverExpires `
+                -Description $Description | Out-Null
+        }
+        else {
+            Set-LocalUser -Name $StandardUser -Password $securePassword
+        }
+    }
+    finally {
+        $securePassword.Dispose()
     }
 
     $credentialError = 0
