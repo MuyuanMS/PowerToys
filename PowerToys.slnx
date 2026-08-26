@@ -1157,7 +1157,7 @@
       <Platform Solution="*|x64" Project="x64" />
     </Project>
     <Project Path="src/modules/Workspaces/WorkspacesLauncher/WorkspacesLauncher.vcxproj" Id="2cac093e-5fcf-4102-9c2c-ac7dd5d9eb96" />
-    <Project Path="src/modules/Workspaces/WorkspacesLauncherUI/WorkspacesLauncherUI.csproj">
+    <Project Path="src/modules/Workspaces/WorkspacesLauncherUI.WinUI/WorkspacesLauncherUI.WinUI.csproj">
       <Platform Solution="*|ARM64" Project="ARM64" />
       <Platform Solution="*|x64" Project="x64" />
     </Project>
@@ -1168,6 +1168,10 @@
   </Folder>
   <Folder Name="/modules/Workspaces/Tests/">
     <Project Path="src/modules/Workspaces/WorkspacesEditorUITest/Workspaces.Editor.UITests.csproj">
+      <Platform Solution="*|ARM64" Project="ARM64" />
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="src/modules/Workspaces/WorkspacesLauncherUI.UnitTests/WorkspacesLauncherUI.UnitTests.csproj">
       <Platform Solution="*|ARM64" Project="ARM64" />
       <Platform Solution="*|x64" Project="x64" />
     </Project>
@@ -1284,4 +1288,3 @@
   <Project Path="tools/CliShim/CliShim.vcxproj" Id="8a7fb7fa-65ea-4004-ba73-1b237435a57b" />
   <Project Path="tools/CliShim.UnitTests/CliShim.UnitTests.vcxproj" Id="d4b0ed68-867d-46b4-a03f-ec52b9fbebe5" />
 </Solution>
-

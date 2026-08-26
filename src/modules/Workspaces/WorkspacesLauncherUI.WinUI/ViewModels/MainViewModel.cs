@@ -5,36 +5,39 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
+
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 using ManagedCommon;
 using WorkspacesCsharpLibrary;
 using WorkspacesLauncherUI.Data;
+using WorkspacesLauncherUI.Helpers;
 using WorkspacesLauncherUI.Models;
 
 namespace WorkspacesLauncherUI.ViewModels
 {
-    public class MainViewModel : INotifyPropertyChanged, IDisposable
+    public partial class MainViewModel : ObservableObject, IDisposable
     {
-        public ObservableCollection<AppLaunching> AppsListed { get; set; } = new ObservableCollection<AppLaunching>();
+        private readonly PwaHelper _pwaHelper;
+        private readonly Action<string> _ipcMessageReceivedCallback;
+        private readonly Action<string> _sendIpcMessage;
+        private bool _isDisposed;
 
-        private StatusWindow _snapshotWindow;
-        private int launcherProcessID;
-        private PwaHelper _pwaHelper;
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        public void OnPropertyChanged(PropertyChangedEventArgs e)
-        {
-            PropertyChanged?.Invoke(this, e);
-        }
+        [ObservableProperty]
+        private ObservableCollection<AppLaunching> _appsListed = new ObservableCollection<AppLaunching>();
 
         public MainViewModel()
+            : this(App.SendIPCMessage)
         {
+        }
+
+        internal MainViewModel(Action<string> sendIpcMessage)
+        {
+            _sendIpcMessage = sendIpcMessage ?? throw new ArgumentNullException(nameof(sendIpcMessage));
             _pwaHelper = new PwaHelper();
 
-            // receive IPC Message
-            App.IPCMessageReceivedCallback = (string msg) =>
+            _ipcMessageReceivedCallback = (string msg) =>
             {
                 try
                 {
@@ -47,11 +50,11 @@ namespace WorkspacesLauncherUI.ViewModels
                     Logger.LogError(ex.Message);
                 }
             };
+            App.IPCMessageReceivedCallback = _ipcMessageReceivedCallback;
         }
 
         private void HandleAppLaunchingState(AppLaunchData.AppLaunchDataWrapper appLaunchData)
         {
-            launcherProcessID = appLaunchData.LauncherProcessID;
             List<AppLaunching> appLaunchingList = new List<AppLaunching>();
             foreach (var app in appLaunchData.AppLaunchInfos.AppLaunchInfoList)
             {
@@ -59,6 +62,7 @@ namespace WorkspacesLauncherUI.ViewModels
                 {
                     Name = app.Application.Application,
                     AppPath = app.Application.ApplicationPath,
+                    IconImage = IconHelper.TryGetApplicationIcon(app.Application.ApplicationPath, app.Application.PackageFullName, app.Application.PwaAppId),
                     PackagedName = app.Application.PackageFullName,
                     Aumid = app.Application.AppUserModelId,
                     PwaAppId = app.Application.PwaAppId,
@@ -67,30 +71,27 @@ namespace WorkspacesLauncherUI.ViewModels
             }
 
             AppsListed = new ObservableCollection<AppLaunching>(appLaunchingList);
-            OnPropertyChanged(new PropertyChangedEventArgs(nameof(AppsListed)));
         }
 
-        private void SelfDestroy(object source, System.Timers.ElapsedEventArgs e)
+        [RelayCommand]
+        private void CancelLaunch()
         {
-            _snapshotWindow.Dispatcher.Invoke(() =>
-            {
-                _snapshotWindow.Close();
-            });
+            _sendIpcMessage("cancel");
         }
 
         public void Dispose()
         {
+            if (!_isDisposed)
+            {
+                if (ReferenceEquals(App.IPCMessageReceivedCallback, _ipcMessageReceivedCallback))
+                {
+                    App.IPCMessageReceivedCallback = null;
+                }
+
+                _isDisposed = true;
+            }
+
             GC.SuppressFinalize(this);
-        }
-
-        internal void SetSnapshotWindow(StatusWindow snapshotWindow)
-        {
-            _snapshotWindow = snapshotWindow;
-        }
-
-        internal void CancelLaunch()
-        {
-            App.SendIPCMessage("cancel");
         }
     }
 }
