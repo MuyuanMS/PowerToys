@@ -28,6 +28,29 @@ public class ExtensionGalleryViewModelTests
     private static readonly string[] InstallationStatusOrderIds = ["update", "installed", "not-installed"];
 
     [TestMethod]
+    public async Task RunInBackgroundAsync_DoesNotWaitForNonCancelableOperationAfterCancellation()
+    {
+        var operationStarted = new TaskCompletionSource();
+        var operationCompletion = new TaskCompletionSource<int>();
+        using var cancellationSource = new CancellationTokenSource();
+
+        var waitTask = ExtensionGalleryViewModel.RunInBackgroundAsync(
+            async () =>
+            {
+                operationStarted.SetResult();
+                return await operationCompletion.Task;
+            },
+            cancellationSource.Token);
+
+        await operationStarted.Task;
+        cancellationSource.Cancel();
+
+        await Assert.ThrowsExceptionAsync<OperationCanceledException>(() => waitTask);
+        Assert.IsFalse(operationCompletion.Task.IsCompleted);
+        operationCompletion.SetResult(0);
+    }
+
+    [TestMethod]
     public async Task LoadAsync_DoesNotBlockOnSlowSynchronousInstalledStatusKickoff()
     {
         var galleryService = new Mock<IExtensionGalleryService>();

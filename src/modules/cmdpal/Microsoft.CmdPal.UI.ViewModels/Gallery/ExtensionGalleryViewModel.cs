@@ -710,9 +710,9 @@ public sealed partial class ExtensionGalleryViewModel : ObservableObject, IDispo
             _uiScheduler);
     }
 
-    private static Task<T> RunInBackgroundAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken)
+    internal static Task<T> RunInBackgroundAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken)
     {
-        return Task.Run(operation, cancellationToken);
+        return Task.Run(operation, cancellationToken).WaitAsync(cancellationToken);
     }
 
     private static int CompareByName(ExtensionGalleryItemViewModel left, ExtensionGalleryItemViewModel right)
