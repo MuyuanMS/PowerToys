@@ -191,16 +191,16 @@ public class RemoteDesktopListPageTests
     [TestMethod]
     public void PartialQuery_FiltersOutNonMatchingConnection()
     {
-        // Arrange — "qwxyz" shares no characters with "alpha-server", so it can never fuzzy-match
-        var page = CreatePage("alpha-server", "qwxyz");
+        // Arrange — "unrelated-host" cannot fuzzy-match the partial query "alpha".
+        var page = CreatePage("alpha-server", "unrelated-host");
 
         // Act — set SearchText (not just UpdateSearchText) so GetItems() sees the query too
-        page.SearchText = "alpha-server";
+        page.SearchText = "alpha";
         var items = page.GetItems();
 
         // Assert — the non-matching connection is filtered out of the results
         var names = items.OfType<ConnectionListItem>().Select(i => i.ConnectionName).ToList();
         CollectionAssert.Contains(names, "alpha-server");
-        CollectionAssert.DoesNotContain(names, "qwxyz");
+        CollectionAssert.DoesNotContain(names, "unrelated-host");
     }
 }
