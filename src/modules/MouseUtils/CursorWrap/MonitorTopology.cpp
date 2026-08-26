@@ -237,7 +237,8 @@ EdgeType MonitorTopology::PrioritizeEdgeByDirection(const std::vector<EdgeType>&
 }
 
 bool MonitorTopology::IsOnOuterEdge(HMONITOR monitor, const POINT& cursorPos, EdgeType& outEdgeType, 
-                                     WrapMode wrapMode, const CursorDirection* direction) const
+                                     WrapMode wrapMode, const CursorDirection* direction,
+                                     bool suppressTopEdgeAtGlobalTop) const
 {
     RECT monitorRect;
     if (!GetMonitorRect(monitor, monitorRect))
@@ -261,6 +262,21 @@ bool MonitorTopology::IsOnOuterEdge(HMONITOR monitor, const POINT& cursorPos, Ed
     // At corners, multiple edges may match - collect all candidates and try each
     // to find one with a valid wrap destination
     std::vector<EdgeType> candidateEdges;
+    const bool topEdgeSuppressed =
+        (wrapMode == WrapMode::Both || wrapMode == WrapMode::VerticalOnly) &&
+        cursorPos.y <= monitorRect.top + edgeThreshold &&
+        suppressTopEdgeAtGlobalTop &&
+        IsMonitorAtGlobalTop(monitor);
+
+    // At a suppressed top corner, vertical or unknown movement must not fall back to
+    // a horizontal candidate. Horizontal movement still wraps through the side edge.
+    if (topEdgeSuppressed &&
+        (direction == nullptr ||
+         (direction->dx == 0 && direction->dy == 0) ||
+         !direction->IsPrimarilyHorizontal()))
+    {
+        return false;
+    }
 
     // Left edge - only if mode allows horizontal wrapping
     if ((wrapMode == WrapMode::Both || wrapMode == WrapMode::HorizontalOnly) &&
@@ -296,10 +312,17 @@ bool MonitorTopology::IsOnOuterEdge(HMONITOR monitor, const POINT& cursorPos, Ed
     if ((wrapMode == WrapMode::Both || wrapMode == WrapMode::VerticalOnly) &&
         cursorPos.y <= monitorRect.top + edgeThreshold)
     {
-        auto it = m_edgeMap.find({monitorIndex, EdgeType::Top});
-        if (it != m_edgeMap.end() && it->second.isOuter)
+        // In a Remote Desktop session the topmost row of the virtual desktop hosts the RDP
+        // connection bar. Suppressing the top-edge wrap only for the monitor(s) at the very
+        // top of the vertical stack keeps that bar reachable, while monitors that merely have
+        // an outer top edge lower down continue to wrap normally.
+        if (!topEdgeSuppressed)
         {
-            candidateEdges.push_back(EdgeType::Top);
+            auto it = m_edgeMap.find({monitorIndex, EdgeType::Top});
+            if (it != m_edgeMap.end() && it->second.isOuter)
+            {
+                candidateEdges.push_back(EdgeType::Top);
+            }
         }
     }
 
@@ -360,6 +383,34 @@ bool MonitorTopology::IsOnOuterEdge(HMONITOR monitor, const POINT& cursorPos, Ed
     }
 
     return false;
+}
+
+bool MonitorTopology::IsMonitorAtGlobalTop(HMONITOR monitor) const
+{
+    if (m_monitors.empty())
+    {
+        return false;
+    }
+
+    RECT monitorRect;
+    if (!GetMonitorRect(monitor, monitorRect))
+    {
+        return false;
+    }
+
+    // The topmost edge of the entire virtual desktop is the minimum 'top' across all monitors.
+    // A monitor is "top of the vertical stack" when its own top matches that minimum, regardless
+    // of its horizontal position - so an outer top edge lower down does not qualify.
+    LONG globalTop = m_monitors.front().rect.top;
+    for (const auto& m : m_monitors)
+    {
+        if (m.rect.top < globalTop)
+        {
+            globalTop = m.rect.top;
+        }
+    }
+
+    return monitorRect.top == globalTop;
 }
 
 POINT MonitorTopology::GetWrapDestination(HMONITOR fromMonitor, const POINT& cursorPos, EdgeType edgeType) const
@@ -823,4 +874,3 @@ int MonitorTopology::GetMonitorIndex(HMONITOR monitor) const
 
     return -1; // Not found
 }
-
