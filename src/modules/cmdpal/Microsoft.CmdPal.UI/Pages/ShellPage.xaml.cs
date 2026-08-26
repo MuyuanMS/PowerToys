@@ -820,9 +820,10 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
         AnnounceNavigationToPage(page);
 
-        var shouldSearchBoxBeVisible = ViewModel.CurrentPage?.HasSearchBox ?? false;
+        var searchHostPage = ViewModel.SearchHostPage;
+        var shouldSearchBoxBeVisible = searchHostPage?.HasSearchBox ?? false;
 
-        if (shouldSearchBoxBeVisible || page is not ContentPage)
+        if (shouldSearchBoxBeVisible)
         {
             ViewModel.IsSearchBoxVisible = shouldSearchBoxBeVisible;
 
