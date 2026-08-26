@@ -24,6 +24,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$script:pullRequestCommitCache = @{}
 
 function Invoke-Git {
     param([Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
@@ -119,7 +120,11 @@ function Get-AssociatedPrNumber {
 }
 
 function Get-CommitRecord {
-    param([Parameter(Mandatory)][string]$Sha)
+    param(
+        [Parameter(Mandatory)][string]$Sha,
+        [switch]$SkipGitHubLookup,
+        [switch]$SkipPatchId
+    )
 
     $subject = ([string](Invoke-Git show -s --format=%s $Sha)).Trim()
     $body = ([string](Invoke-Git show -s --format=%B $Sha)).Trim()
@@ -127,7 +132,7 @@ function Get-CommitRecord {
     $identitySource = if ($prNumber) { "subject" } else { $null }
     $cherryPickedFrom = $null
 
-    if (-not $prNumber) {
+    if (-not $prNumber -and -not $SkipGitHubLookup) {
         $prNumber = Get-AssociatedPrNumber -Sha $Sha
         if ($prNumber) {
             $identitySource = "github-associated-pr"
@@ -140,7 +145,7 @@ function Get-CommitRecord {
         if ($sourceSha) {
             $sourceSubject = ([string](Invoke-Git show -s --format=%s ([string]$sourceSha).Trim())).Trim()
             $prNumber = Get-SubjectPrNumber -Subject $sourceSubject
-            if (-not $prNumber) {
+            if (-not $prNumber -and -not $SkipGitHubLookup) {
                 $prNumber = Get-AssociatedPrNumber -Sha ([string]$sourceSha).Trim()
             }
             if ($prNumber) {
@@ -149,7 +154,7 @@ function Get-CommitRecord {
         }
     }
 
-    $patchId = Get-PatchId -Sha $Sha
+    $patchId = if ($SkipPatchId) { $null } else { Get-PatchId -Sha $Sha }
     $identity = if ($prNumber) {
         "pr:$prNumber"
     }
@@ -199,13 +204,75 @@ function Get-HistoryPrIdentitySet {
     param([Parameter(Mandatory)][string]$Commit)
 
     $set = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach ($subject in @(Invoke-Git log --format=%s $Commit)) {
-        $prNumber = Get-SubjectPrNumber -Subject ([string]$subject)
-        if ($prNumber) {
-            [void]$set.Add("pr:$prNumber")
+    foreach ($sha in @(Invoke-Git rev-list $Commit)) {
+        $record = Get-CommitRecord `
+            -Sha ([string]$sha).Trim() `
+            -SkipGitHubLookup `
+            -SkipPatchId
+        if ($record.prNumber) {
+            [void]$set.Add([string]$record.identity)
         }
     }
     return ,$set
+}
+
+function Get-PullRequestCommitShas {
+    param([Parameter(Mandatory)][int]$PrNumber)
+
+    $cacheKey = "$Repo#$PrNumber"
+    if ($script:pullRequestCommitCache.ContainsKey($cacheKey)) {
+        return ,$script:pullRequestCommitCache[$cacheKey]
+    }
+
+    $shas = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    if ($NoGitHubLookup) {
+        $script:pullRequestCommitCache[$cacheKey] = $shas
+        return ,$shas
+    }
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+        throw "GitHub CLI ('gh') is required for commit-to-PR fallback resolution."
+    }
+
+    $json = gh api --paginate --slurp `
+        -H "Accept: application/vnd.github+json" `
+        "repos/$Repo/pulls/$PrNumber/commits?per_page=100" 2>$null
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($json)) {
+        foreach ($page in @($json | ConvertFrom-Json)) {
+            foreach ($commit in @($page)) {
+                if ($commit.sha -match "^[0-9a-fA-F]{40}$") {
+                    [void]$shas.Add([string]$commit.sha)
+                }
+            }
+        }
+    }
+
+    $script:pullRequestCommitCache[$cacheKey] = $shas
+    return ,$shas
+}
+
+function Add-AssociatedPrIdentitiesFromHistory {
+    param(
+        [Parameter(Mandatory)][string]$HistoryTip,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Candidates,
+        [Parameter(Mandatory)][System.Collections.Generic.HashSet[string]]$HistoryIdentities
+    )
+
+    foreach ($record in @($Candidates | Where-Object { $_.prNumber })) {
+        $identity = [string]$record.identity
+        if ($HistoryIdentities.Contains($identity)) {
+            continue
+        }
+
+        foreach ($sha in Get-PullRequestCommitShas -PrNumber ([int]$record.prNumber)) {
+            if ([string]::IsNullOrWhiteSpace([string]$sha)) {
+                continue
+            }
+            if (Test-Ancestor -Ancestor $sha -Descendant $HistoryTip) {
+                [void]$HistoryIdentities.Add($identity)
+                break
+            }
+        }
+    }
 }
 
 function Get-EquivalentCommitSet {
@@ -335,6 +402,14 @@ if ($deltaMode -eq "branch-transition") {
     foreach ($identity in $targetHistoryPrIdentities) {
         [void]$targetIdentities.Add($identity)
     }
+    Add-AssociatedPrIdentitiesFromHistory `
+        -HistoryTip $previousSha `
+        -Candidates $targetRecords `
+        -HistoryIdentities $previousIdentities
+    Add-AssociatedPrIdentitiesFromHistory `
+        -HistoryTip $targetSha `
+        -Candidates $previousRecords `
+        -HistoryIdentities $targetIdentities
 
     $previousEquivalentCommits = Get-EquivalentCommitSet -Upstream $targetSha -Head $previousSha
     $targetEquivalentCommits = Get-EquivalentCommitSet -Upstream $previousSha -Head $targetSha
