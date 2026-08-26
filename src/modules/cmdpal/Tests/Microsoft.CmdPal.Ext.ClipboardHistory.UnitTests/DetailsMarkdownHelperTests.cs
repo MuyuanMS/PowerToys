@@ -13,9 +13,10 @@ public class DetailsMarkdownHelperTests
     [TestMethod]
     public void BuildTextBody_PreservesLineBreaksAndIndentation()
     {
-        var body = DetailsMarkdownHelper.BuildTextBody("first line\n    indented line\nlast line");
+        var text = string.Join('\n', "first line", "    indented line", "last line");
+        var body = DetailsMarkdownHelper.BuildTextBody(text);
 
-        Assert.AreEqual("```text\nfirst line\n    indented line\nlast line\n```", body);
+        Assert.AreEqual(string.Join('\n', "```text", "first line", "    indented line", "last line", "```"), body);
     }
 
     [TestMethod]
@@ -24,6 +25,17 @@ public class DetailsMarkdownHelperTests
         var body = DetailsMarkdownHelper.BuildTextBody("before ``` after");
 
         Assert.AreEqual("````text\nbefore ``` after\n````", body);
+    }
+
+    [TestMethod]
+    public void BuildTextBody_UsesFenceLongerThanLongestBacktickRun()
+    {
+        var text = new string('`', 4096);
+        var fence = new string('`', 4097);
+
+        var body = DetailsMarkdownHelper.BuildTextBody(text);
+
+        Assert.AreEqual($"{fence}text\n{text}\n{fence}", body);
     }
 
     [TestMethod]
@@ -47,7 +59,7 @@ public class DetailsMarkdownHelperTests
     }
 
     [TestMethod]
-    public void BuildImageBody_ReturnsEmpty_WhenImageDataIsNull()
+    public void BuildImageBody_ReturnsEmpty_WhenImagePathIsNull()
     {
         var body = DetailsMarkdownHelper.BuildImageBody(null, "Image");
 

@@ -24,10 +24,11 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
 {
     private readonly SettingsManager _settingsManager;
     private readonly string _defaultIconPath;
+    private readonly object loadGate = new();
     private volatile ClipboardItem[] clipboardHistory = [];
     private int hasLoadedOnce;
-    private int loadInFlight;
-    private int reloadRequested;
+    private bool loadInFlight;
+    private bool reloadRequested;
 
     public ClipboardHistoryListPage(SettingsManager settingsManager)
     {
@@ -45,7 +46,6 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
 
     private void TrackClipboardHistoryChanged_EventHandler(object? sender, ClipboardHistoryChangedEventArgs? e)
     {
-        Interlocked.Exchange(ref reloadRequested, 1);
         LoadClipboardHistoryInSTA();
     }
 
@@ -103,8 +103,11 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
                     if (imageReceived is not null)
                     {
                         item.ImageData = imageReceived;
-                        item.ImagePath = GetImagePath(item.Item.Id);
-                        await CacheImageAsync(imageReceived, item.ImagePath).ConfigureAwait(false);
+                        var imagePath = GetImagePath(item.Item.Id);
+                        if (await CacheImageAsync(imageReceived, imagePath).ConfigureAwait(false))
+                        {
+                            item.ImagePath = imagePath;
+                        }
                     }
                 }
             }
@@ -122,7 +125,20 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
         finally
         {
             CleanupCachedImages(clipboardHistory.Where(static item => item.ImagePath is not null).Select(static item => item.ImagePath!));
-            Interlocked.Exchange(ref loadInFlight, 0);
+            var startReload = false;
+            lock (loadGate)
+            {
+                if (loadSucceeded && reloadRequested)
+                {
+                    reloadRequested = false;
+                    startReload = true;
+                }
+                else
+                {
+                    loadInFlight = false;
+                }
+            }
+
             if (!loadSucceeded)
             {
                 Interlocked.Exchange(ref hasLoadedOnce, 0);
@@ -148,9 +164,9 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
                     TryLogMessage($"Failed to notify clipboard history update: {ex}");
                 }
 
-                if (Interlocked.Exchange(ref reloadRequested, 0) != 0)
+                if (startReload)
                 {
-                    LoadClipboardHistoryInSTA();
+                    StartClipboardHistoryLoad();
                 }
             }
         }
@@ -203,20 +219,46 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
         }
     }
 
-    private static async Task CacheImageAsync(RandomAccessStreamReference imageData, string path)
+    private static async Task<bool> CacheImageAsync(RandomAccessStreamReference imageData, string path)
     {
+        var temporaryPath = $"{path}.tmp";
         try
         {
             using var stream = await imageData.OpenReadAsync().AsTask().ConfigureAwait(false);
             using var input = stream.AsStreamForRead();
             var directory = Path.GetDirectoryName(path)!;
             Directory.CreateDirectory(directory);
-            using var output = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read, 64 * 1024, useAsync: true);
-            await input.CopyToAsync(output).ConfigureAwait(false);
+            await using (var output = new FileStream(temporaryPath, FileMode.Create, FileAccess.Write, FileShare.None, 64 * 1024, useAsync: true))
+            {
+                await input.CopyToAsync(output).ConfigureAwait(false);
+                await output.FlushAsync().ConfigureAwait(false);
+            }
+
+            File.Move(temporaryPath, path, overwrite: true);
+            return true;
         }
         catch (Exception ex)
         {
             TryLogMessage($"Failed to cache clipboard image data: {ex}");
+            return false;
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                try
+                {
+                    File.Delete(temporaryPath);
+                }
+                catch (IOException ex)
+                {
+                    TryLogMessage($"Failed to remove incomplete cached clipboard image: {ex.Message}");
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    TryLogMessage($"Failed to remove incomplete cached clipboard image: {ex.Message}");
+                }
+            }
         }
     }
 
@@ -236,12 +278,18 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
 
     private void LoadClipboardHistoryInSTA()
     {
-        if (Interlocked.Exchange(ref loadInFlight, 1) != 0)
+        lock (loadGate)
         {
-            return;
+            reloadRequested = true;
+            if (loadInFlight)
+            {
+                return;
+            }
+
+            loadInFlight = true;
+            reloadRequested = false;
         }
 
-        Interlocked.Exchange(ref reloadRequested, 0);
         StartClipboardHistoryLoad();
     }
 
@@ -263,7 +311,10 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
             {
                 TryLogMessage($"Clipboard history load thread failed: {ex}");
             }
-        });
+        })
+        {
+            IsBackground = true,
+        };
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
     }
