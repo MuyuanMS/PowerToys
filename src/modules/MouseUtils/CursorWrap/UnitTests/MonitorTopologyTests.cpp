@@ -182,5 +182,28 @@ namespace CursorWrapUnitTests
 			Assert::IsTrue(EdgeWraps(topology, top.hMonitor, leftEdge, EdgeType::Left, true),
 						   L"Horizontal wrapping must never be affected by top-edge suppression.");
 		}
+
+		TEST_METHOD(SuppressedTopCorner_BlocksVerticalAndUnknownMovement)
+		{
+			MonitorTopology topology;
+			auto monitor = MakeMonitor(1, 0, 0, 1920, 1080, true);
+			topology.Initialize({ monitor });
+
+			const POINT topLeft = { monitor.rect.left, monitor.rect.top };
+			EdgeType edge{};
+			CursorDirection upward = { 0, -10 };
+			Assert::IsFalse(
+				topology.IsOnOuterEdge(monitor.hMonitor, topLeft, edge, WrapMode::Both, &upward, true),
+				L"Upward movement at a suppressed top corner must not wrap sideways.");
+			Assert::IsFalse(
+				topology.IsOnOuterEdge(monitor.hMonitor, topLeft, edge, WrapMode::Both, nullptr, true),
+				L"Unknown movement at a suppressed top corner must not wrap sideways.");
+
+			CursorDirection left = { -10, 0 };
+			Assert::IsTrue(
+				topology.IsOnOuterEdge(monitor.hMonitor, topLeft, edge, WrapMode::Both, &left, true),
+				L"Horizontal movement at a suppressed top corner should still wrap through the side edge.");
+			Assert::IsTrue(edge == EdgeType::Left);
+		}
 	};
 }

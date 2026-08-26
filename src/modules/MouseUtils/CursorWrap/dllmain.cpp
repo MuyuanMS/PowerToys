@@ -84,7 +84,7 @@ private:
     bool m_autoActivate = false;
     bool m_disableWrapDuringDrag = true; // Default to true to prevent wrap during drag
     bool m_disableOnSingleMonitor = false; // Default to false
-    bool m_suppressTopEdgeWrapInRemoteSession = false; // Default to false; keeps the RDP connection bar reachable
+    std::atomic_bool m_suppressTopEdgeWrapInRemoteSession = false; // Default to false; keeps the RDP connection bar reachable
     int m_wrapMode = 0; // 0=Both (default), 1=VerticalOnly, 2=HorizontalOnly
     int m_activationMode = 0; // 0=Always (default), 1=HoldingCtrl (wraps only while held), 2=HoldingShift (wraps only while held)
     
@@ -728,7 +728,7 @@ private:
                 
                 // Only suppress the top-edge wrap while actually connected via Remote Desktop, so
                 // the behavior is transparent during normal local use.
-                bool suppressTopEdgeWrap = g_cursorWrapInstance->m_suppressTopEdgeWrapInRemoteSession &&
+                bool suppressTopEdgeWrap = g_cursorWrapInstance->m_suppressTopEdgeWrapInRemoteSession.load(std::memory_order_relaxed) &&
                                            (GetSystemMetrics(SM_REMOTESESSION) != 0);
 
                 POINT newPos = g_cursorWrapInstance->m_core.HandleMouseMove(

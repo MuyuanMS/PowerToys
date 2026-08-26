@@ -262,6 +262,21 @@ bool MonitorTopology::IsOnOuterEdge(HMONITOR monitor, const POINT& cursorPos, Ed
     // At corners, multiple edges may match - collect all candidates and try each
     // to find one with a valid wrap destination
     std::vector<EdgeType> candidateEdges;
+    const bool topEdgeSuppressed =
+        (wrapMode == WrapMode::Both || wrapMode == WrapMode::VerticalOnly) &&
+        cursorPos.y <= monitorRect.top + edgeThreshold &&
+        suppressTopEdgeAtGlobalTop &&
+        IsMonitorAtGlobalTop(monitor);
+
+    // At a suppressed top corner, vertical or unknown movement must not fall back to
+    // a horizontal candidate. Horizontal movement still wraps through the side edge.
+    if (topEdgeSuppressed &&
+        (direction == nullptr ||
+         (direction->dx == 0 && direction->dy == 0) ||
+         !direction->IsPrimarilyHorizontal()))
+    {
+        return false;
+    }
 
     // Left edge - only if mode allows horizontal wrapping
     if ((wrapMode == WrapMode::Both || wrapMode == WrapMode::HorizontalOnly) &&
@@ -301,7 +316,7 @@ bool MonitorTopology::IsOnOuterEdge(HMONITOR monitor, const POINT& cursorPos, Ed
         // connection bar. Suppressing the top-edge wrap only for the monitor(s) at the very
         // top of the vertical stack keeps that bar reachable, while monitors that merely have
         // an outer top edge lower down continue to wrap normally.
-        if (!suppressTopEdgeAtGlobalTop || !IsMonitorAtGlobalTop(monitor))
+        if (!topEdgeSuppressed)
         {
             auto it = m_edgeMap.find({monitorIndex, EdgeType::Top});
             if (it != m_edgeMap.end() && it->second.isOuter)
