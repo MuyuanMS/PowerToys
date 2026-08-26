@@ -257,6 +257,11 @@ public sealed class WinGetPackageManagerService : IWinGetPackageManagerService
 
                     return (id, (CatalogPackage?)null);
                 }
+                catch (Exception ex) when (ex is COMException or InvalidOperationException)
+                {
+                    CoreLogger.LogWarning($"Microsoft Store package lookup failed for '{id}': {ex.Message}");
+                    return (id, (CatalogPackage?)null);
+                }
                 finally
                 {
                     throttle.Release();
