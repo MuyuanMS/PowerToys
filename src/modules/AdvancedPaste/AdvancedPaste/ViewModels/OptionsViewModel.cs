@@ -22,6 +22,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ManagedCommon;
 using Microsoft.PowerToys.Settings.UI.Library;
+using Microsoft.PowerToys.Telemetry;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -42,6 +43,7 @@ namespace AdvancedPaste.ViewModels
         private readonly IPasteFormatExecutor _pasteFormatExecutor;
         private readonly IAICredentialsProvider _credentialsProvider;
         private readonly ICustomActionTransformService _customActionTransformService;
+        private readonly IKeystrokeService _keystrokeService;
 
         private CancellationTokenSource _pasteActionCancellationTokenSource;
 
@@ -263,12 +265,13 @@ namespace AdvancedPaste.ViewModels
 
         public event EventHandler PreviewRequested;
 
-        public OptionsViewModel(IFileSystem fileSystem, IAICredentialsProvider credentialsProvider, IUserSettings userSettings, IPasteFormatExecutor pasteFormatExecutor, ICustomActionTransformService customActionTransformService)
+        public OptionsViewModel(IFileSystem fileSystem, IAICredentialsProvider credentialsProvider, IUserSettings userSettings, IPasteFormatExecutor pasteFormatExecutor, ICustomActionTransformService customActionTransformService, IKeystrokeService keystrokeService)
         {
             _credentialsProvider = credentialsProvider;
             _userSettings = userSettings;
             _pasteFormatExecutor = pasteFormatExecutor;
             _customActionTransformService = customActionTransformService;
+            _keystrokeService = keystrokeService;
 
             GeneratedResponses = [];
             GeneratedResponses.CollectionChanged += (s, e) =>
@@ -431,6 +434,9 @@ namespace AdvancedPaste.ViewModels
 
             UpdateFormats(StandardPasteFormats, Enum.GetValues<PasteFormats>()
                                                     .Where(format => PasteFormat.MetadataDict[format].IsCoreAction || _userSettings.AdditionalActions.Contains(format))
+                                                    .OrderByDescending(format => PasteFormat.MetadataDict[format].IsCoreAction)
+                                                    .ThenBy(format => PasteFormat.MetadataDict[format].DisplayOrder)
+                                                    .ThenBy(format => (int)format)
                                                     .Select(CreateStandardPasteFormat));
 
             UpdateFormats(
@@ -729,6 +735,12 @@ namespace AdvancedPaste.ViewModels
                 return;
             }
 
+            if (pasteFormat.Format == PasteFormats.PasteAsKeystrokes)
+            {
+                await ExecutePasteAsKeystrokesAsync(source);
+                return;
+            }
+
             var elapsedWatch = Stopwatch.StartNew();
             Logger.LogDebug($"Started executing {pasteFormat.Format} from source {source}");
 
@@ -882,6 +894,87 @@ namespace AdvancedPaste.ViewModels
                                             .FirstOrDefault(customAction => Models.KernelQueryCache.CacheKey.PromptComparer.Equals(customAction.Prompt, Query));
 
             await ExecutePasteFormatAsync(CreateCustomAIPasteFormat(customAction?.Name ?? "Default", Query, isSavedQuery: customAction != null, customAction?.ProviderId), triggerSource);
+        }
+
+        private async Task ExecutePasteAsKeystrokesAsync(PasteActionSource source)
+        {
+            Logger.LogTrace();
+
+            var elapsedWatch = Stopwatch.StartNew();
+            Logger.LogDebug($"Started executing PasteAsKeystrokes from source {source}");
+
+            IsBusy = true;
+            _pasteActionCancellationTokenSource = new();
+            PasteActionError = PasteActionError.None;
+            var restoreWindowOnFailure = Visible;
+
+            try
+            {
+                if (source == PasteActionSource.ContextMenu)
+                {
+                    PowerToysTelemetry.Log.WriteEvent(new Telemetry.AdvancedPasteFormatClickedEvent(PasteFormats.PasteAsKeystrokes));
+                }
+                else if (source == PasteActionSource.InAppKeyboardShortcut)
+                {
+                    PowerToysTelemetry.Log.WriteEvent(new Telemetry.AdvancedPasteInAppKeyboardShortcutEvent(PasteFormats.PasteAsKeystrokes));
+                }
+
+                var text = ClipboardData != null ? await ClipboardData.GetTextOrEmptyAsync() : string.Empty;
+
+                if (string.IsNullOrEmpty(text))
+                {
+                    Logger.LogWarning("Clipboard does not contain text for keystroke paste");
+                    PasteActionError = PasteActionError.FromResourceId("ClipboardEmptyWarning");
+                    return;
+                }
+
+                HideWindow();
+
+                // Small delay to ensure window is hidden and target application is focused
+                await Task.Delay(100);
+
+                // Send the text as keystrokes on a background thread
+                var completed = await Task.Run(() => _keystrokeService.SendTextAsKeystrokes(text, _pasteActionCancellationTokenSource.Token));
+                if (!completed)
+                {
+                    PasteActionError = PasteActionError.FromResourceId("PasteActionCanceled");
+                    if (restoreWindowOnFailure)
+                    {
+                        ShowWindow();
+                    }
+
+                    return;
+                }
+
+                Logger.LogDebug($"Completed executing PasteAsKeystrokes in {elapsedWatch.ElapsedMilliseconds}ms");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error executing paste as keystrokes", ex);
+                PasteActionError = PasteActionError.FromException(ex);
+                if (restoreWindowOnFailure)
+                {
+                    ShowWindow();
+                }
+            }
+            finally
+            {
+                IsBusy = false;
+                _pasteActionCancellationTokenSource?.Dispose();
+                _pasteActionCancellationTokenSource = null;
+            }
+        }
+
+        private void ShowWindow()
+        {
+            var mainWindow = GetMainWindow();
+
+            if (mainWindow != null)
+            {
+                var windowHandle = mainWindow.GetWindowHandle();
+                Windows.Win32.PInvoke.ShowWindow((Windows.Win32.Foundation.HWND)windowHandle, Windows.Win32.UI.WindowsAndMessaging.SHOW_WINDOW_CMD.SW_SHOW);
+                WindowHelpers.BringToForeground(windowHandle);
+            }
         }
 
         private void HideWindow()

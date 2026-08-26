@@ -53,6 +53,10 @@ internal sealed class IntegrationTestUserSettings : IUserSettings
 
     public bool EnableClipboardPreview => true;
 
+    public int KeystrokeDelayMs => AdvancedPasteProperties.DefaultKeystrokeDelayMs;
+
+    public int KeystrokeBatchSize => AdvancedPasteProperties.DefaultKeystrokeBatchSize;
+
     public IReadOnlyList<AdvancedPasteCustomAction> CustomActions => _customActions;
 
     public IReadOnlyList<PasteFormats> AdditionalActions => _additionalActions;

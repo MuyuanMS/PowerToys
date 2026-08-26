@@ -322,4 +322,8 @@ namespace winrt::PowerToys::Interop::implementation
     {
         return CommonSharedConstants::KEYBOARD_MANAGER_ENGINE_INSTANCE_MUTEX;
     }
+    hstring Constants::AdvancedPasteKeystrokeMessage()
+    {
+        return CommonSharedConstants::ADVANCED_PASTE_KEYSTROKE_MESSAGE;
+    }
 }

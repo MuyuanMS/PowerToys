@@ -44,6 +44,10 @@ namespace AdvancedPaste.Settings
 
         public bool EnableClipboardPreview { get; private set; }
 
+        public int KeystrokeDelayMs { get; private set; }
+
+        public int KeystrokeBatchSize { get; private set; }
+
         public IReadOnlyList<PasteFormats> AdditionalActions => _additionalActions;
 
         public IReadOnlyList<AdvancedPasteCustomAction> CustomActions => _customActions;
@@ -67,22 +71,34 @@ namespace AdvancedPaste.Settings
         public PasteAIConfiguration PasteAIConfiguration { get; private set; }
 
         public UserSettings(IFileSystem fileSystem)
+            : this(fileSystem, TaskScheduler.FromCurrentSynchronizationContext(), createWatcher: true)
+        {
+        }
+
+        internal UserSettings(IFileSystem fileSystem, TaskScheduler taskScheduler)
+            : this(fileSystem, taskScheduler, createWatcher: false)
+        {
+        }
+
+        private UserSettings(IFileSystem fileSystem, TaskScheduler taskScheduler, bool createWatcher)
         {
             _settingsUtils = new SettingsUtils(fileSystem);
+            _taskScheduler = taskScheduler ?? throw new ArgumentNullException(nameof(taskScheduler));
 
             IsAIEnabled = false;
             ShowCustomPreview = true;
             ShowAIPaste = true;
             CloseAfterLosingFocus = false;
             EnableClipboardPreview = true;
+            KeystrokeDelayMs = AdvancedPasteProperties.DefaultKeystrokeDelayMs;
+            KeystrokeBatchSize = AdvancedPasteProperties.DefaultKeystrokeBatchSize;
             PasteAIConfiguration = new PasteAIConfiguration();
             _additionalActions = [];
             _customActions = [];
-            _taskScheduler = TaskScheduler.FromCurrentSynchronizationContext();
 
             LoadSettingsFromJson();
 
-            _watcher = Helper.GetFileWatcher(AdvancedPasteModuleName, "settings.json", OnSettingsFileChanged, fileSystem);
+            _watcher = createWatcher ? Helper.GetFileWatcher(AdvancedPasteModuleName, "settings.json", OnSettingsFileChanged, fileSystem) : null;
         }
 
         private void OnSettingsFileChanged()
@@ -131,6 +147,8 @@ namespace AdvancedPaste.Settings
                                 ShowAIPaste = properties.ShowAIPaste;
                                 CloseAfterLosingFocus = properties.CloseAfterLosingFocus;
                                 EnableClipboardPreview = properties.EnableClipboardPreview;
+                                KeystrokeDelayMs = properties.KeystrokeDelayMs > 0 ? properties.KeystrokeDelayMs : AdvancedPasteProperties.DefaultKeystrokeDelayMs;
+                                KeystrokeBatchSize = properties.KeystrokeBatchSize > 0 ? properties.KeystrokeBatchSize : AdvancedPasteProperties.DefaultKeystrokeBatchSize;
                                 PasteAIConfiguration = properties.PasteAIConfiguration ?? new PasteAIConfiguration();
 
                                 var fixSpellingAction = properties.AdditionalActions.FixSpellingAndGrammar;
