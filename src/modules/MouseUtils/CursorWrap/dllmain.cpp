@@ -85,7 +85,7 @@ private:
     bool m_autoActivate = false;
     bool m_disableWrapDuringDrag = true; // Default to true to prevent wrap during drag
     bool m_disableOnSingleMonitor = false; // Default to false
-    bool m_disableInGameMode = false; // Default to false: only disable wrapping in game mode when the user opts in
+    std::atomic_bool m_disableInGameMode{ false }; // Default to false: only disable wrapping in game mode when the user opts in
     int m_wrapMode = 0; // 0=Both (default), 1=VerticalOnly, 2=HorizontalOnly
     int m_activationMode = 0; // 0=Always (default), 1=HoldingCtrl (wraps only while held), 2=HoldingShift (wraps only while held)
     
@@ -93,9 +93,8 @@ private:
     HHOOK m_mouseHook = nullptr;
     std::atomic<bool> m_hookActive{ false };
 
-    // Cached game mode state, refreshed at most once per GAME_MODE_POLL_MS from the mouse hook to keep the hot path quiet.
+    // Cached game mode state, refreshed from the message thread so the mouse hook only reads atomics.
     std::atomic<bool> m_gameModeActive{ false };
-    std::atomic<ULONGLONG> m_lastGameModeCheckTick{ 0 };
     
     // Core wrapping engine (edge-based polygon model)
     CursorWrapCore m_core;
@@ -113,8 +112,9 @@ private:
     HWND m_messageWindow = nullptr;
     HDEVNOTIFY m_deviceNotify = nullptr;
     static constexpr UINT_PTR TIMER_UPDATE_MONITORS = 1;
+    static constexpr UINT_PTR TIMER_UPDATE_GAME_MODE = 2;
     static constexpr UINT DEBOUNCE_DELAY_MS = 500;
-    static constexpr ULONGLONG GAME_MODE_POLL_MS = 1000; // Re-check game mode at most this often from the mouse hook
+    static constexpr UINT GAME_MODE_POLL_MS = 1000;
 
 public:
     // Constructor
@@ -361,6 +361,11 @@ private:
         }
     }
 
+    void RefreshGameModeState()
+    {
+        m_gameModeActive = m_disableInGameMode.load() && detect_game_mode();
+    }
+
     // Load the settings file.
     void init_settings()
     {
@@ -518,9 +523,9 @@ private:
             m_hookActive = true;
             Logger::info("CursorWrap mouse hook started successfully");
 
-            // Force a fresh game mode check on the first mouse move after activation.
-            m_lastGameModeCheckTick = 0;
+            // The message-thread timer refreshes this cached state outside the low-level hook.
             m_gameModeActive = false;
+            SetTimer(m_messageWindow, TIMER_UPDATE_GAME_MODE, GAME_MODE_POLL_MS, nullptr);
 #ifdef _DEBUG
             Logger::info(L"CursorWrap DEBUG: Hook installed");
 #endif
@@ -540,7 +545,7 @@ private:
             m_mouseHook = nullptr;
             m_hookActive = false;
             m_gameModeActive = false;
-            m_lastGameModeCheckTick = 0;
+            KillTimer(m_messageWindow, TIMER_UPDATE_GAME_MODE);
             Logger::info("CursorWrap mouse hook stopped");
 #ifdef _DEBUG
             Logger::info("CursorWrap DEBUG: Mouse hook stopped");
@@ -637,6 +642,7 @@ private:
         if (m_messageWindow)
         {
             KillTimer(m_messageWindow, TIMER_UPDATE_MONITORS);
+            KillTimer(m_messageWindow, TIMER_UPDATE_GAME_MODE);
             DestroyWindow(m_messageWindow);
             m_messageWindow = nullptr;
             UnregisterClassW(L"CursorWrapDisplayChangeWindow", GetModuleHandle(nullptr));
@@ -703,6 +709,10 @@ private:
                 KillTimer(hwnd, TIMER_UPDATE_MONITORS);
                 g_cursorWrapInstance->OnDisplayChange();
             }
+            else if (wParam == TIMER_UPDATE_GAME_MODE)
+            {
+                g_cursorWrapInstance->RefreshGameModeState();
+            }
             break;
         }
 
@@ -718,21 +728,11 @@ private:
             
             if (g_cursorWrapInstance && g_cursorWrapInstance->m_hookActive)
             {
-                // Don't wrap while a fullscreen game is running. The shell query is throttled to at most
-                // once per GAME_MODE_POLL_MS so the hot path stays quiet, and it's skipped entirely when disabled.
-                if (g_cursorWrapInstance->m_disableInGameMode)
+                // Game Mode is polled by the message thread. This callback only reads the cached
+                // atomic state so it cannot block the system-wide low-level hook.
+                if (g_cursorWrapInstance->m_disableInGameMode.load() && g_cursorWrapInstance->m_gameModeActive)
                 {
-                    ULONGLONG now = GetTickCount64();
-                    if (now - g_cursorWrapInstance->m_lastGameModeCheckTick >= GAME_MODE_POLL_MS)
-                    {
-                        g_cursorWrapInstance->m_gameModeActive = detect_game_mode();
-                        g_cursorWrapInstance->m_lastGameModeCheckTick = now;
-                    }
-
-                    if (g_cursorWrapInstance->m_gameModeActive)
-                    {
-                        return CallNextHookEx(nullptr, nCode, wParam, lParam);
-                    }
+                    return CallNextHookEx(nullptr, nCode, wParam, lParam);
                 }
 
                 // Check activation mode to determine if wrapping should happen.
