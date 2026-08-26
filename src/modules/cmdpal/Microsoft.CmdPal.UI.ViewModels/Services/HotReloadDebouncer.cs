@@ -51,7 +51,18 @@ internal sealed partial class HotReloadDebouncer : IDisposable
             return false;
         }
 
-        return changedPath.IndexOf("node_modules", StringComparison.OrdinalIgnoreCase) < 0;
+        var segments = changedPath.Split(
+            [System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar],
+            StringSplitOptions.RemoveEmptyEntries);
+        foreach (var segment in segments)
+        {
+            if (string.Equals(segment, "node_modules", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>

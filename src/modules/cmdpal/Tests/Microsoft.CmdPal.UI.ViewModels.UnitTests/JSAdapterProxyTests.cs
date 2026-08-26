@@ -234,6 +234,7 @@ public class JSAdapterProxyTests
 
         await Task.Run(() => page.SearchText = "query");
         Assert.AreEqual("query", capturedSearch);
+        Assert.AreEqual("query", page.SearchText);
 
         await fake.PushNotificationAsync(
             "listPage/itemsChanged",
@@ -356,6 +357,29 @@ public class JSAdapterProxyTests
 
         await changed.Task.WaitAsync(Timeout);
         Assert.AreEqual("Updated", fallback.DisplayTitle);
+    }
+
+    [TestMethod]
+    public async Task InvokableCommand_NameUsesCanonicalNameAndTracksUpdates()
+    {
+        using var fake = new JSFakeExtension();
+        fake.OnResult(
+            "provider/getCommand",
+            """{ "id": "invokable", "name": "Canonical", "displayName": "Legacy" }""");
+
+        var provider = CreateProvider(fake);
+        var command = (IInvokableCommand)provider.GetCommand("invokable")!;
+        Assert.AreEqual("Canonical", command.Name);
+
+        await fake.PushNotificationAsync(
+            "command/propChanged",
+            new JsonObject
+            {
+                ["commandId"] = "invokable",
+                ["properties"] = new JsonObject { ["name"] = "Updated" },
+            });
+
+        Assert.AreEqual("Updated", command.Name);
     }
 
     [TestMethod]
