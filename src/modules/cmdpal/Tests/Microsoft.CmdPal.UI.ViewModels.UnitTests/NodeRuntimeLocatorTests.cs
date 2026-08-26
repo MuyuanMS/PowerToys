@@ -59,6 +59,28 @@ public class NodeRuntimeLocatorTests
     }
 
     [TestMethod]
+    public void ResolveNodeExecutable_CanonicalizesRelativeDirectory()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "cmdpal-node-locator-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var expected = Path.Combine(root, "node.exe");
+
+        try
+        {
+            File.WriteAllText(expected, string.Empty);
+            var relativeRoot = Path.GetRelativePath(Environment.CurrentDirectory, root);
+
+            var resolved = NodeRuntimeLocator.ResolveNodeExecutable(new[] { relativeRoot });
+
+            Assert.AreEqual(Path.GetFullPath(expected), resolved);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [TestMethod]
     public void ResolveNodeExecutable_SkipsMalformedPathEntries()
     {
         // A PATH entry containing invalid path characters must be skipped rather than

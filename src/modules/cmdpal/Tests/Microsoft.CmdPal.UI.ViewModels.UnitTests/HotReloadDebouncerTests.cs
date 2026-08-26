@@ -27,6 +27,13 @@ public class HotReloadDebouncerTests
     }
 
     [TestMethod]
+    public void IsRelevantChange_SimilarlyNamedDirectory_IsRelevant()
+    {
+        Assert.IsTrue(HotReloadDebouncer.IsRelevantChange(@"C:\ext\node_modules_backup\index.js"));
+        Assert.IsTrue(HotReloadDebouncer.IsRelevantChange(@"C:\ext\not-node_modules.js"));
+    }
+
+    [TestMethod]
     public void Notify_RapidChanges_InvokesCallbackOnce()
     {
         var fired = new CountdownEvent(1);

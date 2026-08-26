@@ -25,7 +25,7 @@ internal sealed partial class JSInvokableCommandAdapter : JSObservableProxyBase,
     {
     }
 
-    public string Name => JSModelMapper.GetString(Data, "displayName") ?? JSModelMapper.GetString(Data, "name") ?? string.Empty;
+    public string Name => JSModelMapper.GetString(Data, "name") ?? JSModelMapper.GetString(Data, "displayName") ?? string.Empty;
 
     public string Id => JSModelMapper.GetString(Data, "id") ?? string.Empty;
 
