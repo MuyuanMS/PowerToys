@@ -269,6 +269,13 @@ public partial class TabbedPageViewModel : PageViewModel
             return null;
         }
 
+        // Tabbed pages are supported by normal nested shell navigation, but a
+        // tabbed page cannot host another tab strip in the v1 tab-child scope.
+        if (page is ITabbedPage)
+        {
+            return null;
+        }
+
         var child = _factory.TryCreatePageViewModel(page, true, ExtensionHost, ProviderContext);
         if (child is null)
         {
