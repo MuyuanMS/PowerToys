@@ -77,6 +77,7 @@ public sealed class SettingsNavigationSmokeTests : UITestBase
 
         // File management
         new NavigationCase("FileManagementNavItem", "PowerPreviewNavItem"),
+        new NavigationCase("FileManagementNavItem", "FileConverterNavItem"),
         new NavigationCase("FileManagementNavItem", "FileLocksmithNavItem"),
         new NavigationCase("FileManagementNavItem", "ImageResizerNavItem"),
         new NavigationCase("FileManagementNavItem", "NewPlusNavItem"),
@@ -150,4 +151,3 @@ public sealed class SettingsNavigationSmokeTests : UITestBase
 
     private readonly record struct NavigationCase(string? ParentGroupSlug, string NavItemSlug);
 }
-

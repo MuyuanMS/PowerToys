@@ -1430,7 +1430,7 @@ UINT __stdcall UnRegisterContextMenuPackagesCA(MSIHANDLE hInstall)
     try
     {
         // Packages to unregister
-        const std::vector<std::wstring> packagesToRemoveDisplayName{{L"PowerRenameContextMenu"}, {L"ImageResizerContextMenu"}, {L"FileLocksmithContextMenu"}, {L"NewPlusContextMenu"}};
+        const std::vector<std::wstring> packagesToRemoveDisplayName{{L"PowerRenameContextMenu"}, {L"ImageResizerContextMenu"}, {L"FileLocksmithContextMenu"}, {L"NewPlusContextMenu"}, {L"FileConverterContextMenu"}};
 
         for (auto const &package : packagesToRemoveDisplayName)
         {
@@ -1481,6 +1481,37 @@ UINT __stdcall CleanImageResizerRuntimeRegistryCA(MSIHANDLE hInstall)
         }
         // Sentinel
         RegDeleteTreeW(HKEY_CURRENT_USER, L"Software\\Microsoft\\PowerToys\\ImageResizer");
+    }
+    catch (...)
+    {
+        er = ERROR_INSTALL_FAILURE;
+    }
+
+    er = er == ERROR_SUCCESS ? (SUCCEEDED(hr) ? ERROR_SUCCESS : ERROR_INSTALL_FAILURE) : er;
+    return WcaFinalize(er);
+}
+
+UINT __stdcall CleanFileConverterRuntimeRegistryCA(MSIHANDLE hInstall)
+{
+    HRESULT hr = S_OK;
+    UINT er = ERROR_SUCCESS;
+    hr = WcaInitialize(hInstall, "CleanFileConverterRuntimeRegistryCA");
+
+    try
+    {
+        const wchar_t* CLSID_STR = L"{57EC18F5-24D5-4DC6-AE2E-9D0F7A39F8BA}";
+        const wchar_t* exts[] = { L".bmp", L".dib", L".gif", L".jfif", L".jpe", L".jpeg", L".jpg", L".jxr", L".png", L".tif", L".tiff", L".wdp", L".heic", L".heif", L".webp" };
+
+        auto deleteKeyRecursive = [](HKEY root, const std::wstring& path) {
+            RegDeleteTreeW(root, path.c_str());
+        };
+
+        deleteKeyRecursive(HKEY_CURRENT_USER, L"Software\\Classes\\CLSID\\" + std::wstring(CLSID_STR));
+        for (auto ext : exts)
+        {
+            deleteKeyRecursive(HKEY_CURRENT_USER, L"Software\\Classes\\SystemFileAssociations\\" + std::wstring(ext) + L"\\ShellEx\\ContextMenuHandlers\\FileConverterContextMenu");
+        }
+        RegDeleteTreeW(HKEY_CURRENT_USER, L"Software\\Microsoft\\PowerToys\\FileConverter");
     }
     catch (...)
     {

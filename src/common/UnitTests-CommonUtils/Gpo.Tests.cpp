@@ -70,6 +70,12 @@ namespace UnitTestsCommonUtils
             Assert::IsTrue(IsValidGpoResult(result));
         }
 
+        TEST_METHOD(GetConfiguredFileConverterEnabledValue_ReturnsValidState)
+        {
+            auto result = getConfiguredFileConverterEnabledValue();
+            Assert::IsTrue(IsValidGpoResult(result));
+        }
+
         TEST_METHOD(GetConfiguredFileLocksmithEnabledValue_ReturnsValidState)
         {
             auto result = getConfiguredFileLocksmithEnabledValue();
@@ -192,6 +198,7 @@ namespace UnitTestsCommonUtils
             getConfiguredAwakeEnabledValue();
             getConfiguredColorPickerEnabledValue();
             getConfiguredFancyZonesEnabledValue();
+            getConfiguredFileConverterEnabledValue();
             getConfiguredFileLocksmithEnabledValue();
             getConfiguredImageResizerEnabledValue();
             getConfiguredKeyboardManagerEnabledValue();

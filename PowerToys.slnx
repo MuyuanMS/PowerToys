@@ -500,6 +500,12 @@
       <Platform Solution="*|x64" Project="x64" />
     </Project>
   </Folder>
+  <Folder Name="/modules/FileConverter/">
+    <Project Path="src/modules/FileConverter/FileConverterContextMenu/FileConverterContextMenu.vcxproj" Id="f3610647-6f9f-45ee-987f-c9a89c23f7f0" />
+    <Project Path="src/modules/FileConverter/FileConverterLib/FileConverterLib.vcxproj" Id="2d6e2c29-43ce-4be9-b0fd-2f6240d04ef4" />
+    <Project Path="src/modules/FileConverter/FileConverterModuleInterface/FileConverterModuleInterface.vcxproj" Id="7f2a1e2c-3b84-4c84-9e8d-29ef6abf1d11" />
+    <Project Path="src/modules/FileConverter/FileConverterWorker/FileConverterWorker.vcxproj" Id="70f24a98-4d63-4df4-9b21-a3127b45f5cc" />
+  </Folder>
   <Folder Name="/modules/Hosts/">
     <Project Path="src/modules/Hosts/Hosts/Hosts.csproj">
       <Platform Solution="*|ARM64" Project="ARM64" />
@@ -1258,6 +1264,9 @@
     <BuildDependency Project="src/modules/awake/AwakeModuleInterface/AwakeModuleInterface.vcxproj" />
     <BuildDependency Project="src/modules/colorPicker/ColorPicker/ColorPicker.vcxproj" />
     <BuildDependency Project="src/modules/colorPicker/ColorPickerUI/ColorPickerUI.csproj" />
+    <BuildDependency Project="src/modules/FileConverter/FileConverterContextMenu/FileConverterContextMenu.vcxproj" />
+    <BuildDependency Project="src/modules/FileConverter/FileConverterModuleInterface/FileConverterModuleInterface.vcxproj" />
+    <BuildDependency Project="src/modules/FileConverter/FileConverterWorker/FileConverterWorker.vcxproj" />
     <BuildDependency Project="src/modules/fancyzones/editor/FancyZonesEditor/FancyZonesEditor.csproj" />
     <BuildDependency Project="src/modules/fancyzones/FancyZonesLib/FancyZonesLib.vcxproj" />
     <BuildDependency Project="src/modules/fancyzones/FancyZonesModuleInterface/FancyZonesModuleInterface.vcxproj" />
@@ -1284,4 +1293,3 @@
   <Project Path="tools/CliShim/CliShim.vcxproj" Id="8a7fb7fa-65ea-4004-ba73-1b237435a57b" />
   <Project Path="tools/CliShim.UnitTests/CliShim.UnitTests.vcxproj" Id="d4b0ed68-867d-46b4-a03f-ec52b9fbebe5" />
 </Solution>
-
