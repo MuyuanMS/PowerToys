@@ -718,7 +718,13 @@ static std::shared_ptr<const std::vector<std::wstring>> ParseExcludedApps(std::w
             position = view.length();
         }
 
-        apps.emplace_back(view.substr(0, position));
+        const auto app = view.substr(0, position);
+        const auto end = app.find_last_not_of(L" \t");
+        if (end != std::wstring_view::npos)
+        {
+            apps.emplace_back(app.substr(0, end + 1));
+        }
+
         view.remove_prefix(position);
     }
 
@@ -1998,11 +2004,6 @@ static HookDisposition EnterModifierPassthrough(MouseButton button, bool latchHo
         }
         if (inserted == ARRAYSIZE(inputs))
         {
-            disposition = HookDisposition::Swallow;
-        }
-        else if (inserted == 0)
-        {
-            MarkButtonUpForSwallow(button);
             disposition = HookDisposition::Swallow;
         }
     }
