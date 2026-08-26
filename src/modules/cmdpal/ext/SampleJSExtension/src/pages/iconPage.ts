@@ -58,12 +58,15 @@ function codePointTags(value: string): Tag[] {
     const hex =
       cp <= 0xffff
         ? `\\u${cp.toString(16).toUpperCase().padStart(4, '0')}`
-        : `\\U${cp.toString(16).toUpperCase().padStart(8, '0')}`;
+        : `\\u{${cp.toString(16).toUpperCase()}}`;
     return { text: hex };
   });
 }
 
 function buildIconItem(glyph: string, title: string, description: string): IListItem {
+  const commandId = [...glyph]
+    .map((ch) => (ch.codePointAt(0) ?? 0).toString(16).toUpperCase())
+    .join('-');
   const iconInfo = icon(glyph);
   const details: Details = {
     heroImage: iconInfo,
@@ -78,7 +81,7 @@ function buildIconItem(glyph: string, title: string, description: string): IList
   };
 
   return new ListItemBase({
-    command: new CopyTextCommand(glyph, `Action with ${glyph}`, undefined, `icon:${title}`),
+    command: new CopyTextCommand(glyph, `Action with ${glyph}`, undefined, `icon:${commandId}`),
     title,
     subtitle: description,
     icon: iconInfo,

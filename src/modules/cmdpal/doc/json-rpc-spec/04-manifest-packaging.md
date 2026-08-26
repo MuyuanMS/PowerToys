@@ -101,8 +101,9 @@ A resolved relative icon (`cmdpal.icon`) is subject to the same containment rule
 
 The `cmdpal.icon` value is interpreted as follows:
 
-- A **glyph** (for example, `"\uE943"`) or an **absolute URI** (for example, an
-  `https://` or `ms-appx://` value) is used exactly as written.
+- A **glyph** (for example, `"\uE943"`) or a **non-file absolute URI** (for example,
+  an `https://` or `ms-appx://` value) is used exactly as written. A `file:` URI is
+  rejected; use a relative path for a local package icon.
 - A **relative file path** (for example, `"icon.png"` or `"assets/icon.png"`) is
   resolved against the extension's own installed directory, which is the folder that
   contains its `package.json`.
@@ -345,7 +346,7 @@ Copy-Item .\package-stage\publisher-cmdpal-my-extension-1.0.0.tgz $temp
 Push-Location $temp
 npm init -y | Out-Null
 npm install .\publisher-cmdpal-my-extension-1.0.0.tgz
-node -e "import('@publisher/cmdpal-my-extension').then(() => console.log('loaded'))"
+node -e "const fs=require('fs'),path=require('path'),manifestPath=require.resolve('@publisher/cmdpal-my-extension/package.json'),manifest=JSON.parse(fs.readFileSync(manifestPath,'utf8')),main=manifest.cmdpal?.main??manifest.main;if(typeof main!=='string')throw new Error('The installed extension has no entry point.');const entry=path.resolve(path.dirname(manifestPath),main);if(!fs.existsSync(entry))throw new Error('The installed extension entry point is missing.');console.log(entry)"
 Pop-Location
 ```
 
