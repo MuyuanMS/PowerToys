@@ -64,7 +64,7 @@ struct MonitorTopology
     // Check if cursor is on an outer edge of the given monitor
     // wrapMode filters which edges are considered (Both, VerticalOnly, HorizontalOnly)
     // direction is used to prioritize edges at corners based on cursor movement
-    // suppressTopEdgeAtGlobalTop: when true, the top edge is not treated as wrappable if the
+    // suppressTopEdgeAtGlobalTop: when true, the top edge is not treated as a wrapping edge if the
     // monitor sits at the very top of the virtual desktop (used to keep the RDP connection
     // bar reachable in Remote Desktop sessions)
     bool IsOnOuterEdge(HMONITOR monitor, const POINT& cursorPos, EdgeType& outEdgeType, 

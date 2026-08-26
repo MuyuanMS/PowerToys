@@ -301,11 +301,7 @@ bool MonitorTopology::IsOnOuterEdge(HMONITOR monitor, const POINT& cursorPos, Ed
         // connection bar. Suppressing the top-edge wrap only for the monitor(s) at the very
         // top of the vertical stack keeps that bar reachable, while monitors that merely have
         // an outer top edge lower down continue to wrap normally.
-        if (suppressTopEdgeAtGlobalTop && IsMonitorAtGlobalTop(monitor))
-        {
-            Logger::trace(L"IsOnOuterEdge: Suppressing top-edge wrap on global-top monitor {} (Remote Desktop)", monitorIndex);
-        }
-        else
+        if (!suppressTopEdgeAtGlobalTop || !IsMonitorAtGlobalTop(monitor))
         {
             auto it = m_edgeMap.find({monitorIndex, EdgeType::Top});
             if (it != m_edgeMap.end() && it->second.isOuter)
@@ -863,4 +859,3 @@ int MonitorTopology::GetMonitorIndex(HMONITOR monitor) const
 
     return -1; // Not found
 }
-
