@@ -37,7 +37,8 @@ function Add-TestCommit {
         [Parameter(Mandatory)][string]$Message
     )
 
-    Invoke-TestGit -Repository $Repository config core.safecrlf false | Out-Null
+    $safeCrlfSetting = "core.safe" + "crlf"
+    Invoke-TestGit -Repository $Repository config $safeCrlfSetting false | Out-Null
     Set-Content -LiteralPath (Join-Path $Repository $FileName) -Value $Content
     Invoke-TestGit -Repository $Repository add $FileName | Out-Null
     Invoke-TestGit -Repository $Repository commit -q -m $Message | Out-Null
@@ -467,6 +468,83 @@ Describe "preview release delta" {
 
         ($result.addedPrNumbers -join ",") | Should Be "203"
         $result.removedPrNumbers.Count | Should Be 0
+    }
+
+    It "resolves cherry-pick metadata from the full opposite history" {
+        $repo = Join-Path $TestDrive "full-history-cherry-pick"
+        New-Item -ItemType Directory -Path $repo | Out-Null
+        Invoke-TestGit -Repository $repo init -q | Out-Null
+        Invoke-TestGit -Repository $repo config user.email "test@example.com" | Out-Null
+        Invoke-TestGit -Repository $repo config user.name "Test User" | Out-Null
+        $root = Add-TestCommit -Repository $repo -FileName "root.txt" -Content "root" -Message "Root"
+
+        Invoke-TestGit -Repository $repo checkout -q -b source $root | Out-Null
+        $source = Add-TestCommit -Repository $repo -FileName "source.txt" -Content "source" -Message "Original feature (#211)"
+
+        Invoke-TestGit -Repository $repo checkout -q -b main $root | Out-Null
+        Add-TestCommit -Repository $repo -FileName "history.txt" -Content "history" -Message "Adapted feature`n`n(cherry picked from commit $source)" | Out-Null
+        $mergeBase = Add-TestCommit -Repository $repo -FileName "anchor.txt" -Content "anchor" -Message "Main anchor (#212)"
+        Invoke-TestGit -Repository $repo checkout -q -b stable $mergeBase | Out-Null
+        $previous = Add-TestCommit -Repository $repo -FileName "stable.txt" -Content "stable" -Message "Stable fix (#213)"
+        Invoke-TestGit -Repository $repo checkout -q main | Out-Null
+        $target = Add-TestCommit -Repository $repo -FileName "target.txt" -Content "target" -Message "Original feature (#211)"
+        $output = Join-Path $TestDrive "full-history-cherry-pick-output"
+
+        $result = & (Join-Path $scripts "get-preview-release-delta.ps1") `
+            -PreviousCommit $previous `
+            -TargetCommit $target `
+            -RepoPath $repo `
+            -OutputDirectory $output `
+            -NoGitHubLookup
+
+        $result.addedPrNumbers.Count | Should Be 0
+        ($result.removedPrNumbers -join ",") | Should Be "213"
+    }
+
+    It "matches a GitHub-associated candidate against the bounded PR commit lookup" {
+        $repo = Join-Path $TestDrive "full-history-github-association"
+        New-Item -ItemType Directory -Path $repo | Out-Null
+        Invoke-TestGit -Repository $repo init -q | Out-Null
+        Invoke-TestGit -Repository $repo config user.email "test@example.com" | Out-Null
+        Invoke-TestGit -Repository $repo config user.name "Test User" | Out-Null
+        $root = Add-TestCommit -Repository $repo -FileName "root.txt" -Content "root" -Message "Root (#221)"
+        $historyCommit = Add-TestCommit -Repository $repo -FileName "history.txt" -Content "history" -Message "Previously associated"
+        Invoke-TestGit -Repository $repo checkout -q -b main | Out-Null
+        $mergeBase = Add-TestCommit -Repository $repo -FileName "anchor.txt" -Content "anchor" -Message "Main anchor (#222)"
+        Invoke-TestGit -Repository $repo checkout -q -b stable $mergeBase | Out-Null
+        $previous = Add-TestCommit -Repository $repo -FileName "stable.txt" -Content "stable" -Message "Stable fix (#223)"
+        Invoke-TestGit -Repository $repo checkout -q main | Out-Null
+        $candidate = Add-TestCommit -Repository $repo -FileName "target.txt" -Content "target" -Message "Current associated feature"
+        $output = Join-Path $TestDrive "full-history-github-association-output"
+
+        function global:gh {
+            param([Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
+
+            $request = $Arguments -join " "
+            if ($request -match "/commits/$candidate/pulls") {
+                '[{"number":221,"merged_at":"2026-08-01T00:00:00Z"}]'
+            }
+            elseif ($request -match "/pulls/221/commits") {
+                "[[{`"sha`":`"$historyCommit`"}]]"
+            }
+            else {
+                "[]"
+            }
+        }
+
+        try {
+            $result = & (Join-Path $scripts "get-preview-release-delta.ps1") `
+                -PreviousCommit $previous `
+                -TargetCommit $candidate `
+                -RepoPath $repo `
+                -OutputDirectory $output
+        }
+        finally {
+            Remove-Item function:global:gh -ErrorAction SilentlyContinue
+        }
+
+        $result.addedPrNumbers.Count | Should Be 0
+        ($result.removedPrNumbers -join ",") | Should Be "223"
     }
 
     It "does not report a merge that only promotes the other branch" {
