@@ -14,6 +14,7 @@ using Microsoft.PowerToys.Settings.UI.Library;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
 using Windows.Graphics.Imaging;
+using Windows.Security.Cryptography;
 using Windows.Storage.Streams;
 
 namespace AdvancedPaste.Helpers;
@@ -94,10 +95,33 @@ public static class TransformHelpers
 
         using var jpgStream = new InMemoryRandomAccessStream();
         var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.JpegEncoderId, jpgStream, encoderOptions);
-        encoder.SetSoftwareBitmap(clipboardBitmap);
+        using var flattenedBitmap = FlattenForJpeg(clipboardBitmap);
+        encoder.SetSoftwareBitmap(flattenedBitmap);
         await encoder.FlushAsync();
 
         return await CreateDataPackageFromFileContentAsync(jpgStream.AsStreamForRead(), "jpg", cancellationToken);
+    }
+
+    private static SoftwareBitmap FlattenForJpeg(SoftwareBitmap bitmap)
+    {
+        using var premultipliedBitmap = SoftwareBitmap.Convert(bitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+        var pixels = new byte[premultipliedBitmap.PixelWidth * premultipliedBitmap.PixelHeight * 4];
+        var pixelBuffer = CryptographicBuffer.CreateFromByteArray(pixels);
+        premultipliedBitmap.CopyToBuffer(pixelBuffer);
+        CryptographicBuffer.CopyToByteArray(pixelBuffer, out pixels);
+
+        for (var i = 0; i < pixels.Length; i += 4)
+        {
+            var alpha = pixels[i + 3];
+            pixels[i] = (byte)Math.Min(byte.MaxValue, pixels[i] + byte.MaxValue - alpha);
+            pixels[i + 1] = (byte)Math.Min(byte.MaxValue, pixels[i + 1] + byte.MaxValue - alpha);
+            pixels[i + 2] = (byte)Math.Min(byte.MaxValue, pixels[i + 2] + byte.MaxValue - alpha);
+            pixels[i + 3] = byte.MaxValue;
+        }
+
+        var flattenedBitmap = new SoftwareBitmap(BitmapPixelFormat.Bgra8, premultipliedBitmap.PixelWidth, premultipliedBitmap.PixelHeight, BitmapAlphaMode.Ignore);
+        flattenedBitmap.CopyFromBuffer(CryptographicBuffer.CreateFromByteArray(pixels));
+        return flattenedBitmap;
     }
 
     private static async Task<DataPackage> ToTxtFileAsync(DataPackageView clipboardData, CancellationToken cancellationToken)
