@@ -13,6 +13,7 @@
 #include "../../../common/interop/shared_constants.h"
 #include "../../../common/utils/game_mode.h"
 #include <atomic>
+#include <system_error>
 #include <thread>
 #include <vector>
 #include <map>
@@ -381,12 +382,22 @@ private:
         }
 
         HANDLE stopEvent = m_gameModePollStopEvent;
-        m_gameModePollThread = std::thread([this, stopEvent]() {
-            while (WaitForSingleObject(stopEvent, GAME_MODE_POLL_MS) == WAIT_TIMEOUT)
-            {
-                RefreshGameModeState();
-            }
-        });
+        try
+        {
+            m_gameModePollThread = std::thread([this, stopEvent]() {
+                while (WaitForSingleObject(stopEvent, GAME_MODE_POLL_MS) == WAIT_TIMEOUT)
+                {
+                    RefreshGameModeState();
+                }
+            });
+        }
+        catch (const std::system_error& error)
+        {
+            CloseHandle(m_gameModePollStopEvent);
+            m_gameModePollStopEvent = nullptr;
+            Logger::error("Failed to start CursorWrap Game Mode polling thread: {}", error.what());
+            return false;
+        }
 
         return true;
     }
@@ -775,6 +786,7 @@ private:
                 // atomic state so it cannot block the system-wide low-level hook.
                 if (g_cursorWrapInstance->m_disableInGameMode.load() && g_cursorWrapInstance->m_gameModeActive)
                 {
+                    g_cursorWrapInstance->m_core.ResetWrapState();
                     return CallNextHookEx(nullptr, nCode, wParam, lParam);
                 }
 
