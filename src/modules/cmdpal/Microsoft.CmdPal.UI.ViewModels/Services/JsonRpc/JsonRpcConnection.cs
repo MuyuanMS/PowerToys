@@ -60,6 +60,10 @@ public sealed partial class JsonRpcConnection : IDisposable
     // cap is hit, the request is dropped and the peer observes a timeout.
     private const int MaxConcurrentRejectionSends = 64;
 
+    // Rejection responses echo the request ID. Bound their combined retained size separately from
+    // the task count so oversized IDs cannot exhaust memory while output is backlogged.
+    internal const int MaxPendingRejectionResponseBytes = 64 * 1024;
+
     // Protocol-error logging is rate limited so a peer that streams malformed or undecodable frames
     // cannot flood the log. At most this many protocol-error entries are logged per window.
     private const int ProtocolErrorLogMaxPerWindow = 10;
@@ -123,6 +127,7 @@ public sealed partial class JsonRpcConnection : IDisposable
     private long _queuedNotificationBytes;
     private long _queuedRequestBytes;
     private int _pendingRejectionSends;
+    private long _pendingRejectionResponseBytes;
     private Task? _readLoopTask;
     private Task? _errorPumpTask;
     private Task? _notificationConsumerTask;
@@ -185,6 +190,8 @@ public sealed partial class JsonRpcConnection : IDisposable
     /// exceeded its count or byte budget. Exposed for tests.
     /// </summary>
     internal long DroppedNotificationCount => Interlocked.Read(ref _droppedNotifications);
+
+    internal long PendingRejectionResponseBytes => Interlocked.Read(ref _pendingRejectionResponseBytes);
 
     /// <summary>
     /// Gets the total number of protocol-error log entries suppressed by the rate limiter. Exposed for tests.
@@ -910,6 +917,15 @@ public sealed partial class JsonRpcConnection : IDisposable
             return;
         }
 
+        var responseIdBytes = Encoding.UTF8.GetByteCount(idElement.GetRawText());
+        var projected = Interlocked.Add(ref _pendingRejectionResponseBytes, responseIdBytes);
+        if (projected > MaxPendingRejectionResponseBytes)
+        {
+            Interlocked.Add(ref _pendingRejectionResponseBytes, -responseIdBytes);
+            Interlocked.Decrement(ref _pendingRejectionSends);
+            return;
+        }
+
         var id = idElement.Clone();
         _ = Task.Run(async () =>
         {
@@ -923,6 +939,7 @@ public sealed partial class JsonRpcConnection : IDisposable
             }
             finally
             {
+                Interlocked.Add(ref _pendingRejectionResponseBytes, -responseIdBytes);
                 Interlocked.Decrement(ref _pendingRejectionSends);
             }
         });

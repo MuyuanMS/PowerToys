@@ -558,6 +558,45 @@ public partial class JsonRpcConnectionTests
     }
 
     [TestMethod]
+    public async Task InboundRequest_RejectionWithOversizedId_DoesNotRetainResponse()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var toHost = new Pipe();
+        var host = new JsonRpcConnection(
+            toHost.Reader.AsStream(),
+            new BlockingWriteStream(),
+            errorStream: null,
+            requestTimeout: TimeSpan.FromSeconds(30),
+            writeTimeout: null,
+            maxQueuedNotificationBytes: null,
+            maxQueuedRequestBytes: 4);
+        host.StartListening();
+
+        try
+        {
+            var oversizedId = new string('i', JsonRpcConnection.MaxPendingRejectionResponseBytes);
+            var request = new JsonObject
+            {
+                ["jsonrpc"] = "2.0",
+                ["id"] = oversizedId,
+                ["method"] = "work",
+            }.ToJsonString();
+
+            await WriteFramedAsync(toHost.Writer.AsStream(), request, cts.Token);
+            await Task.Delay(100, cts.Token);
+
+            Assert.AreEqual(
+                0L,
+                host.PendingRejectionResponseBytes,
+                "A rejection that would exceed the response byte budget must be dropped before it retains the request ID.");
+        }
+        finally
+        {
+            host.Dispose();
+        }
+    }
+
+    [TestMethod]
     public async Task InboundNotification_ExceedingByteBudget_IsDropped()
     {
         using var cts = new CancellationTokenSource(TestTimeout);
