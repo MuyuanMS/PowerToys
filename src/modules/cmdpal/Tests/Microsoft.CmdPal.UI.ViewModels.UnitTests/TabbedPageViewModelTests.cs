@@ -354,4 +354,19 @@ public partial class TabbedPageViewModelTests
 
         viewModel.SafeCleanup();
     }
+
+    [TestMethod]
+    public void Factory_AllowsTabbedPageInNestedShellNavigation()
+    {
+        var tabbedPage = new TestTabbedPage([]);
+
+        var viewModel = CreateFactory().TryCreatePageViewModel(
+            tabbedPage,
+            nested: true,
+            new TestAppExtensionHost(),
+            CommandProviderContext.Empty);
+
+        Assert.IsInstanceOfType(viewModel, typeof(TabbedPageViewModel));
+        viewModel!.SafeCleanup();
+    }
 }
