@@ -13,6 +13,9 @@
 #include "../../../common/interop/shared_constants.h"
 #include "../../../common/utils/game_mode.h"
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
 #include <thread>
 #include <vector>
 #include <map>
@@ -93,8 +96,12 @@ private:
     HHOOK m_mouseHook = nullptr;
     std::atomic<bool> m_hookActive{ false };
 
-    // Cached game mode state, refreshed from the message thread so the mouse hook only reads atomics.
+    // Cached game mode state, refreshed by a worker so the mouse hook only reads atomics.
     std::atomic<bool> m_gameModeActive{ false };
+    std::atomic_bool m_gameModePolling{ false };
+    std::mutex m_gameModePollingMutex;
+    std::condition_variable m_gameModePollingCondition;
+    std::thread m_gameModePollingThread;
     
     // Core wrapping engine (edge-based polygon model)
     CursorWrapCore m_core;
@@ -112,7 +119,6 @@ private:
     HWND m_messageWindow = nullptr;
     HDEVNOTIFY m_deviceNotify = nullptr;
     static constexpr UINT_PTR TIMER_UPDATE_MONITORS = 1;
-    static constexpr UINT_PTR TIMER_UPDATE_GAME_MODE = 2;
     static constexpr UINT DEBOUNCE_DELAY_MS = 500;
     static constexpr UINT GAME_MODE_POLL_MS = 1000;
 
@@ -366,6 +372,38 @@ private:
         m_gameModeActive = m_disableInGameMode.load() && detect_game_mode();
     }
 
+    void StartGameModePolling()
+    {
+        m_gameModePolling = true;
+        m_gameModePollingThread = std::thread([this]() {
+            std::unique_lock<std::mutex> lock(m_gameModePollingMutex);
+            while (m_gameModePolling.load())
+            {
+                if (m_gameModePollingCondition.wait_for(
+                        lock,
+                        std::chrono::milliseconds(GAME_MODE_POLL_MS),
+                        [this] { return !m_gameModePolling.load(); }))
+                {
+                    break;
+                }
+
+                lock.unlock();
+                RefreshGameModeState();
+                lock.lock();
+            }
+        });
+    }
+
+    void StopGameModePolling()
+    {
+        m_gameModePolling = false;
+        m_gameModePollingCondition.notify_one();
+        if (m_gameModePollingThread.joinable())
+        {
+            m_gameModePollingThread.join();
+        }
+    }
+
     // Load the settings file.
     void init_settings()
     {
@@ -516,6 +554,9 @@ private:
 
         // Refresh monitor info before starting hook
         m_core.UpdateMonitorInfo();
+
+        // Initialize the cache before installing the hook so Game Mode does not have a stale interval.
+        RefreshGameModeState();
         
         m_mouseHook = SetWindowsHookEx(WH_MOUSE_LL, MouseHookProc, GetModuleHandle(nullptr), 0);
         if (m_mouseHook)
@@ -523,9 +564,7 @@ private:
             m_hookActive = true;
             Logger::info("CursorWrap mouse hook started successfully");
 
-            // The message-thread timer refreshes this cached state outside the low-level hook.
-            m_gameModeActive = false;
-            SetTimer(m_messageWindow, TIMER_UPDATE_GAME_MODE, GAME_MODE_POLL_MS, nullptr);
+            StartGameModePolling();
 #ifdef _DEBUG
             Logger::info(L"CursorWrap DEBUG: Hook installed");
 #endif
@@ -544,8 +583,8 @@ private:
             UnhookWindowsHookEx(m_mouseHook);
             m_mouseHook = nullptr;
             m_hookActive = false;
+            StopGameModePolling();
             m_gameModeActive = false;
-            KillTimer(m_messageWindow, TIMER_UPDATE_GAME_MODE);
             Logger::info("CursorWrap mouse hook stopped");
 #ifdef _DEBUG
             Logger::info("CursorWrap DEBUG: Mouse hook stopped");
@@ -642,7 +681,6 @@ private:
         if (m_messageWindow)
         {
             KillTimer(m_messageWindow, TIMER_UPDATE_MONITORS);
-            KillTimer(m_messageWindow, TIMER_UPDATE_GAME_MODE);
             DestroyWindow(m_messageWindow);
             m_messageWindow = nullptr;
             UnregisterClassW(L"CursorWrapDisplayChangeWindow", GetModuleHandle(nullptr));
@@ -709,10 +747,6 @@ private:
                 KillTimer(hwnd, TIMER_UPDATE_MONITORS);
                 g_cursorWrapInstance->OnDisplayChange();
             }
-            else if (wParam == TIMER_UPDATE_GAME_MODE)
-            {
-                g_cursorWrapInstance->RefreshGameModeState();
-            }
             break;
         }
 
@@ -728,7 +762,7 @@ private:
             
             if (g_cursorWrapInstance && g_cursorWrapInstance->m_hookActive)
             {
-                // Game Mode is polled by the message thread. This callback only reads the cached
+                // Game Mode is polled by a worker. This callback only reads the cached
                 // atomic state so it cannot block the system-wide low-level hook.
                 if (g_cursorWrapInstance->m_disableInGameMode.load() && g_cursorWrapInstance->m_gameModeActive)
                 {
