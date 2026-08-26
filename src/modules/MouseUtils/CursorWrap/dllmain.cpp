@@ -93,8 +93,10 @@ private:
     HHOOK m_mouseHook = nullptr;
     std::atomic<bool> m_hookActive{ false };
 
-    // Cached game mode state, refreshed from the message thread so the mouse hook only reads atomics.
+    // Cached game mode state, refreshed by a dedicated worker so the mouse hook only reads atomics.
     std::atomic<bool> m_gameModeActive{ false };
+    HANDLE m_gameModePollStopEvent = nullptr;
+    std::thread m_gameModePollThread;
     
     // Core wrapping engine (edge-based polygon model)
     CursorWrapCore m_core;
@@ -112,7 +114,6 @@ private:
     HWND m_messageWindow = nullptr;
     HDEVNOTIFY m_deviceNotify = nullptr;
     static constexpr UINT_PTR TIMER_UPDATE_MONITORS = 1;
-    static constexpr UINT_PTR TIMER_UPDATE_GAME_MODE = 2;
     static constexpr UINT DEBOUNCE_DELAY_MS = 500;
     static constexpr UINT GAME_MODE_POLL_MS = 1000;
 
@@ -366,6 +367,51 @@ private:
         m_gameModeActive = m_disableInGameMode.load() && detect_game_mode();
     }
 
+    bool StartGameModePolling()
+    {
+        // The initial query happens before installing WH_MOUSE_LL, so no hook delivery can be blocked
+        // and the cached state is valid as soon as wrapping becomes active.
+        RefreshGameModeState();
+
+        m_gameModePollStopEvent = CreateEventW(nullptr, true, false, nullptr);
+        if (!m_gameModePollStopEvent)
+        {
+            Logger::error(L"Failed to create CursorWrap Game Mode polling stop event, error: {}", GetLastError());
+            return false;
+        }
+
+        HANDLE stopEvent = m_gameModePollStopEvent;
+        m_gameModePollThread = std::thread([this, stopEvent]() {
+            while (WaitForSingleObject(stopEvent, GAME_MODE_POLL_MS) == WAIT_TIMEOUT)
+            {
+                RefreshGameModeState();
+            }
+        });
+
+        return true;
+    }
+
+    void StopGameModePolling()
+    {
+        if (m_gameModePollStopEvent)
+        {
+            SetEvent(m_gameModePollStopEvent);
+        }
+
+        if (m_gameModePollThread.joinable())
+        {
+            m_gameModePollThread.join();
+        }
+
+        if (m_gameModePollStopEvent)
+        {
+            CloseHandle(m_gameModePollStopEvent);
+            m_gameModePollStopEvent = nullptr;
+        }
+
+        m_gameModeActive = false;
+    }
+
     // Load the settings file.
     void init_settings()
     {
@@ -516,16 +562,18 @@ private:
 
         // Refresh monitor info before starting hook
         m_core.UpdateMonitorInfo();
-        
+
+        if (!StartGameModePolling())
+        {
+            return;
+        }
+
         m_mouseHook = SetWindowsHookEx(WH_MOUSE_LL, MouseHookProc, GetModuleHandle(nullptr), 0);
         if (m_mouseHook)
         {
             m_hookActive = true;
             Logger::info("CursorWrap mouse hook started successfully");
 
-            // The message-thread timer refreshes this cached state outside the low-level hook.
-            m_gameModeActive = false;
-            SetTimer(m_messageWindow, TIMER_UPDATE_GAME_MODE, GAME_MODE_POLL_MS, nullptr);
 #ifdef _DEBUG
             Logger::info(L"CursorWrap DEBUG: Hook installed");
 #endif
@@ -533,6 +581,7 @@ private:
         else
         {
             DWORD error = GetLastError();
+            StopGameModePolling();
             Logger::error(L"Failed to install CursorWrap mouse hook, error: {}", error);
         }
     }
@@ -544,8 +593,7 @@ private:
             UnhookWindowsHookEx(m_mouseHook);
             m_mouseHook = nullptr;
             m_hookActive = false;
-            m_gameModeActive = false;
-            KillTimer(m_messageWindow, TIMER_UPDATE_GAME_MODE);
+            StopGameModePolling();
             Logger::info("CursorWrap mouse hook stopped");
 #ifdef _DEBUG
             Logger::info("CursorWrap DEBUG: Mouse hook stopped");
@@ -642,7 +690,6 @@ private:
         if (m_messageWindow)
         {
             KillTimer(m_messageWindow, TIMER_UPDATE_MONITORS);
-            KillTimer(m_messageWindow, TIMER_UPDATE_GAME_MODE);
             DestroyWindow(m_messageWindow);
             m_messageWindow = nullptr;
             UnregisterClassW(L"CursorWrapDisplayChangeWindow", GetModuleHandle(nullptr));
@@ -709,10 +756,6 @@ private:
                 KillTimer(hwnd, TIMER_UPDATE_MONITORS);
                 g_cursorWrapInstance->OnDisplayChange();
             }
-            else if (wParam == TIMER_UPDATE_GAME_MODE)
-            {
-                g_cursorWrapInstance->RefreshGameModeState();
-            }
             break;
         }
 
@@ -728,7 +771,7 @@ private:
             
             if (g_cursorWrapInstance && g_cursorWrapInstance->m_hookActive)
             {
-                // Game Mode is polled by the message thread. This callback only reads the cached
+                // Game Mode is polled by a dedicated worker. This callback only reads the cached
                 // atomic state so it cannot block the system-wide low-level hook.
                 if (g_cursorWrapInstance->m_disableInGameMode.load() && g_cursorWrapInstance->m_gameModeActive)
                 {
