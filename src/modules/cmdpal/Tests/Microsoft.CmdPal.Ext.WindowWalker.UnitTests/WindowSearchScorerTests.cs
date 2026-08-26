@@ -122,6 +122,7 @@ public class WindowSearchScorerTests
 
         Assert.AreEqual(expected, WindowSearchScorer.Score("  word   budget  ", WordTitle, WordProcess));
         Assert.AreEqual(expected, WindowSearchScorer.Score("word\tbudget", WordTitle, WordProcess));
+        Assert.AreEqual(expected, WindowSearchScorer.Score("word\u00A0budget", WordTitle, WordProcess));
     }
 
     [DataTestMethod]

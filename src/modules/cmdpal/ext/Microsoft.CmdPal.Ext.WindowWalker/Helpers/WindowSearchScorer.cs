@@ -10,8 +10,6 @@ namespace Microsoft.CmdPal.Ext.WindowWalker.Helpers;
 /// </summary>
 internal static class WindowSearchScorer
 {
-    private static readonly char[] QuerySeparators = [' ', '\t'];
-
     /// <summary>
     /// Scores <paramref name="query"/> against a window's <paramref name="title"/> and
     /// <paramref name="processName"/>.
@@ -40,7 +38,7 @@ internal static class WindowSearchScorer
 
         var wholeQueryScore = ScoreBothFields(query, title, processName);
 
-        var words = query.Split(QuerySeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var words = query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (words.Length < 2)
         {
             return wholeQueryScore;
