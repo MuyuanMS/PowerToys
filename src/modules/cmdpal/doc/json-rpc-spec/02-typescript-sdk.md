@@ -397,7 +397,7 @@ interface FormContent {
 
 interface ImageContent {
   type: 'image';
-  image: IconInfo;        // Base64-encoded image data (use iconFromUrl/iconFromFile)
+  image: IconInfo;        // Glyph, file/URI reference, or Base64 image data
   maxWidth?: number;
   maxHeight?: number;
 }

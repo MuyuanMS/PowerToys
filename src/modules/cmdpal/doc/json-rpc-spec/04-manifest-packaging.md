@@ -337,6 +337,12 @@ The SDK appears only under `devDependencies` because the build step inlines it i
 `dist/`. The shipped package therefore lists no runtime dependency on
 `@microsoft/cmdpal-sdk`.
 
+Before creating the gallery package, stage the bundled output in a clean publish
+directory and remove the local `file:` SDK entry from the staged `package.json`.
+Regenerate `npm-shrinkwrap.json` from that staged manifest so the published
+package contains neither the local SDK dependency nor a lockfile entry that points
+outside the package.
+
 The build is wired to the **`prepack`** lifecycle hook, not `prepublishOnly`, on
 purpose. `npm pack` (which produces the tarball the gallery ultimately installs, and
 the tarball you validate below) runs `prepack` but does **not** run `prepublishOnly`;
