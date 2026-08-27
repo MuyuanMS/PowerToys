@@ -205,6 +205,64 @@ public class JSExtensionManifestTests
     }
 
     [TestMethod]
+    public void TryParse_JsonComment_IsInvalid()
+    {
+        CreateEntryPoint("index.js");
+        const string Json = """
+        {
+            "name": "sample",
+            // package.json does not allow comments
+            "main": "index.js",
+            "cmdpal": {}
+        }
+        """;
+
+        var result = JSExtensionManifest.TryParse(Json, _testDirectory);
+
+        Assert.IsFalse(result.IsValid);
+    }
+
+    [TestMethod]
+    public void TryParse_TrailingComma_IsInvalid()
+    {
+        CreateEntryPoint("index.js");
+        const string Json = """
+        {
+            "name": "sample",
+            "main": "index.js",
+            "cmdpal": {},
+        }
+        """;
+
+        var result = JSExtensionManifest.TryParse(Json, _testDirectory);
+
+        Assert.IsFalse(result.IsValid);
+    }
+
+    [DataTestMethod]
+    [DataRow(-1)]
+    [DataRow(65536)]
+    public void TryParse_DebugPortOutsideTcpRange_IsInvalid(int debugPort)
+    {
+        CreateEntryPoint("index.js");
+        var json = $$"""
+        {
+            "name": "sample",
+            "main": "index.js",
+            "cmdpal": {
+                "debug": true,
+                "debugPort": {{debugPort}}
+            }
+        }
+        """;
+
+        var result = JSExtensionManifest.TryParse(json, _testDirectory);
+
+        Assert.IsFalse(result.IsValid);
+        StringAssert.Contains(result.FailureReason, "between 0 and 65535");
+    }
+
+    [TestMethod]
     public void TryParse_EffectiveDisplayName_FallsBackToName()
     {
         CreateEntryPoint("index.js");
@@ -590,7 +648,13 @@ public class JSExtensionManifestTests
                 return false;
             }
 
-            process.WaitForExit(10_000);
+            if (!process.WaitForExit(10_000))
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit();
+                return false;
+            }
+
             return process.HasExited && process.ExitCode == 0 && Directory.Exists(junctionPath);
         }
         catch (Exception)

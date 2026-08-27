@@ -196,6 +196,11 @@ public sealed record JSExtensionManifest
             return JSExtensionManifestParseResult.Failure(containmentError!);
         }
 
+        if (package.CmdPal.DebugPort is < 0 or > 65535)
+        {
+            return JSExtensionManifestParseResult.Failure("The 'cmdpal.debugPort' value must be between 0 and 65535.");
+        }
+
         var manifest = new JSExtensionManifest
         {
             Name = package.Name,
