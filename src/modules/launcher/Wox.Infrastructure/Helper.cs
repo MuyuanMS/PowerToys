@@ -7,6 +7,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO.Abstractions;
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -157,10 +158,71 @@ namespace Wox.Infrastructure
             }
             else if (pattern.Contains("%1", StringComparison.Ordinal))
             {
-                arguments = pattern.Replace("%1", arguments);
+                arguments = ReplaceCommandArgument(pattern, arguments);
             }
 
             return OpenInShell(path, arguments, workingDir, runAs, runWithHiddenWindow);
+        }
+
+        internal static string ReplaceCommandArgument(string pattern, string arguments)
+        {
+            var result = new StringBuilder(pattern.Length);
+            var position = 0;
+            while (position < pattern.Length)
+            {
+                var placeholder = pattern.IndexOf("%1", position, StringComparison.Ordinal);
+                if (placeholder < 0)
+                {
+                    result.Append(pattern, position, pattern.Length - position);
+                    break;
+                }
+
+                result.Append(pattern, position, placeholder - position);
+                var isQuoted = placeholder > 0 &&
+                    placeholder + 2 < pattern.Length &&
+                    pattern[placeholder - 1] == '"' &&
+                    pattern[placeholder + 2] == '"';
+                result.Append(isQuoted ? EscapeCommandLineArgument(arguments) : QuoteCommandLineArgument(arguments));
+                position = placeholder + 2;
+            }
+
+            return result.ToString();
+        }
+
+        private static string QuoteCommandLineArgument(string argument)
+        {
+            return $"\"{EscapeCommandLineArgument(argument)}\"";
+        }
+
+        private static string EscapeCommandLineArgument(string argument)
+        {
+            argument ??= string.Empty;
+
+            var escapedArgument = new StringBuilder();
+            var backslashCount = 0;
+
+            foreach (var character in argument)
+            {
+                if (character == '\\')
+                {
+                    backslashCount++;
+                }
+                else if (character == '"')
+                {
+                    escapedArgument.Append('\\', (backslashCount * 2) + 1);
+                    escapedArgument.Append('"');
+                    backslashCount = 0;
+                }
+                else
+                {
+                    escapedArgument.Append('\\', backslashCount);
+                    escapedArgument.Append(character);
+                    backslashCount = 0;
+                }
+            }
+
+            escapedArgument.Append('\\', backslashCount * 2);
+            return escapedArgument.ToString();
         }
 
         public static bool OpenInShell(string path, string arguments = null, string workingDir = null, ShellRunAsType runAs = ShellRunAsType.None, bool runWithHiddenWindow = false)
