@@ -236,6 +236,7 @@ public sealed partial class JsonRpcConnection : IDisposable
     /// <returns>The raw JSON-RPC response, which may contain a result or an error.</returns>
     public async Task<JsonRpcResponse> SendRequestAsync(string method, JsonNode? parameters, CancellationToken cancellationToken)
     {
+        ArgumentException.ThrowIfNullOrEmpty(method);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         // Fail fast once the connection is closed rather than waiting for the request timeout.
@@ -335,6 +336,7 @@ public sealed partial class JsonRpcConnection : IDisposable
     /// <returns>A task that completes when the notification has been written to the output stream.</returns>
     public async Task SendNotificationAsync(string method, JsonNode? parameters, CancellationToken cancellationToken)
     {
+        ArgumentException.ThrowIfNullOrEmpty(method);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         var notification = new JsonRpcNotification
@@ -906,7 +908,7 @@ public sealed partial class JsonRpcConnection : IDisposable
         if (projected > _maxQueuedRequestBytes)
         {
             Interlocked.Add(ref _queuedRequestBytes, -sizeBytes);
-            RejectInboundRequest(idElement, sizeBytes);
+            RejectInboundRequest(idElement);
             return;
         }
 
@@ -926,19 +928,14 @@ public sealed partial class JsonRpcConnection : IDisposable
         // The count-bounded queue is full or completed because the connection is closing. Release the
         // byte reservation and reject the request.
         Interlocked.Add(ref _queuedRequestBytes, -sizeBytes);
-        RejectInboundRequest(idElement, sizeBytes);
+        RejectInboundRequest(idElement);
     }
 
-    private void RejectInboundRequest(JsonElement idElement, int requestSizeBytes)
+    private void RejectInboundRequest(JsonElement idElement)
     {
         if (Volatile.Read(ref _connectionState) != StateOpen)
         {
             // The connection is closing; the peer will observe the disconnect. Nothing to send.
-            return;
-        }
-
-        if (requestSizeBytes > MaxPendingRejectionResponseBytes)
-        {
             return;
         }
 
