@@ -1,8 +1,0 @@
-[2024-07-15 09:23:04.371506] [p-11784] [t-12020] [info] launcher logger is initialized
-[2024-07-15 09:23:04.371617] [p-11784] [t-12020] [info] Launcher object is constructing
-[2024-07-15 09:23:05.327030] [p-11784] [t-12020] [trace] Launching PowerToys Awake process
-[2024-07-15 09:23:05.327112] [p-11784] [t-12020] [trace] PowerToys Awake launching with parameters: --use-pt-config --pid 11784
-[2024-07-15 11:59:36.747827] [p-12316] [t-12328] [info] launcher logger is initialized
-[2024-07-15 11:59:36.747989] [p-12316] [t-12328] [info] Launcher object is constructing
-[2024-07-15 11:59:37.165688] [p-12316] [t-12328] [trace] Launching PowerToys Awake process
-[2024-07-15 11:59:37.166005] [p-12316] [t-12328] [trace] PowerToys Awake launching with parameters: --use-pt-config --pid 12316

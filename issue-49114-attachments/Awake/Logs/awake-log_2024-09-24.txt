@@ -1,4 +1,0 @@
-[2024-09-24 21:15:08.355740] [p-13308] [t-13468] [info] launcher logger is initialized
-[2024-09-24 21:15:08.355832] [p-13308] [t-13468] [info] Launcher object is constructing
-[2024-09-24 21:15:09.040076] [p-13308] [t-13468] [trace] Launching PowerToys Awake process
-[2024-09-24 21:15:09.040140] [p-13308] [t-13468] [trace] PowerToys Awake launching with parameters: --use-pt-config --pid 13308

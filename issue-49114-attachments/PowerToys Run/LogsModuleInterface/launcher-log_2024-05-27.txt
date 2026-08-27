@@ -1,8 +1,0 @@
-[2024-05-27 14:49:57.390623] [p-16688] [t-13624] [info] launcher logger is initialized
-[2024-05-27 14:49:57.390772] [p-16688] [t-13624] [info] Launcher object is constructing
-[2024-05-27 14:49:58.166528] [p-16688] [t-13624] [info] Microsoft_Launcher::enable() begin
-[2024-05-27 14:49:58.166591] [p-16688] [t-13624] [trace] Signaled exitEvent
-[2024-05-27 14:49:58.166615] [p-16688] [t-13624] [trace] Starting PowerToys Run from not elevated process
-[2024-05-27 14:49:58.194440] [p-16688] [t-13624] [trace] Started PowerToys Run
-[2024-05-27 14:49:58.194539] [p-16688] [t-13624] [info] Microsoft_Launcher::enable() end
-[2024-05-27 14:49:58.267505] [p-16688] [t-22608] [info] Send settings telemetry
