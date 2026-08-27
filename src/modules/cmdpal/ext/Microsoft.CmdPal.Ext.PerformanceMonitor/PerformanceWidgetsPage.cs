@@ -148,8 +148,8 @@ internal sealed partial class PerformanceWidgetsPage : OnLoadStaticListPage, IDi
             _networkPage.Updated += (s, e) =>
             {
                 _networkItem.Title = _networkPage.GetItemTitle(isBandPage);
-                _networkUpItem?.Title = _networkPage.GetUpSpeed();
-                _networkDownItem?.Title = _networkPage.GetDownSpeed();
+                _networkUpItem?.Title = FormatIncomingData.AsBandTitle(_networkPage.GetUpSpeed());
+                _networkDownItem?.Title = FormatIncomingData.AsBandTitle(_networkPage.GetDownSpeed());
             };
         }
 
@@ -322,7 +322,7 @@ internal sealed partial class PerformanceWidgetsPage : OnLoadStaticListPage, IDi
             Icon = Icons.NetworkUpIcon,
             MoreCommands = _networkPage!.Commands,
         };
-        _networkUpItem.Title = _networkPage!.GetUpSpeed();
+        _networkUpItem.Title = FormatIncomingData.AsBandTitle(_networkPage!.GetUpSpeed());
 
         _networkDownItem ??= new ListItem(_networkPage!)
         {
@@ -330,7 +330,7 @@ internal sealed partial class PerformanceWidgetsPage : OnLoadStaticListPage, IDi
             Icon = Icons.NetworkDownIcon,
             MoreCommands = _networkPage!.Commands,
         };
-        _networkDownItem.Title = _networkPage!.GetDownSpeed();
+        _networkDownItem.Title = FormatIncomingData.AsBandTitle(_networkPage!.GetDownSpeed());
 
         return [_networkUpItem, _networkDownItem];
     }
@@ -1533,10 +1533,10 @@ internal static class FormatIncomingData
         {
             if (MathF.Round(value, 1) < 100f)
             {
-                return string.Format(CultureInfo.InvariantCulture, "{0,-4:0.0} Kbps", value);
+                return string.Format(CultureInfo.InvariantCulture, "{0:0.0} Kbps", value);
             }
 
-            return string.Format(CultureInfo.InvariantCulture, "{0,-4:0} Kbps", value);
+            return string.Format(CultureInfo.InvariantCulture, "{0:0} Kbps", value);
         }
 
         // Kbits to Mbits
@@ -1545,20 +1545,20 @@ internal static class FormatIncomingData
         {
             if (MathF.Round(value, 1) < 100f)
             {
-                return string.Format(CultureInfo.InvariantCulture, "{0,-4:0.0} Mbps", value);
+                return string.Format(CultureInfo.InvariantCulture, "{0:0.0} Mbps", value);
             }
 
-            return string.Format(CultureInfo.InvariantCulture, "{0,-4:0} Mbps", value);
+            return string.Format(CultureInfo.InvariantCulture, "{0:0} Mbps", value);
         }
 
         // Mbits to Gbits
         value /= 1024;
         if (MathF.Round(value, 1) < 100f)
         {
-            return string.Format(CultureInfo.InvariantCulture, "{0,-4:0.0} Gbps", value);
+            return string.Format(CultureInfo.InvariantCulture, "{0:0.0} Gbps", value);
         }
 
-        return string.Format(CultureInfo.InvariantCulture, "{0,-4:0} Gbps", value);
+        return string.Format(CultureInfo.InvariantCulture, "{0:0} Gbps", value);
     }
 
     public static string AsBytesPerSecString(float value)
@@ -1569,10 +1569,10 @@ internal static class FormatIncomingData
         {
             if (MathF.Round(value, 1) < 100f)
             {
-                return string.Format(CultureInfo.InvariantCulture, "{0,-4:0.0} KB/s", value);
+                return string.Format(CultureInfo.InvariantCulture, "{0:0.0} KB/s", value);
             }
 
-            return string.Format(CultureInfo.InvariantCulture, "{0,-4:0} KB/s", value);
+            return string.Format(CultureInfo.InvariantCulture, "{0:0} KB/s", value);
         }
 
         // KB to MB
@@ -1581,20 +1581,20 @@ internal static class FormatIncomingData
         {
             if (MathF.Round(value, 1) < 100f)
             {
-                return string.Format(CultureInfo.InvariantCulture, "{0,-4:0.0} MB/s", value);
+                return string.Format(CultureInfo.InvariantCulture, "{0:0.0} MB/s", value);
             }
 
-            return string.Format(CultureInfo.InvariantCulture, "{0,-4:0} MB/s", value);
+            return string.Format(CultureInfo.InvariantCulture, "{0:0} MB/s", value);
         }
 
         // MB to GB
         value /= 1000;
         if (MathF.Round(value, 1) < 100f)
         {
-            return string.Format(CultureInfo.InvariantCulture, "{0,-4:0.0} GB/s", value);
+            return string.Format(CultureInfo.InvariantCulture, "{0:0.0} GB/s", value);
         }
 
-        return string.Format(CultureInfo.InvariantCulture, "{0,-4:0} GB/s", value);
+        return string.Format(CultureInfo.InvariantCulture, "{0:0} GB/s", value);
     }
 
     public static string AsBinaryBytesPerSecString(float value)
@@ -1605,10 +1605,10 @@ internal static class FormatIncomingData
         {
             if (MathF.Round(value, 1) < 100f)
             {
-                return string.Format(CultureInfo.InvariantCulture, "{0,-4:0.0} KiB/s", value);
+                return string.Format(CultureInfo.InvariantCulture, "{0:0.0} KiB/s", value);
             }
 
-            return string.Format(CultureInfo.InvariantCulture, "{0,-4:0} KiB/s", value);
+            return string.Format(CultureInfo.InvariantCulture, "{0:0} KiB/s", value);
         }
 
         // KiB to MiB
@@ -1617,19 +1617,27 @@ internal static class FormatIncomingData
         {
             if (MathF.Round(value, 1) < 100f)
             {
-                return string.Format(CultureInfo.InvariantCulture, "{0,-4:0.0} MiB/s", value);
+                return string.Format(CultureInfo.InvariantCulture, "{0:0.0} MiB/s", value);
             }
 
-            return string.Format(CultureInfo.InvariantCulture, "{0,-4:0} MiB/s", value);
+            return string.Format(CultureInfo.InvariantCulture, "{0:0} MiB/s", value);
         }
 
         // MiB to GiB
         value /= 1024;
         if (MathF.Round(value, 1) < 100f)
         {
-            return string.Format(CultureInfo.InvariantCulture, "{0,-4:0.0} GiB/s", value);
+            return string.Format(CultureInfo.InvariantCulture, "{0:0.0} GiB/s", value);
         }
 
-        return string.Format(CultureInfo.InvariantCulture, "{0,-4:0} GiB/s", value);
+        return string.Format(CultureInfo.InvariantCulture, "{0:0} GiB/s", value);
+    }
+
+    public static string AsBandTitle(string formattedSpeed)
+    {
+        var separatorIndex = formattedSpeed.IndexOf(' ', StringComparison.Ordinal);
+        return separatorIndex is > 0 and < 4
+            ? formattedSpeed.Insert(separatorIndex, new string(' ', 4 - separatorIndex))
+            : formattedSpeed;
     }
 }
