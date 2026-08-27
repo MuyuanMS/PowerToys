@@ -83,7 +83,8 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
 
     internal void SetSearchText(string value)
     {
-        using var document = JsonDocument.Parse(JsonSerializer.Serialize(new { searchText = value }));
+        var properties = new JsonObject { ["searchText"] = value };
+        using var document = JsonDocument.Parse(properties.ToJsonString());
         ApplyPropertyChanges(document.RootElement);
     }
 
