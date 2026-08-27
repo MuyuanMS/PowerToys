@@ -19,8 +19,6 @@ public:
     // Load the configuration.
     bool LoadSettings();
 
-    bool IsConfigurationNameResolved() const;
-
     // Save the updated configuration.
     bool SaveSettingsToFile();
 
@@ -72,8 +70,6 @@ public:
     std::wstring currentConfig = KeyboardManagerConstants::DefaultConfiguration;
 
 private:
-    bool configurationNameResolved = false;
-
     bool LoadSingleKeyRemaps(const json::JsonObject& jsonData);
     bool LoadSingleKeyToTextRemaps(const json::JsonObject& jsonData);
     bool LoadShortcutRemaps(const json::JsonObject& jsonData, const std::wstring& objectName);

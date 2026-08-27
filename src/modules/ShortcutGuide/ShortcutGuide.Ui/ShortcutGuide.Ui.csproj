@@ -50,8 +50,7 @@
       <PRIFile Include="$(OutDir)**\PowerToys.ShortcutGuide.pri" />
     </ItemGroup>
 
-    <!-- Wildcard can match nothing (e.g. build-cache restore, incremental build); skip instead of failing with MSB3030. -->
-    <Copy SourceFiles="@(PRIFile)" DestinationFolder="$(OutDir)" Condition="'@(PRIFile)' != ''" />
+    <Copy SourceFiles="@(PRIFile)" DestinationFolder="$(OutDir)" />
 
     <Message Text="Copied CopyPRIFileToOutputDir files" Importance="High" />
   </Target>

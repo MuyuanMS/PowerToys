@@ -35,8 +35,5 @@
                 </controls:SettingsGroup>
             </StackPanel>
         </controls:SettingsPageControl.ModuleContent>
-        <controls:SettingsPageControl.SecondaryLinks>
-            <controls:PageLink x:Uid="Attribution_AltWindowCycle" Link="https://github.com/wzhudev" />
-        </controls:SettingsPageControl.SecondaryLinks>
     </controls:SettingsPageControl>
 </local:NavigablePage>

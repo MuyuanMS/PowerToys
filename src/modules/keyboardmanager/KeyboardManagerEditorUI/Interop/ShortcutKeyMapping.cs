@@ -20,8 +20,6 @@ namespace KeyboardManagerEditorUI.Interop
 
         public ShortcutOperationType OperationType { get; set; }
 
-        public bool ExactMatch { get; set; }
-
         public string TargetText { get; set; } = string.Empty;
 
         public string ProgramPath { get; set; } = string.Empty;
@@ -74,7 +72,6 @@ namespace KeyboardManagerEditorUI.Interop
                    TargetKeys == other.TargetKeys &&
                    TargetApp == other.TargetApp &&
                    OperationType == other.OperationType &&
-                   ExactMatch == other.ExactMatch &&
                    TargetText == other.TargetText &&
                    ProgramPath == other.ProgramPath &&
                    ProgramArgs == other.ProgramArgs &&
@@ -92,7 +89,6 @@ namespace KeyboardManagerEditorUI.Interop
             hash.Add(TargetKeys);
             hash.Add(TargetApp);
             hash.Add(OperationType);
-            hash.Add(ExactMatch);
             hash.Add(TargetText);
             hash.Add(ProgramPath);
             hash.Add(ProgramArgs);

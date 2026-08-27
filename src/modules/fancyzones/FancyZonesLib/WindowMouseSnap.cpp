@@ -73,11 +73,6 @@ bool WindowMouseSnap::MoveSizeStart(HMONITOR monitor, bool isSnapping)
 
 void WindowMouseSnap::MoveSizeUpdate(HMONITOR monitor, POINT const& ptScreen, bool isSnapping, bool isSelectManyZonesState)
 {
-    // Enter snapping mode before calculating highlights. The transition resets m_highlightedZones;
-    // doing it after Update discards the zone selected by the first Shift-triggered update and makes
-    // snapping depend on an otherwise unnecessary second mouse move.
-    SwitchSnappingMode(isSnapping);
-
     auto iter = m_activeWorkAreas.find(monitor);
     if (isSnapping && iter != m_activeWorkAreas.end())
     {
@@ -113,6 +108,8 @@ void WindowMouseSnap::MoveSizeUpdate(HMONITOR monitor, POINT const& ptScreen, bo
             }
         }
     }
+
+    SwitchSnappingMode(isSnapping);
 }
 
 void WindowMouseSnap::MoveSizeEnd()

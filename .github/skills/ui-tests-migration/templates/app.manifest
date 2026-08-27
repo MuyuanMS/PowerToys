@@ -2,20 +2,21 @@
 <!--
   TEMPLATE app.manifest for a .Next UI-test project.
 
-  Copy this into EVERY UI-test executable that references UITestAutomation.Next, including greenfield
-  projects without a .Next suffix. Element.Click and MouseHelper consume physical-pixel bounds from
-  winappcli; without PerMonitorV2, Win32 cursor coordinates can be virtualized by the display scale
-  and miss their targets on scaled or mixed-DPI desktops.
+  ADD THIS ONLY for projects with COORDINATE-EXACT tests (mouse drag/click asserting on exact
+  pixel/measurement values, e.g. Screen Ruler's Bounds "100 x 100"). Without PerMonitorV2 the test
+  host is DPI-unaware and MouseHelper's SetCursorPos/GetCursorPos coordinates are virtualized by the
+  display scale factor, so they no longer match the PHYSICAL pixels winappcli reports (a 99px drag
+  measured ~149px on a 150% display).
 
   Wire it into the csproj:
     <PropertyGroup>
       <ApplicationManifest>app.manifest</ApplicationManifest>
     </PropertyGroup>
 
-  Replace __ASSEMBLY_NAME__ with the final AssemblyName from the csproj.
+  Replace __MODULE__ in the assemblyIdentity name.
 -->
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
-  <assemblyIdentity version="1.0.0.0" name="__ASSEMBLY_NAME__.app"/>
+  <assemblyIdentity version="1.0.0.0" name="__MODULE__.UITests.Next.app"/>
 
   <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
     <application>

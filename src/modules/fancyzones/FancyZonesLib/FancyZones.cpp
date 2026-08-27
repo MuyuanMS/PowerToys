@@ -296,7 +296,6 @@ public:
     void MoveSizeStart(HWND window, HMONITOR monitor);
     void MoveSizeUpdate(HMONITOR monitor, POINT const& ptScreen);
     void MoveSizeEnd();
-    void AbortMoveSize();
 
     void WindowCreated(HWND window) noexcept;
     void ToggleEditor() noexcept;
@@ -518,17 +517,6 @@ void FancyZones::MoveSizeEnd()
     m_draggingState.Disable();
 }
 
-void FancyZones::AbortMoveSize()
-{
-    if (m_windowMouseSnapper)
-    {
-        m_windowMouseSnapper->Abort();
-        m_windowMouseSnapper = nullptr;
-    }
-
-    m_draggingState.Disable();
-}
-
 bool FancyZones::MoveToAppLastZone(HWND window, HMONITOR monitor, GUID currentVirtualDesktop) noexcept
 {
     const auto& workAreas = m_workAreaConfiguration.GetAllWorkAreas();
@@ -744,13 +732,9 @@ FancyZones::OnKeyDown(PKBDLLHOOKSTRUCT info) noexcept
 
     // Only suppress the bare Shift key itself during drag (used for drag-toggle).
     // Do NOT swallow Shift+<other key> combos - that steals keystrokes from apps.
-    if (m_windowMouseSnapper &&
+    if (m_draggingState.IsDragging() &&
         (info->vkCode == VK_LSHIFT || info->vkCode == VK_RSHIFT))
     {
-        // Record the press before swallowing it. Returning 1 removes the key from the input stream
-        // for every listener - including this module's own WM_INPUT handler, which is what normally
-        // calls SetShiftState - so without this the zones could never be switched off with Shift.
-        m_draggingState.SetShiftState(true);
         return true;
     }
     return false;
@@ -992,7 +976,9 @@ LRESULT FancyZones::WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lpa
             if (m_windowMouseSnapper && m_windowMouseSnapper->GetDraggedWindow() == hwnd)
             {
                 Logger::info(L"Window destroyed during drag - aborting drag");
-                AbortMoveSize();
+                m_windowMouseSnapper->Abort();
+                m_windowMouseSnapper = nullptr;
+                m_draggingState.Disable();
             }
         }
         else if (message == WM_PRIV_LAYOUT_HOTKEYS_FILE_UPDATE)
@@ -1174,9 +1160,9 @@ void FancyZones::UpdateWorkAreas(bool updateWindowPositions) noexcept
             // every unique_ptr<WorkArea> (and hence the inner ZonesOverlay and
             // its std::mutex). If a drag is in flight, the next MoveSizeUpdate
             // would dereference that dangling WorkArea* and lock the freed
-            // mutex. Abort the active drag first so subsequent drag messages
+            // mutex. Drain the active drag first so subsequent drag messages
             // hit the snapper's `if (m_windowMouseSnapper)` guard and no-op.
-            AbortMoveSize();
+            MoveSizeEnd();
             m_workAreaConfiguration.Clear();
 
             FancyZonesDataTypes::WorkAreaId workAreaId;
@@ -1194,7 +1180,7 @@ void FancyZones::UpdateWorkAreas(bool updateWindowPositions) noexcept
         if (ShouldWorkAreasBeRecreated(monitors, currentVirtualDesktop, workAreas))
         {
             // See comment above the matching Clear() in the span-zones branch.
-            AbortMoveSize();
+            MoveSizeEnd();
             m_workAreaConfiguration.Clear();
             for (const auto& monitor : monitors)
             {
@@ -1587,7 +1573,7 @@ void FancyZones::SettingsUpdate(SettingId id)
     {
         // See UpdateWorkAreas() — same WindowMouseSnap dangling-WorkArea*
         // hazard if the user toggles this setting mid-drag.
-        AbortMoveSize();
+        MoveSizeEnd();
         m_workAreaConfiguration.Clear();
         PostMessageW(m_window, WM_PRIV_INIT, NULL, NULL);
     }
