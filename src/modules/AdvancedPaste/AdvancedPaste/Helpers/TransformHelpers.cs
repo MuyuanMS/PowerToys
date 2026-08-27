@@ -96,7 +96,10 @@ public static class TransformHelpers
         using var jpgStream = new InMemoryRandomAccessStream();
         var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.JpegEncoderId, jpgStream, encoderOptions);
         using var flattenedBitmap = clipboardBitmap.BitmapAlphaMode == BitmapAlphaMode.Ignore ? null : FlattenForJpeg(clipboardBitmap);
-        encoder.SetSoftwareBitmap(flattenedBitmap ?? clipboardBitmap);
+        using var normalizedBitmap = flattenedBitmap == null && clipboardBitmap.BitmapPixelFormat is not (BitmapPixelFormat.Rgba16 or BitmapPixelFormat.Rgba8 or BitmapPixelFormat.Bgra8)
+            ? SoftwareBitmap.Convert(clipboardBitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Ignore)
+            : null;
+        encoder.SetSoftwareBitmap(flattenedBitmap ?? normalizedBitmap ?? clipboardBitmap);
         await encoder.FlushAsync();
 
         return await CreateDataPackageFromFileContentAsync(jpgStream.AsStreamForRead(), "jpg", cancellationToken);
