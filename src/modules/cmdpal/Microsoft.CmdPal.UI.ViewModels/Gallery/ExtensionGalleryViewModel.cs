@@ -512,15 +512,26 @@ public sealed partial class ExtensionGalleryViewModel : ObservableObject, IDispo
 
                             if (results.Value.TryGetValue(entry.StoreId, out var catalogPackage))
                             {
-                                var isInstalled = await RunInBackgroundAsync(
-                                    async () =>
-                                    {
-                                        await catalogPackage.CheckInstalledStatusAsync();
-                                        return catalogPackage.InstalledVersion is not null;
-                                    },
-                                    storeCts.Token);
-                                entry.IsInstalled = isInstalled;
-                                entry.IsInstalledStateKnown = true;
+                                try
+                                {
+                                    var isInstalled = await RunInBackgroundAsync(
+                                        async () =>
+                                        {
+                                            await catalogPackage.CheckInstalledStatusAsync();
+                                            return catalogPackage.InstalledVersion is not null;
+                                        },
+                                        storeCts.Token);
+                                    entry.IsInstalled = isInstalled;
+                                    entry.IsInstalledStateKnown = true;
+                                }
+                                catch (OperationCanceledException)
+                                {
+                                    throw;
+                                }
+                                catch (Exception ex)
+                                {
+                                    LogCheckWinGetPackageStatusError(_logger, ex);
+                                }
                             }
                         }
                     }
