@@ -1601,23 +1601,9 @@ internal sealed partial class SystemTemperatureWidgetPage : WidgetPage, IDisposa
                 _lastTemperatureString);
     }
 
-    internal override void PushActivate()
-    {
-        base.PushActivate();
-        if (IsActive)
-        {
-            _dataManager.Start();
-        }
-    }
+    protected override void OnActivated() => _dataManager.Start();
 
-    internal override void PopActivate()
-    {
-        base.PopActivate();
-        if (!IsActive)
-        {
-            _dataManager.Stop();
-        }
-    }
+    protected override void OnDeactivated() => _dataManager.Stop();
 
     public void Dispose()
     {
