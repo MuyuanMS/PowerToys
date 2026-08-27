@@ -25,6 +25,17 @@ namespace AdvancedPaste.UnitTests.HelpersTests;
 public sealed class TransformHelpersTests
 {
     [TestMethod]
+    public void PasteFormats_PreservePersistedValues()
+    {
+        Assert.AreEqual(7, (int)PasteFormats.PasteAsHtmlFile);
+        Assert.AreEqual(8, (int)PasteFormats.TranscodeToMp3);
+        Assert.AreEqual(9, (int)PasteFormats.TranscodeToMp4);
+        Assert.AreEqual(10, (int)PasteFormats.KernelQuery);
+        Assert.AreEqual(11, (int)PasteFormats.CustomTextTransformation);
+        Assert.AreEqual(12, (int)PasteFormats.PasteAsJpgFile);
+    }
+
+    [TestMethod]
     public async Task TransformToJpgFileProducesJpegFileAndRespectsQuality()
     {
         var lowQualitySize = await GetJpgOutputFileSizeAsync(10);
