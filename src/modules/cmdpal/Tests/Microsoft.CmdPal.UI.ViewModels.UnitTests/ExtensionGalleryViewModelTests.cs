@@ -28,6 +28,7 @@ public class ExtensionGalleryViewModelTests
     private static readonly string[] NameOrderIds = ["alpha", "beta", "gamma"];
     private static readonly string[] AuthorOrderIds = ["second", "third", "first"];
     private static readonly string[] InstallationStatusOrderIds = ["update", "installed", "not-installed"];
+    private static readonly string[] StoreOnlyExtensionIds = ["9NZ06M9CNV77"];
 
     [TestMethod]
     public async Task LoadAsync_DoesNotBlockOnSlowSynchronousInstalledStatusKickoff()
@@ -262,7 +263,7 @@ public class ExtensionGalleryViewModelTests
             {
                 winGetService.Verify(
                     s => s.GetStorePackagesByIdAsync(
-                        It.Is<IEnumerable<string>>(ids => ids.SequenceEqual(["9NZ06M9CNV77"])),
+                        It.Is<IEnumerable<string>>(ids => ids.SequenceEqual(StoreOnlyExtensionIds)),
                         It.IsAny<CancellationToken>()),
                     Times.Once);
                 return true;
