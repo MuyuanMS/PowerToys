@@ -196,6 +196,7 @@ internal sealed partial class CommandPaletteContextMenuFactory : IContextMenuFac
     {
         if (topLevelItem.IsFallback ||
             topLevelItem.IsDockBand ||
+            (!topLevelItem.ItemViewModel.Command.IsPage && !topLevelItem.ItemViewModel.Command.IsInvokableCommand) ||
             string.IsNullOrWhiteSpace(itemId) ||
             string.IsNullOrWhiteSpace(providerId))
         {

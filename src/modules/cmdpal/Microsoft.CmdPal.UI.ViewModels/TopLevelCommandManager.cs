@@ -44,6 +44,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     private readonly SupersedingAsyncGate _reloadCommandsGate;
     private CancellationTokenSource _extensionLoadCts = new();
     private CancellationToken _currentExtensionLoadCancellationToken;
+    private int _activeLoadOperations;
 
     private HashSet<(string ProviderId, string CommandId)> _pinnedCommandSet = [];
 
@@ -283,7 +284,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     [RelayCommand]
     public async Task LoadExternalProvidersAsync()
     {
-        IsLoading = true;
+        BeginLoading();
         try
         {
             var ct = _currentExtensionLoadCancellationToken;
@@ -295,13 +296,13 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         }
         finally
         {
-            IsLoading = false;
+            EndLoading();
         }
     }
 
     private async Task ReloadAllCommandsAsyncCore(CancellationToken cancellationToken)
     {
-        IsLoading = true;
+        BeginLoading();
 
         try
         {
@@ -357,14 +358,14 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         }
         finally
         {
-            IsLoading = false;
+            EndLoading();
             WeakReferenceMessenger.Default.Send<ReloadFinishedMessage>();
         }
     }
 
     private async Task UpdateProviderEnabledStateAsyncCore(string providerId, bool isEnabled)
     {
-        IsLoading = true;
+        BeginLoading();
 
         try
         {
@@ -463,6 +464,22 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             }
         }
         finally
+        {
+            EndLoading();
+        }
+    }
+
+    private void BeginLoading()
+    {
+        if (Interlocked.Increment(ref _activeLoadOperations) == 1)
+        {
+            IsLoading = true;
+        }
+    }
+
+    private void EndLoading()
+    {
+        if (Interlocked.Decrement(ref _activeLoadOperations) == 0)
         {
             IsLoading = false;
         }

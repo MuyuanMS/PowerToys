@@ -117,7 +117,7 @@ public partial class App : Application, IDisposable
         AppWindow = new MainWindow();
 
         var activatedEventArgs = Microsoft.Windows.AppLifecycle.AppInstance.GetCurrent().GetActivatedEventArgs();
-        ((MainWindow)AppWindow).HandleLaunchNonUI(activatedEventArgs);
+        ((MainWindow)AppWindow).HandleLaunchNonUI(MainWindow.CaptureActivation(activatedEventArgs));
         Program.ReplayPendingActivations((MainWindow)AppWindow);
     }
 
