@@ -18,7 +18,9 @@ internal static partial class DetailsMarkdownHelper
             return text ?? string.Empty;
         }
 
-        return MarkdownSpecialCharacters().Replace(text, "\\$1");
+        var escapedHtml = text.Replace("&", "&amp;", StringComparison.Ordinal)
+            .Replace("<", "&lt;", StringComparison.Ordinal);
+        return MarkdownSpecialCharacters().Replace(escapedHtml, "\\$1");
     }
 
     [GeneratedRegex(@"([\\`*_{}\[\]()#+\-.!>|~])")]

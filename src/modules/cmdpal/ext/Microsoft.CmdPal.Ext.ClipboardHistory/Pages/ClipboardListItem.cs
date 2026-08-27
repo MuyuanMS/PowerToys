@@ -231,10 +231,11 @@ internal sealed partial class ClipboardListItem : ListItem
 
         if (_item.IsImage)
         {
+            var iconData = new IconData(_item.ImageData);
             return new Details
             {
                 Title = _item.GetDataType(),
-                Body = DetailsMarkdownHelper.BuildImageBody(_item.ImageData, Properties.Resources.clipboard_item_image_title),
+                HeroImage = new IconInfo(iconData),
                 Metadata = [.. metadata],
             };
         }

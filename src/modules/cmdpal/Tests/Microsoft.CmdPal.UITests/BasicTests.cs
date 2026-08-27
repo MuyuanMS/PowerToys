@@ -168,11 +168,22 @@ public class BasicTests : CommandPaletteTestBase
         OpenSettingsWindow();
         NavigateToDockSettings();
 
-        this.Find<ToggleSwitch>(By.AccessibilityId("CmdPal_DockSettingsPage_EnableDock")).Toggle();
+        var enableDockToggle = this.Find<ToggleSwitch>(By.AccessibilityId("CmdPal_DockSettingsPage_EnableDock"));
+        var initialState = enableDockToggle.IsOn;
+        var searchBox = this.Find<TextBox>(By.AccessibilityId("MainSearchBox"), global: true);
+        try
+        {
+            searchBox.SendKeys("{ESC}");
+            enableDockToggle.Toggle(true);
 
-        var homeDockItem = this.Find<Custom>("Home", global: true);
-        homeDockItem.SendKeys(key);
+            var homeDockItem = this.Find<Custom>("Home", global: true);
+            homeDockItem.SendKeys(key);
 
-        Assert.IsTrue(this.Find<TextBox>(By.AccessibilityId("MainSearchBox"), global: true).Displayed);
+            Assert.IsTrue(searchBox.Displayed);
+        }
+        finally
+        {
+            enableDockToggle.Toggle(initialState);
+        }
     }
 }
