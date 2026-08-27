@@ -42,9 +42,20 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
         ShowDetails = true;
 
         Clipboard.HistoryChanged += TrackClipboardHistoryChanged_EventHandler;
+        Clipboard.HistoryEnabledChanged += TrackClipboardHistoryEnabledChanged_EventHandler;
     }
 
     private void TrackClipboardHistoryChanged_EventHandler(object? sender, ClipboardHistoryChangedEventArgs? e)
+    {
+        ReloadClipboardHistoryIfLoaded();
+    }
+
+    private void TrackClipboardHistoryEnabledChanged_EventHandler(object? sender, ClipboardHistoryEnabledChangedEventArgs? e)
+    {
+        ReloadClipboardHistoryIfLoaded();
+    }
+
+    private void ReloadClipboardHistoryIfLoaded()
     {
         if (Volatile.Read(ref hasLoadedOnce) != 0)
         {
