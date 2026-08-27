@@ -2073,8 +2073,8 @@ static void ReplayPendingClick(MouseButton button, bool completeModifier = false
 {
     if (g_modifierSession.absorbed && !g_modifierSession.replayedDown)
     {
-        g_modifierSession.replayedDown = true;
-        ReplayCapturedModifier(ModifierReplay::DownOnly);
+        g_modifierSession.replayedDown =
+            ReplayCapturedModifier(ModifierReplay::DownOnly) == 1;
     }
 
     INPUT inputs[2] = {};
@@ -2481,10 +2481,12 @@ static HookDisposition HandleKeyboardEvent(WPARAM message, const KBDLLHOOKSTRUCT
         !g_modifierSession.consumed &&
         !g_modifierSession.replayedDown)
     {
-        ReplayCapturedModifier(ModifierReplay::DownOnly);
-        g_modifierSession.absorbed = false;
-        g_modifierSession.pressed = false;
-        g_modifierSession.replayedDown = true;
+        if (ReplayCapturedModifier(ModifierReplay::DownOnly) == 1)
+        {
+            g_modifierSession.absorbed = false;
+            g_modifierSession.pressed = false;
+            g_modifierSession.replayedDown = true;
+        }
     }
 
     TrackHeldNonModifierKey(key.vkCode, message);
