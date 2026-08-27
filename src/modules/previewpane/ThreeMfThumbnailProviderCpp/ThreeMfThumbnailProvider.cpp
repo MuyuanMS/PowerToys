@@ -3,9 +3,11 @@
 
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <shellapi.h>
 #include <Shlwapi.h>
 #include <string>
+#include <wincodec.h>
 
 #include <wil/com.h>
 
@@ -16,6 +18,102 @@
 
 extern HINSTANCE g_hInst;
 extern long g_cDllRef;
+
+namespace
+{
+    HRESULT LoadPngAsArgbBitmap(const std::wstring& fileName, HBITMAP* bitmap)
+    {
+        if (!bitmap)
+        {
+            return E_INVALIDARG;
+        }
+
+        *bitmap = NULL;
+
+        wil::com_ptr<IWICImagingFactory> factory;
+        HRESULT result = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(factory.put()));
+        if (FAILED(result))
+        {
+            return result;
+        }
+
+        wil::com_ptr<IWICBitmapDecoder> decoder;
+        result = factory->CreateDecoderFromFilename(fileName.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, decoder.put());
+        if (FAILED(result))
+        {
+            return result;
+        }
+
+        wil::com_ptr<IWICBitmapFrameDecode> frame;
+        result = decoder->GetFrame(0, frame.put());
+        if (FAILED(result))
+        {
+            return result;
+        }
+
+        wil::com_ptr<IWICFormatConverter> converter;
+        result = factory->CreateFormatConverter(converter.put());
+        if (FAILED(result))
+        {
+            return result;
+        }
+
+        result = converter->Initialize(
+            frame.get(),
+            GUID_WICPixelFormat32bppPBGRA,
+            WICBitmapDitherTypeNone,
+            nullptr,
+            0.0,
+            WICBitmapPaletteTypeCustom);
+        if (FAILED(result))
+        {
+            return result;
+        }
+
+        UINT width = 0;
+        UINT height = 0;
+        result = converter->GetSize(&width, &height);
+        if (FAILED(result) || width == 0 || height == 0 ||
+            width > static_cast<UINT>((std::numeric_limits<LONG>::max)()) ||
+            height > static_cast<UINT>((std::numeric_limits<LONG>::max)()) ||
+            width > (std::numeric_limits<UINT>::max)() / 4)
+        {
+            return FAILED(result) ? result : E_FAIL;
+        }
+
+        const UINT stride = width * 4;
+        if (height > (std::numeric_limits<UINT>::max)() / stride)
+        {
+            return E_FAIL;
+        }
+
+        BITMAPINFO bitmapInfo{};
+        bitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        bitmapInfo.bmiHeader.biWidth = static_cast<LONG>(width);
+        bitmapInfo.bmiHeader.biHeight = -static_cast<LONG>(height);
+        bitmapInfo.bmiHeader.biPlanes = 1;
+        bitmapInfo.bmiHeader.biBitCount = 32;
+        bitmapInfo.bmiHeader.biCompression = BI_RGB;
+
+        void* pixels = nullptr;
+        HBITMAP dib = CreateDIBSection(nullptr, &bitmapInfo, DIB_RGB_COLORS, &pixels, nullptr, 0);
+        if (!dib || !pixels)
+        {
+            const DWORD error = GetLastError();
+            return HRESULT_FROM_WIN32(error == ERROR_SUCCESS ? ERROR_NOT_ENOUGH_MEMORY : error);
+        }
+
+        result = converter->CopyPixels(nullptr, stride, stride * height, static_cast<BYTE*>(pixels));
+        if (FAILED(result))
+        {
+            DeleteObject(dib);
+            return result;
+        }
+
+        *bitmap = dib;
+        return S_OK;
+    }
+}
 
 ThreeMfThumbnailProvider::ThreeMfThumbnailProvider() :
     m_cRef(1), m_pStream(NULL), m_process(NULL)
@@ -222,7 +320,7 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
 
             try
             {
-                Logger::trace(L"Start ThreeMfThumbnailProvider.exe");
+                Logger::info(L"Start ThreeMfThumbnailProvider.exe");
                 
                 STARTUPINFO info = { sizeof(info) };
                 std::wstring cmdLine{ L"\"" + fileName + L"\"" };
@@ -232,8 +330,8 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
                 std::wstring appPath = get_module_folderpath(g_hInst) + L"\\PowerToys.ThreeMfThumbnailProvider.exe";
 
                 // The worker writes its output next to the input using the same guid; compute it up
-                // front so every failure path can also remove a partially written BMP.
-                std::wstring fileNameBmp = filePath + guid + L".bmp";
+                // front so every failure path can also remove a partially written PNG.
+                std::wstring fileNamePng = filePath + guid + L".png";
 
                 SHELLEXECUTEINFO sei{ sizeof(sei) };
                 sei.fMask = { SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI };
@@ -266,9 +364,9 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
                     m_process = NULL;
                     std::filesystem::remove(fileName, ec);
 
-                    // The worker may have already created or partially written the output BMP before
+                    // The worker may have already created or partially written the output PNG before
                     // being terminated; remove it too so stale files cannot accumulate in LocalLow.
-                    std::filesystem::remove(fileNameBmp, ec);
+                    std::filesystem::remove(fileNamePng, ec);
                     return E_FAIL;
                 }
 
@@ -277,12 +375,13 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
 
                 std::filesystem::remove(fileName, ec);
 
-                if (std::filesystem::exists(fileNameBmp))
+                if (std::filesystem::exists(fileNamePng))
                 {
-                    HBITMAP hbmp = static_cast<HBITMAP>(LoadImage(NULL, fileNameBmp.c_str(), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE));
-                    std::filesystem::remove(fileNameBmp, ec);
+                    HBITMAP hbmp = NULL;
+                    HRESULT loadResult = LoadPngAsArgbBitmap(fileNamePng, &hbmp);
+                    std::filesystem::remove(fileNamePng, ec);
 
-                    if (hbmp == NULL)
+                    if (FAILED(loadResult) || hbmp == NULL)
                     {
                         Logger::error(L"Failed to load generated bitmap.");
                         return E_FAIL;
@@ -296,7 +395,7 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
                 }
                 else
                 {
-                    Logger::warn(L"Bmp file not generated.");
+                    Logger::warn(L"PNG file not generated.");
                     return E_FAIL;
                 }
             }
@@ -305,7 +404,7 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
                 m_process = NULL;
                 std::error_code ec;
                 std::filesystem::remove(fileName, ec);
-                std::filesystem::remove(filePath + guid + L".bmp", ec);
+                std::filesystem::remove(filePath + guid + L".png", ec);
                 std::wstring errorMessage = std::wstring{ winrt::to_hstring(e.what()) };
                 Logger::error(L"Failed to start ThreeMfThumbnailProvider.exe. Error: {}", errorMessage);
             }

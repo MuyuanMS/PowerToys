@@ -28,8 +28,8 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                     Bitmap thumbnail = _thumbnailProvider.GetThumbnail(cx);
                     if (thumbnail != null)
                     {
-                        filePath = filePath.Replace(".3mf", ".bmp", StringComparison.OrdinalIgnoreCase);
-                        thumbnail.Save(filePath, System.Drawing.Imaging.ImageFormat.Bmp);
+                        filePath = GetThumbnailPath(filePath);
+                        thumbnail.Save(filePath, System.Drawing.Imaging.ImageFormat.Png);
                     }
                 }
                 else
@@ -37,6 +37,11 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                     MessageBox.Show("ThreeMf thumbnail - wrong number of args: " + args.Length.ToString(CultureInfo.InvariantCulture));
                 }
             }
+        }
+
+        internal static string GetThumbnailPath(string filePath)
+        {
+            return Path.ChangeExtension(filePath, ".png");
         }
     }
 }

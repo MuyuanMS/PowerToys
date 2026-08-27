@@ -95,6 +95,40 @@ namespace ThreeMfThumbnailProviderUnitTests
         }
 
         [TestMethod]
+        public void GetThumbnailPrefersRelationshipThumbnailOverNamedFallback()
+        {
+            const string model =
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+                "<model unit=\"millimeter\" xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\">" +
+                "<resources><object id=\"1\" type=\"model\"><mesh>" +
+                "<vertices><vertex x=\"0\" y=\"0\" z=\"0\"/><vertex x=\"1\" y=\"0\" z=\"0\"/><vertex x=\"0\" y=\"1\" z=\"0\"/></vertices>" +
+                "<triangles><triangle v1=\"0\" v2=\"1\" v3=\"2\"/></triangles>" +
+                "</mesh></object></resources><build><item objectid=\"1\"/></build></model>";
+            using var stream = BuildPackage(
+                model,
+                CreatePng(64, 48, System.Drawing.Color.CornflowerBlue),
+                64,
+                48,
+                heuristicThumbnailPng: CreatePng(16, 12, System.Drawing.Color.Red));
+
+            using Bitmap thumbnail = ThreeMfThumbnailProvider.GetThumbnail(stream, 256);
+
+            Assert.IsNotNull(thumbnail);
+            Assert.AreEqual(64, thumbnail.Width);
+            Assert.AreEqual(48, thumbnail.Height);
+        }
+
+        [TestMethod]
+        public void GetThumbnailPathChangesOnlyTerminalExtension()
+        {
+            const string input = @"C:\profile.3mf\model.3mf";
+
+            string output = Program.GetThumbnailPath(input);
+
+            Assert.AreEqual(@"C:\profile.3mf\model.png", output);
+        }
+
+        [TestMethod]
         public void GetThumbnailFallsBackToMeshRenderingWhenNoEmbeddedThumbnail()
         {
             // Arrange: a mesh-only 3MF package (no embedded thumbnail image).
@@ -219,9 +253,9 @@ namespace ThreeMfThumbnailProviderUnitTests
                 "<model unit=\"millimeter\" xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\" " +
                 "xmlns:p=\"http://schemas.microsoft.com/3dmanufacturing/production/2015/06\">" +
                 (directBuildReference
-                    ? "<resources/><build><item objectid=\"10\" p:path=\"parts/part1.model\"/></build></model>"
+                    ? "<resources/><build><item objectid=\"10\" p:path=\"/3D/parts/part1.model\"/></build></model>"
                     : "<resources><object id=\"1\" type=\"model\"><components>" +
-                      "<component objectid=\"10\" p:path=\"parts/part1.model\"/>" +
+                      "<component objectid=\"10\" p:path=\"/3D/parts/part1.model\"/>" +
                       "</components></object></resources><build><item objectid=\"1\"/></build></model>");
 
             var partModel =
@@ -286,20 +320,7 @@ namespace ThreeMfThumbnailProviderUnitTests
                 "<triangles><triangle v1=\"0\" v2=\"1\" v3=\"2\"/></triangles>" +
                 "</mesh></object></resources><build><item objectid=\"1\"/></build></model>";
 
-            byte[] png;
-            using (var bmp = new Bitmap(width, height, PixelFormat.Format32bppArgb))
-            using (var pngStream = new MemoryStream())
-            {
-                using (var g = Graphics.FromImage(bmp))
-                {
-                    g.Clear(System.Drawing.Color.CornflowerBlue);
-                }
-
-                bmp.Save(pngStream, ImageFormat.Png);
-                png = pngStream.ToArray();
-            }
-
-            return BuildPackage(model, png, width, height);
+            return BuildPackage(model, CreatePng(width, height, System.Drawing.Color.CornflowerBlue), width, height);
         }
 
         private static MemoryStream BuildPackage(
@@ -308,7 +329,8 @@ namespace ThreeMfThumbnailProviderUnitTests
             int thumbnailWidth,
             int thumbnailHeight,
             string modelPath = "3D/3dmodel.model",
-            string relationshipTarget = "/3D/3dmodel.model")
+            string relationshipTarget = "/3D/3dmodel.model",
+            byte[] heuristicThumbnailPng = null)
         {
             _ = thumbnailWidth;
             _ = thumbnailHeight;
@@ -337,10 +359,28 @@ namespace ThreeMfThumbnailProviderUnitTests
                 {
                     WriteEntry(archive, "Auxiliaries/preview.png", thumbnailPng);
                 }
+
+                if (heuristicThumbnailPng != null)
+                {
+                    WriteEntry(archive, "Metadata/thumbnail.png", heuristicThumbnailPng);
+                }
             }
 
             package.Position = 0;
             return package;
+        }
+
+        private static byte[] CreatePng(int width, int height, System.Drawing.Color color)
+        {
+            using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+            using (var graphics = Graphics.FromImage(bitmap))
+            {
+                graphics.Clear(color);
+            }
+
+            using var stream = new MemoryStream();
+            bitmap.Save(stream, ImageFormat.Png);
+            return stream.ToArray();
         }
 
         private static void WriteEntry(ZipArchive archive, string path, byte[] content)

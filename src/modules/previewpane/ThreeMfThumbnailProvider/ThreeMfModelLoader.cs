@@ -186,9 +186,18 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
         private static ZipArchiveEntry FindThumbnailEntry(ZipArchive archive)
         {
-            // Prefer files actually named thumbnail* (e.g. Auxiliaries/.thumbnails/thumbnail_3mf.png).
-            // Slicer packages often also ship dark Metadata/plate_*.png previews and relationships that
-            // point at those plates; those are a last resort only.
+            foreach (var target in GetThumbnailTargetsFromRelationships(archive))
+            {
+                var entry = ResolveEntry(archive, target);
+                if (entry != null)
+                {
+                    return entry;
+                }
+            }
+
+            // Compatibility fallback for packages without a thumbnail relationship: prefer files
+            // actually named thumbnail* (e.g. Auxiliaries/.thumbnails/thumbnail_3mf.png), then other
+            // Metadata images.
             ZipArchiveEntry namedThumbnail = null;
             ZipArchiveEntry metadataFallback = null;
 
@@ -215,15 +224,6 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             if (namedThumbnail != null)
             {
                 return namedThumbnail;
-            }
-
-            foreach (var target in GetThumbnailTargetsFromRelationships(archive))
-            {
-                var entry = ResolveEntry(archive, target);
-                if (entry != null)
-                {
-                    return entry;
-                }
             }
 
             return metadataFallback;
@@ -597,10 +597,9 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                     // Component transform is applied first, then the parent transform (row-vector convention).
                     var combined = childTransform.HasValue ? childTransform.Value * transform : transform;
 
-                    // 3MF Production Extension: a component may carry a p:path attribute referencing an
-                    // object in another .model part (matched by local name + non-core namespace so we do
-                    // not depend on the exact production namespace version). Resolve into that part;
-                    // otherwise the reference is same-part.
+                    // 3MF Production Extension: a component may carry a p:path attribute in the
+                    // standardized Production namespace referencing an object in another .model part.
+                    // Resolve into that part; otherwise the reference is same-part.
                     var pathValue = GetExternalPartPath(component, part.CoreNamespace);
 
                     var targetPart = string.IsNullOrWhiteSpace(pathValue)
