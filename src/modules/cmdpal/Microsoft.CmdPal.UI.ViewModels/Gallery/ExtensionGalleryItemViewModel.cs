@@ -64,9 +64,6 @@ public sealed partial class ExtensionGalleryItemViewModel : ObservableObject
     // Backs Cancel while a jsonrpc install or uninstall is running.
     private CancellationTokenSource? _jsonRpcActionCts;
 
-    // Backs Cancel while a jsonrpc install or uninstall is running.
-    private CancellationTokenSource? _jsonRpcActionCts;
-
     public ExtensionGalleryItemViewModel(
         GalleryExtensionEntry entry,
         ILogger<ExtensionGalleryItemViewModel> logger,
