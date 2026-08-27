@@ -128,7 +128,15 @@ public partial class TabbedPageViewModel : PageViewModel
         return result;
     }
 
-    private static bool PageIsSearchable(IPage? page) => page is IListPage or IParametersPage;
+    private static bool PageIsSearchable(IPage? page) => page is IListPage;
+
+    public void SetActive(bool isActive)
+    {
+        if (ActiveChild is not null)
+        {
+            ActiveChild.IsActive = isActive;
+        }
+    }
 
     //// Dynamic tab set: re-read GetTabs() and preserve the active tab by identity ////
     private void Model_ItemsChanged(object sender, IItemsChangedEventArgs args)

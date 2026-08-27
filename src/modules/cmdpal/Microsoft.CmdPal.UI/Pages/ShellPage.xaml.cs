@@ -916,6 +916,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         {
             ListPage listPage => listPage.ViewModel?.Title,
             ContentPage contentPage => contentPage.ViewModel?.Title,
+            Microsoft.CmdPal.UI.TabbedPage tabbedPage => tabbedPage.ViewModel?.Title,
             _ => null,
         };
 

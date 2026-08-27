@@ -58,6 +58,7 @@ public sealed partial class TabbedPage : Page
         }
 
         ViewModel = tabbedPageViewModel;
+        ViewModel.SetActive(true);
 
         base.OnNavigatedTo(e);
     }
@@ -65,6 +66,7 @@ public sealed partial class TabbedPage : Page
     protected override void OnNavigatingFrom(NavigatingCancelEventArgs e)
     {
         base.OnNavigatingFrom(e);
+        ViewModel?.SetActive(false);
 
         if (e.NavigationMode != NavigationMode.New)
         {
