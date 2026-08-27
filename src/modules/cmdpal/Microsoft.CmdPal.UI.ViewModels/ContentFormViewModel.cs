@@ -148,6 +148,13 @@ public partial class ContentFormViewModel(IFormContent _form, WeakReference<IPag
         UpdateProperty(propertyName);
     }
 
+    internal static string GetActionData(IAdaptiveActionElement action) => action switch
+    {
+        AdaptiveSubmitAction submitAction => submitAction.DataJson.Stringify(),
+        AdaptiveExecuteAction executeAction => executeAction.DataJson.Stringify(),
+        _ => string.Empty,
+    };
+
     [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(AdaptiveOpenUrlAction))]
     [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(AdaptiveSubmitAction))]
     [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(AdaptiveExecuteAction))]
@@ -162,7 +169,7 @@ public partial class ContentFormViewModel(IFormContent _form, WeakReference<IPag
         if (action is AdaptiveSubmitAction or AdaptiveExecuteAction)
         {
             // Get the data and inputs
-            var dataString = (action as AdaptiveSubmitAction)?.DataJson.Stringify() ?? string.Empty;
+            var dataString = GetActionData(action);
             var inputString = inputs.Stringify();
 
             _ = Task.Run(() =>
