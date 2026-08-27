@@ -25,6 +25,9 @@ internal sealed partial class NowDockBand : ListItem, IDisposable
     private readonly object _updateLock = new();
     private readonly OpenUrlCommand _notificationCenterCommand;
     private readonly NoOpCommand _noOpCommand;
+    private int _timerConfigurationGeneration;
+    private System.Timers.ElapsedEventHandler? _timerElapsedHandler;
+    private System.Timers.ElapsedEventHandler? _timerElapsedFirstMinuteTickHandler;
     private bool _timeWithSeconds;
     private bool _disposed;
     private (bool Seconds, int DateMode, string CustomFormat, bool NotificationCenter, int FirstWeek, int FirstDay) _appliedSettings;
@@ -120,14 +123,25 @@ internal sealed partial class NowDockBand : ListItem, IDisposable
 
     private void ConfigureTimerCore()
     {
+        var configurationGeneration = ++_timerConfigurationGeneration;
         _timer.Stop();
-        _timer.Elapsed -= Timer_Elapsed;
-        _timer.Elapsed -= Timer_ElapsedFirstMinuteTick;
+        if (_timerElapsedHandler is not null)
+        {
+            _timer.Elapsed -= _timerElapsedHandler;
+            _timerElapsedHandler = null;
+        }
+
+        if (_timerElapsedFirstMinuteTickHandler is not null)
+        {
+            _timer.Elapsed -= _timerElapsedFirstMinuteTickHandler;
+            _timerElapsedFirstMinuteTickHandler = null;
+        }
 
         if (_timeWithSeconds)
         {
             _timer.Interval = PerSecondUpdateInterval.TotalMilliseconds;
-            _timer.Elapsed += Timer_Elapsed;
+            _timerElapsedHandler = (sender, e) => Timer_Elapsed(sender, e, configurationGeneration);
+            _timer.Elapsed += _timerElapsedHandler;
         }
         else
         {
@@ -135,17 +149,18 @@ internal sealed partial class NowDockBand : ListItem, IDisposable
             // exactly when the system clock does, then fall back to a per-minute cadence.
             var now = _clock();
             _timer.Interval = PerMinuteUpdateInterval.TotalMilliseconds - ((now.Second * 1000) + now.Millisecond);
-            _timer.Elapsed += Timer_ElapsedFirstMinuteTick;
+            _timerElapsedFirstMinuteTickHandler = (sender, e) => Timer_ElapsedFirstMinuteTick(sender, e, configurationGeneration);
+            _timer.Elapsed += _timerElapsedFirstMinuteTickHandler;
         }
 
         _timer.Start();
     }
 
-    private void Timer_ElapsedFirstMinuteTick(object? sender, System.Timers.ElapsedEventArgs e)
+    private void Timer_ElapsedFirstMinuteTick(object? sender, System.Timers.ElapsedEventArgs e, int configurationGeneration)
     {
         lock (_updateLock)
         {
-            if (_disposed)
+            if (_disposed || configurationGeneration != _timerConfigurationGeneration)
             {
                 return;
             }
@@ -153,8 +168,14 @@ internal sealed partial class NowDockBand : ListItem, IDisposable
             if (sender is System.Timers.Timer timer)
             {
                 timer.Interval = PerMinuteUpdateInterval.TotalMilliseconds;
-                timer.Elapsed -= Timer_ElapsedFirstMinuteTick;
-                timer.Elapsed += Timer_Elapsed;
+                if (_timerElapsedFirstMinuteTickHandler is not null)
+                {
+                    timer.Elapsed -= _timerElapsedFirstMinuteTickHandler;
+                    _timerElapsedFirstMinuteTickHandler = null;
+                }
+
+                _timerElapsedHandler = (currentSender, currentEventArgs) => Timer_Elapsed(currentSender, currentEventArgs, configurationGeneration);
+                timer.Elapsed += _timerElapsedHandler;
             }
 
             UpdateTextCore();
@@ -163,9 +184,19 @@ internal sealed partial class NowDockBand : ListItem, IDisposable
         _onUpdated?.Invoke();
     }
 
-    private void Timer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    private void Timer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e, int configurationGeneration)
     {
-        UpdateText();
+        lock (_updateLock)
+        {
+            if (_disposed || configurationGeneration != _timerConfigurationGeneration)
+            {
+                return;
+            }
+
+            UpdateTextCore();
+        }
+
+        _onUpdated?.Invoke();
     }
 
     internal void UpdateText()
