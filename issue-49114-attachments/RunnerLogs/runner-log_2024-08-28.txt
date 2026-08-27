@@ -1,0 +1,78 @@
+[2024-08-28 08:47:46.819507] [p-14980] [t-11604] [info] runner logger is initialized
+[2024-08-28 08:47:46.819632] [p-14980] [t-11604] [info] Running powertoys with cmd args: 
+[2024-08-28 08:47:46.836306] [p-14980] [t-11604] [info] Scoobe: product_version=v0.82.1 last_version_run=v0.82.1
+[2024-08-28 08:47:46.845478] [p-14980] [t-11604] [info] apply_general_settings: {"startup":true,"enabled":{"AdvancedPaste":true,"AlwaysOnTop":true,"Awake":true,"CmdNotFound":false,"ColorPicker":true,"CropAndLock":true,"EnvironmentVariables":true,"FancyZones":true,"File Explorer":true,"File Locksmith":true,"FindMyMouse":true,"Hosts":true,"Image Resizer":true,"Keyboard Manager":false,"Measure Tool":true,"MouseHighlighter":true,"MouseJump":false,"MousePointerCrosshairs":false,"MouseWithoutBorders":true,"Peek":true,"PowerRename":true,"PowerToys Run":true,"QuickAccent":false,"RegistryPreview":true,"Shortcut Guide":true,"TextExtractor":false,"Video Conference":true},"is_elevated":false,"run_elevated":false,"show_new_updates_toast_notification":true,"download_updates_automatically":true,"show_whats_new_after_updates":true,"enable_experimentation":true,"is_admin":true,"enable_warnings_elevated_apps":true,"theme":"system","system_theme":"light","powertoys_version":"v0.82.1"}
+[2024-08-28 08:47:46.895597] [p-14980] [t-11604] [info] Runner is starting. Elevated=false openOobe=false openScoobe=false showRestartNotificationAfterUpdate=false
+[2024-08-28 08:47:46.949838] [p-14980] [t-11604] [trace] UnRegister hotkey action for FancyZones
+[2024-08-28 08:47:46.979494] [p-14980] [t-11604] [trace] UnRegister hotkey action for File Explorer
+[2024-08-28 08:47:46.985761] [p-14980] [t-11604] [trace] UnRegister hotkey action for Image Resizer
+[2024-08-28 08:47:47.013179] [p-14980] [t-11604] [trace] UnRegister hotkey action for Keyboard Manager
+[2024-08-28 08:47:47.030271] [p-14980] [t-11604] [trace] UnRegister hotkey action for PowerToys Run
+[2024-08-28 08:47:47.030451] [p-14980] [t-11604] [trace] Register hotkey action for PowerToys Run
+[2024-08-28 08:47:47.094829] [p-14980] [t-11604] [trace] UnRegister hotkey action for PowerRename
+[2024-08-28 08:47:47.207626] [p-14980] [t-11604] [trace] UnRegister hotkey action for Shortcut Guide
+[2024-08-28 08:47:47.244517] [p-14980] [t-11604] [trace] UnRegister hotkey action for ColorPicker
+[2024-08-28 08:47:47.275691] [p-14980] [t-11604] [trace] Register hotkey action for ColorPicker
+[2024-08-28 08:47:47.323868] [p-14980] [t-11604] [trace] UnRegister hotkey action for Awake
+[2024-08-28 08:47:47.433468] [p-14980] [t-11604] [trace] UnRegister hotkey action for FindMyMouse
+[2024-08-28 08:47:47.583811] [p-14980] [t-11604] [trace] UnRegister hotkey action for MouseHighlighter
+[2024-08-28 08:47:47.598266] [p-14980] [t-11604] [trace] UnRegister hotkey action for MouseJump
+[2024-08-28 08:47:47.619035] [p-14980] [t-11604] [trace] Register hotkey action for MouseJump
+[2024-08-28 08:47:47.629870] [p-14980] [t-11604] [trace] UnRegister hotkey action for AlwaysOnTop
+[2024-08-28 08:47:47.633984] [p-14980] [t-11604] [trace] Register hotkey action for AlwaysOnTop
+[2024-08-28 08:47:47.644574] [p-14980] [t-11604] [trace] UnRegister hotkey action for MousePointerCrosshairs
+[2024-08-28 08:47:47.685242] [p-14980] [t-11604] [trace] UnRegister hotkey action for QuickAccent
+[2024-08-28 08:47:47.704812] [p-14980] [t-11604] [trace] UnRegister hotkey action for TextExtractor
+[2024-08-28 08:47:47.704989] [p-14980] [t-11604] [trace] Register hotkey action for TextExtractor
+[2024-08-28 08:47:47.721847] [p-14980] [t-11604] [trace] UnRegister hotkey action for AdvancedPaste
+[2024-08-28 08:47:47.775043] [p-14980] [t-11604] [trace] Register hotkey action for AdvancedPaste
+[2024-08-28 08:47:47.790983] [p-14980] [t-11604] [trace] Register hotkey action for AdvancedPaste
+[2024-08-28 08:47:47.791151] [p-14980] [t-11604] [trace] Register hotkey action for AdvancedPaste
+[2024-08-28 08:47:47.791381] [p-14980] [t-11604] [trace] Register hotkey action for AdvancedPaste
+[2024-08-28 08:47:47.818526] [p-14980] [t-11604] [trace] UnRegister hotkey action for File Locksmith
+[2024-08-28 08:47:47.856636] [p-14980] [t-11604] [trace] UnRegister hotkey action for RegistryPreview
+[2024-08-28 08:47:47.885078] [p-14980] [t-11604] [trace] UnRegister hotkey action for Measure Tool
+[2024-08-28 08:47:47.901260] [p-14980] [t-11604] [trace] Register hotkey action for Measure Tool
+[2024-08-28 08:47:47.907417] [p-14980] [t-11604] [trace] UnRegister hotkey action for Hosts
+[2024-08-28 08:47:47.921197] [p-14980] [t-11604] [trace] UnRegister hotkey action for Peek
+[2024-08-28 08:47:47.921437] [p-14980] [t-11604] [trace] Register hotkey action for Peek
+[2024-08-28 08:47:47.928650] [p-14980] [t-11604] [trace] UnRegister hotkey action for EnvironmentVariables
+[2024-08-28 08:47:47.987404] [p-14980] [t-11604] [trace] UnRegister hotkey action for MouseWithoutBorders
+[2024-08-28 08:47:48.008891] [p-14980] [t-11604] [trace] UnRegister hotkey action for CropAndLock
+[2024-08-28 08:47:48.009241] [p-14980] [t-11604] [trace] Register hotkey action for CropAndLock
+[2024-08-28 08:47:48.009449] [p-14980] [t-11604] [trace] Register hotkey action for CropAndLock
+[2024-08-28 08:47:48.017879] [p-14980] [t-11604] [trace] UnRegister hotkey action for CmdNotFound
+[2024-08-28 08:47:48.080686] [p-14980] [t-11604] [trace] UnRegister hotkey action for Video Conference
+[2024-08-28 08:47:48.084797] [p-14980] [t-11604] [info] start_enabled_powertoys: Powertoy QuickAccent explicitly disabled
+[2024-08-28 08:47:48.086136] [p-14980] [t-4436] [trace] Discovered new version v0.83.0
+[2024-08-28 08:47:48.103108] [p-14980] [t-4436] [trace] New version is already downloaded
+[2024-08-28 08:47:48.102869] [p-14980] [t-11604] [info] start_enabled_powertoys: Overriding default enabled value for Video Conference powertoy
+[2024-08-28 08:47:48.103449] [p-14980] [t-11604] [info] start_enabled_powertoys: Powertoy MousePointerCrosshairs explicitly disabled
+[2024-08-28 08:47:48.103692] [p-14980] [t-11604] [info] start_enabled_powertoys: Powertoy Keyboard Manager explicitly disabled
+[2024-08-28 08:47:48.103903] [p-14980] [t-11604] [info] start_enabled_powertoys: Powertoy TextExtractor explicitly disabled
+[2024-08-28 08:47:48.104697] [p-14980] [t-11604] [info] start_enabled_powertoys: Overriding default enabled value for MouseWithoutBorders powertoy
+[2024-08-28 08:47:48.104946] [p-14980] [t-11604] [info] start_enabled_powertoys: Powertoy CmdNotFound explicitly disabled
+[2024-08-28 08:47:48.105139] [p-14980] [t-11604] [info] start_enabled_powertoys: Powertoy MouseJump explicitly disabled
+[2024-08-28 08:47:48.105303] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy AdvancedPaste
+[2024-08-28 08:47:48.439866] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy AlwaysOnTop
+[2024-08-28 08:47:48.488600] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy Awake
+[2024-08-28 08:47:48.510196] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy ColorPicker
+[2024-08-28 08:47:48.568899] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy CropAndLock
+[2024-08-28 08:47:48.626175] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy EnvironmentVariables
+[2024-08-28 08:47:48.639122] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy FancyZones
+[2024-08-28 08:47:48.667263] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy File Explorer
+[2024-08-28 08:47:48.685805] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy File Locksmith
+[2024-08-28 08:47:48.759917] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy FindMyMouse
+[2024-08-28 08:47:48.760188] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy Hosts
+[2024-08-28 08:47:48.760412] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy Image Resizer
+[2024-08-28 08:47:48.810401] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy Measure Tool
+[2024-08-28 08:47:48.814731] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy MouseHighlighter
+[2024-08-28 08:47:48.816408] [p-14980] [t-11604] [trace] shift+win+H shortcut registered
+[2024-08-28 08:47:48.817395] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy MouseWithoutBorders
+[2024-08-28 08:47:48.838231] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy Peek
+[2024-08-28 08:47:49.036866] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy PowerRename
+[2024-08-28 08:47:49.068730] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy PowerToys Run
+[2024-08-28 08:47:49.202516] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy RegistryPreview
+[2024-08-28 08:47:49.203288] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy Shortcut Guide
+[2024-08-28 08:47:49.203563] [p-14980] [t-11604] [trace] shift+win+/ shortcut registered
+[2024-08-28 08:47:49.203715] [p-14980] [t-11604] [info] start_enabled_powertoys: Enabling powertoy Video Conference

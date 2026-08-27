@@ -1,0 +1,121 @@
+[2025-01-08 08:53:14.834421] [p-1300] [t-1304] [info] runner logger is initialized
+[2025-01-08 08:53:14.834508] [p-1300] [t-1304] [info] Running powertoys with cmd args: 
+[2025-01-08 08:53:14.852728] [p-1300] [t-1304] [info] Scoobe: product_version=v0.82.1 last_version_run=v0.82.1
+[2025-01-08 08:53:14.872293] [p-1300] [t-1304] [info] apply_general_settings: {"startup":true,"enabled":{"AdvancedPaste":true,"AlwaysOnTop":true,"Awake":true,"CmdNotFound":false,"ColorPicker":true,"CropAndLock":true,"EnvironmentVariables":true,"FancyZones":true,"File Explorer":true,"File Locksmith":true,"FindMyMouse":true,"Hosts":true,"Image Resizer":true,"Keyboard Manager":false,"Measure Tool":true,"MouseHighlighter":true,"MouseJump":false,"MousePointerCrosshairs":false,"MouseWithoutBorders":true,"Peek":true,"PowerRename":true,"PowerToys Run":true,"QuickAccent":true,"RegistryPreview":true,"Shortcut Guide":true,"TextExtractor":false,"Video Conference":true},"is_elevated":false,"run_elevated":false,"show_new_updates_toast_notification":true,"download_updates_automatically":true,"show_whats_new_after_updates":true,"enable_experimentation":true,"is_admin":true,"enable_warnings_elevated_apps":true,"theme":"system","system_theme":"dark","powertoys_version":"v0.82.1"}
+[2025-01-08 08:53:15.017495] [p-1300] [t-1304] [info] Runner is starting. Elevated=false openOobe=false openScoobe=false showRestartNotificationAfterUpdate=false
+[2025-01-08 08:53:15.169351] [p-1300] [t-1304] [trace] UnRegister hotkey action for FancyZones
+[2025-01-08 08:53:15.324927] [p-1300] [t-1304] [trace] UnRegister hotkey action for File Explorer
+[2025-01-08 08:53:15.449272] [p-1300] [t-1304] [trace] UnRegister hotkey action for Image Resizer
+[2025-01-08 08:53:15.489309] [p-1300] [t-1304] [trace] UnRegister hotkey action for Keyboard Manager
+[2025-01-08 08:53:15.547991] [p-1300] [t-1304] [trace] UnRegister hotkey action for PowerToys Run
+[2025-01-08 08:53:15.548208] [p-1300] [t-1304] [trace] Register hotkey action for PowerToys Run
+[2025-01-08 08:53:15.581163] [p-1300] [t-1304] [trace] UnRegister hotkey action for PowerRename
+[2025-01-08 08:53:15.651848] [p-1300] [t-1304] [trace] UnRegister hotkey action for Shortcut Guide
+[2025-01-08 08:53:15.812944] [p-1300] [t-1304] [trace] UnRegister hotkey action for ColorPicker
+[2025-01-08 08:53:15.828504] [p-1300] [t-1304] [trace] Register hotkey action for ColorPicker
+[2025-01-08 08:53:15.903667] [p-1300] [t-1304] [trace] UnRegister hotkey action for Awake
+[2025-01-08 08:53:16.003593] [p-1300] [t-1304] [trace] UnRegister hotkey action for FindMyMouse
+[2025-01-08 08:53:16.131702] [p-1300] [t-1304] [trace] UnRegister hotkey action for MouseHighlighter
+[2025-01-08 08:53:16.194233] [p-1300] [t-1304] [trace] UnRegister hotkey action for MouseJump
+[2025-01-08 08:53:16.194505] [p-1300] [t-1304] [trace] Register hotkey action for MouseJump
+[2025-01-08 08:53:16.254495] [p-1300] [t-1304] [trace] UnRegister hotkey action for AlwaysOnTop
+[2025-01-08 08:53:16.255057] [p-1300] [t-1304] [trace] Register hotkey action for AlwaysOnTop
+[2025-01-08 08:53:16.299063] [p-1300] [t-1304] [trace] UnRegister hotkey action for MousePointerCrosshairs
+[2025-01-08 08:53:16.368098] [p-1300] [t-1304] [trace] UnRegister hotkey action for QuickAccent
+[2025-01-08 08:53:16.387777] [p-1300] [t-1304] [trace] UnRegister hotkey action for TextExtractor
+[2025-01-08 08:53:16.387961] [p-1300] [t-1304] [trace] Register hotkey action for TextExtractor
+[2025-01-08 08:53:16.424459] [p-1300] [t-1304] [trace] UnRegister hotkey action for AdvancedPaste
+[2025-01-08 08:53:16.424958] [p-1300] [t-1304] [trace] Register hotkey action for AdvancedPaste
+[2025-01-08 08:53:16.425307] [p-1300] [t-1304] [trace] Register hotkey action for AdvancedPaste
+[2025-01-08 08:53:16.425401] [p-1300] [t-1304] [trace] Register hotkey action for AdvancedPaste
+[2025-01-08 08:53:16.425442] [p-1300] [t-1304] [trace] Register hotkey action for AdvancedPaste
+[2025-01-08 08:53:16.579608] [p-1300] [t-1304] [trace] UnRegister hotkey action for File Locksmith
+[2025-01-08 08:53:16.651336] [p-1300] [t-1304] [trace] UnRegister hotkey action for RegistryPreview
+[2025-01-08 08:53:16.706103] [p-1300] [t-1304] [trace] UnRegister hotkey action for Measure Tool
+[2025-01-08 08:53:16.722614] [p-1300] [t-1304] [trace] Register hotkey action for Measure Tool
+[2025-01-08 08:53:16.737227] [p-1300] [t-1304] [trace] UnRegister hotkey action for Hosts
+[2025-01-08 08:53:16.758980] [p-1300] [t-1304] [trace] UnRegister hotkey action for Peek
+[2025-01-08 08:53:16.759140] [p-1300] [t-1304] [trace] Register hotkey action for Peek
+[2025-01-08 08:53:16.774281] [p-1300] [t-1304] [trace] UnRegister hotkey action for EnvironmentVariables
+[2025-01-08 08:53:16.858483] [p-1300] [t-1304] [trace] UnRegister hotkey action for MouseWithoutBorders
+[2025-01-08 08:53:16.908858] [p-1300] [t-1304] [trace] UnRegister hotkey action for CropAndLock
+[2025-01-08 08:53:16.908980] [p-1300] [t-1304] [trace] Register hotkey action for CropAndLock
+[2025-01-08 08:53:16.909150] [p-1300] [t-1304] [trace] Register hotkey action for CropAndLock
+[2025-01-08 08:53:16.931959] [p-1300] [t-1304] [trace] UnRegister hotkey action for CmdNotFound
+[2025-01-08 08:53:17.033768] [p-1300] [t-1304] [trace] UnRegister hotkey action for Video Conference
+[2025-01-08 08:53:17.034597] [p-1300] [t-1304] [info] start_enabled_powertoys: Overriding default enabled value for QuickAccent powertoy
+[2025-01-08 08:53:17.034794] [p-1300] [t-1304] [info] start_enabled_powertoys: Overriding default enabled value for Video Conference powertoy
+[2025-01-08 08:53:17.034918] [p-1300] [t-1304] [info] start_enabled_powertoys: Powertoy MousePointerCrosshairs explicitly disabled
+[2025-01-08 08:53:17.034970] [p-1300] [t-1304] [info] start_enabled_powertoys: Powertoy Keyboard Manager explicitly disabled
+[2025-01-08 08:53:17.035174] [p-1300] [t-1304] [info] start_enabled_powertoys: Powertoy TextExtractor explicitly disabled
+[2025-01-08 08:53:17.035699] [p-1300] [t-1304] [info] start_enabled_powertoys: Overriding default enabled value for MouseWithoutBorders powertoy
+[2025-01-08 08:53:17.035811] [p-1300] [t-1304] [info] start_enabled_powertoys: Powertoy CmdNotFound explicitly disabled
+[2025-01-08 08:53:17.035892] [p-1300] [t-1304] [info] start_enabled_powertoys: Powertoy MouseJump explicitly disabled
+[2025-01-08 08:53:17.035935] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy AdvancedPaste
+[2025-01-08 08:53:17.221891] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy AlwaysOnTop
+[2025-01-08 08:53:17.279539] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy Awake
+[2025-01-08 08:53:17.316891] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy ColorPicker
+[2025-01-08 08:53:17.359522] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy CropAndLock
+[2025-01-08 08:53:17.409307] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy EnvironmentVariables
+[2025-01-08 08:53:17.438613] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy FancyZones
+[2025-01-08 08:53:17.520529] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy File Explorer
+[2025-01-08 08:53:17.532766] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy File Locksmith
+[2025-01-08 08:53:17.554036] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy FindMyMouse
+[2025-01-08 08:53:17.555339] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy Hosts
+[2025-01-08 08:53:17.556137] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy Image Resizer
+[2025-01-08 08:53:17.579667] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy Measure Tool
+[2025-01-08 08:53:17.595027] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy MouseHighlighter
+[2025-01-08 08:53:17.597776] [p-1300] [t-1304] [trace] shift+win+H shortcut registered
+[2025-01-08 08:53:17.598003] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy MouseWithoutBorders
+[2025-01-08 08:53:17.612911] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy Peek
+[2025-01-08 08:53:17.742923] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy PowerRename
+[2025-01-08 08:53:17.763768] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy PowerToys Run
+[2025-01-08 08:53:17.844804] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy QuickAccent
+[2025-01-08 08:53:17.857805] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy RegistryPreview
+[2025-01-08 08:53:17.861993] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy Shortcut Guide
+[2025-01-08 08:53:17.877172] [p-1300] [t-1304] [trace] shift+win+/ shortcut registered
+[2025-01-08 08:53:17.877420] [p-1300] [t-1304] [info] start_enabled_powertoys: Enabling powertoy Video Conference
+[2025-01-08 09:42:04.507529] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 11:03:47.565319] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 11:21:30.360592] [p-1300] [t-1304] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook
+[2025-01-08 12:05:02.318111] [p-1300] [t-1304] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook
+[2025-01-08 12:40:19.154201] [p-1300] [t-1304] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook
+[2025-01-08 12:40:24.582369] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 12:40:36.617005] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 12:40:49.932284] [p-1300] [t-1304] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook
+[2025-01-08 12:41:05.132388] [p-1300] [t-1304] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook
+[2025-01-08 12:44:40.199854] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 12:45:19.694342] [p-1300] [t-1304] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook
+[2025-01-08 12:47:52.977208] [p-1300] [t-1304] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook
+[2025-01-08 12:49:24.869380] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 12:50:04.244443] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 13:05:36.558503] [p-1300] [t-1304] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook
+[2025-01-08 13:10:55.992809] [p-1300] [t-1304] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook
+[2025-01-08 14:34:00.826041] [p-1300] [t-1304] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook
+[2025-01-08 14:36:07.094630] [p-1300] [t-1304] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook
+[2025-01-08 14:58:07.835271] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 16:42:09.000734] [p-1300] [t-1304] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook
+[2025-01-08 16:42:10.816723] [p-1300] [t-1304] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook
+[2025-01-08 16:42:12.220928] [p-1300] [t-1304] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook
+[2025-01-08 17:22:28.898854] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 17:33:40.914290] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 17:33:41.708338] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 17:43:01.642578] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 17:43:03.622850] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 17:44:09.057805] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 17:46:53.009178] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 17:49:14.456574] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 17:49:27.618090] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 17:49:48.270872] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 17:52:10.126591] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 17:55:28.285801] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 17:57:48.112347] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 18:10:07.186980] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 18:18:52.105055] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 18:19:22.552565] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 18:19:51.976646] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 18:20:14.935924] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 18:20:16.358697] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 18:20:25.981307] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 18:20:31.147456] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-01-08 18:21:27.094180] [p-1300] [t-1304] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook

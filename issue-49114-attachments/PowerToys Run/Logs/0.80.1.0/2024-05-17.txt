@@ -1,0 +1,596 @@
+[2024-05-17 09:35:55.6952] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::55]
+Starting PowerToys Run with PID=1232
+
+[2024-05-17 09:35:55.7141] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::66]
+Runner pid=13668
+
+[2024-05-17 09:35:56.2780] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::108]
+On Startup.
+
+[2024-05-17 09:35:56.3610] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\ImageCache.json>
+
+[2024-05-17 09:35:56.4235] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+ImageLoader.Initialize - Preload images cost <1ms>
+
+[2024-05-17 09:35:56.4235] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Image\ImageLoader.cs::99]
+Number of preload images is <0>, Images Number: 2, Unique Items 2
+
+[2024-05-17 09:35:56.4518] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\PowerToysRunSettings.json>
+
+[2024-05-17 09:35:56.4825] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Pinyin.json>
+
+[2024-05-17 09:35:56.5635] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+|Wox.Infrastructure.Alphabet.Initialize|Preload pinyin cache <82ms>
+
+[2024-05-17 09:35:56.5635] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Alphabet.cs::46]
+Number of preload pinyin combination<0>
+
+[2024-05-17 09:35:56.5711] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\QueryHistory.json>
+
+[2024-05-17 09:35:56.5711] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\UserSelectedRecord.json>
+
+[2024-05-17 09:35:56.8779] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Calculator> is <132ms>
+
+[2024-05-17 09:35:57.0345] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Folder> is <151ms>
+
+[2024-05-17 09:35:57.1155] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <History> is <71ms>
+
+[2024-05-17 09:35:57.2878] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Windows Indexer> is <168ms>
+
+[2024-05-17 09:35:57.3618] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <OneNote> is <66ms>
+
+[2024-05-17 09:35:57.5056] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <PowerToys> is <138ms>
+
+[2024-05-17 09:35:58.9844] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Program\ProgramPluginSettings.json>
+
+[2024-05-17 09:35:59.0317] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Program> is <1516ms>
+
+[2024-05-17 09:35:59.1892] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Registry> is <146ms>
+
+[2024-05-17 09:35:59.5176] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Service> is <319ms>
+
+[2024-05-17 09:35:59.6922] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Shell\ShellPluginSettings.json>
+
+[2024-05-17 09:35:59.6922] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Shell> is <183ms>
+
+[2024-05-17 09:36:00.0422] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <System Commands> is <327ms>
+
+[2024-05-17 09:36:00.2647] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Time and date> is <212ms>
+
+[2024-05-17 09:36:00.3940] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Unit Converter> is <119ms>
+
+[2024-05-17 09:36:00.4985] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Uri\UriSettings.json>
+
+[2024-05-17 09:36:00.5127] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Windows Uri Handler> is <107ms>
+
+[2024-05-17 09:36:00.8904] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <ValueGenerator> is <370ms>
+
+[2024-05-17 09:36:01.1112] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <VS Code Workspaces> is <208ms>
+
+[2024-05-17 09:36:01.1773] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Web Search> is <61ms>
+
+[2024-05-17 09:36:01.4139] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Windows Settings> is <226ms>
+
+[2024-05-17 09:36:01.5869] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Windows Terminal> is <162ms>
+
+[2024-05-17 09:36:01.8295] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Window Walker> is <230ms>
+
+[2024-05-17 09:36:03.9017] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\SettingsReader.cs::87]
+Successfully read new settings. retryCount=1
+
+[2024-05-17 09:36:03.9017] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Shell\ShellPluginSettings.json>
+
+[2024-05-17 09:36:04.0235] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Calculator> is <134ms>
+
+[2024-05-17 09:36:04.0235] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <ValueGenerator> is <370ms>
+
+[2024-05-17 09:36:04.0235] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <System Commands> is <331ms>
+
+[2024-05-17 09:36:04.0235] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Shell> is <189ms>
+
+[2024-05-17 09:36:04.0235] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Windows Uri Handler> is <112ms>
+
+[2024-05-17 09:36:04.0235] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Registry> is <152ms>
+
+[2024-05-17 09:36:04.0235] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Window Walker> is <230ms>
+
+[2024-05-17 09:36:04.0235] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <History> is <77ms>
+
+[2024-05-17 09:36:04.0235] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Time and date> is <219ms>
+
+[2024-05-17 09:36:04.0235] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Unit Converter> is <126ms>
+
+[2024-05-17 09:36:04.0235] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Service> is <328ms>
+
+[2024-05-17 09:36:04.0235] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Indexer\IndexerSettings.json>
+
+[2024-05-17 09:36:04.0235] [WARN] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\Common\DefaultBrowserInfo.cs::73]
+I've tried updating the chosen Web Browser info at least once.
+
+[2024-05-17 09:36:04.0235] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Web Search> is <70ms>
+
+[2024-05-17 09:36:04.0367] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Folder\FolderSettings.json>
+
+[2024-05-17 09:36:04.0607] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Windows Settings> is <261ms>
+
+[2024-05-17 09:36:04.0607] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <PowerToys> is <178ms>
+
+[2024-05-17 09:36:04.0695] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Windows Indexer> is <216ms>
+
+[2024-05-17 09:36:04.0695] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Folder> is <210ms>
+
+[2024-05-17 09:36:07.7750] [ERROR] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\ShellLinkHelper.cs::169]
+-------------------------- Begin exception --------------------------
+Message: Failed to fetch description for C:\Windows\syswow64\odbcad32.exe, Error HRESULT E_FAIL has been returned from a call to a COM component.
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : Error HRESULT E_FAIL has been returned from a call to a COM component.
+Exception stack trace:
+   at Wox.Infrastructure.ShellLinkHelper.IShellLinkW.GetDescription(StringBuilder pszName, Int32 cchMaxName)
+   at Wox.Infrastructure.ShellLinkHelper.RetrieveTargetPath(String path)
+Exception source     : Wox.Infrastructure
+Exception target site: Void GetDescription(System.Text.StringBuilder, Int32)
+Exception HResult    : -2147467259
+-------------------------- End exception --------------------------
+
+
+[2024-05-17 09:36:07.7750] [ERROR] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\ShellLinkHelper.cs::169]
+-------------------------- Begin exception --------------------------
+Message: Failed to fetch description for C:\PROGRA~2\WINDOW~4\wmplayer.exe, Error HRESULT E_FAIL has been returned from a call to a COM component.
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : Error HRESULT E_FAIL has been returned from a call to a COM component.
+Exception stack trace:
+   at Wox.Infrastructure.ShellLinkHelper.IShellLinkW.GetDescription(StringBuilder pszName, Int32 cchMaxName)
+   at Wox.Infrastructure.ShellLinkHelper.RetrieveTargetPath(String path)
+Exception source     : Wox.Infrastructure
+Exception target site: Void GetDescription(System.Text.StringBuilder, Int32)
+Exception HResult    : -2147467259
+-------------------------- End exception --------------------------
+
+
+[2024-05-17 09:36:07.7750] [INFO] [C:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Storage\PackageRepository.cs::85]
+Indexed 42 packaged applications
+
+[2024-05-17 09:36:07.7750] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+Microsoft.Plugin.Program.Main - Package index cost <3713ms>
+
+[2024-05-17 09:36:11.0407] [INFO] [C:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Storage\Win32ProgramRepository.cs::243]
+Indexed 779 win32 applications
+
+[2024-05-17 09:36:11.0407] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+Microsoft.Plugin.Program.Main - Win32Program index cost <6973ms>
+
+[2024-05-17 09:36:11.0407] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Program> is <8540ms>
+
+[2024-05-17 09:36:11.0407] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::1299]
+Refresh plugins overview
+
+[2024-05-17 09:36:11.0520] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::157]
+Begin PowerToys Run startup ----------------------------------------------------
+Runtime info:
+Version: 0.80.1.0
+OS Version: Microsoft Windows NT 10.0.22621.0
+IntPtr Length: 8
+x64: True
+End PowerToys Run startup ----------------------------------------------------  
+
+
+[2024-05-17 09:36:11.0520] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+App.OnStartup - Startup cost <14774ms>
+
+[2024-05-17 09:36:11.0704] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\MainWindow.xaml.cs::88]
+Send Run settings telemetry
+
+[2024-05-17 09:36:11.7323] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+EnvironmentHelper.GetProtectedEnvironmentVariables - Duration cost <1ms>
+
+[2024-05-17 09:36:11.7323] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::98]
+RegisterHotkey()
+
+[2024-05-17 09:36:11.7323] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::852]
+Set HotKey()
+
+[2024-05-17 09:36:11.7323] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::893]
+Registered global hotkey
+
+[2024-05-17 09:38:35.5057] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::97]
+Runner with pid=13668 exited. Exiting PowerToys Run
+
+[2024-05-17 09:38:35.5057] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\QueryHistory.json>
+
+[2024-05-17 09:38:35.5057] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\UserSelectedRecord.json>
+
+[2024-05-17 09:38:35.5266] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::200]
+Application.Current.Exit
+
+[2024-05-17 09:38:35.5266] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::254]
+Start PowerToys Run Exit----------------------------------------------------  
+
+[2024-05-17 09:38:35.5266] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\PowerToysRunSettings.json>
+
+[2024-05-17 09:38:35.5266] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Folder\FolderSettings.json>
+
+[2024-05-17 09:38:35.5266] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Indexer\IndexerSettings.json>
+
+[2024-05-17 09:38:35.5266] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Program\ProgramPluginSettings.json>
+
+[2024-05-17 09:38:35.5266] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Shell\ShellPluginSettings.json>
+
+[2024-05-17 09:38:35.5266] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Uri\UriSettings.json>
+
+[2024-05-17 09:38:35.5452] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\ImageCache.json>
+
+[2024-05-17 09:38:35.5452] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::265]
+End PowerToys Run Exit ----------------------------------------------------  
+
+[2024-05-17 09:38:35.5452] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+App.OnExit - Exit cost <21ms>
+
+[2024-05-17 09:38:35.9351] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::55]
+Starting PowerToys Run with PID=7392
+
+[2024-05-17 09:38:35.9568] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::66]
+Runner pid=12560
+
+[2024-05-17 09:38:36.0883] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::108]
+On Startup.
+
+[2024-05-17 09:38:36.1348] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+ImageLoader.Initialize - Preload images cost <1ms>
+
+[2024-05-17 09:38:36.1348] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Image\ImageLoader.cs::99]
+Number of preload images is <0>, Images Number: 2, Unique Items 2
+
+[2024-05-17 09:38:36.1828] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+|Wox.Infrastructure.Alphabet.Initialize|Preload pinyin cache <17ms>
+
+[2024-05-17 09:38:36.1828] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Alphabet.cs::46]
+Number of preload pinyin combination<0>
+
+[2024-05-17 09:38:36.2021] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Calculator> is <1ms>
+
+[2024-05-17 09:38:36.2021] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Folder> is <2ms>
+
+[2024-05-17 09:38:36.2021] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <History> is <0ms>
+
+[2024-05-17 09:38:36.2021] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Windows Indexer> is <0ms>
+
+[2024-05-17 09:38:36.2021] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <OneNote> is <0ms>
+
+[2024-05-17 09:38:36.2021] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <PowerToys> is <0ms>
+
+[2024-05-17 09:38:36.2408] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Program> is <31ms>
+
+[2024-05-17 09:38:36.2408] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Registry> is <0ms>
+
+[2024-05-17 09:38:36.2408] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Service> is <0ms>
+
+[2024-05-17 09:38:36.2481] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Shell> is <4ms>
+
+[2024-05-17 09:38:36.2481] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <System Commands> is <1ms>
+
+[2024-05-17 09:38:36.2481] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Time and date> is <0ms>
+
+[2024-05-17 09:38:36.2481] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Unit Converter> is <0ms>
+
+[2024-05-17 09:38:36.2481] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Windows Uri Handler> is <1ms>
+
+[2024-05-17 09:38:36.2481] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <ValueGenerator> is <1ms>
+
+[2024-05-17 09:38:36.2481] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <VS Code Workspaces> is <2ms>
+
+[2024-05-17 09:38:36.2481] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Web Search> is <0ms>
+
+[2024-05-17 09:38:36.2481] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Windows Settings> is <0ms>
+
+[2024-05-17 09:38:36.2696] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Windows Terminal> is <10ms>
+
+[2024-05-17 09:38:36.2696] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Window Walker> is <0ms>
+
+[2024-05-17 09:38:36.5372] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\SettingsReader.cs::87]
+Successfully read new settings. retryCount=1
+
+[2024-05-17 09:38:36.5372] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Shell\ShellPluginSettings.json>
+
+[2024-05-17 09:38:36.5483] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Calculator> is <1ms>
+
+[2024-05-17 09:38:36.5483] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Time and date> is <0ms>
+
+[2024-05-17 09:38:36.5483] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Registry> is <0ms>
+
+[2024-05-17 09:38:36.5483] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Shell> is <4ms>
+
+[2024-05-17 09:38:36.5483] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Service> is <0ms>
+
+[2024-05-17 09:38:36.5483] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <History> is <0ms>
+
+[2024-05-17 09:38:36.5483] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <ValueGenerator> is <1ms>
+
+[2024-05-17 09:38:36.5483] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Unit Converter> is <0ms>
+
+[2024-05-17 09:38:36.5483] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Web Search> is <0ms>
+
+[2024-05-17 09:38:36.5483] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Window Walker> is <0ms>
+
+[2024-05-17 09:38:36.5483] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <System Commands> is <1ms>
+
+[2024-05-17 09:38:36.5483] [WARN] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\Common\DefaultBrowserInfo.cs::73]
+I've tried updating the chosen Web Browser info at least once.
+
+[2024-05-17 09:38:36.5483] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Windows Uri Handler> is <2ms>
+
+[2024-05-17 09:38:36.5483] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Windows Indexer> is <1ms>
+
+[2024-05-17 09:38:36.5483] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Folder> is <4ms>
+
+[2024-05-17 09:38:36.5483] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <PowerToys> is <8ms>
+
+[2024-05-17 09:38:36.5483] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Windows Settings> is <8ms>
+
+[2024-05-17 09:38:37.2747] [INFO] [C:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Storage\PackageRepository.cs::85]
+Indexed 42 packaged applications
+
+[2024-05-17 09:38:37.2747] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+Microsoft.Plugin.Program.Main - Package index cost <700ms>
+
+[2024-05-17 09:38:37.5292] [ERROR] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\ShellLinkHelper.cs::169]
+-------------------------- Begin exception --------------------------
+Message: Failed to fetch description for C:\Windows\syswow64\odbcad32.exe, Error HRESULT E_FAIL has been returned from a call to a COM component.
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : Error HRESULT E_FAIL has been returned from a call to a COM component.
+Exception stack trace:
+   at Wox.Infrastructure.ShellLinkHelper.IShellLinkW.GetDescription(StringBuilder pszName, Int32 cchMaxName)
+   at Wox.Infrastructure.ShellLinkHelper.RetrieveTargetPath(String path)
+Exception source     : Wox.Infrastructure
+Exception target site: Void GetDescription(System.Text.StringBuilder, Int32)
+Exception HResult    : -2147467259
+-------------------------- End exception --------------------------
+
+
+[2024-05-17 09:38:37.5292] [ERROR] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\ShellLinkHelper.cs::169]
+-------------------------- Begin exception --------------------------
+Message: Failed to fetch description for C:\PROGRA~2\WINDOW~4\wmplayer.exe, Error HRESULT E_FAIL has been returned from a call to a COM component.
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : Error HRESULT E_FAIL has been returned from a call to a COM component.
+Exception stack trace:
+   at Wox.Infrastructure.ShellLinkHelper.IShellLinkW.GetDescription(StringBuilder pszName, Int32 cchMaxName)
+   at Wox.Infrastructure.ShellLinkHelper.RetrieveTargetPath(String path)
+Exception source     : Wox.Infrastructure
+Exception target site: Void GetDescription(System.Text.StringBuilder, Int32)
+Exception HResult    : -2147467259
+-------------------------- End exception --------------------------
+
+
+[2024-05-17 09:38:38.0803] [INFO] [C:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Storage\Win32ProgramRepository.cs::243]
+Indexed 797 win32 applications
+
+[2024-05-17 09:38:38.0803] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+Microsoft.Plugin.Program.Main - Win32Program index cost <1505ms>
+
+[2024-05-17 09:38:38.0803] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Program> is <1564ms>
+
+[2024-05-17 09:38:38.0803] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::1299]
+Refresh plugins overview
+
+[2024-05-17 09:38:38.0803] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::157]
+Begin PowerToys Run startup ----------------------------------------------------
+Runtime info:
+Version: 0.80.1.0
+OS Version: Microsoft Windows NT 10.0.22621.0
+IntPtr Length: 8
+x64: True
+End PowerToys Run startup ----------------------------------------------------  
+
+
+[2024-05-17 09:38:38.0803] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+App.OnStartup - Startup cost <1995ms>
+
+[2024-05-17 09:38:38.2641] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+EnvironmentHelper.GetProtectedEnvironmentVariables - Duration cost <0ms>
+
+[2024-05-17 09:38:38.2641] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::98]
+RegisterHotkey()
+
+[2024-05-17 09:38:38.2641] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::852]
+Set HotKey()
+
+[2024-05-17 09:38:38.2641] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::893]
+Registered global hotkey
+
+[2024-05-17 09:39:12.3993] [ERROR] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\ListRepository`1.cs::54]
+Item Already Exists <ClipClip.lnk>
+
+[2024-05-17 09:44:08.4239] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::973]
+OnHotkey
+
+[2024-05-17 09:44:09.4484] [WARN] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Folder. Query cost - 76 milliseconds
+
+[2024-05-17 09:44:09.4613] [WARN] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Program. Query cost - 89 milliseconds
+
+[2024-05-17 09:44:09.5103] [WARN] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Window Walker. Query cost - 138 milliseconds
+
+[2024-05-17 09:44:10.2230] [WARN] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 52 milliseconds
+
+[2024-05-17 09:44:10.2230] [WARN] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 421 milliseconds
+
+[2024-05-17 09:44:23.5201] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::973]
+OnHotkey
+
+[2024-05-17 09:44:23.9264] [WARN] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Window Walker. Query cost - 51 milliseconds
+
+[2024-05-17 09:46:19.1243] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::973]
+OnHotkey
+
+[2024-05-17 09:46:21.7635] [WARN] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Window Walker. Query cost - 52 milliseconds
+
+[2024-05-17 09:55:57.9186] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::973]
+OnHotkey
+
+[2024-05-17 09:59:57.9065] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::973]
+OnHotkey
+
+[2024-05-17 10:00:14.8093] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::973]
+OnHotkey
+
+[2024-05-17 10:01:13.2030] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::973]
+OnHotkey
+
+[2024-05-17 10:01:15.2759] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::973]
+OnHotkey
+
+[2024-05-17 10:01:31.6645] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::973]
+OnHotkey
+
+[2024-05-17 10:01:46.0019] [WARN] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 68 milliseconds
+
+[2024-05-17 11:51:06.9649] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::206]
+Application.Current.SessionEnding
+
+[2024-05-17 11:51:06.9649] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::254]
+Start PowerToys Run Exit----------------------------------------------------  
+
+[2024-05-17 11:51:06.9649] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\QueryHistory.json>
+
+[2024-05-17 11:51:06.9732] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\UserSelectedRecord.json>
+
+[2024-05-17 11:51:06.9862] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\PowerToysRunSettings.json>
+
+[2024-05-17 11:51:06.9920] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Folder\FolderSettings.json>
+
+[2024-05-17 11:51:06.9920] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Indexer\IndexerSettings.json>
+
+[2024-05-17 11:51:06.9920] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Program\ProgramPluginSettings.json>
+
+[2024-05-17 11:51:06.9920] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Shell\ShellPluginSettings.json>
+
+[2024-05-17 11:51:06.9920] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Uri\UriSettings.json>
+
+[2024-05-17 11:51:06.9920] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\ImageCache.json>
+
+[2024-05-17 11:51:07.0149] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::265]
+End PowerToys Run Exit ----------------------------------------------------  
+
+[2024-05-17 11:51:07.0149] [INFO] [C:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+App.OnExit - Exit cost <49ms>
+
+[2024-05-17 11:51:07.0779] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::200]
+Application.Current.Exit
+
+[2024-05-17 11:51:07.0848] [INFO] [C:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::97]
+Runner with pid=12560 exited. Exiting PowerToys Run
+

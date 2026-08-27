@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 2,
+  "repository": "microsoft/PowerToys",
+  "generatedAt": "2026-08-06T20:18:53.3899989+08:00",
+  "phase": "ready",
+  "prs": [
+    {
+      "number": 48876,
+      "url": "https://github.com/microsoft/PowerToys/pull/48876",
+      "title": "Fix Keyboard Manager editor file picker not opening when elevated",
+      "phase": "ready",
+      "loop": 2,
+      "waitingOn": "author",
+      "assoc": "MEMBER",
+      "firstTimer": false,
+      "draft": false,
+      "headSha": "f2c79018ea5a07dcd47fa6f421655a97076b2400",
+      "snapshot": {
+        "updatedAt": "2026-07-27T10:22:12Z",
+        "issueCommentCount": 2,
+        "reviewCommentCount": 0,
+        "reviewCount": 2
+      },
+      "disposition": "Request changes",
+      "phase0Note": "Member: routine process asks skipped. CLA and dependency checks pass; the latest x64 and arm64 PowerToys CI checks are failing, so request those failures be addressed.",
+      "publicPayload": {
+        "contextBody": "The latest PowerToys CI run is failing in both the x64 and arm64 Release builds. Please address the reported build failures and rerun the affected checks before merge.",
+        "items": [
+          {
+            "id": "ci-failures",
+            "kind": "companion",
+            "severity": "high",
+            "title": "Resolve the failing CI builds",
+            "body": "### Resolve the failing CI builds\n\n**Severity:** `high`\n\nThe latest PowerToys CI run is failing in both the x64 and arm64 Release builds. Please address the reported build failures and rerun the affected checks so this change is validated on both architectures."
+          }
+        ]
+      },
+      "internalEvidence": {
+        "status": "reviewed-pending-approval",
+        "worktree": "C:\\PowerToys-cf06",
+        "convergence": "Fresh Copilot review submitted 2026-08-06T12:11:12Z generated zero published comments; unresolved Copilot threads: 0.",
+        "build": "Debug build-essentials, KeyboardManager.vcxproj, and KeyboardManagerEditorUI.csproj passed; x64\\Debug\\PowerToys.exe exists.",
+        "fixed": "Removed unsupported FolderPicker.FileTypeFilter access in commit 9c5c299102bd5451486aed5888ddd67396cf8d7 after the first Copilot comment.",
+        "upstreamChecks": {
+          "powerToysCI": "failure",
+          "x64Release": "failure",
+          "arm64Release": "failure",
+          "cla": "success",
+          "dependencyReview": "success"
+        }
+      },
+      "testInstructions": "## Run & verify (already built)\n1. Launch: C:\\PowerToys-cf06\\x64\\Debug\\PowerToys.exe\n2. Open Keyboard Manager, open the editor, choose the Run Program action, and click the program-path browse button and the start-in browse button while PowerToys is elevated.\n3. Verify the Windows file and folder dialogs open and selected paths populate the corresponding fields.\n4. Repeat with Cancel and with a non-elevated run; verify no crash and that existing typed paths remain unchanged."
+    }
+  ]
+}

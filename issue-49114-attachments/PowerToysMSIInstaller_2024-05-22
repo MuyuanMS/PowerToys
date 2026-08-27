@@ -1,0 +1,61 @@
+[2024-05-22 11:24:28.915999] [p-7728] [t-8424] [info] PowerToysMSI logger is initialized
+[2024-05-22 11:24:29.031350] [p-7728] [t-6240] [info] PowerToysMSI logger is initialized
+[2024-05-22 11:25:18.597291] [p-7728] [t-18524] [info] PowerToysMSI logger is initialized
+[2024-05-22 11:25:19.320512] [p-7728] [t-13968] [info] PowerToysMSI logger is initialized
+[2024-05-22 11:25:26.399538] [p-7728] [t-20040] [info] PowerToysMSI logger is initialized
+[2024-05-22 11:25:26.472221] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\.pp\shellex\{8895b1c6-b41f-4c1c-a562-0d564250836f}\Default:{D8034CFA-F34B-41FE-AD45-62FCBB52A6DA}: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.498187] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\.csproj\shellex\{8895b1c6-b41f-4c1c-a562-0d564250836f}\Default:{D8034CFA-F34B-41FE-AD45-62FCBB52A6DA}: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.503156] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\.gitconfig\shellex\{8895b1c6-b41f-4c1c-a562-0d564250836f}\Default:{D8034CFA-F34B-41FE-AD45-62FCBB52A6DA}: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.507883] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.508078] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\Default:PdfPreviewHandler: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.508257] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\InprocServer32\Default:C:\Users\mimichalis\AppData\Local\PowerToys\PowerToys.PdfPreviewHandlerCpp.dll: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.508436] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\InprocServer32\Assembly:PowerToys.PdfPreviewHandler, Version=v0.80.1.0, Culture=neutral: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.508615] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\InprocServer32\Class:PdfPreviewHandler: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.508783] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\InprocServer32\ThreadingModel:Apartment: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.508948] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\.pdf\shellex\{8895b1c6-b41f-4c1c-a562-0d564250836f}\Default:{A5A41CC7-02CB-41D4-8C9B-9087040D6098}: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.509111] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\AppID:{6d2b5079-2f0b-48dd-ab7f-97cec514d30b}: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.509340] [p-7728] [t-20040] [error] unApply of HKCU\Software\Microsoft\Windows\CurrentVersion\PreviewHandlers\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}:Pdf Preview Handler: RegDeleteKeyValueW failed: unknown error
+[2024-05-22 11:25:26.515368] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{10144713-1526-46C9-88DA-1FB52807A9FF}\InprocServer32\Default:C:\Users\mimichalis\AppData\Local\PowerToys\PowerToys.SvgThumbnailProviderCpp.dll: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.515491] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{10144713-1526-46C9-88DA-1FB52807A9FF}\InprocServer32\Assembly:PowerToys.SvgThumbnailProvider, Version=v0.80.1.0, Culture=neutral: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.515572] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{10144713-1526-46C9-88DA-1FB52807A9FF}\InprocServer32\Class:SvgThumbnailProvider: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.515648] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{10144713-1526-46C9-88DA-1FB52807A9FF}\InprocServer32\ThreadingModel:Apartment: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.519458] [p-7728] [t-20040] [error] unApply of HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\KindMap\.svg:Picture: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.520682] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.520911] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\Default:PdfThumbnailProvider: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.521120] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\InprocServer32\Default:C:\Users\mimichalis\AppData\Local\PowerToys\PowerToys.PdfThumbnailProviderCpp.dll: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.521319] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\InprocServer32\Assembly:PowerToys.PdfThumbnailProvider, Version=v0.80.1.0, Culture=neutral: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.521517] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\InprocServer32\Class:PdfThumbnailProvider: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.521711] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\InprocServer32\ThreadingModel:Apartment: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.522083] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\.pdf\shellex\{E357FCCD-A995-4576-B01F-234630154E96}\Default:{D8BB9942-93BD-412D-87E4-33FAB214DC1A}: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.523130] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{F2847CBE-CD03-4C83-A359-1A8052C1B9D5}\InprocServer32\Default:C:\Users\mimichalis\AppData\Local\PowerToys\PowerToys.GcodeThumbnailProviderCpp.dll: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.523287] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{F2847CBE-CD03-4C83-A359-1A8052C1B9D5}\InprocServer32\Assembly:PowerToys.GcodeThumbnailProvider, Version=v0.80.1.0, Culture=neutral: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.523416] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{F2847CBE-CD03-4C83-A359-1A8052C1B9D5}\InprocServer32\Class:GcodeThumbnailProvider: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.523561] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{F2847CBE-CD03-4C83-A359-1A8052C1B9D5}\InprocServer32\ThreadingModel:Apartment: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.525084] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{77257004-6F25-4521-B602-50ECC6EC62A6}\InprocServer32\Default:C:\Users\mimichalis\AppData\Local\PowerToys\PowerToys.StlThumbnailProviderCpp.dll: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.525284] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{77257004-6F25-4521-B602-50ECC6EC62A6}\InprocServer32\Assembly:PowerToys.StlThumbnailProvider, Version=v0.80.1.0, Culture=neutral: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.525466] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{77257004-6F25-4521-B602-50ECC6EC62A6}\InprocServer32\Class:StlThumbnailProvider: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.525635] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{77257004-6F25-4521-B602-50ECC6EC62A6}\InprocServer32\ThreadingModel:Apartment: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.527249] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{AD856B15-D25E-4008-AFB7-AFAA55586188}\InprocServer32\Default:C:\Users\mimichalis\AppData\Local\PowerToys\PowerToys.QoiThumbnailProviderCpp.dll: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.527427] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{AD856B15-D25E-4008-AFB7-AFAA55586188}\InprocServer32\Assembly:PowerToys.QoiThumbnailProvider, Version=v0.80.1.0, Culture=neutral: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.527721] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{AD856B15-D25E-4008-AFB7-AFAA55586188}\InprocServer32\Class:QoiThumbnailProvider: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.527895] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\CLSID\{AD856B15-D25E-4008-AFB7-AFAA55586188}\InprocServer32\ThreadingModel:Apartment: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.528581] [p-7728] [t-20040] [error] unApply of HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\KindMap\.qoi:Picture: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.530126] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\PowerToys.RegistryPreview\Application\ApplicationName:Registry Preview: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.530215] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\PowerToys.RegistryPreview\DefaultIcon\Default:C:\Users\mimichalis\AppData\Local\PowerToys\\WinUI3Apps\PowerToys.RegistryPreview.exe: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.530356] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\PowerToys.RegistryPreview\shell\open\command\Default:C:\Users\mimichalis\AppData\Local\PowerToys\\WinUI3Apps\PowerToys.RegistryPreview.exe "----ms-protocol:ms-encodedlaunch:App?ContractId=Windows.File&Verb=open&File=%1": RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.530502] [p-7728] [t-20040] [error] unApply of HKCU\Software\Classes\.reg\OpenWithProgIDs\PowerToys.RegistryPreview:: RegOpenKeyExW failed: unknown error
+[2024-05-22 11:25:26.626135] [p-7728] [t-17520] [info] PowerToysMSI logger is initialized
+[2024-05-22 11:25:38.702657] [p-7728] [t-19472] [info] PowerToysMSI logger is initialized
+[2024-05-22 11:25:38.703941] [p-7728] [t-19472] [info] RemoveScheduledTasksCA Initialized.
+[2024-05-22 11:25:38.717541] [p-7728] [t-19472] [info] Deleted the PowerToys Task Scheduler folder.
+[2024-05-22 11:25:43.725948] [p-7728] [t-15480] [info] PowerToysMSI logger is initialized
+[2024-05-22 11:25:46.952755] [p-7728] [t-21432] [info] PowerToysMSI logger is initialized
+[2024-05-22 11:25:46.954036] [p-7728] [t-21432] [info] RemoveScheduledTasksCA Initialized.
+[2024-05-22 11:25:46.955475] [p-7728] [t-21432] [info] The PowerToys scheduled task folder wasn't found. Nothing to delete.
+[2024-05-22 11:26:08.021947] [p-7728] [t-15876] [info] PowerToysMSI logger is initialized
+[2024-05-22 11:26:08.210149] [p-7728] [t-15876] [error] apply of HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\KindMap\.svg:Picture: RegCreateKeyExW failed: unknown error
+[2024-05-22 11:26:08.218557] [p-7728] [t-15876] [error] apply of HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\KindMap\.qoi:Picture: RegCreateKeyExW failed: unknown error
+[2024-05-22 11:26:08.220295] [p-7728] [t-15876] [info] All registry changeSets applied successfully
+[2024-05-22 11:26:08.328039] [p-7728] [t-3432] [info] PowerToysMSI logger is initialized
+[2024-05-22 11:26:11.042118] [p-7728] [t-21220] [info] PowerToysMSI logger is initialized
+[2024-05-22 11:26:11.317908] [p-7728] [t-9108] [info] PowerToysMSI logger is initialized

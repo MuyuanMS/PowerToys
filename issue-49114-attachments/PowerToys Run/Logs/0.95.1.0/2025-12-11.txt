@@ -1,0 +1,365 @@
+[2025-12-11 20:51:27.7991] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::72]
+Starting PowerToys Run with PID=17880
+
+[2025-12-11 20:51:27.8709] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::83]
+Runner pid=17004
+
+[2025-12-11 20:51:28.1709] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::129]
+On Startup.
+
+[2025-12-11 20:51:28.8722] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+ImageLoader.Initialize - Preload images cost <4ms>
+
+[2025-12-11 20:51:28.8722] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Image\ImageLoader.cs::100]
+Number of preload images is <136>, Images Number: 2, Unique Items 2
+
+[2025-12-11 20:51:29.4073] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+|Wox.Infrastructure.Alphabet.Initialize|Preload pinyin cache <405ms>
+
+[2025-12-11 20:51:29.4073] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Alphabet.cs::46]
+Number of preload pinyin combination<0>
+
+[2025-12-11 20:51:29.7426] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Calculator> is <1ms>
+
+[2025-12-11 20:51:29.7589] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Folder> is <15ms>
+
+[2025-12-11 20:51:29.7816] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <History> is <0ms>
+
+[2025-12-11 20:51:29.7992] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Indexer> is <1ms>
+
+[2025-12-11 20:51:29.8159] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <OneNote> is <1ms>
+
+[2025-12-11 20:51:29.8159] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <PowerToys> is <1ms>
+
+[2025-12-11 20:51:29.8746] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Program> is <30ms>
+
+[2025-12-11 20:51:29.8909] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Registry> is <0ms>
+
+[2025-12-11 20:51:29.9215] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Service> is <0ms>
+
+[2025-12-11 20:51:29.9215] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Shell> is <8ms>
+
+[2025-12-11 20:51:29.9375] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <System Commands> is <1ms>
+
+[2025-12-11 20:51:29.9375] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Time and date> is <0ms>
+
+[2025-12-11 20:51:29.9375] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Unit Converter> is <0ms>
+
+[2025-12-11 20:51:29.9375] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Uri Handler> is <1ms>
+
+[2025-12-11 20:51:29.9375] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <ValueGenerator> is <0ms>
+
+[2025-12-11 20:51:29.9631] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <VS Code Workspaces> is <18ms>
+
+[2025-12-11 20:51:29.9642] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Web Search> is <0ms>
+
+[2025-12-11 20:51:29.9642] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Settings> is <1ms>
+
+[2025-12-11 20:51:30.1002] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Terminal> is <133ms>
+
+[2025-12-11 20:51:30.1002] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Window Walker> is <0ms>
+
+[2025-12-11 20:51:31.2019] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\SettingsReader.cs::89]
+Successfully read new settings. retryCount=1
+
+[2025-12-11 20:51:31.2201] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Shell\ShellPluginSettings.json>
+
+[2025-12-11 20:51:31.2699] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Calculator> is <1ms>
+
+[2025-12-11 20:51:31.2749] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Service> is <0ms>
+
+[2025-12-11 20:51:31.2749] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Shell> is <8ms>
+
+[2025-12-11 20:51:31.2699] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Windows Indexer> is <4ms>
+
+[2025-12-11 20:51:31.2699] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Folder> is <19ms>
+
+[2025-12-11 20:51:31.2699] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Registry> is <0ms>
+
+[2025-12-11 20:51:31.2699] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <History> is <1ms>
+
+[2025-12-11 20:51:31.2749] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Time and date> is <0ms>
+
+[2025-12-11 20:51:31.2749] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <System Commands> is <1ms>
+
+[2025-12-11 20:51:31.2749] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Unit Converter> is <0ms>
+
+[2025-12-11 20:51:31.2749] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <ValueGenerator> is <0ms>
+
+[2025-12-11 20:51:31.2749] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\Common\DefaultBrowserInfo.cs::76]
+I've tried updating the chosen Web Browser info at least once.
+
+[2025-12-11 20:51:31.4481] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Windows Uri Handler> is <172ms>
+
+[2025-12-11 20:51:31.2749] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Window Walker> is <0ms>
+
+[2025-12-11 20:51:31.2939] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <PowerToys> is <23ms>
+
+[2025-12-11 20:51:31.3859] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Windows Settings> is <108ms>
+
+[2025-12-11 20:51:31.2749] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Web Search> is <0ms>
+
+[2025-12-11 20:51:33.9829] [INFO] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Storage\PackageRepository.cs::112]
+Indexed 60 packaged applications
+
+[2025-12-11 20:51:33.9829] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+Microsoft.Plugin.Program.Main - Package index cost <2191ms>
+
+[2025-12-11 20:51:34.3417] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\ShellLinkHelper.cs::177]
+-------------------------- Begin exception --------------------------
+Message: Failed to fetch description for C:\Windows\syswow64\odbcad32.exe, Unexpected HRESULT has been returned from a call to a COM component.
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : Unexpected HRESULT has been returned from a call to a COM component.
+Exception stack trace:
+   at Wox.Infrastructure.ShellLinkHelper.IShellLinkW.GetDescription(StringBuilder pszName, Int32 cchMaxName)
+   at Wox.Infrastructure.ShellLinkHelper.RetrieveTargetPath(String path)
+Exception source     : Wox.Infrastructure
+Exception target site: Void GetDescription(System.Text.StringBuilder, Int32)
+Exception HResult    : -2147467259
+-------------------------- End exception --------------------------
+
+
+[2025-12-11 20:51:34.3417] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\ShellLinkHelper.cs::177]
+-------------------------- Begin exception --------------------------
+Message: Failed to fetch description for C:\PROGRA~2\WINDOW~4\wmplayer.exe, Unexpected HRESULT has been returned from a call to a COM component.
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : Unexpected HRESULT has been returned from a call to a COM component.
+Exception stack trace:
+   at Wox.Infrastructure.ShellLinkHelper.IShellLinkW.GetDescription(StringBuilder pszName, Int32 cchMaxName)
+   at Wox.Infrastructure.ShellLinkHelper.RetrieveTargetPath(String path)
+Exception source     : Wox.Infrastructure
+Exception target site: Void GetDescription(System.Text.StringBuilder, Int32)
+Exception HResult    : -2147467259
+-------------------------- End exception --------------------------
+
+
+[2025-12-11 20:51:39.6776] [INFO] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Storage\Win32ProgramRepository.cs::268]
+Indexed 838 win32 applications
+
+[2025-12-11 20:51:39.6776] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+Microsoft.Plugin.Program.Main - Win32Program index cost <7880ms>
+
+[2025-12-11 20:51:39.6776] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Program> is <8437ms>
+
+[2025-12-11 20:51:39.6776] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::1302]
+Refresh plugins overview
+
+[2025-12-11 20:51:39.6776] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::178]
+Begin PowerToys Run startup ----------------------------------------------------
+Runtime info:
+Version: 0.95.1.0
+OS Version: Microsoft Windows NT 10.0.22631.0
+IntPtr Length: 8
+x64: True
+End PowerToys Run startup ----------------------------------------------------  
+
+
+[2025-12-11 20:51:39.6776] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+App.OnStartup - Startup cost <11510ms>
+
+[2025-12-11 20:51:39.6776] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\MainWindow.xaml.cs::104]
+Send Run settings telemetry
+
+[2025-12-11 20:51:39.9204] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+EnvironmentHelper.GetProtectedEnvironmentVariables - Duration cost <1ms>
+
+[2025-12-11 20:51:39.9204] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::101]
+RegisterHotkey()
+
+[2025-12-11 20:51:39.9204] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::854]
+Set HotKey()
+
+[2025-12-11 20:51:39.9204] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::895]
+Registered global hotkey
+
+[2025-12-11 20:52:47.8836] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\ListRepository`1.cs::55]
+Item Already Exists <Microsoft Edge.lnk>
+
+[2025-12-11 21:38:04.3610] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2025-12-11 21:38:06.2157] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 72 milliseconds
+
+[2025-12-11 21:38:06.2655] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Calculator. Query cost - 122 milliseconds
+
+[2025-12-11 21:38:06.2655] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 123 milliseconds
+
+[2025-12-11 21:38:06.2959] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 61 milliseconds
+
+[2025-12-11 21:38:06.5192] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 52 milliseconds
+
+[2025-12-11 21:38:06.6600] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 225 milliseconds
+
+[2025-12-11 21:38:07.1043] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 51 milliseconds
+
+[2025-12-11 21:38:07.1043] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 51 milliseconds
+
+[2025-12-11 21:38:07.2351] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 128 milliseconds
+
+[2025-12-11 21:38:07.2935] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Image\WindowsThumbnailProvider.cs::147]
+-------------------------- Begin exception --------------------------
+Message: Error while extracting thumbnail for C:\Users\mimichalis\OneDrive\Pictures\Camera Roll\2019-07-29 12.14.30.jpg
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : 0x8004B205
+Exception stack trace:
+   at Wox.Infrastructure.Image.WindowsThumbnailProvider.GetHBitmap(String fileName, Int32 width, Int32 height, ThumbnailOptions options)
+Exception source     : Wox.Infrastructure
+Exception target site: IntPtr GetHBitmap(System.String, Int32, Int32, Wox.Infrastructure.Image.ThumbnailOptions)
+Exception HResult    : -2147175931
+-------------------------- End exception --------------------------
+
+
+[2025-12-11 21:38:07.3035] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Image\ImageLoader.cs::173]
+-------------------------- Begin exception --------------------------
+Message: Failed to get thumbnail for C:\Users\mimichalis\OneDrive\Pictures\Camera Roll\2019-07-29 12.14.30.jpg
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : 0x8004B205
+Exception stack trace:
+   at Wox.Infrastructure.Image.WindowsThumbnailProvider.GetHBitmap(String fileName, Int32 width, Int32 height, ThumbnailOptions options)
+   at Wox.Infrastructure.Image.WindowsThumbnailProvider.GetThumbnail(String fileName, Int32 width, Int32 height, ThumbnailOptions options)
+   at Wox.Infrastructure.Image.ImageLoader.GetThumbnailResult(String& path, Boolean generateThumbnailsFromFiles, Boolean loadFullImage)
+   at Wox.Infrastructure.Image.ImageLoader.<>c__DisplayClass18_0.<LoadInternalAsync>b__0()
+   at System.Threading.Tasks.Task`1.InnerInvoke()
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+--- End of stack trace from previous location ---
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+   at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+--- End of stack trace from previous location ---
+   at Wox.Infrastructure.Image.ImageLoader.LoadInternalAsync(String path, Boolean generateThumbnailsFromFiles, Boolean loadFullImage)
+Exception source     : Wox.Infrastructure
+Exception target site: IntPtr GetHBitmap(System.String, Int32, Int32, Wox.Infrastructure.Image.ThumbnailOptions)
+Exception HResult    : -2147175931
+-------------------------- End exception --------------------------
+
+
+[2025-12-11 21:38:08.4059] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 242 milliseconds
+
+[2025-12-11 21:38:08.4350] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Image\WindowsThumbnailProvider.cs::147]
+-------------------------- Begin exception --------------------------
+Message: Error while extracting thumbnail for C:\Users\mimichalis\OneDrive\Pictures\Camera Roll\WIN_20230216_14_38_16_Pro.jpg
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : 0x8004B205
+Exception stack trace:
+   at Wox.Infrastructure.Image.WindowsThumbnailProvider.GetHBitmap(String fileName, Int32 width, Int32 height, ThumbnailOptions options)
+Exception source     : Wox.Infrastructure
+Exception target site: IntPtr GetHBitmap(System.String, Int32, Int32, Wox.Infrastructure.Image.ThumbnailOptions)
+Exception HResult    : -2147175931
+-------------------------- End exception --------------------------
+
+
+[2025-12-11 21:38:08.4350] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Image\ImageLoader.cs::173]
+-------------------------- Begin exception --------------------------
+Message: Failed to get thumbnail for C:\Users\mimichalis\OneDrive\Pictures\Camera Roll\WIN_20230216_14_38_16_Pro.jpg
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : 0x8004B205
+Exception stack trace:
+   at Wox.Infrastructure.Image.WindowsThumbnailProvider.GetHBitmap(String fileName, Int32 width, Int32 height, ThumbnailOptions options)
+   at Wox.Infrastructure.Image.WindowsThumbnailProvider.GetThumbnail(String fileName, Int32 width, Int32 height, ThumbnailOptions options)
+   at Wox.Infrastructure.Image.ImageLoader.GetThumbnailResult(String& path, Boolean generateThumbnailsFromFiles, Boolean loadFullImage)
+   at Wox.Infrastructure.Image.ImageLoader.<>c__DisplayClass18_0.<LoadInternalAsync>b__0()
+   at System.Threading.Tasks.Task`1.InnerInvoke()
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+--- End of stack trace from previous location ---
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+   at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+--- End of stack trace from previous location ---
+   at Wox.Infrastructure.Image.ImageLoader.LoadInternalAsync(String path, Boolean generateThumbnailsFromFiles, Boolean loadFullImage)
+Exception source     : Wox.Infrastructure
+Exception target site: IntPtr GetHBitmap(System.String, Int32, Int32, Wox.Infrastructure.Image.ThumbnailOptions)
+Exception HResult    : -2147175931
+-------------------------- End exception --------------------------
+
+
+[2025-12-11 21:38:10.0892] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 51 milliseconds
+
+[2025-12-11 21:38:10.1054] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 65 milliseconds
+
+[2025-12-11 21:38:10.2200] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 53 milliseconds
+
+[2025-12-11 21:38:10.2326] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 65 milliseconds
+
+[2025-12-11 21:38:10.2941] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 54 milliseconds
+
+[2025-12-11 21:38:10.4076] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 60 milliseconds
+
+[2025-12-11 21:38:10.4193] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 71 milliseconds
+
+[2025-12-11 21:38:10.5099] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 57 milliseconds
+
+[2025-12-11 21:38:10.5099] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 65 milliseconds
+
+[2025-12-11 21:38:10.5929] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 59 milliseconds
+
+[2025-12-11 21:38:10.5929] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 65 milliseconds
+
+[2025-12-11 21:38:10.7026] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 62 milliseconds
+
+[2025-12-11 21:38:10.7102] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 69 milliseconds
+
