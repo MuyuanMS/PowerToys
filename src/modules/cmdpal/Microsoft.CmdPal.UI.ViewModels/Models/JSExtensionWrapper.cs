@@ -351,7 +351,7 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
                         connection,
                         _manifest.Name ?? "unknown",
                         _manifest.EffectiveDisplayName,
-                        _manifest.Icon);
+                        _manifest.IconPath ?? _manifest.Icon);
                 }
             }
 
@@ -538,7 +538,7 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
                 _connection,
                 _manifest.Name ?? "unknown",
                 _manifest.EffectiveDisplayName,
-                _manifest.Icon);
+                _manifest.IconPath ?? _manifest.Icon);
             return _commandProviderProxy as T;
         }
     }

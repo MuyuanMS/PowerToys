@@ -35,9 +35,25 @@ public sealed record JSExtensionManifest
     public string? Description { get; init; }
 
     /// <summary>
-    /// Gets the icon glyph or relative path (cmdpal.icon).
+    /// Gets the icon glyph or relative path exactly as declared in the manifest (cmdpal.icon).
     /// </summary>
     public string? Icon { get; init; }
+
+    /// <summary>
+    /// Gets the full path to the package directory the manifest was parsed from. Relative
+    /// resources declared in the manifest (such as <see cref="Icon"/>) are resolved against this
+    /// directory and are required to stay within it.
+    /// </summary>
+    public string? RootDirectory { get; init; }
+
+    /// <summary>
+    /// Gets the effective icon reference the host should display. A glyph or a URI is carried
+    /// through unchanged; a relative file path is resolved to a full path inside
+    /// <see cref="RootDirectory"/>. A relative path that escapes the package, traverses a
+    /// symbolic link or junction, or does not exist resolves to an empty string (no icon) so a
+    /// manifest can never point the host at a file outside its own directory.
+    /// </summary>
+    public string? IconPath { get; init; }
 
     /// <summary>
     /// Gets the author or publisher name (cmdpal.publisher).
@@ -227,6 +243,8 @@ public sealed record JSExtensionManifest
             Version = package.Version,
             Description = package.Description,
             Icon = package.CmdPal.Icon,
+            RootDirectory = ResolveRootDirectory(extensionDirectory),
+            IconPath = ResolveManifestIcon(extensionDirectory, package.CmdPal.Icon),
             Publisher = ResolvePublisher(package),
             Main = entryPoint,
             EntryPointPath = resolvedEntryPoint,
@@ -293,6 +311,136 @@ public sealed record JSExtensionManifest
             default:
                 return null;
         }
+    }
+
+    /// <summary>
+    /// Resolves the package root directory used to anchor relative manifest resources. Returns
+    /// null when no directory is available.
+    /// </summary>
+    private static string? ResolveRootDirectory(string extensionDirectory)
+    {
+        if (string.IsNullOrEmpty(extensionDirectory))
+        {
+            return null;
+        }
+
+        try
+        {
+            return Path.TrimEndingDirectorySeparator(Path.GetFullPath(extensionDirectory));
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Resolves the effective icon reference. A glyph, an empty value, or a URI is returned
+    /// unchanged. A relative file path is resolved against <paramref name="extensionDirectory"/>
+    /// and must stay inside it: a path that escapes the package (via ".." or a symbolic
+    /// link/junction) or that does not exist resolves to an empty string so the host shows no
+    /// icon rather than loading a file from outside the package.
+    /// </summary>
+    private static string? ResolveManifestIcon(string extensionDirectory, string? icon)
+    {
+        if (string.IsNullOrWhiteSpace(icon))
+        {
+            return icon;
+        }
+
+        var trimmed = icon.Trim();
+
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
+        {
+            if (uri.IsFile)
+            {
+                return string.Empty;
+            }
+
+            return trimmed;
+        }
+
+        if (Path.IsPathRooted(trimmed))
+        {
+            return string.Empty;
+        }
+
+        // Resolve an existing package-contained file before applying the path heuristic. This
+        // supports valid icon formats without requiring the manifest parser to maintain an
+        // exhaustive allow-list of image extensions.
+        var resolvedIconPath = TryResolveContainedIconPath(extensionDirectory, trimmed);
+        if (resolvedIconPath is not null)
+        {
+            return resolvedIconPath;
+        }
+
+        // Preserve glyph, emoji, and other non-path values. Values that look like paths but do
+        // not resolve to an existing contained file intentionally produce no icon.
+        return LooksLikeRelativeFilePath(trimmed) ? string.Empty : trimmed;
+    }
+
+    private static string? TryResolveContainedIconPath(string extensionDirectory, string icon)
+    {
+        if (string.IsNullOrEmpty(extensionDirectory))
+        {
+            return null;
+        }
+
+        string baseDirectory;
+        string resolved;
+        try
+        {
+            baseDirectory = Path.GetFullPath(extensionDirectory);
+            resolved = Path.GetFullPath(Path.Combine(baseDirectory, icon));
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return null;
+        }
+
+        // String path check: the resolved icon must stay within the package directory.
+        var prefix = baseDirectory.EndsWith(Path.DirectorySeparatorChar)
+            ? baseDirectory
+            : baseDirectory + Path.DirectorySeparatorChar;
+        if (!resolved.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        if (!File.Exists(resolved))
+        {
+            return null;
+        }
+
+        // Real file system check: a symbolic link or junction must not redirect the icon out
+        // of the package, even when the string path stays within it.
+        if (!IsEntryPointContainmentTrusted(extensionDirectory, resolved, out _))
+        {
+            return null;
+        }
+
+        return resolved;
+    }
+
+    /// <summary>
+    /// Determines whether an icon value should be treated as a relative file path (rather than a
+    /// glyph, emoji, or URI). Existing contained files are resolved before this heuristic is used;
+    /// otherwise, a relative path either has a file extension or contains a directory separator,
+    /// and is not a URI.
+    /// </summary>
+    private static bool LooksLikeRelativeFilePath(string icon)
+    {
+        if (icon.Contains("://", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (icon.Contains('/') || icon.Contains('\\'))
+        {
+            return true;
+        }
+
+        return Path.GetExtension(icon.AsSpan()).Length > 0;
     }
 
     private static string? ResolveEntryPoint(string extensionDirectory, string entryPoint, out string? error)
