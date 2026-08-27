@@ -1,0 +1,95 @@
+> Mirrored from microsoft/PowerToys PR 49378 for review iteration
+
+Bumps [actions/setup-dotnet](https://github.com/actions/setup-dotnet) from 5 to 6.
+<details>
+<summary>Release notes</summary>
+<p><em>Sourced from <a href="https://github.com/actions/setup-dotnet/releases">actions/setup-dotnet's releases</a>.</em></p>
+<blockquote>
+<h2>v6.0.0</h2>
+<h2>What's Changed</h2>
+<ul>
+<li>Migrate to ESM and upgrade dependencies by <a href="https://github.com/priyagupta108"><code>@​priyagupta108</code></a> in <a href="https://redirect.github.com/actions/setup-dotnet/pull/752">actions/setup-dotnetPR 752</a></li>
+<li>Bump actions/checkout from 6.0.3 to 7.0.0 by <a href="https://github.com/dependabot"><code>@​dependabot</code></a>[bot] in <a href="https://redirect.github.com/actions/setup-dotnet/pull/751">actions/setup-dotnetPR 751</a></li>
+<li>chore(deps): bump <code>@​actions/cache</code> to 6.2.0 by <a href="https://github.com/philip-gai"><code>@​philip-gai</code></a> in <a href="https://redirect.github.com/actions/setup-dotnet/pull/756">actions/setup-dotnetPR 756</a></li>
+</ul>
+<h2>New Contributors</h2>
+<ul>
+<li><a href="https://github.com/philip-gai"><code>@​philip-gai</code></a> made their first contribution in <a href="https://redirect.github.com/actions/setup-dotnet/pull/756">actions/setup-dotnetPR 756</a></li>
+</ul>
+<p><strong>Full Changelog</strong>: <a href="https://github.com/actions/setup-dotnet/compare/v5...v6.0.0">https://github.com/actions/setup-dotnet/compare/v5...v6.0.0</a></p>
+<h2>v5.4.0</h2>
+<h2>What's Changed</h2>
+<h3>Enhancements</h3>
+<ul>
+<li>Improve global.json SDK version validation for rollForward by <a href="https://github.com/priyagupta108"><code>@​priyagupta108</code></a> in <a href="https://redirect.github.com/actions/setup-dotnet/pull/742">actions/setup-dotnetPR 742</a></li>
+<li>Pin actions to commit SHAs in workflows by <a href="https://github.com/priya-kinthali"><code>@​priya-kinthali</code></a> in <a href="https://redirect.github.com/actions/setup-dotnet/pull/744">actions/setup-dotnetPR 744</a></li>
+<li>Expand the CSC problem matcher to light up more errors on GitHub. by <a href="https://github.com/StephenCleary"><code>@​StephenCleary</code></a> in <a href="https://redirect.github.com/actions/setup-dotnet/pull/717">actions/setup-dotnetPR 717</a></li>
+</ul>
+<h3>Documentation</h3>
+<ul>
+<li>Docs(action): Explicitly mark all optional inputs with required: false by <a href="https://github.com/kranthipoturaju"><code>@​kranthipoturaju</code></a> in <a href="https://redirect.github.com/actions/setup-dotnet/pull/737">actions/setup-dotnetPR 737</a></li>
+</ul>
+<h3>Bug Fixes</h3>
+<ul>
+<li>Fix global.json creation command by <a href="https://github.com/michal2612"><code>@​michal2612</code></a> in <a href="https://redirect.github.com/actions/setup-dotnet/pull/694">actions/setup-dotnetPR 694</a></li>
+</ul>
+<h3>Dependency Updates</h3>
+<ul>
+<li>Upgrade <code>@​actions/cache</code> to 5.1.0, log cache write denied by <a href="https://github.com/jasongin"><code>@​jasongin</code></a> in <a href="https://redirect.github.com/actions/setup-dotnet/pull/746">actions/setup-dotnetPR 746</a></li>
+</ul>
+<h2>New Contributors</h2>
+<ul>
+<li><a href="https://github.com/jasongin"><code>@​jasongin</code></a> made their first contribution in <a href="https://redirect.github.com/actions/setup-dotnet/pull/746">actions/setup-dotnetPR 746</a></li>
+<li><a href="https://github.com/michal2612"><code>@​michal2612</code></a> made their first contribution in <a href="https://redirect.github.com/actions/setup-dotnet/pull/694">actions/setup-dotnetPR 694</a></li>
+<li><a href="https://github.com/kranthipoturaju"><code>@​kranthipoturaju</code></a> made their first contribution in <a href="https://redirect.github.com/actions/setup-dotnet/pull/737">actions/setup-dotnetPR 737</a></li>
+<li><a href="https://github.com/StephenCleary"><code>@​StephenCleary</code></a> made their first contribution in <a href="https://redirect.github.com/actions/setup-dotnet/pull/717">actions/setup-dotnetPR 717</a></li>
+</ul>
+<p><strong>Full Changelog</strong>: <a href="https://github.com/actions/setup-dotnet/compare/v5...v5.4.0">https://github.com/actions/setup-dotnet/compare/v5...v5.4.0</a></p>
+<h2>v5.3.0</h2>
+<h2>What's Changed</h2>
+<h3>Enhancements</h3>
+<ul>
+<li>Add dotnet-version: latest support with dotnet-channel input by <a href="https://github.com/mahabaleshwars"><code>@​mahabaleshwars</code></a> in <a href="https://redirect.github.com/actions/setup-dotnet/pull/730">actions/setup-dotnetPR 730</a></li>
+<li>Support global.json's rollForward latest* variants by <a href="https://github.com/js6pak"><code>@​js6pak</code></a> in <a href="https://redirect.github.com/actions/setup-dotnet/pull/538">actions/setup-dotnetPR 538</a></li>
+<li>Improve version resolution by <a href="https://github.com/akoeplinger"><code>@​akoeplinger</code></a> in <a href="https://redirect.github.com/actions/setup-dotnet/pull/560">actions/setup-dotnetPR 560</a></li>
+</ul>
+<h3>Dependency Updates</h3>
+<!-- raw HTML omitted -->
+</blockquote>
+<p>... (truncated)</p>
+</details>
+<details>
+<summary>Commits</summary>
+<ul>
+<li><a href="https://github.com/actions/setup-dotnet/commit/a98b56852c35b8e3190ac28c8c2271da59106c68"><code>a98b568</code></a> chore(deps): bump <code>@​actions/cache</code> to 6.2.0 (<a href="https://redirect.github.com/actions/setup-dotnet/issues/756">PR 756</a>)</li>
+<li><a href="https://github.com/actions/setup-dotnet/commit/afb2931642fd907238eb71bce2da0dcc910b3553"><code>afb2931</code></a> Bump actions/checkout from 6.0.3 to 7.0.0 (<a href="https://redirect.github.com/actions/setup-dotnet/issues/751">PR 751</a>)</li>
+<li><a href="https://github.com/actions/setup-dotnet/commit/6df8cefd1440cf9313e76b8fdb8aaf90cfa745a3"><code>6df8cef</code></a> Migrate to ESM and upgrade dependencies (<a href="https://redirect.github.com/actions/setup-dotnet/issues/752">PR 752</a>)</li>
+<li>See full diff in <a href="https://github.com/actions/setup-dotnet/compare/v5...v6">compare view</a></li>
+</ul>
+</details>
+<br />
+
+
+[![Dependabot compatibility score](https://dependabot-badges.githubapp.com/badges/compatibility_score?dependency-name=actions/setup-dotnet&package-manager=github_actions&previous-version=5&new-version=6)](https://docs.github.com/en/github/managing-security-vulnerabilities/about-dependabot-security-updates#about-compatibility-scores)
+
+Dependabot will resolve any conflicts with this PR as long as you don't alter it yourself. You can also trigger a rebase manually by commenting `@dependabot rebase`.
+
+[//]: # (dependabot-automerge-start)
+[//]: # (dependabot-automerge-end)
+
+---
+
+<details>
+<summary>Dependabot commands and options</summary>
+<br />
+
+You can trigger Dependabot actions by commenting on this PR:
+- `@dependabot rebase` will rebase this PR
+- `@dependabot recreate` will recreate this PR, overwriting any edits that have been made to it
+- `@dependabot show <dependency name> ignore conditions` will show all of the ignore conditions of the specified dependency
+- `@dependabot ignore this major version` will close this PR and stop Dependabot creating any more for this major version (unless you reopen the PR or upgrade to it yourself)
+- `@dependabot ignore this minor version` will close this PR and stop Dependabot creating any more for this minor version (unless you reopen the PR or upgrade to it yourself)
+- `@dependabot ignore this dependency` will close this PR and stop Dependabot creating any more for this dependency (unless you reopen the PR or upgrade to it yourself)
+
+
+</details>

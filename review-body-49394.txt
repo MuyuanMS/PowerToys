@@ -1,0 +1,90 @@
+> Mirrored from microsoft/PowerToys PR 49394 for review iteration
+
+## Summary of the Pull Request
+
+<!-- Please review the items on the PR checklist before submitting-->
+## PR Checklist
+
+- [x] Closes: PR 47438
+<!--  - [ ] Closes: #yyy (add separate lines for additional resolved issues) -->
+- [ ] **Communication:** I've discussed this with core contributors already. If the work hasn't been agreed, this work might be rejected
+- [x] **Tests:** Added/updated and all pass
+- [x] **Localization:** All end-user-facing strings can be localized
+- [ ] **Dev docs:** Added/updated
+- [ ] **New binaries:** Added on the required places
+   - [ ] [JSON for signing](https://github.com/microsoft/PowerToys/blob/main/.pipelines/ESRPSigning_core.json) for new binaries
+   - [ ] [WXS for installer](https://github.com/microsoft/PowerToys/blob/main/installer/PowerToysSetup/Product.wxs) for new binaries and localization folder
+   - [ ] [YML for CI pipeline](https://github.com/microsoft/PowerToys/blob/main/.pipelines/ci/templates/build-powertoys-steps.yml) for new test projects
+   - [ ] [YML for signed pipeline](https://github.com/microsoft/PowerToys/blob/main/.pipelines/release.yml)
+- [ ] **Documentation updated:** If checked, please file a pull request on [our docs repo](https://github.com/MicrosoftDocs/windows-uwp/tree/docs/hub/powertoys) and link it here: #xxx
+
+<!-- Provide a more detailed description of the PR, other things fixed, or any additional comments/features here -->
+## Detailed Description of the Pull Request / Additional comments
+This PR includes a new reference guide feature for Quick Accent's Settings page to show the character mappings for each language. Previously, a language's mappings were unavailable to view unless the user inspected the source code or tested each key in turn after enabling a language.
+
+## Interface
+
+Accessed via the new **Open reference guide** button on the Quick Accent settings page:
+
+<img width="983" height="437" alt="image" src="https://github.com/user-attachments/assets/5c05a90b-9bf2-471d-99fb-6ab592235d95" />
+
+The user's selected language(s) are listed first, with the others beneath in alphabetical order:
+
+<img width="956" height="806" alt="image" src="https://github.com/user-attachments/assets/ac68be40-7bb1-49e1-a20a-883f67b2a359" />
+
+Hover over any character to see its Unicode description. These often have great descriptions:
+
+<img width="432" height="176" alt="image" src="https://github.com/user-attachments/assets/caf95e9a-20f6-49eb-87a8-c17e72cf1d45" />
+
+Click on any character to copy it to the clipboard:
+
+https://github.com/user-attachments/assets/67bfc14f-7ab3-492c-a345-d7fa5462b164
+
+Search for any character to filter the list to only the language(s) where it is included:
+
+<img width="942" height="657" alt="image" src="https://github.com/user-attachments/assets/88a4a0c6-1732-4bf1-a120-af7b08139742" />
+
+<img width="942" height="245" alt="image" src="https://github.com/user-attachments/assets/0a17d012-8307-411a-b12b-2d5bf88f7773" />
+
+(Unfortunately, we don't have a language containing this emoji just yet.)
+
+## Additional features
+### Combining marks
+Some Unicode code points are combining marks like diacritics, which can be very small and difficult to discern. A standard way of illustrating the effect of a combining mark is to use the dotted circle (https://en.wikipedia.org/wiki/Dotted_circle). The reference guide uses this method to better show diacritics, as illustrated here for Hebrew:
+
+<img width="260" height="572" alt="image" src="https://github.com/user-attachments/assets/44d849f7-014a-4285-a43b-c17a5bcd1c44" />
+
+We may wish to add this feature as an option for Quick Accent's main selection interface in the future.
+
+### UnicodeInformation replacement
+Previously, Quick Accent relied upon the UnicodeInformation nuget package for Unicode character description information. This is a 1.5 MB DLL (with the package near 7.5 MB) and outdated, with the last release from more than 3 years ago. As such it doesn't include the latest changes and additions to the Unicode standard, which will be important when we move to support user-defined languages in the future. It would have needed to have been referenced by the Settings UI project as part of this update.
+
+Instead, this PR introduces a small UnicodeHelper class which retrieves the Unicode descriptions directly from the Windows ICU library, which is serviced as a standard Windows component, and is automatically updated when a new version of the Unicode standard releases. This also removes the previous need to load and prepare the cache for the Unicode information. The information retrieved is in the exact same format as before. (The ICU library has been a standard component since Windows 10 version 1903.)
+
+### Miscellaneous
+This adds a re-entrancy guard to the All languages tri-state checkbox on the settings page. No functionality change, just a robustness improvement.
+
+A minor refactoring to `GetCharacterDescription()` (beyond now calling `UnicodeHelper` to get the underlying character information) simplifies the flow and hopefully makes this more readable. I added a note about removing Zero-Width Joiner descriptions in the future, as description length may become an issue in the future with fully custom mappings.
+
+<!-- Describe how you validated the behavior. Add automated tests wherever possible, but list manual validation steps taken as well -->
+## Validation Steps Performed
+- 9 new unit tests under **Settings.UI.UnitTests/ViewModelTests/PowerAccentReferenceGuideViewModelTests**
+- Confirmed that all unit tests pass, including all **Settings.UI.UnitTests** and **PowerAccent*** tests.
+- Manual testing to confirm that:
+    - Navigation to the guide and back (using the standard back arrow button) work
+    - Ordering is correct and the groupings follow the user's currently selected sets
+    - Filtering works as expected for simple characters and more complex instances like `°C`
+    - Formatting and descriptions are the same as before for single- and multi-codepoint Unicode characters
+    - The UnicodeInformation package is not referenced in any other project
+
+### Unit tests
+<img width="260" height="52" alt="image" src="https://github.com/user-attachments/assets/e3d67cb4-4008-4911-bcdf-3d0299caf48f" />
+
+<img width="317" height="71" alt="image" src="https://github.com/user-attachments/assets/5313fa5c-cfcf-4396-91f9-9074b57ba193" />
+
+## Screen recording
+
+This screen recording shows how the reference guide is opened via the main Quick Accent page, demonstrates the filtering and hover functionality, and finally shows using the back button to return to the originating Quick Accent settings page:
+
+https://github.com/user-attachments/assets/ebc1bb59-014e-423c-99b7-4cd3c7c58caf
+
