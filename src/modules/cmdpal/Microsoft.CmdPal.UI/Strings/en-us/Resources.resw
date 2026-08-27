@@ -1654,7 +1654,7 @@ Right-click to remove the key combination, thereby deactivating the shortcut.</v
     <value>Command unavailable</value>
   </data>
   <data name="ExternalCommandLink_Unavailable_Description" xml:space="preserve">
-    <value>The linked command is not installed, enabled, or available at the top level.</value>
+    <value>The linked command is not installed, enabled, or available.</value>
   </data>
   <data name="ExternalCommandLink_Reload_Name" xml:space="preserve">
     <value>Reload extensions</value>
