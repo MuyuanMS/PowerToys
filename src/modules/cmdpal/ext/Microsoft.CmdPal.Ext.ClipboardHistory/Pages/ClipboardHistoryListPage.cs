@@ -50,7 +50,7 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
         ReloadClipboardHistoryIfLoaded();
     }
 
-    private void TrackClipboardHistoryEnabledChanged_EventHandler(object? sender, ClipboardHistoryEnabledChangedEventArgs? e)
+    private void TrackClipboardHistoryEnabledChanged_EventHandler(object? sender, object? e)
     {
         ReloadClipboardHistoryIfLoaded();
     }
@@ -153,11 +153,6 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
                 {
                     loadInFlight = false;
                 }
-            }
-
-            if (!loadSucceeded)
-            {
-                Interlocked.Exchange(ref hasLoadedOnce, 0);
             }
 
             try
@@ -374,12 +369,12 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
     {
         // This registry read is only a cheap pre-filter. Clipboard.IsHistoryEnabled()
         // remains the authoritative check inside the load.
+        var initialLoadRequested = Interlocked.CompareExchange(ref hasLoadedOnce, 1, 0) == 0;
         if (!IsClipboardHistoryEnabled())
         {
             ClearClipboardHistory();
         }
-        else if (Volatile.Read(ref hasLoadedOnce) == 0 &&
-                 Interlocked.CompareExchange(ref hasLoadedOnce, 1, 0) == 0)
+        else if (initialLoadRequested)
         {
             LoadClipboardHistoryInSTA();
         }
