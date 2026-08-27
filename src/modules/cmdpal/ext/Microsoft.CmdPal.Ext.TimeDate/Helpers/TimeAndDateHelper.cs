@@ -529,12 +529,17 @@ internal static class TimeAndDateHelper
             {
                 dtObject = dateTimeNowUtc;
                 syntax = syntax.Substring(4);
+                if (string.IsNullOrWhiteSpace(syntax))
+                {
+                    return false;
+                }
+
                 weekOfYear = GetWeekOfYear(dtObject, firstWeekRule, firstDayOfTheWeek);
             }
 
             var unixTimestamp = ((DateTimeOffset)dateTimeNowUtc).ToUnixTimeSeconds();
             var unixTimestampMilliseconds = ((DateTimeOffset)dateTimeNowUtc).ToUnixTimeMilliseconds();
-            var eraShort = DateTimeFormatInfo.CurrentInfo.GetAbbreviatedEraName(calendar.GetEra(dateTimeNow));
+            var eraShort = DateTimeFormatInfo.CurrentInfo.GetAbbreviatedEraName(calendar.GetEra(dtObject));
             var hasCustomSyntax = StringContainsCustomFormatSyntax(syntax);
             var value = ConvertToCustomFormat(dtObject, unixTimestamp, unixTimestampMilliseconds, weekOfYear, eraShort, syntax, firstWeekRule, firstDayOfTheWeek);
             try
