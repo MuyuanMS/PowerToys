@@ -45,14 +45,14 @@ public sealed partial class TimeDateCommandsProvider : CommandProvider
         _notificationCenterBandItem = new NotificationCenterDockBand();
         _clockDockBand = new WrappedDockItem(
             [_bandItem],
-            "com.microsoft.cmdpal.timedate.clock",
+            "com.microsoft.cmdpal.timedate.dockBand",
             Resources.Microsoft_plugin_timedate_dock_band_title)
         {
             Icon = _timeDateExtensionPage.Icon,
         };
         _notificationCenterDockBand = new WrappedDockItem(
             [_notificationCenterBandItem],
-            "com.microsoft.cmdpal.timedate.notificationCenter",
+            "com.microsoft.cmdpal.timedate.notificationCenterBand",
             Resources.timedate_notification_center_band_title);
 
         // Update the band immediately when the user changes a setting (e.g. the week
