@@ -10,8 +10,10 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 
+using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.PowerToys.ThumbnailHandler.ThreeMf;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
 
 using GeometryModel3D = System.Windows.Media.Media3D.GeometryModel3D;
 using MediaColors = System.Windows.Media.Colors;
@@ -147,10 +149,17 @@ namespace ThreeMfThumbnailProviderUnitTests
         {
             using var stream = CreateMeshOnlyThreeMf();
             var expectedColor = System.Windows.Media.Color.FromRgb(0x12, 0x34, 0x56);
+            var configuredSettings = new PowerPreviewSettings();
+            configuredSettings.Properties.ThreeMfThumbnailColor.Value = "#123456";
+            var settingsUtils = new Mock<SettingsUtils>(new System.IO.Abstractions.FileSystem(), null);
+            settingsUtils
+                .Setup(utils => utils.GetSettings<PowerPreviewSettings>(PowerPreviewSettings.ModuleName, SettingsUtils.DefaultFileName))
+                .Returns(configuredSettings);
+            var materialColor = ThreeMfThumbnailProvider.GetMaterialColor(settingsUtils.Object);
 
             var loaderType = typeof(ThreeMfThumbnailProvider).Assembly.GetType("Microsoft.PowerToys.ThumbnailHandler.ThreeMf.ThreeMfModelLoader");
             var loadModel = loaderType.GetMethod("LoadModel", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-            var model = loadModel.Invoke(null, new object[] { stream, expectedColor }) as System.Windows.Media.Media3D.Model3DGroup;
+            var model = loadModel.Invoke(null, new object[] { stream, materialColor }) as System.Windows.Media.Media3D.Model3DGroup;
             Assert.IsNotNull(model);
 
             var geometry = model.Children[0] as System.Windows.Media.Media3D.GeometryModel3D;

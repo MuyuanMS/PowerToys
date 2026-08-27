@@ -241,11 +241,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             {
                 try
                 {
-                    var moduleSettings = SettingsUtils.Default;
-
-                    var colorString = moduleSettings.GetSettings<PowerPreviewSettings>(PowerPreviewSettings.ModuleName).Properties.ThreeMfThumbnailColor.Value;
-
-                    return (Color)ColorConverter.ConvertFromString(colorString);
+                    return GetMaterialColor(SettingsUtils.Default);
                 }
                 catch (FileNotFoundException)
                 {
@@ -254,6 +250,12 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                     return Color.FromRgb(255, 201, 36);
                 }
             }
+        }
+
+        internal static Color GetMaterialColor(SettingsUtils moduleSettings)
+        {
+            var colorString = moduleSettings.GetSettings<PowerPreviewSettings>(PowerPreviewSettings.ModuleName).Properties.ThreeMfThumbnailColor.Value;
+            return (Color)ColorConverter.ConvertFromString(colorString);
         }
     }
 }
