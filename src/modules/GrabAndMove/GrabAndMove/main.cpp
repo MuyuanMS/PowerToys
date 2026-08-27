@@ -2069,7 +2069,7 @@ static void ArmPendingInteraction(InteractionAction action, MouseButton button, 
 // releases the modifier. The captured-modifier state is intentionally retained so
 // the keyboard hook forwards that real key-up; replayedDown guards
 // against replaying the key-down more than once (e.g. across repeated clicks).
-static void ReplayPendingClick(MouseButton button, bool completeModifier = false)
+static bool ReplayPendingClick(MouseButton button, bool completeModifier = false)
 {
     if (g_modifierSession.absorbed && !g_modifierSession.replayedDown)
     {
@@ -2082,7 +2082,7 @@ static void ReplayPendingClick(MouseButton button, bool completeModifier = false
     inputs[0].mi.dwFlags = MouseEventFlagForButton(button, false);
     inputs[1].type = INPUT_MOUSE;
     inputs[1].mi.dwFlags = MouseEventFlagForButton(button, true);
-    SendInput(2, inputs, sizeof(INPUT));
+    const bool replayedClick = SendInput(ARRAYSIZE(inputs), inputs, sizeof(INPUT)) == ARRAYSIZE(inputs);
 
     if (completeModifier && g_modifierSession.replayedDown)
     {
@@ -2099,6 +2099,8 @@ static void ReplayPendingClick(MouseButton button, bool completeModifier = false
             g_swallowNextModifierUpVk = virtualKey;
         }
     }
+
+    return replayedClick;
 }
 
 static void MarkButtonUpForSwallow(MouseButton button)
@@ -2132,8 +2134,10 @@ static void FlushPendingClickOnModifierRelease()
     {
         const MouseButton button = g_interaction.button;
         StopInteraction();
-        ReplayPendingClick(button);
-        MarkButtonUpForSwallow(button);
+        if (ReplayPendingClick(button))
+        {
+            MarkButtonUpForSwallow(button);
+        }
     }
 }
 
@@ -2318,7 +2322,7 @@ static LRESULT CompleteHook(
     case HookDisposition::Swallow:
         return 1;
     case HookDisposition::PassWithoutChaining:
-        return 0;
+        return CallNextHookEx(hook, nCode, wParam, lParam);
     case HookDisposition::Chain:
     default:
         return CallNextHookEx(hook, nCode, wParam, lParam);
@@ -2715,16 +2719,15 @@ static void RecoverStaleInteraction(MouseButton incomingButton)
     if (g_interaction.phase == InteractionPhase::Pending)
     {
         StopInteraction();
-        ReplayPendingClick(button, true);
+        const bool replayedClick = ReplayPendingClick(button, true);
+        if (incomingButton != button && replayedClick)
+        {
+            MarkButtonUpForSwallow(button);
+        }
     }
     else
     {
         StopInteraction();
-    }
-
-    if (incomingButton != button)
-    {
-        MarkButtonUpForSwallow(button);
     }
 }
 
@@ -2806,8 +2809,10 @@ static HookDisposition HandleMouseEvent(WPARAM message, const MSLLHOOKSTRUCT& mo
             else
             {
                 g_modifierSession.disposition = ModifierHoldDisposition::Passthrough;
-                ReplayPendingClick(pending.button);
-                MarkButtonUpForSwallow(pending.button);
+                if (ReplayPendingClick(pending.button))
+                {
+                    MarkButtonUpForSwallow(pending.button);
+                }
             }
         }
         return HookDisposition::PassWithoutChaining;
@@ -2840,8 +2845,7 @@ static HookDisposition HandleMouseEvent(WPARAM message, const MSLLHOOKSTRUCT& mo
         g_modifierSession.disposition = ModifierHoldDisposition::Passthrough;
         const MouseButton button = g_interaction.button;
         StopInteraction();
-        ReplayPendingClick(button);
-        return HookDisposition::Swallow;
+        return ReplayPendingClick(button) ? HookDisposition::Swallow : HookDisposition::Chain;
     }
 
     if (upButton != MouseButton::None &&
