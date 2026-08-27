@@ -2433,8 +2433,9 @@ static HookDisposition ReleaseModifierSession()
         {
             if (g_modifierSession.modifier == GrabAndMoveModifier::Win)
             {
-                ReplayCapturedModifier(ModifierReplay::DownAndUp);
-                disposition = HookDisposition::Swallow;
+                const UINT inserted = ReplayCapturedModifier(ModifierReplay::DownAndUp);
+                disposition =
+                    inserted == 1 ? HookDisposition::Chain : HookDisposition::Swallow;
             }
             else
             {
