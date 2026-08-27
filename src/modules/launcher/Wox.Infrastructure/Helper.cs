@@ -7,6 +7,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO.Abstractions;
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -157,21 +158,52 @@ namespace Wox.Infrastructure
             }
             else if (pattern.Contains("%1", StringComparison.Ordinal))
             {
-                if (pattern.Contains("\"%1\"", StringComparison.Ordinal))
-                {
-                    // Pattern already wraps %1 in quotes (e.g. "chrome.exe" -- "%1"); substitute as-is to avoid double-quoting.
-                    arguments = pattern.Replace("%1", arguments);
-                }
-                else
-                {
-                    // Pattern does not quote %1 (e.g. Edge's own "--single-argument %1" fallback). Quote the substituted
-                    // value so multi-word arguments survive as a single token instead of being split on whitespace by
-                    // the shell, and escape any embedded quotes so they don't prematurely close the quoted argument.
-                    arguments = pattern.Replace("%1", $"\"{arguments.Replace("\"", "\\\"", StringComparison.Ordinal)}\"");
-                }
+                arguments = ReplaceCommandArgument(pattern, arguments);
             }
 
             return OpenInShell(path, arguments, workingDir, runAs, runWithHiddenWindow);
+        }
+
+        internal static string ReplaceCommandArgument(string pattern, string arguments)
+        {
+            if (pattern.Contains("\"%1\"", StringComparison.Ordinal))
+            {
+                return pattern.Replace("%1", arguments);
+            }
+
+            return pattern.Replace("%1", QuoteCommandLineArgument(arguments));
+        }
+
+        private static string QuoteCommandLineArgument(string argument)
+        {
+            argument ??= string.Empty;
+
+            var quotedArgument = new StringBuilder("\"");
+            var backslashCount = 0;
+
+            foreach (var character in argument)
+            {
+                if (character == '\\')
+                {
+                    backslashCount++;
+                }
+                else if (character == '"')
+                {
+                    quotedArgument.Append('\\', (backslashCount * 2) + 1);
+                    quotedArgument.Append(character);
+                    backslashCount = 0;
+                }
+                else
+                {
+                    quotedArgument.Append('\\', backslashCount);
+                    quotedArgument.Append(character);
+                    backslashCount = 0;
+                }
+            }
+
+            quotedArgument.Append('\\', backslashCount * 2);
+            quotedArgument.Append('"');
+            return quotedArgument.ToString();
         }
 
         public static bool OpenInShell(string path, string arguments = null, string workingDir = null, ShellRunAsType runAs = ShellRunAsType.None, bool runWithHiddenWindow = false)
