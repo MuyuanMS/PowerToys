@@ -15,6 +15,7 @@ using Microsoft.CmdPal.Common.WinGet.Services;
 using Microsoft.CmdPal.UI.ViewModels.Gallery;
 using Microsoft.CmdPal.UI.ViewModels.Services;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Management.Deployment;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
@@ -27,6 +28,7 @@ public class ExtensionGalleryViewModelTests
     private static readonly string[] NameOrderIds = ["alpha", "beta", "gamma"];
     private static readonly string[] AuthorOrderIds = ["second", "third", "first"];
     private static readonly string[] InstallationStatusOrderIds = ["update", "installed", "not-installed"];
+    private static readonly string[] StoreOnlyExtensionIds = ["9NZ06M9CNV77"];
 
     [TestMethod]
     public async Task LoadAsync_DoesNotBlockOnSlowSynchronousInstalledStatusKickoff()
@@ -217,6 +219,60 @@ public class ExtensionGalleryViewModelTests
         Assert.IsTrue(refreshTask.IsCompletedSuccessfully);
         Assert.AreEqual(1, viewModel.FilteredEntries.Count);
         Assert.AreEqual("Feed Extension", viewModel.FilteredEntries[0].Title);
+    }
+
+    [TestMethod]
+    public async Task LoadAsync_QueriesStoreOnlyExtensions()
+    {
+        var galleryService = CreateGalleryService(
+            CreateGalleryEntry(
+                "store-only-extension",
+                "Store-only Extension",
+                "Author",
+                storeId: "9NZ06M9CNV77"));
+
+        var extensionService = new Mock<IExtensionService>();
+        extensionService
+            .Setup(s => s.GetInstalledExtensionsAsync(true))
+            .ReturnsAsync(Array.Empty<IExtensionWrapper>());
+
+        var winGetService = new Mock<IWinGetPackageManagerService>();
+        winGetService.Setup(s => s.State).Returns(new WinGetServiceState(true, null));
+        winGetService
+            .Setup(s => s.GetStorePackagesByIdAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                new WinGetQueryResult<IReadOnlyDictionary<string, CatalogPackage>>(
+                    new Dictionary<string, CatalogPackage>(StringComparer.OrdinalIgnoreCase),
+                    false,
+                    null));
+
+        using var viewModel = new ExtensionGalleryViewModel(
+            galleryService.Object,
+            new[] { extensionService.Object },
+            NullLogger<ExtensionGalleryViewModel>.Instance,
+            CreateGalleryExtensionViewModelFactory(winGetPackageManagerService: winGetService.Object),
+            winGetService.Object,
+            winGetPackageStatusService: null,
+            winGetOperationTrackerService: null);
+
+        await viewModel.LoadAsync();
+
+        await WaitForConditionAsync(() =>
+        {
+            try
+            {
+                winGetService.Verify(
+                    s => s.GetStorePackagesByIdAsync(
+                        It.Is<IEnumerable<string>>(ids => ids.SequenceEqual(StoreOnlyExtensionIds)),
+                        It.IsAny<CancellationToken>()),
+                    Times.Once);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        });
     }
 
     [TestMethod]
@@ -549,7 +605,8 @@ public class ExtensionGalleryViewModelTests
         string title,
         string authorName,
         string? winGetId = null,
-        string? packageFamilyName = null)
+        string? packageFamilyName = null,
+        string? storeId = null)
     {
         List<GalleryInstallSource> installSources = [];
         if (!string.IsNullOrWhiteSpace(winGetId))
@@ -558,6 +615,15 @@ public class ExtensionGalleryViewModelTests
             {
                 Type = "winget",
                 Id = winGetId,
+            });
+        }
+
+        if (!string.IsNullOrWhiteSpace(storeId))
+        {
+            installSources.Add(new GalleryInstallSource
+            {
+                Type = "msstore",
+                Id = storeId,
             });
         }
 
