@@ -277,6 +277,11 @@ public partial class TabbedPageViewModel : PageViewModel
             return null;
         }
 
+        if (page is not IListPage and not IContentPage)
+        {
+            return null;
+        }
+
         var child = _factory.TryCreatePageViewModel(page, true, ExtensionHost, ProviderContext);
         if (child is null)
         {
@@ -368,7 +373,7 @@ public partial class TabbedPageViewModel : PageViewModel
             !initializationTask.IsCompleted)
         {
             _ = initializationTask.ContinueWith(
-                _ => DisposeChild(child),
+                _ => DoOnUiThread(() => DisposeChild(child)),
                 CancellationToken.None,
                 TaskContinuationOptions.ExecuteSynchronously,
                 TaskScheduler.Default);
@@ -407,19 +412,13 @@ public partial class TabbedPageViewModel : PageViewModel
         DetachActiveChildLoading(ActiveChild);
         ActiveChild = null;
 
-        foreach (var child in _childCache.Values)
+        foreach (var child in _childCache.Values.ToList())
         {
-            DetachActiveChildLoading(child);
-            child.SafeCleanup();
-            if (child is IDisposable disposable)
-            {
-                disposable.Dispose();
-            }
+            DisposeChild(child);
         }
 
         _childCache.Clear();
         _childPages.Clear();
-        _childInitializationTasks.Clear();
 
         foreach (var tab in Tabs)
         {
