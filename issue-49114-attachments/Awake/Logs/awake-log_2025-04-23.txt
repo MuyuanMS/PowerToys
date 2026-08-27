@@ -1,0 +1,4 @@
+[2025-04-23 09:00:48.178031] [p-24840] [t-9780] [info] launcher logger is initialized
+[2025-04-23 09:00:48.178251] [p-24840] [t-9780] [info] Launcher object is constructing
+[2025-04-23 09:00:49.460758] [p-24840] [t-9780] [trace] Launching PowerToys Awake process
+[2025-04-23 09:00:49.460876] [p-24840] [t-9780] [trace] PowerToys Awake launching with parameters: --use-pt-config --pid 24840

@@ -1,0 +1,20 @@
+[2024-05-24 08:43:12.335948] [p-1304] [t-11224] [info] launcher logger is initialized
+[2024-05-24 08:43:12.336011] [p-1304] [t-11224] [info] Launcher object is constructing
+[2024-05-24 08:43:12.966235] [p-1304] [t-11224] [trace] Launching PowerToys Awake process
+[2024-05-24 08:43:12.966292] [p-1304] [t-11224] [trace] PowerToys Awake launching with parameters: --use-pt-config --pid 1304
+[2024-05-24 10:15:32.515476] [p-14280] [t-14284] [info] launcher logger is initialized
+[2024-05-24 10:15:32.515626] [p-14280] [t-14284] [info] Launcher object is constructing
+[2024-05-24 10:15:33.131156] [p-14280] [t-14284] [trace] Launching PowerToys Awake process
+[2024-05-24 10:15:33.131408] [p-14280] [t-14284] [trace] PowerToys Awake launching with parameters: --use-pt-config --pid 14280
+[2024-05-24 12:34:03.278763] [p-11220] [t-11248] [info] launcher logger is initialized
+[2024-05-24 12:34:03.279010] [p-11220] [t-11248] [info] Launcher object is constructing
+[2024-05-24 12:34:03.877568] [p-11220] [t-11248] [trace] Launching PowerToys Awake process
+[2024-05-24 12:34:03.877595] [p-11220] [t-11248] [trace] PowerToys Awake launching with parameters: --use-pt-config --pid 11220
+[2024-05-24 19:46:08.168828] [p-272] [t-6876] [info] launcher logger is initialized
+[2024-05-24 19:46:08.169202] [p-272] [t-6876] [info] Launcher object is constructing
+[2024-05-24 19:46:08.703501] [p-272] [t-6876] [trace] Launching PowerToys Awake process
+[2024-05-24 19:46:08.703532] [p-272] [t-6876] [trace] PowerToys Awake launching with parameters: --use-pt-config --pid 272
+[2024-05-24 22:54:28.528016] [p-1716] [t-4556] [info] launcher logger is initialized
+[2024-05-24 22:54:28.528269] [p-1716] [t-4556] [info] Launcher object is constructing
+[2024-05-24 22:54:28.955436] [p-1716] [t-4556] [trace] Launching PowerToys Awake process
+[2024-05-24 22:54:28.955458] [p-1716] [t-4556] [trace] PowerToys Awake launching with parameters: --use-pt-config --pid 1716

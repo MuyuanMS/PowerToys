@@ -1,0 +1,93 @@
+[2026-06-25 12:17:25.517262] [p-32788] [t-19556] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:17:25.809824] [p-32788] [t-11564] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:18:00.675677] [p-32788] [t-21800] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:18:05.444640] [p-32788] [t-33652] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:18:26.067192] [p-32788] [t-5828] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:18:26.081186] [p-32788] [t-5828] [info] Uninstalling PackageIdentity MSIX - perUser: true
+[2026-06-25 12:18:29.896739] [p-32788] [t-5828] [error] Per-user removal failed: 0x00000000 - 
+[2026-06-25 12:18:41.946748] [p-32788] [t-21368] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:18:42.694020] [p-32788] [t-33004] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:18:43.247892] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\.pp\shellex\{8895b1c6-b41f-4c1c-a562-0d564250836f}\Default:{D8034CFA-F34B-41FE-AD45-62FCBB52A6DA}: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.495659] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\.csproj\shellex\{8895b1c6-b41f-4c1c-a562-0d564250836f}\Default:{D8034CFA-F34B-41FE-AD45-62FCBB52A6DA}: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.545334] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\.gitconfig\shellex\{8895b1c6-b41f-4c1c-a562-0d564250836f}\Default:{D8034CFA-F34B-41FE-AD45-62FCBB52A6DA}: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.579671] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.580041] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\Default:PdfPreviewHandler: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.580325] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\InprocServer32\Default:C:\Users\mimichalis\AppData\Local\PowerToys\PowerToys.PdfPreviewHandlerCpp.dll: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.580591] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\InprocServer32\Assembly:PowerToys.PdfPreviewHandler, Version=v0.100.0.0, Culture=neutral: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.580842] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\InprocServer32\Class:PdfPreviewHandler: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.581086] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\InprocServer32\ThreadingModel:Apartment: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.581350] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\.pdf\shellex\{8895b1c6-b41f-4c1c-a562-0d564250836f}\Default:{A5A41CC7-02CB-41D4-8C9B-9087040D6098}: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.581780] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\AppID:{6d2b5079-2f0b-48dd-ab7f-97cec514d30b}: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.582671] [p-32788] [t-33004] [error] unApply of HKCU\Software\Microsoft\Windows\CurrentVersion\PreviewHandlers\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}:Pdf Preview Handler: RegDeleteKeyValueW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.645803] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{10144713-1526-46C9-88DA-1FB52807A9FF}\InprocServer32\Default:C:\Users\mimichalis\AppData\Local\PowerToys\PowerToys.SvgThumbnailProviderCpp.dll: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.646765] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{10144713-1526-46C9-88DA-1FB52807A9FF}\InprocServer32\Assembly:PowerToys.SvgThumbnailProvider, Version=v0.100.0.0, Culture=neutral: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.647130] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{10144713-1526-46C9-88DA-1FB52807A9FF}\InprocServer32\Class:SvgThumbnailProvider: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.647416] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{10144713-1526-46C9-88DA-1FB52807A9FF}\InprocServer32\ThreadingModel:Apartment: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.677924] [p-32788] [t-33004] [error] unApply of HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\KindMap\.svg:Picture: RegOpenKeyExW failed: Access is denied.
+[2026-06-25 12:18:43.681765] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.681890] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\Default:PdfThumbnailProvider: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.681945] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\InprocServer32\Default:C:\Users\mimichalis\AppData\Local\PowerToys\PowerToys.PdfThumbnailProviderCpp.dll: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.682003] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\InprocServer32\Assembly:PowerToys.PdfThumbnailProvider, Version=v0.100.0.0, Culture=neutral: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.682059] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\InprocServer32\Class:PdfThumbnailProvider: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.682126] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\InprocServer32\ThreadingModel:Apartment: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.682187] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\.pdf\shellex\{E357FCCD-A995-4576-B01F-234630154E96}\Default:{D8BB9942-93BD-412D-87E4-33FAB214DC1A}: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.683850] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{F2847CBE-CD03-4C83-A359-1A8052C1B9D5}\InprocServer32\Default:C:\Users\mimichalis\AppData\Local\PowerToys\PowerToys.GcodeThumbnailProviderCpp.dll: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.683941] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{F2847CBE-CD03-4C83-A359-1A8052C1B9D5}\InprocServer32\Assembly:PowerToys.GcodeThumbnailProvider, Version=v0.100.0.0, Culture=neutral: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.684016] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{F2847CBE-CD03-4C83-A359-1A8052C1B9D5}\InprocServer32\Class:GcodeThumbnailProvider: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.684141] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{F2847CBE-CD03-4C83-A359-1A8052C1B9D5}\InprocServer32\ThreadingModel:Apartment: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.688319] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{5c93a1e4-99d0-4fb3-991c-6c296a27be21}\InprocServer32\Default:C:\Users\mimichalis\AppData\Local\PowerToys\PowerToys.BgcodeThumbnailProviderCpp.dll: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.688620] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{5c93a1e4-99d0-4fb3-991c-6c296a27be21}\InprocServer32\Assembly:PowerToys.BgcodeThumbnailProvider, Version=v0.100.0.0, Culture=neutral: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.688758] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{5c93a1e4-99d0-4fb3-991c-6c296a27be21}\InprocServer32\Class:BgcodeThumbnailProvider: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.688887] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{5c93a1e4-99d0-4fb3-991c-6c296a27be21}\InprocServer32\ThreadingModel:Apartment: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.700354] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{77257004-6F25-4521-B602-50ECC6EC62A6}\InprocServer32\Default:C:\Users\mimichalis\AppData\Local\PowerToys\PowerToys.StlThumbnailProviderCpp.dll: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.700733] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{77257004-6F25-4521-B602-50ECC6EC62A6}\InprocServer32\Assembly:PowerToys.StlThumbnailProvider, Version=v0.100.0.0, Culture=neutral: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.701027] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{77257004-6F25-4521-B602-50ECC6EC62A6}\InprocServer32\Class:StlThumbnailProvider: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.701300] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{77257004-6F25-4521-B602-50ECC6EC62A6}\InprocServer32\ThreadingModel:Apartment: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.709966] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{AD856B15-D25E-4008-AFB7-AFAA55586188}\InprocServer32\Default:C:\Users\mimichalis\AppData\Local\PowerToys\PowerToys.QoiThumbnailProviderCpp.dll: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.710377] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{AD856B15-D25E-4008-AFB7-AFAA55586188}\InprocServer32\Assembly:PowerToys.QoiThumbnailProvider, Version=v0.100.0.0, Culture=neutral: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.710674] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{AD856B15-D25E-4008-AFB7-AFAA55586188}\InprocServer32\Class:QoiThumbnailProvider: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.710925] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\CLSID\{AD856B15-D25E-4008-AFB7-AFAA55586188}\InprocServer32\ThreadingModel:Apartment: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.715094] [p-32788] [t-33004] [error] unApply of HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\KindMap\.qoi:Picture: RegOpenKeyExW failed: Access is denied.
+[2026-06-25 12:18:43.723317] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\PowerToys.RegistryPreview\Application\ApplicationName:Registry Preview: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.723670] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\PowerToys.RegistryPreview\DefaultIcon\Default:C:\Users\mimichalis\AppData\Local\PowerToys\\WinUI3Apps\PowerToys.RegistryPreview.exe: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.723943] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\PowerToys.RegistryPreview\shell\open\command\Default:C:\Users\mimichalis\AppData\Local\PowerToys\\WinUI3Apps\PowerToys.RegistryPreview.exe "----ms-protocol:ms-encodedlaunch:App?ContractId=Windows.File&Verb=open&File=%1": RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.724219] [p-32788] [t-33004] [error] unApply of HKCU\Software\Classes\.reg\OpenWithProgIDs\PowerToys.RegistryPreview:: RegOpenKeyExW failed: The system cannot find the file specified.
+[2026-06-25 12:18:43.829096] [p-32788] [t-33132] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:18:46.203480] [p-32788] [t-33132] [info] Unregister Microsoft.PowerToys.PowerRenameContextMenu_0.100.0.0_neutral__8wekyb3d8bbwe package completed.
+[2026-06-25 12:18:48.491183] [p-32788] [t-33132] [info] Unregister Microsoft.PowerToys.ImageResizerContextMenu_0.100.0.0_neutral__8wekyb3d8bbwe package completed.
+[2026-06-25 12:18:50.880610] [p-32788] [t-33132] [info] Unregister Microsoft.PowerToys.FileLocksmithContextMenu_0.100.0.0_neutral__8wekyb3d8bbwe package completed.
+[2026-06-25 12:18:50.957314] [p-32788] [t-20864] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:18:51.061740] [p-32788] [t-5004] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:18:51.161513] [p-32788] [t-33116] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:18:51.270893] [p-32788] [t-27528] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:18:51.360239] [p-32788] [t-19836] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:19:47.640558] [p-32788] [t-6604] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:19:47.643604] [p-32788] [t-6604] [info] RemoveScheduledTasksCA Initialized.
+[2026-06-25 12:19:47.697563] [p-32788] [t-6604] [info] Deleted the PowerToys Task Scheduler folder.
+[2026-06-25 12:19:47.795905] [p-32788] [t-4488] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:19:47.807490] [p-32788] [t-4488] [error] Couldn't install DSC module!
+[2026-06-25 12:20:21.141548] [p-32788] [t-14668] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:20:21.153383] [p-32788] [t-14668] [info] DSC module was uninstalled!
+[2026-06-25 12:20:22.877767] [p-32788] [t-6496] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:20:32.171811] [p-32788] [t-21300] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:20:32.174972] [p-32788] [t-21300] [info] RemoveScheduledTasksCA Initialized.
+[2026-06-25 12:20:32.180607] [p-32788] [t-21300] [info] The PowerToys scheduled task folder wasn't found. Nothing to delete.
+[2026-06-25 12:21:45.929787] [p-32788] [t-2300] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:21:46.028505] [p-32788] [t-20448] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:21:46.872600] [p-32788] [t-20448] [error] apply of HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\KindMap\.svg:Picture: RegCreateKeyExW failed: Access is denied.
+[2026-06-25 12:21:46.944477] [p-32788] [t-20448] [error] apply of HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\KindMap\.qoi:Picture: RegCreateKeyExW failed: Access is denied.
+[2026-06-25 12:21:46.949408] [p-32788] [t-20448] [info] All registry changeSets applied successfully
+[2026-06-25 12:21:47.048406] [p-32788] [t-32012] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:21:54.106445] [p-32788] [t-2424] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:21:54.637953] [p-32788] [t-2424] [info] Package name: Microsoft.VCLibs.140.00.UWPDesktop, version: 14.0.33728.0, appxPath: C:\Users\mimichalis\AppData\Local\PowerToys\\WinUI3Apps\CmdPal\Dependencies\x64\Microsoft.VCLibs.x64.14.00.Desktop.appx
+[2026-06-25 12:21:54.758208] [p-32788] [t-2424] [info] Package Microsoft.VCLibs.140.00.UWPDesktop is already satisfied with version 14.0.33728.0; target version 14.0.33728.0; appxPath: C:\Users\mimichalis\AppData\Local\PowerToys\\WinUI3Apps\CmdPal\Dependencies\x64\Microsoft.VCLibs.x64.14.00.Desktop.appx
+[2026-06-25 12:21:54.759263] [p-32788] [t-2424] [info] Dependency already satisfied: C:\Users\mimichalis\AppData\Local\PowerToys\\WinUI3Apps\CmdPal\Dependencies\x64\Microsoft.VCLibs.x64.14.00.Desktop.appx
+[2026-06-25 12:22:12.513489] [p-32788] [t-2424] [info] Register C:\Users\mimichalis\AppData\Local\PowerToys\\WinUI3Apps\CmdPal\Microsoft.CmdPal.UI_0.11.11733.0_x64.msix package completed.
+[2026-06-25 12:22:12.545752] [p-32788] [t-29920] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:22:12.546650] [p-32788] [t-29920] [info] Installing PackageIdentity MSIX - perUser: true
+[2026-06-25 12:22:17.021432] [p-32788] [t-26908] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:22:17.038473] [p-32788] [t-26908] [info] DSC module was installed!
+[2026-06-25 12:22:17.084531] [p-32788] [t-25708] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:22:20.863304] [p-32788] [t-22348] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:22:20.956969] [p-32788] [t-33080] [info] PowerToysMSI logger is initialized
+[2026-06-25 12:22:21.401317] [p-32788] [t-21608] [info] PowerToysMSI logger is initialized

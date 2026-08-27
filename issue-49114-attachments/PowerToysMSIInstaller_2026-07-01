@@ -1,0 +1,13 @@
+[2026-07-01 09:08:12.517814] [p-16660] [t-6148] [info] PowerToysMSI logger is initialized
+[2026-07-01 09:08:13.157906] [p-16660] [t-29804] [info] PowerToysMSI logger is initialized
+[2026-07-01 09:08:41.064531] [p-16660] [t-18588] [info] PowerToysMSI logger is initialized
+[2026-07-01 09:08:47.919438] [p-16660] [t-30668] [info] PowerToysMSI logger is initialized
+[2026-07-01 09:09:03.231984] [p-16660] [t-29100] [info] PowerToysMSI logger is initialized
+[2026-07-01 09:09:03.248346] [p-16660] [t-29100] [info] Uninstalling PackageIdentity MSIX - perUser: true
+[2026-07-01 09:09:09.713362] [p-16660] [t-29100] [error] Per-user removal failed: 0x00000000 - 
+[2026-07-01 09:09:51.917025] [p-3712] [t-25728] [info] PowerToysMSI logger is initialized
+[2026-07-01 09:09:52.205528] [p-3712] [t-19516] [info] PowerToysMSI logger is initialized
+[2026-07-01 09:10:15.985379] [p-3712] [t-23000] [info] PowerToysMSI logger is initialized
+[2026-07-01 09:10:31.472012] [p-22256] [t-21772] [info] PowerToysMSI logger is initialized
+[2026-07-01 09:10:31.743249] [p-22256] [t-15432] [info] PowerToysMSI logger is initialized
+[2026-07-01 09:10:55.579709] [p-22256] [t-24232] [info] PowerToysMSI logger is initialized

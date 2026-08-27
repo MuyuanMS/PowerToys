@@ -1,0 +1,2 @@
+[2024-11-27 09:33:43.711877] [p-12856] [t-12852] [info] FileExplorer logger is initialized
+[2024-11-27 09:33:43.711978] [p-12856] [t-12852] [info] Initializing PowerPreviewModule

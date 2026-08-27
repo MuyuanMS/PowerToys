@@ -1,0 +1,4 @@
+[2024-11-29 15:14:41.272641] [p-26116] [t-28652] [info] launcher logger is initialized
+[2024-11-29 15:14:41.272713] [p-26116] [t-28652] [info] Launcher object is constructing
+[2024-11-29 15:14:41.635458] [p-26116] [t-28652] [trace] Launching PowerToys Awake process
+[2024-11-29 15:14:41.635492] [p-26116] [t-28652] [trace] PowerToys Awake launching with parameters: --use-pt-config --pid 26116

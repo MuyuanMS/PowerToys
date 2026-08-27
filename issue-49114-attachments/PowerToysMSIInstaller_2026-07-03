@@ -1,0 +1,24 @@
+[2026-07-03 14:17:29.332431] [p-21620] [t-6756] [info] PowerToysMSI logger is initialized
+[2026-07-03 14:17:29.421494] [p-21620] [t-22756] [info] PowerToysMSI logger is initialized
+[2026-07-03 14:17:48.168777] [p-21620] [t-13772] [info] PowerToysMSI logger is initialized
+[2026-07-03 14:17:52.861887] [p-21620] [t-3128] [info] PowerToysMSI logger is initialized
+[2026-07-03 14:17:52.863196] [p-21620] [t-3128] [info] RemoveScheduledTasksCA Initialized.
+[2026-07-03 14:17:52.883905] [p-21620] [t-3128] [info] Deleted the PowerToys Task Scheduler folder.
+[2026-07-03 14:19:14.789442] [p-21620] [t-6828] [info] PowerToysMSI logger is initialized
+[2026-07-03 14:19:14.846712] [p-21620] [t-35104] [info] PowerToysMSI logger is initialized
+[2026-07-03 14:19:15.329716] [p-21620] [t-35104] [error] apply of HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\KindMap\.svg:Picture: RegCreateKeyExW failed: Access is denied.
+[2026-07-03 14:19:15.379186] [p-21620] [t-35104] [error] apply of HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\KindMap\.qoi:Picture: RegCreateKeyExW failed: Access is denied.
+[2026-07-03 14:19:15.382635] [p-21620] [t-35104] [info] All registry changeSets applied successfully
+[2026-07-03 14:19:15.435431] [p-21620] [t-31064] [info] PowerToysMSI logger is initialized
+[2026-07-03 14:19:22.459120] [p-21620] [t-34800] [info] PowerToysMSI logger is initialized
+[2026-07-03 14:19:22.838632] [p-21620] [t-34800] [info] Package name: Microsoft.VCLibs.140.00.UWPDesktop, version: 14.0.33728.0, appxPath: C:\Users\mimichalis\AppData\Local\PowerToys\\WinUI3Apps\CmdPal\Dependencies\x64\Microsoft.VCLibs.x64.14.00.Desktop.appx
+[2026-07-03 14:19:22.928545] [p-21620] [t-34800] [info] Package Microsoft.VCLibs.140.00.UWPDesktop is already satisfied with version 14.0.33728.0; target version 14.0.33728.0; appxPath: C:\Users\mimichalis\AppData\Local\PowerToys\\WinUI3Apps\CmdPal\Dependencies\x64\Microsoft.VCLibs.x64.14.00.Desktop.appx
+[2026-07-03 14:19:22.929609] [p-21620] [t-34800] [info] Dependency already satisfied: C:\Users\mimichalis\AppData\Local\PowerToys\\WinUI3Apps\CmdPal\Dependencies\x64\Microsoft.VCLibs.x64.14.00.Desktop.appx
+[2026-07-03 14:19:40.419269] [p-21620] [t-34800] [info] Register C:\Users\mimichalis\AppData\Local\PowerToys\\WinUI3Apps\CmdPal\Microsoft.CmdPal.UI_0.11.11762.0_x64.msix package completed.
+[2026-07-03 14:19:40.501401] [p-21620] [t-28052] [info] PowerToysMSI logger is initialized
+[2026-07-03 14:19:40.504876] [p-21620] [t-28052] [info] Installing PackageIdentity MSIX - perUser: true
+[2026-07-03 14:19:44.718651] [p-21620] [t-31420] [info] PowerToysMSI logger is initialized
+[2026-07-03 14:19:44.748688] [p-21620] [t-31420] [info] DSC module was installed!
+[2026-07-03 14:19:52.076625] [p-21620] [t-30400] [info] PowerToysMSI logger is initialized
+[2026-07-03 14:19:52.263478] [p-21620] [t-37844] [info] PowerToysMSI logger is initialized
+[2026-07-03 14:20:11.593890] [p-21620] [t-37420] [info] PowerToysMSI logger is initialized
