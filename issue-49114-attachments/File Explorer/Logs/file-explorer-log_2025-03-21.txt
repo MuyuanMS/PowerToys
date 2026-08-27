@@ -1,6 +1,0 @@
-[2025-03-21 08:59:52.636590] [p-14008] [t-14012] [info] FileExplorer logger is initialized
-[2025-03-21 08:59:52.636675] [p-14008] [t-14012] [info] Initializing PowerPreviewModule
-[2025-03-21 09:13:58.532324] [p-14112] [t-11844] [info] FileExplorer logger is initialized
-[2025-03-21 09:13:58.532470] [p-14112] [t-11844] [info] Initializing PowerPreviewModule
-[2025-03-21 16:13:31.887494] [p-13064] [t-9168] [info] FileExplorer logger is initialized
-[2025-03-21 16:13:31.887586] [p-13064] [t-9168] [info] Initializing PowerPreviewModule
