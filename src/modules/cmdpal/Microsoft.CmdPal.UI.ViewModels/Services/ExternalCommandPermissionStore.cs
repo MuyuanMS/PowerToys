@@ -229,6 +229,10 @@ public sealed partial class ExternalCommandPermissionStore : IExternalCommandPer
             }
 
             var protectedData = await _dataProtector.ProtectAsync(plaintext, cancellationToken);
+            if (protectedData.Length > MaximumProtectedFileSize)
+            {
+                throw new InvalidDataException("The protected external command permission data is too large.");
+            }
 
             var directory = Path.GetDirectoryName(_filePath);
             if (!string.IsNullOrEmpty(directory))
