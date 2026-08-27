@@ -186,28 +186,6 @@ private:
                     result += std::towupper(ch);
                     capitalize_next = false;
                 }
-                else if (actionName == JSON_KEY_PASTE_AS_FILE)
-                {
-                    // Keep the hotkey sequence stable when older settings omit the JPEG action.
-                    const std::vector<winrt::hstring> expectedOrder = {
-                        L"paste-as-txt-file",
-                        L"paste-as-png-file",
-                        JSON_KEY_PASTE_AS_JPG_FILE,
-                        L"paste-as-html-file"
-                    };
-
-                    for (const auto& subActionName : expectedOrder)
-                    {
-                        if (action.HasKey(subActionName))
-                        {
-                            process_additional_action(subActionName, action.GetNamedValue(subActionName), actionIsShown);
-                        }
-                        else if (subActionName == JSON_KEY_PASTE_AS_JPG_FILE)
-                        {
-                            m_additional_actions.push_back({ subActionName.c_str(), {} });
-                        }
-                    }
-                }
                 else
                 {
                     result += ch;
@@ -294,6 +272,28 @@ private:
                         coachingHotkey
                     };
                     m_additional_actions.push_back(coachingAction);
+                }
+            }
+        }
+        else if (actionName == JSON_KEY_PASTE_AS_FILE)
+        {
+            // Keep the hotkey sequence stable when older settings omit the JPEG action.
+            const std::vector<winrt::hstring> expectedOrder = {
+                L"paste-as-txt-file",
+                L"paste-as-png-file",
+                JSON_KEY_PASTE_AS_JPG_FILE,
+                L"paste-as-html-file"
+            };
+
+            for (const auto& subActionName : expectedOrder)
+            {
+                if (action.HasKey(subActionName))
+                {
+                    process_additional_action(subActionName, action.GetNamedValue(subActionName), actionIsShown);
+                }
+                else if (subActionName == JSON_KEY_PASTE_AS_JPG_FILE)
+                {
+                    m_additional_actions.push_back({ subActionName.c_str(), {} });
                 }
             }
         }
