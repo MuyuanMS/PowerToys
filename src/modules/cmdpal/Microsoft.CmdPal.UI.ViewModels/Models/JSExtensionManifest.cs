@@ -329,7 +329,7 @@ public sealed record JSExtensionManifest
     /// symbolic link or junction could still redirect an in-package path outside the package, so any
     /// reparse point between the extension directory and the entry point is rejected.
     /// </summary>
-    private static bool IsEntryPointContainmentTrusted(string extensionDirectory, string resolvedEntryPoint, out string? error)
+    internal static bool IsEntryPointContainmentTrusted(string extensionDirectory, string resolvedEntryPoint, out string? error)
     {
         error = null;
 
@@ -342,7 +342,13 @@ public sealed record JSExtensionManifest
             // itself and everything above it are outside this check.
             while (!string.Equals(Path.TrimEndingDirectorySeparator(current), baseDirectory, StringComparison.OrdinalIgnoreCase))
             {
-                if (IsReparsePoint(current))
+                if (!TryGetFileAttributes(current, out var attributes))
+                {
+                    error = $"The entry point '{resolvedEntryPoint}' could not be validated because '{current}' is unavailable.";
+                    return false;
+                }
+
+                if ((attributes & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint)
                 {
                     error = $"The entry point '{resolvedEntryPoint}' traverses a symbolic link or junction, which is not allowed.";
                     return false;
@@ -368,22 +374,17 @@ public sealed record JSExtensionManifest
         }
     }
 
-    private static bool IsReparsePoint(string path)
+    private static bool TryGetFileAttributes(string path, out FileAttributes attributes)
     {
         try
         {
-            return (File.GetAttributes(path) & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint;
-        }
-        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
-        {
-            // A missing segment cannot be a trusted but unverified link. The caller already confirmed
-            // the entry point exists, so treat a vanished segment as not a reparse point.
-            return false;
+            attributes = File.GetAttributes(path);
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or System.Security.SecurityException)
         {
-            // If the segment's attributes cannot be read, err on the side of caution and reject it.
-            return true;
+            attributes = default;
+            return false;
         }
     }
 }

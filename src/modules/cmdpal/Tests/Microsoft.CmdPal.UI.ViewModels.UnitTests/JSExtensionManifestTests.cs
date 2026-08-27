@@ -558,6 +558,20 @@ public class JSExtensionManifestTests
         }
     }
 
+    [TestMethod]
+    public void ContainmentValidation_MissingSegment_IsRejected()
+    {
+        var missingEntryPoint = Path.Combine(_testDirectory, "missing", "index.js");
+
+        var isTrusted = JSExtensionManifest.IsEntryPointContainmentTrusted(
+            _testDirectory,
+            missingEntryPoint,
+            out var error);
+
+        Assert.IsFalse(isTrusted);
+        StringAssert.Contains(error, "could not be validated");
+    }
+
     private static bool TryCreateJunction(string junctionPath, string targetPath)
     {
         try
