@@ -507,7 +507,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 .Where(element => element.Name.LocalName == "item" && element.Name.Namespace == buildElement.Name.Namespace)
                 .ToList() ?? new List<XElement>();
 
-            if (buildItems.Count > 0)
+            if (buildElement != null)
             {
                 foreach (var buildItem in buildItems)
                 {
@@ -529,9 +529,14 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             else
             {
                 // No build section: render every object in this part that directly contains a mesh.
-                foreach (var objectId in part.ObjectsById.Keys)
+                foreach (var objectEntry in part.ObjectsById)
                 {
-                    ResolveObject(package, part, objectId, Matrix3D.Identity, modelGroup, material, new HashSet<string>(StringComparer.Ordinal), 0, budget);
+                    if (!objectEntry.Value.Elements().Any(element => element.Name.LocalName == "mesh" && element.Name.Namespace == part.CoreNamespace))
+                    {
+                        continue;
+                    }
+
+                    ResolveObject(package, part, objectEntry.Key, Matrix3D.Identity, modelGroup, material, new HashSet<string>(StringComparer.Ordinal), 0, budget);
 
                     if (budget.Exhausted)
                     {

@@ -289,7 +289,8 @@ public class FileExplorerAddonsTests : UITestBase
             ThreeMfThumbnailProvider,
             "sample.3mf",
             "PowerToys.ThreeMfThumbnailProvider",
-            "3mf");
+            "3mf",
+            "PNG file not generated");
     }
 
     private void TestPreview(
@@ -340,7 +341,8 @@ public class FileExplorerAddonsTests : UITestBase
         string expectedClsid,
         string assetName,
         string providerProcessName,
-        string scenario)
+        string scenario,
+        string generationFailureMarker = "Bmp file not generated")
     {
         AssertShellExtensionRegistration(extension, ThumbnailHandlerShellExtension, expectedClsid, "thumbnail provider");
         PrepareExplorerForRegisteredHandlers();
@@ -376,7 +378,7 @@ public class FileExplorerAddonsTests : UITestBase
             $"Windows Shell did not invoke the PowerToys {providerName} shim for the cold {extension} thumbnail.");
         var providerLogText = ReadAllTextWithRetry(providerLog!);
         Assert.IsFalse(
-            providerLogText.Contains("Bmp file not generated", StringComparison.OrdinalIgnoreCase) ||
+            providerLogText.Contains(generationFailureMarker, StringComparison.OrdinalIgnoreCase) ||
             providerLogText.Contains("Failed to start", StringComparison.OrdinalIgnoreCase),
             $"The PowerToys {providerName} shim reported a generation failure.{Environment.NewLine}{providerLogText}");
         var persistedLogPath = ArtifactPath($"{scenario}-provider", ".log");

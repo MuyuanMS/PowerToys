@@ -236,6 +236,44 @@ namespace ThreeMfThumbnailProviderUnitTests
         }
 
         [TestMethod]
+        public void LoadModelHonorsExplicitEmptyBuild()
+        {
+            const string model =
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+                "<model unit=\"millimeter\" xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\">" +
+                "<resources><object id=\"1\" type=\"model\"><mesh>" +
+                "<vertices><vertex x=\"0\" y=\"0\" z=\"0\"/><vertex x=\"1\" y=\"0\" z=\"0\"/><vertex x=\"0\" y=\"1\" z=\"0\"/></vertices>" +
+                "<triangles><triangle v1=\"0\" v2=\"1\" v3=\"2\"/></triangles>" +
+                "</mesh></object></resources><build/></model>";
+            using var stream = BuildPackage(model, thumbnailPng: null, thumbnailWidth: 0, thumbnailHeight: 0);
+
+            Model3DGroup loaded = ThreeMfModelLoader.LoadModel(stream, MediaColors.Gold);
+
+            Assert.IsNull(loaded, "An explicit empty build must not instantiate resource objects.");
+        }
+
+        [TestMethod]
+        public void LoadModelNoBuildFallbackRendersOnlyDirectMeshes()
+        {
+            const string model =
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+                "<model unit=\"millimeter\" xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\">" +
+                "<resources>" +
+                "<object id=\"1\" type=\"model\"><mesh>" +
+                "<vertices><vertex x=\"0\" y=\"0\" z=\"0\"/><vertex x=\"1\" y=\"0\" z=\"0\"/><vertex x=\"0\" y=\"1\" z=\"0\"/></vertices>" +
+                "<triangles><triangle v1=\"0\" v2=\"1\" v3=\"2\"/></triangles>" +
+                "</mesh></object>" +
+                "<object id=\"2\" type=\"model\"><components><component objectid=\"1\"/></components></object>" +
+                "</resources></model>";
+            using var stream = BuildPackage(model, thumbnailPng: null, thumbnailWidth: 0, thumbnailHeight: 0);
+
+            Model3DGroup loaded = ThreeMfModelLoader.LoadModel(stream, MediaColors.Gold);
+
+            Assert.IsNotNull(loaded);
+            Assert.AreEqual(1, loaded.Children.Count, "Component-only resource objects must not duplicate their child meshes in the no-build fallback.");
+        }
+
+        [TestMethod]
         public void GetThumbnailSupportsNonSeekableMeshStream()
         {
             using var package = CreateMeshOnlyThreeMf();
