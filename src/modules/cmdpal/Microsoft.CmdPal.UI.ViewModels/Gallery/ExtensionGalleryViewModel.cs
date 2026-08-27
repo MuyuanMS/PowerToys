@@ -487,7 +487,7 @@ public sealed partial class ExtensionGalleryViewModel : ObservableObject, IDispo
             {
                 var storeIdsToLookup = snapshot
                     .Where(e => !e.IsInstalledStateKnown && !string.IsNullOrWhiteSpace(e.StoreId))
-                    .Select(e => e.StoreId!)
+                    .Select(e => e.StoreId!.Trim())
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
@@ -510,7 +510,7 @@ public sealed partial class ExtensionGalleryViewModel : ObservableObject, IDispo
                                 continue;
                             }
 
-                            if (results.Value.TryGetValue(entry.StoreId, out var catalogPackage))
+                            if (results.Value.TryGetValue(entry.StoreId.Trim(), out var catalogPackage))
                             {
                                 try
                                 {
