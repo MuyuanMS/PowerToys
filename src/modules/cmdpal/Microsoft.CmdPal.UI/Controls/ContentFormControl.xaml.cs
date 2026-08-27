@@ -109,6 +109,7 @@ public sealed partial class ContentFormControl : UserControl
             return;
         }
 
+        var cardAtThemeChange = _adaptiveCard;
         var inputValues = _renderedCard?.FrameworkElement is FrameworkElement element
             ? CaptureInputValues(element)
             : null;
@@ -118,10 +119,9 @@ public sealed partial class ContentFormControl : UserControl
         {
             _themeRefreshPending = false;
 
-            var card = _adaptiveCard;
-            if (card is not null)
+            if (cardAtThemeChange is not null && ReferenceEquals(cardAtThemeChange, _adaptiveCard))
             {
-                RenderCard(card, focusFirstElement: false, inputValues: inputValues);
+                RenderCard(cardAtThemeChange, focusFirstElement: false, inputValues: inputValues);
             }
         }))
         {
