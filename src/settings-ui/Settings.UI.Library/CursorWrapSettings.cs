@@ -51,7 +51,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
             if (Version == "1.0")
             {
-                Properties.DisableCursorWrapInGameMode = new BoolProperty(false);
+                Properties.DisableCursorWrapInGameMode ??= new BoolProperty(false);
                 Version = "1.1";
                 settingsUpgraded = true;
             }

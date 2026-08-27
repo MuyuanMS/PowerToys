@@ -573,7 +573,7 @@ private:
         // Refresh monitor info before starting hook
         m_core.UpdateMonitorInfo();
 
-        if (!StartGameModePolling())
+        if (m_disableInGameMode.load() && !StartGameModePolling())
         {
             return;
         }
