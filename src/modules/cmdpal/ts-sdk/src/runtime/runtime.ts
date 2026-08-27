@@ -215,6 +215,10 @@ export class ExtensionRuntime {
     this.initError = null;
     this.initSettled = init.then(
       (provider) => {
+        if (this.disposed) {
+          void provider.dispose?.();
+          return;
+        }
         this.provider = provider;
         this.primed = false;
         this.initState = 'ready';

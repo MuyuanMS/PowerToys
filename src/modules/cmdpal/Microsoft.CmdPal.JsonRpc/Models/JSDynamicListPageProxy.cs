@@ -79,6 +79,7 @@ internal sealed partial class JSDynamicListPageProxy : IDynamicListPage, IDispos
                     "listPage/setSearchText",
                     new JsonObject { ["pageId"] = _pageId, ["searchText"] = value },
                     CancellationToken.None).GetAwaiter().GetResult();
+                _inner.SetSearchText(value);
             }
             catch (Exception ex)
             {

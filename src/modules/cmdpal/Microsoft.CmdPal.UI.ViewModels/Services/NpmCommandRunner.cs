@@ -689,6 +689,7 @@ public sealed class NpmCommandRunner : INpmCommandRunner
                 continue;
             }
 
+            nodeCandidate = Path.GetFullPath(nodeCandidate);
             var npmCli = FindNpmCli(directory, includeUserPrefix);
             if (npmCli is not null)
             {
@@ -716,7 +717,7 @@ public sealed class NpmCommandRunner : INpmCommandRunner
 
             if (File.Exists(npmCli))
             {
-                return npmCli;
+                return Path.GetFullPath(npmCli);
             }
         }
 

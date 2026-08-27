@@ -81,6 +81,12 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
 
     public string SearchText => JSModelMapper.GetString(Data, "searchText") ?? string.Empty;
 
+    internal void SetSearchText(string value)
+    {
+        using var document = JsonDocument.Parse(JsonSerializer.Serialize(new { searchText = value }));
+        ApplyPropertyChanges(document.RootElement);
+    }
+
     public string PlaceholderText => JSModelMapper.GetString(Data, "placeholderText") ?? string.Empty;
 
     public bool ShowDetails => JSModelMapper.GetBool(Data, "showDetails", false);
