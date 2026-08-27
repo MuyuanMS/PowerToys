@@ -2,17 +2,17 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-import { ContentPageBase } from '@microsoft/cmdpal-sdk';
+import { ContentPageBase, iconFromFile } from '@microsoft/cmdpal-sdk';
 import type { CommandResult, Content, FormContent } from '@microsoft/cmdpal-sdk';
 import { fileURLToPath } from 'node:url';
 import { icon } from '../util.js';
 
 /**
- * Path to the bundled sample image. The build copies `assets/` next to the
- * compiled output, and `import.meta.url` keeps the reference tied to the
- * installed extension instead of the repo checkout.
+ * Load this once so each content request can reuse the encoded image instead
+ * of reading the file or depending on the repo checkout.
  */
 const localImagePath = fileURLToPath(new URL('../assets/hero.png', import.meta.url));
+const localImage = await iconFromFile(localImagePath);
 
 const loremIpsum =
   "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
@@ -124,10 +124,9 @@ export class SampleImageContentPage extends ContentPageBase {
   override icon = icon('\uE722');
 
   override getContent(): Content[] {
-    const image = icon(localImagePath);
     return [
-      { type: 'image', image },
-      { type: 'image', image, maxWidth: 200, maxHeight: 200 },
+      { type: 'image', image: localImage },
+      { type: 'image', image: localImage, maxWidth: 200, maxHeight: 200 },
     ];
   }
 }
