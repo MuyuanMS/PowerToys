@@ -3,7 +3,6 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -36,7 +35,6 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
     // Host status messages use the statusId minted by the client. That lets an
     // update refresh the same message and lets hide target the right one.
     private readonly Dictionary<string, StatusMessage> _shownStatusMessages = new();
-    private readonly ConcurrentDictionary<string, JSFallbackCommandItemAdapter> _fallbackAdapters = new();
 
     // Guards the host reference, the shown-status bookkeeping, and the buffer of host
     // actions emitted before the host is attached. Notifications an extension raises
@@ -334,7 +332,7 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
     /// extension wrapper after the handshake completes.
     /// </summary>
     /// <param name="providerMetadata">The provider metadata returned during initialize.</param>
-    internal void SetProviderMetadata(JsonElement providerMetadata)
+    public void SetProviderMetadata(JsonElement providerMetadata)
     {
         lock (_metadataLock)
         {
@@ -431,7 +429,13 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
         // fire again, and Dispose still unregisters them during full teardown.
         lock (_hostLock)
         {
-            if (_isDisposed || _shownStatusMessages.Count == 0)
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _pendingHostActions.Clear();
+            if (_shownStatusMessages.Count == 0)
             {
                 return;
             }
@@ -521,23 +525,6 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
         try
         {
             JSPropertyChangeRegistry.Dispatch(_connection, paramsElement);
-
-            var commandId = JSModelMapper.GetString(paramsElement, "commandId") ?? string.Empty;
-            if (string.IsNullOrEmpty(commandId) ||
-                !_fallbackAdapters.TryGetValue(commandId, out var fallbackAdapter))
-            {
-                return;
-            }
-
-            if (paramsElement.TryGetProperty("properties", out var propsProp) &&
-                propsProp.ValueKind == JsonValueKind.Object)
-            {
-                var displayTitle = JSModelMapper.GetString(propsProp, "displayTitle");
-                if (displayTitle != null)
-                {
-                    fallbackAdapter.UpdateDisplayTitle(displayTitle);
-                }
-            }
         }
         catch (Exception ex)
         {
@@ -715,7 +702,7 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
     private static int ReadState(JsonElement paramsElement)
     {
         if (paramsElement.ValueKind == JsonValueKind.Object &&
-            JSModelMapper.TryGetAnyCase(paramsElement, "state", "State", out var stateProp) &&
+            JSModelMapper.TryGetProperty(paramsElement, "state", out var stateProp) &&
             stateProp.ValueKind == JsonValueKind.Number)
         {
             return stateProp.GetInt32();
@@ -727,7 +714,7 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
     private static string ReadStatusId(JsonElement paramsElement)
     {
         if (paramsElement.ValueKind == JsonValueKind.Object &&
-            JSModelMapper.TryGetAnyCase(paramsElement, "statusId", "StatusId", out var idProp) &&
+            JSModelMapper.TryGetProperty(paramsElement, "statusId", out var idProp) &&
             idProp.ValueKind == JsonValueKind.String)
         {
             return idProp.GetString() ?? string.Empty;
@@ -897,14 +884,7 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
         var items = new List<IFallbackCommandItem>();
         foreach (var element in result.Value.EnumerateArray())
         {
-            var adapter = new JSFallbackCommandItemAdapter(element, _connection);
-            items.Add(adapter);
-
-            var id = adapter.Id;
-            if (!string.IsNullOrEmpty(id))
-            {
-                _fallbackAdapters[id] = adapter;
-            }
+            items.Add(new JSFallbackCommandItemAdapter(element, _connection));
         }
 
         return items.ToArray();

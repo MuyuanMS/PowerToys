@@ -76,32 +76,32 @@ internal sealed partial class JSListItemAdapter : JSObservableProxyBase, IListIt
                 Volatile.Write(ref _command, CreateCommand());
                 break;
             }
+        }
+    }
 
-            internal static string ComputeKey(JsonElement data)
+    internal static string ComputeKey(JsonElement data)
+    {
+        var id = JSModelMapper.GetString(data, "id");
+        if (!string.IsNullOrEmpty(id))
+        {
+            return "id:" + id;
+        }
+
+        if (JSModelMapper.TryGetCommandData(data, out var commandData))
+        {
+            var commandId = JSModelMapper.GetString(commandData, "id");
+            if (!string.IsNullOrEmpty(commandId))
             {
-                var id = JSModelMapper.GetString(data, "id");
-                if (!string.IsNullOrEmpty(id))
-                {
-                    return "id:" + id;
-                }
-
-                if (JSModelMapper.TryGetCommandData(data, out var commandData))
-                {
-                    var commandId = JSModelMapper.GetString(commandData, "id");
-                    if (!string.IsNullOrEmpty(commandId))
-                    {
-                        return "cmd:" + commandId;
-                    }
-                }
-
-                return "title:" + (JSModelMapper.GetString(data, "title") ?? string.Empty);
-            }
-
-            internal void UpdateData(JsonElement data)
-            {
-                ReplaceData(data, RefreshableProperties);
+                return "cmd:" + commandId;
             }
         }
+
+        return "title:" + (JSModelMapper.GetString(data, "title") ?? string.Empty);
+    }
+
+    internal void UpdateData(JsonElement data)
+    {
+        ReplaceData(data, RefreshableProperties);
     }
 
     private Lazy<ICommand?> CreateCommand()
