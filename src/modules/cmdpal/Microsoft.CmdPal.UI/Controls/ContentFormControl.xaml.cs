@@ -27,6 +27,8 @@ public sealed partial class ContentFormControl : UserControl
     // form will do seemingly nothing.
     private RenderedAdaptiveCard? _renderedCard;
     private AdaptiveCard? _adaptiveCard;
+    private bool _themeRefreshPending;
+    private bool _focusFirstElementOnLoad = true;
 
     public ContentFormViewModel? ViewModel { get => _viewModel; set => AttachViewModel(value); }
 
@@ -96,16 +98,34 @@ public sealed partial class ContentFormControl : UserControl
 
     private void OnActualThemeChanged(FrameworkElement sender, object args)
     {
-        // _renderer is shared by every ContentFormControl, so re-point its HostConfig
-        // on each theme change. That's safe because ActualThemeChanged fires on every
-        // element in the tree, so each live control re-renders itself immediately
-        // below with the same theme — nobody is left reading a stale HostConfig.
         UpdateRendererTheme();
 
-        var card = _adaptiveCard;
-        if (card is not null)
+        // WindowThemeSynchronizer changes RequestedTheme through two intermediate
+        // values before applying the target theme. Wait for the final value so one
+        // switch does not recreate the form several times.
+        if (_themeRefreshPending)
         {
-            RenderCard(card);
+            return;
+        }
+
+        _themeRefreshPending = true;
+        if (!DispatcherQueue.TryEnqueue(() =>
+        {
+            _themeRefreshPending = false;
+
+            var card = _adaptiveCard;
+            if (card is not null)
+            {
+                RenderCard(card, focusFirstElement: false);
+            }
+        }))
+        {
+            _themeRefreshPending = false;
+            var card = _adaptiveCard;
+            if (card is not null)
+            {
+                RenderCard(card, focusFirstElement: false);
+            }
         }
     }
 
@@ -154,11 +174,12 @@ public sealed partial class ContentFormControl : UserControl
     /// rendered before it. Shared by the initial/view-model-driven render and by
     /// the theme-change re-render so the two can't drift apart.
     /// </summary>
-    private void RenderCard(AdaptiveCard card)
+    private void RenderCard(AdaptiveCard card, bool focusFirstElement = true)
     {
         DetachRenderedCard();
 
         _adaptiveCard = card;
+        _focusFirstElementOnLoad = focusFirstElement;
         _renderedCard = _renderer.RenderAdaptiveCard(card);
 
         ContentGrid.Children.Clear();
@@ -218,7 +239,7 @@ public sealed partial class ContentFormControl : UserControl
         {
             element.Loaded -= OnFrameworkElementLoaded;
 
-            if (!ViewModel?.OnlyControlOnPage ?? true)
+            if (!_focusFirstElementOnLoad || (!ViewModel?.OnlyControlOnPage ?? true))
             {
                 return;
             }
