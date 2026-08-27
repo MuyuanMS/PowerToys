@@ -141,8 +141,8 @@ function Get-CommitRecord {
 
     if (-not $prNumber -and $body -match "\(cherry picked from commit ([0-9a-fA-F]{7,40})\)") {
         $cherryPickedFrom = $matches[1].ToLowerInvariant()
-        $sourceSha = Invoke-Git rev-parse --verify "$cherryPickedFrom^{commit}"
-        if ($sourceSha) {
+        $sourceSha = & git -C $RepoPath rev-parse --verify "$cherryPickedFrom^{commit}" 2>$null
+        if ($LASTEXITCODE -eq 0 -and $sourceSha) {
             $sourceSubject = ([string](Invoke-Git show -s --format=%s ([string]$sourceSha).Trim())).Trim()
             $prNumber = Get-SubjectPrNumber -Subject $sourceSubject
             if (-not $prNumber -and -not $SkipGitHubLookup) {
@@ -204,13 +204,27 @@ function Get-HistoryPrIdentitySet {
     param([Parameter(Mandatory)][string]$Commit)
 
     $set = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach ($sha in @(Invoke-Git rev-list $Commit)) {
-        $record = Get-CommitRecord `
-            -Sha ([string]$sha).Trim() `
-            -SkipGitHubLookup `
-            -SkipPatchId
-        if ($record.prNumber) {
-            [void]$set.Add([string]$record.identity)
+    $history = (Invoke-Git log "--format=%H%x1f%s%x1f%B%x1e" $Commit) -join "`n"
+    foreach ($entry in $history -split [char]0x1e) {
+        $fields = $entry -split [char]0x1f, 3
+        if ($fields.Count -lt 3 -or [string]::IsNullOrWhiteSpace([string]$fields[0])) {
+            continue
+        }
+
+        $prNumber = Get-SubjectPrNumber -Subject ([string]$fields[1]).Trim()
+        if ($prNumber) {
+            [void]$set.Add("pr:$prNumber")
+            continue
+        }
+
+        if ([string]$fields[2] -match "\(cherry picked from commit [0-9a-fA-F]{7,40}\)") {
+            $record = Get-CommitRecord `
+                -Sha ([string]$fields[0]).Trim() `
+                -SkipGitHubLookup `
+                -SkipPatchId
+            if ($record.prNumber) {
+                [void]$set.Add([string]$record.identity)
+            }
         }
     }
     return ,$set
@@ -242,6 +256,20 @@ function Get-PullRequestCommitShas {
                 if ($commit.sha -match "^[0-9a-fA-F]{40}$") {
                     [void]$shas.Add([string]$commit.sha)
                 }
+            }
+        }
+    }
+
+    $pullRequestJson = gh api `
+        -H "Accept: application/vnd.github+json" `
+        "repos/$Repo/pulls/$PrNumber" 2>$null
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($pullRequestJson)) {
+        $pullRequest = $pullRequestJson | ConvertFrom-Json
+        $mergeCommitProperty = $pullRequest.PSObject.Properties["merge_commit_sha"]
+        if ($null -ne $mergeCommitProperty) {
+            $mergeCommitSha = [string]$mergeCommitProperty.Value
+            if ($mergeCommitSha -match "^[0-9a-fA-F]{40}$") {
+                [void]$shas.Add($mergeCommitSha)
             }
         }
     }
@@ -305,12 +333,12 @@ function Test-PromotionMerge {
         return $false
     }
 
-    foreach ($parent in $parents) {
-        if (Test-Ancestor -Ancestor $parent -Descendant $OtherTip) {
-            return $true
+    foreach ($parent in @($parents | Select-Object -Skip 1)) {
+        if (-not (Test-Ancestor -Ancestor $parent -Descendant $OtherTip)) {
+            return $false
         }
     }
-    return $false
+    return $true
 }
 
 function Resolve-CrossSidePatchIdentities {
