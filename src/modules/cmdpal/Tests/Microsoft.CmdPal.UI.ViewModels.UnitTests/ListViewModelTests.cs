@@ -78,8 +78,8 @@ public partial class ListViewModelTests
 
     private sealed partial class InitialItemsChangedPage : ListPage
     {
-        private int _getItemsCallCount;
         private readonly TaskCompletionSource<bool> _refreshedItemsObserved = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _getItemsCallCount;
 
         public Task RefreshedItemsObserved => _refreshedItemsObserved.Task;
 
