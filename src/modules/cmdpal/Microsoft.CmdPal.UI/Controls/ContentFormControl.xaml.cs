@@ -29,6 +29,7 @@ public sealed partial class ContentFormControl : UserControl
     private AdaptiveCard? _adaptiveCard;
     private bool _themeRefreshPending;
     private bool _focusFirstElementOnLoad = true;
+    private IReadOnlyDictionary<string, InputValue>? _inputValuesToRestore;
 
     public ContentFormViewModel? ViewModel { get => _viewModel; set => AttachViewModel(value); }
 
@@ -108,6 +109,10 @@ public sealed partial class ContentFormControl : UserControl
             return;
         }
 
+        var inputValues = _renderedCard?.FrameworkElement is FrameworkElement element
+            ? CaptureInputValues(element)
+            : null;
+
         _themeRefreshPending = true;
         if (!DispatcherQueue.TryEnqueue(() =>
         {
@@ -116,7 +121,7 @@ public sealed partial class ContentFormControl : UserControl
             var card = _adaptiveCard;
             if (card is not null)
             {
-                RenderCard(card, focusFirstElement: false);
+                RenderCard(card, focusFirstElement: false, inputValues: inputValues);
             }
         }))
         {
@@ -169,12 +174,16 @@ public sealed partial class ContentFormControl : UserControl
     /// rendered before it. Shared by the initial/view-model-driven render and by
     /// the theme-change re-render so the two can't drift apart.
     /// </summary>
-    private void RenderCard(AdaptiveCard card, bool focusFirstElement = true)
+    private void RenderCard(
+        AdaptiveCard card,
+        bool focusFirstElement = true,
+        IReadOnlyDictionary<string, InputValue>? inputValues = null)
     {
         DetachRenderedCard();
 
         _adaptiveCard = card;
         _focusFirstElementOnLoad = focusFirstElement;
+        _inputValuesToRestore = inputValues;
         _renderedCard = _renderer.RenderAdaptiveCard(card);
 
         ContentGrid.Children.Clear();
@@ -234,6 +243,8 @@ public sealed partial class ContentFormControl : UserControl
         {
             element.Loaded -= OnFrameworkElementLoaded;
 
+            RestoreInputValues(element);
+
             if (!_focusFirstElementOnLoad || (!ViewModel?.OnlyControlOnPage ?? true))
             {
                 return;
@@ -247,6 +258,114 @@ public sealed partial class ContentFormControl : UserControl
             });
         }
     }
+
+    private static IReadOnlyDictionary<string, InputValue> CaptureInputValues(DependencyObject root)
+    {
+        var values = new Dictionary<string, InputValue>();
+        CaptureInputValues(root, values);
+        return values;
+    }
+
+    private static void CaptureInputValues(DependencyObject root, IDictionary<string, InputValue> values)
+    {
+        if (root is FrameworkElement element)
+        {
+            var key = GetInputKey(element);
+            if (key is not null)
+            {
+                switch (element)
+                {
+                    case TextBox textBox:
+                        values[key] = new InputValue(nameof(TextBox), textBox.Text);
+                        break;
+                    case PasswordBox passwordBox:
+                        values[key] = new InputValue(nameof(PasswordBox), passwordBox.Password);
+                        break;
+                    case ComboBox comboBox:
+                        values[key] = new InputValue(nameof(ComboBox), comboBox.SelectedIndex);
+                        break;
+                    case ToggleSwitch toggleSwitch:
+                        values[key] = new InputValue(nameof(ToggleSwitch), toggleSwitch.IsOn);
+                        break;
+                    case CheckBox checkBox:
+                        values[key] = new InputValue(nameof(CheckBox), checkBox.IsChecked);
+                        break;
+                    case NumberBox numberBox:
+                        values[key] = new InputValue(nameof(NumberBox), numberBox.Value);
+                        break;
+                    case CalendarDatePicker datePicker:
+                        values[key] = new InputValue(nameof(CalendarDatePicker), datePicker.Date);
+                        break;
+                }
+            }
+        }
+
+        var childCount = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < childCount; i++)
+        {
+            CaptureInputValues(VisualTreeHelper.GetChild(root, i), values);
+        }
+    }
+
+    private void RestoreInputValues(FrameworkElement root)
+    {
+        if (_inputValuesToRestore is null)
+        {
+            return;
+        }
+
+        RestoreInputValues(root, _inputValuesToRestore);
+        _inputValuesToRestore = null;
+    }
+
+    private static void RestoreInputValues(DependencyObject root, IReadOnlyDictionary<string, InputValue> values)
+    {
+        if (root is FrameworkElement element)
+        {
+            var key = GetInputKey(element);
+            if (key is not null && values.TryGetValue(key, out var inputValue))
+            {
+                switch (element)
+                {
+                    case TextBox textBox when inputValue.Kind == nameof(TextBox):
+                        textBox.Text = (string)inputValue.Value!;
+                        break;
+                    case PasswordBox passwordBox when inputValue.Kind == nameof(PasswordBox):
+                        passwordBox.Password = (string)inputValue.Value!;
+                        break;
+                    case ComboBox comboBox when inputValue.Kind == nameof(ComboBox):
+                        comboBox.SelectedIndex = (int)inputValue.Value!;
+                        break;
+                    case ToggleSwitch toggleSwitch when inputValue.Kind == nameof(ToggleSwitch):
+                        toggleSwitch.IsOn = (bool)inputValue.Value!;
+                        break;
+                    case CheckBox checkBox when inputValue.Kind == nameof(CheckBox):
+                        checkBox.IsChecked = (bool?)inputValue.Value;
+                        break;
+                    case NumberBox numberBox when inputValue.Kind == nameof(NumberBox):
+                        numberBox.Value = (double)inputValue.Value!;
+                        break;
+                    case CalendarDatePicker datePicker when inputValue.Kind == nameof(CalendarDatePicker):
+                        datePicker.Date = (DateTimeOffset?)inputValue.Value;
+                        break;
+                }
+            }
+        }
+
+        var childCount = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < childCount; i++)
+        {
+            RestoreInputValues(VisualTreeHelper.GetChild(root, i), values);
+        }
+    }
+
+    private static string? GetInputKey(FrameworkElement element)
+    {
+        var automationId = AutomationProperties.GetAutomationId(element);
+        return !string.IsNullOrEmpty(automationId) ? automationId : element.Name;
+    }
+
+    private readonly record struct InputValue(string Kind, object? Value);
 
     /// <summary>
     /// Fixes missing AutomationProperties.Name on CheckBox and ToggleSwitch controls
