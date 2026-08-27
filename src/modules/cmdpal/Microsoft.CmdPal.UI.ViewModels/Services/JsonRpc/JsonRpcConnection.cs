@@ -985,24 +985,25 @@ public sealed partial class JsonRpcConnection : IDisposable
                 }
             }
 
-            private void DiscardQueuedWork()
-            {
-                while (_notificationQueue.Reader.TryRead(out var notification))
-                {
-                    Interlocked.Add(ref _queuedNotificationBytes, -notification.SizeBytes);
-                }
-
-                while (_inboundRequestQueue.Reader.TryRead(out var request))
-                {
-                    Interlocked.Add(ref _queuedRequestBytes, -request.SizeBytes);
-                }
-            }
         }
         catch (OperationCanceledException) when (_shutdownToken.IsCancellationRequested)
         {
         }
         catch (ChannelClosedException)
         {
+        }
+    }
+
+    private void DiscardQueuedWork()
+    {
+        while (_notificationQueue.Reader.TryRead(out var notification))
+        {
+            Interlocked.Add(ref _queuedNotificationBytes, -notification.SizeBytes);
+        }
+
+        while (_inboundRequestQueue.Reader.TryRead(out var request))
+        {
+            Interlocked.Add(ref _queuedRequestBytes, -request.SizeBytes);
         }
     }
 
