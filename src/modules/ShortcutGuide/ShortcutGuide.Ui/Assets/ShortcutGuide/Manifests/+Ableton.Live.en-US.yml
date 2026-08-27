@@ -1,6 +1,6 @@
 PackageName: +Ableton.Live
 Name: Ableton Live
-WindowFilter: "Live.exe"
+WindowFilter: "Ableton Live 12 Suite.exe;Ableton Live 12 Standard.exe;Ableton Live 12 Intro.exe;Ableton Live 12 Lite.exe;Ableton Live 11 Suite.exe;Ableton Live 11 Standard.exe;Ableton Live 11 Intro.exe;Ableton Live 11 Lite.exe;Ableton Live 10 Suite.exe;Ableton Live 10 Standard.exe;Ableton Live 10 Intro.exe;Ableton Live 10 Lite.exe;Ableton Live 9 Suite.exe;Ableton Live 9 Standard.exe;Ableton Live 9 Intro.exe;Ableton Live 9 Lite.exe;Live.exe"
 BackgroundProcess: false
 Shortcuts:
   - SectionName: General
