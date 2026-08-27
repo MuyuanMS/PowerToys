@@ -1,11 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Look at Directory.Build.props in root for common stuff as well -->
   <Import Project="$(RepoRoot)src\Common.Dotnet.CsWinRT.props" />
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <RootNamespace>Microsoft.CmdPal.UI.ViewModels.UnitTests</RootNamespace>
+    <RootNamespace>Microsoft.CmdPal.JsonRpc.UnitTests</RootNamespace>
     <OutputPath>$(RepoRoot)$(Platform)\$(Configuration)\WinUI3Apps\CmdPal\tests\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
@@ -13,21 +12,16 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Moq" />
     <PackageReference Include="MSTest" />
-    <PackageReference Include="WyHash" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Microsoft.CmdPal.Common\Microsoft.CmdPal.Common.csproj" />
-    <ProjectReference Include="..\..\Microsoft.CmdPal.UI.ViewModels\Microsoft.CmdPal.UI.ViewModels.csproj" />
-    <ProjectReference Include="..\Microsoft.CmdPal.Ext.UnitTestsBase\Microsoft.CmdPal.Ext.UnitTestBase.csproj" />
+    <ProjectReference Include="..\..\Microsoft.CmdPal.JsonRpc\Microsoft.CmdPal.JsonRpc.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\..\Microsoft.CmdPal.UI.ViewModels\Assets\template.zip" Link="Assets\template.zip">
+    <Content Include="..\..\ts-sdk\wire-fixtures\*.json" Link="wire-fixtures\%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-
 </Project>
