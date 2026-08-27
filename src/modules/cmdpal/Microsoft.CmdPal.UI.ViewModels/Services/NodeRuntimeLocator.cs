@@ -41,7 +41,7 @@ internal static class NodeRuntimeLocator
             string candidate;
             try
             {
-                candidate = Path.Combine(directory, NodeExecutableName);
+                candidate = Path.GetFullPath(Path.Combine(directory, NodeExecutableName));
             }
             catch (ArgumentException)
             {

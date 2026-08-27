@@ -56,35 +56,38 @@ public class SerialNotificationDispatcherTests
     public void Enqueue_FromConcurrentThreads_PreservesPerCallerOrder()
     {
         using var dispatcher = new SerialNotificationDispatcher();
-        var removeBeforeAdd = true;
-        var addSeen = false;
+        var orderViolations = 0;
+        var callers = new Task[100];
         var done = new CountdownEvent(200);
+        using var start = new ManualResetEventSlim();
 
         for (var i = 0; i < 100; i++)
         {
-            // Each iteration enqueues a "remove" then an "add" from the same caller. The
-            // add handler must never run before its paired remove handler.
-            var removed = false;
-            dispatcher.Enqueue(() =>
+            callers[i] = Task.Run(() =>
             {
-                removed = true;
-                done.Signal();
-            });
-            dispatcher.Enqueue(() =>
-            {
-                if (!removed)
+                start.Wait();
+                var removed = false;
+                dispatcher.Enqueue(() =>
                 {
-                    removeBeforeAdd = false;
-                }
+                    removed = true;
+                    done.Signal();
+                });
+                dispatcher.Enqueue(() =>
+                {
+                    if (!removed)
+                    {
+                        Interlocked.Increment(ref orderViolations);
+                    }
 
-                addSeen = true;
-                done.Signal();
+                    done.Signal();
+                });
             });
         }
 
+        start.Set();
+        Task.WaitAll(callers);
         Assert.IsTrue(done.Wait(TimeSpan.FromSeconds(5)), "All notifications should have run.");
-        Assert.IsTrue(addSeen);
-        Assert.IsTrue(removeBeforeAdd, "An addition must never overtake the removal enqueued before it.");
+        Assert.AreEqual(0, Volatile.Read(ref orderViolations), "An addition must never overtake the removal enqueued before it.");
     }
 
     [TestMethod]

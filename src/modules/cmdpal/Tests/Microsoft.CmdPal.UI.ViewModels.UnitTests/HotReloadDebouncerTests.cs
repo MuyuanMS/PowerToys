@@ -24,6 +24,7 @@ public class HotReloadDebouncerTests
     public void IsRelevantChange_SourceFile_IsRelevant()
     {
         Assert.IsTrue(HotReloadDebouncer.IsRelevantChange(@"C:\ext\dist\index.js"));
+        Assert.IsTrue(HotReloadDebouncer.IsRelevantChange(@"C:\ext\node_modules_backup\index.js"));
     }
 
     [TestMethod]

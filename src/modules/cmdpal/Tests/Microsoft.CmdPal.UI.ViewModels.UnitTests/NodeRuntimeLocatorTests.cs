@@ -13,6 +13,7 @@ namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
 public class NodeRuntimeLocatorTests
 {
     private static readonly string[] MalformedPathEntries = { "invalid|path" };
+    private static readonly string[] RelativePathEntries = { "." };
 
     [TestMethod]
     public void ResolveNodeExecutable_ReturnsFirstDirectoryThatContainsNodeExe()
@@ -71,5 +72,27 @@ public class NodeRuntimeLocatorTests
     public void ResolveNodeExecutable_ReturnsNullForEmptyDirectoryList()
     {
         Assert.IsNull(NodeRuntimeLocator.ResolveNodeExecutable(Array.Empty<string>()));
+    }
+
+    [TestMethod]
+    public void ResolveNodeExecutable_CanonicalizesRelativePathEntries()
+    {
+        var originalDirectory = Environment.CurrentDirectory;
+        var root = Path.Combine(Path.GetTempPath(), "cmdpal-node-locator-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var node = Path.Combine(root, "node.exe");
+
+        try
+        {
+            File.WriteAllText(node, string.Empty);
+            Environment.CurrentDirectory = root;
+
+            Assert.AreEqual(node, NodeRuntimeLocator.ResolveNodeExecutable(RelativePathEntries));
+        }
+        finally
+        {
+            Environment.CurrentDirectory = originalDirectory;
+            Directory.Delete(root, recursive: true);
+        }
     }
 }

@@ -52,7 +52,10 @@ internal sealed partial class HotReloadDebouncer : IDisposable
             return false;
         }
 
-        return changedPath.IndexOf("node_modules", StringComparison.OrdinalIgnoreCase) < 0;
+        var segments = changedPath.Split(
+            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+            StringSplitOptions.RemoveEmptyEntries);
+        return !Array.Exists(segments, segment => string.Equals(segment, "node_modules", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
