@@ -63,8 +63,8 @@ Each JS extension runs in its own Node.js process. The host spawns the process, 
 | Transport | stdio with LSP framing | No port conflicts, no network exposure, proven by LSP ecosystem |
 | Protocol | JSON-RPC 2.0 | Standard, well-tooled, bidirectional |
 | SDK language | TypeScript | Type safety, npm ecosystem, familiar to web developers |
-| Entry point | `cmdpal` field in `package.json` | Simple, declarative, same pattern as VS Code's contributions |
-| Icon data | Base64-encoded in JSON | No filesystem sharing needed, works with generated/fetched images |
+| Entry point | Top-level `main` or `cmdpal.main` in `package.json` | Simple, declarative, and compatible with standard Node.js package metadata |
+| Icon data | Glyphs, file/URI paths, or Base64 data | Supports built-in glyphs, packaged assets, and generated/fetched images |
 | Hot-reload | Recursive FileSystemWatcher on `cmdpal.watchPath` or the entry point directory | Immediate feedback during development |
 
 ---

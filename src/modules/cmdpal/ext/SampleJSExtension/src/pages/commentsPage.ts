@@ -53,21 +53,19 @@ const postTemplate = JSON.stringify({
  * instances alive (see `SampleCommentsPage`), so a reply added to a post is
  * retained on the model.
  *
- * Note on refresh: a content page's tree is serialized in full when the host
- * calls `contentPage/getContent`, and the host does not fetch that content again in
- * response to a form submit (the content-page proxy exposes no live
- * `ItemsChanged` channel, and expanding a tree branch does not ask the
- * extension). A reply therefore does not appear in the thread that is already on
- * screen; it shows up the next time the page's content is loaded, which happens
- * when the user navigates away and reopens the page. This sample is honest about
- * that rather than claiming a live refresh it cannot perform.
+ * The page supplies a callback that raises `contentPage/itemsChanged` after a
+ * reply is appended. The host then re-fetches the tree so the new reply appears
+ * without requiring the user to navigate away and back.
  */
 class Post implements TreeContent {
   readonly type = 'tree';
   readonly replies: Post[] = [];
   readonly formId: string;
 
-  constructor(private readonly body: string) {
+  constructor(
+    private readonly body: string,
+    private readonly raiseItemsChanged: () => void,
+  ) {
     this.formId = `comment-form-${nextPostId()}`;
   }
 
@@ -93,11 +91,9 @@ class Post implements TreeContent {
           const parsed = JSON.parse(inputs) as { ReplyBody?: string };
           const reply = parsed.ReplyBody;
           if (reply) {
-            this.replies.push(new Post(reply));
-            // The reply is saved to the model, but the thread already on screen
-            // is not fetched again (see the class note above), so the status is
-            // honest about when it will be visible.
-            ExtensionHost.showStatus('Reply saved. Reopen this page to see it.', 'success');
+            this.replies.push(new Post(reply, this.raiseItemsChanged));
+            this.raiseItemsChanged();
+            ExtensionHost.showStatus('Reply posted', 'success');
           }
         } catch {
           // Ignore malformed form payloads.
@@ -119,10 +115,10 @@ function nextPostId(): number {
   return postCounter;
 }
 
-function post(body: string, replies: string[] = []): Post {
-  const p = new Post(body);
+function post(body: string, raiseItemsChanged: () => void, replies: string[] = []): Post {
+  const p = new Post(body, raiseItemsChanged);
   for (const reply of replies) {
-    p.replies.push(new Post(reply));
+    p.replies.push(new Post(reply, raiseItemsChanged));
   }
   return p;
 }
@@ -135,11 +131,7 @@ export class SampleCommentsPage extends ContentPageBase {
 
   override icon = icon('\uE90A');
 
-  private readonly posts: Post[] = [
-    post('First', ["Oh very insightful. I hadn't considered that", 'Second', 'ah the ol switcheroo']),
-    post('First\nEDIT: shoot', ['delete this']),
-    post('Do you think they get the picture', ['Probably! Now go build and be happy']),
-  ];
+  private readonly posts: Post[];
 
   private readonly tree: TreeContent = {
     type: 'tree',
@@ -154,6 +146,17 @@ export class SampleCommentsPage extends ContentPageBase {
     },
     getChildren: (): Content[] => [...this.posts],
   };
+
+  constructor() {
+    super();
+
+    const refresh = () => this.notifyItemsChanged();
+    this.posts = [
+      post('First', refresh, ["Oh very insightful. I hadn't considered that", 'Second', 'ah the ol switcheroo']),
+      post('First\nEDIT: shoot', refresh, ['delete this']),
+      post('Do you think they get the picture', refresh, ['Probably! Now go build and be happy']),
+    ];
+  }
 
   override getContent(): Content[] {
     return [this.tree];

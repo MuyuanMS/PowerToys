@@ -149,6 +149,30 @@ describe('form identity and routing', () => {
     expect(responseFor(sent, 1)?.result).toEqual({ kind: 1 });
   });
 
+  it('assigns a deterministic formId when the author omits one', async () => {
+    const page: IContentPage = {
+      id: 'page',
+      name: 'Page',
+      title: 'Page',
+      getContent(): Content[] {
+        return [formContent(undefined, () => ({ kind: 'goHome' }))];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(providerWith(page));
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'contentPage/getContent',
+      params: { pageId: 'page' },
+    });
+
+    const content = responseFor(sent, 1)?.result as Array<Record<string, unknown>>;
+    expect(typeof content[0]?.formId).toBe('string');
+    expect((content[0]?.formId as string).length).toBeGreaterThan(0);
+  });
+
   it('routes submissions to forms at several tree depths', async () => {
     const depthOne = vi.fn((): CommandResult => ({ kind: 'goHome' }));
     const depthTwo = vi.fn((): CommandResult => ({ kind: 'goBack' }));

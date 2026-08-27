@@ -109,27 +109,6 @@ export class SampleToastsPage extends DynamicListPageBase {
 
   override getItems(): IListItem[] {
     const query = (this.searchText ?? '').trim();
-    const iconToast = new KeepOpenToastCommand(
-      'icon-toast',
-      'Show toast with icon',
-      'This toast has an icon next to its message.',
-      { toastIcon: icon('\uE73E') },
-    );
-    iconToast.icon = icon('\uE73E');
-
-    const undoCommand = new KeepOpenToastCommand('toast-undo', 'Undo', 'Delete undone!');
-    undoCommand.icon = icon('\uE7A7');
-    const actionToast = new KeepOpenToastCommand(
-      'action-toast',
-      'Show toast with action',
-      'Item deleted.',
-      {
-        toastIcon: icon('\uE74D'),
-        actionCommand: undoCommand,
-      },
-    );
-    actionToast.icon = icon('\uE74D');
-
     const customItem =
       query.length > 0
         ? new ListItemBase({
@@ -184,18 +163,6 @@ export class SampleToastsPage extends DynamicListPageBase {
         title: 'Long, wrapping toast',
         subtitle: 'Verifies multi-line wrapping inside the banner',
         icon: icon('\uE7C3'),
-      }),
-      new ListItemBase({
-        command: iconToast,
-        title: 'Toast with an icon',
-        subtitle: 'ToastArgs.icon is serialized and rendered by the host',
-        icon: icon('\uE73E'),
-      }),
-      new ListItemBase({
-        command: actionToast,
-        title: 'Toast with an action button',
-        subtitle: 'ToastArgs.command renders an action button (for example Undo)',
-        icon: icon('\uE7A7'),
       }),
       new ListItemBase({
         command: new StatusMessageCommand(
