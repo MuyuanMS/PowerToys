@@ -22,7 +22,7 @@ namespace Microsoft.CmdPal.UI;
 // https://github.com/microsoft/WindowsAppSDK-Samples/tree/main/Samples/AppLifecycle/Instancing/cs2/cs-winui-packaged/CsWinUiDesktopInstancing
 internal sealed class Program
 {
-    private static readonly ConcurrentQueue<AppActivationArguments> PendingActivations = [];
+    private static readonly ConcurrentQueue<ActivationSnapshot?> PendingActivations = [];
 
     private static DispatcherQueueSynchronizationContext? uiContext;
     private static App? app;
@@ -174,6 +174,8 @@ internal sealed class Program
 
     private static void OnActivated(object? sender, AppActivationArguments args)
     {
+        var snapshot = MainWindow.CaptureActivation(args);
+
         // If we already have a form, display the message now.
         if (App.Current?.AppWindow is MainWindow mainWindow)
         {
@@ -182,11 +184,11 @@ internal sealed class Program
             // before the activation is fully handled and the parameters are processed.
             // The sending instance remains blocked until this returns; afterward it may quit,
             // causing the activation arguments to be lost.
-            mainWindow.HandleLaunchNonUI(args);
+            mainWindow.HandleLaunchNonUI(snapshot);
         }
         else
         {
-            PendingActivations.Enqueue(args);
+            PendingActivations.Enqueue(snapshot);
         }
     }
 }
