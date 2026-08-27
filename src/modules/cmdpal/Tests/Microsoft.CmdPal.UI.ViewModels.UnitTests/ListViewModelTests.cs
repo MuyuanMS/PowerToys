@@ -76,6 +76,26 @@ public partial class ListViewModelTests
         public void TriggerItemsChanged(int totalItems) => RaiseItemsChanged(totalItems);
     }
 
+    private sealed partial class InitialItemsChangedPage : ListPage
+    {
+        private int _getItemsCallCount;
+        private readonly TaskCompletionSource<bool> _refreshedItemsObserved = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task RefreshedItemsObserved => _refreshedItemsObserved.Task;
+
+        public override IListItem[] GetItems()
+        {
+            if (Interlocked.Increment(ref _getItemsCallCount) == 1)
+            {
+                RaiseItemsChanged(1);
+                return [];
+            }
+
+            _refreshedItemsObserved.TrySetResult(true);
+            return [new ListItem(new NoOpCommand() { Name = "Refreshed item" })];
+        }
+    }
+
     private static ListViewModel CreateViewModel(IListPage page) =>
         new(page, TaskScheduler.Default, new TestAppExtensionHost(), CommandProviderContext.Empty, DefaultContextMenuFactory.Instance);
 
@@ -134,6 +154,31 @@ public partial class ListViewModelTests
             var loadMoreUpdate = await ObserveNextItemsUpdateAsync(viewModel, viewModel.LoadMoreIfNeeded);
             Assert.IsFalse(loadMoreUpdate.ForceFirstItem);
             Assert.IsFalse(loadMoreUpdate.EnsureSelectionVisible);
+        }
+        finally
+        {
+            viewModel.SafeCleanup();
+            viewModel.Dispose();
+        }
+    }
+
+    [TestMethod]
+    public async Task InitializeProperties_ObservesItemsChangedRaisedByInitialGetItems()
+    {
+        var page = new InitialItemsChangedPage
+        {
+            Id = "list.page",
+            Name = "List Page",
+            Title = "List Page",
+        };
+
+        var viewModel = CreateViewModel(page);
+        try
+        {
+            viewModel.InitializeProperties();
+
+            var completed = await Task.WhenAny(page.RefreshedItemsObserved, Task.Delay(TimeSpan.FromSeconds(2)));
+            Assert.AreSame(page.RefreshedItemsObserved, completed);
         }
         finally
         {
