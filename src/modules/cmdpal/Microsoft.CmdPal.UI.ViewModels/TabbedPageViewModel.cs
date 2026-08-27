@@ -29,6 +29,7 @@ public partial class TabbedPageViewModel : PageViewModel
     private readonly IPageViewModelFactoryService _factory;
     private readonly Dictionary<string, PageViewModel> _childCache = [];
     private readonly Dictionary<string, IPage> _childPages = [];
+    private readonly Dictionary<PageViewModel, Task> _childInitializationTasks = [];
 
     private static readonly string _fallbackPlaceholder = "Type here to search...";
 
@@ -298,11 +299,15 @@ public partial class TabbedPageViewModel : PageViewModel
         // Mirror ShellViewModel.LoadPageViewModelAsync: initialize on a
         // background thread so the tab strip stays responsive. The child view
         // model marshals IsInitialized/property updates back onto the UI thread.
-        _ = Task.Run(() =>
+        _childInitializationTasks[child] = Task.Run(async () =>
         {
             try
             {
                 child.InitializeCommand.Execute(null);
+                if (child.InitializeCommand.ExecutionTask is Task executionTask)
+                {
+                    await executionTask.ConfigureAwait(false);
+                }
             }
             catch (Exception ex)
             {
@@ -358,6 +363,19 @@ public partial class TabbedPageViewModel : PageViewModel
     private void DisposeChild(PageViewModel child)
     {
         DetachActiveChildLoading(child);
+
+        if (_childInitializationTasks.TryGetValue(child, out var initializationTask) &&
+            !initializationTask.IsCompleted)
+        {
+            _ = initializationTask.ContinueWith(
+                _ => DisposeChild(child),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+            return;
+        }
+
+        _childInitializationTasks.Remove(child);
         child.SafeCleanup();
         if (child is IDisposable disposable)
         {
@@ -401,6 +419,7 @@ public partial class TabbedPageViewModel : PageViewModel
 
         _childCache.Clear();
         _childPages.Clear();
+        _childInitializationTasks.Clear();
 
         foreach (var tab in Tabs)
         {
