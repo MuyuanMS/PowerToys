@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Linq;
 using Microsoft.CmdPal.Ext.RemoteDesktop.Commands;
 using Microsoft.CmdPal.Ext.RemoteDesktop.Pages;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -185,5 +186,21 @@ public class RemoteDesktopListPageTests
         var firstItem = items[0] as ConnectionListItem;
         Assert.IsNotNull(firstItem);
         Assert.AreEqual("192.168.1.100:3390", firstItem.ConnectionName);
+    }
+
+    [TestMethod]
+    public void PartialQuery_FiltersOutNonMatchingConnection()
+    {
+        // Arrange — "unrelated-host" cannot fuzzy-match the partial query "alpha".
+        var page = CreatePage("alpha-server", "unrelated-host");
+
+        // Act — set SearchText (not just UpdateSearchText) so GetItems() sees the query too
+        page.SearchText = "alpha";
+        var items = page.GetItems();
+
+        // Assert — the non-matching connection is filtered out of the results
+        var names = items.OfType<ConnectionListItem>().Select(i => i.ConnectionName).ToList();
+        CollectionAssert.Contains(names, "alpha-server");
+        CollectionAssert.DoesNotContain(names, "unrelated-host");
     }
 }
