@@ -984,7 +984,6 @@ public sealed partial class JsonRpcConnection : IDisposable
                     await DispatchInboundRequestAsync(envelope).ConfigureAwait(false);
                 }
             }
-
         }
         catch (OperationCanceledException) when (_shutdownToken.IsCancellationRequested)
         {
