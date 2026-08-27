@@ -1425,14 +1425,33 @@ public sealed partial class MainWindow : WindowEx,
         }
     }
 
-    public void HandleLaunchNonUI(AppActivationArguments? activatedEventArgs)
+    internal static ActivationSnapshot? CaptureActivation(AppActivationArguments? activatedEventArgs)
+    {
+        if (activatedEventArgs is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return activatedEventArgs.Kind == ExtendedActivationKind.Protocol &&
+                activatedEventArgs.Data is IProtocolActivatedEventArgs protocolArgs
+                ? new ActivationSnapshot(activatedEventArgs.Kind, protocolArgs.Uri)
+                : new ActivationSnapshot(activatedEventArgs.Kind, null);
+        }
+        catch (COMException ex)
+        {
+            Logger.LogWarning($"Failed to read activation arguments: {ex.Message}");
+            return null;
+        }
+    }
+
+    internal void HandleLaunchNonUI(ActivationSnapshot? activation)
     {
         // LOAD BEARING
-        // Any reading and processing of the activation arguments must be done
-        // synchronously in this method, before it returns. The sending instance
-        // remains blocked until this returns; afterward it may quit, causing
-        // the activation arguments to be lost.
-        if (activatedEventArgs is null)
+        // Activation arguments are captured before this method is called so their COM-backed
+        // data remains valid even when startup replay happens after the sender exits.
+        if (activation is null)
         {
             Summon(string.Empty);
             return;
@@ -1440,15 +1459,15 @@ public sealed partial class MainWindow : WindowEx,
 
         try
         {
-            if (activatedEventArgs.Kind == ExtendedActivationKind.StartupTask)
+            if (activation.Kind == ExtendedActivationKind.StartupTask)
             {
                 return;
             }
 
-            if (activatedEventArgs.Kind == ExtendedActivationKind.Protocol)
+            if (activation.Kind == ExtendedActivationKind.Protocol)
             {
-                if (activatedEventArgs.Data is IProtocolActivatedEventArgs protocolArgs &&
-                    _protocolActivation.TryParse(protocolArgs.Uri, out var route))
+                if (activation.ProtocolUri is not null &&
+                    _protocolActivation.TryParse(activation.ProtocolUri, out var route))
                 {
                     switch (CmdPalProtocolPolicy.Evaluate(route))
                     {
