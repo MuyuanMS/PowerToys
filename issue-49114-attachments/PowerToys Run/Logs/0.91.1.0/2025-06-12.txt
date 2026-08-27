@@ -1,0 +1,1130 @@
+[2025-06-12 08:26:42.9118] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::72]
+Starting PowerToys Run with PID=7696
+
+[2025-06-12 08:26:42.9439] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::83]
+Runner pid=3660
+
+[2025-06-12 08:26:43.6832] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::129]
+On Startup.
+
+[2025-06-12 08:26:44.0721] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+ImageLoader.Initialize - Preload images cost <5ms>
+
+[2025-06-12 08:26:44.0721] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Image\ImageLoader.cs::100]
+Number of preload images is <131>, Images Number: 2, Unique Items 2
+
+[2025-06-12 08:26:44.2218] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+|Wox.Infrastructure.Alphabet.Initialize|Preload pinyin cache <103ms>
+
+[2025-06-12 08:26:44.2341] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Alphabet.cs::46]
+Number of preload pinyin combination<0>
+
+[2025-06-12 08:26:44.4537] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Calculator> is <2ms>
+
+[2025-06-12 08:26:44.4537] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Folder> is <2ms>
+
+[2025-06-12 08:26:44.4537] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <History> is <0ms>
+
+[2025-06-12 08:26:44.4696] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Indexer> is <9ms>
+
+[2025-06-12 08:26:44.4696] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <OneNote> is <0ms>
+
+[2025-06-12 08:26:44.4696] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <PowerToys> is <0ms>
+
+[2025-06-12 08:26:44.5023] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Program> is <28ms>
+
+[2025-06-12 08:26:44.5023] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Registry> is <1ms>
+
+[2025-06-12 08:26:44.5023] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Service> is <1ms>
+
+[2025-06-12 08:26:44.5023] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Shell> is <6ms>
+
+[2025-06-12 08:26:44.5164] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <System Commands> is <1ms>
+
+[2025-06-12 08:26:44.5320] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Time and date> is <0ms>
+
+[2025-06-12 08:26:44.5320] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Unit Converter> is <0ms>
+
+[2025-06-12 08:26:44.5320] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Uri Handler> is <2ms>
+
+[2025-06-12 08:26:44.5320] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <ValueGenerator> is <1ms>
+
+[2025-06-12 08:26:44.5749] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <VS Code Workspaces> is <37ms>
+
+[2025-06-12 08:26:44.5944] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Web Search> is <0ms>
+
+[2025-06-12 08:26:44.5944] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Settings> is <6ms>
+
+[2025-06-12 08:26:44.6771] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Terminal> is <67ms>
+
+[2025-06-12 08:26:44.6771] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Window Walker> is <0ms>
+
+[2025-06-12 08:26:45.1708] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\SettingsReader.cs::89]
+Successfully read new settings. retryCount=1
+
+[2025-06-12 08:26:45.1708] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Shell\ShellPluginSettings.json>
+
+[2025-06-12 08:26:45.1914] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Registry> is <1ms>
+
+[2025-06-12 08:26:45.1914] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <System Commands> is <1ms>
+
+[2025-06-12 08:26:45.1914] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Shell> is <6ms>
+
+[2025-06-12 08:26:45.1914] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Time and date> is <0ms>
+
+[2025-06-12 08:26:45.1914] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Service> is <2ms>
+
+[2025-06-12 08:26:45.1914] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <History> is <1ms>
+
+[2025-06-12 08:26:45.1914] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Windows Uri Handler> is <3ms>
+
+[2025-06-12 08:26:45.1914] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <ValueGenerator> is <1ms>
+
+[2025-06-12 08:26:45.1914] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Unit Converter> is <1ms>
+
+[2025-06-12 08:26:45.1914] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Window Walker> is <0ms>
+
+[2025-06-12 08:26:45.1914] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\Common\DefaultBrowserInfo.cs::76]
+I've tried updating the chosen Web Browser info at least once.
+
+[2025-06-12 08:26:45.1914] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Windows Indexer> is <11ms>
+
+[2025-06-12 08:26:45.1914] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Folder> is <4ms>
+
+[2025-06-12 08:26:45.2204] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Web Search> is <29ms>
+
+[2025-06-12 08:26:45.1914] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Calculator> is <2ms>
+
+[2025-06-12 08:26:45.1914] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <PowerToys> is <8ms>
+
+[2025-06-12 08:26:45.2204] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Windows Settings> is <42ms>
+
+[2025-06-12 08:26:46.3769] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\UWPApplication.cs::362]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: C:\Program Files\WindowsApps\Microsoft.BingNews_4.55.62231.0_x64__8wekyb3d8bbwe
+		Exception thrown in called method: Not available
+		Possible interpretation of the error: Load pri failed @{Microsoft.BingNews_4.55.62231.0_x64__8wekyb3d8bbwe? ms-resource:///resources/ApplicationTitleWithTagline} with HResult 2147943792 and location C:\Program Files\WindowsApps\Microsoft.BingNews_4.55.62231.0_x64__8wekyb3d8bbwe
+		Possible resolution: Not yet known
+
+Exception full name  : System.BadImageFormatException
+Exception message    : The file or directory is corrupted and unreadable. (0x80070570)
+Exception stack trace:
+
+Exception source     : 
+Exception target site: 
+Exception HResult    : -2147023504
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 08:26:46.3877] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\UWPApplication.cs::362]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: C:\Program Files\WindowsApps\Microsoft.BingNews_4.55.62231.0_x64__8wekyb3d8bbwe
+		Exception thrown in called method: Not available
+		Possible interpretation of the error: Load pri failed @{Microsoft.BingNews_4.55.62231.0_x64__8wekyb3d8bbwe? ms-resource:///resources/ApplicationTitleWithBrandingWithNewName} with HResult 2147943792 and location C:\Program Files\WindowsApps\Microsoft.BingNews_4.55.62231.0_x64__8wekyb3d8bbwe
+		Possible resolution: Not yet known
+
+Exception full name  : System.BadImageFormatException
+Exception message    : The file or directory is corrupted and unreadable. (0x80070570)
+Exception stack trace:
+
+Exception source     : 
+Exception target site: 
+Exception HResult    : -2147023504
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 08:26:47.2237] [INFO] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Storage\PackageRepository.cs::112]
+Indexed 50 packaged applications
+
+[2025-06-12 08:26:47.2237] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+Microsoft.Plugin.Program.Main - Package index cost <1961ms>
+
+[2025-06-12 08:26:47.5010] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\ShellLinkHelper.cs::177]
+-------------------------- Begin exception --------------------------
+Message: Failed to fetch description for C:\Windows\syswow64\odbcad32.exe, Unexpected HRESULT has been returned from a call to a COM component.
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : Unexpected HRESULT has been returned from a call to a COM component.
+Exception stack trace:
+   at Wox.Infrastructure.ShellLinkHelper.IShellLinkW.GetDescription(StringBuilder pszName, Int32 cchMaxName)
+   at Wox.Infrastructure.ShellLinkHelper.RetrieveTargetPath(String path)
+Exception source     : Wox.Infrastructure
+Exception target site: Void GetDescription(System.Text.StringBuilder, Int32)
+Exception HResult    : -2147467259
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 08:26:47.5010] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\ShellLinkHelper.cs::177]
+-------------------------- Begin exception --------------------------
+Message: Failed to fetch description for C:\PROGRA~2\WINDOW~4\wmplayer.exe, Unexpected HRESULT has been returned from a call to a COM component.
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : Unexpected HRESULT has been returned from a call to a COM component.
+Exception stack trace:
+   at Wox.Infrastructure.ShellLinkHelper.IShellLinkW.GetDescription(StringBuilder pszName, Int32 cchMaxName)
+   at Wox.Infrastructure.ShellLinkHelper.RetrieveTargetPath(String path)
+Exception source     : Wox.Infrastructure
+Exception target site: Void GetDescription(System.Text.StringBuilder, Int32)
+Exception HResult    : -2147467259
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 08:26:52.9320] [INFO] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Storage\Win32ProgramRepository.cs::268]
+Indexed 820 win32 applications
+
+[2025-06-12 08:26:52.9320] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+Microsoft.Plugin.Program.Main - Win32Program index cost <7667ms>
+
+[2025-06-12 08:26:52.9320] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Program> is <7771ms>
+
+[2025-06-12 08:26:52.9320] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::1302]
+Refresh plugins overview
+
+[2025-06-12 08:26:52.9320] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::178]
+Begin PowerToys Run startup ----------------------------------------------------
+Runtime info:
+Version: 0.91.1.0
+OS Version: Microsoft Windows NT 10.0.22631.0
+IntPtr Length: 8
+x64: True
+End PowerToys Run startup ----------------------------------------------------  
+
+
+[2025-06-12 08:26:52.9320] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+App.OnStartup - Startup cost <9253ms>
+
+[2025-06-12 08:26:53.3046] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+EnvironmentHelper.GetProtectedEnvironmentVariables - Duration cost <1ms>
+
+[2025-06-12 08:26:53.3046] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::101]
+RegisterHotkey()
+
+[2025-06-12 08:26:53.3046] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::854]
+Set HotKey()
+
+[2025-06-12 08:26:53.3046] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::895]
+Registered global hotkey
+
+[2025-06-12 10:01:42.1555] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2025-06-12 10:01:43.5067] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 65 milliseconds
+
+[2025-06-12 10:01:43.5512] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 109 milliseconds
+
+[2025-06-12 10:01:43.5512] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Calculator. Query cost - 121 milliseconds
+
+[2025-06-12 10:01:43.5878] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 62 milliseconds
+
+[2025-06-12 10:01:43.8553] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 138 milliseconds
+
+[2025-06-12 10:01:46.1485] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 59 milliseconds
+
+[2025-06-12 10:01:46.1597] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 70 milliseconds
+
+[2025-06-12 10:01:46.2962] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 57 milliseconds
+
+[2025-06-12 10:01:46.3027] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 62 milliseconds
+
+[2025-06-12 10:01:47.8647] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 51 milliseconds
+
+[2025-06-12 10:01:47.8818] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 68 milliseconds
+
+[2025-06-12 10:01:48.0158] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 52 milliseconds
+
+[2025-06-12 10:01:48.0221] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 57 milliseconds
+
+[2025-06-12 10:01:55.2215] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 1397 milliseconds
+
+[2025-06-12 10:01:55.2215] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 915 milliseconds
+
+[2025-06-12 10:03:08.1172] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 386 milliseconds
+
+[2025-06-12 10:03:11.3825] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 455 milliseconds
+
+[2025-06-12 10:03:11.7903] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 537 milliseconds
+
+[2025-06-12 10:03:19.0905] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 550 milliseconds
+
+[2025-06-12 10:59:17.9439] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2025-06-12 10:59:19.2694] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 73 milliseconds
+
+[2025-06-12 10:59:24.2968] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 1483 milliseconds
+
+[2025-06-12 10:59:24.3036] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 1715 milliseconds
+
+[2025-06-12 10:59:24.3036] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 1198 milliseconds
+
+[2025-06-12 11:00:06.2343] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2025-06-12 11:01:38.0655] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2025-06-12 11:03:18.3323] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2025-06-12 11:07:31.7248] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2025-06-12 11:08:25.3069] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 589 milliseconds
+
+[2025-06-12 11:08:25.4929] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 557 milliseconds
+
+[2025-06-12 11:10:02.2789] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2025-06-12 11:21:49.6067] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.VP9VideoExtensions
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at WinRT.ExceptionHelpers.ThrowExceptionForHR(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 11:21:49.6159] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.VP9VideoExtensions
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at WinRT.ExceptionHelpers.ThrowExceptionForHR(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 11:21:51.3768] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Storage\PackageRepository.cs::89]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Windows.Storage.StorageFolder
+		Exception thrown in called method: Microsoft.Win32.SafeHandles.SafeFileHandle CreateFile(System.String, System.IO.FileMode, System.IO.FileAccess, System.IO.FileShare, System.IO.FileOptions)
+		Possible interpretation of the error: Could not find file 'C:\Program Files\WindowsApps\Microsoft.VP9VideoExtensions_1.2.6.0_neutral_~_8wekyb3d8bbwe\AppxManifest.xml'.
+		Possible resolution: Not yet known
+
+Exception full name  : System.IO.FileNotFoundException
+Exception message    : Could not find file 'C:\Program Files\WindowsApps\Microsoft.VP9VideoExtensions_1.2.6.0_neutral_~_8wekyb3d8bbwe\AppxManifest.xml'.
+Exception stack trace:
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.Xml.XmlDownloadManager.GetStream(Uri uri, ICredentials credentials, IWebProxy proxy)
+   at System.Xml.XmlTextReaderImpl.FinishInitUriString()
+   at System.Xml.XmlReaderSettings.CreateReader(String inputUri, XmlParserContext inputContext)
+   at System.Xml.Linq.XDocument.Load(String uri, LoadOptions options)
+   at Microsoft.Plugin.Program.Programs.UWP.XmlNamespaces(String path)
+   at Microsoft.Plugin.Program.Programs.UWP.InitializeAppInfo(String installedLocation)
+   at Microsoft.Plugin.Program.Storage.PackageRepository.AddPackage(Package package)
+Exception source     : System.Private.CoreLib
+Exception target site: Microsoft.Win32.SafeHandles.SafeFileHandle CreateFile(System.String, System.IO.FileMode, System.IO.FileAccess, System.IO.FileShare, System.IO.FileOptions)
+Exception HResult    : -2147024894
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 11:21:51.8725] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.HEIFImageExtension
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 11:21:51.8835] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.HEIFImageExtension
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 11:21:52.8235] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Storage\PackageRepository.cs::89]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Windows.Storage.StorageFolder
+		Exception thrown in called method: Microsoft.Win32.SafeHandles.SafeFileHandle CreateFile(System.String, System.IO.FileMode, System.IO.FileAccess, System.IO.FileShare, System.IO.FileOptions)
+		Possible interpretation of the error: Could not find file 'C:\Program Files\WindowsApps\Microsoft.HEIFImageExtension_1.2.20.0_neutral_~_8wekyb3d8bbwe\AppxManifest.xml'.
+		Possible resolution: Not yet known
+
+Exception full name  : System.IO.FileNotFoundException
+Exception message    : Could not find file 'C:\Program Files\WindowsApps\Microsoft.HEIFImageExtension_1.2.20.0_neutral_~_8wekyb3d8bbwe\AppxManifest.xml'.
+Exception stack trace:
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.Xml.XmlDownloadManager.GetStream(Uri uri, ICredentials credentials, IWebProxy proxy)
+   at System.Xml.XmlTextReaderImpl.FinishInitUriString()
+   at System.Xml.XmlReaderSettings.CreateReader(String inputUri, XmlParserContext inputContext)
+   at System.Xml.Linq.XDocument.Load(String uri, LoadOptions options)
+   at Microsoft.Plugin.Program.Programs.UWP.XmlNamespaces(String path)
+   at Microsoft.Plugin.Program.Programs.UWP.InitializeAppInfo(String installedLocation)
+   at Microsoft.Plugin.Program.Storage.PackageRepository.AddPackage(Package package)
+Exception source     : System.Private.CoreLib
+Exception target site: Microsoft.Win32.SafeHandles.SafeFileHandle CreateFile(System.String, System.IO.FileMode, System.IO.FileAccess, System.IO.FileShare, System.IO.FileOptions)
+Exception HResult    : -2147024894
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 11:22:55.0813] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.WindowsAppRuntime.1.7
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 11:22:55.5532] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.WindowsAppRuntime.1.7
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 11:22:56.2183] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 11:22:56.2232] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 11:22:56.2232] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 11:22:56.2232] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 11:22:56.2403] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 11:22:56.3442] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 11:22:56.3442] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 11:22:56.3442] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 11:22:56.3442] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 11:22:56.3442] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 11:29:51.4281] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2025-06-12 11:29:52.5527] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 167 milliseconds
+
+[2025-06-12 12:41:26.8542] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2025-06-12 12:41:27.9593] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 66 milliseconds
+
+[2025-06-12 12:41:28.2569] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 86 milliseconds
+
+[2025-06-12 12:41:35.7755] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 63 milliseconds
+
+[2025-06-12 14:10:33.5754] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 14:10:33.5893] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 14:10:33.5964] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 14:10:33.5964] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 14:10:33.5964] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 14:10:33.6587] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 14:10:33.6587] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 14:10:33.6587] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 14:10:33.6587] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 14:10:33.6728] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.YourPhone
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 14:10:33.7197] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.OneDriveSync
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-06-12 14:10:35.0968] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\MainWindow.xaml.cs::172]
+Reload environment: Updating environment variables for PT Run's process
+
+[2025-06-12 14:10:35.0968] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Helper\EnvironmentHelper.cs::152]
+Skipping update of the environment variable [TEMP] for the PT Run process. This variable is listed as protected process variable and changing them can cause unexpected behavior. (The variable value has a length of [38].)
+
+[2025-06-12 14:10:35.0968] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Helper\EnvironmentHelper.cs::152]
+Skipping update of the environment variable [Path] for the PT Run process. This variable is listed as protected process variable and changing them can cause unexpected behavior. (The variable value has a length of [382].)
+
+[2025-06-12 14:10:35.0968] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Helper\EnvironmentHelper.cs::152]
+Skipping update of the environment variable [TMP] for the PT Run process. This variable is listed as protected process variable and changing them can cause unexpected behavior. (The variable value has a length of [38].)
+
+[2025-06-12 14:10:35.0968] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Helper\EnvironmentHelper.cs::152]
+Skipping update of the environment variable [PSModulePath] for the PT Run process. This variable is listed as protected process variable and changing them can cause unexpected behavior. (The variable value has a length of [93].)
+
+[2025-06-12 14:10:35.0968] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Helper\EnvironmentHelper.cs::152]
+Skipping update of the environment variable [TEMP] for the PT Run process. This variable is listed as protected process variable and changing them can cause unexpected behavior. (The variable value has a length of [38].)
+
+[2025-06-12 14:10:35.0968] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Helper\EnvironmentHelper.cs::152]
+Skipping update of the environment variable [Path] for the PT Run process. This variable is listed as protected process variable and changing them can cause unexpected behavior. (The variable value has a length of [382].)
+
+[2025-06-12 14:10:35.0968] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Helper\EnvironmentHelper.cs::152]
+Skipping update of the environment variable [TMP] for the PT Run process. This variable is listed as protected process variable and changing them can cause unexpected behavior. (The variable value has a length of [38].)
+
+[2025-06-12 14:10:35.0968] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Helper\EnvironmentHelper.cs::152]
+Skipping update of the environment variable [PSModulePath] for the PT Run process. This variable is listed as protected process variable and changing them can cause unexpected behavior. (The variable value has a length of [93].)
+
+[2025-06-12 14:10:35.0968] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+EnvironmentHelper.UpdateEnvironment - Duration cost <2ms>
+
+[2025-06-12 16:22:56.4906] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\MainWindow.xaml.cs::104]
+Send Run settings telemetry
+
+[2025-06-12 17:20:57.1470] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2025-06-12 17:20:58.7886] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 59 milliseconds
+
+[2025-06-12 17:20:59.0712] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 62 milliseconds
+
+[2025-06-12 17:21:06.2796] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 2351 milliseconds
+
+[2025-06-12 17:21:06.3086] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 1999 milliseconds
+
+[2025-06-12 17:21:06.3215] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 2599 milliseconds
+
+[2025-06-12 17:21:06.3416] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 1846 milliseconds
+
+[2025-06-12 17:21:06.8301] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 439 milliseconds
+
+[2025-06-12 17:21:19.2008] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2025-06-12 17:21:20.5183] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 56 milliseconds
+
+[2025-06-12 17:21:29.2712] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 809 milliseconds
+
+[2025-06-12 17:21:29.4167] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 734 milliseconds
+
+[2025-06-12 17:21:48.3055] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 73 milliseconds
+
+[2025-06-12 17:21:50.9749] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 826 milliseconds
+
+[2025-06-12 17:21:53.5368] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 782 milliseconds
+
+[2025-06-12 17:21:57.0042] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 3376 milliseconds
+
+[2025-06-12 17:21:58.1730] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 4933 milliseconds
+
+[2025-06-12 17:21:58.4330] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 3486 milliseconds
+
+[2025-06-12 17:21:59.2935] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 5797 milliseconds
+
+[2025-06-12 17:21:59.9180] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 5836 milliseconds
+
+[2025-06-12 17:22:00.2554] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 5995 milliseconds
+
+[2025-06-12 17:22:00.3305] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 5907 milliseconds
+
+[2025-06-12 17:22:00.4583] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 4996 milliseconds
+
+[2025-06-12 17:37:53.6366] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::227]
+Application.Current.SessionEnding
+
+[2025-06-12 17:37:53.6366] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::275]
+Start PowerToys Run Exit----------------------------------------------------  
+
+[2025-06-12 17:37:53.6510] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\QueryHistory.json>
+
+[2025-06-12 17:37:53.6510] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\UserSelectedRecord.json>
+
+[2025-06-12 17:37:53.6647] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\PowerToysRunSettings.json>
+
+[2025-06-12 17:37:53.6647] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Folder\FolderSettings.json>
+
+[2025-06-12 17:37:53.6829] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Indexer\IndexerSettings.json>
+
+[2025-06-12 17:37:53.6953] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Program\ProgramPluginSettings.json>
+
+[2025-06-12 17:37:53.6953] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Shell\ShellPluginSettings.json>
+
+[2025-06-12 17:37:53.6953] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Uri\UriSettings.json>
+
+[2025-06-12 17:37:53.7181] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\ImageCache.json>
+
+[2025-06-12 17:37:53.7280] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::286]
+End PowerToys Run Exit ----------------------------------------------------  
+
+[2025-06-12 17:37:53.7280] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+App.OnExit - Exit cost <90ms>
+
+[2025-06-12 17:37:53.7515] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::116]
+Runner with pid=3660 exited. Exiting PowerToys Run
+
+[2025-06-12 17:37:53.7515] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::221]
+Application.Current.Exit
+

@@ -1,0 +1,499 @@
+[2024-07-30 09:00:37.7715] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::55]
+Starting PowerToys Run with PID=12436
+
+[2024-07-30 09:00:37.7951] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::66]
+Runner pid=2828
+
+[2024-07-30 09:00:38.4608] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::108]
+On Startup.
+
+[2024-07-30 09:00:38.5497] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+ImageLoader.Initialize - Preload images cost <3ms>
+
+[2024-07-30 09:00:38.5497] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Image\ImageLoader.cs::99]
+Number of preload images is <59>, Images Number: 2, Unique Items 2
+
+[2024-07-30 09:00:38.6287] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+|Wox.Infrastructure.Alphabet.Initialize|Preload pinyin cache <57ms>
+
+[2024-07-30 09:00:38.6287] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Alphabet.cs::46]
+Number of preload pinyin combination<0>
+
+[2024-07-30 09:00:38.7882] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Calculator> is <1ms>
+
+[2024-07-30 09:00:38.8157] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Folder> is <26ms>
+
+[2024-07-30 09:00:38.8157] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <History> is <0ms>
+
+[2024-07-30 09:00:38.8196] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Windows Indexer> is <1ms>
+
+[2024-07-30 09:00:38.8196] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <OneNote> is <0ms>
+
+[2024-07-30 09:00:38.8196] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <PowerToys> is <0ms>
+
+[2024-07-30 09:00:38.8544] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Program> is <30ms>
+
+[2024-07-30 09:00:38.8544] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Registry> is <0ms>
+
+[2024-07-30 09:00:38.8544] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Service> is <0ms>
+
+[2024-07-30 09:00:38.8544] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Shell> is <4ms>
+
+[2024-07-30 09:00:38.8856] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <System Commands> is <21ms>
+
+[2024-07-30 09:00:38.8856] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Time and date> is <0ms>
+
+[2024-07-30 09:00:38.8856] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Unit Converter> is <0ms>
+
+[2024-07-30 09:00:38.8856] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Windows Uri Handler> is <1ms>
+
+[2024-07-30 09:00:38.8856] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <ValueGenerator> is <0ms>
+
+[2024-07-30 09:00:38.9013] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <VS Code Workspaces> is <8ms>
+
+[2024-07-30 09:00:38.9013] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Web Search> is <0ms>
+
+[2024-07-30 09:00:38.9013] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Windows Settings> is <1ms>
+
+[2024-07-30 09:00:38.9176] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Windows Terminal> is <11ms>
+
+[2024-07-30 09:00:38.9176] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::144]
+Load cost for <Window Walker> is <0ms>
+
+[2024-07-30 09:00:39.3268] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\SettingsReader.cs::87]
+Successfully read new settings. retryCount=1
+
+[2024-07-30 09:00:39.3268] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Shell\ShellPluginSettings.json>
+
+[2024-07-30 09:00:39.3700] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Service> is <0ms>
+
+[2024-07-30 09:00:39.3700] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Time and date> is <0ms>
+
+[2024-07-30 09:00:39.3700] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <History> is <0ms>
+
+[2024-07-30 09:00:39.3700] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Registry> is <0ms>
+
+[2024-07-30 09:00:39.3700] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Shell> is <4ms>
+
+[2024-07-30 09:00:39.3700] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Calculator> is <1ms>
+
+[2024-07-30 09:00:39.3700] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <ValueGenerator> is <0ms>
+
+[2024-07-30 09:00:39.3700] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Unit Converter> is <0ms>
+
+[2024-07-30 09:00:39.3700] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Window Walker> is <0ms>
+
+[2024-07-30 09:00:39.3700] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <System Commands> is <22ms>
+
+[2024-07-30 09:00:39.3700] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Windows Uri Handler> is <2ms>
+
+[2024-07-30 09:00:39.3700] [WARN] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\Common\DefaultBrowserInfo.cs::73]
+I've tried updating the chosen Web Browser info at least once.
+
+[2024-07-30 09:00:39.3700] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Web Search> is <2ms>
+
+[2024-07-30 09:00:39.3700] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Windows Indexer> is <3ms>
+
+[2024-07-30 09:00:39.3700] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Folder> is <29ms>
+
+[2024-07-30 09:00:39.3815] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <PowerToys> is <12ms>
+
+[2024-07-30 09:00:39.3815] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Windows Settings> is <17ms>
+
+[2024-07-30 09:00:40.8054] [INFO] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Storage\PackageRepository.cs::111]
+Indexed 45 packaged applications
+
+[2024-07-30 09:00:40.8054] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+Microsoft.Plugin.Program.Main - Package index cost <1391ms>
+
+[2024-07-30 09:00:40.9638] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\ShellLinkHelper.cs::169]
+-------------------------- Begin exception --------------------------
+Message: Failed to fetch description for C:\PROGRA~2\WINDOW~4\wmplayer.exe, Error HRESULT E_FAIL has been returned from a call to a COM component.
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : Error HRESULT E_FAIL has been returned from a call to a COM component.
+Exception stack trace:
+   at Wox.Infrastructure.ShellLinkHelper.IShellLinkW.GetDescription(StringBuilder pszName, Int32 cchMaxName)
+   at Wox.Infrastructure.ShellLinkHelper.RetrieveTargetPath(String path)
+Exception source     : Wox.Infrastructure
+Exception target site: Void GetDescription(System.Text.StringBuilder, Int32)
+Exception HResult    : -2147467259
+-------------------------- End exception --------------------------
+
+
+[2024-07-30 09:00:40.9638] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\ShellLinkHelper.cs::169]
+-------------------------- Begin exception --------------------------
+Message: Failed to fetch description for C:\Windows\syswow64\odbcad32.exe, Error HRESULT E_FAIL has been returned from a call to a COM component.
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : Error HRESULT E_FAIL has been returned from a call to a COM component.
+Exception stack trace:
+   at Wox.Infrastructure.ShellLinkHelper.IShellLinkW.GetDescription(StringBuilder pszName, Int32 cchMaxName)
+   at Wox.Infrastructure.ShellLinkHelper.RetrieveTargetPath(String path)
+Exception source     : Wox.Infrastructure
+Exception target site: Void GetDescription(System.Text.StringBuilder, Int32)
+Exception HResult    : -2147467259
+-------------------------- End exception --------------------------
+
+
+[2024-07-30 09:00:41.4920] [INFO] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Storage\Win32ProgramRepository.cs::243]
+Indexed 807 win32 applications
+
+[2024-07-30 09:00:41.4920] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+Microsoft.Plugin.Program.Main - Win32Program index cost <2076ms>
+
+[2024-07-30 09:00:41.4920] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::56]
+Total initialize cost for <Program> is <2154ms>
+
+[2024-07-30 09:00:41.4920] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::1334]
+Refresh plugins overview
+
+[2024-07-30 09:00:41.4920] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::157]
+Begin PowerToys Run startup ----------------------------------------------------
+Runtime info:
+Version: 0.82.1.0
+OS Version: Microsoft Windows NT 10.0.22631.0
+IntPtr Length: 8
+x64: True
+End PowerToys Run startup ----------------------------------------------------  
+
+
+[2024-07-30 09:00:41.4920] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+App.OnStartup - Startup cost <3038ms>
+
+[2024-07-30 09:00:41.5122] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\MainWindow.xaml.cs::88]
+Send Run settings telemetry
+
+[2024-07-30 09:00:41.8832] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+EnvironmentHelper.GetProtectedEnvironmentVariables - Duration cost <1ms>
+
+[2024-07-30 09:00:41.8832] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::100]
+RegisterHotkey()
+
+[2024-07-30 09:00:41.8832] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::854]
+Set HotKey()
+
+[2024-07-30 09:00:41.8832] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::895]
+Registered global hotkey
+
+[2024-07-30 09:02:00.0558] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\ListRepository`1.cs::54]
+Item Already Exists <Google Chrome.lnk>
+
+[2024-07-30 13:32:20.6039] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\MainWindow.xaml.cs::156]
+Reload environment: Updating environment variables for PT Run's process
+
+[2024-07-30 13:32:20.6039] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Helper\EnvironmentHelper.cs::150]
+Skipping update of the environment variable [PSModulePath] for the PT Run process. This variable is listed as protected process variable and changing them can cause unexpected behavior. (The variable value has a length of [93].)
+
+[2024-07-30 13:32:20.6039] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Helper\EnvironmentHelper.cs::150]
+Skipping update of the environment variable [TEMP] for the PT Run process. This variable is listed as protected process variable and changing them can cause unexpected behavior. (The variable value has a length of [38].)
+
+[2024-07-30 13:32:20.6039] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Helper\EnvironmentHelper.cs::150]
+Skipping update of the environment variable [Path] for the PT Run process. This variable is listed as protected process variable and changing them can cause unexpected behavior. (The variable value has a length of [382].)
+
+[2024-07-30 13:32:20.6039] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Helper\EnvironmentHelper.cs::150]
+Skipping update of the environment variable [TMP] for the PT Run process. This variable is listed as protected process variable and changing them can cause unexpected behavior. (The variable value has a length of [38].)
+
+[2024-07-30 13:32:20.6039] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Helper\EnvironmentHelper.cs::150]
+Skipping update of the environment variable [PSModulePath] for the PT Run process. This variable is listed as protected process variable and changing them can cause unexpected behavior. (The variable value has a length of [93].)
+
+[2024-07-30 13:32:20.6039] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Helper\EnvironmentHelper.cs::150]
+Skipping update of the environment variable [TEMP] for the PT Run process. This variable is listed as protected process variable and changing them can cause unexpected behavior. (The variable value has a length of [38].)
+
+[2024-07-30 13:32:20.6039] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Helper\EnvironmentHelper.cs::150]
+Skipping update of the environment variable [Path] for the PT Run process. This variable is listed as protected process variable and changing them can cause unexpected behavior. (The variable value has a length of [382].)
+
+[2024-07-30 13:32:20.6039] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Helper\EnvironmentHelper.cs::150]
+Skipping update of the environment variable [TMP] for the PT Run process. This variable is listed as protected process variable and changing them can cause unexpected behavior. (The variable value has a length of [38].)
+
+[2024-07-30 13:32:20.6039] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+EnvironmentHelper.UpdateEnvironment - Duration cost <3ms>
+
+[2024-07-30 13:32:20.9394] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::56]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|39_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.OneDriveSync
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|39_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|39_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2024-07-30 15:03:04.1918] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2024-07-30 15:03:06.5243] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Folder. Query cost - 61 milliseconds
+
+[2024-07-30 15:03:06.5243] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Program. Query cost - 64 milliseconds
+
+[2024-07-30 15:03:06.5243] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Calculator. Query cost - 68 milliseconds
+
+[2024-07-30 15:03:06.5604] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Window Walker. Query cost - 97 milliseconds
+
+[2024-07-30 15:03:06.5967] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Window Walker. Query cost - 52 milliseconds
+
+[2024-07-30 15:03:06.7493] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Program. Query cost - 54 milliseconds
+
+[2024-07-30 15:03:06.7493] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Window Walker. Query cost - 57 milliseconds
+
+[2024-07-30 15:03:07.0768] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 322 milliseconds
+
+[2024-07-30 15:03:07.8489] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Window Walker. Query cost - 74 milliseconds
+
+[2024-07-30 15:03:07.8489] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Program. Query cost - 77 milliseconds
+
+[2024-07-30 15:03:07.9893] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Window Walker. Query cost - 63 milliseconds
+
+[2024-07-30 15:03:08.0134] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Program. Query cost - 88 milliseconds
+
+[2024-07-30 15:03:08.1325] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Program. Query cost - 77 milliseconds
+
+[2024-07-30 15:03:08.1325] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Window Walker. Query cost - 81 milliseconds
+
+[2024-07-30 15:03:09.3324] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Program. Query cost - 51 milliseconds
+
+[2024-07-30 15:03:09.4935] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Window Walker. Query cost - 60 milliseconds
+
+[2024-07-30 15:03:09.4935] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Program. Query cost - 67 milliseconds
+
+[2024-07-30 15:03:58.8019] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 53 milliseconds
+
+[2024-07-30 15:04:13.4099] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 53 milliseconds
+
+[2024-07-30 15:04:16.8194] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 55 milliseconds
+
+[2024-07-30 15:05:08.1334] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate </1379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:05:08.2840] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate </1379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:05:20.9850] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 54 milliseconds
+
+[2024-07-30 15:05:42.4031] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 72 milliseconds
+
+[2024-07-30 15:05:58.1225] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 53 milliseconds
+
+[2024-07-30 15:06:07.3879] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate </1379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:06:07.5400] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate </1379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:06:17.2246] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate </1379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:06:17.2647] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate </1379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:06:17.4095] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate </1379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:06:33.8112] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 261 milliseconds
+
+[2024-07-30 15:06:34.0392] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate <18*/1379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:06:34.2041] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate <18*/1379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:06:34.2760] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate <18*/11379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:06:34.4270] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate <18*/101379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:06:34.4627] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate <18*/101379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:06:34.5337] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 308 milliseconds
+
+[2024-07-30 15:06:34.6132] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate <18*/1001379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:06:34.6547] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate <18*/1001379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:06:34.8129] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate <18*/1001379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:06:35.1692] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 331 milliseconds
+
+[2024-07-30 15:06:36.6859] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate <18*/101379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:06:36.8370] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate <18*/11379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:06:36.8721] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate <18*/11379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:06:37.0230] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate <18*/1379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:06:37.0452] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Plugins\Microsoft.PowerToys.Run.Plugin.Calculator\ErrorHandler.cs::30]
+Failed to calculate <18*/1379020>: Expression wrong or incomplete (Did you forget some parentheses?)
+
+[2024-07-30 15:06:40.2674] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 327 milliseconds
+
+[2024-07-30 15:06:40.5356] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 321 milliseconds
+
+[2024-07-30 15:06:41.0626] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 318 milliseconds
+
+[2024-07-30 15:06:57.2422] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 322 milliseconds
+
+[2024-07-30 15:06:57.7086] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 310 milliseconds
+
+[2024-07-30 15:06:58.3460] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 440 milliseconds
+
+[2024-07-30 15:06:58.5755] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 456 milliseconds
+
+[2024-07-30 15:06:59.1057] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 379 milliseconds
+
+[2024-07-30 15:07:00.9636] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 327 milliseconds
+
+[2024-07-30 15:07:01.0936] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 54 milliseconds
+
+[2024-07-30 15:07:07.3862] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Program. Query cost - 56 milliseconds
+
+[2024-07-30 15:09:54.0918] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2024-07-30 15:10:07.0656] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::229]
+PluginManager.QueryForPlugin Program. Query cost - 51 milliseconds
+
+[2024-07-30 15:11:34.3967] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2024-07-30 15:11:46.1587] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2024-07-30 15:28:03.1737] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2024-07-30 17:41:08.7391] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::206]
+Application.Current.SessionEnding
+
+[2024-07-30 17:41:08.7408] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::254]
+Start PowerToys Run Exit----------------------------------------------------  
+
+[2024-07-30 17:41:08.7408] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\QueryHistory.json>
+
+[2024-07-30 17:41:08.7556] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\UserSelectedRecord.json>
+
+[2024-07-30 17:41:08.7556] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\PowerToysRunSettings.json>
+
+[2024-07-30 17:41:08.7556] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Folder\FolderSettings.json>
+
+[2024-07-30 17:41:08.7556] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Indexer\IndexerSettings.json>
+
+[2024-07-30 17:41:08.7712] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Program\ProgramPluginSettings.json>
+
+[2024-07-30 17:41:08.7712] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Shell\ShellPluginSettings.json>
+
+[2024-07-30 17:41:08.7712] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Uri\UriSettings.json>
+
+[2024-07-30 17:41:08.7928] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::139]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\ImageCache.json>
+
+[2024-07-30 17:41:08.8028] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::265]
+End PowerToys Run Exit ----------------------------------------------------  
+
+[2024-07-30 17:41:08.8028] [INFO] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::44]
+App.OnExit - Exit cost <62ms>
+
+[2024-07-30 17:41:08.9223] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::200]
+Application.Current.Exit
+

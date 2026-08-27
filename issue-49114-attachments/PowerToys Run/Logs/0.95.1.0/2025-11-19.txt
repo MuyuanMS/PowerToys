@@ -1,0 +1,60 @@
+[2025-11-19 09:19:22.6234] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\MainWindow.xaml.cs::104]
+Send Run settings telemetry
+
+[2025-11-19 10:44:10.9584] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\ListRepository`1.cs::55]
+Item Already Exists <Marlow Programs.lnk>
+
+[2025-11-19 11:21:39.4680] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception MSTeams
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-11-19 11:21:39.7611] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception MSTeams
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-11-19 15:59:02.6510] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\ListRepository`1.cs::55]
+Item Already Exists <Postman.lnk>
+
+[2025-11-19 15:59:08.2176] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\ListRepository`1.cs::55]
+Item Already Exists <Postman.lnk>
+
+[2025-11-19 15:59:13.7741] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\ListRepository`1.cs::55]
+Item Already Exists <Postman.lnk>
+
+[2025-11-19 15:59:54.9463] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\ListRepository`1.cs::55]
+Item Already Exists <Postman.lnk>
+

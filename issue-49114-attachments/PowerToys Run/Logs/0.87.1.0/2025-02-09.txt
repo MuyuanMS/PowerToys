@@ -1,0 +1,54 @@
+[2025-02-09 16:49:48.4653] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2025-02-09 16:49:54.3399] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::231]
+PluginManager.QueryForPlugin Service. Query cost - 92 milliseconds
+
+[2025-02-09 16:49:54.4646] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::231]
+PluginManager.QueryForPlugin Program. Query cost - 61 milliseconds
+
+[2025-02-09 16:49:54.6508] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::231]
+PluginManager.QueryForPlugin Program. Query cost - 51 milliseconds
+
+[2025-02-09 16:49:54.6508] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::231]
+PluginManager.QueryForPlugin History. Query cost - 259 milliseconds
+
+[2025-02-09 16:49:54.7079] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::231]
+PluginManager.QueryForPlugin History. Query cost - 224 milliseconds
+
+[2025-02-09 16:49:54.7770] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::231]
+PluginManager.QueryForPlugin History. Query cost - 182 milliseconds
+
+[2025-02-09 16:49:58.5775] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::231]
+PluginManager.QueryForPlugin History. Query cost - 179 milliseconds
+
+[2025-02-09 16:49:58.6545] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::231]
+PluginManager.QueryForPlugin History. Query cost - 200 milliseconds
+
+[2025-02-09 16:49:58.6822] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::231]
+PluginManager.QueryForPlugin Program. Query cost - 51 milliseconds
+
+[2025-02-09 16:49:58.8455] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::231]
+PluginManager.QueryForPlugin History. Query cost - 239 milliseconds
+
+[2025-02-09 16:49:58.8624] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::231]
+PluginManager.QueryForPlugin History. Query cost - 267 milliseconds
+
+[2025-02-09 16:49:58.9303] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::231]
+PluginManager.QueryForPlugin Service. Query cost - 135 milliseconds
+
+[2025-02-09 16:49:58.9303] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::231]
+PluginManager.QueryForPlugin Service. Query cost - 176 milliseconds
+
+[2025-02-09 16:50:22.4254] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::231]
+PluginManager.QueryForPlugin Service. Query cost - 86 milliseconds
+
+[2025-02-09 16:50:22.5631] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::231]
+PluginManager.QueryForPlugin Service. Query cost - 73 milliseconds
+
+[2025-02-09 16:50:34.1406] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2025-02-09 16:50:37.1728] [WARN] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::231]
+PluginManager.QueryForPlugin Window Walker. Query cost - 52 milliseconds
+

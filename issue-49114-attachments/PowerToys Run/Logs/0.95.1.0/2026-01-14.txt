@@ -1,0 +1,2089 @@
+[2026-01-14 00:00:19.5559] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.MicrosoftEdge.Stable
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at WinRT.ExceptionHelpers.ThrowExceptionForHR(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 00:02:53.1582] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::227]
+Application.Current.SessionEnding
+
+[2026-01-14 00:02:53.1582] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::275]
+Start PowerToys Run Exit----------------------------------------------------  
+
+[2026-01-14 00:02:53.1725] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\QueryHistory.json>
+
+[2026-01-14 00:02:53.1788] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\UserSelectedRecord.json>
+
+[2026-01-14 00:02:53.2214] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\PowerToysRunSettings.json>
+
+[2026-01-14 00:02:53.2409] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Folder\FolderSettings.json>
+
+[2026-01-14 00:02:53.2409] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Indexer\IndexerSettings.json>
+
+[2026-01-14 00:02:53.2409] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Program\ProgramPluginSettings.json>
+
+[2026-01-14 00:02:53.2409] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Shell\ShellPluginSettings.json>
+
+[2026-01-14 00:02:53.2409] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Uri\UriSettings.json>
+
+[2026-01-14 00:02:53.2633] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\ImageCache.json>
+
+[2026-01-14 00:02:53.7435] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::286]
+End PowerToys Run Exit ----------------------------------------------------  
+
+[2026-01-14 00:02:53.7435] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+App.OnExit - Exit cost <584ms>
+
+[2026-01-14 00:02:53.9753] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::221]
+Application.Current.Exit
+
+[2026-01-14 09:09:12.1316] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::72]
+Starting PowerToys Run with PID=20496
+
+[2026-01-14 09:09:12.1694] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::83]
+Runner pid=11060
+
+[2026-01-14 09:09:12.4457] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::129]
+On Startup.
+
+[2026-01-14 09:09:13.1435] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+ImageLoader.Initialize - Preload images cost <8ms>
+
+[2026-01-14 09:09:13.1435] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Image\ImageLoader.cs::100]
+Number of preload images is <136>, Images Number: 2, Unique Items 2
+
+[2026-01-14 09:09:13.7718] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+|Wox.Infrastructure.Alphabet.Initialize|Preload pinyin cache <563ms>
+
+[2026-01-14 09:09:13.7718] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Alphabet.cs::46]
+Number of preload pinyin combination<0>
+
+[2026-01-14 09:09:15.2526] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Calculator> is <3ms>
+
+[2026-01-14 09:09:15.2526] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Folder> is <3ms>
+
+[2026-01-14 09:09:15.2526] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <History> is <0ms>
+
+[2026-01-14 09:09:15.2621] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Indexer> is <2ms>
+
+[2026-01-14 09:09:15.2621] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <OneNote> is <1ms>
+
+[2026-01-14 09:09:15.2797] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <PowerToys> is <1ms>
+
+[2026-01-14 09:09:15.3297] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Program> is <49ms>
+
+[2026-01-14 09:09:15.3297] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Registry> is <1ms>
+
+[2026-01-14 09:09:15.3342] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Service> is <1ms>
+
+[2026-01-14 09:09:15.3342] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Shell> is <10ms>
+
+[2026-01-14 09:09:15.3722] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <System Commands> is <1ms>
+
+[2026-01-14 09:09:15.3722] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Time and date> is <1ms>
+
+[2026-01-14 09:09:15.3869] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Unit Converter> is <1ms>
+
+[2026-01-14 09:09:15.3869] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Uri Handler> is <2ms>
+
+[2026-01-14 09:09:15.3869] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <ValueGenerator> is <1ms>
+
+[2026-01-14 09:09:15.4152] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <VS Code Workspaces> is <21ms>
+
+[2026-01-14 09:09:15.4171] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Web Search> is <1ms>
+
+[2026-01-14 09:09:15.4171] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Settings> is <2ms>
+
+[2026-01-14 09:09:15.6363] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Terminal> is <215ms>
+
+[2026-01-14 09:09:15.6506] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Window Walker> is <1ms>
+
+[2026-01-14 09:09:17.4461] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\SettingsReader.cs::89]
+Successfully read new settings. retryCount=1
+
+[2026-01-14 09:09:17.4643] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Shell\ShellPluginSettings.json>
+
+[2026-01-14 09:09:17.4908] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Service> is <1ms>
+
+[2026-01-14 09:09:17.4908] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Time and date> is <3ms>
+
+[2026-01-14 09:09:17.4908] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Web Search> is <1ms>
+
+[2026-01-14 09:09:17.4908] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Registry> is <2ms>
+
+[2026-01-14 09:09:17.4908] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <System Commands> is <6ms>
+
+[2026-01-14 09:09:17.4908] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Shell> is <12ms>
+
+[2026-01-14 09:09:17.4908] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <ValueGenerator> is <1ms>
+
+[2026-01-14 09:09:17.4908] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Calculator> is <4ms>
+
+[2026-01-14 09:09:17.4908] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\Common\DefaultBrowserInfo.cs::76]
+I've tried updating the chosen Web Browser info at least once.
+
+[2026-01-14 09:09:17.4908] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <History> is <0ms>
+
+[2026-01-14 09:09:17.4908] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Windows Indexer> is <6ms>
+
+[2026-01-14 09:09:17.4908] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Unit Converter> is <1ms>
+
+[2026-01-14 09:09:17.4908] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Window Walker> is <1ms>
+
+[2026-01-14 09:09:17.4908] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Folder> is <11ms>
+
+[2026-01-14 09:09:17.4996] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Windows Uri Handler> is <11ms>
+
+[2026-01-14 09:09:17.5188] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Windows Settings> is <25ms>
+
+[2026-01-14 09:09:17.5210] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <PowerToys> is <32ms>
+
+[2026-01-14 09:09:20.3792] [INFO] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Storage\PackageRepository.cs::112]
+Indexed 61 packaged applications
+
+[2026-01-14 09:09:20.3792] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+Microsoft.Plugin.Program.Main - Package index cost <2744ms>
+
+[2026-01-14 09:09:20.5504] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\ShellLinkHelper.cs::177]
+-------------------------- Begin exception --------------------------
+Message: Failed to fetch description for C:\PROGRA~2\WINDOW~4\wmplayer.exe, Unexpected HRESULT has been returned from a call to a COM component.
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : Unexpected HRESULT has been returned from a call to a COM component.
+Exception stack trace:
+   at Wox.Infrastructure.ShellLinkHelper.IShellLinkW.GetDescription(StringBuilder pszName, Int32 cchMaxName)
+   at Wox.Infrastructure.ShellLinkHelper.RetrieveTargetPath(String path)
+Exception source     : Wox.Infrastructure
+Exception target site: Void GetDescription(System.Text.StringBuilder, Int32)
+Exception HResult    : -2147467259
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:09:20.5504] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\ShellLinkHelper.cs::177]
+-------------------------- Begin exception --------------------------
+Message: Failed to fetch description for C:\Windows\syswow64\odbcad32.exe, Unexpected HRESULT has been returned from a call to a COM component.
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : Unexpected HRESULT has been returned from a call to a COM component.
+Exception stack trace:
+   at Wox.Infrastructure.ShellLinkHelper.IShellLinkW.GetDescription(StringBuilder pszName, Int32 cchMaxName)
+   at Wox.Infrastructure.ShellLinkHelper.RetrieveTargetPath(String path)
+Exception source     : Wox.Infrastructure
+Exception target site: Void GetDescription(System.Text.StringBuilder, Int32)
+Exception HResult    : -2147467259
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:09:26.3647] [INFO] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Storage\Win32ProgramRepository.cs::268]
+Indexed 844 win32 applications
+
+[2026-01-14 09:09:26.3647] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+Microsoft.Plugin.Program.Main - Win32Program index cost <8727ms>
+
+[2026-01-14 09:09:26.3647] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Program> is <8926ms>
+
+[2026-01-14 09:09:26.3647] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::1302]
+Refresh plugins overview
+
+[2026-01-14 09:09:26.3647] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::178]
+Begin PowerToys Run startup ----------------------------------------------------
+Runtime info:
+Version: 0.95.1.0
+OS Version: Microsoft Windows NT 10.0.22631.0
+IntPtr Length: 8
+x64: True
+End PowerToys Run startup ----------------------------------------------------  
+
+
+[2026-01-14 09:09:26.3647] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+App.OnStartup - Startup cost <13927ms>
+
+[2026-01-14 09:09:26.8303] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+EnvironmentHelper.GetProtectedEnvironmentVariables - Duration cost <4ms>
+
+[2026-01-14 09:09:26.8303] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::101]
+RegisterHotkey()
+
+[2026-01-14 09:09:26.8303] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::854]
+Set HotKey()
+
+[2026-01-14 09:09:26.8303] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::895]
+Registered global hotkey
+
+[2026-01-14 09:47:58.2313] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2026-01-14 09:47:59.8955] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 169 milliseconds
+
+[2026-01-14 09:47:59.8955] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Calculator. Query cost - 180 milliseconds
+
+[2026-01-14 09:47:59.9410] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 214 milliseconds
+
+[2026-01-14 09:48:00.0003] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 84 milliseconds
+
+[2026-01-14 09:48:00.1084] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 55 milliseconds
+
+[2026-01-14 09:48:00.4419] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 90 milliseconds
+
+[2026-01-14 09:48:00.5255] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 523 milliseconds
+
+[2026-01-14 09:48:00.5255] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 344 milliseconds
+
+[2026-01-14 09:48:00.5505] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 90 milliseconds
+
+[2026-01-14 09:48:00.7026] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 91 milliseconds
+
+[2026-01-14 09:48:02.5436] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 68 milliseconds
+
+[2026-01-14 09:48:02.6941] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 67 milliseconds
+
+[2026-01-14 09:48:30.7910] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:48:30.7910] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30088 milliseconds
+
+[2026-01-14 09:48:32.7023] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:48:32.7023] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30008 milliseconds
+
+[2026-01-14 09:48:36.7698] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:48:36.7698] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30008 milliseconds
+
+[2026-01-14 09:48:39.9610] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:48:39.9610] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 29992 milliseconds
+
+[2026-01-14 09:48:40.2915] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:48:40.2915] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30008 milliseconds
+
+[2026-01-14 09:48:40.4535] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:48:40.4535] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30002 milliseconds
+
+[2026-01-14 09:48:40.8547] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:48:40.8547] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30005 milliseconds
+
+[2026-01-14 09:49:00.3021] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 61 milliseconds
+
+[2026-01-14 09:49:00.8567] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 52 milliseconds
+
+[2026-01-14 09:49:24.0598] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:49:24.0598] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30014 milliseconds
+
+[2026-01-14 09:49:24.2867] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:49:24.2867] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30021 milliseconds
+
+[2026-01-14 09:49:24.4796] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:49:24.4796] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30004 milliseconds
+
+[2026-01-14 09:49:24.9154] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:49:24.9154] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30008 milliseconds
+
+[2026-01-14 09:49:25.2522] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:49:25.2522] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30009 milliseconds
+
+[2026-01-14 09:49:25.5557] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:49:25.5557] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30008 milliseconds
+
+[2026-01-14 09:49:29.7040] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:49:29.7040] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30015 milliseconds
+
+[2026-01-14 09:49:29.9098] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:49:29.9098] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30024 milliseconds
+
+[2026-01-14 09:49:30.0942] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:49:30.0942] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30015 milliseconds
+
+[2026-01-14 09:49:30.3137] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:49:30.3137] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30011 milliseconds
+
+[2026-01-14 09:49:30.4357] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:49:30.4357] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30016 milliseconds
+
+[2026-01-14 09:49:30.6248] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:49:30.6248] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30013 milliseconds
+
+[2026-01-14 09:49:30.8538] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 09:49:30.8538] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 29997 milliseconds
+
+[2026-01-14 12:09:17.3916] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2026-01-14 12:09:18.3255] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 66 milliseconds
+
+[2026-01-14 12:09:18.3440] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 84 milliseconds
+
+[2026-01-14 12:09:18.6736] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 109 milliseconds
+
+[2026-01-14 12:09:18.8658] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 84 milliseconds
+
+[2026-01-14 12:09:19.0105] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 71 milliseconds
+
+[2026-01-14 12:09:19.3511] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 57 milliseconds
+
+[2026-01-14 12:09:40.8063] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2026-01-14 12:09:42.6594] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 52 milliseconds
+
+[2026-01-14 12:09:42.9709] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 176 milliseconds
+
+[2026-01-14 15:19:45.3762] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::227]
+Application.Current.SessionEnding
+
+[2026-01-14 15:19:45.3811] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::275]
+Start PowerToys Run Exit----------------------------------------------------  
+
+[2026-01-14 15:19:45.4162] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\QueryHistory.json>
+
+[2026-01-14 15:19:45.4162] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\UserSelectedRecord.json>
+
+[2026-01-14 15:19:45.4424] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\PowerToysRunSettings.json>
+
+[2026-01-14 15:19:45.4465] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Folder\FolderSettings.json>
+
+[2026-01-14 15:19:45.4465] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Indexer\IndexerSettings.json>
+
+[2026-01-14 15:19:45.4465] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Program\ProgramPluginSettings.json>
+
+[2026-01-14 15:19:45.4465] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Shell\ShellPluginSettings.json>
+
+[2026-01-14 15:19:45.4588] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Uri\UriSettings.json>
+
+[2026-01-14 15:19:45.4588] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\ImageCache.json>
+
+[2026-01-14 15:19:45.4792] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::286]
+End PowerToys Run Exit ----------------------------------------------------  
+
+[2026-01-14 15:19:45.4792] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+App.OnExit - Exit cost <99ms>
+
+[2026-01-14 15:19:45.5559] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::221]
+Application.Current.Exit
+
+[2026-01-14 16:33:05.1587] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::72]
+Starting PowerToys Run with PID=12600
+
+[2026-01-14 16:33:05.2006] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::83]
+Runner pid=14956
+
+[2026-01-14 16:33:05.3420] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::129]
+On Startup.
+
+[2026-01-14 16:33:05.4416] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+ImageLoader.Initialize - Preload images cost <5ms>
+
+[2026-01-14 16:33:05.4416] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Image\ImageLoader.cs::100]
+Number of preload images is <136>, Images Number: 2, Unique Items 2
+
+[2026-01-14 16:33:05.5805] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+|Wox.Infrastructure.Alphabet.Initialize|Preload pinyin cache <104ms>
+
+[2026-01-14 16:33:05.5805] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Alphabet.cs::46]
+Number of preload pinyin combination<0>
+
+[2026-01-14 16:33:05.7849] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Calculator> is <1ms>
+
+[2026-01-14 16:33:05.7849] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Folder> is <1ms>
+
+[2026-01-14 16:33:05.7849] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <History> is <0ms>
+
+[2026-01-14 16:33:05.7849] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Indexer> is <0ms>
+
+[2026-01-14 16:33:05.7849] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <OneNote> is <0ms>
+
+[2026-01-14 16:33:05.7849] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <PowerToys> is <0ms>
+
+[2026-01-14 16:33:05.8104] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Program> is <19ms>
+
+[2026-01-14 16:33:05.8104] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Registry> is <0ms>
+
+[2026-01-14 16:33:05.8104] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Service> is <0ms>
+
+[2026-01-14 16:33:05.8104] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Shell> is <7ms>
+
+[2026-01-14 16:33:05.8104] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <System Commands> is <0ms>
+
+[2026-01-14 16:33:05.8104] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Time and date> is <0ms>
+
+[2026-01-14 16:33:05.8241] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Unit Converter> is <0ms>
+
+[2026-01-14 16:33:05.8241] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Uri Handler> is <1ms>
+
+[2026-01-14 16:33:05.8241] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <ValueGenerator> is <0ms>
+
+[2026-01-14 16:33:05.8241] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <VS Code Workspaces> is <11ms>
+
+[2026-01-14 16:33:05.8402] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Web Search> is <0ms>
+
+[2026-01-14 16:33:05.8402] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Settings> is <0ms>
+
+[2026-01-14 16:33:05.8627] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Terminal> is <20ms>
+
+[2026-01-14 16:33:05.8627] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Window Walker> is <0ms>
+
+[2026-01-14 16:33:06.2990] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\SettingsReader.cs::89]
+Successfully read new settings. retryCount=1
+
+[2026-01-14 16:33:06.2990] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Shell\ShellPluginSettings.json>
+
+[2026-01-14 16:33:06.3223] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Calculator> is <1ms>
+
+[2026-01-14 16:33:06.3223] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Registry> is <0ms>
+
+[2026-01-14 16:33:06.3223] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Shell> is <8ms>
+
+[2026-01-14 16:33:06.3223] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Service> is <0ms>
+
+[2026-01-14 16:33:06.3223] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <History> is <1ms>
+
+[2026-01-14 16:33:06.3223] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Time and date> is <0ms>
+
+[2026-01-14 16:33:06.3223] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Unit Converter> is <0ms>
+
+[2026-01-14 16:33:06.3223] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <System Commands> is <1ms>
+
+[2026-01-14 16:33:06.3223] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Web Search> is <0ms>
+
+[2026-01-14 16:33:06.3223] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <ValueGenerator> is <0ms>
+
+[2026-01-14 16:33:06.3223] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\Common\DefaultBrowserInfo.cs::76]
+I've tried updating the chosen Web Browser info at least once.
+
+[2026-01-14 16:33:06.3223] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Window Walker> is <0ms>
+
+[2026-01-14 16:33:06.3223] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Windows Indexer> is <2ms>
+
+[2026-01-14 16:33:06.3223] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Folder> is <4ms>
+
+[2026-01-14 16:33:06.3223] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Windows Uri Handler> is <4ms>
+
+[2026-01-14 16:33:06.3345] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <PowerToys> is <12ms>
+
+[2026-01-14 16:33:06.3345] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Windows Settings> is <13ms>
+
+[2026-01-14 16:33:08.7083] [INFO] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Storage\PackageRepository.cs::112]
+Indexed 61 packaged applications
+
+[2026-01-14 16:33:08.7173] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+Microsoft.Plugin.Program.Main - Package index cost <2287ms>
+
+[2026-01-14 16:33:09.3097] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\ShellLinkHelper.cs::177]
+-------------------------- Begin exception --------------------------
+Message: Failed to fetch description for C:\Windows\syswow64\odbcad32.exe, Unexpected HRESULT has been returned from a call to a COM component.
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : Unexpected HRESULT has been returned from a call to a COM component.
+Exception stack trace:
+   at Wox.Infrastructure.ShellLinkHelper.IShellLinkW.GetDescription(StringBuilder pszName, Int32 cchMaxName)
+   at Wox.Infrastructure.ShellLinkHelper.RetrieveTargetPath(String path)
+Exception source     : Wox.Infrastructure
+Exception target site: Void GetDescription(System.Text.StringBuilder, Int32)
+Exception HResult    : -2147467259
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 16:33:09.3097] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\ShellLinkHelper.cs::177]
+-------------------------- Begin exception --------------------------
+Message: Failed to fetch description for C:\PROGRA~2\WINDOW~4\wmplayer.exe, Unexpected HRESULT has been returned from a call to a COM component.
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : Unexpected HRESULT has been returned from a call to a COM component.
+Exception stack trace:
+   at Wox.Infrastructure.ShellLinkHelper.IShellLinkW.GetDescription(StringBuilder pszName, Int32 cchMaxName)
+   at Wox.Infrastructure.ShellLinkHelper.RetrieveTargetPath(String path)
+Exception source     : Wox.Infrastructure
+Exception target site: Void GetDescription(System.Text.StringBuilder, Int32)
+Exception HResult    : -2147467259
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 16:33:15.4235] [INFO] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Storage\Win32ProgramRepository.cs::268]
+Indexed 841 win32 applications
+
+[2026-01-14 16:33:15.4235] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+Microsoft.Plugin.Program.Main - Win32Program index cost <8997ms>
+
+[2026-01-14 16:33:15.4235] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Program> is <9125ms>
+
+[2026-01-14 16:33:15.4235] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::1302]
+Refresh plugins overview
+
+[2026-01-14 16:33:15.4390] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::178]
+Begin PowerToys Run startup ----------------------------------------------------
+Runtime info:
+Version: 0.95.1.0
+OS Version: Microsoft Windows NT 10.0.22631.0
+IntPtr Length: 8
+x64: True
+End PowerToys Run startup ----------------------------------------------------  
+
+
+[2026-01-14 16:33:15.4390] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+App.OnStartup - Startup cost <10097ms>
+
+[2026-01-14 16:33:16.2361] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+EnvironmentHelper.GetProtectedEnvironmentVariables - Duration cost <1ms>
+
+[2026-01-14 16:33:16.2361] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::101]
+RegisterHotkey()
+
+[2026-01-14 16:33:16.2361] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::854]
+Set HotKey()
+
+[2026-01-14 16:33:16.2361] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::895]
+Registered global hotkey
+
+[2026-01-14 16:33:23.1803] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.OutlookForWindows
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at WinRT.ExceptionHelpers.ThrowExceptionForHR(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 16:54:33.4775] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.OfficePushNotificationUtility
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 16:54:38.2945] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception Microsoft.Office.ActionsServer
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 16:54:40.4270] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\PackageWrapper.cs::58]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: UNKNOWN
+		Program path: Path could not be determined
+		Exception thrown in called method: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+		Possible interpretation of the error: Exception aimgr
+		Possible resolution: Not yet known
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
+   at ABI.Windows.ApplicationModel.IPackageMethods.get_InstalledLocation(IObjectReference _obj)
+   at Windows.ApplicationModel.Package.get_InstalledLocation()
+   at Microsoft.Plugin.Program.Programs.PackageWrapper.GetWrapperFromPackage(Package package)
+Exception source     : WinRT.Runtime
+Exception target site: Void <ThrowExceptionForHR>g__Throw|38_0(Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 16:55:22.0502] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\UWPApplication.cs::362]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: KNOWN
+		Program path: C:\Program Files\WindowsApps\Microsoft.6365217CE6EB4_102.2504.16004.0_x64__8wekyb3d8bbwe
+		Exception thrown in called method: Not available
+		Possible interpretation of the error: Load pri failed @{Microsoft.6365217CE6EB4_102.2504.16004.0_x64__8wekyb3d8bbwe? ms-resource:///resources/AppDescription} with HResult 2147957527 and location C:\Program Files\WindowsApps\Microsoft.6365217CE6EB4_102.2504.16004.0_x64__8wekyb3d8bbwe
+		Possible resolution: Can be ignored and PowerToys Run should still continue, however the program may not be loaded
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : NamedResource Not Found. (0x80073B17)
+Exception stack trace:
+
+Exception source     : 
+Exception target site: 
+Exception HResult    : -2147009769
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:46:05.0279] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2026-01-14 17:46:07.8065] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 74 milliseconds
+
+[2026-01-14 17:46:07.8573] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 125 milliseconds
+
+[2026-01-14 17:46:07.8573] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Calculator. Query cost - 130 milliseconds
+
+[2026-01-14 17:46:07.8874] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 62 milliseconds
+
+[2026-01-14 17:46:08.4814] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 56 milliseconds
+
+[2026-01-14 17:46:08.5347] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 511 milliseconds
+
+[2026-01-14 17:46:08.6371] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 62 milliseconds
+
+[2026-01-14 17:46:08.7406] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 103 milliseconds
+
+[2026-01-14 17:46:09.1013] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Image\WindowsThumbnailProvider.cs::147]
+-------------------------- Begin exception --------------------------
+Message: Error while extracting thumbnail for C:\Users\mimichalis\OneDrive\Pictures\Camera Roll\20160614_214417.jpg
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : 0x8004B205
+Exception stack trace:
+   at Wox.Infrastructure.Image.WindowsThumbnailProvider.GetHBitmap(String fileName, Int32 width, Int32 height, ThumbnailOptions options)
+Exception source     : Wox.Infrastructure
+Exception target site: IntPtr GetHBitmap(System.String, Int32, Int32, Wox.Infrastructure.Image.ThumbnailOptions)
+Exception HResult    : -2147175931
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:46:09.1013] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Image\WindowsThumbnailProvider.cs::147]
+-------------------------- Begin exception --------------------------
+Message: Error while extracting thumbnail for C:\Users\mimichalis\OneDrive\Pictures\Camera Roll\20160614_214417.jpg
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : 0x8004B205
+Exception stack trace:
+   at Wox.Infrastructure.Image.WindowsThumbnailProvider.GetHBitmap(String fileName, Int32 width, Int32 height, ThumbnailOptions options)
+Exception source     : Wox.Infrastructure
+Exception target site: IntPtr GetHBitmap(System.String, Int32, Int32, Wox.Infrastructure.Image.ThumbnailOptions)
+Exception HResult    : -2147175931
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:46:09.1233] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Image\ImageLoader.cs::173]
+-------------------------- Begin exception --------------------------
+Message: Failed to get thumbnail for C:\Users\mimichalis\OneDrive\Pictures\Camera Roll\20160614_214417.jpg
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : 0x8004B205
+Exception stack trace:
+   at Wox.Infrastructure.Image.WindowsThumbnailProvider.GetHBitmap(String fileName, Int32 width, Int32 height, ThumbnailOptions options)
+   at Wox.Infrastructure.Image.WindowsThumbnailProvider.GetThumbnail(String fileName, Int32 width, Int32 height, ThumbnailOptions options)
+   at Wox.Infrastructure.Image.ImageLoader.GetThumbnailResult(String& path, Boolean generateThumbnailsFromFiles, Boolean loadFullImage)
+   at Wox.Infrastructure.Image.ImageLoader.<>c__DisplayClass18_0.<LoadInternalAsync>b__0()
+   at System.Threading.Tasks.Task`1.InnerInvoke()
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+--- End of stack trace from previous location ---
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+   at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+--- End of stack trace from previous location ---
+   at Wox.Infrastructure.Image.ImageLoader.LoadInternalAsync(String path, Boolean generateThumbnailsFromFiles, Boolean loadFullImage)
+Exception source     : Wox.Infrastructure
+Exception target site: IntPtr GetHBitmap(System.String, Int32, Int32, Wox.Infrastructure.Image.ThumbnailOptions)
+Exception HResult    : -2147175931
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:46:09.1233] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Image\ImageLoader.cs::173]
+-------------------------- Begin exception --------------------------
+Message: Failed to get thumbnail for C:\Users\mimichalis\OneDrive\Pictures\Camera Roll\20160614_214417.jpg
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : 0x8004B205
+Exception stack trace:
+   at Wox.Infrastructure.Image.WindowsThumbnailProvider.GetHBitmap(String fileName, Int32 width, Int32 height, ThumbnailOptions options)
+   at Wox.Infrastructure.Image.WindowsThumbnailProvider.GetThumbnail(String fileName, Int32 width, Int32 height, ThumbnailOptions options)
+   at Wox.Infrastructure.Image.ImageLoader.GetThumbnailResult(String& path, Boolean generateThumbnailsFromFiles, Boolean loadFullImage)
+   at Wox.Infrastructure.Image.ImageLoader.<>c__DisplayClass18_0.<LoadInternalAsync>b__0()
+   at System.Threading.Tasks.Task`1.InnerInvoke()
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+--- End of stack trace from previous location ---
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+   at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+--- End of stack trace from previous location ---
+   at Wox.Infrastructure.Image.ImageLoader.LoadInternalAsync(String path, Boolean generateThumbnailsFromFiles, Boolean loadFullImage)
+Exception source     : Wox.Infrastructure
+Exception target site: IntPtr GetHBitmap(System.String, Int32, Int32, Wox.Infrastructure.Image.ThumbnailOptions)
+Exception HResult    : -2147175931
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:46:09.4650] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 53 milliseconds
+
+[2026-01-14 17:46:19.3978] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Program. Query cost - 55 milliseconds
+
+[2026-01-14 17:46:19.5525] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Window Walker. Query cost - 60 milliseconds
+
+[2026-01-14 17:46:50.6479] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:46:50.6479] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30020 milliseconds
+
+[2026-01-14 17:46:51.0697] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:46:51.0697] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30006 milliseconds
+
+[2026-01-14 17:46:51.8255] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:46:51.8255] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30006 milliseconds
+
+[2026-01-14 17:46:52.0453] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:46:52.0453] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30008 milliseconds
+
+[2026-01-14 17:46:52.3593] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:46:52.3593] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30006 milliseconds
+
+[2026-01-14 17:46:53.6150] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:46:53.6150] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30007 milliseconds
+
+[2026-01-14 17:46:53.8947] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:46:53.8949] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30006 milliseconds
+
+[2026-01-14 17:46:56.4847] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2026-01-14 17:46:59.9826] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:46:59.9826] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30007 milliseconds
+
+[2026-01-14 17:47:00.7874] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:47:00.7874] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 29993 milliseconds
+
+[2026-01-14 17:47:01.3301] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:47:01.3301] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30012 milliseconds
+
+[2026-01-14 17:47:01.6181] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:47:01.6181] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30006 milliseconds
+
+[2026-01-14 17:47:02.3670] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:47:02.3670] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30006 milliseconds
+
+[2026-01-14 17:47:02.5608] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:47:02.5608] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30006 milliseconds
+
+[2026-01-14 17:47:02.7519] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Indexer\Main.cs::182]
+-------------------------- Begin exception --------------------------
+Message: Something failed
+
+Exception full name  : System.Data.OleDb.OleDbException
+Exception message    : Unspecified error: -2147215865(0x80041607)
+Exception stack trace:
+   at System.Data.OleDb.OleDbDataReader.ProcessResults(OleDbHResult hr)
+   at System.Data.OleDb.OleDbDataReader.GetRowHandles()
+   at System.Data.OleDb.OleDbDataReader.ReadRowset()
+   at System.Data.OleDb.OleDbDataReader.Read()
+   at System.Data.OleDb.OleDbDataReader.HasRowsRead()
+   at System.Data.OleDb.OleDbCommand.ExecuteReaderInternal(CommandBehavior behavior, String method)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader(CommandBehavior behavior)
+   at System.Data.OleDb.OleDbCommand.ExecuteReader()
+   at Microsoft.Plugin.Indexer.SearchHelper.OleDBSearch.Query(String connectionString, String sqlQuery)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.ExecuteQuery(ISearchQueryHelper queryHelper, String keyword)
+   at Microsoft.Plugin.Indexer.SearchHelper.WindowsSearchAPI.Search(String keyword, ISearchManager manager, String pattern, List`1 excludedPatterns, Int32 maxCount)
+   at Microsoft.Plugin.Indexer.Main.Query(Query query, Boolean isFullQuery)
+Exception source     : System.Data.OleDb
+Exception target site: Void ProcessResults(System.Data.OleDb.OleDbHResult)
+Exception HResult    : -2147215865
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 17:47:02.7519] [WARN] [P:\_work\1\s\src\modules\launcher\PowerLauncher\Plugin\PluginManager.cs::232]
+PluginManager.QueryForPlugin Windows Indexer. Query cost - 30008 milliseconds
+
+[2026-01-14 17:47:09.7680] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::975]
+OnHotkey
+
+[2026-01-14 18:20:25.6667] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::227]
+Application.Current.SessionEnding
+
+[2026-01-14 18:20:25.6667] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::275]
+Start PowerToys Run Exit----------------------------------------------------  
+
+[2026-01-14 18:20:25.6915] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\QueryHistory.json>
+
+[2026-01-14 18:20:25.6965] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\UserSelectedRecord.json>
+
+[2026-01-14 18:20:25.7208] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\PowerToysRunSettings.json>
+
+[2026-01-14 18:20:25.7387] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Folder\FolderSettings.json>
+
+[2026-01-14 18:20:25.7552] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Indexer\IndexerSettings.json>
+
+[2026-01-14 18:20:25.7552] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Program\ProgramPluginSettings.json>
+
+[2026-01-14 18:20:25.7552] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Shell\ShellPluginSettings.json>
+
+[2026-01-14 18:20:25.7552] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Uri\UriSettings.json>
+
+[2026-01-14 18:20:25.7763] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\ImageCache.json>
+
+[2026-01-14 18:20:25.7859] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::286]
+End PowerToys Run Exit ----------------------------------------------------  
+
+[2026-01-14 18:20:25.7859] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+App.OnExit - Exit cost <117ms>
+
+[2026-01-14 18:20:25.8331] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::221]
+Application.Current.Exit
+
+[2026-01-14 21:28:49.9522] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::72]
+Starting PowerToys Run with PID=36712
+
+[2026-01-14 21:28:49.9914] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::83]
+Runner pid=32356
+
+[2026-01-14 21:28:50.2645] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::129]
+On Startup.
+
+[2026-01-14 21:28:50.4456] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+ImageLoader.Initialize - Preload images cost <7ms>
+
+[2026-01-14 21:28:50.4456] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Image\ImageLoader.cs::100]
+Number of preload images is <136>, Images Number: 2, Unique Items 2
+
+[2026-01-14 21:28:50.5754] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+|Wox.Infrastructure.Alphabet.Initialize|Preload pinyin cache <78ms>
+
+[2026-01-14 21:28:50.5754] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Alphabet.cs::46]
+Number of preload pinyin combination<0>
+
+[2026-01-14 21:28:51.1868] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Calculator> is <1ms>
+
+[2026-01-14 21:28:51.1868] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Folder> is <2ms>
+
+[2026-01-14 21:28:51.1868] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <History> is <0ms>
+
+[2026-01-14 21:28:51.2091] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Indexer> is <1ms>
+
+[2026-01-14 21:28:51.2244] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <OneNote> is <1ms>
+
+[2026-01-14 21:28:51.2244] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <PowerToys> is <0ms>
+
+[2026-01-14 21:28:51.2645] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Program> is <37ms>
+
+[2026-01-14 21:28:51.2645] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Registry> is <0ms>
+
+[2026-01-14 21:28:51.2645] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Service> is <1ms>
+
+[2026-01-14 21:28:51.2755] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Shell> is <7ms>
+
+[2026-01-14 21:28:51.2755] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <System Commands> is <1ms>
+
+[2026-01-14 21:28:51.2755] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Time and date> is <0ms>
+
+[2026-01-14 21:28:51.2755] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Unit Converter> is <0ms>
+
+[2026-01-14 21:28:51.2755] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Uri Handler> is <2ms>
+
+[2026-01-14 21:28:51.2755] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <ValueGenerator> is <0ms>
+
+[2026-01-14 21:28:51.3015] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <VS Code Workspaces> is <16ms>
+
+[2026-01-14 21:28:51.3015] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Web Search> is <0ms>
+
+[2026-01-14 21:28:51.3015] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Settings> is <1ms>
+
+[2026-01-14 21:28:51.4599] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Windows Terminal> is <154ms>
+
+[2026-01-14 21:28:51.4599] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::146]
+Load cost for <Window Walker> is <0ms>
+
+[2026-01-14 21:28:52.0234] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\SettingsReader.cs::89]
+Successfully read new settings. retryCount=1
+
+[2026-01-14 21:28:52.0234] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Shell\ShellPluginSettings.json>
+
+[2026-01-14 21:28:52.0585] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Registry> is <1ms>
+
+[2026-01-14 21:28:52.0585] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Time and date> is <2ms>
+
+[2026-01-14 21:28:52.0585] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Calculator> is <3ms>
+
+[2026-01-14 21:28:52.0585] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <ValueGenerator> is <0ms>
+
+[2026-01-14 21:28:52.0585] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <History> is <2ms>
+
+[2026-01-14 21:28:52.0585] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Web Search> is <0ms>
+
+[2026-01-14 21:28:52.0585] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\Common\DefaultBrowserInfo.cs::76]
+I've tried updating the chosen Web Browser info at least once.
+
+[2026-01-14 21:28:52.0585] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <System Commands> is <3ms>
+
+[2026-01-14 21:28:52.0585] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Service> is <3ms>
+
+[2026-01-14 21:28:52.0585] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Shell> is <9ms>
+
+[2026-01-14 21:28:52.0585] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Unit Converter> is <2ms>
+
+[2026-01-14 21:28:52.0585] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Window Walker> is <0ms>
+
+[2026-01-14 21:28:52.0585] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Windows Uri Handler> is <6ms>
+
+[2026-01-14 21:28:52.0585] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Folder> is <8ms>
+
+[2026-01-14 21:28:52.0585] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Windows Indexer> is <7ms>
+
+[2026-01-14 21:28:52.0876] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Windows Settings> is <28ms>
+
+[2026-01-14 21:28:52.0876] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <PowerToys> is <35ms>
+
+[2026-01-14 21:28:54.2145] [ERROR] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Programs\UWPApplication.cs::362]
+-------------------------- Begin exception --------------------------
+Message: 	Error status: KNOWN
+		Program path: C:\Program Files\WindowsApps\Microsoft.6365217CE6EB4_102.2504.16004.0_x64__8wekyb3d8bbwe
+		Exception thrown in called method: Not available
+		Possible interpretation of the error: Load pri failed @{Microsoft.6365217CE6EB4_102.2504.16004.0_x64__8wekyb3d8bbwe? ms-resource:///resources/AppDescription} with HResult 2147957527 and location C:\Program Files\WindowsApps\Microsoft.6365217CE6EB4_102.2504.16004.0_x64__8wekyb3d8bbwe
+		Possible resolution: Can be ignored and PowerToys Run should still continue, however the program may not be loaded
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : NamedResource Not Found. (0x80073B17)
+Exception stack trace:
+
+Exception source     : 
+Exception target site: 
+Exception HResult    : -2147009769
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 21:28:54.3240] [INFO] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Storage\PackageRepository.cs::112]
+Indexed 62 packaged applications
+
+[2026-01-14 21:28:54.3847] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+Microsoft.Plugin.Program.Main - Package index cost <2243ms>
+
+[2026-01-14 21:28:54.8332] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\ShellLinkHelper.cs::177]
+-------------------------- Begin exception --------------------------
+Message: Failed to fetch description for C:\PROGRA~2\WINDOW~4\wmplayer.exe, Unexpected HRESULT has been returned from a call to a COM component.
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : Unexpected HRESULT has been returned from a call to a COM component.
+Exception stack trace:
+   at Wox.Infrastructure.ShellLinkHelper.IShellLinkW.GetDescription(StringBuilder pszName, Int32 cchMaxName)
+   at Wox.Infrastructure.ShellLinkHelper.RetrieveTargetPath(String path)
+Exception source     : Wox.Infrastructure
+Exception target site: Void GetDescription(System.Text.StringBuilder, Int32)
+Exception HResult    : -2147467259
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 21:28:54.8332] [ERROR] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\ShellLinkHelper.cs::177]
+-------------------------- Begin exception --------------------------
+Message: Failed to fetch description for C:\Windows\syswow64\odbcad32.exe, Unexpected HRESULT has been returned from a call to a COM component.
+
+Exception full name  : System.Runtime.InteropServices.COMException
+Exception message    : Unexpected HRESULT has been returned from a call to a COM component.
+Exception stack trace:
+   at Wox.Infrastructure.ShellLinkHelper.IShellLinkW.GetDescription(StringBuilder pszName, Int32 cchMaxName)
+   at Wox.Infrastructure.ShellLinkHelper.RetrieveTargetPath(String path)
+Exception source     : Wox.Infrastructure
+Exception target site: Void GetDescription(System.Text.StringBuilder, Int32)
+Exception HResult    : -2147467259
+-------------------------- End exception --------------------------
+
+
+[2026-01-14 21:29:00.9818] [INFO] [P:\_work\1\s\src\modules\launcher\Plugins\Microsoft.Plugin.Program\Storage\Win32ProgramRepository.cs::268]
+Indexed 844 win32 applications
+
+[2026-01-14 21:29:00.9818] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+Microsoft.Plugin.Program.Main - Win32Program index cost <8842ms>
+
+[2026-01-14 21:29:00.9818] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Plugin\PluginPair.cs::57]
+Total initialize cost for <Program> is <8964ms>
+
+[2026-01-14 21:29:00.9818] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::1302]
+Refresh plugins overview
+
+[2026-01-14 21:29:00.9902] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::178]
+Begin PowerToys Run startup ----------------------------------------------------
+Runtime info:
+Version: 0.95.1.0
+OS Version: Microsoft Windows NT 10.0.22631.0
+IntPtr Length: 8
+x64: True
+End PowerToys Run startup ----------------------------------------------------  
+
+
+[2026-01-14 21:29:00.9902] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+App.OnStartup - Startup cost <10694ms>
+
+[2026-01-14 21:29:01.3807] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+EnvironmentHelper.GetProtectedEnvironmentVariables - Duration cost <1ms>
+
+[2026-01-14 21:29:01.3807] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::101]
+RegisterHotkey()
+
+[2026-01-14 21:29:01.3807] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::854]
+Set HotKey()
+
+[2026-01-14 21:29:01.3807] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\ViewModel\MainViewModel.cs::895]
+Registered global hotkey
+
+[2026-01-14 22:02:28.0992] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\MainWindow.xaml.cs::104]
+Send Run settings telemetry
+
+[2026-01-14 22:46:05.9590] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::227]
+Application.Current.SessionEnding
+
+[2026-01-14 22:46:05.9590] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::275]
+Start PowerToys Run Exit----------------------------------------------------  
+
+[2026-01-14 22:46:06.0709] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\QueryHistory.json>
+
+[2026-01-14 22:46:06.0709] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\UserSelectedRecord.json>
+
+[2026-01-14 22:46:06.2602] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\PowerToysRunSettings.json>
+
+[2026-01-14 22:46:06.2602] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Folder\FolderSettings.json>
+
+[2026-01-14 22:46:06.2602] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Indexer\IndexerSettings.json>
+
+[2026-01-14 22:46:06.2730] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Program\ProgramPluginSettings.json>
+
+[2026-01-14 22:46:06.2730] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Shell\ShellPluginSettings.json>
+
+[2026-01-14 22:46:06.2730] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\Plugins\Microsoft.Plugin.Uri\UriSettings.json>
+
+[2026-01-14 22:46:06.2877] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\JsonStorage`1.cs::141]
+Saving cached data at <C:\Users\mimichalis\AppData\Local\Microsoft\PowerToys\PowerToys Run\Settings\ImageCache.json>
+
+[2026-01-14 22:46:06.3017] [INFO] [P:\_work\1\s\src\modules\launcher\PowerLauncher\App.xaml.cs::286]
+End PowerToys Run Exit ----------------------------------------------------  
+
+[2026-01-14 22:46:06.3017] [INFO] [P:\_work\1\s\src\modules\launcher\Wox.Infrastructure\Stopwatch.cs::46]
+App.OnExit - Exit cost <341ms>
+
