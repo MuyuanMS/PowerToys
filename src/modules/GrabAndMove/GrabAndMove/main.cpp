@@ -571,6 +571,7 @@ static void MarkButtonUpForSwallow(MouseButton button);
 static void FinalizeTargetUpdate();
 static HCURSOR CursorForHandle(ResizeHandle handle);
 static void EnsureOverlayWindow();
+static bool IsModifierExcluded(HWND hwnd);
 
 static bool HasModifierSession()
 {
@@ -652,6 +653,27 @@ static void CALLBACK WinEventProc(HWINEVENTHOOK, DWORD, HWND hwnd, LONG, LONG, D
 #ifdef GRABANDMOVE_PERF_DIAGNOSTICS
         FlushPendingPerfReport();
 #endif
+    }
+    else if (hwnd && IsModifierExcluded(hwnd))
+    {
+        if (g_interaction.phase == InteractionPhase::Pending)
+        {
+            FlushPendingClickOnModifierRelease();
+        }
+        else if (g_interaction.phase == InteractionPhase::Active)
+        {
+            MarkButtonUpForSwallow(g_interaction.button);
+            StopInteraction();
+        }
+
+        if (g_modifierSession.absorbed && !g_modifierSession.replayedDown &&
+            ReplayCapturedModifier(ModifierReplay::DownOnly) == 1)
+        {
+            g_modifierSession.replayedDown = true;
+            g_modifierSession.absorbed = false;
+        }
+
+        g_modifierSession.disposition = ModifierHoldDisposition::Passthrough;
     }
 }
 
@@ -2678,6 +2700,11 @@ static HookDisposition HandleActionButtonDown(MouseButton button, POINT point)
             MarkButtonUpForSwallow(button);
         }
         return HookDisposition::Swallow;
+    }
+
+    if (g_modifierSession.disposition == ModifierHoldDisposition::Passthrough)
+    {
+        return EnterModifierPassthrough(button, false);
     }
 
     if (IsSuppressedByGameMode())
