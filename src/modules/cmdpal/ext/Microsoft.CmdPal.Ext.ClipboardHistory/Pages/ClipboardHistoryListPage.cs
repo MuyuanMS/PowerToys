@@ -46,7 +46,10 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
 
     private void TrackClipboardHistoryChanged_EventHandler(object? sender, ClipboardHistoryChangedEventArgs? e)
     {
-        LoadClipboardHistoryInSTA();
+        if (Volatile.Read(ref hasLoadedOnce) != 0)
+        {
+            LoadClipboardHistoryInSTA();
+        }
     }
 
     private bool IsClipboardHistoryEnabled()
@@ -72,6 +75,7 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
 
             if (!Clipboard.IsHistoryEnabled())
             {
+                ClearClipboardHistory();
                 return;
             }
 
@@ -224,6 +228,11 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
         var temporaryPath = $"{path}.tmp";
         try
         {
+            if (File.Exists(path))
+            {
+                return true;
+            }
+
             using var stream = await imageData.OpenReadAsync().AsTask().ConfigureAwait(false);
             using var input = stream.AsStreamForRead();
             var directory = Path.GetDirectoryName(path)!;
@@ -293,6 +302,12 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
         StartClipboardHistoryLoad();
     }
 
+    private void ClearClipboardHistory()
+    {
+        clipboardHistory = [];
+        CleanupCachedImages([]);
+    }
+
     private void StartClipboardHistoryLoad()
     {
         IsLoading = true;
@@ -334,8 +349,12 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
     {
         // This registry read is only a cheap pre-filter. Clipboard.IsHistoryEnabled()
         // remains the authoritative check inside the load.
-        if (Volatile.Read(ref hasLoadedOnce) == 0 && IsClipboardHistoryEnabled() &&
-            Interlocked.CompareExchange(ref hasLoadedOnce, 1, 0) == 0)
+        if (!IsClipboardHistoryEnabled())
+        {
+            ClearClipboardHistory();
+        }
+        else if (Volatile.Read(ref hasLoadedOnce) == 0 &&
+                 Interlocked.CompareExchange(ref hasLoadedOnce, 1, 0) == 0)
         {
             LoadClipboardHistoryInSTA();
         }
