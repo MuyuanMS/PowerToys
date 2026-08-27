@@ -45,7 +45,7 @@ export abstract class DynamicListPageBase extends ListPageBase implements IDynam
   /**
    * Tells the host that this page's items have changed and should be re-fetched.
    */
-  protected notifyItemsChanged(): void {
+  protected override notifyItemsChanged(): void {
     sendNotification('listPage/itemsChanged', { pageId: this.id });
   }
 }

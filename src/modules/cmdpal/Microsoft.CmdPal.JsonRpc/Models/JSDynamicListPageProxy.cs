@@ -23,12 +23,14 @@ internal sealed partial class JSDynamicListPageProxy : IDynamicListPage, IDispos
     private readonly JSListPageProxy _inner;
     private readonly string _pageId;
     private readonly JsonRpcConnection _connection;
+    private string _searchText;
 
     public JSDynamicListPageProxy(string pageId, JsonRpcConnection connection, JsonElement pageData = default)
     {
         _pageId = pageId ?? throw new ArgumentNullException(nameof(pageId));
         _connection = connection ?? throw new ArgumentNullException(nameof(connection));
         _inner = new JSListPageProxy(pageId, connection, pageData);
+        _searchText = _inner.SearchText;
     }
 
     public event TypedEventHandler<object, IItemsChangedEventArgs>? ItemsChanged
@@ -69,21 +71,20 @@ internal sealed partial class JSDynamicListPageProxy : IDynamicListPage, IDispos
 
     public string SearchText
     {
-        get => _inner.SearchText;
+        get => _searchText;
 
         set
         {
-            try
+            var response = _connection.SendRequestAsync(
+                "listPage/setSearchText",
+                new JsonObject { ["pageId"] = _pageId, ["searchText"] = value },
+                CancellationToken.None).GetAwaiter().GetResult();
+            if (response.Error != null)
             {
-                _connection.SendRequestAsync(
-                    "listPage/setSearchText",
-                    new JsonObject { ["pageId"] = _pageId, ["searchText"] = value },
-                    CancellationToken.None).GetAwaiter().GetResult();
+                throw new InvalidOperationException(response.Error.Message);
             }
-            catch (Exception ex)
-            {
-                Logger.LogWarning($"Failed to set search text for page {_pageId}: {ex.Message}");
-            }
+
+            _searchText = value;
         }
     }
 

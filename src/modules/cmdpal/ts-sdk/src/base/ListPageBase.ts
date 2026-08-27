@@ -11,6 +11,7 @@ import type {
   IconInfo,
   OptionalColor,
 } from '../types.js';
+import { sendNotification } from '../runtime/notifications.js';
 import { ObservableBase } from './ObservableBase.js';
 
 /**
@@ -69,6 +70,13 @@ export abstract class ListPageBase extends ObservableBase implements IListPage {
   abstract getItems(): IListItem[] | Promise<IListItem[]>;
 
   /**
+   * Tells the host that this page's items have changed and should be re-fetched.
+   */
+  protected notifyItemsChanged(): void {
+    sendNotification('listPage/itemsChanged', { pageId: this.id });
+  }
+
+  /**
    * Loads the next page of items when {@link ListPageBase.hasMoreItems} is
    * `true`. Does nothing by default; override to support infinite scroll.
    */
@@ -79,6 +87,7 @@ export abstract class ListPageBase extends ObservableBase implements IListPage {
   setFilter(filterId: string): void | Promise<void> {
     if (this.filters) {
       this.filters.currentFilterId = filterId;
+      this.notifyItemsChanged();
     }
   }
 }

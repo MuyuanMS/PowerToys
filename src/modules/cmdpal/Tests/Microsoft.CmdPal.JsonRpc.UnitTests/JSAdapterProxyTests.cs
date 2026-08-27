@@ -293,6 +293,7 @@ public class JSAdapterProxyTests
 
         await Task.Run(() => page.SearchText = "query");
         Assert.AreEqual("query", capturedSearch);
+        Assert.AreEqual("query", page.SearchText);
 
         await fake.PushNotificationAsync(
             "listPage/itemsChanged",

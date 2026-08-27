@@ -35,14 +35,20 @@ internal sealed partial class JSFiltersAdapter : IFilters
 
         set
         {
+            var previousFilterId = _currentFilterId;
             _currentFilterId = value;
 
             if (!string.IsNullOrEmpty(_pageId))
             {
-                _ = _connection.SendRequestAsync(
+                var response = _connection.SendRequestAsync(
                     "listPage/setFilter",
                     new JsonObject { ["pageId"] = _pageId, ["filterId"] = value },
-                    CancellationToken.None);
+                    CancellationToken.None).GetAwaiter().GetResult();
+                if (response.Error != null)
+                {
+                    _currentFilterId = previousFilterId;
+                    throw new InvalidOperationException(response.Error.Message);
+                }
             }
         }
     }

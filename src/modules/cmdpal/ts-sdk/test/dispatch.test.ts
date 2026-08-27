@@ -201,7 +201,7 @@ describe('ExtensionRuntime request dispatch', () => {
     }
 
     const page = new FilterPage();
-    const { runtime } = createHarness();
+    const { runtime, sent } = createHarness();
     runtime.setProvider({
       id: 'ext',
       displayName: 'Ext',
@@ -220,6 +220,7 @@ describe('ExtensionRuntime request dispatch', () => {
     });
 
     expect(page.filters.currentFilterId).toBe('active');
+    expect(notificationsOf(sent, 'listPage/itemsChanged')).toHaveLength(1);
   });
 
   it('reports method not found for unknown methods', async () => {
