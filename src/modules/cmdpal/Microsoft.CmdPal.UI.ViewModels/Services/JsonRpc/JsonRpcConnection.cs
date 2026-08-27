@@ -4,7 +4,9 @@
 
 using System;
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.IO;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
@@ -23,6 +25,7 @@ public sealed class JsonRpcConnection : IDisposable
 {
     private const int NotificationQueueCapacity = 1024;
     internal const int InboundRequestConcurrencyLimit = 16;
+    internal const int MaxInboundContentLength = 32 * 1024 * 1024;
 
     private static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan DisposeDrainTimeout = TimeSpan.FromSeconds(2);
@@ -69,6 +72,10 @@ public sealed class JsonRpcConnection : IDisposable
 
         _errorStream = errorStream;
         _requestTimeout = requestTimeout ?? DefaultRequestTimeout;
+        if (_requestTimeout < TimeSpan.Zero && _requestTimeout != Timeout.InfiniteTimeSpan)
+        {
+            throw new ArgumentOutOfRangeException(nameof(requestTimeout), "The request timeout must be non-negative or infinite.");
+        }
 
         var formatter = new SystemTextJsonFormatter
         {
@@ -79,7 +86,7 @@ public sealed class JsonRpcConnection : IDisposable
         };
         _messageFactory = formatter;
 
-        _messageHandler = new HeaderDelimitedMessageHandler(output, input, formatter);
+        _messageHandler = new HeaderDelimitedMessageHandler(output, new InboundFrameLimitStream(input), formatter);
         _rpc = new CmdPalJsonRpc(_messageHandler)
         {
             AllowModificationWhileListening = true,
@@ -530,6 +537,143 @@ public sealed class JsonRpcConnection : IDisposable
         public Task<JsonNode?> InvokeAsync(JsonElement parameters = default, CancellationToken cancellationToken = default)
         {
             return _connection.DispatchMethodAsync(_method, parameters, cancellationToken);
+        }
+    }
+
+    internal sealed class InboundFrameLimitStream : Stream
+    {
+        private const int MaxHeaderLength = 8 * 1024;
+
+        private readonly Stream _inner;
+        private readonly byte[] _header = new byte[MaxHeaderLength];
+        private int _headerLength;
+        private long _remainingBodyBytes;
+
+        internal InboundFrameLimitStream(Stream inner)
+        {
+            _inner = inner;
+        }
+
+        public override bool CanRead => _inner.CanRead;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            var read = _inner.Read(buffer, offset, count);
+            Validate(buffer.AsSpan(offset, read));
+            return read;
+        }
+
+        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            var read = await _inner.ReadAsync(buffer.AsMemory(offset, count), cancellationToken).ConfigureAwait(false);
+            Validate(buffer.AsSpan(offset, read));
+            return read;
+        }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            var read = await _inner.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            Validate(buffer.Span[..read]);
+            return read;
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _inner.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+
+        private void Validate(ReadOnlySpan<byte> bytes)
+        {
+            var offset = 0;
+            while (offset < bytes.Length)
+            {
+                if (_remainingBodyBytes > 0)
+                {
+                    var consumed = Math.Min(_remainingBodyBytes, bytes.Length - offset);
+                    _remainingBodyBytes -= consumed;
+                    offset += (int)consumed;
+                    continue;
+                }
+
+                if (_headerLength == MaxHeaderLength)
+                {
+                    throw new InvalidDataException($"The JSON-RPC header exceeds {MaxHeaderLength} bytes.");
+                }
+
+                _header[_headerLength++] = bytes[offset++];
+                if (_headerLength >= 4 &&
+                    _header[_headerLength - 4] == (byte)'\r' &&
+                    _header[_headerLength - 3] == (byte)'\n' &&
+                    _header[_headerLength - 2] == (byte)'\r' &&
+                    _header[_headerLength - 1] == (byte)'\n')
+                {
+                    _remainingBodyBytes = ParseContentLength(_header.AsSpan(0, _headerLength));
+                    _headerLength = 0;
+                }
+            }
+        }
+
+        private static long ParseContentLength(ReadOnlySpan<byte> headerBytes)
+        {
+            var header = Encoding.ASCII.GetString(headerBytes);
+            long? contentLength = null;
+            foreach (var line in header.Split("\r\n", StringSplitOptions.RemoveEmptyEntries))
+            {
+                var separator = line.IndexOf(':', StringComparison.Ordinal);
+                if (separator <= 0 ||
+                    !line.AsSpan(0, separator).Trim().Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (contentLength is not null ||
+                    !long.TryParse(line.AsSpan(separator + 1).Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) ||
+                    parsed < 0)
+                {
+                    throw new InvalidDataException("The JSON-RPC Content-Length header is invalid.");
+                }
+
+                contentLength = parsed;
+            }
+
+            if (contentLength is null)
+            {
+                throw new InvalidDataException("The JSON-RPC header does not contain Content-Length.");
+            }
+
+            if (contentLength > MaxInboundContentLength)
+            {
+                throw new InvalidDataException($"The JSON-RPC Content-Length exceeds the {MaxInboundContentLength}-byte limit.");
+            }
+
+            return contentLength.Value;
         }
     }
 

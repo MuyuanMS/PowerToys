@@ -116,6 +116,35 @@ public partial class JsonRpcConnectionTests
     }
 
     [TestMethod]
+    public async Task InboundFrameLimit_AllowsContentLengthAtLimit()
+    {
+        var header = Encoding.ASCII.GetBytes($"Content-Length: {JsonRpcConnection.MaxInboundContentLength}\r\n\r\n");
+        using var stream = new JsonRpcConnection.InboundFrameLimitStream(new MemoryStream(header));
+        var buffer = new byte[header.Length];
+
+        var read = await stream.ReadAsync(buffer);
+
+        Assert.AreEqual(header.Length, read);
+    }
+
+    [TestMethod]
+    public async Task InboundFrameLimit_RejectsContentLengthAboveLimit()
+    {
+        var header = Encoding.ASCII.GetBytes($"Content-Length: {JsonRpcConnection.MaxInboundContentLength + 1L}\r\n\r\n");
+        using var stream = new JsonRpcConnection.InboundFrameLimitStream(new MemoryStream(header));
+        var buffer = new byte[header.Length];
+
+        await Assert.ThrowsExceptionAsync<InvalidDataException>(async () => await stream.ReadAsync(buffer));
+    }
+
+    [TestMethod]
+    public void Constructor_RejectsInvalidNegativeRequestTimeout()
+    {
+        Assert.ThrowsException<ArgumentOutOfRangeException>(() =>
+            new JsonRpcConnection(Stream.Null, Stream.Null, requestTimeout: TimeSpan.FromMilliseconds(-2)));
+    }
+
+    [TestMethod]
     public async Task ConcurrentRequests_AreCorrelatedIndependently()
     {
         using var cts = new CancellationTokenSource(TestTimeout);
