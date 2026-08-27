@@ -64,7 +64,6 @@ public static class TextBoxCaretColor
         States.Add(tb, st);
 
         tb.Loaded += TbOnLoaded;
-        tb.Unloaded += TbOnUnloaded;
         tb.GotFocus += TbOnGotFocus;
 
         st.ForegroundToken = tb.RegisterPropertyChangedCallback(Control.ForegroundProperty!, (_, _) => Apply(tb));
@@ -83,7 +82,6 @@ public static class TextBoxCaretColor
         }
 
         tb.Loaded -= TbOnLoaded;
-        tb.Unloaded -= TbOnUnloaded;
         tb.GotFocus -= TbOnGotFocus;
 
         if (st.ForegroundToken != 0)
@@ -100,14 +98,6 @@ public static class TextBoxCaretColor
         if (sender is TextBox tb)
         {
             Apply(tb);
-        }
-    }
-
-    private static void TbOnUnloaded(object sender, RoutedEventArgs e)
-    {
-        if (sender is TextBox tb)
-        {
-            Detach(tb);
         }
     }
 
