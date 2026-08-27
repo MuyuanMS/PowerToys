@@ -106,18 +106,23 @@ public sealed record JSExtensionManifest
             return JSExtensionManifestParseResult.Failure($"The package.json at '{packageJsonPath}' exceeds the maximum supported size.");
         }
 
-        string json;
         try
         {
-            json = File.ReadAllText(packageJsonPath);
+            using var stream = new FileStream(packageJsonPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (stream.Length > MaxManifestBytes)
+            {
+                return JSExtensionManifestParseResult.Failure($"The package.json at '{packageJsonPath}' exceeds the maximum supported size.");
+            }
+
+            using var reader = new StreamReader(stream);
+            var json = reader.ReadToEnd();
+            var directory = Path.GetDirectoryName(Path.GetFullPath(packageJsonPath)) ?? string.Empty;
+            return TryParse(json, directory);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return JSExtensionManifestParseResult.Failure($"Failed to read '{packageJsonPath}': {ex.Message}");
         }
-
-        var directory = Path.GetDirectoryName(Path.GetFullPath(packageJsonPath)) ?? string.Empty;
-        return TryParse(json, directory);
     }
 
     /// <summary>

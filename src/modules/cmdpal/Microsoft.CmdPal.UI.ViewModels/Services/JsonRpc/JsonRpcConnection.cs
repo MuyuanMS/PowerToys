@@ -426,6 +426,8 @@ public sealed partial class JsonRpcConnection : IDisposable
             }
         }
 
+        DiscardQueuedWork();
+
         if (acquiredWriteLock)
         {
             try
@@ -723,6 +725,12 @@ public sealed partial class JsonRpcConnection : IDisposable
             }
 
             var hasId = root.TryGetProperty("id", out var idElement);
+            if (hasId && idElement.ValueKind is not (JsonValueKind.String or JsonValueKind.Number or JsonValueKind.Null))
+            {
+                _protocolErrorLog.Run(static () => Logger.LogWarning("Received a JSON-RPC message with an invalid id."));
+                return;
+            }
+
             var hasMethodProperty = root.TryGetProperty("method", out var methodElement);
             if (hasMethodProperty && methodElement.ValueKind != JsonValueKind.String)
             {
@@ -892,7 +900,7 @@ public sealed partial class JsonRpcConnection : IDisposable
         if (projected > _maxQueuedRequestBytes)
         {
             Interlocked.Add(ref _queuedRequestBytes, -sizeBytes);
-            RejectInboundRequest(idElement);
+            RejectInboundRequest(idElement, sizeBytes);
             return;
         }
 
@@ -912,14 +920,19 @@ public sealed partial class JsonRpcConnection : IDisposable
         // The count-bounded queue is full or completed because the connection is closing. Release the
         // byte reservation and reject the request.
         Interlocked.Add(ref _queuedRequestBytes, -sizeBytes);
-        RejectInboundRequest(idElement);
+        RejectInboundRequest(idElement, sizeBytes);
     }
 
-    private void RejectInboundRequest(JsonElement idElement)
+    private void RejectInboundRequest(JsonElement idElement, int requestSizeBytes)
     {
         if (Volatile.Read(ref _connectionState) != StateOpen)
         {
             // The connection is closing; the peer will observe the disconnect. Nothing to send.
+            return;
+        }
+
+        if (requestSizeBytes > MaxPendingRejectionResponseBytes)
+        {
             return;
         }
 
@@ -969,6 +982,19 @@ public sealed partial class JsonRpcConnection : IDisposable
                 {
                     Interlocked.Add(ref _queuedRequestBytes, -envelope.SizeBytes);
                     await DispatchInboundRequestAsync(envelope).ConfigureAwait(false);
+                }
+            }
+
+            private void DiscardQueuedWork()
+            {
+                while (_notificationQueue.Reader.TryRead(out var notification))
+                {
+                    Interlocked.Add(ref _queuedNotificationBytes, -notification.SizeBytes);
+                }
+
+                while (_inboundRequestQueue.Reader.TryRead(out var request))
+                {
+                    Interlocked.Add(ref _queuedRequestBytes, -request.SizeBytes);
                 }
             }
         }

@@ -450,7 +450,7 @@ public partial class JsonRpcConnectionTests
             await Task.Delay(50, cts.Token);
 
             Assert.IsFalse(handlerInvoked);
-            await Assert.ThrowsExceptionAsync<JsonRpcException>(async () =>
+            await Assert.ThrowsExceptionAsync<TimeoutException>(async () =>
                 await harness.Host.SendRequestAsync("wait", null, cts.Token));
         }
         finally
