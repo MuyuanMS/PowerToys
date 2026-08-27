@@ -54,6 +54,9 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             "http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel",
         };
 
+        private static readonly XNamespace ProductionNamespace =
+            "http://schemas.microsoft.com/3dmanufacturing/production/2015/06";
+
         // Mutable budgets shared across the whole package so a single 3MF cannot exhaust memory/CPU
         // through large vertex lists, triangle counts, or repeated component references.
         private sealed class GeometryBudget
@@ -319,7 +322,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             return XDocument.Load(reader);
         }
 
-        private static void CopyWithLimit(Stream source, Stream destination, long limit)
+        private static long CopyWithLimit(Stream source, Stream destination, long limit)
         {
             var buffer = new byte[81920];
             long total = 0;
@@ -334,6 +337,8 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
                 destination.Write(buffer, 0, read);
             }
+
+            return total;
         }
 
         private static IEnumerable<string> GetThumbnailTargetsFromRelationships(ZipArchive archive)
@@ -447,14 +452,16 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 ModelPart part = null;
                 var entry = _archive.GetEntry(partName) ??
                             _archive.Entries.FirstOrDefault(e => string.Equals(NormalizePartName(e.FullName), partName, StringComparison.OrdinalIgnoreCase));
-                if (entry != null && entry.Length > 0 && entry.Length <= _remainingModelBytes)
+                if (entry != null)
                 {
-                    _remainingModelBytes -= entry.Length;
-
                     try
                     {
                         using var partStream = entry.Open();
-                        var document = LoadXmlSafe(partStream);
+                        using var boundedStream = new MemoryStream();
+                        var copiedBytes = CopyWithLimit(partStream, boundedStream, _remainingModelBytes);
+                        _remainingModelBytes -= copiedBytes;
+                        boundedStream.Position = 0;
+                        var document = LoadXmlSafe(boundedStream);
                         var core = document.Root?.Name.Namespace;
 
                         var objects = new Dictionary<string, XElement>(StringComparer.Ordinal);
@@ -613,8 +620,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
         {
             return element.Attributes()
                 .FirstOrDefault(attribute => attribute.Name.LocalName == "path" &&
-                                             attribute.Name.Namespace != XNamespace.None &&
-                                             attribute.Name.Namespace != coreNamespace)?.Value;
+                                             attribute.Name.Namespace == ProductionNamespace)?.Value;
         }
 
         private static MeshGeometry3D CreateMeshGeometry(XElement meshElement, GeometryBudget budget, double unitScale)

@@ -99,6 +99,7 @@ public class FileExplorerAddonsTests : UITestBase
                         "pdf-thumbnail-toggle-setting",
                         "gcode-thumbnail-toggle-setting",
                         "stl-thumbnail-toggle-setting",
+                        "threemf-thumbnail-toggle-setting",
                     })
                     {
                         properties[settingName] = new JsonObject { ["value"] = true };
