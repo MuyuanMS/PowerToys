@@ -101,11 +101,6 @@ public sealed record JSExtensionManifest
             return JSExtensionManifestParseResult.Failure($"No package.json was found at '{packageJsonPath}'.");
         }
 
-        if (new FileInfo(packageJsonPath).Length > MaxManifestBytes)
-        {
-            return JSExtensionManifestParseResult.Failure($"The package.json at '{packageJsonPath}' exceeds the maximum supported size.");
-        }
-
         try
         {
             using var stream = new FileStream(packageJsonPath, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -389,8 +384,8 @@ public sealed record JSExtensionManifest
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
         {
             // A missing segment cannot be a trusted but unverified link. The caller already confirmed
-            // the entry point exists, so treat a vanished segment as not a reparse point.
-            return false;
+            // the entry point exists, so treat a vanished segment as untrusted.
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or System.Security.SecurityException)
         {

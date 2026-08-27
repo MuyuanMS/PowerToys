@@ -582,10 +582,6 @@ public sealed partial class JsonRpcConnection : IDisposable
                 }
 
                 var body = await ReadExactAsync(contentLength, _shutdownToken).ConfigureAwait(false);
-                if (body is null)
-                {
-                    break;
-                }
 
                 var json = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true).GetString(body);
 
@@ -677,7 +673,7 @@ public sealed partial class JsonRpcConnection : IDisposable
         throw new InvalidDataException("The JSON-RPC message was missing a Content-Length header.");
     }
 
-    private async Task<byte[]?> ReadExactAsync(int count, CancellationToken cancellationToken)
+    private async Task<byte[]> ReadExactAsync(int count, CancellationToken cancellationToken)
     {
         var buffer = new byte[count];
         var offset = 0;
@@ -687,7 +683,7 @@ public sealed partial class JsonRpcConnection : IDisposable
             var read = await _input.ReadAsync(buffer.AsMemory(offset, count - offset), cancellationToken).ConfigureAwait(false);
             if (read == 0)
             {
-                return null;
+                throw new InvalidDataException("The stream closed in the middle of a JSON-RPC message.");
             }
 
             offset += read;
@@ -748,7 +744,7 @@ public sealed partial class JsonRpcConnection : IDisposable
             }
             else if (hasId)
             {
-                DispatchResponse(idElement, json);
+                DispatchResponse(idElement, root, json);
             }
             else
             {
@@ -767,11 +763,21 @@ public sealed partial class JsonRpcConnection : IDisposable
         return $"{value.Substring(0, MaxLoggedBodyChars)}... [truncated; {value.Length} total characters]";
     }
 
-    private void DispatchResponse(JsonElement idElement, string json)
+    private void DispatchResponse(JsonElement idElement, JsonElement root, string json)
     {
         if (idElement.ValueKind != JsonValueKind.Number || !idElement.TryGetInt32(out var id))
         {
             _protocolErrorLog.Run(static () => Logger.LogWarning("Received a JSON-RPC response with a non-integer id."));
+            return;
+        }
+
+        var hasResult = root.TryGetProperty("result", out _);
+        var hasError = root.TryGetProperty("error", out var errorElement);
+        if (hasResult == hasError || (hasError && errorElement.ValueKind != JsonValueKind.Object))
+        {
+            var exception = new InvalidDataException("The JSON-RPC response must contain exactly one valid result or error member.");
+            _protocolErrorLog.Run(() => Logger.LogWarning(exception.Message));
+            RaiseError(exception);
             return;
         }
 
