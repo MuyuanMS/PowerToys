@@ -20,6 +20,22 @@ namespace Wox.Test
         }
 
         [TestMethod]
+        public void ReplaceCommandArgumentEscapesAlreadyQuotedPlaceholder()
+        {
+            var result = Helper.ReplaceCommandArgument("--single-argument \"%1\"", "C:\\Program Files\\");
+
+            Assert.AreEqual("--single-argument \"C:\\Program Files\\\\\"", result);
+        }
+
+        [TestMethod]
+        public void ReplaceCommandArgumentEscapesMixedPlaceholdersIndependently()
+        {
+            var result = Helper.ReplaceCommandArgument("--first %1 --second \"%1\"", "multiple words");
+
+            Assert.AreEqual("--first \"multiple words\" --second \"multiple words\"", result);
+        }
+
+        [TestMethod]
         public void ReplaceCommandArgumentQuotesUnquotedPlaceholder()
         {
             var result = Helper.ReplaceCommandArgument("--single-argument %1", "multiple words");

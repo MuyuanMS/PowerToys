@@ -166,19 +166,39 @@ namespace Wox.Infrastructure
 
         internal static string ReplaceCommandArgument(string pattern, string arguments)
         {
-            if (pattern.Contains("\"%1\"", StringComparison.Ordinal))
+            var result = new StringBuilder(pattern.Length);
+            var position = 0;
+            while (position < pattern.Length)
             {
-                return pattern.Replace("%1", arguments);
+                var placeholder = pattern.IndexOf("%1", position, StringComparison.Ordinal);
+                if (placeholder < 0)
+                {
+                    result.Append(pattern, position, pattern.Length - position);
+                    break;
+                }
+
+                result.Append(pattern, position, placeholder - position);
+                var isQuoted = placeholder > 0 &&
+                    placeholder + 2 < pattern.Length &&
+                    pattern[placeholder - 1] == '"' &&
+                    pattern[placeholder + 2] == '"';
+                result.Append(isQuoted ? EscapeCommandLineArgument(arguments) : QuoteCommandLineArgument(arguments));
+                position = placeholder + 2;
             }
 
-            return pattern.Replace("%1", QuoteCommandLineArgument(arguments));
+            return result.ToString();
         }
 
         private static string QuoteCommandLineArgument(string argument)
         {
+            return $"\"{EscapeCommandLineArgument(argument)}\"";
+        }
+
+        private static string EscapeCommandLineArgument(string argument)
+        {
             argument ??= string.Empty;
 
-            var quotedArgument = new StringBuilder("\"");
+            var escapedArgument = new StringBuilder();
             var backslashCount = 0;
 
             foreach (var character in argument)
@@ -189,21 +209,20 @@ namespace Wox.Infrastructure
                 }
                 else if (character == '"')
                 {
-                    quotedArgument.Append('\\', (backslashCount * 2) + 1);
-                    quotedArgument.Append(character);
+                    escapedArgument.Append('\\', (backslashCount * 2) + 1);
+                    escapedArgument.Append('"');
                     backslashCount = 0;
                 }
                 else
                 {
-                    quotedArgument.Append('\\', backslashCount);
-                    quotedArgument.Append(character);
+                    escapedArgument.Append('\\', backslashCount);
+                    escapedArgument.Append(character);
                     backslashCount = 0;
                 }
             }
 
-            quotedArgument.Append('\\', backslashCount * 2);
-            quotedArgument.Append('"');
-            return quotedArgument.ToString();
+            escapedArgument.Append('\\', backslashCount * 2);
+            return escapedArgument.ToString();
         }
 
         public static bool OpenInShell(string path, string arguments = null, string workingDir = null, ShellRunAsType runAs = ShellRunAsType.None, bool runWithHiddenWindow = false)
