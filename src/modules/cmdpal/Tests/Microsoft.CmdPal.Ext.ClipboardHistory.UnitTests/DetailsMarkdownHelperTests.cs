@@ -36,7 +36,7 @@ public class DetailsMarkdownHelperTests
     [DataRow("[link](url)", "\\[link\\]\\(url\\)")]
     [DataRow("`code`", "\\`code\\`")]
     [DataRow("a > b", "a \\> b")]
-    [DataRow("<https://example.com>", "&lt;https://example.com>")]
+    [DataRow("<https://example.com>", "&lt;https://example\\.com\\>")]
     [DataRow("&copy;", "&amp;copy;")]
     public void EscapeMarkdown_EscapesMarkdownSyntaxCharacters(string input, string expected)
     {
