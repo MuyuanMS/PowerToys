@@ -156,6 +156,24 @@ namespace ThreeMfThumbnailProviderUnitTests
         }
 
         [TestMethod]
+        public void LoadModelResolvesEscapedRelationshipTarget()
+        {
+            const string model =
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+                "<model unit=\"millimeter\" xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\">" +
+                "<resources><object id=\"1\" type=\"model\"><mesh>" +
+                "<vertices><vertex x=\"0\" y=\"0\" z=\"0\"/><vertex x=\"1\" y=\"0\" z=\"0\"/><vertex x=\"0\" y=\"1\" z=\"0\"/></vertices>" +
+                "<triangles><triangle v1=\"0\" v2=\"1\" v3=\"2\"/></triangles>" +
+                "</mesh></object></resources><build><item objectid=\"1\"/></build></model>";
+            using var stream = BuildPackage(model, thumbnailPng: null, thumbnailWidth: 0, thumbnailHeight: 0, modelPath: "3D/My Model.model", relationshipTarget: "/3D/My%20Model.model");
+
+            Model3DGroup loaded = ThreeMfModelLoader.LoadModel(stream, MediaColors.Gold);
+
+            Assert.IsNotNull(loaded);
+            Assert.AreEqual(1, loaded.Children.Count);
+        }
+
+        [TestMethod]
         public void LoadModelNormalizesCrossPartUnits()
         {
             using var stream = CreateCrossPartThreeMf(directBuildReference: true, partUnit: "inch", vertexExtent: 1);
@@ -284,7 +302,13 @@ namespace ThreeMfThumbnailProviderUnitTests
             return BuildPackage(model, png, width, height);
         }
 
-        private static MemoryStream BuildPackage(string model, byte[] thumbnailPng, int thumbnailWidth, int thumbnailHeight)
+        private static MemoryStream BuildPackage(
+            string model,
+            byte[] thumbnailPng,
+            int thumbnailWidth,
+            int thumbnailHeight,
+            string modelPath = "3D/3dmodel.model",
+            string relationshipTarget = "/3D/3dmodel.model")
         {
             _ = thumbnailWidth;
             _ = thumbnailHeight;
@@ -292,12 +316,14 @@ namespace ThreeMfThumbnailProviderUnitTests
             var package = new MemoryStream();
             using (var archive = new ZipArchive(package, ZipArchiveMode.Create, leaveOpen: true))
             {
-                WriteEntry(archive, "3D/3dmodel.model", Encoding.UTF8.GetBytes(model));
+                WriteEntry(archive, modelPath, Encoding.UTF8.GetBytes(model));
 
                 var rels = new StringBuilder();
                 rels.Append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
                 rels.Append("<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">");
-                rels.Append("<Relationship Id=\"rel0\" Type=\"http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel\" Target=\"/3D/3dmodel.model\"/>");
+                rels.Append("<Relationship Id=\"rel0\" Type=\"http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel\" Target=\"");
+                rels.Append(relationshipTarget);
+                rels.Append("\"/>");
 
                 if (thumbnailPng != null)
                 {

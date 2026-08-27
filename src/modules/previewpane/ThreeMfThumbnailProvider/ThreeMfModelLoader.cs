@@ -30,6 +30,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
         private const int MaxTotalTriangles = 2_000_000;
         private const int MaxTotalVertices = 4_000_000;
         private const int MaxComponentDepth = 16;
+        private const int MaxModelInstances = 100_000;
 
         // Bound the number of distinct .model parts loaded while resolving Production Extension
         // cross-part component references, so a package cannot force loading an unbounded number of parts.
@@ -61,7 +62,9 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
             public int Vertices { get; set; }
 
-            public bool Exhausted => Triangles <= 0 || Vertices <= 0;
+            public int Instances { get; set; }
+
+            public bool Exhausted => Triangles <= 0 || Vertices <= 0 || Instances <= 0;
         }
 
         public static System.Drawing.Bitmap TryLoadEmbeddedThumbnail(Stream stream, uint maxSize)
@@ -142,7 +145,12 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 var modelGroup = new Model3DGroup();
                 var material = new DiffuseMaterial(new SolidColorBrush(materialColor));
 
-                var triangleBudget = new GeometryBudget { Triangles = MaxTotalTriangles, Vertices = MaxTotalVertices };
+                var triangleBudget = new GeometryBudget
+                {
+                    Triangles = MaxTotalTriangles,
+                    Vertices = MaxTotalVertices,
+                    Instances = MaxModelInstances,
+                };
 
                 // A single package context is shared across every root model part so that Production
                 // Extension components referencing objects in other .model parts (via p:path) can be
@@ -242,7 +250,13 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
         private static string NormalizePartName(string target)
         {
-            var path = target.Replace('\\', '/').TrimStart('/');
+            var decodedTarget = DecodeUriPath(target);
+            if (decodedTarget == null)
+            {
+                return string.Empty;
+            }
+
+            var path = decodedTarget.Replace('\\', '/').TrimStart('/');
             var segments = new List<string>();
             foreach (var segment in path.Split('/'))
             {
@@ -555,8 +569,9 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 if (meshElement != null)
                 {
                     var geometry = CreateMeshGeometry(meshElement, budget, part.UnitScale);
-                    if (geometry.TriangleIndices.Count > 0)
+                    if (geometry.TriangleIndices.Count > 0 && budget.Instances > 0)
                     {
+                        budget.Instances--;
                         var transformedGeometry = transform.IsIdentity ? geometry : ApplyTransform(geometry, transform);
                         modelGroup.Children.Add(new GeometryModel3D(transformedGeometry, material));
                     }
@@ -724,7 +739,13 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             }
 
             var normalizedBasePath = basePartPath.Replace('\\', '/');
-            var normalizedTargetPath = targetPath.Replace('\\', '/');
+            var decodedTarget = DecodeUriPath(targetPath);
+            if (decodedTarget == null)
+            {
+                return null;
+            }
+
+            var normalizedTargetPath = decodedTarget.Replace('\\', '/');
             var lastSeparator = normalizedBasePath.LastIndexOf('/');
             var combinedPath = normalizedTargetPath.StartsWith('/')
                 ? normalizedTargetPath.TrimStart('/')
@@ -754,6 +775,18 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
             var normalizedPath = string.Join("/", segments);
             return normalizedPath.EndsWith(".model", StringComparison.OrdinalIgnoreCase) ? normalizedPath : null;
+        }
+
+        private static string DecodeUriPath(string path)
+        {
+            try
+            {
+                return Uri.UnescapeDataString(path);
+            }
+            catch (UriFormatException)
+            {
+                return null;
+            }
         }
 
         private static double ParseUnitScale(string unit)
