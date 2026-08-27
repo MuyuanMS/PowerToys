@@ -507,7 +507,7 @@ Describe "preview release delta" {
         Invoke-TestGit -Repository $repo init -q | Out-Null
         Invoke-TestGit -Repository $repo config user.email "test@example.com" | Out-Null
         Invoke-TestGit -Repository $repo config user.name "Test User" | Out-Null
-        $root = Add-TestCommit -Repository $repo -FileName "root.txt" -Content "root" -Message "Root (#221)"
+        $root = Add-TestCommit -Repository $repo -FileName "root.txt" -Content "root" -Message "Root"
         $historyCommit = Add-TestCommit -Repository $repo -FileName "history.txt" -Content "history" -Message "Previously associated"
         Invoke-TestGit -Repository $repo checkout -q -b main | Out-Null
         $mergeBase = Add-TestCommit -Repository $repo -FileName "anchor.txt" -Content "anchor" -Message "Main anchor (#222)"
@@ -525,7 +525,10 @@ Describe "preview release delta" {
                 '[{"number":221,"merged_at":"2026-08-01T00:00:00Z"}]'
             }
             elseif ($request -match "/pulls/221/commits") {
-                "[[{`"sha`":`"$historyCommit`"}]]"
+                "[[]]"
+            }
+            elseif ($request -match "/pulls/221$") {
+                "{`"merge_commit_sha`":`"$historyCommit`"}"
             }
             else {
                 "[]"

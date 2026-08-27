@@ -250,12 +250,13 @@ function Get-PullRequestCommitShas {
     $json = gh api --paginate --slurp `
         -H "Accept: application/vnd.github+json" `
         "repos/$Repo/pulls/$PrNumber/commits?per_page=100" 2>$null
-    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($json)) {
-        foreach ($page in @($json | ConvertFrom-Json)) {
-            foreach ($commit in @($page)) {
-                if ($commit.sha -match "^[0-9a-fA-F]{40}$") {
-                    [void]$shas.Add([string]$commit.sha)
-                }
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($json)) {
+        throw "GitHub pull-request commit lookup failed for PR $PrNumber."
+    }
+    foreach ($page in @($json | ConvertFrom-Json)) {
+        foreach ($commit in @($page)) {
+            if ($commit.sha -match "^[0-9a-fA-F]{40}$") {
+                [void]$shas.Add([string]$commit.sha)
             }
         }
     }
@@ -263,14 +264,15 @@ function Get-PullRequestCommitShas {
     $pullRequestJson = gh api `
         -H "Accept: application/vnd.github+json" `
         "repos/$Repo/pulls/$PrNumber" 2>$null
-    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($pullRequestJson)) {
-        $pullRequest = $pullRequestJson | ConvertFrom-Json
-        $mergeCommitProperty = $pullRequest.PSObject.Properties["merge_commit_sha"]
-        if ($null -ne $mergeCommitProperty) {
-            $mergeCommitSha = [string]$mergeCommitProperty.Value
-            if ($mergeCommitSha -match "^[0-9a-fA-F]{40}$") {
-                [void]$shas.Add($mergeCommitSha)
-            }
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($pullRequestJson)) {
+        throw "GitHub pull-request details lookup failed for PR $PrNumber."
+    }
+    $pullRequest = $pullRequestJson | ConvertFrom-Json
+    $mergeCommitProperty = $pullRequest.PSObject.Properties["merge_commit_sha"]
+    if ($null -ne $mergeCommitProperty) {
+        $mergeCommitSha = [string]$mergeCommitProperty.Value
+        if ($mergeCommitSha -match "^[0-9a-fA-F]{40}$") {
+            [void]$shas.Add($mergeCommitSha)
         }
     }
 
