@@ -145,7 +145,8 @@ internal sealed class BoundedStderrReader
 
         if (value == (byte)'\r')
         {
-            // Carriage returns are terminators. The following line feed or trailing flush does the work.
+            EmitLine();
+            ResetLine();
             return;
         }
 
