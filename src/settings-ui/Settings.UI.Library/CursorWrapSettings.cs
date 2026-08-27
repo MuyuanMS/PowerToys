@@ -21,7 +21,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         {
             Name = ModuleName;
             Properties = new CursorWrapProperties();
-            Version = "1.0";
+            Version = "1.1";
         }
 
         public string GetModuleName()
@@ -48,6 +48,13 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         public bool UpgradeSettingsConfiguration()
         {
             bool settingsUpgraded = false;
+
+            if (Version == "1.0")
+            {
+                Properties.DisableCursorWrapInGameMode = new BoolProperty(false);
+                Version = "1.1";
+                settingsUpgraded = true;
+            }
 
             // Add WrapMode property if it doesn't exist (for users upgrading from older versions)
             if (Properties.WrapMode == null)

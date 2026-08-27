@@ -381,12 +381,22 @@ private:
         }
 
         HANDLE stopEvent = m_gameModePollStopEvent;
-        m_gameModePollThread = std::thread([this, stopEvent]() {
-            while (WaitForSingleObject(stopEvent, GAME_MODE_POLL_MS) == WAIT_TIMEOUT)
-            {
-                RefreshGameModeState();
-            }
-        });
+        try
+        {
+            m_gameModePollThread = std::thread([this, stopEvent]() {
+                while (WaitForSingleObject(stopEvent, GAME_MODE_POLL_MS) == WAIT_TIMEOUT)
+                {
+                    RefreshGameModeState();
+                }
+            });
+        }
+        catch (const std::system_error& error)
+        {
+            Logger::error("Failed to start CursorWrap Game Mode polling thread: {}", error.what());
+            CloseHandle(m_gameModePollStopEvent);
+            m_gameModePollStopEvent = nullptr;
+            return false;
+        }
 
         return true;
     }
