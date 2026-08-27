@@ -23,6 +23,7 @@ internal sealed class Program
 {
     private static DispatcherQueueSynchronizationContext? uiContext;
     private static App? app;
+    private static readonly Queue<AppActivationArguments> pendingActivations = [];
 
     // LOAD BEARING
     //
@@ -102,6 +103,14 @@ internal sealed class Program
         return 0;
     }
 
+    internal static void ReplayPendingActivations(MainWindow mainWindow)
+    {
+        while (pendingActivations.TryDequeue(out var args))
+        {
+            mainWindow.HandleLaunchNonUI(args);
+        }
+    }
+
     private static bool DecideRedirection()
     {
         var isRedirect = false;
@@ -175,12 +184,7 @@ internal sealed class Program
         }
         else
         {
-            // TODO: Buffer these arguments and replay them once OnLaunched has created MainWindow.
-            // AppInstance.Activated is wired in DecideRedirection before Application.Start, so a
-            // redirect arriving while this instance is still starting finds no window. The sending
-            // instance is blocked in RedirectActivationToAsync until this returns and then exits,
-            // so the activation is lost with no feedback to the caller.
-            Logger.LogWarning("Dropping a redirected activation because the main window is not ready.");
+            pendingActivations.Enqueue(args);
         }
     }
 }
