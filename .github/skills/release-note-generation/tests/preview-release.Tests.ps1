@@ -520,15 +520,13 @@ Describe "preview release delta" {
         function global:gh {
             param([Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
 
+            $global:LASTEXITCODE = 0
             $request = $Arguments -join " "
             if ($request -match "/commits/$candidate/pulls") {
                 '[{"number":221,"merged_at":"2026-08-01T00:00:00Z"}]'
             }
             elseif ($request -match "/pulls/221/commits") {
-                "[[]]"
-            }
-            elseif ($request -match "/pulls/221$") {
-                "{`"merge_commit_sha`":`"$historyCommit`"}"
+                "[[{`"sha`":`"$historyCommit`"}]]"
             }
             else {
                 "[]"

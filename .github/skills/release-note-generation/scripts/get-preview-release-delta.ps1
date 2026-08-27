@@ -297,6 +297,10 @@ function Add-AssociatedPrIdentitiesFromHistory {
             if ([string]::IsNullOrWhiteSpace([string]$sha)) {
                 continue
             }
+            & git -C $RepoPath cat-file -e "$sha^{commit}" 2>$null
+            if ($LASTEXITCODE -ne 0) {
+                continue
+            }
             if (Test-Ancestor -Ancestor $sha -Descendant $HistoryTip) {
                 [void]$HistoryIdentities.Add($identity)
                 break
