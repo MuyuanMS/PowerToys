@@ -22,6 +22,7 @@ namespace Microsoft.CmdPal.UI.ViewModels.Services.JsonRpc;
 public sealed class JsonRpcConnection : IDisposable
 {
     private const int NotificationQueueCapacity = 1024;
+    internal const int InboundRequestConcurrencyLimit = 16;
 
     private static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan DisposeDrainTimeout = TimeSpan.FromSeconds(2);
@@ -37,6 +38,7 @@ public sealed class JsonRpcConnection : IDisposable
     private readonly ConcurrentDictionary<string, Func<JsonElement, CancellationToken, Task<JsonNode?>>> _requestHandlers = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, RpcMethodTarget> _registeredMethods = new(StringComparer.Ordinal);
     private readonly object _registrationLock = new();
+    private readonly SemaphoreSlim _inboundRequestGate = new(InboundRequestConcurrencyLimit, InboundRequestConcurrencyLimit);
     private readonly Channel<NotificationEnvelope> _notificationQueue = Channel.CreateBounded<NotificationEnvelope>(
         new BoundedChannelOptions(NotificationQueueCapacity)
         {
@@ -333,6 +335,14 @@ public sealed class JsonRpcConnection : IDisposable
         {
             if (_requestHandlers.TryGetValue(method, out var requestHandler))
             {
+                if (!_inboundRequestGate.Wait(0, cancellationToken))
+                {
+                    throw new LocalRpcException("The JSON-RPC request concurrency limit was reached.")
+                    {
+                        ErrorCode = JsonRpcError.ServerBusy,
+                    };
+                }
+
                 try
                 {
                     return await requestHandler(parameters, cancellationToken).ConfigureAwait(false);
@@ -348,6 +358,10 @@ public sealed class JsonRpcConnection : IDisposable
                     {
                         ErrorCode = JsonRpcError.InternalError,
                     };
+                }
+                finally
+                {
+                    _inboundRequestGate.Release();
                 }
             }
 

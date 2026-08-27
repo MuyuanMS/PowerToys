@@ -356,6 +356,56 @@ public partial class JsonRpcConnectionTests
     }
 
     [TestMethod]
+    public async Task InboundRequests_AboveConcurrencyLimit_ReturnServerBusy()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var harness = CreateHarness();
+        var releaseHandlers = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allSlotsOccupied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var activeHandlers = 0;
+
+        try
+        {
+            harness.Host.RegisterRequestHandler("block", async (_, cancellationToken) =>
+            {
+                if (Interlocked.Increment(ref activeHandlers) == JsonRpcConnection.InboundRequestConcurrencyLimit)
+                {
+                    allSlotsOccupied.TrySetResult();
+                }
+
+                try
+                {
+                    await releaseHandlers.Task.WaitAsync(cancellationToken);
+                    return null;
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref activeHandlers);
+                }
+            });
+
+            for (var id = 1; id <= JsonRpcConnection.InboundRequestConcurrencyLimit; id++)
+            {
+                await WriteFramedAsync(harness.ExtensionWrites, BuildRequest(id, "block", null), cts.Token);
+            }
+
+            await allSlotsOccupied.Task.WaitAsync(cts.Token);
+            var rejectedId = JsonRpcConnection.InboundRequestConcurrencyLimit + 1;
+            await WriteFramedAsync(harness.ExtensionWrites, BuildRequest(rejectedId, "block", null), cts.Token);
+
+            var (_, body) = await ReadFramedAsync(harness.ExtensionReads, cts.Token);
+            using var document = JsonDocument.Parse(body);
+            Assert.AreEqual(rejectedId, document.RootElement.GetProperty("id").GetInt32());
+            Assert.AreEqual(JsonRpcError.ServerBusy, document.RootElement.GetProperty("error").GetProperty("code").GetInt32());
+        }
+        finally
+        {
+            releaseHandlers.TrySetResult();
+            harness.Host.Dispose();
+        }
+    }
+
+    [TestMethod]
     public async Task InboundRequest_UnknownMethod_ReturnsMethodNotFound()
     {
         using var cts = new CancellationTokenSource(TestTimeout);
