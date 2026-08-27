@@ -87,7 +87,7 @@ Per Application/Package one or more Keyboard manifests can be declared. Every ma
 <details>
  <summary><b>WindowFilter</b> - The filter of window processes to which the shortcuts apply to</summary>
 
- This field declares for which process name the shortcuts should be shown (To rephrase: For which processes the shortcut will have an effect if pressed). The value can be either an exact process executable name, for example `explorer.exe` or `chrome.exe`, or a single asterisk (`*`) to apply to any process. No other wildcard patterns are supported by this specification.
+ This field declares for which process names the shortcuts should be shown (To rephrase: For which processes the shortcut will have an effect if pressed). The value can be either one exact process executable name, a semicolon-separated list of exact executable names, for example `Ableton Live 12 Suite.exe;Ableton Live 11 Suite.exe`, or a single asterisk (`*`) to apply to any process. No other wildcard patterns are supported by this specification. Semicolon-separated lists are supported for foreground-window matching; manifests with `BackgroundProcess: True` must use one exact executable name or `*`.
 
 </details>
 

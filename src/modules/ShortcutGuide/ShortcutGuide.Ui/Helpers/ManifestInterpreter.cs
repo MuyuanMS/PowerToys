@@ -200,7 +200,6 @@ namespace ShortcutGuide.Helpers
             }
 
             return applicationIds;
-
         }
 
         internal static bool IsMatch(string input, string filter)
