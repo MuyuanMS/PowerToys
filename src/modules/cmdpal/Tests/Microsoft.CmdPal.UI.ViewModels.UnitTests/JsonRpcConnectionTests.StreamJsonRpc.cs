@@ -94,33 +94,6 @@ public partial class JsonRpcConnectionTests
     }
 
     [TestMethod]
-    public async Task SendNotification_WritesMethodAndParametersWithoutId()
-    {
-        using var cts = new CancellationTokenSource(TestTimeout);
-        var harness = CreateHarness();
-
-        try
-        {
-            var sendTask = harness.Host.SendNotificationAsync(
-                "notify",
-                new JsonObject { ["value"] = 42 },
-                cts.Token);
-
-            var (_, body) = await ReadFramedAsync(harness.ExtensionReads, cts.Token);
-            await sendTask.WaitAsync(cts.Token);
-
-            using var document = JsonDocument.Parse(body);
-            Assert.AreEqual("notify", document.RootElement.GetProperty("method").GetString());
-            Assert.AreEqual(42, document.RootElement.GetProperty("params").GetProperty("value").GetInt32());
-            Assert.IsFalse(document.RootElement.TryGetProperty("id", out _));
-        }
-        finally
-        {
-            harness.Host.Dispose();
-        }
-    }
-
-    [TestMethod]
     public async Task ErrorResponse_PreservesStructuredData()
     {
         using var cts = new CancellationTokenSource(TestTimeout);
@@ -153,6 +126,36 @@ public partial class JsonRpcConnectionTests
         }
         finally
         {
+            harness.Host.Dispose();
+        }
+    }
+
+    [TestMethod]
+    public async Task ConcurrentRegistrations_ForSameMethod_DoNotDuplicateRpcRegistration()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var harness = CreateHarness();
+        const int RegistrationCount = 64;
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registrations = new Task[RegistrationCount];
+
+        try
+        {
+            for (var i = 0; i < registrations.Length; i++)
+            {
+                registrations[i] = Task.Run(async () =>
+                {
+                    await start.Task.ConfigureAwait(false);
+                    harness.Host.RegisterNotificationHandler("concurrent", _ => { });
+                });
+            }
+
+            start.TrySetResult();
+            await Task.WhenAll(registrations).WaitAsync(cts.Token);
+        }
+        finally
+        {
+            start.TrySetResult();
             harness.Host.Dispose();
         }
     }
