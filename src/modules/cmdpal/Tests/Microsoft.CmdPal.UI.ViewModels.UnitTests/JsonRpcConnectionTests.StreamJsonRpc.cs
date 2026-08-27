@@ -189,6 +189,45 @@ public partial class JsonRpcConnectionTests
     }
 
     [TestMethod]
+    public async Task NotificationQueue_EnforcesAggregateByteBudget()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var harness = CreateHarness();
+        var handlerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseHandler = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        try
+        {
+            harness.Host.RegisterNotificationHandler("large", _ =>
+            {
+                handlerStarted.TrySetResult();
+                releaseHandler.Task.Wait(cts.Token);
+            });
+
+            var parameters = new JsonObject { ["payload"] = new string('x', 1024 * 1024) };
+            await WriteFramedAsync(harness.ExtensionWrites, BuildNotification("large", parameters.DeepClone()), cts.Token);
+            await handlerStarted.Task.WaitAsync(cts.Token);
+
+            for (var i = 0; i < 10; i++)
+            {
+                await WriteFramedAsync(harness.ExtensionWrites, BuildNotification("large", parameters.DeepClone()), cts.Token);
+            }
+
+            while (harness.Host.DroppedNotificationCount == 0)
+            {
+                await Task.Delay(10, cts.Token);
+            }
+
+            Assert.IsTrue(harness.Host.QueuedNotificationBytes <= JsonRpcConnection.MaxQueuedNotificationBytes);
+        }
+        finally
+        {
+            releaseHandler.TrySetResult();
+            harness.Host.Dispose();
+        }
+    }
+
+    [TestMethod]
     public async Task Dispose_KeepsCancellationTokensAliveUntilNotificationPumpExits()
     {
         using var cts = new CancellationTokenSource(TestTimeout);

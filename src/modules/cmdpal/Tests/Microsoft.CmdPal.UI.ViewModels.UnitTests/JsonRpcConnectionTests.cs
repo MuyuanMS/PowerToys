@@ -293,6 +293,26 @@ public partial class JsonRpcConnectionTests
     }
 
     [TestMethod]
+    public async Task ParameterlessNotification_IsDispatchedWithUndefinedParameters()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var harness = CreateHarness();
+        var received = new TaskCompletionSource<JsonValueKind>(TaskCreationOptions.RunContinuationsAsynchronously);
+        try
+        {
+            harness.Host.RegisterNotificationHandler("parameterless", element => received.TrySetResult(element.ValueKind));
+
+            await WriteFramedAsync(harness.ExtensionWrites, BuildNotification("parameterless", null), cts.Token);
+
+            Assert.AreEqual(JsonValueKind.Undefined, await received.Task.WaitAsync(cts.Token));
+        }
+        finally
+        {
+            harness.Host.Dispose();
+        }
+    }
+
+    [TestMethod]
     public async Task Notification_IsDispatched_WhenBytesArriveOneAtATime()
     {
         using var cts = new CancellationTokenSource(TestTimeout);

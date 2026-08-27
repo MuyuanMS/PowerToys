@@ -26,6 +26,7 @@ public sealed class JsonRpcConnection : IDisposable
     private const int NotificationQueueCapacity = 1024;
     internal const int InboundRequestConcurrencyLimit = 16;
     internal const int MaxInboundContentLength = 32 * 1024 * 1024;
+    internal const int MaxQueuedNotificationBytes = 8 * 1024 * 1024;
 
     private static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan DisposeDrainTimeout = TimeSpan.FromSeconds(2);
@@ -57,6 +58,7 @@ public sealed class JsonRpcConnection : IDisposable
     private int _disconnectedRaised;
     private int _nextRequestId;
     private long _droppedNotifications;
+    private long _queuedNotificationBytes;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="JsonRpcConnection"/> class.
@@ -108,6 +110,8 @@ public sealed class JsonRpcConnection : IDisposable
     public event EventHandler<JsonRpcErrorEventArgs>? Error;
 
     internal long DroppedNotificationCount => Interlocked.Read(ref _droppedNotifications);
+
+    internal long QueuedNotificationBytes => Interlocked.Read(ref _queuedNotificationBytes);
 
     internal Task NotificationConsumerCompletion => _notificationConsumerTask ?? Task.CompletedTask;
 
@@ -388,17 +392,68 @@ public sealed class JsonRpcConnection : IDisposable
 
     private void EnqueueNotification(string method, JsonElement parameters)
     {
-        var envelope = new NotificationEnvelope(method, parameters.Clone());
-        while (!_notificationQueue.Writer.TryWrite(envelope))
+        var payloadBytes = parameters.ValueKind == JsonValueKind.Undefined
+            ? 0
+            : Encoding.UTF8.GetByteCount(parameters.GetRawText());
+
+        if (payloadBytes > MaxQueuedNotificationBytes)
         {
-            if (_notificationQueue.Reader.TryRead(out _))
+            Interlocked.Increment(ref _droppedNotifications);
+            return;
+        }
+
+        while (!TryReserveNotificationBytes(payloadBytes))
+        {
+            if (_notificationQueue.Reader.TryRead(out var dropped))
             {
+                ReleaseNotificationBytes(dropped.PayloadBytes);
                 Interlocked.Increment(ref _droppedNotifications);
                 continue;
             }
 
+            Interlocked.Increment(ref _droppedNotifications);
             return;
         }
+
+        var clonedParameters = parameters.ValueKind == JsonValueKind.Undefined
+            ? default
+            : parameters.Clone();
+        var envelope = new NotificationEnvelope(method, clonedParameters, payloadBytes);
+        while (!_notificationQueue.Writer.TryWrite(envelope))
+        {
+            if (_notificationQueue.Reader.TryRead(out var dropped))
+            {
+                ReleaseNotificationBytes(dropped.PayloadBytes);
+                Interlocked.Increment(ref _droppedNotifications);
+                continue;
+            }
+
+            ReleaseNotificationBytes(payloadBytes);
+            Interlocked.Increment(ref _droppedNotifications);
+            return;
+        }
+    }
+
+    private bool TryReserveNotificationBytes(int payloadBytes)
+    {
+        while (true)
+        {
+            var current = Interlocked.Read(ref _queuedNotificationBytes);
+            if (payloadBytes > MaxQueuedNotificationBytes - current)
+            {
+                return false;
+            }
+
+            if (Interlocked.CompareExchange(ref _queuedNotificationBytes, current + payloadBytes, current) == current)
+            {
+                return true;
+            }
+        }
+    }
+
+    private void ReleaseNotificationBytes(int payloadBytes)
+    {
+        Interlocked.Add(ref _queuedNotificationBytes, -payloadBytes);
     }
 
     private async Task ConsumeNotificationsAsync()
@@ -409,6 +464,7 @@ public sealed class JsonRpcConnection : IDisposable
             {
                 while (_notificationQueue.Reader.TryRead(out var envelope))
                 {
+                    ReleaseNotificationBytes(envelope.PayloadBytes);
                     if (!_notificationHandlers.TryGetValue(envelope.Method, out var handler))
                     {
                         continue;
@@ -724,5 +780,5 @@ public sealed class JsonRpcConnection : IDisposable
         protected override Type? GetErrorDetailsDataType(StreamJsonRpc.Protocol.JsonRpcError error) => typeof(JsonElement);
     }
 
-    private readonly record struct NotificationEnvelope(string Method, JsonElement Parameters);
+    private readonly record struct NotificationEnvelope(string Method, JsonElement Parameters, int PayloadBytes);
 }
