@@ -25,6 +25,35 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
     // Upper bound on how long to wait for the host to load and register a freshly promoted extension.
     private static readonly TimeSpan RegistrationTimeout = TimeSpan.FromSeconds(30);
 
+<<<<<<< HEAD
+=======
+    private static readonly HashSet<string> ReservedWindowsNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        "COM1",
+        "COM2",
+        "COM3",
+        "COM4",
+        "COM5",
+        "COM6",
+        "COM7",
+        "COM8",
+        "COM9",
+        "LPT1",
+        "LPT2",
+        "LPT3",
+        "LPT4",
+        "LPT5",
+        "LPT6",
+        "LPT7",
+        "LPT8",
+        "LPT9",
+    };
+
+>>>>>>> upstream-pr-49326
     private readonly IJsExtensionHost _host;
     private readonly INpmCommandRunner _npmCommandRunner;
 
@@ -100,6 +129,7 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
             await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
+<<<<<<< HEAD
                 // Stop the Node.js process before delete so file handles are released. StopExtension
                 // blocks until the process exits, and the token lets Cancel stop waiting on a busy gate.
                 _host.StopExtension(targetDirectory, cancellationToken);
@@ -108,6 +138,16 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
                 // handles are still closing. The token stops the retry loop between attempts.
                 if (!_npmCommandRunner.RemoveDirectory(targetDirectory, cancellationToken))
                 {
+=======
+                // Stop the Node.js process before delete so file handles are released. The token lets
+                // Cancel stop waiting on a busy lifecycle gate without blocking the UI thread.
+                await _host.StopExtensionAsync(targetDirectory, cancellationToken).ConfigureAwait(false);
+
+                // Delete on a worker thread since process handles can take a moment to close.
+                if (!await RemoveDirectoryAsync(targetDirectory).ConfigureAwait(false))
+                {
+                    await _host.RefreshAndAwaitProviderAsync(targetDirectory, RegistrationTimeout, CancellationToken.None).ConfigureAwait(false);
+>>>>>>> upstream-pr-49326
                     Logger.LogError($"Uninstall of JS extension '{extensionName}' failed: could not delete {targetDirectory}.");
                     return JsExtensionInstallResult.Fail(Resources.npm_installer_remove_failed);
                 }
@@ -191,6 +231,11 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
                 return JsExtensionInstallResult.Fail(Resources.npm_installer_version_mismatch);
             }
 
+<<<<<<< HEAD
+=======
+            File.WriteAllText(Path.Combine(packageDirectory, JsonRpcExtensionService.GalleryInstallMarkerFileName), string.Empty);
+
+>>>>>>> upstream-pr-49326
             // The extracted package root already has the layout discovery expects: package.json at the
             // root with the frozen dependency closure under its own node_modules. Promote it directly.
             //
@@ -205,7 +250,11 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
             if (!registered)
             {
                 Logger.LogError($"Promoted '{extensionName}' but the host did not register a provider within {RegistrationTimeout.TotalSeconds:0} seconds.");
+<<<<<<< HEAD
                 if (RollbackPromotedInstall(targetDirectory))
+=======
+                if (await RollbackPromotedInstallAsync(targetDirectory).ConfigureAwait(false))
+>>>>>>> upstream-pr-49326
                 {
                     promoted = false;
                 }
@@ -213,6 +262,10 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
                 return JsExtensionInstallResult.Fail(Resources.npm_installer_not_discoverable);
             }
 
+<<<<<<< HEAD
+=======
+            TryRemoveInstallMarker(targetDirectory);
+>>>>>>> upstream-pr-49326
             Logger.LogInfo($"Installed JS extension '{extensionName}' from npm package '{artifact.InstallSpec}'.");
             return JsExtensionInstallResult.Ok();
         }
@@ -222,7 +275,11 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
             // process and provider first, then remove the promoted tree.
             if (promoted)
             {
+<<<<<<< HEAD
                 RollbackPromotedInstall(targetDirectory);
+=======
+                await RollbackPromotedInstallAsync(targetDirectory).ConfigureAwait(false);
+>>>>>>> upstream-pr-49326
             }
 
             return JsExtensionInstallResult.Fail(Resources.npm_installer_canceled);
@@ -231,7 +288,11 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
         {
             if (promoted)
             {
+<<<<<<< HEAD
                 RollbackPromotedInstall(targetDirectory);
+=======
+                await RollbackPromotedInstallAsync(targetDirectory).ConfigureAwait(false);
+>>>>>>> upstream-pr-49326
             }
 
             Logger.LogError($"Install of '{extensionName}' failed: {ex.Message}");
@@ -241,7 +302,11 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
         {
             // Clean the staging tree on every path, even after cancel. Do not observe the caller token
             // here, because cleanup still needs to run.
+<<<<<<< HEAD
             if (!_npmCommandRunner.RemoveDirectory(stagingDirectory, CancellationToken.None))
+=======
+            if (!await RemoveDirectoryAsync(stagingDirectory).ConfigureAwait(false))
+>>>>>>> upstream-pr-49326
             {
                 Logger.LogWarning($"Failed to clean up staging directory {stagingDirectory}.");
             }
@@ -254,10 +319,39 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
     /// extension both installed and running. Uses no cancellation token so cleanup can finish.
     /// </summary>
     /// <returns><see langword="true"/> when the promoted directory was removed; otherwise, <see langword="false"/>.</returns>
+<<<<<<< HEAD
     private bool RollbackPromotedInstall(string targetDirectory)
     {
         _host.StopExtension(targetDirectory);
         return _npmCommandRunner.RemoveDirectory(targetDirectory);
+=======
+    private async Task<bool> RollbackPromotedInstallAsync(string targetDirectory)
+    {
+        await _host.StopExtensionAsync(targetDirectory, CancellationToken.None).ConfigureAwait(false);
+        var removed = await RemoveDirectoryAsync(targetDirectory).ConfigureAwait(false);
+        if (!removed)
+        {
+            TryRemoveInstallMarker(targetDirectory);
+        }
+
+        return removed;
+    }
+
+    private Task<bool> RemoveDirectoryAsync(string targetDirectory) =>
+        Task.Run(() => _npmCommandRunner.RemoveDirectory(targetDirectory, CancellationToken.None));
+
+    private static void TryRemoveInstallMarker(string targetDirectory)
+    {
+        var markerPath = Path.Combine(targetDirectory, JsonRpcExtensionService.GalleryInstallMarkerFileName);
+        try
+        {
+            File.Delete(markerPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Logger.LogWarning($"Failed to remove gallery install marker '{markerPath}': {ex.Message}");
+        }
+>>>>>>> upstream-pr-49326
     }
 
     /// <summary>
@@ -346,8 +440,18 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
 
         // Guard against path traversal or absolute paths escaping the JSExtensions root.
         var trimmed = extensionName.Trim();
+<<<<<<< HEAD
         if (trimmed.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
             || trimmed is "." or ".."
+=======
+        var separatorIndex = trimmed.IndexOf('.');
+        var deviceName = separatorIndex >= 0 ? trimmed[..separatorIndex] : trimmed;
+        if (!string.Equals(trimmed, extensionName, StringComparison.Ordinal)
+            || trimmed.EndsWith('.')
+            || trimmed.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+            || trimmed is "." or ".."
+            || ReservedWindowsNames.Contains(deviceName)
+>>>>>>> upstream-pr-49326
             || Path.IsPathRooted(trimmed))
         {
             return false;
@@ -365,21 +469,53 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
             return false;
         }
 
+<<<<<<< HEAD
         var candidate = Path.GetFullPath(Path.Combine(normalizedRoot, trimmed));
+=======
+        string candidate;
+        try
+        {
+            candidate = Path.GetFullPath(Path.Combine(normalizedRoot, trimmed));
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
+        }
+
+>>>>>>> upstream-pr-49326
         if (!candidate.StartsWith(normalizedRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
 
+<<<<<<< HEAD
+=======
+        if (!string.Equals(Path.GetFileName(candidate), trimmed, StringComparison.OrdinalIgnoreCase)
+            || (Directory.Exists(candidate) && !DirectoryResolvesToItself(candidate)))
+        {
+            return false;
+        }
+
+>>>>>>> upstream-pr-49326
         targetDirectory = candidate;
         return true;
     }
 
+<<<<<<< HEAD
     private static bool RootResolvesToItself(string normalizedRoot)
     {
         // A root that does not exist yet cannot redirect anywhere. Install creates it as a real
         // directory before promoting into it.
         if (!Directory.Exists(normalizedRoot))
+=======
+    private static bool RootResolvesToItself(string normalizedRoot) => DirectoryResolvesToItself(normalizedRoot);
+
+    private static bool DirectoryResolvesToItself(string directory)
+    {
+        // A root that does not exist yet cannot redirect anywhere. Install creates it as a real
+        // directory before promoting into it.
+        if (!Directory.Exists(directory))
+>>>>>>> upstream-pr-49326
         {
             return true;
         }
@@ -388,12 +524,20 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
         {
             // ResolveLinkTarget returns null when the path is not a reparse point. Any reparse point on
             // the root is treated as unsafe.
+<<<<<<< HEAD
             return Directory.ResolveLinkTarget(normalizedRoot, returnFinalTarget: true) is null;
+=======
+            return Directory.ResolveLinkTarget(directory, returnFinalTarget: true) is null;
+>>>>>>> upstream-pr-49326
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {
             // If the root cannot be inspected, play it safe and refuse.
+<<<<<<< HEAD
             Logger.LogError($"Failed to inspect extensions root '{normalizedRoot}' for reparse points: {ex.Message}");
+=======
+            Logger.LogError($"Failed to inspect extension directory '{directory}' for reparse points: {ex.Message}");
+>>>>>>> upstream-pr-49326
             return false;
         }
     }

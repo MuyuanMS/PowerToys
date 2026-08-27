@@ -108,13 +108,27 @@ public sealed class NpmCommandRunner : INpmCommandRunner
                 return NpmCommandResult.Fail(Resources.npm_runner_extract_failed);
             }
 
+<<<<<<< HEAD
             // 2) The caller compares this tarball hash to the catalog value before promotion.
+=======
+            // 2) Verify the downloaded tarball before extracting or executing npm against anything it
+            //    contains. A mismatched artifact must not get a chance to choose dependency URLs.
+>>>>>>> upstream-pr-49326
             var resolvedIntegrity = ComputeTarballIntegrity(tarballPath);
             if (resolvedIntegrity is null)
             {
                 return NpmCommandResult.Fail(Resources.npm_runner_extract_failed);
             }
 
+<<<<<<< HEAD
+=======
+            if (!string.Equals(resolvedIntegrity, artifact.Integrity, StringComparison.Ordinal))
+            {
+                Logger.LogError($"Integrity mismatch installing '{artifact.InstallSpec}': expected {artifact.Integrity}, npm resolved {resolvedIntegrity}.");
+                return NpmCommandResult.Fail(Resources.npm_installer_integrity_mismatch);
+            }
+
+>>>>>>> upstream-pr-49326
             // 3) Make the published package the root project before npm ci runs. npm only honors an
             //    embedded npm-shrinkwrap.json at the project root, not inside a dependency.
             var packageRoot = Path.Combine(stagingDirectory, PackageRootDirectoryName);
@@ -133,7 +147,19 @@ public sealed class NpmCommandRunner : INpmCommandRunner
                 return NpmCommandResult.Fail(shrinkwrapError);
             }
 
+<<<<<<< HEAD
             // 5) npm ci installs the exact closure named in the shrinkwrap. It fails when the lockfile
+=======
+            // 5) Validate every dependency URL and integrity hash before npm can fetch the closure.
+            var lockfileError = VerifyLockfileIntegrity(packageRoot);
+            if (lockfileError is not null)
+            {
+                Logger.LogError($"npm package {artifact.InstallSpec} contains an untrusted lockfile: {lockfileError}");
+                return NpmCommandResult.Fail(lockfileError);
+            }
+
+            // 6) npm ci installs the exact closure named in the shrinkwrap. It fails when the lockfile
+>>>>>>> upstream-pr-49326
             //    is missing or out of sync with package.json.
             var ciResult = await RunNpmAsync(invocation.Value, BuildCiArguments(artifact), packageRoot, artifact.InstallSpec, cancellationToken).ConfigureAwait(false);
             if (!ciResult.Succeeded)
@@ -141,9 +167,14 @@ public sealed class NpmCommandRunner : INpmCommandRunner
                 return NpmCommandResult.Fail(ciResult.ErrorMessage ?? Resources.npm_runner_lockfile_untrusted);
             }
 
+<<<<<<< HEAD
             // 6) Check every lockfile entry before promotion. Anything outside an approved HTTPS
             //    registry, or missing a Subresource Integrity hash, is rejected.
             var lockfileError = VerifyLockfileIntegrity(packageRoot);
+=======
+            // 7) Check the lockfile again after npm exits so promotion only uses the closure we approved.
+            lockfileError = VerifyLockfileIntegrity(packageRoot);
+>>>>>>> upstream-pr-49326
             if (lockfileError is not null)
             {
                 Logger.LogError($"npm ci {artifact.InstallSpec} produced an untrusted lockfile: {lockfileError}");
@@ -648,9 +679,18 @@ public sealed class NpmCommandRunner : INpmCommandRunner
     /// the environment. Returns null when either piece cannot be found.
     /// </summary>
     internal static NpmInvocation? ResolveNpmInvocation() =>
+<<<<<<< HEAD
         ResolveNpmInvocation(GetPathDirectories());
 
     internal static NpmInvocation? ResolveNpmInvocation(IReadOnlyList<string> pathDirectories)
+=======
+        ResolveNpmInvocation(GetPathDirectories(), includeUserPrefix: true);
+
+    internal static NpmInvocation? ResolveNpmInvocation(IReadOnlyList<string> pathDirectories) =>
+        ResolveNpmInvocation(pathDirectories, includeUserPrefix: false);
+
+    private static NpmInvocation? ResolveNpmInvocation(IReadOnlyList<string> pathDirectories, bool includeUserPrefix)
+>>>>>>> upstream-pr-49326
     {
         ArgumentNullException.ThrowIfNull(pathDirectories);
 
@@ -672,7 +712,11 @@ public sealed class NpmCommandRunner : INpmCommandRunner
                 continue;
             }
 
+<<<<<<< HEAD
             var npmCli = FindNpmCli(directory);
+=======
+            var npmCli = FindNpmCli(directory, includeUserPrefix);
+>>>>>>> upstream-pr-49326
             if (npmCli is not null)
             {
                 return new NpmInvocation(nodeCandidate, new[] { npmCli });
@@ -682,10 +726,17 @@ public sealed class NpmCommandRunner : INpmCommandRunner
         return null;
     }
 
+<<<<<<< HEAD
     private static string? FindNpmCli(string nodeDirectory)
     {
         // Standard Windows Node.js layout: npm-cli.js sits under the same directory as node.exe.
         foreach (var candidateRoot in EnumerateNpmPrefixCandidates(nodeDirectory))
+=======
+    private static string? FindNpmCli(string nodeDirectory, bool includeUserPrefix)
+    {
+        // Standard Windows Node.js layout: npm-cli.js sits under the same directory as node.exe.
+        foreach (var candidateRoot in EnumerateNpmPrefixCandidates(nodeDirectory, includeUserPrefix))
+>>>>>>> upstream-pr-49326
         {
             string npmCli;
             try
@@ -706,11 +757,23 @@ public sealed class NpmCommandRunner : INpmCommandRunner
         return null;
     }
 
+<<<<<<< HEAD
     private static IEnumerable<string> EnumerateNpmPrefixCandidates(string nodeDirectory)
+=======
+    private static IEnumerable<string> EnumerateNpmPrefixCandidates(string nodeDirectory, bool includeUserPrefix)
+>>>>>>> upstream-pr-49326
     {
         // node.exe's own directory (Program Files\nodejs) is the usual prefix on Windows.
         yield return nodeDirectory;
 
+<<<<<<< HEAD
+=======
+        if (!includeUserPrefix)
+        {
+            yield break;
+        }
+
+>>>>>>> upstream-pr-49326
         // A user-level npm prefix (npm config's default on Windows) lives under APPDATA\npm.
         var appData = Environment.GetEnvironmentVariable("APPDATA");
         if (!string.IsNullOrEmpty(appData))

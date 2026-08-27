@@ -50,6 +50,10 @@ public class NpmJsExtensionInstallerTests
         Assert.IsTrue(Directory.Exists(target));
         Assert.IsTrue(File.Exists(Path.Combine(target, "package.json")));
         Assert.IsTrue(File.Exists(Path.Combine(target, "index.js")));
+<<<<<<< HEAD
+=======
+        Assert.IsFalse(File.Exists(Path.Combine(target, JsonRpcExtensionService.GalleryInstallMarkerFileName)));
+>>>>>>> upstream-pr-49326
         Assert.IsTrue(host.IsExtensionInstalled("left-pad-ext"));
         AssertStagingEmpty(host);
     }
@@ -176,6 +180,47 @@ public class NpmJsExtensionInstallerTests
         Assert.AreEqual(0, runner.InstallCallCount);
     }
 
+<<<<<<< HEAD
+=======
+    [DataTestMethod]
+    [DataRow("sample-ext.")]
+    [DataRow(" sample-ext")]
+    [DataRow("sample-ext ")]
+    [DataRow("CON")]
+    [DataRow("con.txt")]
+    [DataRow("CON.foo.txt")]
+    [DataRow("COM1.foo.bar")]
+    public async Task InstallAsync_Fails_ForWindowsAliasName(string extensionName)
+    {
+        var host = CreateHost();
+        var runner = new FakeRunner();
+        var installer = new NpmJsExtensionInstaller(host, runner);
+
+        var result = await installer.InstallAsync(extensionName, Package, Version, ValidIntegrity, null, CancellationToken.None);
+
+        Assert.IsFalse(result.Succeeded);
+        Assert.AreEqual(0, runner.InstallCallCount);
+    }
+
+    [DataTestMethod]
+    [DataRow("sample-ext.")]
+    [DataRow("NUL")]
+    [DataRow("CON.foo.txt")]
+    [DataRow("COM1.foo.bar")]
+    public async Task UninstallAsync_Fails_ForWindowsAliasName(string extensionName)
+    {
+        var host = CreateHost();
+        var runner = new FakeRunner();
+        var installer = new NpmJsExtensionInstaller(host, runner);
+
+        var result = await installer.UninstallAsync(extensionName, CancellationToken.None);
+
+        Assert.IsFalse(result.Succeeded);
+        Assert.AreEqual(0, host.StopCallCount);
+        Assert.AreEqual(0, runner.RemoveCallCount);
+    }
+
+>>>>>>> upstream-pr-49326
     [TestMethod]
     public async Task InstallAsync_Fails_AndDoesNotPromote_OnIntegrityMismatch()
     {
@@ -247,6 +292,25 @@ public class NpmJsExtensionInstallerTests
     }
 
     [TestMethod]
+<<<<<<< HEAD
+=======
+    public async Task InstallAsync_RemovesMarker_WhenRollbackDeleteFails()
+    {
+        var host = CreateHost();
+        host.RegistrationSucceeds = false;
+        var runner = new FakeRunner { RemoveSucceeds = false };
+        var installer = new NpmJsExtensionInstaller(host, runner);
+
+        var result = await installer.InstallAsync(ExtensionName, Package, Version, ValidIntegrity, null, CancellationToken.None);
+
+        var target = Path.Combine(host.ExtensionsRootPath, ExtensionName);
+        Assert.IsFalse(result.Succeeded);
+        Assert.IsTrue(Directory.Exists(target));
+        Assert.IsFalse(File.Exists(Path.Combine(target, JsonRpcExtensionService.GalleryInstallMarkerFileName)));
+    }
+
+    [TestMethod]
+>>>>>>> upstream-pr-49326
     public async Task InstallAsync_Fails_AndCleansStaging_OnNpmFailure()
     {
         var host = CreateHost();
@@ -349,6 +413,13 @@ public class NpmJsExtensionInstallerTests
     public async Task UninstallAsync_Fails_WhenRemoveFails()
     {
         var host = CreateHost();
+<<<<<<< HEAD
+=======
+        host.MarkInstalled(ExtensionName);
+        var target = Path.Combine(host.ExtensionsRootPath, ExtensionName);
+        Directory.CreateDirectory(target);
+        File.WriteAllText(Path.Combine(target, "package.json"), "{}");
+>>>>>>> upstream-pr-49326
         var runner = new FakeRunner { RemoveSucceeds = false };
         var installer = new NpmJsExtensionInstaller(host, runner);
 
@@ -357,6 +428,10 @@ public class NpmJsExtensionInstallerTests
         Assert.IsFalse(result.Succeeded);
         Assert.IsNotNull(result.ErrorMessage);
         Assert.AreEqual(1, host.StopCallCount);
+<<<<<<< HEAD
+=======
+        Assert.IsTrue(host.IsExtensionInstalled(ExtensionName), "A failed delete must reload the surviving extension.");
+>>>>>>> upstream-pr-49326
     }
 
     [TestMethod]
@@ -368,21 +443,33 @@ public class NpmJsExtensionInstallerTests
         File.WriteAllText(Path.Combine(target, "package.json"), "{}");
 
         using var stopStarted = new ManualResetEventSlim(false);
+<<<<<<< HEAD
         host.StopHook = token =>
+=======
+        host.StopHook = async token =>
+>>>>>>> upstream-pr-49326
         {
             // Simulate the host blocking while it stops the provider, then observe cancel after the
             // operation has already begun. This matches the real host threading the uninstall token
             // through stop and delete.
             stopStarted.Set();
+<<<<<<< HEAD
             Assert.IsTrue(token.WaitHandle.WaitOne(TimeSpan.FromSeconds(5)), "Cancellation was not observed during stop.");
             token.ThrowIfCancellationRequested();
+=======
+            await Task.Delay(Timeout.InfiniteTimeSpan, token).ConfigureAwait(false);
+>>>>>>> upstream-pr-49326
         };
 
         var runner = new FakeRunner();
         var installer = new NpmJsExtensionInstaller(host, runner);
 
         using var cts = new CancellationTokenSource();
+<<<<<<< HEAD
         var task = Task.Run(() => installer.UninstallAsync(ExtensionName, cts.Token));
+=======
+        var task = installer.UninstallAsync(ExtensionName, cts.Token);
+>>>>>>> upstream-pr-49326
 
         Assert.IsTrue(stopStarted.Wait(TimeSpan.FromSeconds(5)), "Uninstall did not reach the stop step.");
         cts.Cancel();
@@ -681,7 +768,11 @@ public class NpmJsExtensionInstallerTests
 
         public ConcurrentQueue<string>? OrderLog { get; set; }
 
+<<<<<<< HEAD
         public Action<CancellationToken>? StopHook { get; set; }
+=======
+        public Func<CancellationToken, Task>? StopHook { get; set; }
+>>>>>>> upstream-pr-49326
 
         public ManualResetEventSlim? RegistrationStarted { get; set; }
 
@@ -693,11 +784,28 @@ public class NpmJsExtensionInstallerTests
             }
         }
 
+<<<<<<< HEAD
         public void StopExtension(string extensionDirectory, CancellationToken cancellationToken = default)
         {
             OrderLog?.Enqueue("stop");
             StopCallCount++;
             StopHook?.Invoke(cancellationToken);
+=======
+        public async Task StopExtensionAsync(string extensionDirectory, CancellationToken cancellationToken = default)
+        {
+            OrderLog?.Enqueue("stop");
+            StopCallCount++;
+            if (StopHook is not null)
+            {
+                await StopHook(cancellationToken).ConfigureAwait(false);
+            }
+
+            var name = Path.GetFileName(Path.TrimEndingDirectorySeparator(extensionDirectory));
+            lock (_installedGate)
+            {
+                _installed.Remove(name);
+            }
+>>>>>>> upstream-pr-49326
         }
 
         public bool IsExtensionDiscoverable(string extensionDirectory) =>

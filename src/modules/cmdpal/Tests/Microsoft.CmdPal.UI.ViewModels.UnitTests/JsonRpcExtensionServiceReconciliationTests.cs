@@ -71,6 +71,25 @@ public class JsonRpcExtensionServiceReconciliationTests
     }
 
     [TestMethod]
+<<<<<<< HEAD
+=======
+    public void ReconcileDirectories_DuplicateWinnerChange_ReplacesLoadedDirectory()
+    {
+        var discovered = new[] { @"C:\ext\a-winner" };
+        var loaded = new[] { @"C:\ext\z-loser" };
+
+        var (toAdd, toRemove) = JsonRpcExtensionService.ReconcileDirectories(discovered, loaded);
+
+        Assert.AreEqual(
+            DirectoryLifecycleGate.Canonicalize(@"C:\ext\a-winner"),
+            DirectoryLifecycleGate.Canonicalize(toAdd.Single()));
+        Assert.AreEqual(
+            DirectoryLifecycleGate.Canonicalize(@"C:\ext\z-loser"),
+            DirectoryLifecycleGate.Canonicalize(toRemove.Single()));
+    }
+
+    [TestMethod]
+>>>>>>> upstream-pr-49326
     public void ResolveIdCollisions_DuplicateIds_DeterministicWinnerByPath()
     {
         // Two extensions in different directories advertise the same name key.

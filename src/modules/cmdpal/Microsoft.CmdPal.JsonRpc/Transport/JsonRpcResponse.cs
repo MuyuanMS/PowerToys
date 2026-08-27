@@ -5,12 +5,11 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Microsoft.CmdPal.UI.ViewModels.Services.JsonRpc;
+namespace Microsoft.CmdPal.JsonRpc;
 
 /// <summary>
-/// Represents a JSON-RPC 2.0 response message. A response carries the
-/// <see cref="Id"/> of the request it answers and exactly one of
-/// <see cref="Result"/> or <see cref="Error"/>.
+/// A JSON-RPC 2.0 response message. It carries the <see cref="Id"/> of the request it answers and
+/// exactly one of <see cref="Result"/> or <see cref="Error"/>.
 /// </summary>
 public sealed class JsonRpcResponse
 {

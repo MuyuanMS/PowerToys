@@ -4,6 +4,11 @@
 
 using System;
 using System.IO;
+<<<<<<< HEAD
+=======
+using System.Threading;
+using System.Threading.Tasks;
+>>>>>>> upstream-pr-49326
 using Microsoft.CmdPal.UI.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -120,4 +125,20 @@ public class JSExtensionWrapperTests
         var wrapper = CreateWrapper();
         Assert.IsNull(wrapper.GetExtensionObject());
     }
+<<<<<<< HEAD
+=======
+
+    [TestMethod]
+    public async Task StartExtensionAsync_StopsBeforeLaunch_WhenCanceled()
+    {
+        var wrapper = CreateWrapper();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            () => wrapper.StartExtensionAsync(cancellation.Token));
+
+        Assert.IsFalse(wrapper.IsRunning());
+    }
+>>>>>>> upstream-pr-49326
 }

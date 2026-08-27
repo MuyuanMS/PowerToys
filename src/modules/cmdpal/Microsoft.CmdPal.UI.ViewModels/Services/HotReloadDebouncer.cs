@@ -18,8 +18,14 @@ internal sealed partial class HotReloadDebouncer : IDisposable
     private readonly TimeSpan _delay;
     private readonly Action<string> _callback;
     private readonly Lock _lock = new();
+<<<<<<< HEAD
     private readonly Dictionary<string, Timer> _timers = new(StringComparer.OrdinalIgnoreCase);
     private bool _disposed;
+=======
+    private readonly Dictionary<string, TimerRegistration> _timers = new(StringComparer.OrdinalIgnoreCase);
+    private bool _disposed;
+    private long _nextRegistrationId;
+>>>>>>> upstream-pr-49326
 
     // Monotonic load generation. A timer captures the generation current when it is
     // (re)armed; when the service stops it advances the generation so a callback that was
@@ -76,6 +82,7 @@ internal sealed partial class HotReloadDebouncer : IDisposable
 
             if (_timers.TryGetValue(key, out var existing))
             {
+<<<<<<< HEAD
                 existing.Change(_delay, Timeout.InfiniteTimeSpan);
                 return;
             }
@@ -85,6 +92,15 @@ internal sealed partial class HotReloadDebouncer : IDisposable
             // any timer found in the map above was armed in the current generation.
             var state = new PendingReload(key, _generation);
             _timers[key] = new Timer(OnTimerElapsed, state, _delay, Timeout.InfiniteTimeSpan);
+=======
+                existing.Timer.Dispose();
+            }
+
+            var registrationId = ++_nextRegistrationId;
+            var state = new PendingReload(key, _generation, registrationId);
+            var timer = new Timer(OnTimerElapsed, state, _delay, Timeout.InfiniteTimeSpan);
+            _timers[key] = new TimerRegistration(timer, registrationId);
+>>>>>>> upstream-pr-49326
         }
     }
 
@@ -98,7 +114,11 @@ internal sealed partial class HotReloadDebouncer : IDisposable
         {
             if (_timers.TryGetValue(key, out var timer))
             {
+<<<<<<< HEAD
                 timer.Dispose();
+=======
+                timer.Timer.Dispose();
+>>>>>>> upstream-pr-49326
                 _timers.Remove(key);
             }
         }
@@ -122,7 +142,11 @@ internal sealed partial class HotReloadDebouncer : IDisposable
             _generation++;
             foreach (var timer in _timers.Values)
             {
+<<<<<<< HEAD
                 timer.Dispose();
+=======
+                timer.Timer.Dispose();
+>>>>>>> upstream-pr-49326
             }
 
             _timers.Clear();
@@ -141,7 +165,11 @@ internal sealed partial class HotReloadDebouncer : IDisposable
             _disposed = true;
             foreach (var timer in _timers.Values)
             {
+<<<<<<< HEAD
                 timer.Dispose();
+=======
+                timer.Timer.Dispose();
+>>>>>>> upstream-pr-49326
             }
 
             _timers.Clear();
@@ -166,15 +194,32 @@ internal sealed partial class HotReloadDebouncer : IDisposable
                 return;
             }
 
+<<<<<<< HEAD
             if (_timers.TryGetValue(pending.Key, out var timer))
             {
                 timer.Dispose();
                 _timers.Remove(pending.Key);
             }
+=======
+            if (!_timers.TryGetValue(pending.Key, out var registration)
+                || registration.Id != pending.RegistrationId)
+            {
+                return;
+            }
+
+            registration.Timer.Dispose();
+            _timers.Remove(pending.Key);
+>>>>>>> upstream-pr-49326
         }
 
         _callback(pending.Key);
     }
 
+<<<<<<< HEAD
     private readonly record struct PendingReload(string Key, long Generation);
+=======
+    private readonly record struct PendingReload(string Key, long Generation, long RegistrationId);
+
+    private readonly record struct TimerRegistration(Timer Timer, long Id);
+>>>>>>> upstream-pr-49326
 }

@@ -15,7 +15,12 @@ namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
 /// Verifies the single ordered dispatch path for provider add/remove notifications
 /// (r3-p4-04). Every emission runs on one worker in strict first-in-first-out order, so a
 /// consumer can never observe a provider addition ahead of the removal enqueued before it,
+<<<<<<< HEAD
 /// even when the two originate on different threads.
+=======
+/// even when the two originate on different threads, and none of this depends on a
+/// UI-thread concept such as DispatcherQueue.
+>>>>>>> upstream-pr-49326
 /// </summary>
 [TestClass]
 public class SerialNotificationDispatcherTests
@@ -126,4 +131,40 @@ public class SerialNotificationDispatcherTests
 
         Assert.IsTrue(reached.Task.Wait(TimeSpan.FromSeconds(5)), "A throwing handler must not stall the worker.");
     }
+<<<<<<< HEAD
+=======
+
+    // The dispatcher must never rely on a UI-thread concept such as DispatcherQueue: it has
+    // to keep running notifications even when the calling thread's SynchronizationContext
+    // would reject any attempt to marshal work onto it.
+    [TestMethod]
+    public void Enqueue_DoesNotDependOnCallingThreadSynchronizationContext()
+    {
+        var originalContext = SynchronizationContext.Current;
+        try
+        {
+            SynchronizationContext.SetSynchronizationContext(new ThrowingSynchronizationContext());
+
+            using var dispatcher = new SerialNotificationDispatcher();
+            var reached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            dispatcher.Enqueue(() => reached.TrySetResult());
+
+            Assert.IsTrue(reached.Task.Wait(TimeSpan.FromSeconds(5)), "Notifications must run without depending on the caller's synchronization context.");
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(originalContext);
+        }
+    }
+
+    private sealed class ThrowingSynchronizationContext : SynchronizationContext
+    {
+        public override void Post(SendOrPostCallback d, object? state) =>
+            throw new InvalidOperationException("The dispatcher must not marshal work through the caller's synchronization context.");
+
+        public override void Send(SendOrPostCallback d, object? state) =>
+            throw new InvalidOperationException("The dispatcher must not marshal work through the caller's synchronization context.");
+    }
+>>>>>>> upstream-pr-49326
 }

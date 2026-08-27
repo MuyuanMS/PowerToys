@@ -30,6 +30,7 @@
     </Content>
   </ItemGroup>
 
+<<<<<<< HEAD
   <ItemGroup>
     <!-- The TS SDK owns the canonical wire fixtures. Copy them next to the test
          binaries so the C# parser tests consume the same bytes as the SDK. -->
@@ -37,4 +38,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+=======
+>>>>>>> upstream-pr-49326
 </Project>
