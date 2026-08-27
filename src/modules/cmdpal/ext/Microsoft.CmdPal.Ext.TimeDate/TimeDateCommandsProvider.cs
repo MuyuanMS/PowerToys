@@ -9,6 +9,7 @@ using Microsoft.CmdPal.Ext.TimeDate.Helpers;
 using Microsoft.CmdPal.Ext.TimeDate.Pages;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
+using Windows.Foundation;
 
 namespace Microsoft.CmdPal.Ext.TimeDate;
 
@@ -20,11 +21,11 @@ public sealed partial class TimeDateCommandsProvider : CommandProvider
     private static readonly TimeDateExtensionPage _timeDateExtensionPage = new(_settingsManager);
     private readonly FallbackTimeDateItem _fallbackTimeDateItem = new(_settingsManager);
 
-    private readonly WrappedDockItem _bandItem;
-    private readonly WrappedDockItem _notificationCenterBandItem;
-
-    // Keep a reference to the band so we can dispose it when the provider is disposed.
-    private NowDockBand? _nowDockBand;
+    private readonly NowDockBand _bandItem;
+    private readonly ListItem _notificationCenterBandItem;
+    private readonly WrappedDockItem _clockDockBand;
+    private readonly WrappedDockItem _notificationCenterDockBand;
+    private readonly TypedEventHandler<object, Settings> _settingsChangedHandler;
 
     public TimeDateCommandsProvider()
     {
@@ -40,40 +41,32 @@ public sealed partial class TimeDateCommandsProvider : CommandProvider
         Icon = _timeDateExtensionPage.Icon;
         Settings = _settingsManager.Settings;
 
-        WrappedDockItem? wrappedBand = null;
-
-        // During NowDockBand construction, UpdateText() runs synchronously.
-        // At that point wrappedBand is still null so the callback is a no-op.
-        // On subsequent timer ticks, wrappedBand is non-null and SetItems fires
-        // RaiseItemsChanged - the framework marshals to the UI thread in
-        // DockBandViewModel.InitializeFromList via DoOnUiThread.
-        _nowDockBand = new NowDockBand(_settingsManager.DockClockWithSecond, onUpdated: () =>
-        {
-            if (wrappedBand is not null)
-            {
-                wrappedBand.Items = [_nowDockBand!];
-            }
-        });
-
-        // Re-read the dock clock preference whenever settings change so the band updates
-        // live (no app restart required). The band ignores no-op changes internally.
-        _settingsManager.Settings.SettingsChanged += OnSettingsChanged;
-
-        wrappedBand = new WrappedDockItem(
-            [_nowDockBand],
+        _bandItem = new NowDockBand(_settingsManager);
+        _notificationCenterBandItem = new NotificationCenterDockBand();
+        _clockDockBand = new WrappedDockItem(
+            [_bandItem],
             "com.microsoft.cmdpal.timedate.dockBand",
             Resources.Microsoft_plugin_timedate_dock_band_title)
         {
-            Icon = Icons.TimeDateExtIcon,
+            Icon = _timeDateExtensionPage.Icon,
         };
-
-        _bandItem = wrappedBand;
-
-        var notificationCenterBand = new NotificationCenterDockBand();
-        _notificationCenterBandItem = new WrappedDockItem(
-            [notificationCenterBand],
+        _notificationCenterDockBand = new WrappedDockItem(
+            [_notificationCenterBandItem],
             "com.microsoft.cmdpal.timedate.notificationCenterBand",
             Resources.timedate_notification_center_band_title);
+
+        // Update the band immediately when the user changes a setting (e.g. the week
+        // number mode). Stored as a field so Dispose can unsubscribe from the static
+        // settings instance again.
+        _settingsChangedHandler = (s, a) => _bandItem.Refresh();
+        _settingsManager.Settings.SettingsChanged += _settingsChangedHandler;
+    }
+
+    public override void Dispose()
+    {
+        _settingsManager.Settings.SettingsChanged -= _settingsChangedHandler;
+        _bandItem.Dispose();
+        base.Dispose();
     }
 
     private string GetTranslatedPluginDescription()
@@ -91,21 +84,7 @@ public sealed partial class TimeDateCommandsProvider : CommandProvider
 
     public override ICommandItem[] GetDockBands()
     {
-        return [_bandItem, _notificationCenterBandItem];
-    }
-
-    private void OnSettingsChanged(object sender, Settings args)
-    {
-        _nowDockBand?.UpdateSettings(_settingsManager.DockClockWithSecond);
-    }
-
-    public override void Dispose()
-    {
-        _settingsManager.Settings.SettingsChanged -= OnSettingsChanged;
-        _nowDockBand?.Dispose();
-        _nowDockBand = null;
-        GC.SuppressFinalize(this);
-        base.Dispose();
+        return [_clockDockBand, _notificationCenterDockBand];
     }
 }
 

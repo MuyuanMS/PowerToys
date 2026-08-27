@@ -112,5 +112,16 @@ namespace Microsoft.CmdPal.Ext.TimeDate.UnitTests
             Assert.IsTrue(bands.Length > 1, "Expected notification center band to be present");
             Assert.IsNull(bands[1].Icon, "Notification center band should not set a dock icon");
         }
+
+        [TestMethod]
+        public void GetDockBands_ClockBandRetainsStableMetadata()
+        {
+            var provider = new TimeDateCommandsProvider();
+
+            var bands = provider.GetDockBands();
+
+            Assert.AreEqual(Resources.Microsoft_plugin_timedate_dock_band_title, bands[0].Title);
+            Assert.AreEqual(provider.Icon, bands[0].Icon);
+        }
     }
 }

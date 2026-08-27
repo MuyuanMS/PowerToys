@@ -18,37 +18,50 @@ internal sealed partial class NowDockBand : ListItem, IDisposable
     // command itself
     public override IconInfo Icon => new(string.Empty);
 
+    private readonly ISettingsInterface _settings;
     private readonly System.Timers.Timer _timer;
     private readonly Action? _onUpdated;
     private readonly Func<DateTime> _clock;
+    private readonly object _updateLock = new();
+    private readonly OpenUrlCommand _notificationCenterCommand;
+    private readonly NoOpCommand _noOpCommand;
+    private int _timerConfigurationGeneration;
+    private System.Timers.ElapsedEventHandler? _timerElapsedHandler;
+    private System.Timers.ElapsedEventHandler? _timerElapsedFirstMinuteTickHandler;
     private bool _timeWithSeconds;
+    private bool _disposed;
+    private (bool Seconds, int DateMode, string CustomFormat, bool NotificationCenter, int FirstWeek, int FirstDay) _appliedSettings;
 
     private CopyTextCommand _copyTimeCommand;
     private CopyTextCommand _copyDateCommand;
+    private CopyTextCommand _copyWeekNumberCommand;
+    private bool? _weekNumberShown;
+    private bool? _notificationCenterOnClick;
 
     internal CopyTextCommand CopyTimeCommand => _copyTimeCommand;
 
     internal CopyTextCommand CopyDateCommand => _copyDateCommand;
 
-    internal NowDockBand(bool timeWithSeconds = false, Action? onUpdated = null, Func<DateTime>? clock = null)
+    internal CopyTextCommand CopyWeekNumberCommand => _copyWeekNumberCommand;
+
+    internal NowDockBand(ISettingsInterface settings, Action? onUpdated = null, Func<DateTime>? clock = null)
     {
-        _timeWithSeconds = timeWithSeconds;
+        _settings = settings;
+        _appliedSettings = ReadSettings();
+        _timeWithSeconds = _appliedSettings.Seconds;
         _onUpdated = onUpdated;
         _clock = clock ?? (() => DateTime.Now);
 
-        Command = new OpenUrlCommand("ms-actioncenter:")
+        _notificationCenterCommand = new OpenUrlCommand("ms-actioncenter:")
         {
             Id = "com.microsoft.cmdpal.timedate.dockBand",
             Name = Resources.timedate_show_notification_center_command_name,
             Result = CommandResult.Dismiss(),
         };
+        _noOpCommand = new NoOpCommand() { Id = "com.microsoft.cmdpal.timedate.dockBand", Name = Resources.Microsoft_plugin_timedate_dock_band_title };
         _copyTimeCommand = new CopyTextCommand(string.Empty) { Name = Resources.timedate_copy_time_command_name };
         _copyDateCommand = new CopyTextCommand(string.Empty) { Name = Resources.timedate_copy_date_command_name };
-        MoreCommands =
-        [
-            new CommandContextItem(_copyTimeCommand),
-            new CommandContextItem(_copyDateCommand),
-        ];
+        _copyWeekNumberCommand = new CopyTextCommand(string.Empty) { Name = Resources.timedate_copy_week_number_command_name };
 
         UpdateText();
 
@@ -56,32 +69,79 @@ internal sealed partial class NowDockBand : ListItem, IDisposable
         ConfigureTimer();
     }
 
-    // Reads the current "show seconds" preference and, if it changed, reconfigures
-    // the timer cadence and refreshes the displayed text. Safe to call at any time
-    // (e.g. from a settings-changed handler) so the dock clock stays in sync without
-    // requiring the app to restart.
-    internal void UpdateSettings(bool timeWithSeconds)
+    // Re-reads the settings and, if any of them changed, refreshes the displayed text.
+    // If the "show seconds" preference changed, the timer cadence is reconfigured as
+    // well. Safe to call at any time (e.g. from a settings-changed handler) so the dock
+    // clock stays in sync without requiring the app to restart.
+    internal void UpdateSettings()
     {
-        if (_timeWithSeconds == timeWithSeconds)
+        var settings = ReadSettings();
+        var updated = false;
+
+        lock (_updateLock)
         {
-            return;
+            if (_disposed || _appliedSettings == settings)
+            {
+                return;
+            }
+
+            var secondsChanged = _appliedSettings.Seconds != settings.Seconds;
+            _appliedSettings = settings;
+            _timeWithSeconds = settings.Seconds;
+            if (secondsChanged)
+            {
+                ConfigureTimerCore();
+            }
+
+            UpdateTextCore();
+            updated = true;
         }
 
-        _timeWithSeconds = timeWithSeconds;
-        ConfigureTimer();
-        UpdateText();
+        if (updated)
+        {
+            _onUpdated?.Invoke();
+        }
     }
+
+    internal void Refresh() => UpdateSettings();
+
+    private (bool Seconds, int DateMode, string CustomFormat, bool NotificationCenter, int FirstWeek, int FirstDay) ReadSettings() =>
+        (_settings.DockClockWithSecond,
+         _settings.ClockBandDateMode,
+         _settings.CustomDateFormatInClockBand,
+         _settings.ClockBandOpensNotificationCenter,
+         _settings.FirstWeekOfYear,
+         _settings.FirstDayOfWeek);
 
     private void ConfigureTimer()
     {
+        lock (_updateLock)
+        {
+            ConfigureTimerCore();
+        }
+    }
+
+    private void ConfigureTimerCore()
+    {
+        var configurationGeneration = ++_timerConfigurationGeneration;
         _timer.Stop();
-        _timer.Elapsed -= Timer_Elapsed;
-        _timer.Elapsed -= Timer_ElapsedFirstMinuteTick;
+        if (_timerElapsedHandler is not null)
+        {
+            _timer.Elapsed -= _timerElapsedHandler;
+            _timerElapsedHandler = null;
+        }
+
+        if (_timerElapsedFirstMinuteTickHandler is not null)
+        {
+            _timer.Elapsed -= _timerElapsedFirstMinuteTickHandler;
+            _timerElapsedFirstMinuteTickHandler = null;
+        }
 
         if (_timeWithSeconds)
         {
             _timer.Interval = PerSecondUpdateInterval.TotalMilliseconds;
-            _timer.Elapsed += Timer_Elapsed;
+            _timerElapsedHandler = (sender, e) => Timer_Elapsed(sender, e, configurationGeneration);
+            _timer.Elapsed += _timerElapsedHandler;
         }
         else
         {
@@ -89,30 +149,72 @@ internal sealed partial class NowDockBand : ListItem, IDisposable
             // exactly when the system clock does, then fall back to a per-minute cadence.
             var now = _clock();
             _timer.Interval = PerMinuteUpdateInterval.TotalMilliseconds - ((now.Second * 1000) + now.Millisecond);
-            _timer.Elapsed += Timer_ElapsedFirstMinuteTick;
+            _timerElapsedFirstMinuteTickHandler = (sender, e) => Timer_ElapsedFirstMinuteTick(sender, e, configurationGeneration);
+            _timer.Elapsed += _timerElapsedFirstMinuteTickHandler;
         }
 
         _timer.Start();
     }
 
-    private void Timer_ElapsedFirstMinuteTick(object? sender, System.Timers.ElapsedEventArgs e)
+    private void Timer_ElapsedFirstMinuteTick(object? sender, System.Timers.ElapsedEventArgs e, int configurationGeneration)
     {
-        if (sender is System.Timers.Timer timer)
+        lock (_updateLock)
         {
-            timer.Interval = PerMinuteUpdateInterval.TotalMilliseconds;
-            timer.Elapsed -= Timer_ElapsedFirstMinuteTick;
-            timer.Elapsed += Timer_Elapsed;
+            if (_disposed || configurationGeneration != _timerConfigurationGeneration)
+            {
+                return;
+            }
+
+            if (sender is System.Timers.Timer timer)
+            {
+                timer.Interval = PerMinuteUpdateInterval.TotalMilliseconds;
+                if (_timerElapsedFirstMinuteTickHandler is not null)
+                {
+                    timer.Elapsed -= _timerElapsedFirstMinuteTickHandler;
+                    _timerElapsedFirstMinuteTickHandler = null;
+                }
+
+                _timerElapsedHandler = (currentSender, currentEventArgs) => Timer_Elapsed(currentSender, currentEventArgs, configurationGeneration);
+                timer.Elapsed += _timerElapsedHandler;
+            }
+
+            UpdateTextCore();
         }
 
-        Timer_Elapsed(sender, e);
+        _onUpdated?.Invoke();
     }
 
-    private void Timer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    private void Timer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e, int configurationGeneration)
     {
-        UpdateText();
+        lock (_updateLock)
+        {
+            if (_disposed || configurationGeneration != _timerConfigurationGeneration)
+            {
+                return;
+            }
+
+            UpdateTextCore();
+        }
+
+        _onUpdated?.Invoke();
     }
 
     internal void UpdateText()
+    {
+        lock (_updateLock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            UpdateTextCore();
+        }
+
+        _onUpdated?.Invoke(); // Must remain last — ViewModel reads Title/Subtitle via GetItems() on callback
+    }
+
+    private void UpdateTextCore()
     {
         var now = _clock();
         var timeString = now.ToString(
@@ -122,17 +224,59 @@ internal sealed partial class NowDockBand : ListItem, IDisposable
             TimeAndDateHelper.GetStringFormat(FormatStringType.Date, false, false),
             CultureInfo.CurrentCulture);
 
+        var dateMode = _settings.ClockBandDateMode;
+        var subtitleString = TimeAndDateHelper.GetClockBandDateLine(now, _settings);
+
+        // The week number is part of the band (subtitle and copy command) in the
+        // week number and ISO week date modes. The copy command matches what is
+        // shown: the configured week number in mode 1, the ISO week number in mode 2.
+        var showWeekNumber = dateMode is 1 or 2;
+        if (showWeekNumber)
+        {
+            var weekNumber = dateMode == 2 ? ISOWeek.GetWeekOfYear(now) : TimeAndDateHelper.GetWeekOfYear(now, _settings);
+            _copyWeekNumberCommand.Text = weekNumber.ToString(CultureInfo.CurrentCulture);
+        }
+
         Title = timeString;
-        Subtitle = dateString;
+        Subtitle = subtitleString;
         _copyTimeCommand.Text = timeString;
         _copyDateCommand.Text = dateString;
 
-        _onUpdated?.Invoke(); // Must remain last — ViewModel reads Title/Subtitle via GetItems() on callback
+        var notificationCenterOnClick = _settings.ClockBandOpensNotificationCenter;
+        if (_notificationCenterOnClick != notificationCenterOnClick)
+        {
+            _notificationCenterOnClick = notificationCenterOnClick;
+            Command = notificationCenterOnClick ? _notificationCenterCommand : _noOpCommand;
+        }
+
+        if (_weekNumberShown != showWeekNumber)
+        {
+            _weekNumberShown = showWeekNumber;
+            MoreCommands = showWeekNumber
+                ? [
+                    new CommandContextItem(_copyTimeCommand),
+                    new CommandContextItem(_copyDateCommand),
+                    new CommandContextItem(_copyWeekNumberCommand)
+                ]
+                : [
+                    new CommandContextItem(_copyTimeCommand),
+                    new CommandContextItem(_copyDateCommand)
+                ];
+        }
     }
 
     public void Dispose()
     {
-        _timer.Stop();
-        _timer.Dispose();
+        lock (_updateLock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _timer.Stop();
+            _timer.Dispose();
+        }
     }
 }

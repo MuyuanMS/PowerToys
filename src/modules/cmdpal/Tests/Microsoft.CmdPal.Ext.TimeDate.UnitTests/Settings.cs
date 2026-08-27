@@ -13,9 +13,12 @@ public class Settings : ISettingsInterface
     private readonly int firstDayOfWeek;
     private readonly bool enableFallbackItems;
     private readonly bool timeWithSecond;
-    private readonly bool dockClockWithSecond;
     private readonly bool dateWithWeekday;
+    private readonly string customDateFormatInClockBand;
+    private readonly bool clockBandOpensNotificationCenter;
     private readonly List<string> customFormats;
+    private bool dockClockWithSecond;
+    private int clockBandDateMode;
 
     public Settings(
         int firstWeekOfYear = -1,
@@ -24,6 +27,9 @@ public class Settings : ISettingsInterface
         bool timeWithSecond = false,
         bool dockClockWithSecond = false,
         bool dateWithWeekday = false,
+        int clockBandDateMode = 0,
+        string customDateFormatInClockBand = "",
+        bool clockBandOpensNotificationCenter = true,
         List<string>? customFormats = null)
     {
         this.firstWeekOfYear = firstWeekOfYear;
@@ -32,6 +38,9 @@ public class Settings : ISettingsInterface
         this.timeWithSecond = timeWithSecond;
         this.dockClockWithSecond = dockClockWithSecond;
         this.dateWithWeekday = dateWithWeekday;
+        this.clockBandDateMode = clockBandDateMode;
+        this.customDateFormatInClockBand = customDateFormatInClockBand;
+        this.clockBandOpensNotificationCenter = clockBandOpensNotificationCenter;
         this.customFormats = customFormats ?? new List<string>();
     }
 
@@ -43,9 +52,23 @@ public class Settings : ISettingsInterface
 
     public bool TimeWithSecond => timeWithSecond;
 
-    public bool DockClockWithSecond => dockClockWithSecond;
+    public bool DockClockWithSecond
+    {
+        get => dockClockWithSecond;
+        set => dockClockWithSecond = value;
+    }
 
     public bool DateWithWeekday => dateWithWeekday;
+
+    public int ClockBandDateMode
+    {
+        get => clockBandDateMode;
+        set => clockBandDateMode = value;
+    }
+
+    public string CustomDateFormatInClockBand => customDateFormatInClockBand;
+
+    public bool ClockBandOpensNotificationCenter => clockBandOpensNotificationCenter;
 
     public List<string> CustomFormats => customFormats;
 }
