@@ -1,0 +1,4 @@
+[2025-05-21 08:41:32.819338] [p-9336] [t-18440] [info] launcher logger is initialized
+[2025-05-21 08:41:32.819403] [p-9336] [t-18440] [info] Launcher object is constructing
+[2025-05-21 08:41:33.569650] [p-9336] [t-18440] [trace] Launching PowerToys Awake process
+[2025-05-21 08:41:33.569712] [p-9336] [t-18440] [trace] PowerToys Awake launching with parameters: --use-pt-config --pid 9336

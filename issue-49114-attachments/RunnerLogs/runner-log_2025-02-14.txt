@@ -1,0 +1,5 @@
+[2025-02-14 15:09:38.164989] [p-21056] [t-26300] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook
+[2025-02-14 15:11:08.089835] [p-21056] [t-26300] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook
+[2025-02-14 15:26:15.929193] [p-21056] [t-26300] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook
+[2025-02-14 15:27:35.530302] [p-21056] [t-26300] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook
+[2025-02-14 15:33:19.303299] [p-21056] [t-26300] [trace] AlwaysOnTop hotkey is invoked from Centralized keyboard hook

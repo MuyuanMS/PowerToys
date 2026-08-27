@@ -1,0 +1,2 @@
+[2025-02-09 16:49:48.458674] [p-3984] [t-19960] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
+[2025-02-09 16:50:34.139144] [p-3984] [t-19960] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook

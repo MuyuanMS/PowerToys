@@ -1,0 +1,2 @@
+Preferred user language: English (United Kingdom)
+User locale: en-GB

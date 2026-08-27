@@ -1,0 +1,18 @@
+[2025-03-29 06:30:44.9109] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\ShellLinkHelper.cs::156]
+-------------------------- Begin exception --------------------------
+Message: Exception loading path C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Google Chrome.lnk
+
+Exception full name  : System.ArgumentException
+Exception message    : Value does not fall within the expected range.
+Exception stack trace:
+   at System.Runtime.InteropServices.ComTypes.IPersistFile.Load(String pszFileName, Int32 dwMode)
+   at Wox.Infrastructure.ShellLinkHelper.RetrieveTargetPath(String path)
+Exception source     : System.Private.CoreLib
+Exception target site: Void Load(System.String, Int32)
+Exception HResult    : -2147024809
+-------------------------- End exception --------------------------
+
+
+[2025-03-29 06:30:44.9109] [ERROR] [D:\a\_work\1\s\src\modules\launcher\Wox.Infrastructure\Storage\ListRepository`1.cs::55]
+Item Already Exists <Google Chrome.lnk>
+
