@@ -13,12 +13,12 @@ public class Settings : ISettingsInterface
     private readonly int firstDayOfWeek;
     private readonly bool enableFallbackItems;
     private readonly bool timeWithSecond;
-    private bool dockClockWithSecond;
     private readonly bool dateWithWeekday;
-    private int clockBandDateMode;
     private readonly string customDateFormatInClockBand;
     private readonly bool clockBandOpensNotificationCenter;
     private readonly List<string> customFormats;
+    private bool dockClockWithSecond;
+    private int clockBandDateMode;
 
     public Settings(
         int firstWeekOfYear = -1,
@@ -30,7 +30,7 @@ public class Settings : ISettingsInterface
         int clockBandDateMode = 0,
         string customDateFormatInClockBand = "",
         bool clockBandOpensNotificationCenter = true,
-        List<string> customFormats = null)
+        List<string>? customFormats = null)
     {
         this.firstWeekOfYear = firstWeekOfYear;
         this.firstDayOfWeek = firstDayOfWeek;

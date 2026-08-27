@@ -161,7 +161,7 @@ public class SettingsManager : JsonSettingsManager, ISettingsInterface
 
     public bool ClockBandOpensNotificationCenter => _clockBandOpensNotificationCenter.Value;
 
-    public List<string> CustomFormats => _customFormats.Value.Split(TEXTBOXNEWLINE).ToList();
+    public List<string> CustomFormats => (_customFormats.Value ?? string.Empty).Split(TEXTBOXNEWLINE).ToList();
 
     internal static string SettingsJsonPath()
     {
