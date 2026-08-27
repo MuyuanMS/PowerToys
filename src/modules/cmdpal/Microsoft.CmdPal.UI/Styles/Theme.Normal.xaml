@@ -49,7 +49,7 @@
             <StaticResource x:Key="CmdPal.ParameterBackgroundDisabledBrush" ResourceKey="TextControlBackgroundDisabled" />
             <StaticResource x:Key="CmdPal.ParameterBorderBrush" ResourceKey="ControlStrokeColorDefaultBrush" />
             <StaticResource x:Key="CmdPal.ParameterBorderBrushPointerOver" ResourceKey="ControlStrokeColorSecondaryBrush" />
-            <SolidColorBrush x:Key="CmdPal.ParameterBorderBrushFocused" Color="{ThemeResource SystemAccentColorLight2}" />
+            <StaticResource x:Key="CmdPal.ParameterBorderBrushFocused" ResourceKey="TextControlBorderBrushFocused" />
             <StaticResource x:Key="CmdPal.ParameterBorderBrushDisabled" ResourceKey="TextControlBorderBrushDisabled" />
             <StaticResource x:Key="CmdPal.ParameterSelectionHighlightColor" ResourceKey="TextControlSelectionHighlightColor" />
             <Thickness x:Key="CmdPal.ParameterBorderThicknessFocused">2</Thickness>
