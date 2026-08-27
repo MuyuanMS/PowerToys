@@ -37,10 +37,6 @@ internal static class JSPropertyChangeRegistry
         {
             targets.RemoveAll(reference =>
                 !reference.TryGetTarget(out var current) || ReferenceEquals(current, target));
-            if (targets.Count == 0)
-            {
-                registry.Targets.TryRemove(commandId, out _);
-            }
         }
     }
 

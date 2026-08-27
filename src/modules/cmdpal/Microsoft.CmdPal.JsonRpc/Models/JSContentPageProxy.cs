@@ -94,10 +94,6 @@ internal sealed partial class JSContentPageProxy : JSObservableProxyBase, IConte
             lock (pages)
             {
                 pages.RemoveAll(weak => !weak.TryGetTarget(out var target) || ReferenceEquals(target, this));
-                if (pages.Count == 0)
-                {
-                    _registry.Pages.TryRemove(_pageId, out _);
-                }
             }
         }
 

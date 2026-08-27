@@ -78,7 +78,7 @@ export interface Color {
   /** Blue channel, 0 to 255. */
   b: number;
   /** Alpha channel, 0 to 255. Defaults to 255 (opaque). */
-  a: number;
+  a?: number;
 }
 
 /**

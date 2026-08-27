@@ -324,10 +324,6 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
             lock (list)
             {
                 list.RemoveAll(weak => !weak.TryGetTarget(out var target) || ReferenceEquals(target, this));
-                if (list.Count == 0)
-                {
-                    _registry.Pages.TryRemove(_pageId, out _);
-                }
             }
         }
     }

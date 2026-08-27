@@ -39,7 +39,7 @@ public sealed partial class JsonRpcConnection : IDisposable
     private readonly Channel<NotificationEnvelope> _notificationQueue = Channel.CreateBounded<NotificationEnvelope>(
         new BoundedChannelOptions(NotificationQueueCapacity)
         {
-            SingleReader = true,
+            SingleReader = false,
             SingleWriter = false,
             FullMode = BoundedChannelFullMode.Wait,
         });

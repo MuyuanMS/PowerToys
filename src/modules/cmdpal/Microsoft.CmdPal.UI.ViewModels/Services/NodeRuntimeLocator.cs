@@ -51,7 +51,7 @@ internal static class NodeRuntimeLocator
 
             if (File.Exists(candidate))
             {
-                return candidate;
+                return Path.GetFullPath(candidate);
             }
         }
 
