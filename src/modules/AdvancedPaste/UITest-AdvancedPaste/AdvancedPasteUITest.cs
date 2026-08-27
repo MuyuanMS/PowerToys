@@ -39,6 +39,9 @@ namespace Microsoft.AdvancedPaste.UITests
         private readonly string pasteAsMarkdownSrcFile = "PasteAsMarkdownFile.html";
         private readonly string pasteAsMarkdownResultFile = "PasteAsMarkdownResultFile.txt";
 
+        private readonly string pasteAsSingleLineSrcFile = "PasteAsSingleLineFile.txt";
+        private readonly string pasteAsSingleLineResultFile = "PasteAsSingleLineResultFile.txt";
+
         private readonly string pasteAsJsonFileName = "PasteAsJsonFile.xml";
         private readonly string pasteAsJsonResultFile = "PasteAsJsonResultFile.txt";
 
@@ -51,6 +54,7 @@ namespace Microsoft.AdvancedPaste.UITests
             // paste as plain text: win + ctrl + alt + o
             // paste as markdown text: win + ctrl + alt + m
             // paste as json text: win + ctrl + alt + j
+            // paste as single line text: win + ctrl + alt + s
             CopySettingsFileBeforeTests();
         }
 
@@ -128,6 +132,44 @@ namespace Microsoft.AdvancedPaste.UITests
 
         [TestMethod]
         [TestCategory("AdvancedPasteUITest")]
+        [TestCategory("PasteAsSingleLine")]
+        public void TestCasePasteAsSingleLine()
+        {
+            if (_notepadSettingsChanged == false)
+            {
+                ChangeNotePadSettings();
+            }
+
+            DeleteAndCopyFile(pasteAsSingleLineSrcFile, tempTxtFileName);
+            ContentCopyAndPasteAsSingleLine(tempTxtFileName);
+            var result = FileReader.CompareRtfFiles(
+                Path.Combine(testFilesFolderPath, tempTxtFileName),
+                Path.Combine(testFilesFolderPath, pasteAsSingleLineResultFile),
+                compareFormatting: true);
+            Assert.IsTrue(result.IsConsistent, "Paste as single line using popup shortcut failed.");
+        }
+
+        [TestMethod]
+        [TestCategory("AdvancedPasteUITest")]
+        [TestCategory("PasteAsSingleLineDirectShortcut")]
+        public void TestCasePasteAsSingleLineDirectShortcut()
+        {
+            if (_notepadSettingsChanged == false)
+            {
+                ChangeNotePadSettings();
+            }
+
+            DeleteAndCopyFile(pasteAsSingleLineSrcFile, tempTxtFileName);
+            ContentCopyAndPasteAsSingleLineDirectShortcut(tempTxtFileName);
+            var result = FileReader.CompareRtfFiles(
+                Path.Combine(testFilesFolderPath, tempTxtFileName),
+                Path.Combine(testFilesFolderPath, pasteAsSingleLineResultFile),
+                compareFormatting: true);
+            Assert.IsTrue(result.IsConsistent, "Paste as single line using direct shortcut failed.");
+        }
+
+        [TestMethod]
+        [TestCategory("AdvancedPasteUITest")]
         [TestCategory("PasteAsMarkdownCase1")]
         public void TestCasePasteAsMarkdownCase1()
         {
@@ -179,7 +221,7 @@ namespace Microsoft.AdvancedPaste.UITests
             }
 
             // Copy some text(same as in the previous step or different.If nothing is coppied between steps, previously pasted Markdown text will be picked up from clipboard and converted again to nested Markdown).
-            // Open Advanced Paste window using hotkey, press Ctrl + 2 and confirm that pasted text is converted to markdown
+            // Open Advanced Paste window using hotkey, press Ctrl + 3 and confirm that pasted text is converted to markdown
             DeleteAndCopyFile(pasteAsMarkdownSrcFile, tempTxtFileName);
             ContentCopyAndPasteAsMarkdownCase3(tempTxtFileName);
             var result = FileReader.CompareRtfFiles(
@@ -221,7 +263,7 @@ namespace Microsoft.AdvancedPaste.UITests
             }
 
             // Copy some text(same as in the previous step or different.If nothing is coppied between steps, previously pasted JSON text will be picked up from clipboard and converted again to nested JSON).
-            // Open Advanced Paste window using hotkey, click Paste as markdown button and confirm that pasted text is converted to markdown
+            // Open Advanced Paste window using hotkey, click Paste as JSON button and confirm that pasted text is converted to JSON
             DeleteAndCopyFile(pasteAsJsonFileName, tempTxtFileName);
             ContentCopyAndPasteAsJsonCase2(tempTxtFileName);
             var result = FileReader.CompareRtfFiles(
@@ -242,7 +284,7 @@ namespace Microsoft.AdvancedPaste.UITests
             }
 
             // Copy some text(same as in the previous step or different.If nothing is coppied between steps, previously pasted JSON text will be picked up from clipboard and converted again to nested JSON).
-            // Open Advanced Paste window using hotkey, press Ctrl + 3 and confirm that pasted text is converted to markdown
+            // Open Advanced Paste window using hotkey, press Ctrl + 4 and confirm that pasted text is converted to JSON
             DeleteAndCopyFile(pasteAsJsonFileName, tempTxtFileName);
             ContentCopyAndPasteAsJsonCase3(tempTxtFileName);
             var result = FileReader.CompareRtfFiles(
@@ -645,6 +687,73 @@ namespace Microsoft.AdvancedPaste.UITests
             process.Kill(true);
         }
 
+        private void ContentCopyAndPasteAsSingleLine(string fileName, bool isRTF = false)
+        {
+            string tempFile = Path.Combine(testFilesFolderPath, fileName);
+
+            Process process = Process.Start(isRTF ? wordpadPath : "notepad.exe", tempFile);
+            if (process == null)
+            {
+                throw new InvalidOperationException($"Failed to start {(isRTF ? "WordPad" : "Notepad")}.");
+            }
+
+            Thread.Sleep(15000);
+            var window = FindWindowWithFlexibleTitle(Path.GetFileName(tempFile), isRTF);
+
+            window.Click();
+            Thread.Sleep(1000);
+
+            this.SendKeys(Key.LCtrl, Key.A);
+            Thread.Sleep(1000);
+            this.SendKeys(Key.LCtrl, Key.C);
+            Thread.Sleep(1000);
+            this.SendKeys(Key.Delete);
+            Thread.Sleep(1000);
+
+            this.SendKeys(Key.Win, Key.Shift, Key.V);
+            Thread.Sleep(15000);
+
+            this.SendKeys(Key.LCtrl, Key.Num2);
+            Thread.Sleep(1000);
+
+            this.SendKeys(Key.LCtrl, Key.S);
+            Thread.Sleep(1000);
+
+            window.Close();
+        }
+
+        private void ContentCopyAndPasteAsSingleLineDirectShortcut(string fileName, bool isRTF = false)
+        {
+            string tempFile = Path.Combine(testFilesFolderPath, fileName);
+
+            Process process = Process.Start(isRTF ? wordpadPath : "notepad.exe", tempFile);
+            if (process == null)
+            {
+                throw new InvalidOperationException($"Failed to start {(isRTF ? "WordPad" : "Notepad")}.");
+            }
+
+            Thread.Sleep(15000);
+            var window = FindWindowWithFlexibleTitle(Path.GetFileName(tempFile), isRTF);
+
+            window.Click();
+            Thread.Sleep(1000);
+
+            this.SendKeys(Key.LCtrl, Key.A);
+            Thread.Sleep(1000);
+            this.SendKeys(Key.LCtrl, Key.C);
+            Thread.Sleep(1000);
+            this.SendKeys(Key.Delete);
+            Thread.Sleep(1000);
+
+            this.SendKeys(Key.Win, Key.LCtrl, Key.Alt, Key.S);
+            Thread.Sleep(1000);
+
+            this.SendKeys(Key.LCtrl, Key.S);
+            Thread.Sleep(1000);
+
+            window.Close();
+        }
+
         private void ContentCopyAndPasteAsMarkdownCase1(string fileName, bool isRTF = false)
         {
             // Copy some rich text again.
@@ -745,7 +854,7 @@ namespace Microsoft.AdvancedPaste.UITests
             this.SendKeys(Key.Win, Key.Shift, Key.V);
             Thread.Sleep(15000);
 
-            this.SendKeys(Key.LCtrl, Key.Num2);
+            this.SendKeys(Key.LCtrl, Key.Num3);
             Thread.Sleep(1000);
 
             this.SendKeys(Key.LCtrl, Key.S);
@@ -817,7 +926,7 @@ namespace Microsoft.AdvancedPaste.UITests
             this.SendKeys(Key.Win, Key.Shift, Key.V);
             Thread.Sleep(15000);
 
-            // click Paste as markdown button and confirm that pasted text is converted to markdown
+            // click Paste as JSON button and confirm that pasted text is converted to JSON
             var apWind = this.Find<Window>("Advanced Paste", global: true);
             apWind.Find<TextBlock>("Paste as JSON").Click();
 
@@ -855,7 +964,7 @@ namespace Microsoft.AdvancedPaste.UITests
             this.SendKeys(Key.Win, Key.Shift, Key.V);
             Thread.Sleep(15000);
 
-            this.SendKeys(Key.LCtrl, Key.Num3);
+            this.SendKeys(Key.LCtrl, Key.Num4);
             Thread.Sleep(1000);
 
             this.SendKeys(Key.LCtrl, Key.S);
