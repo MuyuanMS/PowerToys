@@ -1,0 +1,48 @@
+[2025-05-28 08:59:30.443734] [p-18836] [t-28860] [info] FileExplorer logger is initialized
+[2025-05-28 08:59:30.443861] [p-18836] [t-28860] [info] Initializing PowerPreviewModule
+[2025-05-28 11:03:15.861393] [p-14260] [t-14264] [info] FileExplorer logger is initialized
+[2025-05-28 11:03:15.861555] [p-14260] [t-14264] [info] Initializing PowerPreviewModule
+[2025-05-28 14:37:58.779031] [p-23476] [t-19664] [info] FileExplorer logger is initialized
+[2025-05-28 14:37:58.779266] [p-23476] [t-19664] [info] Initializing PowerPreviewModule
+[2025-05-28 20:08:05.351908] [p-22156] [t-14628] [info] FileExplorer logger is initialized
+[2025-05-28 20:08:05.353765] [p-22156] [t-14628] [info] Initializing PowerPreviewModule
+[2025-05-28 22:10:45.864977] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:45.869669] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:45.876145] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:45.876677] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:45.966023] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:45.966553] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:45.973123] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:45.973981] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.019172] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.019757] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.026366] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.026981] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.066147] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.066809] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.072632] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.073569] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.112295] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.113031] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.119273] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.119766] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.162352] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.163095] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.171792] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.172476] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.210724] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.211303] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.217276] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:46.217761] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:47.766149] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:47.766759] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:47.773651] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:47.774098] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:48.299922] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:48.300532] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:48.306897] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:48.307410] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:48.344912] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:48.345443] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:48.351444] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{A5A41CC7-02CB-41D4-8C9B-9087040D6098}\DisplayName:Pdf Preview Handler: RegOpenKeyExW failed: unknown error
+[2025-05-28 22:10:48.351924] [p-22156] [t-14628] [info] isApplied of HKCU\Software\Classes\CLSID\{D8BB9942-93BD-412D-87E4-33FAB214DC1A}\DisplayName:Pdf Thumbnail Provider: RegOpenKeyExW failed: unknown error

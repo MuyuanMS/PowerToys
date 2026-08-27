@@ -1,0 +1,12 @@
+Display name: PowerToys ImageResizer Context Menu
+Full name: Microsoft.PowerToys.ImageResizerContextMenu_0.100.2.0_neutral__8wekyb3d8bbwe
+Version: 0.100.2.0.
+Publisher: CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US
+Status: OK
+
+Display name: PowerToys PowerRename Context Menu
+Full name: Microsoft.PowerToys.PowerRenameContextMenu_0.100.2.0_neutral__8wekyb3d8bbwe
+Version: 0.100.2.0.
+Publisher: CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US
+Status: OK
+

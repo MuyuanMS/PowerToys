@@ -1,0 +1,3 @@
+[2025-10-28 06:58:21.3400] [INFO] [D:\a\_work\1\s\src\modules\launcher\PowerLauncher\MainWindow.xaml.cs::104]
+Send Run settings telemetry
+

@@ -1,0 +1,3 @@
+[2024-05-21 17:53:04.397394] [p-13460] [t-13464] [info] PastePlain logger is initialized
+[2024-05-21 17:53:04.892574] [p-13460] [t-13464] [trace] PastePlain::enable()
+[2024-05-21 17:53:04.999234] [p-13460] [t-9160] [info] Send settings telemetry
