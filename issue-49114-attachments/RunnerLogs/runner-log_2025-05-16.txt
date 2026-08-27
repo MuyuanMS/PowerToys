@@ -1,6 +1,0 @@
-[2025-05-16 11:51:16.378253] [p-13792] [t-13796] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
-[2025-05-16 12:25:44.275200] [p-13792] [t-13796] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
-[2025-05-16 12:26:04.039126] [p-13792] [t-13796] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
-[2025-05-16 12:28:58.430188] [p-13792] [t-13796] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
-[2025-05-16 12:29:54.958945] [p-13792] [t-13796] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook
-[2025-05-16 15:03:57.197530] [p-13792] [t-13796] [trace] PowerToys Run hotkey is invoked from Centralized keyboard hook

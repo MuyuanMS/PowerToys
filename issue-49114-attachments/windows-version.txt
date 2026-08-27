@@ -1,3 +1,0 @@
-MajorVersion: 10
-MinorVersion: 0
-BuildNumber: 22631

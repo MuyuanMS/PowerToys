@@ -1,8 +1,0 @@
-[2025-01-07 21:20:04.186365] [p-7700] [t-412] [info] launcher logger is initialized
-[2025-01-07 21:20:04.186439] [p-7700] [t-412] [info] Launcher object is constructing
-[2025-01-07 21:20:05.257263] [p-7700] [t-412] [trace] Launching PowerToys Awake process
-[2025-01-07 21:20:05.257624] [p-7700] [t-412] [trace] PowerToys Awake launching with parameters: --use-pt-config --pid 7700
-[2025-01-07 21:43:12.743453] [p-14956] [t-14960] [info] launcher logger is initialized
-[2025-01-07 21:43:12.743554] [p-14956] [t-14960] [info] Launcher object is constructing
-[2025-01-07 21:43:13.213925] [p-14956] [t-14960] [trace] Launching PowerToys Awake process
-[2025-01-07 21:43:13.214179] [p-14956] [t-14960] [trace] PowerToys Awake launching with parameters: --use-pt-config --pid 14956
