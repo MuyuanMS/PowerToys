@@ -121,11 +121,6 @@ public sealed partial class ContentFormControl : UserControl
         }))
         {
             _themeRefreshPending = false;
-            var card = _adaptiveCard;
-            if (card is not null)
-            {
-                RenderCard(card, focusFirstElement: false);
-            }
         }
     }
 
