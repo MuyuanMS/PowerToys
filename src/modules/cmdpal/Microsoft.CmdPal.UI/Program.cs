@@ -21,9 +21,10 @@ namespace Microsoft.CmdPal.UI;
 // https://github.com/microsoft/WindowsAppSDK-Samples/tree/main/Samples/AppLifecycle/Instancing/cs2/cs-winui-packaged/CsWinUiDesktopInstancing
 internal sealed class Program
 {
+    private static readonly Queue<AppActivationArguments> PendingActivations = [];
+
     private static DispatcherQueueSynchronizationContext? uiContext;
     private static App? app;
-    private static readonly Queue<AppActivationArguments> pendingActivations = [];
 
     // LOAD BEARING
     //
@@ -105,7 +106,7 @@ internal sealed class Program
 
     internal static void ReplayPendingActivations(MainWindow mainWindow)
     {
-        while (pendingActivations.TryDequeue(out var args))
+        while (PendingActivations.TryDequeue(out var args))
         {
             mainWindow.HandleLaunchNonUI(args);
         }
@@ -184,7 +185,7 @@ internal sealed class Program
         }
         else
         {
-            pendingActivations.Enqueue(args);
+            PendingActivations.Enqueue(args);
         }
     }
 }

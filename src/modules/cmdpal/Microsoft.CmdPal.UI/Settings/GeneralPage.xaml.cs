@@ -125,6 +125,11 @@ public sealed partial class GeneralPage : Page, INotifyPropertyChanged
     private void ExternalCommandPermissionStore_PermissionsChanged(object? sender, EventArgs e) =>
         _ = RefreshExternalCommandPermissionsAsync();
 
+    private void OpenSystemSettings_Click(object sender, RoutedEventArgs e)
+    {
+        _ = global::Windows.System.Launcher.LaunchUriAsync(new Uri("ms-settings:notifications"));
+    }
+
     private async Task RefreshExternalCommandPermissionsAsync()
     {
         try
