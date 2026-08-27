@@ -23,7 +23,7 @@ internal static partial class DetailsMarkdownHelper
         return MarkdownSpecialCharacters().Replace(escapedHtml, "\\$1");
     }
 
-    [GeneratedRegex(@"([\\`*_{}\[\]()#+\-.!>|~])")]
+    [GeneratedRegex(@"([\\`*_{}\[\]()#+=\-.!>|~])")]
     private static partial Regex MarkdownSpecialCharacters();
 
     public static string BuildImageBody(RandomAccessStreamReference? imageData, string altText)

@@ -154,13 +154,13 @@ public class BasicTests : CommandPaletteTestBase
     [TestMethod]
     public void DockItemEnterKeyActivatesTest()
     {
-        AssertDockItemKeyboardActivation("{ENTER}");
+        AssertDockItemKeyboardActivation(OpenQA.Selenium.Keys.Enter);
     }
 
     [TestMethod]
     public void DockItemSpaceKeyActivatesTest()
     {
-        AssertDockItemKeyboardActivation(" ");
+        AssertDockItemKeyboardActivation(OpenQA.Selenium.Keys.Space);
     }
 
     private void AssertDockItemKeyboardActivation(string key)

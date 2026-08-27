@@ -38,6 +38,7 @@ public class DetailsMarkdownHelperTests
     [DataRow("a > b", "a \\> b")]
     [DataRow("<https://example.com>", "&lt;https://example\\.com\\>")]
     [DataRow("&copy;", "&amp;copy;")]
+    [DataRow("Heading\n=======", "Heading\n\\=\\=\\=\\=\\=\\=\\=")]
     public void EscapeMarkdown_EscapesMarkdownSyntaxCharacters(string input, string expected)
     {
         var result = DetailsMarkdownHelper.EscapeMarkdown(input);

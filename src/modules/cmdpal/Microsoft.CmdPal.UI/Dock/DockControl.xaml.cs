@@ -315,7 +315,9 @@ public sealed partial class DockControl : UserControl, IRecipient<CloseContextMe
     {
         // Tapped only fires for pointer input, so keyboard focus + Enter/Space
         // never invoked a dock item. This is the keyboard side of BandItem_Tapped.
-        if (IsEditMode || (e.Key != VirtualKey.Enter && e.Key != VirtualKey.Space))
+        if (IsEditMode ||
+            e.KeyStatus.WasKeyDown ||
+            (e.Key != VirtualKey.Enter && e.Key != VirtualKey.Space))
         {
             return;
         }
