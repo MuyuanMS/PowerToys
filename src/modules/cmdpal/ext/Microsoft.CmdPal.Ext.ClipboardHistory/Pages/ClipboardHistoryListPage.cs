@@ -76,6 +76,7 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
             if (!Clipboard.IsHistoryEnabled())
             {
                 ClearClipboardHistory();
+                loadSucceeded = true;
                 return;
             }
 
