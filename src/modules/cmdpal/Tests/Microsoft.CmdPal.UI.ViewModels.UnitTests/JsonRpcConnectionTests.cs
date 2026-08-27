@@ -425,6 +425,41 @@ public partial class JsonRpcConnectionTests
     }
 
     [TestMethod]
+    public async Task InboundMessage_WithInvalidProtocolFields_IsIgnored()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var harness = CreateHarness(TimeSpan.FromMilliseconds(250));
+        try
+        {
+            var handlerInvoked = false;
+            harness.Host.RegisterRequestHandler("ping", (_, _) =>
+            {
+                handlerInvoked = true;
+                return Task.FromResult<JsonNode?>(null);
+            });
+
+            await WriteFramedAsync(
+                harness.ExtensionWrites,
+                """{"jsonrpc":"1.0","id":1,"method":"ping"}""",
+                cts.Token);
+            await WriteFramedAsync(
+                harness.ExtensionWrites,
+                """{"jsonrpc":"2.0","id":1,"method":42}""",
+                cts.Token);
+
+            await Task.Delay(50, cts.Token);
+
+            Assert.IsFalse(handlerInvoked);
+            await Assert.ThrowsExceptionAsync<JsonRpcException>(async () =>
+                await harness.Host.SendRequestAsync("wait", null, cts.Token));
+        }
+        finally
+        {
+            harness.Host.Dispose();
+        }
+    }
+
+    [TestMethod]
     public async Task Dispose_CancelsPendingRequests()
     {
         using var cts = new CancellationTokenSource(TestTimeout);

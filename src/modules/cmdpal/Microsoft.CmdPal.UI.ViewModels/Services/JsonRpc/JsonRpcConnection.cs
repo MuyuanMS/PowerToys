@@ -713,14 +713,28 @@ public sealed partial class JsonRpcConnection : IDisposable
         using (document)
         {
             var root = document.RootElement;
-            var hasId = root.TryGetProperty("id", out var idElement);
-            var hasMethod = root.TryGetProperty("method", out var methodElement) && methodElement.ValueKind == JsonValueKind.String;
+            if (root.ValueKind != JsonValueKind.Object ||
+                !root.TryGetProperty("jsonrpc", out var versionElement) ||
+                versionElement.ValueKind != JsonValueKind.String ||
+                versionElement.GetString() != "2.0")
+            {
+                _protocolErrorLog.Run(static () => Logger.LogWarning("Received a JSON-RPC message with an invalid protocol version."));
+                return;
+            }
 
-            if (hasMethod && !hasId)
+            var hasId = root.TryGetProperty("id", out var idElement);
+            var hasMethodProperty = root.TryGetProperty("method", out var methodElement);
+            if (hasMethodProperty && methodElement.ValueKind != JsonValueKind.String)
+            {
+                _protocolErrorLog.Run(static () => Logger.LogWarning("Received a JSON-RPC message with a non-string method."));
+                return;
+            }
+
+            if (hasMethodProperty && !hasId)
             {
                 EnqueueNotification(methodElement.GetString() ?? string.Empty, root, frameByteLength);
             }
-            else if (hasMethod && hasId)
+            else if (hasMethodProperty && hasId)
             {
                 EnqueueInboundRequest(methodElement.GetString() ?? string.Empty, idElement, root, frameByteLength);
             }

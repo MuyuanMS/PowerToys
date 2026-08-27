@@ -562,6 +562,7 @@ public partial class JsonRpcConnectionTests
     {
         using var cts = new CancellationTokenSource(TestTimeout);
         var toHost = new Pipe();
+        var disconnected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var host = new JsonRpcConnection(
             toHost.Reader.AsStream(),
             new BlockingWriteStream(),
@@ -570,6 +571,7 @@ public partial class JsonRpcConnectionTests
             writeTimeout: null,
             maxQueuedNotificationBytes: null,
             maxQueuedRequestBytes: 4);
+        host.Disconnected += (_, _) => disconnected.TrySetResult();
         host.StartListening();
 
         try
@@ -583,7 +585,8 @@ public partial class JsonRpcConnectionTests
             }.ToJsonString();
 
             await WriteFramedAsync(toHost.Writer.AsStream(), request, cts.Token);
-            await Task.Delay(100, cts.Token);
+            toHost.Writer.Complete();
+            await disconnected.Task.WaitAsync(cts.Token);
 
             Assert.AreEqual(
                 0L,
