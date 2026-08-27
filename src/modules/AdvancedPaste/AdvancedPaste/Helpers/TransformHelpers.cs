@@ -10,15 +10,18 @@ using System.Threading.Tasks;
 
 using AdvancedPaste.Models;
 using ManagedCommon;
+using Microsoft.PowerToys.Settings.UI.Library;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Foundation;
 using Windows.Graphics.Imaging;
+using Windows.Security.Cryptography;
 using Windows.Storage.Streams;
 
 namespace AdvancedPaste.Helpers;
 
 public static class TransformHelpers
 {
-    public static async Task<DataPackage> TransformAsync(PasteFormats format, DataPackageView clipboardData, CancellationToken cancellationToken, IProgress<double> progress)
+    public static async Task<DataPackage> TransformAsync(PasteFormats format, DataPackageView clipboardData, CancellationToken cancellationToken, IProgress<double> progress, int jpgQuality = AdvancedPasteProperties.DefaultPasteAsJpgQuality)
     {
         return format switch
         {
@@ -28,6 +31,7 @@ public static class TransformHelpers
             PasteFormats.ImageToText => await ImageToTextAsync(clipboardData, cancellationToken),
             PasteFormats.PasteAsTxtFile => await ToTxtFileAsync(clipboardData, cancellationToken),
             PasteFormats.PasteAsPngFile => await ToPngFileAsync(clipboardData, cancellationToken),
+            PasteFormats.PasteAsJpgFile => await ToJpgFileAsync(clipboardData, jpgQuality, cancellationToken),
             PasteFormats.PasteAsHtmlFile => await ToHtmlFileAsync(clipboardData, cancellationToken),
             PasteFormats.TranscodeToMp3 => await TranscodeHelpers.TranscodeToMp3Async(clipboardData, cancellationToken, progress),
             PasteFormats.TranscodeToMp4 => await TranscodeHelpers.TranscodeToMp4Async(clipboardData, cancellationToken, progress),
@@ -76,6 +80,51 @@ public static class TransformHelpers
         await encoder.FlushAsync();
 
         return await CreateDataPackageFromFileContentAsync(pngStream.AsStreamForRead(), "png", cancellationToken);
+    }
+
+    private static async Task<DataPackage> ToJpgFileAsync(DataPackageView clipboardData, int jpgQuality, CancellationToken cancellationToken)
+    {
+        Logger.LogTrace();
+
+        var clipboardBitmap = await clipboardData.GetImageContentAsync();
+
+        var encoderOptions = new BitmapPropertySet
+        {
+            ["ImageQuality"] = new BitmapTypedValue(Math.Clamp(jpgQuality, 1, 100) / 100f, PropertyType.Single),
+        };
+
+        using var jpgStream = new InMemoryRandomAccessStream();
+        var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.JpegEncoderId, jpgStream, encoderOptions);
+        using var flattenedBitmap = clipboardBitmap.BitmapAlphaMode == BitmapAlphaMode.Ignore ? null : FlattenForJpeg(clipboardBitmap);
+        using var normalizedBitmap = flattenedBitmap == null && clipboardBitmap.BitmapPixelFormat is not (BitmapPixelFormat.Rgba16 or BitmapPixelFormat.Rgba8 or BitmapPixelFormat.Bgra8)
+            ? SoftwareBitmap.Convert(clipboardBitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Ignore)
+            : null;
+        encoder.SetSoftwareBitmap(flattenedBitmap ?? normalizedBitmap ?? clipboardBitmap);
+        await encoder.FlushAsync();
+
+        return await CreateDataPackageFromFileContentAsync(jpgStream.AsStreamForRead(), "jpg", cancellationToken);
+    }
+
+    private static SoftwareBitmap FlattenForJpeg(SoftwareBitmap bitmap)
+    {
+        using var premultipliedBitmap = SoftwareBitmap.Convert(bitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+        var pixels = new byte[premultipliedBitmap.PixelWidth * premultipliedBitmap.PixelHeight * 4];
+        var pixelBuffer = CryptographicBuffer.CreateFromByteArray(pixels);
+        premultipliedBitmap.CopyToBuffer(pixelBuffer);
+        CryptographicBuffer.CopyToByteArray(pixelBuffer, out pixels);
+
+        for (var i = 0; i < pixels.Length; i += 4)
+        {
+            var alpha = pixels[i + 3];
+            pixels[i] = (byte)Math.Min(byte.MaxValue, pixels[i] + byte.MaxValue - alpha);
+            pixels[i + 1] = (byte)Math.Min(byte.MaxValue, pixels[i + 1] + byte.MaxValue - alpha);
+            pixels[i + 2] = (byte)Math.Min(byte.MaxValue, pixels[i + 2] + byte.MaxValue - alpha);
+            pixels[i + 3] = byte.MaxValue;
+        }
+
+        var flattenedBitmap = new SoftwareBitmap(BitmapPixelFormat.Bgra8, premultipliedBitmap.PixelWidth, premultipliedBitmap.PixelHeight, BitmapAlphaMode.Ignore);
+        flattenedBitmap.CopyFromBuffer(CryptographicBuffer.CreateFromByteArray(pixels));
+        return flattenedBitmap;
     }
 
     private static async Task<DataPackage> ToTxtFileAsync(DataPackageView clipboardData, CancellationToken cancellationToken)
