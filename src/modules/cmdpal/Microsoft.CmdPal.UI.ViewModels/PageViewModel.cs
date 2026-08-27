@@ -91,6 +91,8 @@ public partial class PageViewModel : ExtensionObjectViewModel, IPageContext
 
     public bool HasFilters { get; protected set; }
 
+    public bool IsActive { get; internal set; } = true;
+
     public IconInfoViewModel Icon { get; protected set; }
 
     public ICommandProviderContext ProviderContext { get; protected set; }

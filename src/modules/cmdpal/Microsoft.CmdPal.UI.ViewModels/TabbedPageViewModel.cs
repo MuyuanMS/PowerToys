@@ -204,6 +204,10 @@ public partial class TabbedPageViewModel : PageViewModel
     private void ActivateTab(TabViewModel? tab)
     {
         DetachActiveChildLoading(ActiveChild);
+        if (ActiveChild is not null)
+        {
+            ActiveChild.IsActive = false;
+        }
 
         if (tab is null)
         {
@@ -216,6 +220,10 @@ public partial class TabbedPageViewModel : PageViewModel
 
         var child = GetOrCreateChild(tab);
         ActiveChild = child;
+        if (child is not null)
+        {
+            child.IsActive = true;
+        }
 
         // The shared search box follows the active tab: it activates for a
         // searchable page (list, dynamic list or parameters) and deactivates

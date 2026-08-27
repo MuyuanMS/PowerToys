@@ -135,7 +135,10 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
         DoOnUiThread(
         () =>
         {
-            WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(this));
+            if (IsActive)
+            {
+                WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(this));
+            }
         });
     }
 
@@ -192,7 +195,10 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
                 DoOnUiThread(
                 () =>
                 {
-                    WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(this));
+                    if (IsActive)
+                    {
+                        WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(this));
+                    }
                 });
 
                 break;
@@ -214,6 +220,11 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
         DoOnUiThread(
             () =>
             {
+                if (!IsActive)
+                {
+                    return;
+                }
+
                 if (HasDetails)
                 {
                     WeakReferenceMessenger.Default.Send<ShowDetailsMessage>(new(Details));
