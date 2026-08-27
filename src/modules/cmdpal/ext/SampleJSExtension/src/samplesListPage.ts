@@ -50,131 +50,131 @@ export class SamplesListPage extends ListPageBase {
 
   override icon = icon('\ue946');
 
-  // These two pages own periodic refresh timers, so they are built once and
-  // reused. Constructing a new instance on every navigation would let a fresh
-  // timer be armed each time the page is opened.
+  // Keep page instances stable so their lifecycle and user-entered state survive
+  // index refreshes and navigation.
   private readonly liveDetailsPage = new SampleLiveDetailsPage();
   private readonly updatingItemsPage = new SampleUpdatingItemsPage();
+  private readonly items: IListItem[] = [
+    new ListItemBase({
+      command: new SampleListPage(),
+      title: 'List Page Sample Command',
+      subtitle: 'Display a list of items',
+    }),
+    new ListItemBase({
+      command: new SampleToastsPage(),
+      title: 'Toast Notification Samples',
+      subtitle: 'Demonstrates CommandResult.ShowToast and lets you send custom toasts',
+    }),
+    new ListItemBase({
+      command: new SampleListPageWithDetails(),
+      title: 'List Page With Details',
+      subtitle: 'A list of items, each with additional details to display',
+    }),
+    new ListItemBase({
+      command: this.liveDetailsPage,
+      title: 'Live Updating Details',
+      subtitle: 'Details pane updates in real time without reselecting',
+    }),
+    new ListItemBase({
+      command: new SectionsIndexPage(),
+      title: 'List Pages With Sections',
+      subtitle: 'A list of items, with sections header',
+    }),
+    new ListItemBase({
+      command: this.updatingItemsPage,
+      title: 'List page with items that change',
+      subtitle: 'The items on the list update themselves in real time',
+    }),
+    new ListItemBase({
+      command: new SampleDynamicListPage(),
+      title: 'Dynamic List Page Command',
+      subtitle: 'Changes the list of items in response to the typed query',
+    }),
+    new ListItemBase({
+      command: new SampleGridsListPage(),
+      title: 'Grid views and galleries',
+      subtitle: 'Displays items as a gallery',
+    }),
+    new ListItemBase({
+      command: new OnLoadPage(),
+      title: 'Demo of OnLoad/OnUnload',
+      subtitle: 'Changes the list of items every time the page is opened / closed',
+    }),
+    new ListItemBase({
+      command: new SampleIconPage(),
+      title: 'Sample Icon Page',
+      subtitle: 'A demo of using icons in various ways',
+    }),
+    new ListItemBase({
+      command: new SlowListPage(),
+      title: 'Slow loading list page',
+      subtitle: 'A demo of a list page that takes a while to load',
+    }),
+    new ListItemBase({
+      command: new SampleSuggestionsPage(),
+      title: 'Sample Prefix Suggestions',
+      subtitle: "A demo of using 'nested' pages to provide 'suggestions' as the user types",
+    }),
+    new ListItemBase({
+      command: new SampleContentPage(),
+      title: 'Sample content page',
+      subtitle: 'Display mixed forms, markdown, and other types of content',
+    }),
+    new ListItemBase({
+      command: new SamplePlainTextContentPage(),
+      title: 'Sample plain text content page',
+      subtitle: 'Display a page of plain text content',
+    }),
+    new ListItemBase({
+      command: new SampleImageContentPage(),
+      title: 'Sample image content page',
+      subtitle: 'Display a page with an image',
+    }),
+    new ListItemBase({
+      command: new SampleTreeContentPage(),
+      title: 'Sample nested content',
+      subtitle: 'Example of nesting a tree of content',
+    }),
+    new ListItemBase({
+      command: new SampleCommentsPage(),
+      title: 'Sample of nested comments',
+      subtitle: 'Demo of using nested trees of content to create a comment thread-like experience',
+      icon: icon('\uE90A'),
+    }),
+    new ListItemBase({
+      command: new SampleMarkdownPage(),
+      title: 'Markdown Page Sample Command',
+      subtitle: 'Display a page of rendered markdown',
+    }),
+    new ListItemBase({
+      command: new SampleMarkdownManyBodies(),
+      title: 'Markdown with multiple blocks',
+      subtitle: 'A page with multiple blocks of rendered markdown',
+    }),
+    new ListItemBase({
+      command: new SampleMarkdownDetails(),
+      title: 'Markdown with details',
+      subtitle: 'A page with markdown and details',
+    }),
+    new ListItemBase({
+      command: new SampleMarkdownImagesPage(),
+      title: 'Markdown with images',
+      subtitle: 'A page with rendered markdown and images',
+      icon: icon('\uee71'),
+    }),
+    new ListItemBase({
+      command: new SampleSettingsPage(),
+      title: 'Sample settings page',
+      subtitle: 'A demo of the settings helpers',
+    }),
+    new ListItemBase({
+      command: new SampleDataTransferPage(),
+      title: 'Clipboard and Drag-and-Drop Demo',
+      subtitle: 'Demonstrates clipboard integration and drag-and-drop functionality',
+    }),
+  ];
 
   override getItems(): IListItem[] {
-    return [
-      new ListItemBase({
-        command: new SampleListPage(),
-        title: 'List Page Sample Command',
-        subtitle: 'Display a list of items',
-      }),
-      new ListItemBase({
-        command: new SampleToastsPage(),
-        title: 'Toast Notification Samples',
-        subtitle: 'Demonstrates CommandResult.ShowToast and lets you send custom toasts',
-      }),
-      new ListItemBase({
-        command: new SampleListPageWithDetails(),
-        title: 'List Page With Details',
-        subtitle: 'A list of items, each with additional details to display',
-      }),
-      new ListItemBase({
-        command: this.liveDetailsPage,
-        title: 'Live Updating Details',
-        subtitle: 'Details pane updates in real time without reselecting',
-      }),
-      new ListItemBase({
-        command: new SectionsIndexPage(),
-        title: 'List Pages With Sections',
-        subtitle: 'A list of items, with sections header',
-      }),
-      new ListItemBase({
-        command: this.updatingItemsPage,
-        title: 'List page with items that change',
-        subtitle: 'The items on the list update themselves in real time',
-      }),
-      new ListItemBase({
-        command: new SampleDynamicListPage(),
-        title: 'Dynamic List Page Command',
-        subtitle: 'Changes the list of items in response to the typed query',
-      }),
-      new ListItemBase({
-        command: new SampleGridsListPage(),
-        title: 'Grid views and galleries',
-        subtitle: 'Displays items as a gallery',
-      }),
-      new ListItemBase({
-        command: new OnLoadPage(),
-        title: 'Demo of OnLoad/OnUnload',
-        subtitle: 'Changes the list of items every time the page is opened / closed',
-      }),
-      new ListItemBase({
-        command: new SampleIconPage(),
-        title: 'Sample Icon Page',
-        subtitle: 'A demo of using icons in various ways',
-      }),
-      new ListItemBase({
-        command: new SlowListPage(),
-        title: 'Slow loading list page',
-        subtitle: 'A demo of a list page that takes a while to load',
-      }),
-      new ListItemBase({
-        command: new SampleSuggestionsPage(),
-        title: 'Sample Prefix Suggestions',
-        subtitle: "A demo of using 'nested' pages to provide 'suggestions' as the user types",
-      }),
-      new ListItemBase({
-        command: new SampleContentPage(),
-        title: 'Sample content page',
-        subtitle: 'Display mixed forms, markdown, and other types of content',
-      }),
-      new ListItemBase({
-        command: new SamplePlainTextContentPage(),
-        title: 'Sample plain text content page',
-        subtitle: 'Display a page of plain text content',
-      }),
-      new ListItemBase({
-        command: new SampleImageContentPage(),
-        title: 'Sample image content page',
-        subtitle: 'Display a page with an image',
-      }),
-      new ListItemBase({
-        command: new SampleTreeContentPage(),
-        title: 'Sample nested content',
-        subtitle: 'Example of nesting a tree of content',
-      }),
-      new ListItemBase({
-        command: new SampleCommentsPage(),
-        title: 'Sample of nested comments',
-        subtitle: 'Demo of using nested trees of content to create a comment thread-like experience',
-        icon: icon('\uE90A'),
-      }),
-      new ListItemBase({
-        command: new SampleMarkdownPage(),
-        title: 'Markdown Page Sample Command',
-        subtitle: 'Display a page of rendered markdown',
-      }),
-      new ListItemBase({
-        command: new SampleMarkdownManyBodies(),
-        title: 'Markdown with multiple blocks',
-        subtitle: 'A page with multiple blocks of rendered markdown',
-      }),
-      new ListItemBase({
-        command: new SampleMarkdownDetails(),
-        title: 'Markdown with details',
-        subtitle: 'A page with markdown and details',
-      }),
-      new ListItemBase({
-        command: new SampleMarkdownImagesPage(),
-        title: 'Markdown with images',
-        subtitle: 'A page with rendered markdown and images',
-        icon: icon('\uee71'),
-      }),
-      new ListItemBase({
-        command: new SampleSettingsPage(),
-        title: 'Sample settings page',
-        subtitle: 'A demo of the settings helpers',
-      }),
-      new ListItemBase({
-        command: new SampleDataTransferPage(),
-        title: 'Clipboard and Drag-and-Drop Demo',
-        subtitle: 'Demonstrates clipboard integration and drag-and-drop functionality',
-      }),
-    ];
+    return this.items;
   }
 }
