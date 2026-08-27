@@ -8,10 +8,10 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CmdPal.UI.ViewModels.Services.JsonRpc;
+using Microsoft.CmdPal.JsonRpc;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
+namespace Microsoft.CmdPal.JsonRpc.UnitTests;
 
 [TestClass]
 public class BoundedStderrReaderTests
@@ -57,8 +57,8 @@ public class BoundedStderrReaderTests
         Assert.AreEqual(1, reader.LinesTruncated);
         StringAssert.Contains(lines[0], "(truncated)");
 
-        // The retained content must be bounded by the per-line cap (which has a 64-byte floor)
-        // regardless of the 5000-byte input size.
+        // The retained content stays within the per-line cap, which has a 64-byte floor, regardless
+        // of the 5000-byte input size.
         Assert.IsTrue(lines[0].Length <= 64 + " ... (truncated)".Length, $"Line length {lines[0].Length} exceeded the cap.");
     }
 

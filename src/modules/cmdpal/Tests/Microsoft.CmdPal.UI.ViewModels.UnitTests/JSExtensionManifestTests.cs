@@ -258,8 +258,8 @@ public class JSExtensionManifestTests
     [TestMethod]
     public void TryParse_AbsoluteEntryPoint_IsInvalid()
     {
-        // Create a real file at an absolute path outside the extension directory so the
-        // rejection is due to the rooted-path rule, not a missing file.
+        // Create a real file outside the extension directory so rejection comes from the rooted-path
+        // rule, not a missing file.
         var outsidePath = Path.Combine(Path.GetTempPath(), $"JSExtensionManifestAbsolute_{Guid.NewGuid():N}.js");
         File.WriteAllText(outsidePath, "// entry point");
         try
@@ -385,6 +385,164 @@ public class JSExtensionManifestTests
 
         Assert.IsTrue(result.IsValid, result.FailureReason);
         Assert.IsNull(result.Manifest!.Publisher);
+    }
+
+    [TestMethod]
+    public void TryParse_WatchPath_ResolvesToWatchDirectory()
+    {
+        CreateEntryPoint("index.js");
+        Directory.CreateDirectory(Path.Combine(_testDirectory, "src"));
+        const string Json = """
+        {
+            "name": "watch-path-sample",
+            "main": "index.js",
+            "cmdpal": { "watchPath": "src" }
+        }
+        """;
+
+        var result = JSExtensionManifest.TryParse(Json, _testDirectory);
+
+        Assert.IsTrue(result.IsValid, result.FailureReason);
+        Assert.AreEqual(Path.Combine(_testDirectory, "src"), result.Manifest!.WatchDirectory);
+    }
+
+    [TestMethod]
+    public void TryParse_NoWatchPath_LeavesWatchDirectoryNull()
+    {
+        CreateEntryPoint("index.js");
+        const string Json = """
+        {
+            "name": "no-watch-path",
+            "main": "index.js",
+            "cmdpal": {}
+        }
+        """;
+
+        var result = JSExtensionManifest.TryParse(Json, _testDirectory);
+
+        Assert.IsTrue(result.IsValid, result.FailureReason);
+        Assert.IsNull(result.Manifest!.WatchDirectory);
+    }
+
+    [TestMethod]
+    public void TryParse_AbsoluteWatchPath_IsInvalid()
+    {
+        CreateEntryPoint("index.js");
+        var outsidePath = Path.Combine(Path.GetTempPath(), $"JSExtensionManifestWatchAbsolute_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(outsidePath);
+        try
+        {
+            var json = $$"""
+            {
+                "name": "absolute-watch-path",
+                "main": "index.js",
+                "cmdpal": { "watchPath": {{System.Text.Json.JsonSerializer.Serialize(outsidePath)}} }
+            }
+            """;
+
+            var result = JSExtensionManifest.TryParse(json, _testDirectory);
+
+            Assert.IsFalse(result.IsValid);
+            StringAssert.Contains(result.FailureReason, "relative path");
+        }
+        finally
+        {
+            Directory.Delete(outsidePath, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public void TryParse_WatchPathEscapingDirectory_IsInvalid()
+    {
+        // Create a real directory one level above the extension directory and try to reach it via "..".
+        var parent = Path.GetDirectoryName(_testDirectory)!;
+        var escapeTarget = Path.Combine(parent, $"JSExtensionManifestWatchEscape_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(escapeTarget);
+        try
+        {
+            CreateEntryPoint("index.js");
+            var relative = "../" + Path.GetFileName(escapeTarget);
+            var json = $$"""
+            {
+                "name": "watch-path-escaping",
+                "main": "index.js",
+                "cmdpal": { "watchPath": {{System.Text.Json.JsonSerializer.Serialize(relative)}} }
+            }
+            """;
+
+            var result = JSExtensionManifest.TryParse(json, _testDirectory);
+
+            Assert.IsFalse(result.IsValid);
+            StringAssert.Contains(result.FailureReason, "escape");
+        }
+        finally
+        {
+            Directory.Delete(escapeTarget, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public void TryParse_WatchPathMissingDirectory_IsInvalid()
+    {
+        CreateEntryPoint("index.js");
+        const string Json = """
+        {
+            "name": "watch-path-missing",
+            "main": "index.js",
+            "cmdpal": { "watchPath": "does-not-exist" }
+        }
+        """;
+
+        var result = JSExtensionManifest.TryParse(Json, _testDirectory);
+
+        Assert.IsFalse(result.IsValid);
+        StringAssert.Contains(result.FailureReason, "does not resolve to an existing directory");
+    }
+
+    [TestMethod]
+    public void TryParse_WatchPathThroughJunction_IsRejected()
+    {
+        // Create a real directory outside the extension directory, then expose it through a junction
+        // inside the extension directory. The path text stays inside the package, but the reparse point
+        // redirects outside it.
+        var outsideDirectory = Path.Combine(Path.GetTempPath(), $"JSExtensionManifestWatchJunctionTarget_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(outsideDirectory);
+
+        var junctionPath = Path.Combine(_testDirectory, "linked-watch");
+        if (!TryCreateJunction(junctionPath, outsideDirectory))
+        {
+            Directory.Delete(outsideDirectory, recursive: true);
+            Assert.Inconclusive("A directory junction could not be created in this environment.");
+            return;
+        }
+
+        try
+        {
+            CreateEntryPoint("index.js");
+            const string Json = """
+            {
+                "name": "watch-path-junction-escape",
+                "main": "index.js",
+                "cmdpal": { "watchPath": "linked-watch" }
+            }
+            """;
+
+            var result = JSExtensionManifest.TryParse(Json, _testDirectory);
+
+            Assert.IsFalse(result.IsValid);
+            StringAssert.Contains(result.FailureReason, "junction");
+        }
+        finally
+        {
+            // Remove the junction reparse point itself before deleting the target so shared cleanup
+            // does not recurse through the junction into the outside tree.
+            if (Directory.Exists(junctionPath))
+            {
+                Directory.Delete(junctionPath, recursive: false);
+            }
+
+            Directory.Delete(outsideDirectory, recursive: true);
+        }
     }
 
     private void CreateEntryPoint(string relativePath)
@@ -515,9 +673,9 @@ public class JSExtensionManifestTests
     [TestMethod]
     public void TryParse_EntryPointThroughJunction_IsRejected()
     {
-        // Create a directory outside the extension dir with a real entry point, then expose it inside
-        // the extension dir through a junction. A lexically-contained path must still be rejected
-        // because it traverses a reparse point that redirects outside the package.
+        // Create a real entry point outside the extension directory, then expose it through a junction
+        // inside the extension directory. The path text stays inside the package, but the reparse point
+        // redirects outside it.
         var outsideDirectory = Path.Combine(Path.GetTempPath(), $"JSExtensionManifestJunctionTarget_{Guid.NewGuid():N}");
         Directory.CreateDirectory(outsideDirectory);
         File.WriteAllText(Path.Combine(outsideDirectory, "index.js"), "// entry point");
@@ -547,8 +705,8 @@ public class JSExtensionManifestTests
         }
         finally
         {
-            // Remove the junction reparse point itself (non-recursive) before deleting the target so
-            // the shared cleanup does not try to recurse through the junction into the outside tree.
+            // Remove the junction reparse point itself before deleting the target so shared cleanup
+            // does not recurse through the junction into the outside tree.
             if (Directory.Exists(junctionPath))
             {
                 Directory.Delete(junctionPath, recursive: false);

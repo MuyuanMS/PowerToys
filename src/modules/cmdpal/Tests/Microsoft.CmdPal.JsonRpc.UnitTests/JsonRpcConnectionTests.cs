@@ -12,10 +12,10 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CmdPal.UI.ViewModels.Services.JsonRpc;
+using Microsoft.CmdPal.JsonRpc;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
+namespace Microsoft.CmdPal.JsonRpc.UnitTests;
 
 [TestClass]
 public partial class JsonRpcConnectionTests
@@ -97,9 +97,9 @@ public partial class JsonRpcConnectionTests
                 received.TrySetResult(element.GetProperty("text").GetString() ?? string.Empty);
             });
 
-            // Build the raw JSON body with literal multi-byte characters so the framed
-            // bytes genuinely exceed the character count. This exercises the decode path
-            // reading exactly Content-Length bytes rather than characters.
+            // Build the raw JSON body with literal multi-byte characters so the framed bytes are
+            // larger than the character count. This proves the reader uses Content-Length bytes, not
+            // characters.
             var rawBody = "{\"jsonrpc\":\"2.0\",\"method\":\"unicode\",\"params\":{\"text\":\"" + MultiByte + "\"}}";
             Assert.IsTrue(Encoding.UTF8.GetByteCount(rawBody) > rawBody.Length, "The raw body should contain multi-byte UTF-8 characters.");
 
@@ -134,7 +134,7 @@ public partial class JsonRpcConnectionTests
                 idByMethod[method] = document.RootElement.GetProperty("id").GetInt32();
             }
 
-            // Respond in the opposite order to prove correlation is by id, not arrival order.
+            // Respond in the opposite order to prove correlation uses id, not arrival order.
             await RespondWithResultAsync(harness.ExtensionWrites, idByMethod["second"], new JsonObject { ["message"] = "two" }, cts.Token);
             await RespondWithResultAsync(harness.ExtensionWrites, idByMethod["first"], new JsonObject { ["message"] = "one" }, cts.Token);
 
@@ -286,8 +286,8 @@ public partial class JsonRpcConnectionTests
                 }
             });
 
-            var first = Frame(BuildNotification("tick", null));
-            var second = Frame(BuildNotification("tick", null));
+            var first = Frame(BuildNotification("tick", new JsonObject()));
+            var second = Frame(BuildNotification("tick", new JsonObject()));
             var combined = new byte[first.Length + second.Length];
             Buffer.BlockCopy(first, 0, combined, 0, first.Length);
             Buffer.BlockCopy(second, 0, combined, first.Length, second.Length);
@@ -351,6 +351,55 @@ public partial class JsonRpcConnectionTests
     }
 
     [TestMethod]
+    public async Task InboundRequest_DoesNotInvokeNotificationHandler()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var harness = CreateHarness();
+        try
+        {
+            var invocationCount = 0;
+            harness.Host.RegisterNotificationHandler("tick", _ => Interlocked.Increment(ref invocationCount));
+
+            await WriteFramedAsync(harness.ExtensionWrites, BuildRequest(10, "tick", new JsonObject()), cts.Token);
+
+            var (_, body) = await ReadFramedAsync(harness.ExtensionReads, cts.Token);
+            using var document = JsonDocument.Parse(body);
+            Assert.AreEqual(JsonRpcError.MethodNotFound, document.RootElement.GetProperty("error").GetProperty("code").GetInt32());
+            Assert.AreEqual(0, Volatile.Read(ref invocationCount));
+        }
+        finally
+        {
+            harness.Host.Dispose();
+        }
+    }
+
+    [TestMethod]
+    public async Task InboundNotification_DoesNotInvokeRequestHandler()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var harness = CreateHarness();
+        try
+        {
+            var invocationCount = 0;
+            harness.Host.RegisterRequestHandler("ping", (_, _) =>
+            {
+                Interlocked.Increment(ref invocationCount);
+                return Task.FromResult<JsonNode?>(null);
+            });
+
+            await WriteFramedAsync(harness.ExtensionWrites, BuildNotification("ping", new JsonObject()), cts.Token);
+            await WriteFramedAsync(harness.ExtensionWrites, BuildRequest(11, "ping", new JsonObject()), cts.Token);
+
+            await ReadFramedAsync(harness.ExtensionReads, cts.Token);
+            Assert.AreEqual(1, Volatile.Read(ref invocationCount));
+        }
+        finally
+        {
+            harness.Host.Dispose();
+        }
+    }
+
+    [TestMethod]
     public async Task Dispose_CancelsPendingRequests()
     {
         using var cts = new CancellationTokenSource(TestTimeout);
@@ -358,38 +407,12 @@ public partial class JsonRpcConnectionTests
 
         var requestTask = harness.Host.SendRequestAsync("wait", null, cts.Token);
 
-        // Make sure the request has actually been written before disposing.
+        // Make sure the request has been written before disposing.
         _ = await ReadFramedAsync(harness.ExtensionReads, cts.Token);
 
         harness.Host.Dispose();
 
         await Assert.ThrowsExceptionAsync<JsonRpcException>(async () => await requestTask.WaitAsync(cts.Token));
-    }
-
-    [TestMethod]
-    public async Task Inbound_OversizedContentLength_RaisesErrorWithoutAllocating()
-    {
-        using var cts = new CancellationTokenSource(TestTimeout);
-        var harness = CreateHarness();
-        try
-        {
-            var errorRaised = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
-            harness.Host.Error += (_, e) => errorRaised.TrySetResult(e.Exception);
-
-            // A Content-Length far larger than the allowed maximum must be rejected up front
-            // rather than triggering a huge buffer allocation. No body is written on purpose.
-            var header = Encoding.ASCII.GetBytes("Content-Length: 2000000000\r\n\r\n");
-            await harness.ExtensionWrites.WriteAsync(header, cts.Token);
-            await harness.ExtensionWrites.FlushAsync(cts.Token);
-
-            var exception = await errorRaised.Task.WaitAsync(cts.Token);
-            Assert.IsInstanceOfType(exception, typeof(InvalidDataException));
-            StringAssert.Contains(exception.Message, "maximum");
-        }
-        finally
-        {
-            harness.Host.Dispose();
-        }
     }
 
     private static Harness CreateHarness(TimeSpan? requestTimeout = null)

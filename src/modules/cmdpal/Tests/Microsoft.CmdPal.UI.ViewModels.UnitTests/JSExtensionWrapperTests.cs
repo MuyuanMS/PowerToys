@@ -4,6 +4,8 @@
 
 using System;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CmdPal.UI.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -119,5 +121,18 @@ public class JSExtensionWrapperTests
     {
         var wrapper = CreateWrapper();
         Assert.IsNull(wrapper.GetExtensionObject());
+    }
+
+    [TestMethod]
+    public async Task StartExtensionAsync_StopsBeforeLaunch_WhenCanceled()
+    {
+        var wrapper = CreateWrapper();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            () => wrapper.StartExtensionAsync(cancellation.Token));
+
+        Assert.IsFalse(wrapper.IsRunning());
     }
 }

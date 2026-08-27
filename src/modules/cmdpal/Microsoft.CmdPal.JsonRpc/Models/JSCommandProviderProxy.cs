@@ -1,0 +1,892 @@
+// Copyright (c) Microsoft Corporation
+// The Microsoft Corporation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using System;
+using System.Collections.Generic;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Threading;
+using ManagedCommon;
+using Microsoft.CmdPal.JsonRpc;
+using Microsoft.CommandPalette.Extensions;
+using Microsoft.CommandPalette.Extensions.Toolkit;
+using Windows.Foundation;
+
+namespace Microsoft.CmdPal.JsonRpc.Models;
+
+/// <summary>
+/// Lets Command Palette treat a Node.js extension as an <see cref="ICommandProvider"/>.
+/// Provider calls go over JSON-RPC. Fallback titles, host status, log messages,
+/// and clipboard requests from the extension are handled here.
+/// </summary>
+public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposable
+{
+    private readonly JsonRpcConnection _connection;
+    private readonly string _fallbackId;
+    private readonly string _fallbackDisplayName;
+    private readonly string? _fallbackIcon;
+
+    // Guards the provider metadata, which is set once from the initialize handshake
+    // after the proxy is constructed (the proxy is created before the handshake so its
+    // notification handlers are registered in time to receive startup notifications).
+    private readonly Lock _metadataLock = new();
+
+    // Host status messages use the statusId minted by the client. That lets an
+    // update refresh the same message and lets hide target the right one.
+    private readonly Dictionary<string, StatusMessage> _shownStatusMessages = new();
+
+    // Guards the host reference, the shown-status bookkeeping, and the buffer of host
+    // actions emitted before the host is attached. Notifications an extension raises
+    // while it activates (during the initialize handshake) arrive before the host is
+    // set; they are buffered here and flushed in order once the host attaches so those
+    // startup logs, statuses, and clipboard requests are not lost.
+    private readonly Lock _hostLock = new();
+    private readonly List<Action<IExtensionHost>> _pendingHostActions = [];
+
+    private JsonElement _providerMetadata;
+
+    // Provider identity carried from the initialize handshake metadata. Each field
+    // falls back to the configured values when the handshake omits it. Guarded by _metadataLock
+    // because SetProviderMetadata can refresh them after the proxy is already in use.
+    private string _id = "unknown";
+    private string _displayName = string.Empty;
+    private IIconInfo _icon = new IconInfo(string.Empty);
+
+    private IExtensionHost? _host;
+    private ICommandSettings? _settingsCache;
+    private bool _settingsQueried;
+    private bool _isDisposed;
+
+    public JSCommandProviderProxy(
+        JsonRpcConnection connection,
+        string fallbackId,
+        string fallbackDisplayName,
+        string? fallbackIcon = null,
+        JsonElement providerMetadata = default)
+    {
+        _connection = connection ?? throw new ArgumentNullException(nameof(connection));
+        ArgumentException.ThrowIfNullOrEmpty(fallbackId);
+        ArgumentNullException.ThrowIfNull(fallbackDisplayName);
+        _fallbackId = fallbackId;
+        _fallbackDisplayName = fallbackDisplayName;
+        _fallbackIcon = fallbackIcon;
+        _providerMetadata = providerMetadata;
+
+        // Apply the identity captured at construction. The proxy is created before the
+        // initialize handshake completes, so this seeds id, display name, and icon from
+        // whatever metadata is available now (or the configured fallback); SetProviderMetadata later
+        // refreshes them with the real handshake values.
+        lock (_metadataLock)
+        {
+            ApplyProviderIdentityLocked(providerMetadata);
+        }
+
+        RegisterNotificationHandlers();
+
+        // Clean up any active host statuses when the extension disconnects or its process
+        // exits, not only when it explicitly hides them. The wrapper also disposes this
+        // proxy during teardown; both paths are idempotent.
+        _connection.Disconnected += OnConnectionDisconnected;
+    }
+
+    public event TypedEventHandler<object, IItemsChangedEventArgs>? ItemsChanged;
+
+    public string Id
+    {
+        get
+        {
+            lock (_metadataLock)
+            {
+                return _id;
+            }
+        }
+    }
+
+    public string DisplayName
+    {
+        get
+        {
+            lock (_metadataLock)
+            {
+                return _displayName;
+            }
+        }
+    }
+
+    public IIconInfo Icon
+    {
+        get
+        {
+            lock (_metadataLock)
+            {
+                return _icon;
+            }
+        }
+    }
+
+    // Whether the provider's top-level command set is fixed. The value is carried
+    // from the initialize handshake metadata; the wire default is true when the
+    // extension does not specify it.
+    public bool Frozen
+    {
+        get
+        {
+            lock (_metadataLock)
+            {
+                return ReadFrozen(_providerMetadata);
+            }
+        }
+    }
+
+    public ICommandSettings? Settings
+    {
+        get
+        {
+            if (_settingsQueried)
+            {
+                return _settingsCache;
+            }
+
+            _settingsQueried = true;
+
+            try
+            {
+                var response = _connection.SendRequestAsync(
+                    "provider/getSettings",
+                    null,
+                    CancellationToken.None).GetAwaiter().GetResult();
+
+                if (response.Error != null ||
+                    !response.Result.HasValue ||
+                    response.Result.Value.ValueKind != JsonValueKind.Object)
+                {
+                    return _settingsCache;
+                }
+
+                var pageId = JSModelMapper.GetString(response.Result.Value, "id") ?? string.Empty;
+                if (!string.IsNullOrEmpty(pageId))
+                {
+                    _settingsCache = new JSCommandSettingsProxy(pageId, _connection, response.Result.Value.Clone());
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogDebug($"Failed to get settings for {DisplayName}: {ex.Message}");
+            }
+
+            return _settingsCache;
+        }
+    }
+
+    public ICommandItem[] TopLevelCommands()
+    {
+        try
+        {
+            var response = _connection.SendRequestAsync(
+                "provider/getTopLevelCommands",
+                null,
+                CancellationToken.None).GetAwaiter().GetResult();
+
+            if (response.Error != null)
+            {
+                Logger.LogError($"TopLevelCommands error: {response.Error.Message}");
+                return [];
+            }
+
+            return ParseCommandItems(response.Result);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Failed to get top-level commands: {ex.Message}");
+            return [];
+        }
+    }
+
+    public IFallbackCommandItem[]? FallbackCommands()
+    {
+        try
+        {
+            var response = _connection.SendRequestAsync(
+                "provider/getFallbackCommands",
+                null,
+                CancellationToken.None).GetAwaiter().GetResult();
+
+            if (response.Error != null)
+            {
+                Logger.LogWarning($"FallbackCommands error: {response.Error.Message}");
+                return null;
+            }
+
+            return ParseFallbackCommandItems(response.Result);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Failed to get fallback commands: {ex.Message}");
+            return null;
+        }
+    }
+
+    public ICommand? GetCommand(string id)
+    {
+        try
+        {
+            var response = _connection.SendRequestAsync(
+                "provider/getCommand",
+                new JsonObject { ["commandId"] = id },
+                CancellationToken.None).GetAwaiter().GetResult();
+
+            if (response.Error != null)
+            {
+                Logger.LogWarning($"GetCommand error for {id}: {response.Error.Message}");
+                return null;
+            }
+
+            if (!response.Result.HasValue || response.Result.Value.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            return JSCommandFactory.CreateCommandFromJson(response.Result.Value, _connection);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Failed to get command {id}: {ex.Message}");
+            return null;
+        }
+    }
+
+    public ICommandItem? GetCommandItem(string id)
+    {
+        try
+        {
+            var response = _connection.SendRequestAsync(
+                "provider/getCommandItem",
+                new JsonObject { ["commandId"] = id },
+                CancellationToken.None).GetAwaiter().GetResult();
+
+            if (response.Error != null)
+            {
+                Logger.LogWarning($"GetCommandItem error for {id}: {response.Error.Message}");
+                return null;
+            }
+
+            if (!response.Result.HasValue || response.Result.Value.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            return new JSCommandItemAdapter(response.Result.Value, _connection);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Failed to get command item {id}: {ex.Message}");
+            return null;
+        }
+    }
+
+    public object[] GetApiExtensionStubs() => [];
+
+    public ICommandItem[]? GetDockBands() => null;
+
+    public void InitializeWithHost(IExtensionHost host)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+
+        lock (_hostLock)
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _host = host;
+
+            // Deliver, in arrival order, the host actions that the extension emitted while
+            // it was activating (before the host was attached), such as startup logs,
+            // statuses, and clipboard requests. Replaying under the lock keeps this delivery
+            // ordered against a concurrent dispose or disconnect so a buffered show cannot
+            // land after teardown has already hidden everything.
+            foreach (var action in _pendingHostActions)
+            {
+                try
+                {
+                    action(host);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"Error flushing buffered host action for {DisplayName}: {ex.Message}");
+                }
+            }
+
+            _pendingHostActions.Clear();
+        }
+
+        Logger.LogDebug($"JSCommandProviderProxy initialized with host for {DisplayName}");
+    }
+
+    /// <summary>
+    /// Sets the provider metadata captured from the initialize handshake so that the
+    /// author-specified <see cref="Frozen"/> value and the handshake identity (id,
+    /// display name, and icon) flow through instead of the wire defaults. Called by the
+    /// extension wrapper after the handshake completes.
+    /// </summary>
+    /// <param name="providerMetadata">The provider metadata returned during initialize.</param>
+    public void SetProviderMetadata(JsonElement providerMetadata)
+    {
+        lock (_metadataLock)
+        {
+            _providerMetadata = providerMetadata;
+            ApplyProviderIdentityLocked(providerMetadata);
+        }
+    }
+
+    /// <summary>
+    /// Runs a host action now when the host is attached, or buffers it in arrival order to
+    /// be replayed once <see cref="InitializeWithHost"/> attaches the host. This keeps
+    /// notifications emitted during activation (before the host is set) from being dropped.
+    /// </summary>
+    private void RunWithHost(Action<IExtensionHost> action)
+    {
+        lock (_hostLock)
+        {
+            RunWithHostLocked(action);
+        }
+    }
+
+    /// <summary>
+    /// Variant of <see cref="RunWithHost"/> that requires <see cref="_hostLock"/> to already
+    /// be held by the caller. Status show and hide handlers call this from inside the same
+    /// lock acquisition that mutates <see cref="_shownStatusMessages"/> so the dictionary
+    /// update and the host dispatch are a single atomic, ordered step. Splitting them across
+    /// two lock acquisitions would let a hide dispatch overtake its pending show.
+    /// </summary>
+    private void RunWithHostLocked(Action<IExtensionHost> action)
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        var host = _host;
+        if (host is null)
+        {
+            _pendingHostActions.Add(action);
+            return;
+        }
+
+        // Invoke the host action while holding the lock so status show and hide calls
+        // run in the same order as their lock acquisition. Host status methods are
+        // fire-and-forget (they return an async operation immediately), so the lock is
+        // held only briefly. This keeps a hide from being reordered ahead of a late
+        // show, and, because Dispose sets _isDisposed under this same lock, keeps a show
+        // from resurrecting status after teardown has hidden everything.
+        action(host);
+    }
+
+    public void Dispose()
+    {
+        lock (_hostLock)
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _isDisposed = true;
+
+            var host = _host;
+            _host = null;
+            _pendingHostActions.Clear();
+            var activeStatuses = new List<StatusMessage>(_shownStatusMessages.Values);
+            _shownStatusMessages.Clear();
+
+            // Hide any status still visible while holding the lock so the hide is ordered
+            // after every show already dispatched and cannot be overtaken by a late show.
+            // Once _isDisposed is set here, RunWithHost is a no-op, so no show can resurrect
+            // status after teardown has hidden it.
+            HideStatuses(host, activeStatuses);
+        }
+
+        _connection.Disconnected -= OnConnectionDisconnected;
+
+        // Detach every notification handler this proxy registered so late
+        // notifications from the connection are no longer routed here. Process
+        // teardown and the protocol dispose request are owned by the extension
+        // service, so this proxy only releases its own subscriptions and host
+        // references. See the W4 coordination note in the remediation report.
+        foreach (var method in RegisteredNotificationMethods)
+        {
+            _connection.UnregisterNotificationHandler(method);
+        }
+    }
+
+    private void OnConnectionDisconnected(object? sender, EventArgs e)
+    {
+        // The extension disconnected or its process exited. Clear any active statuses so
+        // they do not linger in the host UI even though no explicit hide arrived. The
+        // notification handlers stay registered; the connection is gone so they cannot
+        // fire again, and Dispose still unregisters them during full teardown.
+        lock (_hostLock)
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _pendingHostActions.Clear();
+            if (_shownStatusMessages.Count == 0)
+            {
+                return;
+            }
+
+            var host = _host;
+            var activeStatuses = new List<StatusMessage>(_shownStatusMessages.Values);
+            _shownStatusMessages.Clear();
+
+            // Hide under the lock so this teardown hide is ordered against any concurrent
+            // show or dispose and cannot strand or resurrect status.
+            HideStatuses(host, activeStatuses);
+        }
+    }
+
+    private void HideStatuses(IExtensionHost? host, List<StatusMessage> statuses)
+    {
+        if (host is null)
+        {
+            return;
+        }
+
+        foreach (var status in statuses)
+        {
+            try
+            {
+                _ = host.HideStatus(status);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning($"Error hiding status for {DisplayName}: {ex.Message}");
+            }
+        }
+    }
+
+    private static readonly string[] RegisteredNotificationMethods =
+    [
+        "provider/itemsChanged",
+        "command/propChanged",
+        "host/logMessage",
+        "host/showStatus",
+        "host/hideStatus",
+        "host/copyText",
+    ];
+
+    private void RegisterNotificationHandlers()
+    {
+        _connection.RegisterNotificationHandler("provider/itemsChanged", HandleItemsChangedNotification);
+        _connection.RegisterNotificationHandler("command/propChanged", HandleCommandPropChangedNotification);
+        _connection.RegisterNotificationHandler("host/logMessage", HandleLogMessageNotification);
+        _connection.RegisterNotificationHandler("host/showStatus", HandleShowStatusNotification);
+        _connection.RegisterNotificationHandler("host/hideStatus", HandleHideStatusNotification);
+        _connection.RegisterNotificationHandler("host/copyText", HandleCopyTextNotification);
+    }
+
+    private void HandleItemsChangedNotification(JsonElement paramsElement)
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        try
+        {
+            var totalItems = -1;
+            if (paramsElement.ValueKind == JsonValueKind.Object &&
+                paramsElement.TryGetProperty("totalItems", out var totalItemsProp) &&
+                totalItemsProp.ValueKind == JsonValueKind.Number)
+            {
+                totalItems = totalItemsProp.GetInt32();
+            }
+
+            ItemsChanged?.Invoke(this, new ItemsChangedEventArgs(totalItems));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Error handling provider/itemsChanged notification: {ex.Message}");
+        }
+    }
+
+    private void HandleCommandPropChangedNotification(JsonElement paramsElement)
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        try
+        {
+            JSPropertyChangeRegistry.Dispatch(_connection, paramsElement);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Error handling command/propChanged notification: {ex.Message}");
+        }
+    }
+
+    private void HandleLogMessageNotification(JsonElement paramsElement)
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        try
+        {
+            var message = JSModelMapper.GetString(paramsElement, "message");
+            if (message == null)
+            {
+                return;
+            }
+
+            var state = ReadState(paramsElement);
+            switch (state)
+            {
+                case 0:
+                    Logger.LogInfo($"[{DisplayName}] {message}");
+                    break;
+                case 1:
+                    Logger.LogInfo($"[{DisplayName}] {message}");
+                    break;
+                case 2:
+                    Logger.LogWarning($"[{DisplayName}] {message}");
+                    break;
+                case 3:
+                    Logger.LogError($"[{DisplayName}] {message}");
+                    break;
+                default:
+                    Logger.LogInfo($"[{DisplayName}] {message}");
+                    break;
+            }
+
+            var logMessage = new LogMessage { Message = message, State = (MessageState)state };
+            RunWithHost(host => _ = host.LogMessage(logMessage));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Error handling host/logMessage notification: {ex.Message}");
+        }
+    }
+
+    private void HandleShowStatusNotification(JsonElement paramsElement)
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        try
+        {
+            var (message, state) = ReadStatusMessage(paramsElement);
+            if (message.Length == 0)
+            {
+                return;
+            }
+
+            var statusId = ReadStatusId(paramsElement);
+            var progress = ReadProgress(paramsElement);
+            var context = ReadStatusContext(paramsElement);
+
+            StatusMessage statusMessage;
+            lock (_hostLock)
+            {
+                if (_isDisposed)
+                {
+                    return;
+                }
+
+                if (!string.IsNullOrEmpty(statusId) &&
+                    _shownStatusMessages.TryGetValue(statusId, out var existing))
+                {
+                    // Same status shown again: refresh it in place so the host keeps a
+                    // single message rather than stacking duplicates. The buffered or
+                    // already-delivered ShowStatus references this same object.
+                    existing.Message = message;
+                    existing.State = (MessageState)state;
+                    existing.Progress = progress;
+                    return;
+                }
+
+                statusMessage = new StatusMessage
+                {
+                    Message = message,
+                    State = (MessageState)state,
+                    Progress = progress,
+                };
+
+                if (!string.IsNullOrEmpty(statusId))
+                {
+                    _shownStatusMessages[statusId] = statusMessage;
+                }
+
+                // Dispatch inside the same lock acquisition that recorded the status so the
+                // show cannot be reordered behind a hide that arrives immediately after.
+                RunWithHostLocked(host => _ = host.ShowStatus(statusMessage, context));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Error handling host/showStatus notification: {ex.Message}");
+        }
+    }
+
+    private void HandleHideStatusNotification(JsonElement paramsElement)
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        try
+        {
+            var statusId = ReadStatusId(paramsElement);
+            if (string.IsNullOrEmpty(statusId))
+            {
+                return;
+            }
+
+            lock (_hostLock)
+            {
+                if (_isDisposed)
+                {
+                    return;
+                }
+
+                if (!_shownStatusMessages.TryGetValue(statusId, out var existing))
+                {
+                    return;
+                }
+
+                _shownStatusMessages.Remove(statusId);
+
+                // Dispatch inside the same lock acquisition that removed the status so the
+                // hide observes the same ordering as the show that preceded it.
+                RunWithHostLocked(host => _ = host.HideStatus(existing));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Error handling host/hideStatus notification: {ex.Message}");
+        }
+    }
+
+    private void HandleCopyTextNotification(JsonElement paramsElement)
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        try
+        {
+            var text = JSModelMapper.GetString(paramsElement, "text");
+            if (text != null)
+            {
+                ClipboardHelper.SetText(text);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Error handling host/copyText notification: {ex.Message}");
+        }
+    }
+
+    private static int ReadState(JsonElement paramsElement)
+    {
+        if (paramsElement.ValueKind == JsonValueKind.Object &&
+            JSModelMapper.TryGetProperty(paramsElement, "state", out var stateProp) &&
+            stateProp.ValueKind == JsonValueKind.Number)
+        {
+            return stateProp.GetInt32();
+        }
+
+        return 0;
+    }
+
+    private static string ReadStatusId(JsonElement paramsElement)
+    {
+        if (paramsElement.ValueKind == JsonValueKind.Object &&
+            JSModelMapper.TryGetProperty(paramsElement, "statusId", out var idProp) &&
+            idProp.ValueKind == JsonValueKind.String)
+        {
+            return idProp.GetString() ?? string.Empty;
+        }
+
+        return string.Empty;
+    }
+
+    // Maps a status progress payload (indeterminate spinner or a percentage) onto
+    // a toolkit progress state. Returns null when no progress is reported.
+    private static IProgressState? ReadProgress(JsonElement paramsElement)
+    {
+        if (paramsElement.ValueKind != JsonValueKind.Object ||
+            !JSModelMapper.TryGetProperty(paramsElement, "progress", out var progressProp) ||
+            progressProp.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var isIndeterminate =
+            JSModelMapper.TryGetProperty(progressProp, "isIndeterminate", out var indeterminateProp) &&
+            indeterminateProp.ValueKind == JsonValueKind.True;
+
+        var progress = new ProgressState { IsIndeterminate = isIndeterminate };
+
+        if (JSModelMapper.TryGetProperty(progressProp, "progressPercent", out var percentProp) &&
+            percentProp.ValueKind == JsonValueKind.Number &&
+            percentProp.TryGetDouble(out var percent) &&
+            percent >= 0)
+        {
+            progress.ProgressPercent = percent >= uint.MaxValue ? uint.MaxValue : (uint)percent;
+        }
+
+        return progress;
+    }
+
+    // Caller must hold _metadataLock. Applies the provider identity (id, display name,
+    // and icon) from the initialize handshake metadata, falling back to configured values for
+    // any field the handshake omits. Called from the constructor with the metadata passed
+    // at construction and again from SetProviderMetadata when the real handshake completes.
+    private void ApplyProviderIdentityLocked(JsonElement metadata)
+    {
+        _id = ReadHandshakeString(metadata, "id") ?? _fallbackId;
+        _displayName = ReadHandshakeString(metadata, "displayName") ?? _fallbackDisplayName;
+        _icon = ReadHandshakeIcon(metadata) ?? new IconInfo(_fallbackIcon ?? string.Empty);
+    }
+
+    // Reads a string field declared in the initialize handshake metadata. Returns null when absent or empty so the caller
+    // falls back to the manifest value rather than overwriting it with an empty string.
+    private static string? ReadHandshakeString(JsonElement metadata, string name)
+    {
+        if (metadata.ValueKind == JsonValueKind.Object &&
+            JSModelMapper.TryGetProperty(metadata, name, out var prop) &&
+            prop.ValueKind == JsonValueKind.String)
+        {
+            var value = prop.GetString();
+            return string.IsNullOrEmpty(value) ? null : value;
+        }
+
+        return null;
+    }
+
+    // Reads the icon declared in the initialize handshake metadata. Returns null
+    // when the handshake omits an icon so the caller falls back to the manifest
+    // icon rather than replacing it with an empty glyph.
+    private static IIconInfo? ReadHandshakeIcon(JsonElement metadata)
+    {
+        if (metadata.ValueKind == JsonValueKind.Object &&
+            JSModelMapper.TryGetIcon(metadata, "icon", out var icon))
+        {
+            return icon;
+        }
+
+        return null;
+    }
+
+    private static bool ReadFrozen(JsonElement metadata)
+    {
+        if (metadata.ValueKind == JsonValueKind.Object &&
+            JSModelMapper.TryGetProperty(metadata, "frozen", out var frozenProp))
+        {
+            if (frozenProp.ValueKind == JsonValueKind.False)
+            {
+                return false;
+            }
+
+            if (frozenProp.ValueKind == JsonValueKind.True)
+            {
+                return true;
+            }
+        }
+
+        // The wire default when the extension omits the flag is frozen.
+        return true;
+    }
+
+    private static (string Message, int State) ReadStatusMessage(JsonElement paramsElement)
+    {
+        if (paramsElement.ValueKind != JsonValueKind.Object ||
+            !paramsElement.TryGetProperty("message", out var messageProp))
+        {
+            return (string.Empty, 0);
+        }
+
+        if (messageProp.ValueKind == JsonValueKind.String)
+        {
+            return (messageProp.GetString() ?? string.Empty, 0);
+        }
+
+        if (messageProp.ValueKind == JsonValueKind.Object)
+        {
+            var text = JSModelMapper.GetString(messageProp, "message") ?? string.Empty;
+            var state = ReadState(messageProp);
+            return (text, state);
+        }
+
+        return (string.Empty, 0);
+    }
+
+    private static StatusContext ReadStatusContext(JsonElement paramsElement)
+    {
+        if (paramsElement.ValueKind == JsonValueKind.Object &&
+            paramsElement.TryGetProperty("context", out var contextProp))
+        {
+            if (contextProp.ValueKind == JsonValueKind.Number)
+            {
+                return (StatusContext)contextProp.GetInt32();
+            }
+
+            if (contextProp.ValueKind == JsonValueKind.String)
+            {
+                return contextProp.GetString() switch
+                {
+                    "page" => StatusContext.Page,
+                    "extension" => StatusContext.Extension,
+                    _ => StatusContext.Extension,
+                };
+            }
+        }
+
+        return StatusContext.Extension;
+    }
+
+    private ICommandItem[] ParseCommandItems(JsonElement? result)
+    {
+        if (!result.HasValue || result.Value.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var items = new List<ICommandItem>();
+        foreach (var element in result.Value.EnumerateArray())
+        {
+            items.Add(new JSCommandItemAdapter(element, _connection));
+        }
+
+        return items.ToArray();
+    }
+
+    private IFallbackCommandItem[]? ParseFallbackCommandItems(JsonElement? result)
+    {
+        if (!result.HasValue || result.Value.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        var items = new List<IFallbackCommandItem>();
+        foreach (var element in result.Value.EnumerateArray())
+        {
+            items.Add(new JSFallbackCommandItemAdapter(element, _connection));
+        }
+
+        return items.ToArray();
+    }
+}

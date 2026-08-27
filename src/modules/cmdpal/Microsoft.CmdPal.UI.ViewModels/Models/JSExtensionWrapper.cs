@@ -14,8 +14,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using ManagedCommon;
 using Microsoft.CmdPal.Common.Services;
+using Microsoft.CmdPal.JsonRpc;
+using Microsoft.CmdPal.JsonRpc.Models;
 using Microsoft.CmdPal.UI.ViewModels.Services;
-using Microsoft.CmdPal.UI.ViewModels.Services.JsonRpc;
 using Microsoft.CommandPalette.Extensions;
 using Windows.ApplicationModel;
 
@@ -210,7 +211,9 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
         }
     }
 
-    public Task StartExtensionAsync()
+    public Task StartExtensionAsync() => StartExtensionAsync(CancellationToken.None);
+
+    internal Task StartExtensionAsync(CancellationToken cancellationToken)
     {
         lock (_lock)
         {
@@ -226,16 +229,16 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
             // instead of spawning a second Node process. The start body runs on the thread
             // pool so no process is spawned while this lock is held; the task is cleared
             // when it completes so a later restart can start again.
-            _startInProgress ??= Task.Run(RunStartAsync);
+            _startInProgress ??= Task.Run(() => RunStartAsync(cancellationToken), CancellationToken.None);
             return _startInProgress;
         }
     }
 
-    private async Task RunStartAsync()
+    private async Task RunStartAsync(CancellationToken cancellationToken)
     {
         try
         {
-            await StartCoreAsync().ConfigureAwait(false);
+            await StartCoreAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -246,8 +249,10 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
         }
     }
 
-    private async Task StartCoreAsync()
+    private async Task StartCoreAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         lock (_lock)
         {
             // The wrapper may have been disposed, or another start may have completed,
@@ -267,7 +272,7 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
             return;
         }
 
-        // Launch through the Phase 1 SDK bootstrap when it is installed so the bootstrap
+        // Launch through the SDK bootstrap when it is installed so the bootstrap
         // claims stdout for the protocol before the extension entry is dynamically imported.
         // The effective launch command is:
         //   node [--inspect=<port>] "<bootstrap>" "<entry>"
@@ -342,7 +347,11 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
                     // notification handlers are registered in time to receive notifications
                     // (logs, statuses, clipboard requests, items-changed) that the extension
                     // emits while it activates during initialize.
-                    _commandProviderProxy = new JSCommandProviderProxy(connection, _manifest);
+                    _commandProviderProxy = new JSCommandProviderProxy(
+                        connection,
+                        _manifest.Name ?? "unknown",
+                        _manifest.EffectiveDisplayName,
+                        _manifest.Icon);
                 }
             }
 
@@ -358,7 +367,7 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
             var initResponse = await connection.SendRequestAsync(
                 "initialize",
                 new JsonObject { ["extensionId"] = _manifest.Name },
-                CancellationToken.None).ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(false);
 
             if (initResponse.Error is not null)
             {
@@ -390,7 +399,11 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Failed to start JS extension {_manifest.Name}: {ex.Message}");
+            var canceled = ex is OperationCanceledException && cancellationToken.IsCancellationRequested;
+            if (!canceled)
+            {
+                Logger.LogError($"Failed to start JS extension {_manifest.Name}: {ex.Message}");
+            }
 
             try
             {
@@ -405,6 +418,10 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
             }
 
             SignalDispose();
+            if (canceled)
+            {
+                throw;
+            }
         }
     }
 
@@ -440,6 +457,22 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
 
     public void SignalDispose()
     {
+        var (process, connection, proxy) = DetachForDispose();
+        TearDown(process, connection, proxy);
+    }
+
+    public Task SignalDisposeAsync()
+    {
+        var (process, connection, proxy) = DetachForDispose();
+        return process is null && connection is null && proxy is null
+            ? Task.CompletedTask
+            : Task.Run(() => TearDown(process, connection, proxy));
+    }
+
+    public void Dispose() => SignalDispose();
+
+    private (Process? Process, JsonRpcConnection? Connection, JSCommandProviderProxy? Proxy) DetachForDispose()
+    {
         Process? process;
         JsonRpcConnection? connection;
         JSCommandProviderProxy? proxy;
@@ -456,10 +489,8 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
             _commandProviderProxy = null;
         }
 
-        TearDown(process, connection, proxy);
+        return (process, connection, proxy);
     }
-
-    public void Dispose() => SignalDispose();
 
     public IExtension? GetExtensionObject()
     {
@@ -503,7 +534,11 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
                 return null;
             }
 
-            _commandProviderProxy ??= new JSCommandProviderProxy(_connection, _manifest);
+            _commandProviderProxy ??= new JSCommandProviderProxy(
+                _connection,
+                _manifest.Name ?? "unknown",
+                _manifest.EffectiveDisplayName,
+                _manifest.Icon);
             return _commandProviderProxy as T;
         }
     }
@@ -729,7 +764,7 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
     }
 
     /// <summary>
-    /// Resolves the Phase 1 SDK bootstrap loader for an installed extension. The bootstrap
+    /// Resolves the SDK bootstrap loader for an installed extension. The bootstrap
     /// claims and guards stdout before it dynamically imports the extension entry, so a
     /// static top-level stdout write cannot corrupt the JSON-RPC framing. Resolution is
     /// relative to the extension's installed SDK
