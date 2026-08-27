@@ -270,18 +270,20 @@ void PowerPreviewModule::apply_settings(const PowerToysSettings::PowerToyValues&
             continue;
         }
 
+        const bool previous_state = fileExplorerModule.registryChanges.isApplied();
+
         // (Un)Apply registry changes depending on the new setting value
         const bool updated = module_new_state ? fileExplorerModule.registryChanges.apply() : fileExplorerModule.registryChanges.unApply();
 
         if (updated)
         {
             notifyShell = true;
-            Trace::PowerPreviewSettingsUpdated(fileExplorerModule.settingName.c_str(), !*toggle, *toggle, true);
+            Trace::PowerPreviewSettingsUpdated(fileExplorerModule.settingName.c_str(), previous_state, module_new_state, true);
         }
         else
         {
-            Logger::error(L"Couldn't {} file explorer module {} during apply_settings", *toggle ? L"enable " : L"disable", fileExplorerModule.settingName);
-            Trace::PowerPreviewSettingsUpdateFailed(fileExplorerModule.settingName.c_str(), !*toggle, *toggle, true);
+            Logger::error(L"Couldn't {} file explorer module {} during apply_settings", module_new_state ? L"enable " : L"disable", fileExplorerModule.settingName);
+            Trace::PowerPreviewSettingsUpdateFailed(fileExplorerModule.settingName.c_str(), previous_state, module_new_state, true);
         }
     }
     if (notifyShell)

@@ -45,6 +45,9 @@
     <Content Include="$(RepoRoot)src\modules\previewpane\UnitTests-StlThumbnailProvider\HelperFiles\sample.stl" Link="TestAssets\sample.stl">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="$(RepoRoot)src\modules\previewpane\UnitTests-ThreeMfThumbnailProvider\HelperFiles\sample.3mf" Link="TestAssets\sample.3mf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="$(RepoRoot)src\runner\main.cpp" Link="TestAssets\main.cpp">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

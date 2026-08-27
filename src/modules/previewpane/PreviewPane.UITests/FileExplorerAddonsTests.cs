@@ -32,6 +32,7 @@ public class FileExplorerAddonsTests : UITestBase
     private const string PdfThumbnailProvider = "{D8BB9942-93BD-412D-87E4-33FAB214DC1A}";
     private const string GcodeThumbnailProvider = "{F2847CBE-CD03-4C83-A359-1A8052C1B9D5}";
     private const string StlThumbnailProvider = "{77257004-6F25-4521-B602-50ECC6EC62A6}";
+    private const string ThreeMfThumbnailProvider = "{A96A6F91-B58D-4715-9E19-085D934D60C9}";
 
     private const int ExplorerTimeoutMS = 30_000;
     private const int ExplorerOpenAttempts = 3;
@@ -52,6 +53,7 @@ public class FileExplorerAddonsTests : UITestBase
         (".pdf", PdfThumbnailProvider),
         (".gcode", GcodeThumbnailProvider),
         (".stl", StlThumbnailProvider),
+        (".3mf", ThreeMfThumbnailProvider),
     };
 
     private static readonly object ExplorerPreparationLock = new();
@@ -274,6 +276,19 @@ public class FileExplorerAddonsTests : UITestBase
             "sample.stl",
             "PowerToys.StlThumbnailProvider",
             "stl");
+    }
+
+    [TestMethod("FileExplorerAddons.Thumbnail.ThreeMf")]
+    [TestCategory("File Explorer Add-ons")]
+    [TestCategory("Icon Preview")]
+    public void ThreeMfThumbnailRendersAtMultipleIconSizes()
+    {
+        TestThumbnail(
+            ".3mf",
+            ThreeMfThumbnailProvider,
+            "sample.3mf",
+            "PowerToys.ThreeMfThumbnailProvider",
+            "3mf");
     }
 
     private void TestPreview(
