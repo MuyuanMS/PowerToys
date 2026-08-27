@@ -73,7 +73,7 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
         }
         catch (Exception)
         {
-            return false;
+            return true;
         }
     }
 
@@ -210,18 +210,15 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
             {
                 if (!activeFileNames.Contains(Path.GetFileName(path)))
                 {
-                    try
-                    {
-                        File.Delete(path);
-                    }
-                    catch (IOException ex)
-                    {
-                        TryLogMessage($"Failed to remove cached clipboard image: {ex.Message}");
-                    }
-                    catch (UnauthorizedAccessException ex)
-                    {
-                        TryLogMessage($"Failed to remove cached clipboard image: {ex.Message}");
-                    }
+                    DeleteCachedImage(path);
+                }
+            }
+
+            foreach (var path in Directory.EnumerateFiles(directory, "*.png.tmp"))
+            {
+                if (File.GetLastWriteTimeUtc(path) < DateTime.UtcNow - TimeSpan.FromMinutes(5))
+                {
+                    DeleteCachedImage(path);
                 }
             }
         }
@@ -232,6 +229,22 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
         catch (UnauthorizedAccessException ex)
         {
             TryLogMessage($"Failed to enumerate cached clipboard images: {ex.Message}");
+        }
+    }
+
+    private static void DeleteCachedImage(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (IOException ex)
+        {
+            TryLogMessage($"Failed to remove cached clipboard image: {ex.Message}");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            TryLogMessage($"Failed to remove cached clipboard image: {ex.Message}");
         }
     }
 
