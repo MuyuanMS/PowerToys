@@ -315,10 +315,20 @@ function Get-EquivalentCommitSet {
         [Parameter(Mandatory)][string]$Head
     )
 
+    $upstreamPatchIds = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($sha in @(Invoke-Git rev-list $Upstream)) {
+        $patchId = Get-PatchId -Sha ([string]$sha).Trim()
+        if ($patchId) {
+            [void]$upstreamPatchIds.Add($patchId)
+        }
+    }
+
     $set = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach ($line in @(Invoke-Git cherry $Upstream $Head)) {
-        if ([string]$line -match "^-\s+([0-9a-fA-F]{40})$") {
-            [void]$set.Add($matches[1])
+    foreach ($sha in @(Invoke-Git rev-list $Head)) {
+        $commitSha = ([string]$sha).Trim()
+        $patchId = Get-PatchId -Sha $commitSha
+        if ($patchId -and $upstreamPatchIds.Contains($patchId)) {
+            [void]$set.Add($commitSha)
         }
     }
     return ,$set
