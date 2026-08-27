@@ -189,10 +189,12 @@ namespace ViewModelTests
         public void ThreeMfThumbnailIsEnabledShouldPrevHandlerWhenSuccessful()
         {
             // Assert
+            var callbackInvoked = false;
             Func<string, int> sendMockIPCConfigMSG = msg =>
             {
                 SndModuleSettings<SndPowerPreviewSettings> snd = JsonSerializer.Deserialize<SndModuleSettings<SndPowerPreviewSettings>>(msg);
-                Assert.IsTrue(snd.PowertoysSetting.FileExplorerPreviewSettings.Properties.EnableThreeMfThumbnail);
+                callbackInvoked = true;
+                Assert.IsFalse(snd.PowertoysSetting.FileExplorerPreviewSettings.Properties.EnableThreeMfThumbnail);
                 return 0;
             };
 
@@ -200,7 +202,8 @@ namespace ViewModelTests
             PowerPreviewViewModel viewModel = new PowerPreviewViewModel(SettingsRepository<PowerPreviewSettings>.GetInstance(mockPowerPreviewSettingsUtils.Object), SettingsRepository<GeneralSettings>.GetInstance(mockGeneralSettingsUtils.Object), sendMockIPCConfigMSG, PowerPreviewSettings.ModuleName);
 
             // act
-            viewModel.ThreeMfThumbnailIsEnabled = true;
+            viewModel.ThreeMfThumbnailIsEnabled = false;
+            Assert.IsTrue(callbackInvoked);
         }
 
         [TestMethod]

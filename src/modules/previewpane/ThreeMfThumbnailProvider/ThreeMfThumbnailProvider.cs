@@ -125,13 +125,12 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                     OversamplingMultiplier = 1,
                 };
 
-                var bitmapStream = new MemoryStream();
-
+                using var bitmapStream = new MemoryStream();
                 bitmapExporter.Export(viewport, bitmapStream);
-
                 bitmapStream.Position = 0;
 
-                thumbnail = new Bitmap(bitmapStream);
+                using var exportedBitmap = new Bitmap(bitmapStream);
+                thumbnail = new Bitmap(exportedBitmap);
                 return ResizeImage(thumbnail, cx);
             }
             catch (Exception)
