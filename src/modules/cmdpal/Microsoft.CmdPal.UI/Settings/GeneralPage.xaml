@@ -114,7 +114,6 @@
                     <controls:SettingsCard x:Uid="Settings_GeneralPage_HighlightSearch_SettingsCard" HeaderIcon="{ui:FontIcon Glyph=&#xE933;}">
                         <ToggleSwitch AutomationProperties.AutomationId="CmdPal_GeneralPage_HighlightSearch" IsOn="{x:Bind viewModel.HighlightSearchOnActivate, Mode=TwoWay}" />
                     </controls:SettingsCard>
-
                     <!--  'Behavior' section  -->
 
                     <TextBlock x:Uid="Settings_GeneralPage_AppBehaviorSettingsHeader" Style="{StaticResource SettingsSectionHeaderTextBlockStyle}" />

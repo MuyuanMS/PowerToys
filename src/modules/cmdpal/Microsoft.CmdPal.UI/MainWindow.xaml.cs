@@ -137,7 +137,6 @@ public sealed partial class MainWindow : WindowEx,
     {
         _protocolActivation = App.Current.Services.GetRequiredService<ICmdPalProtocolActivation>();
         _monitorService = App.Current.Services.GetRequiredService<ViewModels.Models.IMonitorService>();
-
         InitializeComponent();
 
         ViewModel = App.Current.Services.GetService<MainWindowViewModel>()!;
@@ -1701,6 +1700,10 @@ public sealed partial class MainWindow : WindowEx,
     {
         switch (uMsg)
         {
+            case PInvoke.WM_DISPLAYCHANGE:
+                _monitorService.NotifyMonitorsChanged();
+                break;
+
             // Prevent the window from maximizing when double-clicking the title bar area
             case PInvoke.WM_NCLBUTTONDBLCLK:
                 return (LRESULT)IntPtr.Zero;

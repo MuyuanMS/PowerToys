@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using ManagedCommon;
 using Microsoft.CmdPal.Common.Services;
@@ -21,7 +22,7 @@ namespace Microsoft.CmdPal.UI;
 // https://github.com/microsoft/WindowsAppSDK-Samples/tree/main/Samples/AppLifecycle/Instancing/cs2/cs-winui-packaged/CsWinUiDesktopInstancing
 internal sealed class Program
 {
-    private static readonly Queue<AppActivationArguments> PendingActivations = [];
+    private static readonly ConcurrentQueue<AppActivationArguments> PendingActivations = [];
 
     private static DispatcherQueueSynchronizationContext? uiContext;
     private static App? app;
