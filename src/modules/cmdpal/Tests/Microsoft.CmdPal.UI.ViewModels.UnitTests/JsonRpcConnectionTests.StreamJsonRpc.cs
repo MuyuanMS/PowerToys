@@ -131,6 +131,36 @@ public partial class JsonRpcConnectionTests
     }
 
     [TestMethod]
+    public async Task ConcurrentRegistrations_ForSameMethod_DoNotDuplicateRpcRegistration()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var harness = CreateHarness();
+        const int RegistrationCount = 64;
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registrations = new Task[RegistrationCount];
+
+        try
+        {
+            for (var i = 0; i < registrations.Length; i++)
+            {
+                registrations[i] = Task.Run(async () =>
+                {
+                    await start.Task.ConfigureAwait(false);
+                    harness.Host.RegisterNotificationHandler("concurrent", _ => { });
+                });
+            }
+
+            start.TrySetResult();
+            await Task.WhenAll(registrations).WaitAsync(cts.Token);
+        }
+        finally
+        {
+            start.TrySetResult();
+            harness.Host.Dispose();
+        }
+    }
+
+    [TestMethod]
     public async Task SlowNotificationHandler_DoesNotBlockFrameReading()
     {
         using var cts = new CancellationTokenSource(TestTimeout);
