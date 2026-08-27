@@ -15,6 +15,7 @@ namespace Microsoft.CmdPal.UI.ViewModels.Models;
 public sealed record JSExtensionManifest
 {
     private const long MaxManifestBytes = 1024 * 1024;
+
     /// <summary>
     /// Gets the extension identifier (package.json "name").
     /// </summary>
