@@ -217,9 +217,9 @@ internal sealed partial class ExternalCommandLinkPresenter : IExternalCommandLin
         var content = new StackPanel { Spacing = 12 };
         var requestDescription = request.IsReload
             ? _reloadConsentDescription
-            : request.ListPageOptions is null
-                ? _commandConsentDescription
-                : _pageConsentDescription;
+            : request.IsPage
+                ? _pageConsentDescription
+                : _commandConsentDescription;
         content.Children.Add(CreateConsentText(requestDescription));
 
         var preview = new CommandPreviewBox();
