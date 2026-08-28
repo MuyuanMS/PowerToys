@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.IO.Enumeration;
@@ -49,9 +50,7 @@ namespace Peek.FilePreviewer.Previewers
         {
             FolderEnumerationOptions = new()
             {
-                RecurseSubdirectories = true,
                 AttributesToSkip = FileAttributes.ReparsePoint,
-                IgnoreInaccessible = true,
             };
         }
 
@@ -154,45 +153,55 @@ namespace Peek.FilePreviewer.Previewers
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             TimeSpan nextUpdate = updateInterval;
 
-            try
+            var directories = new Stack<string>();
+            directories.Push(path);
+
+            while (directories.Count > 0)
             {
-                var enumerable = new FileSystemEnumerable<(long Length, bool IsDirectory)>(
-                    path,
-                    (ref FileSystemEntry entry) => (entry.Length, entry.IsDirectory),
-                    FolderEnumerationOptions);
+                cancellationToken.ThrowIfCancellationRequested();
+                string directoryPath = directories.Pop();
 
-                foreach (var (length, isDirectory) in enumerable)
+                try
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    var enumerable = new FileSystemEnumerable<(long Length, bool IsDirectory, string FullPath)>(
+                        directoryPath,
+                        (ref FileSystemEntry entry) => (entry.Length, entry.IsDirectory, entry.ToFullPath()),
+                        FolderEnumerationOptions);
 
-                    if (isDirectory)
+                    foreach (var (length, isDirectory, fullPath) in enumerable)
                     {
-                        directoryCount++;
-                    }
-                    else
-                    {
-                        fileCount++;
-                        if (length > 0)
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        if (isDirectory)
                         {
-                            folderSize += (ulong)length;
+                            directoryCount++;
+                            directories.Push(fullPath);
+                        }
+                        else
+                        {
+                            fileCount++;
+                            if (length > 0)
+                            {
+                                folderSize += (ulong)length;
+                            }
+                        }
+
+                        if (stopwatch.Elapsed >= nextUpdate)
+                        {
+                            progress.Report(new FolderScanProgress(folderSize, fileCount, directoryCount, FolderScanState.Scanning));
+                            nextUpdate = stopwatch.Elapsed + updateInterval;
                         }
                     }
-
-                    if (stopwatch.Elapsed >= nextUpdate)
-                    {
-                        progress.Report(new FolderScanProgress(folderSize, fileCount, directoryCount, FolderScanState.Scanning));
-                        nextUpdate = stopwatch.Elapsed + updateInterval;
-                    }
                 }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception)
-            {
-                hadError = true;
-                Logger.LogDebug("Error calculating folder size for directory: " + path);
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    hadError = true;
+                    Logger.LogDebug($"Error calculating folder size for directory: {directoryPath}. {ex.Message}");
+                }
             }
 
             var finalState = hadError ? FolderScanState.PartialError : FolderScanState.Completed;

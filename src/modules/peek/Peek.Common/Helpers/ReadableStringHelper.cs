@@ -79,15 +79,22 @@ namespace Peek.Common.Helpers
                 ? resourceLoader.GetString("UnsupportedFile_FolderDirectoryCount_Single")
                 : string.Format(CultureInfo.CurrentCulture, resourceLoader.GetString("UnsupportedFile_FolderDirectoryCount_Plural"), directories);
 
-            string result = $"{formattedFiles}, {formattedDirectories}";
-
             if (isPartial)
             {
                 string incomplete = resourceLoader.GetString("UnsupportedFile_FolderContains_Incomplete");
-                result += $" ({incomplete})";
+                return string.Format(
+                    CultureInfo.CurrentCulture,
+                    resourceLoader.GetString("UnsupportedFile_FolderContains_Partial"),
+                    formattedFiles,
+                    formattedDirectories,
+                    incomplete);
             }
 
-            return result;
+            return string.Format(
+                CultureInfo.CurrentCulture,
+                resourceLoader.GetString("UnsupportedFile_FolderContains_Complete"),
+                formattedFiles,
+                formattedDirectories);
         }
 
         public static int GetPrecision(int index, double number)

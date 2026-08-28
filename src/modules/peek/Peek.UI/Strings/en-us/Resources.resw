@@ -177,6 +177,14 @@
     <value>incomplete</value>
     <comment>Short tag appended to folder contents when enumeration encounters an error.</comment>
   </data>
+  <data name="UnsupportedFile_FolderContains_Complete" xml:space="preserve">
+    <value>{0}, {1}</value>
+    <comment>Folder contents summary. 0: formatted file count. 1: formatted folder count.</comment>
+  </data>
+  <data name="UnsupportedFile_FolderContains_Partial" xml:space="preserve">
+    <value>{0}, {1} ({2})</value>
+    <comment>Incomplete folder contents summary. 0: formatted file count. 1: formatted folder count. 2: incomplete marker.</comment>
+  </data>
   <data name="UnsupportedFile_DateModified" xml:space="preserve">
     <value>Date Modified: {0}</value>
     <comment>Date Modified label for the unsupported files view. {0} is the date.</comment>
