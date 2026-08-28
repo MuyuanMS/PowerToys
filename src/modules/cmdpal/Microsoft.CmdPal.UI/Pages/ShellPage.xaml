@@ -188,7 +188,8 @@
                 FormTemplate="{StaticResource DetailsFormContentTemplate}"
                 ImageTemplate="{StaticResource DetailsImageContentTemplate}"
                 MarkdownTemplate="{StaticResource DetailsMarkdownContentTemplate}"
-                PlainTextTemplate="{StaticResource DetailsPlainTextContentTemplate}" />
+                PlainTextTemplate="{StaticResource DetailsPlainTextContentTemplate}"
+                TreeTemplate="{StaticResource DetailsTreeContentTemplate}" />
 
             <DataTemplate x:Key="DetailsFormContentTemplate" x:DataType="viewModels:ContentFormViewModel">
                 <cpcontrols:ContentFormControl ViewModel="{x:Bind}" />
@@ -211,6 +212,40 @@
 
             <DataTemplate x:Key="DetailsImageContentTemplate" x:DataType="viewModels:ContentImageViewModel">
                 <extViews:ImageContentViewer DataContext="{x:Bind}" />
+            </DataTemplate>
+
+            <DataTemplate x:Key="NestedDetailsFormContentTemplate" x:DataType="viewModels:ContentFormViewModel">
+                <cpcontrols:ContentFormControl ViewModel="{x:Bind}" />
+            </DataTemplate>
+
+            <DataTemplate x:Key="NestedDetailsMarkdownContentTemplate" x:DataType="viewModels:ContentMarkdownViewModel">
+                <tkcontrols:MarkdownTextBlock Config="{StaticResource DefaultMarkdownConfig}" Text="{x:Bind Body, Mode=OneWay}" />
+            </DataTemplate>
+
+            <DataTemplate x:Key="DetailsTreeContentTemplate" x:DataType="viewModels:ContentTreeViewModel">
+                <StackPanel Orientation="Vertical">
+                    <ItemsRepeater
+                        VerticalAlignment="Stretch"
+                        ItemTemplate="{StaticResource DetailsContentTemplateSelector}"
+                        ItemsSource="{x:Bind Root, Mode=OneWay}"
+                        Layout="{StaticResource DetailsContentLayout}" />
+
+                    <ItemsRepeater
+                        Margin="8,8,0,0"
+                        VerticalAlignment="Stretch"
+                        ItemsSource="{x:Bind Children, Mode=OneWay}"
+                        Layout="{StaticResource DetailsContentLayout}"
+                        Visibility="{x:Bind HasChildren, Mode=OneWay}">
+                        <ItemsRepeater.ItemTemplate>
+                            <cmdpalUI:ContentTemplateSelector
+                                FormTemplate="{StaticResource NestedDetailsFormContentTemplate}"
+                                ImageTemplate="{StaticResource DetailsImageContentTemplate}"
+                                MarkdownTemplate="{StaticResource NestedDetailsMarkdownContentTemplate}"
+                                PlainTextTemplate="{StaticResource DetailsPlainTextContentTemplate}"
+                                TreeTemplate="{StaticResource DetailsTreeContentTemplate}" />
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+                </StackPanel>
             </DataTemplate>
         </ResourceDictionary>
     </Page.Resources>
@@ -530,7 +565,8 @@
                             IsTabStop="False"
                             ItemTemplate="{StaticResource DetailsContentTemplateSelector}"
                             ItemsSource="{x:Bind ViewModel.Details.Content, Mode=OneWay}"
-                            Layout="{StaticResource DetailsContentLayout}" />
+                            Layout="{StaticResource DetailsContentLayout}"
+                            Visibility="{x:Bind ViewModel.Details.HasContent, Mode=OneWay}" />
 
                         <ItemsRepeater
                             Grid.Row="4"
