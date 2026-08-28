@@ -82,6 +82,9 @@ public class IconPathConverterTests
         using var glyph = IconPathConverter.PreparedIcon.FromGlyph("\uE700", "Segoe Fluent Icons", targetSize: 20);
         Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(glyph));
 
+        using var svgData = IconPathConverter.PreparedIcon.FromSvgData([], targetSize: 20);
+        Assert.IsTrue(IconPathConverter.RequiresAsynchronousMaterialization(svgData));
+
         using var emptyBinary = IconPathConverter.PreparedIcon.FromBinary(null);
         Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(emptyBinary));
 
@@ -112,7 +115,6 @@ public class IconPathConverterTests
             null,
             20,
             ElementTheme.Dark);
-        Assert.AreEqual(IconPathConverter.PreparedIconKind.Empty, prepared.Kind);
         Assert.AreEqual(IconPathConverter.PreparedIconKind.Empty, prepared.Kind);
     }
 }
