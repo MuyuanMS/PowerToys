@@ -24,6 +24,7 @@ internal sealed class IconLoadDiagnosticsSession
     private readonly object _stopLock = new();
     private readonly object _queueDemandLock = new();
     private readonly DateTimeOffset _startedUtc = DateTimeOffset.UtcNow;
+    private readonly bool _retainCompletedLoadDemandStates;
     private readonly long _startedAt = Stopwatch.GetTimestamp();
     private readonly long[] _requestStatuses = new long[Enum.GetValues<IconRequestStatus>().Length];
     private readonly long[] _providerResolutions = new long[Enum.GetValues<IconProviderResolution>().Length];
@@ -126,9 +127,13 @@ internal sealed class IconLoadDiagnosticsSession
 
     public long Id { get; }
 
-    internal IconLoadDiagnosticsSession(long id, DispatcherQueue? dispatcherQueue = null)
+    internal IconLoadDiagnosticsSession(
+        long id,
+        DispatcherQueue? dispatcherQueue = null,
+        bool retainCompletedLoadDemandStates = true)
     {
         Id = id;
+        _retainCompletedLoadDemandStates = retainCompletedLoadDemandStates;
         _processCpuStartedTicks = GetProcessCpuTicks();
         _managedAllocatedBytesStarted = GC.GetTotalAllocatedBytes(precise: false);
         _gcPauseStartedTicks = GC.GetTotalPauseDuration().Ticks;
@@ -527,6 +532,10 @@ internal sealed class IconLoadDiagnosticsSession
         if (_loadDemandStates.TryGetValue(loadId, out var demandState))
         {
             demandState.MarkRejected();
+            if (!_retainCompletedLoadDemandStates)
+            {
+                _loadDemandStates.TryRemove(loadId, out _);
+            }
         }
 
         IconLoadEventSource.Log.LoadRejected(Id, loadId);
@@ -774,6 +783,11 @@ internal sealed class IconLoadDiagnosticsSession
                 Id,
                 loadId,
                 ToMicroseconds(demandResult.WithoutRequesterElapsedTicks));
+        }
+
+        if (!_retainCompletedLoadDemandStates)
+        {
+            _loadDemandStates.TryRemove(loadId, out _);
         }
     }
 
