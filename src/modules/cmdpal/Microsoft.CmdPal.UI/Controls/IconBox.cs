@@ -429,7 +429,7 @@ public partial class IconBox : ContentControl
                 ? iconBox._lastScale
                 : (iconBox.XamlRoot?.RasterizationScale > 0 ? iconBox.XamlRoot.RasterizationScale : 1.0);
 
-            diagnostics = IconLoadDiagnostics.IsRecording
+            diagnostics = IconLoadDiagnostics.IsEnabled
                 ? IconLoadDiagnostics.BeginRequest(reason, scale, iconBox.GetDiagnosticOrigin())
                 : default;
             iconBox.TrackActiveRequest(requestVersion, diagnostics);

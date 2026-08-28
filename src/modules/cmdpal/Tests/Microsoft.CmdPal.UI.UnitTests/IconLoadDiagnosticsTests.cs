@@ -740,6 +740,7 @@ public class IconLoadDiagnosticsTests
         using (var listener = new EnablingEventListener())
         {
             Assert.IsFalse(IconLoadDiagnostics.IsRecording);
+            Assert.IsTrue(IconLoadDiagnostics.IsEnabled);
             Assert.IsNull(IconLoadDiagnostics.ActiveSessionId);
 
             var request = IconLoadDiagnostics.BeginRequest(IconRequestReason.SourceChanged, 1.0);
