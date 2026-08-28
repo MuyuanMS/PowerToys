@@ -51,7 +51,7 @@ internal static class SvgFileTextReader
     {
         encoding = Encoding.UTF8;
 
-        // StreamReader handles BOMs. These signatures cover BOM-less UTF-16 and
+        // StreamReader handles byte-order marks. These signatures cover BOM-less UTF-16 and
         // UTF-32, whose zero bytes prevent reading the declaration as ASCII.
         if (prefix.Length >= 4)
         {
