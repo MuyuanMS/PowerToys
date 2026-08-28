@@ -73,35 +73,40 @@ public partial class DetailsViewModelTests
         }
     }
 
-    private static WeakReference<IPageContext> CreatePageContext()
+    private sealed record PageContextFixture(TestPageContext Context, WeakReference<IPageContext> Reference);
+
+    private static PageContextFixture CreatePageContext()
     {
         var ctx = new TestPageContext();
-        return new WeakReference<IPageContext>(ctx);
+        return new(ctx, new WeakReference<IPageContext>(ctx));
     }
 
-    private static WeakReference<IPageContext> CreatePageContext(TaskScheduler scheduler)
+    private static PageContextFixture CreatePageContext(TaskScheduler scheduler)
     {
         var ctx = new TestPageContext { Scheduler = scheduler };
-        return new WeakReference<IPageContext>(ctx);
+        return new(ctx, new WeakReference<IPageContext>(ctx));
     }
 
     [TestMethod]
     public void InitializeProperties_SetsBodyAndTitle()
     {
         var details = new Details { Title = "Hello", Body = "World" };
-        var vm = new DetailsViewModel(details, CreatePageContext());
+        var context = CreatePageContext();
+        var vm = new DetailsViewModel(details, context.Reference);
 
         vm.InitializeProperties();
 
         Assert.AreEqual("Hello", vm.Title);
         Assert.AreEqual("World", vm.Body);
+        GC.KeepAlive(context.Context);
     }
 
     [TestMethod]
     public void PropChanged_Body_UpdatesViewModelProperty()
     {
         var details = new Details { Title = "Initial", Body = "Initial body" };
-        var vm = new DetailsViewModel(details, CreatePageContext());
+        var context = CreatePageContext();
+        var vm = new DetailsViewModel(details, context.Reference);
         vm.InitializeProperties();
 
         // Act — toolkit Details raises PropChanged synchronously on set
@@ -112,19 +117,22 @@ public partial class DetailsViewModelTests
         vm.ApplyPendingUpdates();
 
         Assert.AreEqual("Updated body", vm.Body);
+        GC.KeepAlive(context.Context);
     }
 
     [TestMethod]
     public void PropChanged_Title_UpdatesViewModelProperty()
     {
         var details = new Details { Title = "Original", Body = "Text" };
-        var vm = new DetailsViewModel(details, CreatePageContext());
+        var context = CreatePageContext();
+        var vm = new DetailsViewModel(details, context.Reference);
         vm.InitializeProperties();
 
         details.Title = "New Title";
         vm.ApplyPendingUpdates();
 
         Assert.AreEqual("New Title", vm.Title);
+        GC.KeepAlive(context.Context);
     }
 
     [TestMethod]
@@ -136,7 +144,8 @@ public partial class DetailsViewModelTests
             Body = "B",
             Metadata = [],
         };
-        var vm = new DetailsViewModel(details, CreatePageContext());
+        var context = CreatePageContext();
+        var vm = new DetailsViewModel(details, context.Reference);
         vm.InitializeProperties();
         Assert.AreEqual(0, vm.Metadata.Count);
 
@@ -145,6 +154,7 @@ public partial class DetailsViewModelTests
         vm.ApplyPendingUpdates();
 
         Assert.AreEqual(1, vm.Metadata.Count);
+        GC.KeepAlive(context.Context);
     }
 
     [TestMethod]
@@ -159,7 +169,8 @@ public partial class DetailsViewModelTests
                 new TreeContent { RootContent = new MarkdownContent { Body = "Root" } },
             ],
         };
-        var vm = new DetailsViewModel(details, CreatePageContext());
+        var context = CreatePageContext();
+        var vm = new DetailsViewModel(details, context.Reference);
 
         vm.InitializeProperties();
 
@@ -168,6 +179,7 @@ public partial class DetailsViewModelTests
         Assert.IsInstanceOfType<ContentMarkdownViewModel>(vm.Content[0]);
         Assert.IsInstanceOfType<ContentPlainTextViewModel>(vm.Content[1]);
         Assert.IsInstanceOfType<ContentTreeViewModel>(vm.Content[2]);
+        GC.KeepAlive(context.Context);
     }
 
     [TestMethod]
@@ -177,7 +189,8 @@ public partial class DetailsViewModelTests
         var first = new MarkdownContent { Body = "First" };
         var second = new PlainTextContent { Text = "Second" };
         var details = new Details { Content = [first] };
-        var vm = new DetailsViewModel(details, CreatePageContext(scheduler));
+        var context = CreatePageContext(scheduler);
+        var vm = new DetailsViewModel(details, context.Reference);
 
         vm.InitializeProperties();
         scheduler.ExecuteUntil(() => vm.Content.Count == 1);
@@ -190,6 +203,48 @@ public partial class DetailsViewModelTests
         scheduler.ExecuteUntil(() => vm.Content.Count == 1 && vm.Content[0] is ContentPlainTextViewModel);
 
         Assert.IsTrue(vm.HasContent);
+        GC.KeepAlive(context.Context);
+    }
+
+    [TestMethod]
+    public void ConcurrentItemsChanged_IgnoresStaleContentRebuild()
+    {
+        using var slowGetContentStarted = new ManualResetEventSlim();
+        using var releaseSlowGetContent = new ManualResetEventSlim();
+        var scheduler = new QueuedTaskScheduler();
+        var first = new MarkdownContent { Body = "First" };
+        var second = new PlainTextContent { Text = "Second" };
+        var third = new PlainTextContent { Text = "Third" };
+        var details = new TestDetailsWithQueuedContent { Content = [first] };
+        var context = CreatePageContext(scheduler);
+        var vm = new DetailsViewModel(details, context.Reference);
+
+        vm.InitializeProperties();
+        scheduler.ExecuteUntil(() => vm.Content.Count == 1);
+
+        details.EnqueueContent(() =>
+        {
+            slowGetContentStarted.Set();
+            releaseSlowGetContent.Wait(TimeSpan.FromSeconds(2));
+            return [second];
+        });
+        var slowRefresh = Task.Run(details.TriggerItemsChanged);
+
+        Assert.IsTrue(slowGetContentStarted.Wait(TimeSpan.FromSeconds(2)));
+
+        details.EnqueueContent(() => [third]);
+        details.TriggerItemsChanged();
+        scheduler.ExecuteUntil(() => vm.Content.Count == 1 && vm.Content[0] is ContentPlainTextViewModel plainText && plainText.Text == "Third");
+
+        releaseSlowGetContent.Set();
+        Assert.IsTrue(slowRefresh.Wait(TimeSpan.FromSeconds(2)));
+        scheduler.ExecuteAllAvailable();
+
+        Assert.AreEqual(1, vm.Content.Count);
+        Assert.IsInstanceOfType<ContentPlainTextViewModel>(vm.Content[0]);
+        var current = (ContentPlainTextViewModel)vm.Content[0];
+        Assert.AreEqual("Third", current.Text);
+        GC.KeepAlive(context.Context);
     }
 
     [TestMethod]
@@ -198,7 +253,8 @@ public partial class DetailsViewModelTests
         var first = new MarkdownContent { Body = "First" };
         var second = new MarkdownContent { Body = "Second" };
         var details = new Details { Content = [first] };
-        var vm = new DetailsViewModel(details, CreatePageContext());
+        var context = CreatePageContext();
+        var vm = new DetailsViewModel(details, context.Reference);
         vm.InitializeProperties();
 
         Assert.AreEqual(1, GetPropChangedSubscriberCount(first));
@@ -207,6 +263,7 @@ public partial class DetailsViewModelTests
 
         Assert.AreEqual(0, GetPropChangedSubscriberCount(first));
         Assert.AreEqual(1, GetPropChangedSubscriberCount(second));
+        GC.KeepAlive(context.Context);
     }
 
     [TestMethod]
@@ -214,7 +271,8 @@ public partial class DetailsViewModelTests
     {
         var content = new MarkdownContent { Body = "Content" };
         var details = new Details { Content = [content] };
-        var vm = new DetailsViewModel(details, CreatePageContext());
+        var context = CreatePageContext();
+        var vm = new DetailsViewModel(details, context.Reference);
         vm.InitializeProperties();
 
         Assert.AreEqual(1, GetPropChangedSubscriberCount(content));
@@ -224,13 +282,15 @@ public partial class DetailsViewModelTests
         Assert.AreEqual(0, vm.Content.Count);
         Assert.IsFalse(vm.HasContent);
         Assert.AreEqual(0, GetPropChangedSubscriberCount(content));
+        GC.KeepAlive(context.Context);
     }
 
     [TestMethod]
     public void Cleanup_UnsubscribesFromPropChanged()
     {
         var details = new Details { Title = "T", Body = "Original" };
-        var vm = new DetailsViewModel(details, CreatePageContext());
+        var context = CreatePageContext();
+        var vm = new DetailsViewModel(details, context.Reference);
         vm.InitializeProperties();
 
         // Act — cleanup unsubscribes, then change should not propagate
@@ -238,6 +298,7 @@ public partial class DetailsViewModelTests
         details.Body = "After cleanup";
 
         Assert.AreEqual("Original", vm.Body);
+        GC.KeepAlive(context.Context);
     }
 
     [TestMethod]
@@ -245,13 +306,15 @@ public partial class DetailsViewModelTests
     {
         // IDetails that does NOT implement INotifyPropChanged
         var details = new NonObservableDetails();
-        var vm = new DetailsViewModel(details, CreatePageContext());
+        var context = CreatePageContext();
+        var vm = new DetailsViewModel(details, context.Reference);
 
         // Should not throw — just doesn't subscribe to anything
         vm.InitializeProperties();
 
         Assert.AreEqual("Static Title", vm.Title);
         Assert.AreEqual("Static Body", vm.Body);
+        GC.KeepAlive(context.Context);
     }
 
     /// <summary>
@@ -266,6 +329,19 @@ public partial class DetailsViewModelTests
         public string Body => "Static Body";
 
         public IDetailsElement[] Metadata => [];
+    }
+
+    private sealed partial class TestDetailsWithQueuedContent : Details
+    {
+        private readonly ConcurrentQueue<Func<IContent[]>> _queuedContent = [];
+
+        public void EnqueueContent(Func<IContent[]> content) => _queuedContent.Enqueue(content);
+
+        public void TriggerItemsChanged() => RaiseItemsChanged();
+
+        public override IContent[] GetContent() => _queuedContent.TryDequeue(out var content)
+            ? content()
+            : base.GetContent();
     }
 
     private static int GetPropChangedSubscriberCount(BaseObservable observable) =>
