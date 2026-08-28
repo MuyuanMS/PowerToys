@@ -175,7 +175,9 @@ internal static class IconLoadDiagnostics
         var etwSession = Volatile.Read(ref _etwSession);
         if (etwSession is null)
         {
-            var candidate = new IconLoadDiagnosticsSession(Interlocked.Increment(ref _nextSessionId));
+            var candidate = new IconLoadDiagnosticsSession(
+                Interlocked.Increment(ref _nextSessionId),
+                retainCompletedLoadDemandStates: false);
             etwSession = Interlocked.CompareExchange(ref _etwSession, candidate, null);
             if (etwSession is null)
             {
@@ -281,9 +283,10 @@ internal static class IconLoadDiagnostics
             path = path[..comma];
         }
 
-        if (path.EndsWith(".exe", StringComparison.Ordinal)
-            || path.EndsWith(".dll", StringComparison.Ordinal)
-            || path.EndsWith(".lnk", StringComparison.Ordinal))
+        if ((path.EndsWith(".exe", StringComparison.Ordinal)
+                || path.EndsWith(".dll", StringComparison.Ordinal)
+                || path.EndsWith(".lnk", StringComparison.Ordinal))
+            && (comma < 0 || int.TryParse(iconString.AsSpan()[(comma + 1)..], out _)))
         {
             return IconDispatcherMaterializationKind.Binary;
         }

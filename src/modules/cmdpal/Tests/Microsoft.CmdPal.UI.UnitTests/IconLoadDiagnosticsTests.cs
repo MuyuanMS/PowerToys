@@ -340,6 +340,9 @@ public class IconLoadDiagnosticsTests
             IconDispatcherMaterializationKind.Binary,
             IconLoadDiagnostics.ClassifyStringMaterialization(@"C:\Windows\System32\shell32.dll,10"));
         Assert.AreEqual(
+            IconDispatcherMaterializationKind.BitmapUri,
+            IconLoadDiagnostics.ClassifyStringMaterialization(@"C:\Windows\System32\shell32.dll,invalid"));
+        Assert.AreEqual(
             IconDispatcherMaterializationKind.SvgUri,
             IconLoadDiagnostics.ClassifyStringMaterialization("https://contoso.test/icon.svg"));
         Assert.AreEqual(
