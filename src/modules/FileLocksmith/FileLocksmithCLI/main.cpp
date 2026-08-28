@@ -237,6 +237,7 @@ namespace
         {
             if (!TerminateProcess(process.get(), 2))
             {
+                parent_stdin.reset();
                 ResumeThread(thread.get());
             }
             WaitForSingleObject(process.get(), INFINITE);
