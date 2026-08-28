@@ -269,6 +269,7 @@ namespace PowerToys.FileLocksmithUI.Services
             [JsonPropertyName("name")]
             public string? Name { get; init; }
 
+            [JsonRequired]
             [JsonPropertyName("pid")]
             public uint Pid { get; init; }
 

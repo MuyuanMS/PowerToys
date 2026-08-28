@@ -47,6 +47,7 @@ namespace PowerToys.FileLocksmithUI.UnitTests
 
         [DataTestMethod]
         [DataRow("""{"processes":[null]}""")]
+        [DataRow("""{"processes":[{"name":"process.exe","user":"user","files":["C:\\file.txt"]}]}""")]
         [DataRow("""{"processes":[{"pid":123,"name":"process.exe","user":"user","files":[null]}]}""")]
         public async Task FindProcessesAsyncReportsMalformedStructuredWorkerOutput(string output)
         {
@@ -117,8 +118,7 @@ namespace PowerToys.FileLocksmithUI.UnitTests
 
             try
             {
-                var workerPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "FileLocksmithCLI.exe"));
-                Assert.IsTrue(File.Exists(workerPath), $"The File Locksmith worker was not built at {workerPath}.");
+                var workerPath = GetWorkerPath();
                 var service = new FileLocksmithQueryService(
                     () => FileLocksmithQueryService.CreateWorkerStartInfo(workerPath),
                     TimeSpan.FromMinutes(2),
@@ -132,6 +132,29 @@ namespace PowerToys.FileLocksmithUI.UnitTests
             {
                 File.Delete(testPath);
             }
+        }
+
+        [DataTestMethod]
+        [DataRow("not-json")]
+        [DataRow("""{"paths":"C:\\file.txt"}""")]
+        [DataRow("""{"paths":[1]}""")]
+        [DataRow("""{"paths":[]}""")]
+        public async Task RealWorkerRejectsMalformedRequest(string request)
+        {
+            using var process = new Process
+            {
+                StartInfo = FileLocksmithQueryService.CreateWorkerStartInfo(GetWorkerPath()),
+            };
+
+            Assert.IsTrue(process.Start());
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+            await process.StandardInput.WriteAsync(request);
+            process.StandardInput.Close();
+
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(30));
+            await Task.WhenAll(outputTask, errorTask);
+            Assert.AreEqual(2, process.ExitCode);
         }
 
         private static FileLocksmithQueryService CreateService(
@@ -159,6 +182,13 @@ namespace PowerToys.FileLocksmithUI.UnitTests
                 },
                 timeout ?? TimeSpan.FromSeconds(10),
                 processStarted);
+        }
+
+        private static string GetWorkerPath()
+        {
+            var workerPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "FileLocksmithCLI.exe"));
+            Assert.IsTrue(File.Exists(workerPath), $"The File Locksmith worker was not built at {workerPath}.");
+            return workerPath;
         }
 
         private static bool IsProcessRunning(int pid)
