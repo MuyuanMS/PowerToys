@@ -41,10 +41,10 @@ public class AppIconProtocolProcessorTests
     }
 
     [TestMethod]
-    public async Task FallsBackToPrimaryAfterEveryThumbnailMisses()
+    public async Task PreservesCandidateOrderAfterEveryThumbnailMisses()
     {
         const string primary = "C:\\Icons\\primary.ico";
-        const string fallback = "C:\\Program Files\\Example\\app.exe";
+        const string fallback = "ms-appx:///Assets/fallback.png";
         var processor = new AppIconProtocolProcessor(
             (_, _) => Task.FromResult<IRandomAccessStream?>(null));
 
@@ -53,7 +53,7 @@ public class AppIconProtocolProcessorTests
             20,
             ElementTheme.Default);
 
-        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.FallbackIconString, result.Kind);
-        Assert.AreEqual(primary, result.FallbackIconString);
+        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.FallbackIconStrings, result.Kind);
+        CollectionAssert.AreEqual(new[] { primary, fallback }, result.FallbackIconStrings.ToArray());
     }
 }
