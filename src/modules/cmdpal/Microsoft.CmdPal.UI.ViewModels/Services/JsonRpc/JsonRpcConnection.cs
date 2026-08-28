@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Text.Json;
@@ -22,6 +23,8 @@ namespace Microsoft.CmdPal.UI.ViewModels.Services.JsonRpc;
 public sealed class JsonRpcConnection : IDisposable
 {
     private const int NotificationQueueCapacity = 1024;
+    private const int MaxInboundMessageBytes = 32 * 1024 * 1024;
+    private const int MaxConcurrentInboundRequests = 8;
 
     private static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan DisposeDrainTimeout = TimeSpan.FromSeconds(2);
@@ -36,10 +39,11 @@ public sealed class JsonRpcConnection : IDisposable
     private readonly ConcurrentDictionary<string, Action<JsonElement>> _notificationHandlers = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Func<JsonElement, CancellationToken, Task<JsonNode?>>> _requestHandlers = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, RpcMethodTarget> _registeredMethods = new(StringComparer.Ordinal);
+    private readonly SemaphoreSlim _requestConcurrency = new(MaxConcurrentInboundRequests, MaxConcurrentInboundRequests);
     private readonly Channel<NotificationEnvelope> _notificationQueue = Channel.CreateBounded<NotificationEnvelope>(
         new BoundedChannelOptions(NotificationQueueCapacity)
         {
-            SingleReader = true,
+            SingleReader = false,
             SingleWriter = false,
             FullMode = BoundedChannelFullMode.Wait,
         });
@@ -76,7 +80,7 @@ public sealed class JsonRpcConnection : IDisposable
         };
         _messageFactory = formatter;
 
-        _messageHandler = new HeaderDelimitedMessageHandler(output, input, formatter);
+        _messageHandler = new BoundedHeaderDelimitedMessageHandler(output, input, formatter);
         _rpc = new CmdPalJsonRpc(_messageHandler)
         {
             AllowModificationWhileListening = true,
@@ -328,6 +332,14 @@ public sealed class JsonRpcConnection : IDisposable
     {
         if (_rpc.IsResponseExpected)
         {
+            if (!await _requestConcurrency.WaitAsync(0, cancellationToken).ConfigureAwait(false))
+            {
+                throw new LocalRpcException("The JSON-RPC request capacity is temporarily exhausted.")
+                {
+                    ErrorCode = JsonRpcError.ServerBusy,
+                };
+            }
+
             if (_requestHandlers.TryGetValue(method, out var requestHandler))
             {
                 try
@@ -346,8 +358,13 @@ public sealed class JsonRpcConnection : IDisposable
                         ErrorCode = JsonRpcError.InternalError,
                     };
                 }
+                finally
+                {
+                    _requestConcurrency.Release();
+                }
             }
 
+            _requestConcurrency.Release();
             throw new LocalRpcException($"No request handler is registered for '{method}'.")
             {
                 ErrorCode = JsonRpcError.MethodNotFound,
@@ -561,6 +578,103 @@ public sealed class JsonRpcConnection : IDisposable
         }
 
         protected override Type? GetErrorDetailsDataType(StreamJsonRpc.Protocol.JsonRpcError error) => typeof(JsonElement);
+    }
+
+    private sealed class BoundedHeaderDelimitedMessageHandler : HeaderDelimitedMessageHandler
+    {
+        private readonly Stream _input;
+        private readonly IJsonRpcMessageFormatter _formatter;
+
+        internal BoundedHeaderDelimitedMessageHandler(Stream output, Stream input, IJsonRpcMessageFormatter formatter)
+            : base(output, input, formatter)
+        {
+            _input = input;
+            _formatter = formatter;
+        }
+
+        protected override async ValueTask<StreamJsonRpc.Protocol.JsonRpcMessage?> ReadCoreAsync(CancellationToken cancellationToken)
+        {
+            var contentLength = -1;
+            while (true)
+            {
+                var line = await ReadHeaderLineAsync(cancellationToken).ConfigureAwait(false);
+                if (line.Length == 0)
+                {
+                    break;
+                }
+
+                var separator = Array.IndexOf(line, (byte)':');
+                if (separator <= 0)
+                {
+                    throw new InvalidDataException("The JSON-RPC message header is malformed.");
+                }
+
+                var name = System.Text.Encoding.ASCII.GetString(line, 0, separator);
+                if (name.Trim().Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
+                {
+                    var value = System.Text.Encoding.ASCII.GetString(line, separator + 1, line.Length - separator - 1).Trim();
+                    if (!int.TryParse(value, out contentLength) || contentLength < 0 || contentLength > MaxInboundMessageBytes)
+                    {
+                        throw new InvalidDataException($"The JSON-RPC message exceeds the {MaxInboundMessageBytes}-byte limit.");
+                    }
+                }
+            }
+
+            if (contentLength < 0)
+            {
+                throw new InvalidDataException("The JSON-RPC message did not contain a Content-Length header.");
+            }
+
+            var content = new byte[contentLength];
+            await ReadExactlyAsync(content, cancellationToken).ConfigureAwait(false);
+            return _formatter.Deserialize(new ReadOnlySequence<byte>(content));
+        }
+
+        private async ValueTask<byte[]> ReadHeaderLineAsync(CancellationToken cancellationToken)
+        {
+            using var line = new MemoryStream();
+            var oneByte = new byte[1];
+            while (true)
+            {
+                var read = await _input.ReadAsync(oneByte, cancellationToken).ConfigureAwait(false);
+                if (read == 0)
+                {
+                    if (line.Length == 0)
+                    {
+                        throw new EndOfStreamException();
+                    }
+
+                    throw new InvalidDataException("The JSON-RPC message ended during its headers.");
+                }
+
+                line.WriteByte(oneByte[0]);
+                if (line.Length > 8 * 1024)
+                {
+                    throw new InvalidDataException("The JSON-RPC message headers exceed the size limit.");
+                }
+
+                if (oneByte[0] == (byte)'\n')
+                {
+                    var bytes = line.ToArray();
+                    return bytes.AsSpan(0, bytes.Length - 1).TrimEnd((byte)'\r').ToArray();
+                }
+            }
+        }
+
+        private async ValueTask ReadExactlyAsync(byte[] buffer, CancellationToken cancellationToken)
+        {
+            var offset = 0;
+            while (offset < buffer.Length)
+            {
+                var read = await _input.ReadAsync(buffer.AsMemory(offset), cancellationToken).ConfigureAwait(false);
+                if (read == 0)
+                {
+                    throw new EndOfStreamException();
+                }
+
+                offset += read;
+            }
+        }
     }
 
     private readonly record struct NotificationEnvelope(string Method, JsonElement Parameters);

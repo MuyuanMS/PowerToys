@@ -20,6 +20,7 @@ public class BoundedStderrReaderTests
     private static readonly string[] HelloWorldLines = { "hello", "world" };
     private static readonly string[] TrailingLine = { "no trailing newline" };
     private static readonly string[] RealLine = { "real" };
+    private static readonly string[] BareCrLines = { "first", "second" };
 
     [TestMethod]
     public async Task Pump_ForwardsLines_AndHandlesCrLf()
@@ -31,6 +32,17 @@ public class BoundedStderrReaderTests
 
         CollectionAssert.AreEqual(HelloWorldLines, lines);
         Assert.AreEqual(2, reader.LinesEmitted);
+    }
+
+    [TestMethod]
+    public async Task Pump_ForwardsLines_AndHandlesBareCr()
+    {
+        var lines = new List<string>();
+        var reader = new BoundedStderrReader(lines.Add, rateWindow: LongWindow);
+
+        await reader.PumpAsync(StreamFrom("first\rsecond\r"), CancellationToken.None);
+
+        CollectionAssert.AreEqual(BareCrLines, lines);
     }
 
     [TestMethod]
