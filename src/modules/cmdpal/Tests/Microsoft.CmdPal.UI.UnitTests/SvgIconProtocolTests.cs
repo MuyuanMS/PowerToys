@@ -88,6 +88,28 @@ public class SvgIconProtocolTests
         }
     }
 
+    [DataTestMethod]
+    [DataRow("|Svg|")]
+    [DataRow("|ThemedSvg|")]
+    public void OversizedSvgFilesAreRejected(string prefix)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"CmdPal-{Guid.NewGuid():N}.svg");
+        try
+        {
+            using (var stream = File.Create(path))
+            {
+                stream.SetLength(SvgFileTextReader.MaximumSvgFileSize + 1);
+            }
+
+            Assert.IsFalse(SvgIconProtocol.TryCreateSvg(prefix + path, ElementTheme.Light, out var svg));
+            Assert.AreEqual(0, svg.Length);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [TestMethod]
     public void ThemedInlineSvgReplacesThemeAndDefaultInfoAccent()
     {

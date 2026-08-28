@@ -195,8 +195,7 @@ internal static class SvgIconProtocol
         // IconPathConverter.Prepare invokes this on an icon-loader worker, so
         // filesystem access never blocks the WinUI STA thread. Reading bytes also
         // preserves the file's original encoding and XML declaration exactly.
-        svg = File.ReadAllBytes(payload);
-        return svg.Length > 0;
+        return SvgFileTextReader.TryReadBytes(payload, out svg);
     }
 
     private static bool TryCreateThemedSvg(string value, ElementTheme theme, out byte[] svg)
