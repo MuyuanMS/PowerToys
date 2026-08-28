@@ -179,6 +179,7 @@ public sealed partial class AppListItem : ListItem, IPrecomputedListItem
     private static IconInfo CreateIcon(AppItem app, bool useThumbnails)
     {
         var iconPath = !string.IsNullOrEmpty(app.IcoPath) ? app.IcoPath : app.ExePath;
+        var genericAppIcon = Icons.GenericAppIcon.Light.Icon;
         if (string.IsNullOrEmpty(iconPath))
         {
             return Icons.GenericAppIcon;
@@ -186,18 +187,20 @@ public sealed partial class AppListItem : ListItem, IPrecomputedListItem
 
         return new IconInfo(
             !app.IsPackaged && useThumbnails
-                ? AppIconProtocol.Create(iconPath, app.ExePath)
+                ? AppIconProtocol.Create(iconPath, app.ExePath, genericAppIcon)
                 : iconPath);
     }
 
     private static IconInfo? CreateHeroIcon(AppItem app)
     {
+        var genericAppIcon = Icons.GenericAppIcon.Light.Icon;
+
         if (!string.IsNullOrEmpty(app.JumboIconPath))
         {
             return new IconInfo(
                 app.IsPackaged
                     ? app.JumboIconPath
-                    : AppIconProtocol.CreateJumbo(app.JumboIconPath, app.IcoPath, app.ExePath));
+                    : AppIconProtocol.CreateJumbo(app.JumboIconPath, app.IcoPath, app.ExePath, genericAppIcon));
         }
 
         if (!string.IsNullOrEmpty(app.IcoPath))
@@ -205,7 +208,7 @@ public sealed partial class AppListItem : ListItem, IPrecomputedListItem
             return new IconInfo(
                 app.IsPackaged
                     ? app.IcoPath
-                    : AppIconProtocol.CreateJumbo(app.IcoPath, app.ExePath));
+                    : AppIconProtocol.CreateJumbo(app.IcoPath, app.ExePath, genericAppIcon));
         }
 
         if (!string.IsNullOrEmpty(app.ExePath))
@@ -213,7 +216,7 @@ public sealed partial class AppListItem : ListItem, IPrecomputedListItem
             return new IconInfo(
                 app.IsPackaged
                     ? app.ExePath
-                    : AppIconProtocol.CreateJumbo(app.ExePath));
+                    : AppIconProtocol.CreateJumbo(app.ExePath, genericAppIcon));
         }
 
         return null;

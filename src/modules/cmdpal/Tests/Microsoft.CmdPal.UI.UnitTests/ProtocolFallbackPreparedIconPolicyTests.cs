@@ -42,4 +42,26 @@ public class ProtocolFallbackPreparedIconPolicyTests
 
         Assert.IsFalse(ProtocolFallbackPreparedIconPolicy.ShouldUse(icon));
     }
+
+    [TestMethod]
+    public void RejectsInvalidGlyphFallback()
+    {
+        using var icon = IconPathConverter.PreparedIcon.FromGlyph(
+            "\u25CC",
+            "Segoe Fluent Icons",
+            targetSize: 20);
+
+        Assert.IsFalse(ProtocolFallbackPreparedIconPolicy.ShouldUse(icon));
+    }
+
+    [TestMethod]
+    public void AcceptsValidGlyphFallback()
+    {
+        using var icon = IconPathConverter.PreparedIcon.FromGlyph(
+            "\uE737",
+            "Segoe Fluent Icons",
+            targetSize: 20);
+
+        Assert.IsTrue(ProtocolFallbackPreparedIconPolicy.ShouldUse(icon));
+    }
 }

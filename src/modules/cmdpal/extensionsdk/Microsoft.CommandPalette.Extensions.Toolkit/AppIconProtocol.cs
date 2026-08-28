@@ -37,7 +37,17 @@ public static class AppIconProtocol
     /// <param name="fallback">An optional candidate to try if the primary candidate cannot provide an icon.</param>
     /// <returns>A protocol string that can be passed to <see cref="IconData"/> or <see cref="IconInfo"/>.</returns>
     public static string Create(string primary, string? fallback = null) =>
-        CreateCore(AppIconPrefix, primary, fallback, null);
+        CreateCore(AppIconPrefix, primary, fallback);
+
+    /// <summary>
+    /// Creates a standard app-icon request with up to two fallback candidates.
+    /// </summary>
+    /// <param name="primary">The first icon candidate to try.</param>
+    /// <param name="fallback">An optional candidate to try if the primary candidate cannot provide an icon.</param>
+    /// <param name="finalFallback">An optional final candidate.</param>
+    /// <returns>A protocol string that can be passed to <see cref="IconData"/> or <see cref="IconInfo"/>.</returns>
+    public static string Create(string primary, string? fallback, string? finalFallback) =>
+        CreateCore(AppIconPrefix, primary, fallback, finalFallback);
 
     /// <summary>
     /// Creates a large app-icon request with up to two fallback candidates.
@@ -51,6 +61,21 @@ public static class AppIconProtocol
         string? fallback = null,
         string? finalFallback = null) =>
         CreateCore(JumboAppIconPrefix, primary, fallback, finalFallback);
+
+    /// <summary>
+    /// Creates a large app-icon request with up to three fallback candidates.
+    /// </summary>
+    /// <param name="primary">The first icon candidate to try.</param>
+    /// <param name="fallback">An optional candidate to try if the primary candidate cannot provide an icon.</param>
+    /// <param name="finalFallback">An optional final candidate.</param>
+    /// <param name="terminalFallback">An optional terminal candidate.</param>
+    /// <returns>A protocol string that can be passed to <see cref="IconData"/> or <see cref="IconInfo"/>.</returns>
+    public static string CreateJumbo(
+        string primary,
+        string? fallback,
+        string? finalFallback,
+        string? terminalFallback) =>
+        CreateCore(JumboAppIconPrefix, primary, fallback, finalFallback, terminalFallback);
 
     /// <summary>
     /// Determines whether a value is claimed by the app-icon protocol.
@@ -128,8 +153,7 @@ public static class AppIconProtocol
     private static string CreateCore(
         string prefix,
         string primary,
-        string? fallback,
-        string? finalFallback)
+        params string?[] fallbacks)
     {
         ArgumentException.ThrowIfNullOrEmpty(primary);
 
@@ -138,17 +162,29 @@ public static class AppIconProtocol
         builder.Append(WireVersion);
         AppendCandidate(builder, primary);
 
-        if (!string.IsNullOrEmpty(fallback)
-            && !string.Equals(fallback, primary, StringComparison.Ordinal))
+        for (var fallbackIndex = 0; fallbackIndex < fallbacks.Length; fallbackIndex++)
         {
-            AppendCandidate(builder, fallback);
-        }
+            var fallback = fallbacks[fallbackIndex];
+            if (string.IsNullOrEmpty(fallback)
+                || string.Equals(fallback, primary, StringComparison.Ordinal))
+            {
+                continue;
+            }
 
-        if (!string.IsNullOrEmpty(finalFallback)
-            && !string.Equals(finalFallback, primary, StringComparison.Ordinal)
-            && !string.Equals(finalFallback, fallback, StringComparison.Ordinal))
-        {
-            AppendCandidate(builder, finalFallback);
+            var duplicate = false;
+            for (var previousIndex = 0; previousIndex < fallbackIndex; previousIndex++)
+            {
+                if (string.Equals(fallback, fallbacks[previousIndex], StringComparison.Ordinal))
+                {
+                    duplicate = true;
+                    break;
+                }
+            }
+
+            if (!duplicate)
+            {
+                AppendCandidate(builder, fallback);
+            }
         }
 
         return builder.ToString();

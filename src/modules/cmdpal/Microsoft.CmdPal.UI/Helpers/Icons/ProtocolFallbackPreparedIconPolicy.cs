@@ -6,6 +6,8 @@ namespace Microsoft.CmdPal.UI.Helpers;
 
 internal static class ProtocolFallbackPreparedIconPolicy
 {
+    private const string InvalidGlyph = "\u25CC";
+
     private static readonly HashSet<string> DecodableUriSchemes = new(StringComparer.OrdinalIgnoreCase)
     {
         Uri.UriSchemeFile,
@@ -25,6 +27,11 @@ internal static class ProtocolFallbackPreparedIconPolicy
         if (preparedIcon.Kind == IconPathConverter.PreparedIconKind.Binary)
         {
             return preparedIcon.SoftwareBitmap is not null;
+        }
+
+        if (preparedIcon.Kind == IconPathConverter.PreparedIconKind.Glyph)
+        {
+            return !string.Equals(preparedIcon.Glyph, InvalidGlyph, StringComparison.Ordinal);
         }
 
         if (preparedIcon.Kind is IconPathConverter.PreparedIconKind.BitmapUri or IconPathConverter.PreparedIconKind.SvgUri

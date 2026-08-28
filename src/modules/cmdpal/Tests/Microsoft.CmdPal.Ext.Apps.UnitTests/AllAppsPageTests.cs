@@ -155,14 +155,14 @@ public class AllAppsPageTests : AppsTestBase
         var rowIcon = (IconInfo)item.Icon!;
         Assert.IsTrue(AppIconProtocol.TryParse(rowIcon.Light.Icon, out var rowCandidates, out var rowJumbo));
         Assert.IsFalse(rowJumbo);
-        CollectionAssert.AreEqual(new[] { app.IcoPath, app.ExePath }, rowCandidates);
+        CollectionAssert.AreEqual(new[] { app.IcoPath, app.ExePath, Icons.GenericAppIcon.Light.Icon }, rowCandidates);
         Assert.AreSame(rowIcon, item.Command.Icon);
 
         var details = (Details)item.Details!;
         var heroIcon = (IconInfo)details.HeroImage;
         Assert.IsTrue(AppIconProtocol.TryParse(heroIcon.Light.Icon, out var heroCandidates, out var heroJumbo));
         Assert.IsTrue(heroJumbo);
-        CollectionAssert.AreEqual(new[] { app.JumboIconPath, app.IcoPath, app.ExePath }, heroCandidates);
+        CollectionAssert.AreEqual(new[] { app.JumboIconPath, app.IcoPath, app.ExePath, Icons.GenericAppIcon.Light.Icon }, heroCandidates);
     }
 
     [TestMethod]
