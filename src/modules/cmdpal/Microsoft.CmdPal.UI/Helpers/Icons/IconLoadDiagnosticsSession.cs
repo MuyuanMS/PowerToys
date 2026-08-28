@@ -102,6 +102,8 @@ internal sealed class IconLoadDiagnosticsSession
 
     public long Id { get; }
 
+    internal bool IsStopped => Volatile.Read(ref _stoppedAt) != 0;
+
     internal IconLoadDiagnosticsSession(long id, DispatcherQueue? dispatcherQueue = null)
     {
         Id = id;
@@ -121,21 +123,49 @@ internal sealed class IconLoadDiagnosticsSession
         }
     }
 
-    internal void RecordUiProbeEnqueued() => Interlocked.Increment(ref _uiProbeEnqueued);
+    internal void RecordUiProbeEnqueued()
+    {
+        if (!IsStopped)
+        {
+            Interlocked.Increment(ref _uiProbeEnqueued);
+        }
+    }
 
     internal void RecordUiProbeCompleted(long elapsedTicks)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         Interlocked.Increment(ref _uiProbeCompleted);
         _uiProbeWaitLatency.Record(elapsedTicks);
         IconLoadEventSource.Log.UiResponsivenessProbeCompleted(Id, ToMicroseconds(elapsedTicks));
     }
 
-    internal void RecordUiProbeSkipped() => Interlocked.Increment(ref _uiProbeSkipped);
+    internal void RecordUiProbeSkipped()
+    {
+        if (!IsStopped)
+        {
+            Interlocked.Increment(ref _uiProbeSkipped);
+        }
+    }
 
-    internal void RecordUiProbeRejected() => Interlocked.Increment(ref _uiProbeRejected);
+    internal void RecordUiProbeRejected()
+    {
+        if (!IsStopped)
+        {
+            Interlocked.Increment(ref _uiProbeRejected);
+        }
+    }
 
     public IconRequestMeasurement BeginRequest(IconRequestReason reason, double scale, IconRequestOrigin origin)
     {
+        if (IsStopped)
+        {
+            return default;
+        }
+
         origin = origin.Normalize();
         var requestId = Interlocked.Increment(ref _nextRequestId);
         Interlocked.Increment(ref _requestsStarted);
@@ -155,6 +185,11 @@ internal sealed class IconLoadDiagnosticsSession
 
     public IconLoadMeasurement CreateLoad(IconLoadInputKind inputKind, double width, double height, double scale)
     {
+        if (IsStopped)
+        {
+            throw new InvalidOperationException("Cannot create an icon-load measurement after the diagnostics session has stopped.");
+        }
+
         var loadId = Interlocked.Increment(ref _nextLoadId);
         Interlocked.Increment(ref _loadsCreated);
         Interlocked.Increment(ref _inputKinds[(int)inputKind]);

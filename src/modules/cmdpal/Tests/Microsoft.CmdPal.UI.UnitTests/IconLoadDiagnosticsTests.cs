@@ -605,6 +605,39 @@ public class IconLoadDiagnosticsTests
         Assert.IsEmpty(IconLoadDiagnostics.GetReports());
     }
 
+    [TestMethod]
+    public async Task StoppedSessionIgnoresLateRequestAndLoadUpdates()
+    {
+        IconLoadDiagnostics.Start();
+        var request = IconLoadDiagnostics.BeginRequest(IconRequestReason.SourceChanged, 1.0);
+        var load = IconLoadDiagnostics.CreateLoad(
+            request,
+            "bitmap.png",
+            hasStream: false,
+            width: 20,
+            height: 20,
+            scale: 1.0);
+
+        Assert.IsNotNull(load);
+        request.RecordProviderResolution(IconProviderResolution.NewLoad, load);
+        var workerStart = load.WorkerStartingAsync().AsTask();
+
+        var report = IconLoadDiagnostics.StopAndCreateReport();
+
+        load.Enqueued(IconLoadPriority.Low);
+        Assert.IsFalse(await workerStart.WaitAsync(TimeSpan.FromSeconds(5)));
+        load.SetResult(null);
+        load.Complete();
+        request.Complete(IconRequestStatus.Applied);
+
+        Assert.IsNotNull(report);
+        StringAssert.Contains(report.Text, "Started: 1");
+        StringAssert.Contains(report.Text, "Outstanding at stop: 1");
+        StringAssert.Contains(report.Text, "Created: 1");
+        StringAssert.Contains(report.Text, "Active at stop: 0");
+        StringAssert.Contains(report.Text, "Enqueue to completion: no samples");
+    }
+
     private static int CountOccurrences(string value, string text)
     {
         var count = 0;

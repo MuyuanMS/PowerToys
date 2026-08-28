@@ -18,6 +18,8 @@ public class SourceRequestedEventArgs(object? key, ElementTheme requestedTheme, 
 
     public IconSource? Value { get; set; }
 
+    internal bool Failed { get; set; }
+
     public ElementTheme Theme => requestedTheme;
 
     public double Scale => scale;
