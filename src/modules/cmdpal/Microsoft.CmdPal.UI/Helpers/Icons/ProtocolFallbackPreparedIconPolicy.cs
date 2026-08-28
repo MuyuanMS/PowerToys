@@ -6,6 +6,15 @@ namespace Microsoft.CmdPal.UI.Helpers;
 
 internal static class ProtocolFallbackPreparedIconPolicy
 {
+    private static readonly HashSet<string> DecodableUriSchemes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        Uri.UriSchemeFile,
+        Uri.UriSchemeHttp,
+        Uri.UriSchemeHttps,
+        "ms-appx",
+        "ms-appdata",
+    };
+
     public static bool ShouldUse(IconPathConverter.PreparedIcon preparedIcon)
     {
         if (preparedIcon.Kind == IconPathConverter.PreparedIconKind.Empty)
@@ -19,9 +28,10 @@ internal static class ProtocolFallbackPreparedIconPolicy
         }
 
         if (preparedIcon.Kind is IconPathConverter.PreparedIconKind.BitmapUri or IconPathConverter.PreparedIconKind.SvgUri
-            && preparedIcon.Uri?.IsFile == true)
+            && preparedIcon.Uri is { } uri)
         {
-            return File.Exists(preparedIcon.Uri.LocalPath);
+            return DecodableUriSchemes.Contains(uri.Scheme)
+                && (!uri.IsFile || File.Exists(uri.LocalPath));
         }
 
         return true;

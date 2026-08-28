@@ -22,7 +22,7 @@ public class ProtocolFallbackPreparedIconPolicyTests
     }
 
     [TestMethod]
-    public void AcceptsNonFileUriFallback()
+    public void AcceptsDecodableNonFileUriFallback()
     {
         using var icon = IconPathConverter.PreparedIcon.FromUri(
             new Uri("ms-appx:///Assets/fallback.png"),
@@ -30,5 +30,16 @@ public class ProtocolFallbackPreparedIconPolicyTests
             targetSize: 20);
 
         Assert.IsTrue(ProtocolFallbackPreparedIconPolicy.ShouldUse(icon));
+    }
+
+    [TestMethod]
+    public void RejectsNonDecodableUriFallback()
+    {
+        using var icon = IconPathConverter.PreparedIcon.FromUri(
+            new Uri("steam://run/12345"),
+            isSvg: false,
+            targetSize: 20);
+
+        Assert.IsFalse(ProtocolFallbackPreparedIconPolicy.ShouldUse(icon));
     }
 }
