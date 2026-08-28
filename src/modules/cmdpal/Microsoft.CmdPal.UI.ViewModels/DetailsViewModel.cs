@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Collections.ObjectModel;
+using System.Threading;
 using Microsoft.CmdPal.UI.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
@@ -17,6 +18,7 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
     private bool _isSubscribed;
     private bool _isContentSubscribed;
     private bool _isCleanedUp;
+    private int _contentRebuildGeneration;
 
     // Remember - "observable" properties from the model (via PropChanged)
     // cannot be marked [ObservableProperty]
@@ -187,6 +189,7 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
 
     private void RebuildContent(IDetails model)
     {
+        var generation = Interlocked.Increment(ref _contentRebuildGeneration);
         List<ContentViewModel> content = [];
         if (model is IDetails2 details2)
         {
@@ -204,7 +207,7 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
         var updateScheduled = TryDoOnUiThread(
             () =>
             {
-                if (_isCleanedUp)
+                if (_isCleanedUp || generation != Volatile.Read(ref _contentRebuildGeneration))
                 {
                     CleanupContentViewModels(content);
                     return;
