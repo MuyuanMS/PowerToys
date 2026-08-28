@@ -141,7 +141,7 @@ public class AllAppsPageTests : AppsTestBase
         {
             Name = "Test App",
             IcoPath = "C:\\Windows\\System32\\shell32.dll,1",
-            JumboIconPath = "C:\\Windows\\System32\\imageres.dll,2",
+            JumboIconPath = "C:\\Windows\\System32\\shell32.dll,2",
             ExePath = "C:\\Program Files\\Example\\app.exe",
         };
 
