@@ -688,6 +688,8 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                     break;
                 }
 
+                budget.Triangles--;
+
                 var v1 = ParseInt(triangle.Attribute("v1")?.Value);
                 var v2 = ParseInt(triangle.Attribute("v2")?.Value);
                 var v3 = ParseInt(triangle.Attribute("v3")?.Value);
@@ -697,8 +699,6 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 {
                     continue;
                 }
-
-                budget.Triangles--;
 
                 triangleIndices.Add(v1);
                 triangleIndices.Add(v2);
