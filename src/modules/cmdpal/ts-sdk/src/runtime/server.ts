@@ -64,6 +64,7 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
   const notify = (method: string, params?: unknown): void => {
     writeMessage({ jsonrpc: JSONRPC_VERSION, method, params });
   };
+  let chain: Promise<void> = Promise.resolve();
 
   // Idempotent shutdown: dispose the provider within the host-supplied bound,
   // release the host bridge, restore stdout, and prefer setting process.exitCode
@@ -90,7 +91,7 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
   const runtime = new ExtensionRuntime({
     send: writeMessage,
     onDispose: () => {
-      void finalize(0);
+      void chain.then(() => finalize(0));
     },
     reportFatal: (code: number) => {
       process.exitCode = code;
@@ -107,8 +108,6 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
       return provider;
     })(),
   );
-
-  let chain: Promise<void> = Promise.resolve();
 
   const enqueue = (message: unknown): void => {
     chain = chain
@@ -157,7 +156,7 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
   });
 
   process.stdin.on('end', () => {
-    void finalize(0);
+    void chain.then(() => finalize(0));
   });
 }
 

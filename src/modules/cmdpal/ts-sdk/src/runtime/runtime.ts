@@ -852,13 +852,26 @@ export class ExtensionRuntime {
 
 function createFormCollector(scope: PageScope): FormCollector {
   let counter = 0;
+  const allocatedIds = new Set<string>();
+  const registeredIds = new Set<string>();
   return {
     nextId(): string {
+      while (allocatedIds.has(`form-${String(counter)}`) || registeredIds.has(`form-${String(counter)}`)) {
+        counter += 1;
+      }
       const id = `form-${String(counter)}`;
       counter += 1;
+      allocatedIds.add(id);
       return id;
     },
     register(formId: string, handler: FormSubmitHandler): void {
+      if (registeredIds.has(formId)) {
+        throw new Error(`Duplicate form id: ${formId}`);
+      }
+      if (allocatedIds.has(formId)) {
+        allocatedIds.delete(formId);
+      }
+      registeredIds.add(formId);
       scope.forms.set(formId, handler);
     },
   };
