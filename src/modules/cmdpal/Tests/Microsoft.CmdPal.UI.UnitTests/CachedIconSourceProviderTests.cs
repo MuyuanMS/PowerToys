@@ -422,6 +422,50 @@ public partial class CachedIconSourceProviderTests
     }
 
     [TestMethod]
+    [DoNotParallelize]
+    [Timeout(5_000)]
+    public async Task ProgressiveShellRequestKeepsTypeIconWhenExactRefinementReturnsShellFallback()
+    {
+        var fallback = CreateTestIconSource();
+        var sourceField = typeof(ShellItemIconFallback).GetField(
+            "_source",
+            BindingFlags.Static | BindingFlags.NonPublic)!;
+        var previousSource = sourceField.GetValue(null);
+        sourceField.SetValue(null, fallback);
+        try
+        {
+            var loader = new ControllableIconLoader();
+            var provider = CreateProvider(loader);
+            var progress = new ProgressiveIconRequest();
+            var icon = new IconDataViewModel
+            {
+                Icon = ShellItemIconProtocol.Create(@"C:\Windows\System32\custom.exe"),
+            };
+
+            var finalTask = provider.GetIconSource(icon, 1.0, demand: progress);
+            Assert.IsTrue(SpinWait.SpinUntil(
+                () => loader.ShellEnqueueCount == 1,
+                TimeSpan.FromSeconds(2)));
+            loader.LocateNextShellItem(7, ShellItemIconLocationMode.FileType);
+            var typeSource = CreateTestIconSource();
+            loader.CompleteNextShellOwner(typeSource);
+
+            Assert.IsTrue(SpinWait.SpinUntil(
+                () => loader.ShellEnqueueCount == 2 && progress.Intermediate is not null,
+                TimeSpan.FromSeconds(2)));
+            loader.LocateNextShellItem(99, ShellItemIconLocationMode.ExactItem);
+            loader.CompleteNextShellOwner(fallback);
+
+            Assert.AreSame(typeSource, await finalTask);
+            progress.Release();
+        }
+        finally
+        {
+            sourceField.SetValue(null, previousSource);
+        }
+    }
+
+    [TestMethod]
     [Timeout(5_000)]
     public async Task ProgressiveShellRequestContinuesWhenIntermediatePresentationFails()
     {
