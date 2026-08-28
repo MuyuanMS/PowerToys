@@ -344,7 +344,7 @@ namespace Microsoft.CommandPalette.Extensions
     }
 
     [contract(Microsoft.CommandPalette.Extensions.ExtensionsContract, 1)]
-    interface IDetails2 requires IDetails {
+    interface IDetails2 requires IDetails, INotifyItemsChanged {
         IContent[] GetContent();
     }
     

@@ -13,7 +13,10 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
 {
     private readonly ExtensionObject<IDetails> _detailsModel;
     private INotifyPropChanged? _observableDetails;
+    private INotifyItemsChanged? _observableContentDetails;
     private bool _isSubscribed;
+    private bool _isContentSubscribed;
+    private bool _isCleanedUp;
 
     // Remember - "observable" properties from the model (via PropChanged)
     // cannot be marked [ObservableProperty]
@@ -30,6 +33,8 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
     public List<DetailsElementViewModel> Metadata { get; private set; } = [];
 
     public ObservableCollection<ContentViewModel> Content { get; } = [];
+
+    public bool HasContent => Content.Count > 0;
 
     public DetailsViewModel(IDetails details, WeakReference<IPageContext> context)
         : base(context)
@@ -79,9 +84,14 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
 
             // here be dragons: IDetails2 exposes a method GetContent() to build
             // the content object. But the property change comes in under the name
-            // "Content". So yes, this intentionally uses the toolkit's property name
+            // "Content". Listen to it only for models that do not also expose the
+            // collection-change notification contract.
             case nameof(Details.Content):
-                RebuildContent(model);
+                if (model is not INotifyItemsChanged)
+                {
+                    RebuildContent(model);
+                }
+
                 break;
         }
     }
@@ -129,6 +139,15 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
             _isSubscribed = true;
         }
 
+        if (!_isContentSubscribed && model is INotifyItemsChanged observableContent)
+        {
+            observableContent.ItemsChanged += Model_ItemsChanged;
+            _observableContentDetails = observableContent;
+            _isContentSubscribed = true;
+        }
+
+        _isCleanedUp = false;
+
         Title = model.Title ?? string.Empty;
         Body = model.Body ?? string.Empty;
         HeroImage = new(model.HeroImage);
@@ -157,6 +176,15 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
         RebuildContent(model);
     }
 
+    private void Model_ItemsChanged(object sender, IItemsChangedEventArgs args)
+    {
+        var model = _detailsModel.Unsafe;
+        if (model is not null)
+        {
+            RebuildContent(model);
+        }
+    }
+
     private void RebuildContent(IDetails model)
     {
         List<ContentViewModel> content = [];
@@ -173,19 +201,50 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
             }
         }
 
-        ListHelpers.InPlaceUpdateList(Content, content);
-        UpdateProperty(nameof(Content));
+        DoOnUiThread(
+            () =>
+            {
+                if (_isCleanedUp)
+                {
+                    CleanupContentViewModels(content);
+                    return;
+                }
+
+                ListHelpers.InPlaceUpdateList(Content, content, out var removedContent);
+                CleanupContentViewModels(removedContent);
+                UpdateProperty(nameof(Content), nameof(HasContent));
+            });
     }
 
     protected override void UnsafeCleanup()
     {
         base.UnsafeCleanup();
 
+        _isCleanedUp = true;
+
+        CleanupContentViewModels(Content);
+        Content.Clear();
+
         if (_isSubscribed && _observableDetails is not null)
         {
             _observableDetails.PropChanged -= Model_PropChanged;
             _observableDetails = null;
             _isSubscribed = false;
+        }
+
+        if (_isContentSubscribed && _observableContentDetails is not null)
+        {
+            _observableContentDetails.ItemsChanged -= Model_ItemsChanged;
+            _observableContentDetails = null;
+            _isContentSubscribed = false;
+        }
+    }
+
+    private static void CleanupContentViewModels(IEnumerable<ContentViewModel> content)
+    {
+        foreach (var item in content)
+        {
+            item.SafeCleanup();
         }
     }
 }

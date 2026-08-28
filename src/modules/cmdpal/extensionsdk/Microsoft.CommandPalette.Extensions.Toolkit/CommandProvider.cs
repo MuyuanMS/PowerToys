@@ -93,6 +93,12 @@ public abstract partial class CommandProvider :
 
     private sealed partial class SupportDetailsContent : IDetails2
     {
+        public event TypedEventHandler<object, IItemsChangedEventArgs>? ItemsChanged
+        {
+            add { }
+            remove { }
+        }
+
         public IIconInfo? HeroImage => null;
 
         public string Title => string.Empty;
