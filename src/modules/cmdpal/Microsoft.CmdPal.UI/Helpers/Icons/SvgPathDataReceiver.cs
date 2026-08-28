@@ -46,7 +46,7 @@ internal sealed partial class SvgPathDataReceiver : ICanvasPathReceiver
         _path.Append(' ');
         AppendNumber(radiusY);
         _path.Append(' ');
-        AppendNumber(rotationAngle);
+        AppendNumber(rotationAngle * (180f / MathF.PI));
         _path.Append(arcSize == CanvasArcSize.Large ? " 1 " : " 0 ");
         _path.Append(sweepDirection == CanvasSweepDirection.Clockwise ? "1 " : "0 ");
         AppendPoint(endPoint);
