@@ -205,8 +205,8 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
                     var viewModel = CommandPaletteContentPageViewModel.CreateViewModel(item, PageContext);
                     if (viewModel is not null)
                     {
-                        viewModel.InitializeProperties();
                         content.Add(viewModel);
+                        viewModel.InitializeProperties();
                     }
                 }
             }
