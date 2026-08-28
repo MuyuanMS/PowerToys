@@ -205,9 +205,22 @@ internal sealed class AdaptiveCache<TKey, TValue>
             {
                 TryRemove(
                     key,
+                    entry,
                     overCapacity ? AdaptiveCacheRemovalReason.Capacity : AdaptiveCacheRemovalReason.LowScore);
             }
         }
+    }
+
+    private bool TryRemove(TKey key, CacheEntry expectedEntry, AdaptiveCacheRemovalReason reason)
+    {
+        if (((ICollection<KeyValuePair<TKey, CacheEntry>>)_map).Remove(new KeyValuePair<TKey, CacheEntry>(key, expectedEntry)))
+        {
+            Interlocked.Decrement(ref _entryCount);
+            _removalCallback?.Invoke(key, expectedEntry.Value, reason, ApproximateCount, _capacity);
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>
