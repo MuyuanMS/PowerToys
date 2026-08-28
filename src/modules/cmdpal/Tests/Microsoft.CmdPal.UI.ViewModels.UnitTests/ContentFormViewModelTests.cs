@@ -73,6 +73,13 @@ public partial class ContentFormViewModelTests
     }
 
     [TestMethod]
+    public void GetActionData_ActionsWithoutData_ReturnsEmptyString()
+    {
+        Assert.AreEqual(string.Empty, ContentFormViewModel.GetActionData(new AdaptiveSubmitAction()));
+        Assert.AreEqual(string.Empty, ContentFormViewModel.GetActionData(new AdaptiveExecuteAction()));
+    }
+
+    [TestMethod]
     public async Task HandleSubmit_IFormContent2_PassesActionIdInputsAndData()
     {
         var form = new ActionFormContent();

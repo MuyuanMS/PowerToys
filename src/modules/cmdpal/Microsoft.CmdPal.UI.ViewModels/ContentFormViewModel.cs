@@ -148,12 +148,23 @@ public partial class ContentFormViewModel(IFormContent _form, WeakReference<IPag
         UpdateProperty(propertyName);
     }
 
-    internal static string GetActionData(IAdaptiveActionElement action) => action switch
+    internal static string GetActionData(IAdaptiveActionElement action)
     {
-        AdaptiveSubmitAction submitAction => submitAction.DataJson.Stringify(),
-        AdaptiveExecuteAction executeAction => executeAction.DataJson.Stringify(),
-        _ => string.Empty,
-    };
+        if (action is AdaptiveSubmitAction submitAction)
+        {
+            return GetActionData(submitAction.DataJson);
+        }
+
+        if (action is AdaptiveExecuteAction executeAction)
+        {
+            return GetActionData(executeAction.DataJson);
+        }
+
+        return string.Empty;
+    }
+
+    private static string GetActionData(JsonValue? data) =>
+        data is null || data.ValueType == JsonValueType.Null ? string.Empty : data.Stringify();
 
     [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(AdaptiveOpenUrlAction))]
     [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(AdaptiveSubmitAction))]
