@@ -45,6 +45,19 @@ namespace PowerToys.FileLocksmithUI.UnitTests
             Assert.IsEmpty(result.Processes);
         }
 
+        [DataTestMethod]
+        [DataRow("""{"processes":[null]}""")]
+        [DataRow("""{"processes":[{"pid":123,"name":"process.exe","user":"user","files":[null]}]}""")]
+        public async Task FindProcessesAsyncReportsMalformedStructuredWorkerOutput(string output)
+        {
+            var service = CreateService($"[Console]::Out.Write('{output}')");
+
+            var result = await service.FindProcessesAsync(SelectedPaths, CancellationToken.None);
+
+            Assert.AreEqual(FileLocksmithQueryStatus.MalformedOutput, result.Status);
+            Assert.IsEmpty(result.Processes);
+        }
+
         [TestMethod]
         public async Task FindProcessesAsyncReportsFailedWorkerExitCode()
         {
@@ -71,6 +84,29 @@ namespace PowerToys.FileLocksmithUI.UnitTests
             Assert.AreEqual(FileLocksmithQueryStatus.TimedOut, result.Status);
             Assert.AreNotEqual(0, workerPid);
             Assert.IsFalse(IsProcessRunning(workerPid), "The timed-out worker process was left running.");
+        }
+
+        [TestMethod]
+        public async Task FindProcessesAsyncCallerCancellationTerminatesWorker()
+        {
+            var workerPid = 0;
+            var service = CreateService(
+                "Start-Sleep -Seconds 30",
+                TimeSpan.FromSeconds(30),
+                pid => workerPid = pid);
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+
+            try
+            {
+                await service.FindProcessesAsync(SelectedPaths, cancellation.Token);
+                Assert.Fail("Caller cancellation was not propagated.");
+            }
+            catch (OperationCanceledException)
+            {
+            }
+
+            Assert.AreNotEqual(0, workerPid);
+            Assert.IsFalse(IsProcessRunning(workerPid), "The canceled worker process was left running.");
         }
 
         [TestMethod]

@@ -163,9 +163,11 @@ namespace PowerToys.FileLocksmithUI.Services
                     var processes = new List<FileLocksmithProcessInfo>(response.Processes.Length);
                     foreach (var processInfo in response.Processes)
                     {
-                        if (processInfo.Name is null ||
+                        if (processInfo is null ||
+                            processInfo.Name is null ||
                             processInfo.User is null ||
-                            processInfo.Files is null)
+                            processInfo.Files is null ||
+                            Array.Exists(processInfo.Files, static file => file is null))
                         {
                             return MalformedOutput();
                         }
@@ -259,7 +261,7 @@ namespace PowerToys.FileLocksmithUI.Services
         private sealed class WorkerResponse
         {
             [JsonPropertyName("processes")]
-            public WorkerProcessInfo[]? Processes { get; init; }
+            public WorkerProcessInfo?[]? Processes { get; init; }
         }
 
         private sealed class WorkerProcessInfo
