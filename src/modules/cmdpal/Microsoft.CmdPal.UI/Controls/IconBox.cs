@@ -28,6 +28,7 @@ public partial class IconBox : ContentControl
     private long _requestVersion;
     private IconRequestMeasurement _activeRequestDiagnostics;
     private IIconRequestDemand? _activeRequestDemand;
+    private XamlRoot? _subscribedXamlRoot;
     private long _diagnosticId;
     private IconRequestSite _derivedRequestSite;
     private bool _hasDerivedRequestSite;
@@ -173,9 +174,15 @@ public partial class IconBox : ContentControl
         _lastScale = newScale;
         UpdateLastFontSize();
 
-        if (XamlRoot is not null)
+        if (_subscribedXamlRoot is not null)
         {
-            XamlRoot.Changed += OnXamlRootChanged;
+            _subscribedXamlRoot.Changed -= OnXamlRootChanged;
+        }
+
+        _subscribedXamlRoot = XamlRoot;
+        if (_subscribedXamlRoot is not null)
+        {
+            _subscribedXamlRoot.Changed += OnXamlRootChanged;
         }
 
         if (SourceKey is not null && (changedTheme || changedScale))
@@ -208,9 +215,10 @@ public partial class IconBox : ContentControl
             return;
         }
 
-        if (XamlRoot is not null)
+        if (_subscribedXamlRoot is not null)
         {
-            XamlRoot.Changed -= OnXamlRootChanged;
+            _subscribedXamlRoot.Changed -= OnXamlRootChanged;
+            _subscribedXamlRoot = null;
         }
 
         if (_activeRequestDemand is not null)
