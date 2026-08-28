@@ -283,6 +283,25 @@ public partial class DetailsViewModelTests
     }
 
     [TestMethod]
+    public void FormContentReplacement_CleansRemovedViewModel()
+    {
+        var form = new FormContent { TemplateJson = ValidAdaptiveCardJson };
+        var replacement = new MarkdownContent { Body = "Replacement" };
+        var details = new Details { Content = [form] };
+        var context = CreatePageContext();
+        var vm = new DetailsViewModel(details, context.Reference);
+        vm.InitializeProperties();
+
+        Assert.AreEqual(1, GetPropChangedSubscriberCount(form));
+
+        details.Content = [replacement];
+
+        Assert.AreEqual(0, GetPropChangedSubscriberCount(form));
+        Assert.AreEqual(1, GetPropChangedSubscriberCount(replacement));
+        GC.KeepAlive(context.Context);
+    }
+
+    [TestMethod]
     public void ContentInitializationException_CleansInitializedViewModels()
     {
         var content = new MarkdownContent { Body = "Content" };
@@ -313,6 +332,25 @@ public partial class DetailsViewModelTests
         vm.SafeCleanup();
 
         Assert.AreEqual(0, vm.Content.Count);
+        Assert.IsFalse(vm.HasContent);
+        Assert.AreEqual(0, GetPropChangedSubscriberCount(content));
+        GC.KeepAlive(context.Context);
+    }
+
+    [TestMethod]
+    public void Cleanup_ClearsContentOnPageScheduler()
+    {
+        var scheduler = new QueuedTaskScheduler();
+        var content = new MarkdownContent { Body = "Content" };
+        var details = new Details { Content = [content] };
+        var context = CreatePageContext(scheduler);
+        var vm = new DetailsViewModel(details, context.Reference);
+        vm.InitializeProperties();
+        scheduler.ExecuteUntil(() => vm.Content.Count == 1);
+
+        vm.SafeCleanup();
+
+        scheduler.ExecuteUntil(() => vm.Content.Count == 0);
         Assert.IsFalse(vm.HasContent);
         Assert.AreEqual(0, GetPropChangedSubscriberCount(content));
         GC.KeepAlive(context.Context);
@@ -385,6 +423,15 @@ public partial class DetailsViewModelTests
             set => base.Body = value;
         }
     }
+
+    private const string ValidAdaptiveCardJson = """
+{
+    "$schema": "https://adaptivecards.io/schemas/adaptive-card.json",
+    "type": "AdaptiveCard",
+    "version": "1.5",
+    "body": []
+}
+""";
 
     private static int GetPropChangedSubscriberCount(BaseObservable observable) =>
         ((Delegate?)typeof(BaseObservable)
