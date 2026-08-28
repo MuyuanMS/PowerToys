@@ -106,9 +106,9 @@ internal static class IconLoadDiagnostics
         return session.CreateLoad(ClassifyInput(iconString, hasStream), width, height, scale);
     }
 
-    internal static void RecordCacheLookup(Size iconSize, int capacity, bool hit)
+    internal static void RecordCacheLookup(Size iconSize, int capacity, bool hit, int entryCount)
     {
-        GetCurrentSession()?.RecordCacheLookup(iconSize, capacity, hit);
+        GetCurrentSession()?.RecordCacheLookup(iconSize, capacity, hit, entryCount);
     }
 
     internal static void RecordCacheEntryAdded(Size iconSize, int capacity, int entryCount)

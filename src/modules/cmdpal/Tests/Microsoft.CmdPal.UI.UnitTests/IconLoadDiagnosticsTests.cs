@@ -218,9 +218,9 @@ public class IconLoadDiagnosticsTests
     {
         IconLoadDiagnostics.Start();
         var size = new global::Windows.Foundation.Size(20, 20);
-        IconLoadDiagnostics.RecordCacheLookup(size, capacity: 16, hit: false);
+        IconLoadDiagnostics.RecordCacheLookup(size, capacity: 16, hit: false, entryCount: 0);
         IconLoadDiagnostics.RecordCacheEntryAdded(size, capacity: 16, entryCount: 1);
-        IconLoadDiagnostics.RecordCacheLookup(size, capacity: 16, hit: true);
+        IconLoadDiagnostics.RecordCacheLookup(size, capacity: 16, hit: true, entryCount: 1);
         IconLoadDiagnostics.RecordCacheEntryRemoved(
             size,
             capacity: 16,
