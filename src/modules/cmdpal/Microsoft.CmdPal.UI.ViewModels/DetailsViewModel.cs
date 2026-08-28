@@ -201,7 +201,7 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
             }
         }
 
-        DoOnUiThread(
+        var updateScheduled = TryDoOnUiThread(
             () =>
             {
                 if (_isCleanedUp)
@@ -214,6 +214,11 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
                 CleanupContentViewModels(removedContent);
                 UpdateProperty(nameof(Content), nameof(HasContent));
             });
+
+        if (!updateScheduled)
+        {
+            CleanupContentViewModels(content);
+        }
     }
 
     protected override void UnsafeCleanup()
