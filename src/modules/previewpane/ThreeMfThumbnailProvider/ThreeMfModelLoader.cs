@@ -31,6 +31,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
         private const int MaxTotalVertices = 4_000_000;
         private const int MaxComponentDepth = 16;
         private const int MaxModelInstances = 100_000;
+        private const int MaxObjectResolutions = 100_000;
 
         // Bound the number of distinct .model parts loaded while resolving Production Extension
         // cross-part component references, so a package cannot force loading an unbounded number of parts.
@@ -67,7 +68,11 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
 
             public int Instances { get; set; }
 
-            public bool Exhausted => Triangles <= 0 || Vertices <= 0 || Instances <= 0;
+            public int Resolutions { get; set; }
+
+            public bool GeometryExhausted => Triangles <= 0 || Vertices <= 0 || Instances <= 0;
+
+            public bool Exhausted => GeometryExhausted || Resolutions <= 0;
         }
 
         public static System.Drawing.Bitmap TryLoadEmbeddedThumbnail(Stream stream, uint maxSize)
@@ -153,6 +158,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                     Triangles = MaxTotalTriangles,
                     Vertices = MaxTotalVertices,
                     Instances = MaxModelInstances,
+                    Resolutions = MaxObjectResolutions,
                 };
 
                 // A single package context is shared across every root model part so that Production
@@ -466,6 +472,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                         catch (InvalidDataException)
                         {
                             _remainingModelBytes = 0;
+                            _parts[partName] = null;
                             return null;
                         }
 
@@ -567,7 +574,13 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
             int depth,
             GeometryBudget budget)
         {
-            if (depth > MaxComponentDepth || budget.Exhausted || part == null)
+            if (budget.Resolutions <= 0)
+            {
+                return;
+            }
+
+            budget.Resolutions--;
+            if (depth > MaxComponentDepth || budget.GeometryExhausted || part == null)
             {
                 return;
             }

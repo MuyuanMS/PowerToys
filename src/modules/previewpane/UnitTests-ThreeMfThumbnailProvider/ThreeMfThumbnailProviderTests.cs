@@ -247,16 +247,41 @@ namespace ThreeMfThumbnailProviderUnitTests
         public void LoadModelAppliesWhitespaceSeparatedNestedTransforms()
         {
             using var stream = CreateCrossPartThreeMf(
-                componentTransform: "1 0 0 0\t1 0 0 0 1 1 0 0",
-                buildTransform: "1 0 0 0 1 0 0 0 1 0\n2 0",
+                componentTransform: "2 0 0 0\t1 0 0 0 1 0 0 0",
+                buildTransform: "1 0 0 0 1 0 0 0 1 3\n0 0",
                 vertexExtent: 1);
 
             Model3DGroup model = ThreeMfModelLoader.LoadModel(stream, MediaColors.Gold);
 
             Assert.IsNotNull(model);
             var geometry = model.Children.OfType<GeometryModel3D>().Single();
-            Assert.AreEqual(1, geometry.Bounds.X, 0.001);
-            Assert.AreEqual(2, geometry.Bounds.Y, 0.001);
+            Assert.AreEqual(3, geometry.Bounds.X, 0.001);
+            Assert.AreEqual(2, geometry.Bounds.SizeX, 0.001);
+        }
+
+        [TestMethod]
+        public void LoadModelBoundsInvalidObjectReferences()
+        {
+            const int invalidReferenceCount = 100_001;
+            var model = new StringBuilder(
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+                "<model unit=\"millimeter\" xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\">" +
+                "<resources><object id=\"1\" type=\"model\"><mesh>" +
+                "<vertices><vertex x=\"0\" y=\"0\" z=\"0\"/><vertex x=\"1\" y=\"0\" z=\"0\"/><vertex x=\"0\" y=\"1\" z=\"0\"/></vertices>" +
+                "<triangles><triangle v1=\"0\" v2=\"1\" v3=\"2\"/></triangles>" +
+                "</mesh></object></resources><build>");
+
+            for (var index = 0; index < invalidReferenceCount; index++)
+            {
+                model.Append("<item objectid=\"missing\"/>");
+            }
+
+            model.Append("<item objectid=\"1\"/></build></model>");
+            using var stream = BuildPackage(model.ToString(), thumbnailPng: null, thumbnailWidth: 0, thumbnailHeight: 0);
+
+            Model3DGroup loaded = ThreeMfModelLoader.LoadModel(stream, MediaColors.Gold);
+
+            Assert.IsNull(loaded, "Invalid object references must consume the resolution budget before later items are resolved.");
         }
 
         [TestMethod]
