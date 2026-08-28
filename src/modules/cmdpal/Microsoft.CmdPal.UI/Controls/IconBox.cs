@@ -445,7 +445,9 @@ public partial class IconBox : ContentControl
             // list virtualization situation, it's very possible we
             // may have already been set to a new icon before we
             // even got back from the await.
-            if (requestVersion != iconBox._requestVersion || !ReferenceEquals(sourceKey, iconBox.SourceKey))
+            if (requestVersion != iconBox._requestVersion ||
+                !ReferenceEquals(sourceKey, iconBox.SourceKey) ||
+                !ReferenceEquals(sourceRequested, iconBox._sourceRequested))
             {
                 // If the requested icon has changed, then just bail
                 diagnostics.Complete(IconRequestStatus.Stale, eventArgs.Value);
