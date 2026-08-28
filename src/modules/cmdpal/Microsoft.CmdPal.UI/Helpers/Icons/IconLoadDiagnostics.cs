@@ -26,8 +26,6 @@ internal static class IconLoadDiagnostics
 
     public static bool IsRecording => Volatile.Read(ref _activeSession) is not null;
 
-    public static bool IsEnabled => Volatile.Read(ref _activeSession) is not null || IconLoadEventSource.Log.IsEnabled();
-
     public static long? ActiveSessionId => Volatile.Read(ref _activeSession)?.Id;
 
     public static IReadOnlyList<IconLoadDiagnosticsReport> GetReports()
