@@ -2450,7 +2450,7 @@ the details view. This is especially useful for extensions that want to provide
 richer inline content in the details view, like a card.
 
 ```csharp
-interface IDetails2 requires IDetails {
+interface IDetails2 requires IDetails, INotifyItemsChanged {
     IContent[] GetContent();
 }
 ```
@@ -2458,10 +2458,9 @@ interface IDetails2 requires IDetails {
 This is a method, not a property, because we want to explicitly indicate that
 the content may be generated when it is requested. 
 
-Should an extension want to indicate that the content has changed, they can
-raise a `INotifyPropChanged` event on the `IDetails2` object for the property
-name "Content". The host will accept that as a notification that the content has
-changed. 
+Should an extension want to indicate that the content has changed, it should
+raise the inherited `INotifyItemsChanged.ItemsChanged` event. The host uses that
+contract-defined notification to refresh the rich details content.
 
 ## Class diagram
 
