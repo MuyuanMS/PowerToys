@@ -36,7 +36,7 @@ internal sealed class LatestWinsUpdateQueue<T>
             }
         }
 
-        superseded?.Complete();
+        superseded?.Cancel();
         if (startProcessing)
         {
             _ = ProcessAsync(workItem);
@@ -54,7 +54,7 @@ internal sealed class LatestWinsUpdateQueue<T>
             _pending = null;
         }
 
-        pending?.Complete();
+        pending?.Cancel();
     }
 
     private async Task ProcessAsync(WorkItem workItem)
@@ -103,6 +103,8 @@ internal sealed class LatestWinsUpdateQueue<T>
 
         public void Cancel(CancellationToken cancellationToken) =>
             _completion.TrySetCanceled(cancellationToken);
+
+        public void Cancel() => _completion.TrySetCanceled();
 
         public void Fail(Exception exception) => _completion.TrySetException(exception);
     }

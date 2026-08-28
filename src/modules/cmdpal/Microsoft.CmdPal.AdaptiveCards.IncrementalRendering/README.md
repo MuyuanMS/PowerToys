@@ -45,7 +45,7 @@ The updater changes plain text and inline SVG images in place.
 Markdown, actions, inputs, layout changes, and unknown changes replace the complete card.
 
 Changed SVG images load concurrently.
-The updater commits each image as soon as its SVG decode is complete.
+The updater applies the complete image group after every SVG decode succeeds.
 A three-second timeout is the maximum wait for the complete image group.
 
 The updater finishes the active update without cancellation.

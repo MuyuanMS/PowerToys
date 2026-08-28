@@ -135,6 +135,9 @@ public sealed partial class ContentFormControl : UserControl
             await _cardUpdater.UpdateAsync(card);
             AttachRenderedCard(_cardUpdater.RenderedCard);
         }
+        catch (OperationCanceledException)
+        {
+        }
         catch (Exception ex)
         {
             Logger.LogError("Failed to update an Adaptive Card", ex);
