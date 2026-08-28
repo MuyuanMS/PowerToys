@@ -376,9 +376,7 @@ public sealed record JSExtensionManifest
         }
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
         {
-            // A missing segment cannot be a trusted but unverified link. The caller already confirmed
-            // the entry point exists, so treat a vanished segment as not a reparse point.
-            return false;
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or System.Security.SecurityException)
         {
