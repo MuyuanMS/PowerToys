@@ -7,5 +7,6 @@ namespace Microsoft.CmdPal.UI.Helpers;
 internal enum ShellIconCacheInvalidationReason
 {
     AssociationChanged,
+    SystemImageUpdated,
     ShellRestarted,
 }

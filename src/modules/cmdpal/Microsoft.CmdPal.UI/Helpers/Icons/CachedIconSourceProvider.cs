@@ -197,7 +197,7 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
                     scale,
                     diagnostics: default,
                     demand: null,
-                    shellDiagnostics: shellDiagnostics.CreateSuboperation());
+                    shellDiagnostics: shellDiagnostics.CreateChildOperation());
                 intermediate = await typeTask.ConfigureAwait(false);
                 var canPublish = intermediate is not null
                     && !ShellItemIconFallback.IsFallback(intermediate);

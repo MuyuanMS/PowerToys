@@ -325,6 +325,16 @@ internal sealed partial class IconLoaderService : IIconLoaderService
                     extractionStartedAt,
                     locatedIcon.Value.Identity.Kind,
                     extractionResult.HasContent);
+                if (locatedIcon.Value.Identity.Kind == ShellIconIdentityKind.SystemImageList
+                    && !ShellIconLocations.IsCurrent(locatedIcon.Value))
+                {
+                    extractionResult.Dispose();
+                    diagnostics?.CompleteBackgroundPreparation(preparationStartedAt);
+                    var fallback = await GetShellItemFallbackSourceAsync(diagnostics).ConfigureAwait(false);
+                    diagnostics?.Complete();
+                    tcs.TrySetResult(fallback);
+                    return;
+                }
             }
             catch
             {
