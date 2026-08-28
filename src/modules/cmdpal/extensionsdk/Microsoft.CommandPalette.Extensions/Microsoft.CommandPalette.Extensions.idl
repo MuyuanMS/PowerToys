@@ -348,11 +348,6 @@ namespace Microsoft.CommandPalette.Extensions
     }
 
     [contract(Microsoft.CommandPalette.Extensions.ExtensionsContract, 1)]
-    interface IFormContent2 requires IFormContent {
-        ICommandResult SubmitAction(String actionId, String inputs, String data);
-    }
-
-    [contract(Microsoft.CommandPalette.Extensions.ExtensionsContract, 1)]
     interface IMarkdownContent requires IContent {
         String Body { get; };
     }
