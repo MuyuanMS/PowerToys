@@ -180,6 +180,12 @@ internal static class IconLoadDiagnostics
             if (etwSession is null)
             {
                 etwSession = candidate;
+                if (!IconLoadEventSource.Log.IsEnabled() &&
+                    ReferenceEquals(Interlocked.CompareExchange(ref _etwSession, null, candidate), candidate))
+                {
+                    candidate.Stop();
+                    return null;
+                }
             }
             else
             {
