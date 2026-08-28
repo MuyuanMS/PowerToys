@@ -5,7 +5,7 @@
 namespace Microsoft.CmdPal.UI.ViewModels;
 
 /// <summary>
-/// The run-once initialization latch and the demand a row carries while it waits
+/// The run-once initialization latch and each row's demand while it waits
 /// to be initialized. Kept apart from the view model's property marshalling so the
 /// memory-ordering requirements can be read in one place.
 /// </summary>

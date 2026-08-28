@@ -307,7 +307,7 @@ public sealed partial class ListViewModelNavigationTests
             page.ReplaceItems([CreateItem("Current")]);
 
             // Hold off the resumed background fetch before it can increment the
-            // generation itself. Run queued UI work reentrantly on this test thread
+            // generation itself. Run queued UI work during reentrant execution on this test thread
             // to prove suspension invalidated the old callback, not just the next fetch.
             using (GetPrivateField<Lock>(viewModel, "_fetchStateLock").EnterScope())
             {

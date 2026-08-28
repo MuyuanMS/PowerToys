@@ -370,11 +370,11 @@ public sealed partial class ListItemsView : UserControl,
             // Unloading releases demand. Loading the same view need not raise
             // ContainerContentChanging again. Only visit realized panel children,
             // never the potentially very large Items collection.
-            if (ItemsList.ItemsPanelRoot is { } panel)
+            if (ItemView.ItemsPanelRoot is { } panel)
             {
                 foreach (var child in panel.Children)
                 {
-                    if (child is SelectorItem container && ItemsList.ItemFromContainer(container) is ListItemViewModel item)
+                    if (child is SelectorItem container && ItemView.ItemFromContainer(container) is ListItemViewModel item)
                     {
                         RegisterRealizedItem(container, item);
                     }

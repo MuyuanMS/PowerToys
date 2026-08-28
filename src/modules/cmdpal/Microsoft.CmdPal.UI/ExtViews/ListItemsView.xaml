@@ -648,6 +648,7 @@
                             x:Name="ItemsGrid"
                             Padding="16,16"
                             CanDragItems="True"
+                            ContainerContentChanging="Items_ContainerContentChanging"
                             ContextCanceled="Items_OnContextCanceled"
                             ContextRequested="Items_OnContextRequested"
                             DoubleTapped="Items_DoubleTapped"
