@@ -373,6 +373,26 @@ public partial class DetailsViewModelTests
     }
 
     [TestMethod]
+    public void InitializeProperties_AfterCleanup_DoesNotResubscribeOrRebuildContent()
+    {
+        var content = new MarkdownContent { Body = "Content" };
+        var details = new TestDetailsWithQueuedContent { Content = [content] };
+        var context = CreatePageContext();
+        var vm = new DetailsViewModel(details, context.Reference);
+
+        vm.SafeCleanup();
+        vm.InitializeProperties();
+        details.EnqueueContent(() => [new PlainTextContent { Text = "Updated" }]);
+        details.TriggerItemsChanged();
+
+        Assert.AreEqual(0, vm.Content.Count);
+        Assert.IsFalse(vm.HasContent);
+        Assert.AreEqual(0, GetPropChangedSubscriberCount(details));
+        Assert.AreEqual(0, GetItemsChangedSubscriberCount(details));
+        GC.KeepAlive(context.Context);
+    }
+
+    [TestMethod]
     public void NonObservableDetails_DoesNotThrow()
     {
         // IDetails that does NOT implement INotifyPropChanged
@@ -436,6 +456,13 @@ public partial class DetailsViewModelTests
     private static int GetPropChangedSubscriberCount(BaseObservable observable) =>
         ((Delegate?)typeof(BaseObservable)
             .GetField(nameof(BaseObservable.PropChanged), BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(observable))?
+            .GetInvocationList()
+            .Length ?? 0;
+
+    private static int GetItemsChangedSubscriberCount(Details observable) =>
+        ((Delegate?)typeof(Details)
+            .GetField(nameof(Details.ItemsChanged), BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(observable))?
             .GetInvocationList()
             .Length ?? 0;

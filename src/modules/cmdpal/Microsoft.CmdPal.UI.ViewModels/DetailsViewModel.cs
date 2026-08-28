@@ -127,6 +127,11 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
 
     public override void InitializeProperties()
     {
+        if (Volatile.Read(ref _isCleanedUp) != 0)
+        {
+            return;
+        }
+
         var model = _detailsModel.Unsafe;
         if (model is null)
         {
@@ -148,7 +153,11 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
             _isContentSubscribed = true;
         }
 
-        Volatile.Write(ref _isCleanedUp, 0);
+        if (Volatile.Read(ref _isCleanedUp) != 0)
+        {
+            UnsubscribeFromDetails();
+            return;
+        }
 
         Title = model.Title ?? string.Empty;
         Body = model.Body ?? string.Empty;
@@ -244,6 +253,16 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
 
         Volatile.Write(ref _isCleanedUp, 1);
         Interlocked.Increment(ref _contentRebuildGeneration);
+        UnsubscribeFromDetails();
+        var cleanupScheduled = TryDoOnUiThread(CleanupCurrentContent);
+        if (!cleanupScheduled)
+        {
+            CleanupCurrentContent();
+        }
+    }
+
+    private void UnsubscribeFromDetails()
+    {
         if (_isSubscribed && _observableDetails is not null)
         {
             _observableDetails.PropChanged -= Model_PropChanged;
@@ -256,12 +275,6 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
             _observableContentDetails.ItemsChanged -= Model_ItemsChanged;
             _observableContentDetails = null;
             _isContentSubscribed = false;
-        }
-
-        var cleanupScheduled = TryDoOnUiThread(CleanupCurrentContent);
-        if (!cleanupScheduled)
-        {
-            CleanupCurrentContent();
         }
     }
 
