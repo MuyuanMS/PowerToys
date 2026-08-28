@@ -294,6 +294,21 @@ namespace
 
             if (WaitForSingleObject(process.get(), 0) == WAIT_OBJECT_0)
             {
+                for (;;)
+                {
+                    char buffer[4096];
+                    DWORD read = 0;
+                    if (!ReadFile(parent_stdout.get(), buffer, sizeof(buffer), &read, nullptr))
+                    {
+                        if (GetLastError() != ERROR_BROKEN_PIPE)
+                        {
+                            return std::nullopt;
+                        }
+                        break;
+                    }
+                    output.append(buffer, read);
+                }
+
                 DWORD exit_code = 0;
                 if (!GetExitCodeProcess(process.get(), &exit_code) || exit_code != 0)
                 {
