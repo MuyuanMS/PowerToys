@@ -203,7 +203,7 @@ public class SvgIconProtocolTests
     }
 
     [TestMethod]
-    public void ThemedSvgFileHonorsBomlessXmlEncodingDeclaration()
+    public void ThemedSvgFileHonorsXmlEncodingDeclarationWithoutByteOrderMark()
     {
         var path = Path.Combine(Path.GetTempPath(), $"CmdPal-{Guid.NewGuid():N}.svg");
         try
