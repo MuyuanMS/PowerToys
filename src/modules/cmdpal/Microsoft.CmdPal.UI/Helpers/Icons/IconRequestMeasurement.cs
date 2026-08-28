@@ -24,7 +24,7 @@ internal readonly struct IconRequestMeasurement
 
     public void RecordProviderResolution(IconProviderResolution resolution, IconLoadMeasurement? load)
     {
-        if (Session is not { } session)
+        if (Session is not { } session || session.IsStopped)
         {
             return;
         }
@@ -40,12 +40,15 @@ internal readonly struct IconRequestMeasurement
 
     public void Invalidate()
     {
-        Session?.InvalidateRequest(Id);
+        if (Session is { IsStopped: false } session)
+        {
+            session.InvalidateRequest(Id);
+        }
     }
 
     public void Complete(IconRequestStatus status, IconSource? result = null)
     {
-        if (Session is not { } session)
+        if (Session is not { } session || session.IsStopped)
         {
             return;
         }
