@@ -135,7 +135,7 @@ public class AllAppsPageTests : AppsTestBase
     }
 
     [TestMethod]
-    public void AppListItem_DefersWin32RowAndHeroIconsToUiLoader()
+    public async Task AppListItem_DefersWin32RowAndHeroIconsToUiLoader()
     {
         var app = new AppItem
         {
@@ -146,6 +146,11 @@ public class AllAppsPageTests : AppsTestBase
         };
 
         var item = new AppListItem(app, useThumbnails: true);
+
+        Assert.AreSame(Icons.GenericAppIcon, item.Icon);
+        Assert.AreSame(Icons.GenericAppIcon, item.Command.Icon);
+
+        await WaitForIconAsync(item);
 
         var rowIcon = (IconInfo)item.Icon!;
         Assert.IsTrue(AppIconProtocol.TryParse(rowIcon.Light.Icon, out var rowCandidates, out var rowJumbo));
@@ -179,5 +184,20 @@ public class AllAppsPageTests : AppsTestBase
         var details = (Details)item.Details!;
         var heroIcon = (IconInfo)details.HeroImage;
         Assert.AreEqual(app.JumboIconPath, heroIcon.Light.Icon);
+    }
+
+    private static async Task WaitForIconAsync(AppListItem item)
+    {
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            if (!ReferenceEquals(item.Icon, Icons.GenericAppIcon))
+            {
+                return;
+            }
+
+            await Task.Delay(10);
+        }
+
+        Assert.Fail("The deferred app icon was not published.");
     }
 }

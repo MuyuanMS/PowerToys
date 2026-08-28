@@ -16,9 +16,12 @@ namespace Microsoft.CmdPal.Ext.Apps.Programs;
 
 public sealed partial class AppListItem : ListItem, IPrecomputedListItem
 {
+    private readonly AppCommand _appCommand;
     private readonly AppItem _app;
+    private readonly Lazy<Task<IconInfo>> _iconLoadTask;
     private readonly Lazy<Task<Details>> _detailsLoadTask;
 
+    private InterlockedBoolean _isLoadingIcon;
     private InterlockedBoolean _isLoadingDetails;
 
     private FuzzyTargetCache _titleCache;
@@ -64,21 +67,45 @@ public sealed partial class AppListItem : ListItem, IPrecomputedListItem
         set => base.Details = value;
     }
 
+    public override IIconInfo? Icon
+    {
+        get
+        {
+            if (_isLoadingIcon.Set())
+            {
+                _ = LoadIconAsync();
+            }
+
+            return base.Icon;
+        }
+        set => base.Icon = value;
+    }
+
     public string AppIdentifier => _app.AppIdentifier;
 
     public AppItem App => _app;
 
     public AppListItem(AppItem app, bool useThumbnails)
     {
-        var appCommand = new AppCommand(app);
-        Command = appCommand;
+        Command = _appCommand = new AppCommand(app);
         _app = app;
         Title = app.Name;
         Subtitle = app.Subtitle;
-        Icon = appCommand.Icon = CreateIcon(app, useThumbnails);
+        var icon = CreateIcon(app, useThumbnails);
+        var deferIconLoad = !app.IsPackaged && useThumbnails && !ReferenceEquals(icon, Icons.GenericAppIcon);
+        Icon = _appCommand.Icon = deferIconLoad ? Icons.GenericAppIcon : icon;
 
         MoreCommands = _app.Commands?.ToArray() ?? [];
 
+        _iconLoadTask = new Lazy<Task<IconInfo>>(async () =>
+        {
+            if (deferIconLoad)
+            {
+                await Task.Yield();
+            }
+
+            return icon;
+        });
         _detailsLoadTask = new Lazy<Task<Details>>(BuildDetails);
     }
 
@@ -91,6 +118,18 @@ public sealed partial class AppListItem : ListItem, IPrecomputedListItem
         catch (Exception ex)
         {
             Logger.LogWarning($"Failed to load details for {AppIdentifier}\n{ex}");
+        }
+    }
+
+    private async Task LoadIconAsync()
+    {
+        try
+        {
+            Icon = _appCommand.Icon = CoalesceIcon(await _iconLoadTask.Value);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Failed to load icon for {AppIdentifier}\n{ex}");
         }
     }
 
