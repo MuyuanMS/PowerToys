@@ -249,8 +249,7 @@ internal sealed partial class IconLoaderService : IIconLoaderService
                         foreach (var fallbackIconString in protocolResult.FallbackIconStrings)
                         {
                             preparedIcon = IconPathConverter.Prepare(fallbackIconString, fontFamily, targetSize, theme);
-                            if (preparedIcon.Kind != IconPathConverter.PreparedIconKind.Empty
-                                && (preparedIcon.Kind != IconPathConverter.PreparedIconKind.Binary || preparedIcon.SoftwareBitmap is not null))
+                            if (ProtocolFallbackPreparedIconPolicy.ShouldUse(preparedIcon))
                             {
                                 break;
                             }
