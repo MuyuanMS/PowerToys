@@ -41,6 +41,12 @@ internal sealed class IconLoadMeasurement
 
     public void Enqueued(IconLoadPriority priority)
     {
+        if (Session.IsStopped)
+        {
+            PublishEnqueueState(EnqueueState.Rejected);
+            return;
+        }
+
         _queuePriority = (int)priority;
         _enqueuedAt = Stopwatch.GetTimestamp();
         try
@@ -58,11 +64,19 @@ internal sealed class IconLoadMeasurement
 
     public void RegisterTask(Task<IconSource?> task)
     {
-        Session.RegisterLoad(task, this);
+        if (!Session.IsStopped)
+        {
+            Session.RegisterLoad(task, this);
+        }
     }
 
     public void Rejected()
     {
+        if (Session.IsStopped)
+        {
+            return;
+        }
+
         if (!PublishEnqueueState(EnqueueState.Rejected))
         {
             return;
@@ -76,7 +90,17 @@ internal sealed class IconLoadMeasurement
 
     public async ValueTask<bool> WorkerStartingAsync(int workerCount = 1)
     {
+        if (Session.IsStopped)
+        {
+            return false;
+        }
+
         if (!await WaitForEnqueueAsync().ConfigureAwait(false))
+        {
+            return false;
+        }
+
+        if (Session.IsStopped)
         {
             return false;
         }
@@ -91,17 +115,27 @@ internal sealed class IconLoadMeasurement
         return true;
     }
 
-    public long BeginBackgroundPreparation() => Stopwatch.GetTimestamp();
+    public long BeginBackgroundPreparation() => Session.IsStopped ? 0 : Stopwatch.GetTimestamp();
 
     public void CompleteBackgroundPreparation(long startedAt)
     {
+        if (Session.IsStopped)
+        {
+            return;
+        }
+
         Session.RecordBackgroundPreparation(Id, InputKind, Stopwatch.GetTimestamp() - startedAt);
     }
 
-    public long BeginDispatcherWait() => Stopwatch.GetTimestamp();
+    public long BeginDispatcherWait() => Session.IsStopped ? 0 : Stopwatch.GetTimestamp();
 
     public long DispatcherStarted(long enqueuedAt)
     {
+        if (Session.IsStopped)
+        {
+            return 0;
+        }
+
         var now = Stopwatch.GetTimestamp();
         Session.RecordDispatcherWait(Id, InputKind, now - enqueuedAt);
         return now;
@@ -109,16 +143,31 @@ internal sealed class IconLoadMeasurement
 
     public void DispatcherCompleted(long startedAt)
     {
+        if (Session.IsStopped)
+        {
+            return;
+        }
+
         Session.RecordDispatcherWork(Id, InputKind, Stopwatch.GetTimestamp() - startedAt);
     }
 
     public void SetResult(IconSource? result)
     {
+        if (Session.IsStopped)
+        {
+            return;
+        }
+
         _resultKind = (int)IconLoadDiagnostics.ClassifyResult(result);
     }
 
     public void CompleteDirectGlyph(IconSource? result)
     {
+        if (Session.IsStopped)
+        {
+            return;
+        }
+
         SetResult(result);
         if (Interlocked.Exchange(ref _completed, 1) == 0)
         {
@@ -132,6 +181,11 @@ internal sealed class IconLoadMeasurement
 
     public void Complete()
     {
+        if (Session.IsStopped)
+        {
+            return;
+        }
+
         if (Interlocked.Exchange(ref _completed, 1) == 0)
         {
             var enqueuedAt = Volatile.Read(ref _enqueuedAt);
@@ -144,6 +198,11 @@ internal sealed class IconLoadMeasurement
 
     public void Fail()
     {
+        if (Session.IsStopped)
+        {
+            return;
+        }
+
         if (Interlocked.Exchange(ref _completed, 1) == 0)
         {
             var enqueuedAt = Volatile.Read(ref _enqueuedAt);

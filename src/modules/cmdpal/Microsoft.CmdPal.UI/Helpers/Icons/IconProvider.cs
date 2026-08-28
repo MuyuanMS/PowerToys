@@ -67,6 +67,7 @@ public static partial class IconProvider
         {
             Logger.LogError("Failed to provide icon source", ex);
             args.Value = null;
+            args.Failed = true;
         }
         finally
         {
