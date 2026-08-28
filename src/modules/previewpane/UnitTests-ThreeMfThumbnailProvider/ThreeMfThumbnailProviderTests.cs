@@ -65,6 +65,19 @@ namespace ThreeMfThumbnailProviderUnitTests
         }
 
         [TestMethod]
+        public void ResizeImageDoesNotEnlargeFittingNonArgbBitmap()
+        {
+            using var source = new Bitmap(32, 24, PixelFormat.Format24bppRgb);
+
+            using Bitmap resized = ThreeMfThumbnailProvider.ResizeImage(source, 256);
+
+            Assert.IsNotNull(resized);
+            Assert.AreEqual(32, resized.Width);
+            Assert.AreEqual(24, resized.Height);
+            Assert.AreEqual(PixelFormat.Format32bppArgb, resized.PixelFormat);
+        }
+
+        [TestMethod]
         public void CheckNoThreeMfEmptyStreamShouldReturnNullBitmap()
         {
             using (var stream = new MemoryStream())
@@ -231,6 +244,22 @@ namespace ThreeMfThumbnailProviderUnitTests
         }
 
         [TestMethod]
+        public void LoadModelAppliesWhitespaceSeparatedNestedTransforms()
+        {
+            using var stream = CreateCrossPartThreeMf(
+                componentTransform: "1 0 0 0\t1 0 0 0 1 1 0 0",
+                buildTransform: "1 0 0 0 1 0 0 0 1 0\n2 0",
+                vertexExtent: 1);
+
+            Model3DGroup model = ThreeMfModelLoader.LoadModel(stream, MediaColors.Gold);
+
+            Assert.IsNotNull(model);
+            var geometry = model.Children.OfType<GeometryModel3D>().Single();
+            Assert.AreEqual(1, geometry.Bounds.X, 0.001);
+            Assert.AreEqual(2, geometry.Bounds.Y, 0.001);
+        }
+
+        [TestMethod]
         public void LoadModelPreservesIndexedMeshVertices()
         {
             using var stream = CreateMeshOnlyThreeMf();
@@ -293,17 +322,24 @@ namespace ThreeMfThumbnailProviderUnitTests
             Assert.IsNotNull(thumbnail);
         }
 
-        private static MemoryStream CreateCrossPartThreeMf(bool directBuildReference = false, string partUnit = "millimeter", int vertexExtent = 10)
+        private static MemoryStream CreateCrossPartThreeMf(
+            bool directBuildReference = false,
+            string partUnit = "millimeter",
+            int vertexExtent = 10,
+            string componentTransform = null,
+            string buildTransform = null)
         {
+            var componentTransformAttribute = componentTransform is null ? string.Empty : $" transform=\"{componentTransform}\"";
+            var buildTransformAttribute = buildTransform is null ? string.Empty : $" transform=\"{buildTransform}\"";
             var rootModel =
                 "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
                 "<model unit=\"millimeter\" xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\" " +
                 "xmlns:p=\"http://schemas.microsoft.com/3dmanufacturing/production/2015/06\">" +
                 (directBuildReference
-                    ? "<resources/><build><item objectid=\"10\" p:path=\"/3D/parts/part1.model\"/></build></model>"
+                    ? $"<resources/><build><item objectid=\"10\" p:path=\"/3D/parts/part1.model\"{buildTransformAttribute}/></build></model>"
                     : "<resources><object id=\"1\" type=\"model\"><components>" +
-                      "<component objectid=\"10\" p:path=\"/3D/parts/part1.model\"/>" +
-                      "</components></object></resources><build><item objectid=\"1\"/></build></model>");
+                      $"<component objectid=\"10\" p:path=\"/3D/parts/part1.model\"{componentTransformAttribute}/>" +
+                      $"</components></object></resources><build><item objectid=\"1\"{buildTransformAttribute}/></build></model>");
 
             var partModel =
                 "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +

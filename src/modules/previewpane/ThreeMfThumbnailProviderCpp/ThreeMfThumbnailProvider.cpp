@@ -389,6 +389,7 @@ IFACEMETHODIMP ThreeMfThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, W
 
                     *phbmp = hbmp;
                     *pdwAlpha = WTS_ALPHATYPE::WTSAT_ARGB;
+                    Logger::info(L"PNG file generated.");
 
                     // Only report success once both COM output parameters have been assigned.
                     return S_OK;

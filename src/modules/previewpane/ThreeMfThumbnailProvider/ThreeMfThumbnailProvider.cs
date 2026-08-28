@@ -179,7 +179,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 return image;
             }
 
-            float scale = Math.Min((float)maxSize / image.Width, (float)maxSize / image.Height);
+            float scale = Math.Min(1f, Math.Min((float)maxSize / image.Width, (float)maxSize / image.Height));
             int scaleWidth = (int)(image.Width * scale);
             int scaleHeight = (int)(image.Height * scale);
 

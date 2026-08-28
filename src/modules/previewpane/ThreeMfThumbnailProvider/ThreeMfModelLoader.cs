@@ -15,7 +15,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
     internal static class ThreeMfModelLoader
     {
         private static readonly string[] ThumbnailExtensions = { ".png", ".jpg", ".jpeg" };
-        private static readonly char[] TransformSeparators = { ' ' };
+        private static readonly char[] TransformSeparators = { ' ', '\t', '\r', '\n' };
 
         // Because Explorer invokes this provider on untrusted files, cap the amount of work a
         // single 3MF (a ZIP of XML) can trigger to avoid decompression/geometry bombs.
@@ -458,7 +458,17 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                     {
                         using var partStream = entry.Open();
                         using var boundedStream = new MemoryStream();
-                        var copiedBytes = CopyWithLimit(partStream, boundedStream, _remainingModelBytes);
+                        long copiedBytes;
+                        try
+                        {
+                            copiedBytes = CopyWithLimit(partStream, boundedStream, _remainingModelBytes);
+                        }
+                        catch (InvalidDataException)
+                        {
+                            _remainingModelBytes = 0;
+                            return null;
+                        }
+
                         _remainingModelBytes -= copiedBytes;
                         boundedStream.Position = 0;
                         var document = LoadXmlSafe(boundedStream);
