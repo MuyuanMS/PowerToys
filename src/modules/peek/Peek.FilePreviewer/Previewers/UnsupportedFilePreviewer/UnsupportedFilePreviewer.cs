@@ -133,6 +133,7 @@ namespace Peek.FilePreviewer.Previewers
 
             if (Item is FolderItem)
             {
+                sizeProgress.Report(new FolderScanProgress(0, 0, 0, FolderScanState.Scanning));
                 await Task.Run(() => CalculateFolderSizeWithProgress(Item.Path, sizeProgress, cancellationToken), cancellationToken);
             }
             else
