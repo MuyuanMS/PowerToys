@@ -52,7 +52,24 @@ struct RealStringProvider : IStringProvider
 namespace
 {
     constexpr std::wstring_view WorkerArgument = L"--worker-json";
-    constexpr DWORD WorkerTimeoutMilliseconds = 30000;
+    constexpr DWORD DefaultWorkerTimeoutMilliseconds = 30000;
+
+    DWORD worker_timeout_milliseconds()
+    {
+#ifdef _DEBUG
+        wchar_t value[16]{};
+        if (GetEnvironmentVariableW(L"POWERTOYS_FILE_LOCKSMITH_TEST_TIMEOUT_MS", value, ARRAYSIZE(value)) > 0)
+        {
+            wchar_t* end = nullptr;
+            const auto timeout = wcstoul(value, &end, 10);
+            if (end != value && *end == L'\0' && timeout > 0 && timeout <= MAXDWORD)
+            {
+                return static_cast<DWORD>(timeout);
+            }
+        }
+#endif
+        return DefaultWorkerTimeoutMilliseconds;
+    }
 
     struct unique_handle
     {
@@ -241,7 +258,7 @@ namespace
         parent_stdin.reset();
 
         std::string output;
-        const auto deadline = GetTickCount64() + WorkerTimeoutMilliseconds;
+        const auto deadline = GetTickCount64() + worker_timeout_milliseconds();
         while (GetTickCount64() < deadline)
         {
             DWORD available = 0;
@@ -419,6 +436,13 @@ int wmain(int argc, wchar_t* argv[])
             Trace::UnregisterProvider();
             return 2;
         }
+
+#ifdef _DEBUG
+        if (GetEnvironmentVariableW(L"POWERTOYS_FILE_LOCKSMITH_TEST_BLOCK_WORKER", nullptr, 0) > 0)
+        {
+            Sleep(INFINITE);
+        }
+#endif
 
         Logger::info("Worker query started with {} paths", paths->size());
         const auto started = std::chrono::steady_clock::now();

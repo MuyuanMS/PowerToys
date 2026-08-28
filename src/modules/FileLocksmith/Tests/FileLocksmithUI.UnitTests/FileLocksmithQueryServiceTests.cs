@@ -5,6 +5,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -155,6 +156,55 @@ namespace PowerToys.FileLocksmithUI.UnitTests
             await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(30));
             await Task.WhenAll(outputTask, errorTask);
             Assert.AreEqual(2, process.ExitCode);
+        }
+
+        [TestMethod]
+        public async Task DirectCliTimeoutTerminatesBlockedWorker()
+        {
+            var existingProcessIds = Process.GetProcessesByName("FileLocksmithCLI")
+                .Select(process =>
+                {
+                    using (process)
+                    {
+                        return process.Id;
+                    }
+                })
+                .ToHashSet();
+
+            using var process = new Process
+            {
+                StartInfo = new ProcessStartInfo(GetWorkerPath())
+                {
+                    CreateNoWindow = true,
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                },
+            };
+            process.StartInfo.ArgumentList.Add("--json");
+            process.StartInfo.ArgumentList.Add(SelectedPaths[0]);
+            process.StartInfo.Environment["POWERTOYS_FILE_LOCKSMITH_TEST_BLOCK_WORKER"] = "1";
+            process.StartInfo.Environment["POWERTOYS_FILE_LOCKSMITH_TEST_TIMEOUT_MS"] = "500";
+
+            Assert.IsTrue(process.Start());
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
+            await Task.WhenAll(outputTask, errorTask);
+
+            Assert.AreEqual(2, process.ExitCode);
+            await Task.Delay(500);
+            var orphanedProcessIds = Process.GetProcessesByName("FileLocksmithCLI")
+                .Where(candidate => !existingProcessIds.Contains(candidate.Id))
+                .Select(candidate =>
+                {
+                    using (candidate)
+                    {
+                        return candidate.Id;
+                    }
+                })
+                .ToArray();
+            Assert.IsEmpty(orphanedProcessIds, $"Blocked worker processes remained: {string.Join(", ", orphanedProcessIds)}");
         }
 
         private static FileLocksmithQueryService CreateService(
