@@ -31,7 +31,7 @@ public sealed class LatestWinsUpdateQueueTests
         var superseded = queue.EnqueueAsync(2);
         var newest = queue.EnqueueAsync(3);
 
-        await superseded;
+        await Assert.ThrowsExactlyAsync<TaskCanceledException>(async () => await superseded);
         Assert.IsFalse(first.IsCompleted);
         Assert.IsFalse(newest.IsCompleted);
 
@@ -63,7 +63,7 @@ public sealed class LatestWinsUpdateQueueTests
         var pending = queue.EnqueueAsync(2);
         queue.ClearPending();
 
-        await pending;
+        await Assert.ThrowsExactlyAsync<TaskCanceledException>(async () => await pending);
         Assert.IsFalse(first.IsCompleted);
 
         releaseFirst.TrySetResult();
