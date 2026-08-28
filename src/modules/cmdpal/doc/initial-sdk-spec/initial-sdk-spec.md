@@ -2431,9 +2431,9 @@ Adaptive Cards supports setting multiple actions on a card. Those actions can be
 identified by an `id` property on the action. That `id` is not necessarily
 encoded in the JSON payload of the action.
 
-For us to properly support the gammut of AC scenarios, we need to be able to
+For us to properly support the gamut of AC scenarios, we need to be able to
 pass the `id` of the action back to the extension. This is a relatively simple
-addition to the `IForm` interface.
+addition to the `IFormContent` interface.
 
 ```csharp
 interface IFormContent2 requires IFormContent {
