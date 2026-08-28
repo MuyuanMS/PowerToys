@@ -191,17 +191,26 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
     {
         var generation = Interlocked.Increment(ref _contentRebuildGeneration);
         List<ContentViewModel> content = [];
-        if (model is IDetails2 details2)
+        try
         {
-            foreach (var item in details2.GetContent())
+            if (model is IDetails2 details2)
             {
-                var viewModel = CommandPaletteContentPageViewModel.CreateViewModel(item, PageContext);
-                if (viewModel is not null)
+                foreach (var item in details2.GetContent())
                 {
-                    viewModel.InitializeProperties();
-                    content.Add(viewModel);
+                    var viewModel = CommandPaletteContentPageViewModel.CreateViewModel(item, PageContext);
+                    if (viewModel is not null)
+                    {
+                        viewModel.InitializeProperties();
+                        content.Add(viewModel);
+                    }
                 }
             }
+        }
+        catch (Exception ex)
+        {
+            CleanupContentViewModels(content);
+            ShowException(ex);
+            return;
         }
 
         var updateScheduled = TryDoOnUiThread(
