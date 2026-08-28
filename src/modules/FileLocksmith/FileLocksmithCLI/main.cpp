@@ -62,7 +62,7 @@ namespace
         {
             wchar_t* end = nullptr;
             const auto timeout = wcstoul(value, &end, 10);
-            if (end != value && *end == L'\0' && timeout > 0 && timeout <= MAXDWORD)
+            if (end != value && *end == L'\0' && timeout > 0)
             {
                 return static_cast<DWORD>(timeout);
             }
