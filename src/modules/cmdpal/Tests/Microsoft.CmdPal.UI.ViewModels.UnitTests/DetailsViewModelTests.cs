@@ -24,8 +24,18 @@ public partial class DetailsViewModelTests
 
         public ICommandProviderContext ProviderContext => CommandProviderContext.Empty;
 
+        public bool ThrowOnException { get; init; } = true;
+
+        public Exception? LastException { get; private set; }
+
         public void ShowException(Exception ex, string? extensionHint = null)
         {
+            LastException = ex;
+            if (!ThrowOnException)
+            {
+                return;
+            }
+
             throw new AssertFailedException($"Unexpected exception from view model: {ex}");
         }
     }
@@ -84,6 +94,12 @@ public partial class DetailsViewModelTests
     private static PageContextFixture CreatePageContext(TaskScheduler scheduler)
     {
         var ctx = new TestPageContext { Scheduler = scheduler };
+        return new(ctx, new WeakReference<IPageContext>(ctx));
+    }
+
+    private static PageContextFixture CreatePageContext(bool throwOnException)
+    {
+        var ctx = new TestPageContext { ThrowOnException = throwOnException };
         return new(ctx, new WeakReference<IPageContext>(ctx));
     }
 
@@ -267,6 +283,23 @@ public partial class DetailsViewModelTests
     }
 
     [TestMethod]
+    public void ContentInitializationException_CleansInitializedViewModels()
+    {
+        var content = new MarkdownContent { Body = "Content" };
+        var throwingContent = new ThrowingMarkdownContent();
+        var details = new Details { Content = [content, throwingContent] };
+        var context = CreatePageContext(throwOnException: false);
+        var vm = new DetailsViewModel(details, context.Reference);
+
+        vm.InitializeProperties();
+
+        Assert.IsInstanceOfType<InvalidOperationException>(context.Context.LastException);
+        Assert.AreEqual(0, vm.Content.Count);
+        Assert.AreEqual(0, GetPropChangedSubscriberCount(content));
+        GC.KeepAlive(context.Context);
+    }
+
+    [TestMethod]
     public void Cleanup_CleansContentViewModels()
     {
         var content = new MarkdownContent { Body = "Content" };
@@ -342,6 +375,15 @@ public partial class DetailsViewModelTests
         public override IContent[] GetContent() => _queuedContent.TryDequeue(out var content)
             ? content()
             : base.GetContent();
+    }
+
+    private sealed partial class ThrowingMarkdownContent : MarkdownContent
+    {
+        public override string Body
+        {
+            get => throw new InvalidOperationException("Test content failed.");
+            set => base.Body = value;
+        }
     }
 
     private static int GetPropChangedSubscriberCount(BaseObservable observable) =>
