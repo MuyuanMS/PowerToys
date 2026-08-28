@@ -22,7 +22,6 @@ internal sealed class AdaptiveCache<TKey, TValue>
     private readonly Action<TKey, TValue, AdaptiveCacheRemovalReason, int, int>? _removalCallback;
 
     private readonly ConcurrentDictionary<TKey, CacheEntry> _map;
-    private readonly ConcurrentStack<CacheEntry> _pool = [];
     private readonly WaitCallback _maintenanceCallback;
 
     // ConcurrentDictionary.Count acquires every stripe lock. Keep an approximate count so
@@ -68,29 +67,19 @@ internal sealed class AdaptiveCache<TKey, TValue>
             return entry.Value!;
         }
 
-        if (!_pool.TryPop(out var newEntry))
-        {
-            newEntry = new CacheEntry();
-        }
-
         var value = factory(key, arg);
         var tick = Interlocked.Increment(ref _currentTick);
+        var newEntry = new CacheEntry();
         newEntry.Initialize(key, value, 1.0, tick);
 
         if (_map.TryAdd(key, newEntry))
         {
             Interlocked.Increment(ref _entryCount);
         }
-        else
+        else if (_map.TryGetValue(key, out var existing))
         {
-            newEntry.Clear();
-            _pool.Push(newEntry);
-
-            if (_map.TryGetValue(key, out var existing))
-            {
-                existing.Update(tick);
-                return existing.Value!;
-            }
+            existing.Update(tick);
+            return existing.Value!;
         }
 
         if (ShouldMaintenanceRun())
@@ -116,36 +105,34 @@ internal sealed class AdaptiveCache<TKey, TValue>
 
     public void Add(TKey key, TValue value)
     {
-        var tick = Interlocked.Increment(ref _currentTick);
-
-        if (_map.TryGetValue(key, out var existing))
+        while (true)
         {
-            existing.Update(tick);
-            _removalCallback?.Invoke(
-                key,
-                existing.Value,
-                AdaptiveCacheRemovalReason.Replaced,
-                ApproximateCount,
-                _capacity);
-            existing.SetValue(value);
-            return;
-        }
+            var tick = Interlocked.Increment(ref _currentTick);
+            var newEntry = new CacheEntry();
 
-        if (!_pool.TryPop(out var newEntry))
-        {
-            newEntry = new CacheEntry();
-        }
+            if (_map.TryGetValue(key, out var existing))
+            {
+                newEntry.Initialize(key, value, existing.GetFrequency() + 1.0, tick);
+                if (_map.TryUpdate(key, newEntry, existing))
+                {
+                    _removalCallback?.Invoke(
+                        key,
+                        existing.Value,
+                        AdaptiveCacheRemovalReason.Replaced,
+                        ApproximateCount,
+                        _capacity);
+                    break;
+                }
 
-        newEntry.Initialize(key, value, 1.0, tick);
+                continue;
+            }
 
-        if (_map.TryAdd(key, newEntry))
-        {
-            Interlocked.Increment(ref _entryCount);
-        }
-        else
-        {
-            newEntry.Clear();
-            _pool.Push(newEntry);
+            newEntry.Initialize(key, value, 1.0, tick);
+            if (_map.TryAdd(key, newEntry))
+            {
+                Interlocked.Increment(ref _entryCount);
+                break;
+            }
         }
 
         if (ShouldMaintenanceRun())
@@ -162,8 +149,6 @@ internal sealed class AdaptiveCache<TKey, TValue>
         {
             Interlocked.Decrement(ref _entryCount);
             _removalCallback?.Invoke(key, evicted.Value, reason, ApproximateCount, _capacity);
-            evicted.Clear();
-            _pool.Push(evicted);
             return true;
         }
 
@@ -280,17 +265,6 @@ internal sealed class AdaptiveCache<TKey, TValue>
             Value = value;
             _frequencyBits = BitConverter.DoubleToInt64Bits(frequency);
             _lastAccessTick = lastAccessTick;
-        }
-
-        public void SetValue(TValue value)
-        {
-            Value = value;
-        }
-
-        public void Clear()
-        {
-            Key = default!;
-            Value = default!;
         }
 
         public void Update(long tick)

@@ -265,4 +265,38 @@ internal static class IconLoadDiagnostics
             return IconLoadResultKind.Other;
         }
     }
+
+    internal static IconDispatcherMaterializationKind ClassifyStringMaterialization(string iconString)
+    {
+        var path = iconString.AsSpan();
+        var comma = path.IndexOf(',');
+        if (comma >= 0)
+        {
+            path = path[..comma];
+        }
+
+        if (path.EndsWith(".exe", StringComparison.Ordinal)
+            || path.EndsWith(".dll", StringComparison.Ordinal)
+            || path.EndsWith(".lnk", StringComparison.Ordinal))
+        {
+            return IconDispatcherMaterializationKind.Binary;
+        }
+
+        if (iconString.AsSpan().TrimStart().StartsWith("<svg", StringComparison.OrdinalIgnoreCase))
+        {
+            return IconDispatcherMaterializationKind.SvgData;
+        }
+
+        if (Uri.TryCreate(iconString, UriKind.Absolute, out var uri) && uri.AbsolutePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+        {
+            return IconDispatcherMaterializationKind.SvgUri;
+        }
+
+        if (Uri.TryCreate(iconString, UriKind.Absolute, out _))
+        {
+            return IconDispatcherMaterializationKind.BitmapUri;
+        }
+
+        return IconDispatcherMaterializationKind.Glyph;
+    }
 }
