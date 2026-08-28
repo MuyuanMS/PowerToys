@@ -184,6 +184,16 @@ public partial class ContentFormViewModel(IFormContent _form, WeakReference<IPag
         }
     }
 
+    protected override void UnsafeCleanup()
+    {
+        base.UnsafeCleanup();
+        var model = _formModel.Unsafe;
+        if (model is not null)
+        {
+            model.PropChanged -= Model_PropChanged;
+        }
+    }
+
     private static readonly string ErrorCardJson = """
 {
     "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
