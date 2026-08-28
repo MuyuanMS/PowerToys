@@ -62,7 +62,8 @@
         "TestableIO.System.IO.Abstractions.dll",
         "TestableIO.System.IO.Abstractions.Wrappers.dll",
         "WinRT.Runtime.dll"
-      ]
+      ],
+      "SdlWorkItemId": 49911822
     }
   ]
 }
