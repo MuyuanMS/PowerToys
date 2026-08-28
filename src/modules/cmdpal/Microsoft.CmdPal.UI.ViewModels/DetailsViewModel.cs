@@ -2,8 +2,11 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Collections.ObjectModel;
+using System.Threading;
 using Microsoft.CmdPal.UI.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
+using Microsoft.CommandPalette.Extensions.Toolkit;
 
 namespace Microsoft.CmdPal.UI.ViewModels;
 
@@ -11,7 +14,11 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
 {
     private readonly ExtensionObject<IDetails> _detailsModel;
     private INotifyPropChanged? _observableDetails;
+    private INotifyItemsChanged? _observableContentDetails;
     private bool _isSubscribed;
+    private bool _isContentSubscribed;
+    private int _isCleanedUp;
+    private int _contentRebuildGeneration;
 
     // Remember - "observable" properties from the model (via PropChanged)
     // cannot be marked [ObservableProperty]
@@ -26,6 +33,10 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
     // Metadata is an array of IDetailsElement,
     //   where IDetailsElement = {IDetailsTags, IDetailsLink, IDetailsSeparator}
     public List<DetailsElementViewModel> Metadata { get; private set; } = [];
+
+    public ObservableCollection<ContentViewModel> Content { get; } = [];
+
+    public bool HasContent => Content.Count > 0;
 
     public DetailsViewModel(IDetails details, WeakReference<IPageContext> context)
         : base(context)
@@ -72,6 +83,18 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
                 RebuildMetadata(model);
                 UpdateProperty(nameof(Metadata));
                 break;
+
+            // here be dragons: IDetails2 exposes a method GetContent() to build
+            // the content object. But the property change comes in under the name
+            // "Content". Listen to it only for models that do not also expose the
+            // collection-change notification contract.
+            case nameof(Details.Content):
+                if (model is not INotifyItemsChanged)
+                {
+                    RebuildContent(model);
+                }
+
+                break;
         }
     }
 
@@ -104,6 +127,11 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
 
     public override void InitializeProperties()
     {
+        if (Volatile.Read(ref _isCleanedUp) != 0)
+        {
+            return;
+        }
+
         var model = _detailsModel.Unsafe;
         if (model is null)
         {
@@ -116,6 +144,19 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
             observable.PropChanged += Model_PropChanged;
             _observableDetails = observable;
             _isSubscribed = true;
+        }
+
+        if (!_isContentSubscribed && model is INotifyItemsChanged observableContent)
+        {
+            observableContent.ItemsChanged += Model_ItemsChanged;
+            _observableContentDetails = observableContent;
+            _isContentSubscribed = true;
+        }
+
+        if (Volatile.Read(ref _isCleanedUp) != 0)
+        {
+            UnsubscribeFromDetails();
+            return;
         }
 
         Title = model.Title ?? string.Empty;
@@ -143,17 +184,112 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
         UpdateProperty(nameof(Size));
 
         RebuildMetadata(model);
+        RebuildContent(model);
+    }
+
+    private void Model_ItemsChanged(object sender, IItemsChangedEventArgs args)
+    {
+        var model = _detailsModel.Unsafe;
+        if (model is not null)
+        {
+            RebuildContent(model);
+        }
+    }
+
+    private void RebuildContent(IDetails model)
+    {
+        if (Volatile.Read(ref _isCleanedUp) != 0)
+        {
+            return;
+        }
+
+        var generation = Interlocked.Increment(ref _contentRebuildGeneration);
+        List<ContentViewModel> content = [];
+        try
+        {
+            if (model is IDetails2 details2)
+            {
+                foreach (var item in details2.GetContent())
+                {
+                    var viewModel = CommandPaletteContentPageViewModel.CreateViewModel(item, PageContext);
+                    if (viewModel is not null)
+                    {
+                        content.Add(viewModel);
+                        viewModel.InitializeProperties();
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            CleanupContentViewModels(content);
+            ShowException(ex);
+            return;
+        }
+
+        var updateScheduled = TryDoOnUiThread(
+            () =>
+            {
+                if (Volatile.Read(ref _isCleanedUp) != 0 || generation != Volatile.Read(ref _contentRebuildGeneration))
+                {
+                    CleanupContentViewModels(content);
+                    return;
+                }
+
+                ListHelpers.InPlaceUpdateList(Content, content, out var removedContent);
+                CleanupContentViewModels(removedContent);
+                UpdateProperty(nameof(Content), nameof(HasContent));
+            });
+
+        if (!updateScheduled)
+        {
+            CleanupContentViewModels(content);
+        }
     }
 
     protected override void UnsafeCleanup()
     {
         base.UnsafeCleanup();
 
+        Volatile.Write(ref _isCleanedUp, 1);
+        Interlocked.Increment(ref _contentRebuildGeneration);
+        UnsubscribeFromDetails();
+        var cleanupScheduled = TryDoOnUiThread(CleanupCurrentContent);
+        if (!cleanupScheduled)
+        {
+            CleanupCurrentContent();
+        }
+    }
+
+    private void UnsubscribeFromDetails()
+    {
         if (_isSubscribed && _observableDetails is not null)
         {
             _observableDetails.PropChanged -= Model_PropChanged;
             _observableDetails = null;
             _isSubscribed = false;
+        }
+
+        if (_isContentSubscribed && _observableContentDetails is not null)
+        {
+            _observableContentDetails.ItemsChanged -= Model_ItemsChanged;
+            _observableContentDetails = null;
+            _isContentSubscribed = false;
+        }
+    }
+
+    private void CleanupCurrentContent()
+    {
+        CleanupContentViewModels(Content);
+        Content.Clear();
+        UpdateProperty(nameof(Content), nameof(HasContent));
+    }
+
+    private static void CleanupContentViewModels(IEnumerable<ContentViewModel> content)
+    {
+        foreach (var item in content)
+        {
+            item.SafeCleanup();
         }
     }
 }
