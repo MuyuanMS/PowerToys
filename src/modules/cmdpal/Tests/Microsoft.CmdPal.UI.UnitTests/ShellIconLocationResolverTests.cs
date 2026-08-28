@@ -67,6 +67,26 @@ public class ShellIconLocationResolverTests
     }
 
     [TestMethod]
+    public void FailedFileTypeLocationDoesNotCachePathSpecificIdentityUnderTypeAlias()
+    {
+        var cache = new ShellIconLocationCache();
+        var locator = new EmptyLocator();
+        var resolver = new ShellIconLocationResolver(locator, cache);
+        var request = new ShellItemIconRequest(
+            "|ShellFileType|.TXT",
+            @"C:\Files\missing.txt",
+            Jumbo: false,
+            ShellItemIconLocationMode.FileType);
+
+        var locatedIcon = resolver.Resolve(request);
+
+        Assert.AreEqual(ShellIconIdentityKind.ItemPath, locatedIcon.Identity.Kind);
+        Assert.AreEqual(request.ItemPath, locatedIcon.Identity.ItemPath);
+        Assert.IsFalse(locatedIcon.CacheRawRequestAlias);
+        Assert.IsFalse(cache.TryGet(request, out _));
+    }
+
+    [TestMethod]
     public void SyntheticTypeLocationRetriesWhenGenerationChanges()
     {
         var cache = new ShellIconLocationCache();
@@ -132,6 +152,15 @@ public class ShellIconLocationResolverTests
             }
 
             return true;
+        }
+    }
+
+    private sealed class EmptyLocator : IShellItemIconLocator
+    {
+        public bool TryLocate(ShellItemIconRequest request, out LocatedShellIcon locatedIcon)
+        {
+            locatedIcon = default;
+            return false;
         }
     }
 }

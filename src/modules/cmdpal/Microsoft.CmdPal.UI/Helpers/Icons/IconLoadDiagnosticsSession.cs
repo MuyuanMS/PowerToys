@@ -1802,7 +1802,6 @@ internal sealed class IconLoadDiagnosticsSession
         _shellIconExtractionLatency.Append(builder, "Extraction", "    ");
         builder.AppendLine("    Extraction routes");
         AppendEnumCounts<ShellIconIdentityKind>(builder, _shellIconExtractionKinds, "      ");
-        AppendPercentage(builder, "Requests avoiding extraction", Math.Max(0, requestCount - extractionCount), requestCount, "    ");
         builder.AppendLine("    Direct system image-list extraction");
         AppendValue(builder, "Attempts", imageListExtractionCount, "      ");
         builder.AppendLine("      Image-list levels used");
