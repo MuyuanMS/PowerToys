@@ -134,6 +134,30 @@ namespace ThreeMfThumbnailProviderUnitTests
         }
 
         [TestMethod]
+        public void GetThumbnailUsesMetadataFallbackWithoutThumbnailRelationship()
+        {
+            const string model =
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+                "<model unit=\"millimeter\" xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\">" +
+                "<resources><object id=\"1\" type=\"model\"><mesh>" +
+                "<vertices><vertex x=\"0\" y=\"0\" z=\"0\"/><vertex x=\"1\" y=\"0\" z=\"0\"/><vertex x=\"0\" y=\"1\" z=\"0\"/></vertices>" +
+                "<triangles><triangle v1=\"0\" v2=\"1\" v3=\"2\"/></triangles>" +
+                "</mesh></object></resources><build><item objectid=\"1\"/></build></model>";
+            using var stream = BuildPackage(
+                model,
+                thumbnailPng: null,
+                thumbnailWidth: 0,
+                thumbnailHeight: 0,
+                heuristicThumbnailPng: CreatePng(16, 12, System.Drawing.Color.Red));
+
+            using Bitmap thumbnail = ThreeMfThumbnailProvider.GetThumbnail(stream, 256);
+
+            Assert.IsNotNull(thumbnail);
+            Assert.AreEqual(16, thumbnail.Width);
+            Assert.AreEqual(12, thumbnail.Height);
+        }
+
+        [TestMethod]
         public void GetThumbnailPathChangesOnlyTerminalExtension()
         {
             const string input = @"C:\profile.3mf\model.3mf";
