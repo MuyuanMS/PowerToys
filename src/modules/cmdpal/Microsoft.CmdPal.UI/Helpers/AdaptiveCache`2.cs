@@ -242,7 +242,7 @@ internal sealed class AdaptiveCache<TKey, TValue>
     }
 
     /// <summary>
-    /// Represents a single pooled entry in the cache, containing the value and
+    /// Represents a single entry in the cache, containing the value and
     /// atomic metadata for adaptive eviction logic.
     /// </summary>
     private sealed class CacheEntry
@@ -253,7 +253,7 @@ internal sealed class AdaptiveCache<TKey, TValue>
         public TKey Key { get; private set; } = default!;
 
         /// <summary>
-        /// Gets the cached value. This reference is cleared on eviction to allow GC collection.
+        /// Gets the cached value. The entry is removed from the map on eviction to allow GC collection.
         /// </summary>
         public TValue Value { get; private set; } = default!;
 
