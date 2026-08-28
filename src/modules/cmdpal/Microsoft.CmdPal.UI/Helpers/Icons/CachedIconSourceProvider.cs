@@ -40,12 +40,12 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
 
         if (_cache.TryGet(key, out var existingTask))
         {
-            IconLoadDiagnostics.RecordCacheLookup(_iconSize, _cacheSize, hit: true);
+            IconLoadDiagnostics.RecordCacheLookup(_iconSize, _cacheSize, hit: true, _cache.ApproximateCount);
             diagnostics.RecordProviderResolution(IconProviderResolution.CacheHit, existingTask);
             return existingTask;
         }
 
-        IconLoadDiagnostics.RecordCacheLookup(_iconSize, _cacheSize, hit: false);
+        IconLoadDiagnostics.RecordCacheLookup(_iconSize, _cacheSize, hit: false, _cache.ApproximateCount);
         return GetOrCreateSlowPath(key, icon, scale, diagnostics);
     }
 

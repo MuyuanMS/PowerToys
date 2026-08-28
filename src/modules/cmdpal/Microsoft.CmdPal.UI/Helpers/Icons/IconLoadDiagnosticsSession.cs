@@ -158,9 +158,9 @@ internal sealed class IconLoadDiagnosticsSession
 
     internal void RecordUiProbeRejected() => Interlocked.Increment(ref _uiProbeRejected);
 
-    internal void RecordCacheLookup(Size iconSize, int capacity, bool hit)
+    internal void RecordCacheLookup(Size iconSize, int capacity, bool hit, int entryCount)
     {
-        GetCacheMeasurements(iconSize, capacity).RecordLookup(hit);
+        GetCacheMeasurements(iconSize, capacity).RecordLookup(hit, entryCount);
     }
 
     internal void RecordCacheEntryAdded(Size iconSize, int capacity, int entryCount)
@@ -1722,8 +1722,9 @@ internal sealed class IconLoadDiagnosticsSession
         private long _entriesAdded;
         private long _entriesRemoved;
 
-        public void RecordLookup(bool hit)
+        public void RecordLookup(bool hit, int entryCount)
         {
+            RecordObservation(entryCount);
             if (hit)
             {
                 Interlocked.Increment(ref _hits);
