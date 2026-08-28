@@ -243,6 +243,9 @@ namespace PowerToys.FileLocksmithUI.Services
             catch (InvalidOperationException) when (process.HasExited)
             {
             }
+            catch (Win32Exception) when (process.HasExited)
+            {
+            }
 
             await process.WaitForExitAsync(CancellationToken.None);
         }
