@@ -65,10 +65,20 @@ namespace context_menu_lifecycle
             return value;
         }
 
-        inline HRESULT& initialization_result()
+        inline std::atomic<HRESULT>& initialization_result()
         {
-            static HRESULT value = E_UNEXPECTED;
+            static std::atomic<HRESULT> value = E_UNEXPECTED;
             return value;
+        }
+
+        inline void set_initialization_result(HRESULT result) noexcept
+        {
+            initialization_result().store(result, std::memory_order_release);
+        }
+
+        inline HRESULT get_initialization_result() noexcept
+        {
+            return initialization_result().load(std::memory_order_acquire);
         }
 
         inline void report(monitor_state* state, HRESULT result) noexcept
@@ -201,7 +211,7 @@ namespace context_menu_lifecycle
             const auto parameters = static_cast<initialization_parameters*>(parameter);
             if (!is_expected_package_host(parameters->package_family_name_prefix))
             {
-                initialization_result() = S_FALSE;
+                set_initialization_result(S_FALSE);
                 return TRUE;
             }
 
@@ -211,22 +221,22 @@ namespace context_menu_lifecycle
                     reinterpret_cast<LPCWSTR>(parameters->module_address),
                     &module))
             {
-                initialization_result() = HRESULT_FROM_WIN32(GetLastError());
+                set_initialization_result(HRESULT_FROM_WIN32(GetLastError()));
                 if (parameters->report_initialization)
                 {
-                    parameters->report_initialization(initialization_result());
+                    parameters->report_initialization(get_initialization_result());
                 }
-                SetLastError(HRESULT_CODE(initialization_result()));
+                SetLastError(HRESULT_CODE(get_initialization_result()));
                 return FALSE;
             }
 
             auto monitor = new (std::nothrow) monitor_state{};
             if (!monitor)
             {
-                initialization_result() = E_OUTOFMEMORY;
+                set_initialization_result(E_OUTOFMEMORY);
                 if (parameters->report_initialization)
                 {
-                    parameters->report_initialization(initialization_result());
+                    parameters->report_initialization(get_initialization_result());
                 }
                 FreeLibrary(module);
                 SetLastError(ERROR_OUTOFMEMORY);
@@ -240,47 +250,48 @@ namespace context_menu_lifecycle
             monitor->initialization_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
             if (!monitor->initialization_event)
             {
-                initialization_result() = HRESULT_FROM_WIN32(GetLastError());
-                report(monitor, initialization_result());
+                set_initialization_result(HRESULT_FROM_WIN32(GetLastError()));
+                report(monitor, get_initialization_result());
                 FreeLibrary(module);
                 delete monitor;
-                SetLastError(HRESULT_CODE(initialization_result()));
+                SetLastError(HRESULT_CODE(get_initialization_result()));
                 return FALSE;
             }
 
             const HANDLE thread = CreateThread(nullptr, 0, monitor_thread, monitor, 0, nullptr);
             if (!thread)
             {
-                initialization_result() = HRESULT_FROM_WIN32(GetLastError());
-                report(monitor, initialization_result());
+                set_initialization_result(HRESULT_FROM_WIN32(GetLastError()));
+                report(monitor, get_initialization_result());
                 CloseHandle(monitor->initialization_event);
                 FreeLibrary(module);
                 delete monitor;
-                SetLastError(HRESULT_CODE(initialization_result()));
+                SetLastError(HRESULT_CODE(get_initialization_result()));
                 return FALSE;
             }
 
             const DWORD wait_result = WaitForSingleObject(monitor->initialization_event, 5000);
             if (wait_result != WAIT_OBJECT_0)
             {
-                initialization_result() = wait_result == WAIT_TIMEOUT ? HRESULT_FROM_WIN32(ERROR_TIMEOUT) : HRESULT_FROM_WIN32(GetLastError());
-                report(monitor, initialization_result());
-                state().store(monitor, std::memory_order_release);
+                const DWORD error = wait_result == WAIT_TIMEOUT ? ERROR_TIMEOUT : GetLastError();
+                set_initialization_result(HRESULT_FROM_WIN32(error));
+                report(monitor, get_initialization_result());
                 CloseHandle(thread);
-                return TRUE;
+                SetLastError(error);
+                return FALSE;
             }
 
-            initialization_result() = monitor->initialization_result;
+            set_initialization_result(monitor->initialization_result);
             CloseHandle(monitor->initialization_event);
             monitor->initialization_event = nullptr;
-            if (FAILED(initialization_result()))
+            if (FAILED(get_initialization_result()))
             {
                 WaitForSingleObject(thread, INFINITE);
                 CloseHandle(thread);
-                report(monitor, initialization_result());
+                report(monitor, get_initialization_result());
                 FreeLibrary(module);
                 delete monitor;
-                SetLastError(HRESULT_CODE(initialization_result()));
+                SetLastError(HRESULT_CODE(get_initialization_result()));
                 return FALSE;
             }
 
@@ -315,10 +326,10 @@ namespace context_menu_lifecycle
             nullptr);
         if (!initialized)
         {
-            return details::initialization_result();
+            return details::get_initialization_result();
         }
 
-        return details::initialization_result();
+        return details::get_initialization_result();
     }
 
     inline activity_token begin_activity() noexcept
