@@ -159,6 +159,26 @@ namespace PowerToys.FileLocksmithUI.UnitTests
         }
 
         [TestMethod]
+        public async Task RealWorkerRejectsInvalidUtf8Request()
+        {
+            using var process = new Process
+            {
+                StartInfo = FileLocksmithQueryService.CreateWorkerStartInfo(GetWorkerPath()),
+            };
+
+            Assert.IsTrue(process.Start());
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+            await process.StandardInput.BaseStream.WriteAsync(new byte[] { 0xC3, 0x28 });
+            process.StandardInput.Close();
+
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(30));
+            await Task.WhenAll(outputTask, errorTask);
+            Assert.AreEqual(2, process.ExitCode);
+        }
+
+#if DEBUG
+        [TestMethod]
         public async Task DirectCliTimeoutTerminatesBlockedWorker()
         {
             var existingProcessIds = Process.GetProcessesByName("FileLocksmithCLI")
@@ -206,6 +226,7 @@ namespace PowerToys.FileLocksmithUI.UnitTests
                 .ToArray();
             Assert.IsEmpty(orphanedProcessIds, $"Blocked worker processes remained: {string.Join(", ", orphanedProcessIds)}");
         }
+#endif
 
         private static FileLocksmithQueryService CreateService(
             string script,
