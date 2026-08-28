@@ -227,10 +227,16 @@ namespace
 
         unique_handle process{ process_info.hProcess };
         unique_handle thread{ process_info.hThread };
+        const auto terminate_worker = [&] {
+            if (TerminateJobObject(job.get(), 2))
+            {
+                WaitForSingleObject(process.get(), INFINITE);
+            }
+        };
         if (!AssignProcessToJobObject(job.get(), process.get()) ||
             ResumeThread(thread.get()) == static_cast<DWORD>(-1))
         {
-            TerminateJobObject(job.get(), 2);
+            terminate_worker();
             return std::nullopt;
         }
 
@@ -250,7 +256,7 @@ namespace
                     nullptr) ||
                 written == 0)
             {
-                TerminateJobObject(job.get(), 2);
+                terminate_worker();
                 return std::nullopt;
             }
             written_total += written;
@@ -266,7 +272,7 @@ namespace
             {
                 if (GetLastError() != ERROR_BROKEN_PIPE)
                 {
-                    TerminateJobObject(job.get(), 2);
+                    terminate_worker();
                     return std::nullopt;
                 }
                 available = 0;
@@ -279,7 +285,7 @@ namespace
                 const auto to_read = (std::min)(available, static_cast<DWORD>(sizeof(buffer)));
                 if (!ReadFile(parent_stdout.get(), buffer, to_read, &read, nullptr))
                 {
-                    TerminateJobObject(job.get(), 2);
+                    terminate_worker();
                     return std::nullopt;
                 }
                 output.append(buffer, read);
@@ -299,7 +305,7 @@ namespace
             Sleep(10);
         }
 
-        TerminateJobObject(job.get(), 2);
+        terminate_worker();
         return std::nullopt;
     }
 
@@ -359,14 +365,14 @@ namespace
             std::istreambuf_iterator<char>{}
         };
 
-        json::JsonObject request;
-        if (!json::JsonObject::TryParse(winrt::to_hstring(input), request) || !request.HasKey(L"paths"))
-        {
-            return std::nullopt;
-        }
-
         try
         {
+            json::JsonObject request;
+            if (!json::JsonObject::TryParse(winrt::to_hstring(input), request) || !request.HasKey(L"paths"))
+            {
+                return std::nullopt;
+            }
+
             std::vector<std::wstring> paths;
             const auto json_paths = request.GetNamedArray(L"paths");
             paths.reserve(json_paths.Size());
