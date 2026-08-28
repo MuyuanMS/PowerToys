@@ -282,11 +282,6 @@ internal static class IconLoadDiagnostics
             return IconDispatcherMaterializationKind.Binary;
         }
 
-        if (iconString.AsSpan().TrimStart().StartsWith("<svg", StringComparison.OrdinalIgnoreCase))
-        {
-            return IconDispatcherMaterializationKind.SvgData;
-        }
-
         if (Uri.TryCreate(iconString, UriKind.Absolute, out var uri) && uri.AbsolutePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
         {
             return IconDispatcherMaterializationKind.SvgUri;

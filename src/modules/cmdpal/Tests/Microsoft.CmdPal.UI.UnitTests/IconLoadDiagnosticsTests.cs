@@ -346,11 +346,11 @@ public class IconLoadDiagnosticsTests
             IconDispatcherMaterializationKind.BitmapUri,
             IconLoadDiagnostics.ClassifyStringMaterialization("https://contoso.test/icon.png"));
         Assert.AreEqual(
-            IconDispatcherMaterializationKind.SvgData,
-            IconLoadDiagnostics.ClassifyStringMaterialization("  <svg viewBox=\"0 0 16 16\" />"));
-        Assert.AreEqual(
             IconDispatcherMaterializationKind.Glyph,
             IconLoadDiagnostics.ClassifyStringMaterialization("\uE700"));
+        Assert.AreEqual(
+            IconDispatcherMaterializationKind.Glyph,
+            IconLoadDiagnostics.ClassifyStringMaterialization("  <svg viewBox=\"0 0 16 16\" />"));
     }
 
     [TestMethod]
