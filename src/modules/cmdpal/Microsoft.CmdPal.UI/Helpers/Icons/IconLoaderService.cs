@@ -351,10 +351,18 @@ internal sealed partial class IconLoaderService : IIconLoaderService
                 if (extractionResult.TakeSoftwareBitmap() is { } softwareBitmap)
                 {
                     result = await CreateSoftwareBitmapIconSourceAsync(softwareBitmap, diagnostics).ConfigureAwait(false);
+                    if (result is ImageIconSource { ImageSource: null })
+                    {
+                        result = await GetShellItemFallbackSourceAsync(diagnostics).ConfigureAwait(false);
+                    }
                 }
                 else if (extractionResult.BitmapStream is { } bitmapStream)
                 {
                     result = await CreateImageIconSourceAsync(bitmapStream, scaledSize, diagnostics).ConfigureAwait(false);
+                    if (result is ImageIconSource { ImageSource: null })
+                    {
+                        result = await GetShellItemFallbackSourceAsync(diagnostics).ConfigureAwait(false);
+                    }
                 }
                 else
                 {

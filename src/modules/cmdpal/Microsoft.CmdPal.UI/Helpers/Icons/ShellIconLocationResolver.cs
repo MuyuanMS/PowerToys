@@ -98,6 +98,7 @@ internal sealed class ShellIconLocationResolver
 
         return new LocatedShellIcon(
             request,
-            ShellIconIdentity.FromItemPath(request.ItemPath, request.Jumbo));
+            ShellIconIdentity.FromItemPath(request.ItemPath, request.Jumbo),
+            request.LocationMode != ShellItemIconLocationMode.FileType);
     }
 }
