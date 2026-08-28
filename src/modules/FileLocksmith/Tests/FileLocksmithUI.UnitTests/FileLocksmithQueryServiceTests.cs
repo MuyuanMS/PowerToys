@@ -1,0 +1,278 @@
+// Copyright (c) Microsoft Corporation
+// The Microsoft Corporation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+using PowerToys.FileLocksmithUI.Services;
+
+namespace PowerToys.FileLocksmithUI.UnitTests
+{
+    [TestClass]
+    public sealed class FileLocksmithQueryServiceTests
+    {
+        private static readonly string[] SelectedPaths = [@"C:\file.txt"];
+
+        [TestMethod]
+        public async Task FindProcessesAsyncReturnsWorkerResults()
+        {
+            const string output = """
+                {"processes":[{"pid":123,"name":"process.exe","user":"user","files":["C:\\file.txt"]}]}
+                """;
+            var service = CreateService($"[Console]::Out.Write('{output}')");
+
+            var result = await service.FindProcessesAsync(SelectedPaths, CancellationToken.None);
+
+            Assert.AreEqual(FileLocksmithQueryStatus.Success, result.Status);
+            Assert.HasCount(1, result.Processes);
+            Assert.AreEqual(123U, result.Processes[0].Pid);
+            Assert.AreEqual("process.exe", result.Processes[0].Name);
+            Assert.AreEqual(@"C:\file.txt", result.Processes[0].Files[0]);
+        }
+
+        [TestMethod]
+        public async Task FindProcessesAsyncReportsMalformedWorkerOutput()
+        {
+            var service = CreateService("[Console]::Out.Write('not-json')");
+
+            var result = await service.FindProcessesAsync(SelectedPaths, CancellationToken.None);
+
+            Assert.AreEqual(FileLocksmithQueryStatus.MalformedOutput, result.Status);
+            Assert.IsEmpty(result.Processes);
+        }
+
+        [DataTestMethod]
+        [DataRow("""{"processes":[null]}""")]
+        [DataRow("""{"processes":[{"name":"process.exe","user":"user","files":["C:\\file.txt"]}]}""")]
+        [DataRow("""{"processes":[{"pid":123,"name":"process.exe","user":"user","files":[null]}]}""")]
+        public async Task FindProcessesAsyncReportsMalformedStructuredWorkerOutput(string output)
+        {
+            var service = CreateService($"[Console]::Out.Write('{output}')");
+
+            var result = await service.FindProcessesAsync(SelectedPaths, CancellationToken.None);
+
+            Assert.AreEqual(FileLocksmithQueryStatus.MalformedOutput, result.Status);
+            Assert.IsEmpty(result.Processes);
+        }
+
+        [TestMethod]
+        public async Task FindProcessesAsyncReportsFailedWorkerExitCode()
+        {
+            var service = CreateService("exit 17");
+
+            var result = await service.FindProcessesAsync(SelectedPaths, CancellationToken.None);
+
+            Assert.AreEqual(FileLocksmithQueryStatus.Failed, result.Status);
+            Assert.AreEqual(17, result.ExitCode);
+            Assert.IsEmpty(result.Processes);
+        }
+
+        [TestMethod]
+        public async Task FindProcessesAsyncTimeoutTerminatesWorker()
+        {
+            var workerPid = 0;
+            var service = CreateService(
+                "Start-Sleep -Seconds 30",
+                TimeSpan.FromMilliseconds(500),
+                pid => workerPid = pid);
+
+            var result = await service.FindProcessesAsync(SelectedPaths, CancellationToken.None);
+
+            Assert.AreEqual(FileLocksmithQueryStatus.TimedOut, result.Status);
+            Assert.AreNotEqual(0, workerPid);
+            Assert.IsFalse(IsProcessRunning(workerPid), "The timed-out worker process was left running.");
+        }
+
+        [TestMethod]
+        public async Task FindProcessesAsyncCallerCancellationTerminatesWorker()
+        {
+            var workerPid = 0;
+            var service = CreateService(
+                "Start-Sleep -Seconds 30",
+                TimeSpan.FromSeconds(30),
+                pid => workerPid = pid);
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+
+            try
+            {
+                await service.FindProcessesAsync(SelectedPaths, cancellation.Token);
+                Assert.Fail("Caller cancellation was not propagated.");
+            }
+            catch (OperationCanceledException)
+            {
+            }
+
+            Assert.AreNotEqual(0, workerPid);
+            Assert.IsFalse(IsProcessRunning(workerPid), "The canceled worker process was left running.");
+        }
+
+        [TestMethod]
+        public async Task FindProcessesAsyncUsesBomFreeUtf8WithRealWorker()
+        {
+            var testPath = Path.Combine(Path.GetTempPath(), $"File Locksmith \u6d4b\u8bd5 {Guid.NewGuid():N}.txt");
+            await File.WriteAllTextAsync(testPath, string.Empty);
+
+            try
+            {
+                var workerPath = GetWorkerPath();
+                var service = new FileLocksmithQueryService(
+                    () => FileLocksmithQueryService.CreateWorkerStartInfo(workerPath),
+                    TimeSpan.FromMinutes(2),
+                    null);
+
+                var result = await service.FindProcessesAsync(new[] { testPath }, CancellationToken.None);
+
+                Assert.AreEqual(FileLocksmithQueryStatus.Success, result.Status);
+            }
+            finally
+            {
+                File.Delete(testPath);
+            }
+        }
+
+        [DataTestMethod]
+        [DataRow("not-json")]
+        [DataRow("""{"paths":"C:\\file.txt"}""")]
+        [DataRow("""{"paths":[1]}""")]
+        [DataRow("""{"paths":[]}""")]
+        public async Task RealWorkerRejectsMalformedRequest(string request)
+        {
+            using var process = new Process
+            {
+                StartInfo = FileLocksmithQueryService.CreateWorkerStartInfo(GetWorkerPath()),
+            };
+
+            Assert.IsTrue(process.Start());
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+            await process.StandardInput.WriteAsync(request);
+            process.StandardInput.Close();
+
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(30));
+            await Task.WhenAll(outputTask, errorTask);
+            Assert.AreEqual(2, process.ExitCode);
+        }
+
+        [TestMethod]
+        public async Task RealWorkerRejectsInvalidUtf8Request()
+        {
+            using var process = new Process
+            {
+                StartInfo = FileLocksmithQueryService.CreateWorkerStartInfo(GetWorkerPath()),
+            };
+
+            Assert.IsTrue(process.Start());
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+            await process.StandardInput.BaseStream.WriteAsync(new byte[] { 0xC3, 0x28 });
+            process.StandardInput.Close();
+
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(30));
+            await Task.WhenAll(outputTask, errorTask);
+            Assert.AreEqual(2, process.ExitCode);
+        }
+
+#if DEBUG
+        [TestMethod]
+        public async Task DirectCliTimeoutTerminatesBlockedWorker()
+        {
+            var existingProcessIds = Process.GetProcessesByName("FileLocksmithCLI")
+                .Select(process =>
+                {
+                    using (process)
+                    {
+                        return process.Id;
+                    }
+                })
+                .ToHashSet();
+
+            using var process = new Process
+            {
+                StartInfo = new ProcessStartInfo(GetWorkerPath())
+                {
+                    CreateNoWindow = true,
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                },
+            };
+            process.StartInfo.ArgumentList.Add("--json");
+            process.StartInfo.ArgumentList.Add(SelectedPaths[0]);
+            process.StartInfo.Environment["POWERTOYS_FILE_LOCKSMITH_TEST_BLOCK_WORKER"] = "1";
+            process.StartInfo.Environment["POWERTOYS_FILE_LOCKSMITH_TEST_TIMEOUT_MS"] = "500";
+
+            Assert.IsTrue(process.Start());
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
+            await Task.WhenAll(outputTask, errorTask);
+
+            Assert.AreEqual(2, process.ExitCode);
+            await Task.Delay(500);
+            var orphanedProcessIds = Process.GetProcessesByName("FileLocksmithCLI")
+                .Where(candidate => !existingProcessIds.Contains(candidate.Id))
+                .Select(candidate =>
+                {
+                    using (candidate)
+                    {
+                        return candidate.Id;
+                    }
+                })
+                .ToArray();
+            Assert.IsEmpty(orphanedProcessIds, $"Blocked worker processes remained: {string.Join(", ", orphanedProcessIds)}");
+        }
+#endif
+
+        private static FileLocksmithQueryService CreateService(
+            string script,
+            TimeSpan? timeout = null,
+            Action<int>? processStarted = null)
+        {
+            return new FileLocksmithQueryService(
+                () =>
+                {
+                    var startInfo = new ProcessStartInfo("powershell.exe")
+                    {
+                        CreateNoWindow = true,
+                        RedirectStandardError = true,
+                        RedirectStandardInput = true,
+                        RedirectStandardOutput = true,
+                        UseShellExecute = false,
+                    };
+                    startInfo.ArgumentList.Add("-NoLogo");
+                    startInfo.ArgumentList.Add("-NoProfile");
+                    startInfo.ArgumentList.Add("-NonInteractive");
+                    startInfo.ArgumentList.Add("-Command");
+                    startInfo.ArgumentList.Add($"$null = [Console]::In.ReadToEnd(); {script}");
+                    return startInfo;
+                },
+                timeout ?? TimeSpan.FromSeconds(10),
+                processStarted);
+        }
+
+        private static string GetWorkerPath()
+        {
+            var workerPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "FileLocksmithCLI.exe"));
+            Assert.IsTrue(File.Exists(workerPath), $"The File Locksmith worker was not built at {workerPath}.");
+            return workerPath;
+        }
+
+        private static bool IsProcessRunning(int pid)
+        {
+            try
+            {
+                using var process = Process.GetProcessById(pid);
+                return !process.HasExited;
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+        }
+    }
+}
