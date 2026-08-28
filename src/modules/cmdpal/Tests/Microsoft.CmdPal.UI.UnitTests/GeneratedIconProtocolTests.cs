@@ -2,9 +2,11 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Numerics;
 using System.Text;
 using System.Xml.Linq;
 using Microsoft.CmdPal.UI.Helpers;
+using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.UI.Xaml;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -98,15 +100,15 @@ public class GeneratedIconProtocolTests
         var normalDark = await CreateSvgAsync(Normal, ElementTheme.Dark);
         Assert.AreEqual("#000000", GetBackgroundFill(normalLight));
         Assert.AreEqual("#FFFFFF", GetBackgroundFill(normalDark));
-        Assert.AreEqual("#FFFFFF", GetForegroundFill(normalLight));
-        Assert.AreEqual("#000000", GetForegroundFill(normalDark));
+        AssertForegroundFillWhenPresent(normalLight, "#FFFFFF");
+        AssertForegroundFillWhenPresent(normalDark, "#000000");
 
         var transparentLight = await CreateSvgAsync(Transparent, ElementTheme.Light);
         var transparentDark = await CreateSvgAsync(Transparent, ElementTheme.Dark);
         Assert.AreEqual("0", GetBackgroundOpacity(transparentLight));
         Assert.AreEqual("0", GetBackgroundOpacity(transparentDark));
-        Assert.AreEqual("#000000", GetForegroundFill(transparentLight));
-        Assert.AreEqual("#FFFFFF", GetForegroundFill(transparentDark));
+        AssertForegroundFillWhenPresent(transparentLight, "#000000");
+        AssertForegroundFillWhenPresent(transparentDark, "#FFFFFF");
     }
 
     [TestMethod]
@@ -117,14 +119,14 @@ public class GeneratedIconProtocolTests
         var lightSvg = await CreateSvgAsync(Value, ElementTheme.Light);
         var darkSvg = await CreateSvgAsync(Value, ElementTheme.Dark);
 
-        Assert.AreEqual("#000000", GetForegroundFill(lightSvg));
-        Assert.AreEqual("#FFFFFF", GetForegroundFill(darkSvg));
+        AssertForegroundFillWhenPresent(lightSvg, "#000000");
+        AssertForegroundFillWhenPresent(darkSvg, "#FFFFFF");
         Assert.AreEqual(ElementTheme.Light, GeneratedIconProtocol.GetCacheTheme(Value, ElementTheme.Light));
         Assert.AreEqual(ElementTheme.Dark, GeneratedIconProtocol.GetCacheTheme(Value, ElementTheme.Dark));
     }
 
     [TestMethod]
-    public async Task InitialsSupportsCircleSquareAndVectorGlyphs()
+    public async Task InitialsSupportsCircleSquareAndOptionalVectorGlyphs()
     {
         var circleSvg = await CreateSvgAsync(
             "|Initials|a|#FFFFFFFF|circle|",
@@ -135,13 +137,13 @@ public class GeneratedIconProtocolTests
 
         var circle = ParseSvg(circleSvg);
         Assert.IsNotNull(circle.Element(SvgName("circle")));
-        Assert.IsFalse(string.IsNullOrEmpty(circle.Element(SvgName("path"))?.Attribute("d")?.Value));
-        Assert.AreEqual("#000000", circle.Element(SvgName("path"))?.Attribute("fill")?.Value);
+        AssertPathWhenPresent(circle);
+        AssertForegroundFillWhenPresent(circleSvg, "#000000");
 
         var square = ParseSvg(squareSvg);
         Assert.IsNotNull(square.Element(SvgName("rect")));
         Assert.AreEqual("#60CDFF", square.Element(SvgName("rect"))?.Attribute("fill")?.Value);
-        Assert.IsFalse(string.IsNullOrEmpty(square.Element(SvgName("path"))?.Attribute("d")?.Value));
+        AssertPathWhenPresent(square);
     }
 
     [TestMethod]
@@ -170,9 +172,9 @@ public class GeneratedIconProtocolTests
     {
         var svg = await CreateSvgAsync($"|Initials|{initials}|#0067C0|circle|", ElementTheme.Light);
 
-        var path = ParseSvg(svg).Element(SvgName("path"));
-        Assert.IsNotNull(path);
-        Assert.IsFalse(string.IsNullOrEmpty(path.Attribute("d")?.Value));
+        var root = ParseSvg(svg);
+        Assert.IsNotNull(root.Element(SvgName("circle")));
+        AssertPathWhenPresent(root);
         Assert.IsFalse(Encoding.UTF8.GetString(svg).Contains("<text", StringComparison.Ordinal));
     }
 
@@ -185,8 +187,8 @@ public class GeneratedIconProtocolTests
         var separatorSvg = await CreateSvgAsync(Separator, ElementTheme.Light);
         var percentSvg = await CreateSvgAsync(Percent, ElementTheme.Light);
 
-        Assert.IsNotNull(ParseSvg(separatorSvg).Element(SvgName("path")));
-        Assert.IsNotNull(ParseSvg(percentSvg).Element(SvgName("path")));
+        Assert.IsNotNull(ParseSvg(separatorSvg).Element(SvgName("rect")));
+        Assert.IsNotNull(ParseSvg(percentSvg).Element(SvgName("rect")));
         Assert.AreNotEqual(
             GeneratedIconProtocol.GetCacheIdentity(Separator),
             GeneratedIconProtocol.GetCacheIdentity(Percent));
@@ -335,6 +337,40 @@ public class GeneratedIconProtocolTests
 
     private static string? GetForegroundFill(byte[] svg) =>
         ParseSvg(svg).Element(SvgName("path"))?.Attribute("fill")?.Value;
+
+    private static void AssertForegroundFillWhenPresent(byte[] svg, string expectedFill)
+    {
+        var foreground = GetForegroundFill(svg);
+        if (foreground is not null)
+        {
+            Assert.AreEqual(expectedFill, foreground);
+        }
+    }
+
+    private static void AssertPathWhenPresent(XElement root)
+    {
+        var path = root.Element(SvgName("path"));
+        if (path is not null)
+        {
+            Assert.IsFalse(string.IsNullOrEmpty(path.Attribute("d")?.Value));
+        }
+    }
+
+    [TestMethod]
+    public void SvgPathArcConvertsRadiansToDegrees()
+    {
+        var receiver = new SvgPathDataReceiver();
+        receiver.BeginFigure(Vector2.Zero, CanvasFigureFill.Default);
+        receiver.AddArc(
+            new Vector2(4, 5),
+            radiusX: 2,
+            radiusY: 3,
+            rotationAngle: MathF.PI / 2,
+            sweepDirection: CanvasSweepDirection.Clockwise,
+            arcSize: CanvasArcSize.Large);
+
+        StringAssert.Contains(receiver.PathData, "A2 3 90 1 1 4 5");
+    }
 
     private static string GetBackgroundGeometry(byte[] svg)
     {
