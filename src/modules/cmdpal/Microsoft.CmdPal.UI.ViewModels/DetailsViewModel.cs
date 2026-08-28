@@ -17,7 +17,7 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
     private INotifyItemsChanged? _observableContentDetails;
     private bool _isSubscribed;
     private bool _isContentSubscribed;
-    private bool _isCleanedUp;
+    private int _isCleanedUp;
     private int _contentRebuildGeneration;
 
     // Remember - "observable" properties from the model (via PropChanged)
@@ -148,7 +148,7 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
             _isContentSubscribed = true;
         }
 
-        _isCleanedUp = false;
+        Volatile.Write(ref _isCleanedUp, 0);
 
         Title = model.Title ?? string.Empty;
         Body = model.Body ?? string.Empty;
@@ -189,6 +189,11 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
 
     private void RebuildContent(IDetails model)
     {
+        if (Volatile.Read(ref _isCleanedUp) != 0)
+        {
+            return;
+        }
+
         var generation = Interlocked.Increment(ref _contentRebuildGeneration);
         List<ContentViewModel> content = [];
         try
@@ -216,7 +221,7 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
         var updateScheduled = TryDoOnUiThread(
             () =>
             {
-                if (_isCleanedUp || generation != Volatile.Read(ref _contentRebuildGeneration))
+                if (Volatile.Read(ref _isCleanedUp) != 0 || generation != Volatile.Read(ref _contentRebuildGeneration))
                 {
                     CleanupContentViewModels(content);
                     return;
@@ -237,11 +242,8 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
     {
         base.UnsafeCleanup();
 
-        _isCleanedUp = true;
-
-        CleanupContentViewModels(Content);
-        Content.Clear();
-
+        Volatile.Write(ref _isCleanedUp, 1);
+        Interlocked.Increment(ref _contentRebuildGeneration);
         if (_isSubscribed && _observableDetails is not null)
         {
             _observableDetails.PropChanged -= Model_PropChanged;
@@ -255,6 +257,19 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
             _observableContentDetails = null;
             _isContentSubscribed = false;
         }
+
+        var cleanupScheduled = TryDoOnUiThread(CleanupCurrentContent);
+        if (!cleanupScheduled)
+        {
+            CleanupCurrentContent();
+        }
+    }
+
+    private void CleanupCurrentContent()
+    {
+        CleanupContentViewModels(Content);
+        Content.Clear();
+        UpdateProperty(nameof(Content), nameof(HasContent));
     }
 
     private static void CleanupContentViewModels(IEnumerable<ContentViewModel> content)
