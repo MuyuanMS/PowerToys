@@ -54,7 +54,11 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
             }
         }
 
-        IconLoadDiagnostics.RecordShellAssociationChangedNotification();
+        if ((eventId & ShcneAssocChanged) != 0)
+        {
+            IconLoadDiagnostics.RecordShellAssociationChangedNotification();
+        }
+
         Invalidate(reason);
         return true;
     }
