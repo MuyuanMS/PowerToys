@@ -145,6 +145,12 @@ public class PeekFilePreviewTests : UITestBase
         var peekWindow = OpenPeekWindow(folderPath);
 
         peekWindow.Find<TextBlock>(By.Name("File Type: File folder"), 5_000);
+
+        long fileCount = Directory.EnumerateFiles(folderPath, "*", SearchOption.AllDirectories).LongCount();
+        long folderCount = Directory.EnumerateDirectories(folderPath, "*", SearchOption.AllDirectories).LongCount();
+        string files = fileCount == 1 ? "1 file" : $"{fileCount:N0} files";
+        string folders = folderCount == 1 ? "1 folder" : $"{folderCount:N0} folders";
+        peekWindow.Find<TextBlock>(By.Name($"Contains: {files}, {folders}"), PreviewLoadTimeoutMS);
     }
 
     [TestMethod("Peek.FilePreview.JPEGImage")]
