@@ -334,6 +334,63 @@ public class IconLoadDiagnosticsTests
     }
 
     [TestMethod]
+    public void StringMaterializationClassificationMatchesIconConverterBranches()
+    {
+        Assert.AreEqual(
+            IconDispatcherMaterializationKind.Binary,
+            IconLoadDiagnostics.ClassifyStringMaterialization(@"C:\Windows\System32\shell32.dll,10"));
+        Assert.AreEqual(
+            IconDispatcherMaterializationKind.SvgUri,
+            IconLoadDiagnostics.ClassifyStringMaterialization("https://contoso.test/icon.svg"));
+        Assert.AreEqual(
+            IconDispatcherMaterializationKind.BitmapUri,
+            IconLoadDiagnostics.ClassifyStringMaterialization("https://contoso.test/icon.png"));
+        Assert.AreEqual(
+            IconDispatcherMaterializationKind.SvgData,
+            IconLoadDiagnostics.ClassifyStringMaterialization("  <svg viewBox=\"0 0 16 16\" />"));
+        Assert.AreEqual(
+            IconDispatcherMaterializationKind.Glyph,
+            IconLoadDiagnostics.ClassifyStringMaterialization("\uE700"));
+    }
+
+    [TestMethod]
+    public void DispatcherOutlierReportCountsAllSamplesButRetainsOnlyTopTen()
+    {
+        IconLoadDiagnostics.Start();
+        for (var i = 0; i < 12; i++)
+        {
+            var request = IconLoadDiagnostics.BeginRequest(IconRequestReason.SourceChanged, 1.0);
+            var load = IconLoadDiagnostics.CreateLoad(
+                request,
+                $"bitmap{i}.png",
+                hasStream: false,
+                width: 20,
+                height: 20,
+                scale: 1.0);
+
+            Assert.IsNotNull(load);
+            request.RecordProviderResolution(IconProviderResolution.NewLoad, load);
+            load.Enqueued(IconLoadPriority.Low);
+            StartWorker(load);
+            var dispatcherEnqueuedAt = load.BeginDispatcherWait(IconDispatcherMaterializationKind.BitmapUri);
+            var dispatcherStartedAt = load.DispatcherStarted(dispatcherEnqueuedAt);
+            load.DispatcherUiSliceCompleted(
+                Stopwatch.GetTimestamp() - (Stopwatch.Frequency / (20 + i)),
+                IconDispatcherUiSliceKind.SynchronousCallback);
+            load.DispatcherCompleted(dispatcherStartedAt);
+            load.SetResult(null);
+            load.Complete();
+            request.Complete(IconRequestStatus.Empty);
+        }
+
+        var report = IconLoadDiagnostics.StopAndCreateReport();
+
+        Assert.IsNotNull(report);
+        StringAssert.Contains(report.Text, "Samples captured: 12");
+        Assert.AreEqual(10, CountOccurrences(report.Text, "    Load "));
+    }
+
+    [TestMethod]
     public void StaleQueuedRequestTracksRetainedCacheUse()
     {
         IconLoadDiagnostics.Start();

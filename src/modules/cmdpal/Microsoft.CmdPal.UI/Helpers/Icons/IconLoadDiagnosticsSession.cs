@@ -47,7 +47,8 @@ internal sealed class IconLoadDiagnosticsSession
     private readonly DiagnosticHistogram[] _dispatcherAsyncSuspensionLatencyByDemand = CreateDemandMeasurements();
     private readonly DiagnosticHistogram[] _dispatcherUiExecutionLatencyBySliceKind = CreateDispatcherUiSliceMeasurements();
     private readonly DispatcherMaterializationMeasurements[] _dispatcherMaterializationMeasurements = CreateDispatcherMaterializationMeasurements();
-    private readonly ConcurrentQueue<DispatcherOutlierSample> _dispatcherOutliers = new();
+    private readonly object _dispatcherOutliersLock = new();
+    private readonly List<DispatcherOutlierSample> _dispatcherOutliers = [];
     private readonly DiagnosticHistogram _uiProbeWaitLatency = new();
     private readonly DiagnosticHistogram _elementUpdateLatency = new();
     private readonly InputKindMeasurements[] _inputKindMeasurements = CreateInputKindMeasurements();
@@ -111,6 +112,7 @@ internal sealed class IconLoadDiagnosticsSession
     private long _dispatcherCompletedDemanded;
     private long _dispatcherCompletedSpeculative;
     private long _dispatcherWaitFailures;
+    private long _dispatcherOutlierSamples;
     private long _currentDispatcherWaits;
     private long _maximumDispatcherWaits;
     private long _currentDispatcherCallbacks;
@@ -1076,10 +1078,15 @@ internal sealed class IconLoadDiagnosticsSession
             builder.AppendLine("    no samples");
         }
 
-        var outliers = _dispatcherOutliers.ToArray();
+        DispatcherOutlierSample[] outliers;
+        lock (_dispatcherOutliersLock)
+        {
+            outliers = _dispatcherOutliers.ToArray();
+        }
+
         Array.Sort(outliers, static (left, right) => right.ElapsedTicks.CompareTo(left.ElapsedTicks));
         builder.AppendLine("  Dispatcher outliers (>=16 ms, top 10 by duration)");
-        AppendValue(builder, "Samples captured", outliers.Length, "    ");
+        AppendValue(builder, "Samples captured", Volatile.Read(ref _dispatcherOutlierSamples), "    ");
         if (outliers.Length == 0)
         {
             builder.AppendLine("    no samples");
@@ -1587,14 +1594,40 @@ internal sealed class IconLoadDiagnosticsSession
             return;
         }
 
-        _dispatcherOutliers.Enqueue(new DispatcherOutlierSample(
+        Interlocked.Increment(ref _dispatcherOutlierSamples);
+        var sample = new DispatcherOutlierSample(
             loadId,
             inputKind,
             materializationKind,
             phase,
             isDemanded,
             startedAt,
-            elapsedTicks));
+            elapsedTicks);
+
+        lock (_dispatcherOutliersLock)
+        {
+            if (_dispatcherOutliers.Count < 10)
+            {
+                _dispatcherOutliers.Add(sample);
+                return;
+            }
+
+            var smallestIndex = 0;
+            var smallestElapsedTicks = _dispatcherOutliers[0].ElapsedTicks;
+            for (var i = 1; i < _dispatcherOutliers.Count; i++)
+            {
+                if (_dispatcherOutliers[i].ElapsedTicks < smallestElapsedTicks)
+                {
+                    smallestIndex = i;
+                    smallestElapsedTicks = _dispatcherOutliers[i].ElapsedTicks;
+                }
+            }
+
+            if (elapsedTicks > smallestElapsedTicks)
+            {
+                _dispatcherOutliers[smallestIndex] = sample;
+            }
+        }
     }
 
     private static int DemandIndex(bool isDemanded) => isDemanded ? 1 : 0;
