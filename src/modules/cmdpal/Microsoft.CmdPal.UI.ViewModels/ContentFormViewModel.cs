@@ -148,6 +148,24 @@ public partial class ContentFormViewModel(IFormContent _form, WeakReference<IPag
         UpdateProperty(propertyName);
     }
 
+    internal static string GetActionData(IAdaptiveActionElement action)
+    {
+        if (action is AdaptiveSubmitAction submitAction)
+        {
+            return GetActionData(submitAction.DataJson);
+        }
+
+        if (action is AdaptiveExecuteAction executeAction)
+        {
+            return GetActionData(executeAction.DataJson);
+        }
+
+        return string.Empty;
+    }
+
+    private static string GetActionData(JsonValue? data) =>
+        data is null || data.ValueType == JsonValueType.Null ? string.Empty : data.Stringify();
+
     [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(AdaptiveOpenUrlAction))]
     [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(AdaptiveSubmitAction))]
     [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(AdaptiveExecuteAction))]
@@ -162,7 +180,7 @@ public partial class ContentFormViewModel(IFormContent _form, WeakReference<IPag
         if (action is AdaptiveSubmitAction or AdaptiveExecuteAction)
         {
             // Get the data and inputs
-            var dataString = (action as AdaptiveSubmitAction)?.DataJson.Stringify() ?? string.Empty;
+            var dataString = GetActionData(action);
             var inputString = inputs.Stringify();
 
             _ = Task.Run(() =>
@@ -172,7 +190,9 @@ public partial class ContentFormViewModel(IFormContent _form, WeakReference<IPag
                     var model = _formModel.Unsafe!;
                     if (model != null)
                     {
-                        var result = model.SubmitForm(inputString, dataString);
+                        var result = model is IFormContent2 form2
+                            ? form2.SubmitAction(action.Id, inputString, dataString)
+                            : model.SubmitForm(inputString, dataString);
                         WeakReferenceMessenger.Default.Send<HandleCommandResultMessage>(new(new(result)));
                     }
                 }
