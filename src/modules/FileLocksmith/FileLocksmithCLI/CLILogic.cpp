@@ -2,12 +2,31 @@
 #include "CLILogic.h"
 #include <common/utils/json.h>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <chrono>
 #include "resource.h"
 #include <common/logger/logger.h>
 #include <common/utils/logger_helper.h>
 #include <type_traits>
+
+namespace
+{
+    std::optional<std::vector<ProcessResult>> find_processes(
+        IProcessFinder& finder,
+        const std::vector<std::wstring>& paths)
+    {
+        try
+        {
+            return finder.find(paths);
+        }
+        catch (const std::exception& error)
+        {
+            Logger::error("Process enumeration failed: {}", error.what());
+            return std::nullopt;
+        }
+    }
+}
 
 template<typename T>
 DWORD_PTR ToDwordPtr(T val)
@@ -204,8 +223,13 @@ CommandResult run_command(int argc, wchar_t* argv[], IProcessFinder& finder, IPr
         auto start_time = std::chrono::steady_clock::now();
         while (true)
         {
-            auto results = finder.find(paths);
-            if (results.empty())
+            auto find_result = find_processes(finder, paths);
+            if (!find_result)
+            {
+                return { 2, strings.GetString(IDS_ERROR_QUERY_FAILED), L"query-wait" };
+            }
+
+            if (find_result->empty())
             {
                 Logger::info("Files unlocked");
                 ss << strings.GetString(IDS_UNLOCKED);
@@ -229,7 +253,13 @@ CommandResult run_command(int argc, wchar_t* argv[], IProcessFinder& finder, IPr
         return { 0, ss.str(), L"query-wait" };
     }
 
-    auto results = finder.find(paths);
+    auto find_result = find_processes(finder, paths);
+    if (!find_result)
+    {
+        return { 2, strings.GetString(IDS_ERROR_QUERY_FAILED), kill ? L"kill" : (json_output ? L"query-json" : L"query") };
+    }
+
+    auto results = std::move(*find_result);
     Logger::info("Found {} processes locking the files", results.size());
     std::wstringstream output_ss;
 
@@ -238,7 +268,13 @@ CommandResult run_command(int argc, wchar_t* argv[], IProcessFinder& finder, IPr
         Logger::info("Killing processes");
         output_ss << kill_processes(results, terminator, strings);
         // Re-check after killing
-        results = finder.find(paths);
+        find_result = find_processes(finder, paths);
+        if (!find_result)
+        {
+            return { 2, strings.GetString(IDS_ERROR_QUERY_FAILED), L"kill" };
+        }
+
+        results = std::move(*find_result);
         Logger::info("Remaining processes: {}", results.size());
     }
 

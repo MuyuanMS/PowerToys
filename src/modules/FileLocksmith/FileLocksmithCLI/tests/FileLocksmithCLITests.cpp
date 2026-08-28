@@ -1,7 +1,9 @@
 #include "pch.h"
 #include "CppUnitTest.h"
 #include "../CLILogic.h"
+#include "../resource.h"
 #include <map>
+#include <stdexcept>
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
@@ -25,6 +27,15 @@ namespace FileLocksmithCLIUnitTests
         {
             terminatedPids.push_back(pid);
             return shouldSucceed;
+        }
+    };
+
+    struct FailingProcessFinder : IProcessFinder
+    {
+        std::vector<ProcessResult> find(const std::vector<std::wstring>& paths) override
+        {
+            (void)paths;
+            throw std::runtime_error("worker failure");
         }
     };
 
@@ -131,6 +142,20 @@ namespace FileLocksmithCLIUnitTests
             
             Assert::AreEqual(1, result.exit_code);
             Assert::AreEqual(std::wstring(L"query-wait"), result.command_name);
+        }
+
+        TEST_METHOD(TestWorkerFailure)
+        {
+            FailingProcessFinder finder;
+            MockProcessTerminator terminator;
+            MockStringProvider strings;
+            strings.strings[IDS_ERROR_QUERY_FAILED] = L"query failed";
+
+            wchar_t* argv[] = { (wchar_t*)L"exe", (wchar_t*)L"file1" };
+            auto result = run_command(2, argv, finder, terminator, strings);
+
+            Assert::AreEqual(2, result.exit_code);
+            Assert::AreEqual(std::wstring(L"query failed"), result.output);
         }
     };
 }
