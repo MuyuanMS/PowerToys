@@ -8,6 +8,7 @@ namespace Microsoft.CmdPal.UI.Helpers;
 
 internal static class SvgFileTextReader
 {
+    internal const int MaximumSvgFileSize = 1024 * 1024;
     private const int MaximumXmlDeclarationByteCount = 1024;
     private const int ReaderBufferSize = 1024;
 
@@ -23,7 +24,12 @@ internal static class SvgFileTextReader
     {
         text = string.Empty;
 
-        using var stream = File.OpenRead(path);
+        if (!TryReadBytes(path, out var bytes))
+        {
+            return false;
+        }
+
+        using var stream = new MemoryStream(bytes, writable: false);
 
         // An XML declaration contains only version, encoding, and standalone.
         // Bound the probe so a malformed file cannot grow stack or parsing work.
@@ -44,6 +50,21 @@ internal static class SvgFileTextReader
             detectEncodingFromByteOrderMarks: true,
             bufferSize: ReaderBufferSize);
         text = reader.ReadToEnd();
+        return true;
+    }
+
+    public static bool TryReadBytes(string path, out byte[] bytes)
+    {
+        bytes = [];
+
+        using var stream = File.OpenRead(path);
+        if (stream.Length is <= 0 or > MaximumSvgFileSize)
+        {
+            return false;
+        }
+
+        bytes = new byte[(int)stream.Length];
+        stream.ReadExactly(bytes);
         return true;
     }
 
