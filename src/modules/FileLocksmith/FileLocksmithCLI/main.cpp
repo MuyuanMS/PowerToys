@@ -233,8 +233,17 @@ namespace
                 WaitForSingleObject(process.get(), INFINITE);
             }
         };
-        if (!AssignProcessToJobObject(job.get(), process.get()) ||
-            ResumeThread(thread.get()) == static_cast<DWORD>(-1))
+        if (!AssignProcessToJobObject(job.get(), process.get()))
+        {
+            if (!TerminateProcess(process.get(), 2))
+            {
+                ResumeThread(thread.get());
+            }
+            WaitForSingleObject(process.get(), INFINITE);
+            return std::nullopt;
+        }
+
+        if (ResumeThread(thread.get()) == static_cast<DWORD>(-1))
         {
             terminate_worker();
             return std::nullopt;
