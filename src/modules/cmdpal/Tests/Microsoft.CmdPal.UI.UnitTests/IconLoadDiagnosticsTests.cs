@@ -564,6 +564,7 @@ public class IconLoadDiagnosticsTests
             $"    Association-change notifications received: 1{Environment.NewLine}" +
             $"    Invalidations by reason{Environment.NewLine}" +
             $"      AssociationChanged: 1{Environment.NewLine}" +
+            $"      SystemImageUpdated: 0{Environment.NewLine}" +
             "      ShellRestarted: 1";
         StringAssert.Contains(report.Text, invalidationBlock);
         var progressiveBlock =

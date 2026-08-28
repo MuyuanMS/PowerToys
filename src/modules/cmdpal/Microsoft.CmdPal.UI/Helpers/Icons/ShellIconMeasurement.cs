@@ -21,7 +21,7 @@ internal readonly struct ShellIconMeasurement
         _session = session;
     }
 
-    public ShellIconMeasurement CreateSuboperation() =>
+    public ShellIconMeasurement CreateChildOperation() =>
         _session is null ? default : new ShellIconMeasurement(_session);
 
     public bool IsEnabled => _session is not null;

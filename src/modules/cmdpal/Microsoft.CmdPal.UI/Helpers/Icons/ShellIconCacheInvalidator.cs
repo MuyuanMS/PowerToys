@@ -14,7 +14,9 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
 {
     private const int ShcnrfShellLevel = 0x0002;
     private const int ShcnrfNewDelivery = 0x8000;
-    private const int ShcneAssocChanged = 0x08000000;
+    internal const int ShcneAssocChanged = 0x08000000;
+    internal const int ShcneUpdateImage = 0x00008000;
+    internal const int ShellIconChangeEvents = ShcneAssocChanged | ShcneUpdateImage;
 
     private static readonly Guid DesktopFolderId = new("B4BFCC3A-DB2C-424C-B029-7FE99A87C641");
 
@@ -41,20 +43,19 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
             return false;
         }
 
-        // New-delivery notifications use Shell-owned shared memory. We do not need the
-        // PIDLs for this global event, but locking and unlocking acknowledges the payload.
-        var notificationLock = NativeMethods.SHChangeNotification_Lock(
-            wParam,
-            unchecked((uint)lParam),
-            0,
-            0);
+        var reason = ShellIconCacheInvalidationReason.AssociationChanged;
+        var notificationLock = LockNotification(wParam, lParam, out var eventId);
         if (notificationLock != 0)
         {
             _ = NativeMethods.SHChangeNotification_Unlock(notificationLock);
+            if ((eventId & ShcneUpdateImage) != 0)
+            {
+                reason = ShellIconCacheInvalidationReason.SystemImageUpdated;
+            }
         }
 
         IconLoadDiagnostics.RecordShellAssociationChangedNotification();
-        Invalidate(ShellIconCacheInvalidationReason.AssociationChanged);
+        Invalidate(reason);
         return true;
     }
 
@@ -103,7 +104,7 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
             _registrationId = NativeMethods.SHChangeNotifyRegister(
                 _windowHandle,
                 ShcnrfShellLevel | ShcnrfNewDelivery,
-                ShcneAssocChanged,
+                ShellIconChangeEvents,
                 _messageId,
                 1,
                 &entry);
@@ -127,6 +128,20 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
         {
             _ = NativeMethods.SHChangeNotifyDeregister(registrationId);
         }
+    }
+
+    private static unsafe nint LockNotification(nint wParam, nint lParam, out int eventId)
+    {
+        // New-delivery notifications use Shell-owned shared memory. We do not need the
+        // PIDLs for this global event, but locking and unlocking acknowledges the payload.
+        var eventIdStorage = stackalloc int[1];
+        var notificationLock = NativeMethods.SHChangeNotification_Lock(
+            wParam,
+            unchecked((uint)lParam),
+            null,
+            eventIdStorage);
+        eventId = eventIdStorage[0];
+        return notificationLock;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -158,11 +173,11 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
 
         [LibraryImport("shell32.dll")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
-        internal static partial nint SHChangeNotification_Lock(
+        internal static unsafe partial nint SHChangeNotification_Lock(
             nint changeHandle,
             uint processId,
-            nint itemIdLists,
-            nint eventId);
+            nint* itemIdLists,
+            int* eventId);
 
         [LibraryImport("shell32.dll")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
