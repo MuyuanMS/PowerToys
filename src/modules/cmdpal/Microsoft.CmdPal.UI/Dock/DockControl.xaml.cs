@@ -19,6 +19,7 @@ using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
@@ -300,22 +301,27 @@ public sealed partial class DockControl : UserControl, IRecipient<CloseContextMe
         }
     }
 
-    private void BandItem_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
+    private void BandItem_Click(object sender, RoutedEventArgs e)
     {
-        // Ignore clicks when in edit mode - allow drag behavior instead
+        TryInvokeBandItem(sender);
+    }
+
+    private bool TryInvokeBandItem(object sender)
+    {
         if (IsEditMode)
         {
-            return;
+            return false;
         }
 
-        if (sender is DockItemControl dockItem && dockItem.DataContext is DockBandViewModel band && dockItem.Tag is DockItemViewModel item)
+        if (sender is not DockItemControl dockItem || dockItem.Tag is not DockItemViewModel item)
         {
-            // Use the center of the border as the point to open at
-            var borderCenter = GetDockItemCenter(dockItem);
-
-            InvokeItem(item, borderCenter);
-            e.Handled = true;
+            return false;
         }
+
+        // Use the center of the border as the point to open at.
+        var borderCenter = GetDockItemCenter(dockItem);
+        InvokeItem(item, borderCenter);
+        return true;
     }
 
     private ContextMenuFilterLocation GetDockContextMenuFilterLocation()
