@@ -263,6 +263,27 @@ public partial class JsonRpcConnectionTests
     }
 
     [TestMethod]
+    public async Task Dispose_FromNotificationHandler_DoesNotWaitForCurrentPump()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var harness = CreateHarness();
+        var disposeDuration = new TaskCompletionSource<TimeSpan>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        harness.Host.RegisterNotificationHandler("dispose", _ =>
+        {
+            var stopwatch = Stopwatch.StartNew();
+            harness.Host.Dispose();
+            stopwatch.Stop();
+            disposeDuration.TrySetResult(stopwatch.Elapsed);
+        });
+
+        await WriteFramedAsync(harness.ExtensionWrites, BuildNotification("dispose", new JsonObject()), cts.Token);
+
+        var elapsed = await disposeDuration.Task.WaitAsync(cts.Token);
+        Assert.IsTrue(elapsed < TimeSpan.FromSeconds(1), $"Dispose took {elapsed}.");
+    }
+
+    [TestMethod]
     public async Task ThrowingErrorSubscriber_DoesNotStopOtherSubscribersOrNotificationPump()
     {
         using var cts = new CancellationTokenSource(TestTimeout);

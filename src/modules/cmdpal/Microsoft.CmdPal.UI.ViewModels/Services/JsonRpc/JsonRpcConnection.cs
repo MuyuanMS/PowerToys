@@ -28,8 +28,6 @@ public sealed class JsonRpcConnection : IDisposable
     private const int MaxConcurrentInboundRequests = 8;
 
     private static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan DisposeDrainTimeout = TimeSpan.FromSeconds(2);
-
     private readonly CmdPalJsonRpc _rpc;
     private readonly IJsonRpcMessageHandler _messageHandler;
     private readonly IJsonRpcMessageFactory _messageFactory;
@@ -298,14 +296,6 @@ public sealed class JsonRpcConnection : IDisposable
             _errorPumpTask ?? Task.CompletedTask,
             _rpc.Completion,
         };
-        try
-        {
-            Task.WhenAll(tasks).Wait(DisposeDrainTimeout);
-        }
-        catch (AggregateException)
-        {
-        }
-
         _ = DisposeTokenSourcesWhenTasksCompleteAsync(tasks, _disposalCts, _connectionClosedCts);
     }
 
