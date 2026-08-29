@@ -330,6 +330,36 @@ public partial class JsonRpcConnectionTests
     }
 
     [TestMethod]
+    public async Task RegisterNotificationHandler_IsSafe_WhenSameMethodRegistersConcurrently()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var harness = CreateHarness();
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var tasks = new Task[128];
+
+        try
+        {
+            for (var i = 0; i < tasks.Length; i++)
+            {
+                tasks[i] = Task.Run(
+                    async () =>
+                    {
+                        await start.Task.WaitAsync(cts.Token);
+                        harness.Host.RegisterNotificationHandler("same-method", _ => { });
+                    },
+                    cts.Token);
+            }
+
+            start.SetResult();
+            await Task.WhenAll(tasks).WaitAsync(cts.Token);
+        }
+        finally
+        {
+            harness.Host.Dispose();
+        }
+    }
+
+    [TestMethod]
     public async Task InboundRequest_IsDispatched_AndResponseReturned()
     {
         using var cts = new CancellationTokenSource(TestTimeout);

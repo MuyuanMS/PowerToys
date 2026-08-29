@@ -40,6 +40,7 @@ public sealed class JsonRpcConnection : IDisposable
     private readonly ConcurrentDictionary<string, Action<JsonElement>> _notificationHandlers = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Func<JsonElement, CancellationToken, Task<JsonNode?>>> _requestHandlers = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, RpcMethodTarget> _registeredMethods = new(StringComparer.Ordinal);
+    private readonly object _registeredMethodsLock = new();
     private readonly object _notificationQueueLock = new();
     private readonly SemaphoreSlim _requestConcurrency = new(MaxConcurrentInboundRequests, MaxConcurrentInboundRequests);
     private readonly Channel<NotificationEnvelope> _notificationQueue = Channel.CreateBounded<NotificationEnvelope>(
@@ -314,21 +315,23 @@ public sealed class JsonRpcConnection : IDisposable
 
     private void RegisterMethod(string method)
     {
-        _registeredMethods.GetOrAdd(
-            method,
-            static (name, connection) =>
+        lock (_registeredMethodsLock)
+        {
+            if (_registeredMethods.ContainsKey(method))
             {
-                var target = new RpcMethodTarget(connection, name);
-                connection._rpc.AddLocalRpcMethod(
-                    typeof(RpcMethodTarget).GetMethod(nameof(RpcMethodTarget.InvokeAsync))!,
-                    target,
-                    new JsonRpcMethodAttribute(name)
-                    {
-                        UseSingleObjectParameterDeserialization = true,
-                    });
-                return target;
-            },
-            this);
+                return;
+            }
+
+            var target = new RpcMethodTarget(this, method);
+            _rpc.AddLocalRpcMethod(
+                typeof(RpcMethodTarget).GetMethod(nameof(RpcMethodTarget.InvokeAsync))!,
+                target,
+                new JsonRpcMethodAttribute(method)
+                {
+                    UseSingleObjectParameterDeserialization = true,
+                });
+            _registeredMethods[method] = target;
+        }
     }
 
     private async Task<JsonNode?> DispatchMethodAsync(string method, JsonElement parameters, CancellationToken cancellationToken)
