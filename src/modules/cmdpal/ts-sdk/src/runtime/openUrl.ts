@@ -8,7 +8,7 @@
  * are provided so the SDK behaves during local development on other platforms.
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 
 /** Opens the given URL. Injected into {@link OpenUrlCommand} for testing. */
 export type UrlOpener = (url: string) => void;
@@ -20,6 +20,13 @@ function hasControlCharacters(value: string): boolean {
     }
   }
   return false;
+}
+
+function detachLauncher(child: ChildProcess): void {
+  child.on('error', (error) => {
+    process.stderr.write(`Failed to launch URL opener: ${error.message}\n`);
+  });
+  child.unref();
 }
 
 /**
@@ -43,11 +50,11 @@ export const openUrlInDefaultBrowser: UrlOpener = (url) => {
       stdio: 'ignore',
       windowsHide: true,
     });
-    child.unref();
+    detachLauncher(child);
     return;
   }
 
   const launcher = process.platform === 'darwin' ? 'open' : 'xdg-open';
   const child = spawn(launcher, [url], { detached: true, stdio: 'ignore' });
-  child.unref();
+  detachLauncher(child);
 };
