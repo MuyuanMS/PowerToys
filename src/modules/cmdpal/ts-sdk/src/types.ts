@@ -144,6 +144,12 @@ export type ObservablePropertyName =
   | 'displayTitle'
   | 'commands';
 
+/** Observable properties that can be sent directly without command serialization. */
+export type DirectObservablePropertyName = Exclude<
+  ObservablePropertyName,
+  'command' | 'emptyContent' | 'commands' | 'moreCommands' | 'details'
+>;
+
 /** The base contract for every command and page. */
 export interface ICommand {
   /** Unique identifier. */

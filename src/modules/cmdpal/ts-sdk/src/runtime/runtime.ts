@@ -198,12 +198,21 @@ export class ExtensionRuntime {
     this.initState = 'pending';
     this.initError = null;
     this.initSettled = init.then(
-      (provider) => {
+      async (provider) => {
+        if (this.disposed) {
+          await disposeProvider(provider, DEFAULT_DISPOSE_TIMEOUT_MS);
+          return;
+        }
+
         this.provider = provider;
         this.primed = false;
         this.initState = 'ready';
       },
       (error: unknown) => {
+        if (this.disposed) {
+          return;
+        }
+
         this.initState = 'failed';
         this.initError = { code: JsonRpcErrorCode.InternalError, message: describeError(error) };
         this.reportFatal?.(1);
@@ -611,9 +620,13 @@ export class ExtensionRuntime {
     const content = await page.getContent();
     const scope = this.beginPageScope(pageId);
     const collector = createFormCollector(scope);
-    const serialized = await this.withScopeSink(scope, () =>
-      Promise.all(content.map((item) => this.serializer.content(item, collector))),
-    );
+    const serialized = await this.withScopeSink(scope, async () => {
+      const result: Record<string, unknown>[] = [];
+      for (const item of content) {
+        result.push(await this.serializer.content(item, collector));
+      }
+      return result;
+    });
     this.reconcilePageContent(pageId, scope);
     return serialized;
   }
@@ -856,7 +869,10 @@ function createFormCollector(scope: PageScope): FormCollector {
   const registeredIds = new Set<string>();
   return {
     nextId(): string {
-      while (allocatedIds.has(`form-${String(counter)}`) || registeredIds.has(`form-${String(counter)}`)) {
+      while (
+        allocatedIds.has(`form-${String(counter)}`) ||
+        registeredIds.has(`form-${String(counter)}`)
+      ) {
         counter += 1;
       }
       const id = `form-${String(counter)}`;
@@ -885,6 +901,7 @@ function withTimeout(work: Promise<void>, timeoutMs: number): Promise<void> {
     void work.catch(() => undefined);
     return Promise.resolve();
   }
+
   if (!Number.isFinite(timeoutMs)) {
     // An explicit, non-finite bound (Infinity) means wait without a deadline.
     return work;
@@ -905,6 +922,21 @@ function withTimeout(work: Promise<void>, timeoutMs: number): Promise<void> {
       },
     );
   });
+}
+
+async function disposeProvider(
+  provider: ICommandProvider,
+  timeoutMs: number = DEFAULT_DISPOSE_TIMEOUT_MS,
+): Promise<void> {
+  if (!provider.dispose) {
+    return;
+  }
+
+  try {
+    await withTimeout(Promise.resolve(provider.dispose()), timeoutMs);
+  } catch (error) {
+    process.stderr.write(`cmdpal-sdk: provider disposal failed: ${describeError(error)}\n`);
+  }
 }
 
 function describeError(error: unknown): string {

@@ -4,6 +4,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { ContentPageBase } from '../src/base/ContentPageBase.js';
+import { ListPageBase } from '../src/base/ListPageBase.js';
 import { setNotificationSink } from '../src/runtime/notifications.js';
 
 class TestContentPage extends ContentPageBase {
@@ -12,6 +13,20 @@ class TestContentPage extends ContentPageBase {
   readonly title = 'Content';
 
   getContent() {
+    return [];
+  }
+
+  refresh(): void {
+    this.notifyItemsChanged();
+  }
+}
+
+class TestListPage extends ListPageBase {
+  readonly id = 'list-page';
+  readonly name = 'List';
+  readonly title = 'List';
+
+  getItems() {
     return [];
   }
 
@@ -35,6 +50,26 @@ describe('ContentPageBase', () => {
       {
         method: 'contentPage/itemsChanged',
         params: { pageId: 'content-page' },
+      },
+    ]);
+  });
+});
+
+describe('ListPageBase', () => {
+  afterEach(() => {
+    setNotificationSink(null);
+  });
+
+  it('notifies the host when list items change', () => {
+    const sent: Array<{ method: string; params: unknown }> = [];
+    setNotificationSink((method, params) => sent.push({ method, params }));
+
+    new TestListPage().refresh();
+
+    expect(sent).toEqual([
+      {
+        method: 'listPage/itemsChanged',
+        params: { pageId: 'list-page' },
       },
     ]);
   });

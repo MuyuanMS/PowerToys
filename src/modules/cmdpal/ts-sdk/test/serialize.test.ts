@@ -2,8 +2,8 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-import { describe, expect, it } from 'vitest';
-import type { ContextItem, IFallbackCommandItem, IListItem } from '../src/types.js';
+import { describe, expect, it, vi } from 'vitest';
+import type { Content, ContextItem, IFallbackCommandItem, IListItem } from '../src/types.js';
 import { WireSerializer } from '../src/runtime/serialize.js';
 
 describe('WireSerializer.contextItems', () => {
@@ -106,6 +106,70 @@ describe('WireSerializer.commandItem fallback ids', () => {
     expect(wire).toMatchObject({
       id: 'fallback-item',
       command: { id: 'fallback-command' },
+    });
+  });
+
+  describe('WireSerializer.content', () => {
+    it('assigns generated form ids in traversal order for async tree children', async () => {
+      let resolveFirst!: (children: Content[]) => void;
+      let resolveSecond!: (children: Content[]) => void;
+      const firstChildren = new Promise<Content[]>((resolve) => {
+        resolveFirst = resolve;
+      });
+      const secondChildren = new Promise<Content[]>((resolve) => {
+        resolveSecond = resolve;
+      });
+      const content: Content = {
+        type: 'tree',
+        rootContent: { type: 'plainText', text: 'root' },
+        getChildren: () => [
+          {
+            type: 'tree',
+            rootContent: { type: 'plainText', text: 'first' },
+            getChildren: () => firstChildren,
+          },
+          {
+            type: 'tree',
+            rootContent: { type: 'plainText', text: 'second' },
+            getChildren: () => secondChildren,
+          },
+        ],
+      };
+      const serializer = new WireSerializer();
+      let nextId = 0;
+      const collector = {
+        nextId: vi.fn(() => {
+          const id = `form-${String(nextId)}`;
+          nextId += 1;
+          return id;
+        }),
+        register: vi.fn(),
+      };
+
+      const resultPromise = serializer.content(content, collector);
+      resolveSecond([
+        {
+          type: 'form',
+          templateJson: '{}',
+          dataJson: '{}',
+          submitForm: () => ({ kind: 'dismiss' }),
+        },
+      ]);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      resolveFirst([
+        {
+          type: 'form',
+          templateJson: '{}',
+          dataJson: '{}',
+          submitForm: () => ({ kind: 'dismiss' }),
+        },
+      ]);
+
+      const result = (await resultPromise) as {
+        children: Array<{ children: Array<{ formId: string }> }>;
+      };
+      expect(result.children[0]?.children[0]?.formId).toBe('form-0');
+      expect(result.children[1]?.children[0]?.formId).toBe('form-1');
     });
   });
 
