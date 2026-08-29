@@ -313,6 +313,7 @@ jobs:
       if (-not [string]::IsNullOrWhiteSpace($modulesRaw)) {
         $modules = $modulesRaw -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
       }
+      $autoSelectedModules = -not [string]::IsNullOrWhiteSpace($env:AUTO_UI_TEST_MODULES)
 
       # Each UI test project is a Microsoft.Testing.Platform app; its entry assembly is paired
       # with a *.runtimeconfig.json. Recurse under the staged 'tests' folders (tolerates TFM/RID subfolders).
@@ -321,7 +322,11 @@ jobs:
       if ($modules.Count -gt 0) {
         $entries = $entries | Where-Object {
           $projectName = $_.Name -replace '\.runtimeconfig\.json$', ''
-          $modules -contains $projectName
+          if ($autoSelectedModules) {
+            $modules -contains $projectName
+          } else {
+            @($modules | Where-Object { $projectName -like "*$_*" }).Count -gt 0
+          }
         }
       }
 
