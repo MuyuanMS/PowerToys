@@ -36,6 +36,21 @@ public class PrecomputedFuzzyMatcherWithPinyinTests
     }
 
     [TestMethod]
+    [DataRow("chongqi", "重启计算机")] // Polyphonic: 重 read as "chong"
+    [DataRow("zhongqi", "重启计算机")] // Polyphonic: 重 read as "zhong" (default reading)
+    [DataRow("chongqijisuanji", "重启计算机")]
+    [DataRow("zhongqijisuanji", "重启计算机")]
+    public void Score_PolyphonicPinyin_MatchesAllReadings(string needle, string haystack)
+    {
+        var matcher = CreateMatcher(PinyinMode.On);
+        var query = matcher.PrecomputeQuery(needle);
+        var target = matcher.PrecomputeTarget(haystack);
+        var score = matcher.Score(query, target);
+
+        Assert.IsTrue(score > 0, $"Expected polyphonic match for needle='{needle}', haystack='{haystack}'");
+    }
+
+    [TestMethod]
     public void Score_PinyinOff_ShouldNotMatchPinyin()
     {
         var matcher = CreateMatcher(PinyinMode.Off);
