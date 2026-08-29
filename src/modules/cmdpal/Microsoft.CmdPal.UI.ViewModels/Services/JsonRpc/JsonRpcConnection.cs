@@ -230,13 +230,19 @@ public sealed class JsonRpcConnection : IDisposable
     {
         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         ArgumentException.ThrowIfNullOrEmpty(method);
+        cancellationToken.ThrowIfCancellationRequested();
 
         try
         {
             var notification = _messageFactory.CreateRequestMessage();
             notification.Method = method;
             notification.Arguments = parameters;
-            await _messageHandler.WriteAsync(notification, cancellationToken).ConfigureAwait(false);
+            await _messageHandler.WriteAsync(notification, _connectionClosedCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (_connectionClosedCts.IsCancellationRequested)
+        {
+            DisposeRpc();
+            throw new JsonRpcException("The JSON-RPC connection failed while writing a notification.");
         }
         catch (Exception ex) when (ex is ConnectionLostException or ObjectDisposedException or IOException or TimeoutException)
         {

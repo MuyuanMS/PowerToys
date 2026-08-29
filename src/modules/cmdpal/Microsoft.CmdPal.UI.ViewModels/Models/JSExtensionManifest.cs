@@ -321,7 +321,7 @@ public sealed record JSExtensionManifest
             ? baseDirectory
             : baseDirectory + Path.DirectorySeparatorChar;
 
-        if (!resolved.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        if (!resolved.StartsWith(prefix, StringComparison.Ordinal))
         {
             error = $"The entry point '{entryPoint}' must not escape the extension directory.";
             return null;
@@ -355,7 +355,7 @@ public sealed record JSExtensionManifest
 
             // Walk from the entry point up toward the extension directory. The extension directory
             // itself and everything above it are outside this check.
-            while (!string.Equals(Path.TrimEndingDirectorySeparator(current), baseDirectory, StringComparison.OrdinalIgnoreCase))
+            while (!string.Equals(Path.TrimEndingDirectorySeparator(current), baseDirectory, StringComparison.Ordinal))
             {
                 if (IsReparsePoint(current))
                 {
@@ -364,7 +364,7 @@ public sealed record JSExtensionManifest
                 }
 
                 var parent = Path.GetDirectoryName(current);
-                if (string.IsNullOrEmpty(parent) || string.Equals(parent, current, StringComparison.OrdinalIgnoreCase))
+                if (string.IsNullOrEmpty(parent) || string.Equals(parent, current, StringComparison.Ordinal))
                 {
                     // Reached a filesystem root without meeting the extension directory. The text
                     // containment check already ran, so this only happens for pathological inputs.
