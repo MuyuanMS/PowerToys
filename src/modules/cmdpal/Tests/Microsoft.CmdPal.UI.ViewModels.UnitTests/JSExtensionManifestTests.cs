@@ -256,6 +256,18 @@ public class JSExtensionManifestTests
     }
 
     [TestMethod]
+    public void TryParseFile_OversizedPackageJson_IsInvalid()
+    {
+        var packageJsonPath = Path.Combine(_testDirectory, "package.json");
+        File.WriteAllText(packageJsonPath, new string(' ', (1024 * 1024) + 1));
+
+        var result = JSExtensionManifest.TryParseFile(packageJsonPath);
+
+        Assert.IsFalse(result.IsValid);
+        StringAssert.Contains(result.FailureReason, "byte limit");
+    }
+
+    [TestMethod]
     public void TryParse_AbsoluteEntryPoint_IsInvalid()
     {
         // Create a real file outside the extension directory so rejection comes from the rooted-path

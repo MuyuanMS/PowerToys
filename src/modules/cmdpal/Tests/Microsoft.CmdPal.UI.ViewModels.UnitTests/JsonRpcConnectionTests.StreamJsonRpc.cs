@@ -68,6 +68,30 @@ public partial class JsonRpcConnectionTests
     }
 
     [TestMethod]
+    public async Task CleanEndOfStreamBeforeHeader_RaisesDisconnectedWithoutError()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var harness = CreateHarness();
+        var disconnected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var error = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        try
+        {
+            harness.Host.Disconnected += (_, _) => disconnected.TrySetResult();
+            harness.Host.Error += (_, args) => error.TrySetResult(args.Exception);
+
+            harness.ExtensionWrites.Dispose();
+
+            await disconnected.Task.WaitAsync(cts.Token);
+            Assert.IsFalse(error.Task.IsCompleted, "A clean extension EOF should not be reported as a protocol error.");
+        }
+        finally
+        {
+            harness.Host.Dispose();
+        }
+    }
+
+    [TestMethod]
     public async Task TimedOutRequest_SendsCancellation()
     {
         using var cts = new CancellationTokenSource(TestTimeout);
@@ -150,6 +174,40 @@ public partial class JsonRpcConnectionTests
             using var document = JsonDocument.Parse(body);
             Assert.AreEqual(1, document.RootElement.GetProperty("id").GetInt32());
             Assert.IsTrue(document.RootElement.GetProperty("result").GetProperty("pong").GetBoolean());
+        }
+        finally
+        {
+            release.TrySetResult();
+            harness.Host.Dispose();
+        }
+    }
+
+    [TestMethod]
+    public async Task SlowNotificationHandler_DropsOldItems_WhenQueuedPayloadBytesAreExhausted()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var harness = CreateHarness();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var payload = new string('a', 40 * 1024);
+
+        try
+        {
+            harness.Host.RegisterNotificationHandler("bulk", _ =>
+            {
+                entered.TrySetResult();
+                release.Task.GetAwaiter().GetResult();
+            });
+
+            await WriteFramedAsync(harness.ExtensionWrites, BuildNotification("bulk", new JsonObject { ["payload"] = payload }), cts.Token);
+            await entered.Task.WaitAsync(cts.Token);
+
+            for (var i = 0; i < 1100; i++)
+            {
+                await WriteFramedAsync(harness.ExtensionWrites, BuildNotification("bulk", new JsonObject { ["payload"] = payload }), cts.Token);
+            }
+
+            Assert.IsTrue(harness.Host.DroppedNotificationCount > 0, "Queued notifications must be bounded by aggregate payload size.");
         }
         finally
         {

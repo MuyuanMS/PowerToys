@@ -24,6 +24,7 @@ public sealed class JsonRpcConnection : IDisposable
 {
     private const int NotificationQueueCapacity = 1024;
     private const int MaxInboundMessageBytes = 32 * 1024 * 1024;
+    private const int MaxQueuedNotificationBytes = MaxInboundMessageBytes;
     private const int MaxConcurrentInboundRequests = 8;
 
     private static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(10);
@@ -39,6 +40,7 @@ public sealed class JsonRpcConnection : IDisposable
     private readonly ConcurrentDictionary<string, Action<JsonElement>> _notificationHandlers = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Func<JsonElement, CancellationToken, Task<JsonNode?>>> _requestHandlers = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, RpcMethodTarget> _registeredMethods = new(StringComparer.Ordinal);
+    private readonly object _notificationQueueLock = new();
     private readonly SemaphoreSlim _requestConcurrency = new(MaxConcurrentInboundRequests, MaxConcurrentInboundRequests);
     private readonly Channel<NotificationEnvelope> _notificationQueue = Channel.CreateBounded<NotificationEnvelope>(
         new BoundedChannelOptions(NotificationQueueCapacity)
@@ -50,6 +52,7 @@ public sealed class JsonRpcConnection : IDisposable
 
     private Task? _notificationConsumerTask;
     private Task? _errorPumpTask;
+    private int _queuedNotificationBytes;
     private int _started;
     private int _disposed;
     private int _disconnectedRaised;
@@ -381,16 +384,32 @@ public sealed class JsonRpcConnection : IDisposable
 
     private void EnqueueNotification(string method, JsonElement parameters)
     {
-        var envelope = new NotificationEnvelope(method, parameters.Clone());
-        while (!_notificationQueue.Writer.TryWrite(envelope))
+        var envelope = new NotificationEnvelope(method, parameters.Clone(), GetNotificationSize(method, parameters));
+        lock (_notificationQueueLock)
         {
-            if (_notificationQueue.Reader.TryRead(out _))
+            while (_queuedNotificationBytes + envelope.ByteLength > MaxQueuedNotificationBytes)
             {
+                if (!_notificationQueue.Reader.TryRead(out var dropped))
+                {
+                    return;
+                }
+
+                _queuedNotificationBytes -= dropped.ByteLength;
                 Interlocked.Increment(ref _droppedNotifications);
-                continue;
             }
 
-            return;
+            while (!_notificationQueue.Writer.TryWrite(envelope))
+            {
+                if (!_notificationQueue.Reader.TryRead(out var dropped))
+                {
+                    return;
+                }
+
+                _queuedNotificationBytes -= dropped.ByteLength;
+                Interlocked.Increment(ref _droppedNotifications);
+            }
+
+            _queuedNotificationBytes += envelope.ByteLength;
         }
     }
 
@@ -400,7 +419,7 @@ public sealed class JsonRpcConnection : IDisposable
         {
             while (await _notificationQueue.Reader.WaitToReadAsync(_disposalCts.Token).ConfigureAwait(false))
             {
-                while (_notificationQueue.Reader.TryRead(out var envelope))
+                while (TryDequeueNotification(out var envelope))
                 {
                     if (!_notificationHandlers.TryGetValue(envelope.Method, out var handler))
                     {
@@ -429,6 +448,20 @@ public sealed class JsonRpcConnection : IDisposable
         {
             Logger.LogError("The JSON-RPC notification pump ended unexpectedly.", ex);
             RaiseError(ex);
+        }
+    }
+
+    private bool TryDequeueNotification(out NotificationEnvelope envelope)
+    {
+        lock (_notificationQueueLock)
+        {
+            if (!_notificationQueue.Reader.TryRead(out envelope))
+            {
+                return false;
+            }
+
+            _queuedNotificationBytes -= envelope.ByteLength;
+            return true;
         }
     }
 
@@ -516,6 +549,17 @@ public sealed class JsonRpcConnection : IDisposable
         };
     }
 
+    private static int GetNotificationSize(string method, JsonElement parameters)
+    {
+        var size = System.Text.Encoding.UTF8.GetByteCount(method);
+        if (parameters.ValueKind is not JsonValueKind.Undefined)
+        {
+            size += System.Text.Encoding.UTF8.GetByteCount(parameters.GetRawText());
+        }
+
+        return size;
+    }
+
     private sealed class RpcMethodTarget
     {
         private readonly JsonRpcConnection _connection;
@@ -595,9 +639,26 @@ public sealed class JsonRpcConnection : IDisposable
         protected override async ValueTask<StreamJsonRpc.Protocol.JsonRpcMessage?> ReadCoreAsync(CancellationToken cancellationToken)
         {
             var contentLength = -1;
+            var headerBytes = 0;
             while (true)
             {
                 var line = await ReadHeaderLineAsync(cancellationToken).ConfigureAwait(false);
+                if (line is null)
+                {
+                    if (headerBytes > 0)
+                    {
+                        throw new InvalidDataException("The JSON-RPC message ended during its headers.");
+                    }
+
+                    return null;
+                }
+
+                headerBytes += line.Length;
+                if (headerBytes > 8 * 1024)
+                {
+                    throw new InvalidDataException("The JSON-RPC message headers exceed the size limit.");
+                }
+
                 if (line.Length == 0)
                 {
                     break;
@@ -630,7 +691,7 @@ public sealed class JsonRpcConnection : IDisposable
             return _formatter.Deserialize(new ReadOnlySequence<byte>(content));
         }
 
-        private async ValueTask<byte[]> ReadHeaderLineAsync(CancellationToken cancellationToken)
+        private async ValueTask<byte[]?> ReadHeaderLineAsync(CancellationToken cancellationToken)
         {
             using var line = new MemoryStream();
             var oneByte = new byte[1];
@@ -641,7 +702,7 @@ public sealed class JsonRpcConnection : IDisposable
                 {
                     if (line.Length == 0)
                     {
-                        throw new EndOfStreamException();
+                        return null;
                     }
 
                     throw new InvalidDataException("The JSON-RPC message ended during its headers.");
@@ -677,5 +738,5 @@ public sealed class JsonRpcConnection : IDisposable
         }
     }
 
-    private readonly record struct NotificationEnvelope(string Method, JsonElement Parameters);
+    private readonly record struct NotificationEnvelope(string Method, JsonElement Parameters, int ByteLength);
 }

@@ -4,6 +4,7 @@
 
 using System;
 using System.IO;
+using System.Text;
 using System.Text.Json;
 
 namespace Microsoft.CmdPal.UI.ViewModels.Models;
@@ -14,6 +15,8 @@ namespace Microsoft.CmdPal.UI.ViewModels.Models;
 /// </summary>
 public sealed record JSExtensionManifest
 {
+    private const int MaxPackageJsonBytes = 1024 * 1024;
+
     /// <summary>
     /// Gets the extension identifier (package.json "name").
     /// </summary>
@@ -102,11 +105,23 @@ public sealed record JSExtensionManifest
         string json;
         try
         {
-            json = File.ReadAllText(packageJsonPath);
+            using var stream = new FileStream(packageJsonPath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, FileOptions.SequentialScan);
+            if (stream.Length > MaxPackageJsonBytes)
+            {
+                return JSExtensionManifestParseResult.Failure($"The package.json exceeds the {MaxPackageJsonBytes}-byte limit.");
+            }
+
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            json = reader.ReadToEnd();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return JSExtensionManifestParseResult.Failure($"Failed to read '{packageJsonPath}': {ex.Message}");
+        }
+
+        if (Encoding.UTF8.GetByteCount(json) > MaxPackageJsonBytes)
+        {
+            return JSExtensionManifestParseResult.Failure($"The package.json exceeds the {MaxPackageJsonBytes}-byte limit.");
         }
 
         var directory = Path.GetDirectoryName(Path.GetFullPath(packageJsonPath)) ?? string.Empty;
