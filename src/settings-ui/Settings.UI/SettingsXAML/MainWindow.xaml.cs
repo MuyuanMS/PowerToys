@@ -137,10 +137,35 @@ namespace Microsoft.PowerToys.Settings.UI
 
         private void SetTitleBar()
         {
-            // We need to assign the window here so it can configure the custom title bar area correctly.
-            shellPage.TitleBar.Window = this;
             this.ExtendsContentIntoTitleBar = true;
+            this.SetTitleBar(shellPage.TitleBar);
+            this.AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
             WindowHelpers.ForceTopBorder1PixelInsetOnWindows10(WindowNative.GetWindowHandle(this));
+
+            // Caption button theming — the built-in TitleBar handles drag regions
+            // and layout automatically, but caption button foreground colors need
+            // to be set explicitly for theme changes (WinUI known issue).
+            if (this.Content is FrameworkElement rootElement)
+            {
+                ApplyThemeToCaptionButtons(rootElement.ActualTheme);
+                rootElement.ActualThemeChanged += (_, _) => ApplyThemeToCaptionButtons(rootElement.ActualTheme);
+            }
+        }
+
+        private void ApplyThemeToCaptionButtons(ElementTheme theme)
+        {
+            this.AppWindow.TitleBar.ButtonBackgroundColor = Colors.Transparent;
+            this.AppWindow.TitleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
+            if (theme == ElementTheme.Dark)
+            {
+                this.AppWindow.TitleBar.ButtonForegroundColor = Colors.White;
+                this.AppWindow.TitleBar.ButtonInactiveForegroundColor = Colors.DarkGray;
+            }
+            else
+            {
+                this.AppWindow.TitleBar.ButtonForegroundColor = Colors.Black;
+                this.AppWindow.TitleBar.ButtonInactiveForegroundColor = Colors.DarkGray;
+            }
         }
 
         public void NavigateToSection(Type type)
