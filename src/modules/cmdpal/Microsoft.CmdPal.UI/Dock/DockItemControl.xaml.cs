@@ -15,7 +15,7 @@ using Microsoft.UI.Xaml.Media;
 namespace Microsoft.CmdPal.UI.Dock;
 
 [ContentProperty(Name = nameof(Icon))]
-public sealed partial class DockItemControl : Control
+public sealed partial class DockItemControl : Button
 {
     public DockItemControl()
     {

@@ -23,7 +23,6 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
-using Windows.System;
 
 using RS_ = Microsoft.CmdPal.UI.Helpers.ResourceLoaderInstance;
 
@@ -302,28 +301,9 @@ public sealed partial class DockControl : UserControl, IRecipient<CloseContextMe
         }
     }
 
-    private void BandItem_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
+    private void BandItem_Click(object sender, RoutedEventArgs e)
     {
-        // Ignore clicks when in edit mode - allow drag behavior instead
-        if (TryInvokeBandItem(sender))
-        {
-            e.Handled = true;
-        }
-    }
-
-    private void BandItem_KeyDown(object sender, KeyRoutedEventArgs e)
-    {
-        // Tapped only fires for pointer input, so keyboard focus + Enter/Space
-        // never invoked a dock item. This is the keyboard side of BandItem_Tapped.
-        if (IsEditMode || (e.Key != VirtualKey.Enter && e.Key != VirtualKey.Space))
-        {
-            return;
-        }
-
-        if (TryInvokeBandItem(sender))
-        {
-            e.Handled = true;
-        }
+        TryInvokeBandItem(sender);
     }
 
     private bool TryInvokeBandItem(object sender)

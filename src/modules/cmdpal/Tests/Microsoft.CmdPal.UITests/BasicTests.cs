@@ -150,4 +150,42 @@ public class BasicTests : CommandPaletteTestBase
         autoHideToggle.Toggle(initialState);
         Assert.AreEqual(initialState, autoHideToggle.IsOn);
     }
+
+    [TestMethod]
+    public void DockItemEnterKeyActivatesTest()
+    {
+        AssertDockItemKeyboardActivation(OpenQA.Selenium.Keys.Enter);
+    }
+
+    [TestMethod]
+    public void DockItemSpaceKeyActivatesTest()
+    {
+        AssertDockItemKeyboardActivation(OpenQA.Selenium.Keys.Space);
+    }
+
+    private void AssertDockItemKeyboardActivation(string key)
+    {
+        OpenSettingsWindow();
+        NavigateToDockSettings();
+
+        var enableDockToggle = this.Find<ToggleSwitch>(By.AccessibilityId("CmdPal_DockSettingsPage_EnableDock"));
+        var initialState = enableDockToggle.IsOn;
+        var searchBox = this.Find<TextBox>(By.AccessibilityId("MainSearchBox"), global: true);
+
+        try
+        {
+            searchBox.SendKeys(OpenQA.Selenium.Keys.Escape);
+            Assert.IsFalse(searchBox.Displayed, "The palette must be hidden before activating the dock item.");
+
+            enableDockToggle.Toggle(true);
+            var homeDockItem = this.Find<Button>("Home", global: true);
+            homeDockItem.SendKeys(key);
+
+            Assert.IsTrue(searchBox.Displayed, "Keyboard activation should open the palette.");
+        }
+        finally
+        {
+            enableDockToggle.Toggle(initialState);
+        }
+    }
 }

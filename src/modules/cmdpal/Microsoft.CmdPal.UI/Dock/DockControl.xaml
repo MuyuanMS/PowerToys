@@ -36,12 +36,12 @@
                     <ItemsRepeater.ItemTemplate>
                         <DataTemplate x:DataType="dockVm:DockItemViewModel">
                             <local:DockItemControl
+                                AutomationProperties.Name="{x:Bind Tooltip, Mode=OneWay}"
+                                Click="BandItem_Click"
                                 Title="{x:Bind Title, Mode=OneWay}"
-                                KeyDown="BandItem_KeyDown"
                                 RightTapped="BandItem_RightTapped"
                                 Subtitle="{x:Bind Subtitle, Mode=OneWay}"
                                 Tag="{x:Bind}"
-                                Tapped="BandItem_Tapped"
                                 ToolTip="{x:Bind Tooltip, Mode=OneWay}">
                                 <local:DockItemControl.Icon>
                                     <cpcontrols:IconBox
