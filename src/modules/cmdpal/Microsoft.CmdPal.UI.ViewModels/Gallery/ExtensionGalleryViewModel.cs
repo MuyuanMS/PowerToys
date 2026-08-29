@@ -59,6 +59,7 @@ public sealed partial class ExtensionGalleryViewModel : ObservableObject, IDispo
     private readonly IWinGetPackageStatusService? _winGetPackageStatusService;
     private readonly TaskScheduler _uiScheduler;
     private readonly Lock _entriesLock = new();
+    private readonly Lock _ctsLock = new();
     private readonly List<ExtensionGalleryItemViewModel> _allEntries = [];
     private readonly Dictionary<string, List<ExtensionGalleryItemViewModel>> _entriesByWinGetId = new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource _cts = new();
@@ -242,6 +243,10 @@ public sealed partial class ExtensionGalleryViewModel : ObservableObject, IDispo
     private async Task FetchCoreAsync(Func<CancellationToken, Task<GalleryFetchResult>> fetchFunc, bool refreshInstallationStatus)
     {
         var cts = ResetCancellation();
+        if (cts is null)
+        {
+            return;
+        }
 
         IsLoading = true;
         HasError = false;
@@ -343,13 +348,27 @@ public sealed partial class ExtensionGalleryViewModel : ObservableObject, IDispo
             refreshWinGetCatalogs: refreshInstallationStatus);
     }
 
-    private CancellationTokenSource ResetCancellation()
+    private CancellationTokenSource? ResetCancellation()
     {
-        var oldCts = _cts;
-        var newCts = new CancellationTokenSource();
-        _cts = newCts;
+        CancellationTokenSource oldCts;
+        CancellationTokenSource newCts;
+
+        lock (_ctsLock)
+        {
+            if (_disposed)
+            {
+                return null;
+            }
+
+            oldCts = _cts;
+            newCts = new CancellationTokenSource();
+            _cts = newCts;
+        }
+
+        // Cancel and dispose outside the lock so we don't hold _ctsLock while calling into oldCts.
         oldCts.Cancel();
         oldCts.Dispose();
+
         return newCts;
     }
 
@@ -766,15 +785,21 @@ public sealed partial class ExtensionGalleryViewModel : ObservableObject, IDispo
 
     public void Dispose()
     {
-        if (_disposed)
+        CancellationTokenSource ctsToCancel;
+
+        lock (_ctsLock)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            ctsToCancel = _cts;
         }
 
-        _disposed = true;
-
-        _cts.Cancel();
-        _cts.Dispose();
+        ctsToCancel.Cancel();
+        ctsToCancel.Dispose();
 
         if (_winGetOperationTrackerService is not null)
         {
