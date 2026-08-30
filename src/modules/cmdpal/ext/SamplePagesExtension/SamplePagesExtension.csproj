@@ -25,10 +25,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Update="Assets\Images\PlainSampleIcon.svg">
+    <Content Include="Assets\Images\PlainSampleIcon.svg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Update="Assets\Images\ThemedSampleIcon.svg">
+    <Content Include="Assets\Images\ThemedSampleIcon.svg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
