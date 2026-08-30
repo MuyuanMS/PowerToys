@@ -76,6 +76,7 @@ public class CommandItemViewModelTests
         Assert.IsTrue(viewModel.HasMoreCommands);
         Assert.IsNotNull(viewModel.SecondaryCommand);
         Assert.AreEqual("Secondary", viewModel.SecondaryCommand.Name);
+        Assert.IsFalse(CommandBarViewModel.ShouldShowMoreCommandsButtonFor(viewModel));
     }
 
     [TestMethod]

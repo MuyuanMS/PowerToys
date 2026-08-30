@@ -47,7 +47,7 @@ public sealed partial class CommandBar : UserControl,
         if (message.Element is null)
         {
             // This is invoked from the "More" button on the command bar
-            if (!ViewModel.ShouldShowMoreCommandsButton)
+            if (!(ViewModel.SelectedItem?.CanOpenContextMenu ?? false))
             {
                 return;
             }

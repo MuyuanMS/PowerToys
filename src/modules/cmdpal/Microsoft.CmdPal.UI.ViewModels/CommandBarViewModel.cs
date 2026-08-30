@@ -130,9 +130,9 @@ public sealed partial class CommandBarViewModel : ObservableObject,
         OnPropertyChanged(nameof(ShouldShowMoreCommandsButton));
     }
 
-    // The first entry in MoreCommands is already surfaced as SecondaryButton.
+    // The first command in MoreCommands is already surfaced as SecondaryButton.
     internal static bool ShouldShowMoreCommandsButtonFor(ICommandBarContext context) =>
-        context.MoreCommands.Count > 1 && context.HasMoreCommands;
+        context.MoreCommands.OfType<CommandContextItemViewModel>().Skip(1).Any();
 
     // InvokeItemCommand is what this will be in Xaml due to source generator
     // this comes in when an item in the list is tapped
