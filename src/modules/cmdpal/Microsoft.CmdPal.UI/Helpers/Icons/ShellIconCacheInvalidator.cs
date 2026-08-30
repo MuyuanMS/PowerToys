@@ -54,7 +54,6 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
         var reason = (eventId & ShcneUpdateImage) != 0
             ? ShellIconCacheInvalidationReason.SystemImageUpdated
             : ShellIconCacheInvalidationReason.AssociationChanged;
-        }
 
         if ((eventId & ShcneAssocChanged) != 0)
         {
