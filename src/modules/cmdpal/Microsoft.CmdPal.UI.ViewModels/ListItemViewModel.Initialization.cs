@@ -195,6 +195,10 @@ public partial class ListItemViewModel
                 : state == InitializationSucceeded;
             Interlocked.Exchange(ref _initializationDemands, null);
             Volatile.Read(ref _initializationCompletion)?.TrySetResult(completedSuccessfully);
+            if (state != InitializationInProgress && succeeded)
+            {
+                CleanupInitializedProperties();
+            }
         }
     }
 

@@ -13,6 +13,7 @@ namespace Microsoft.CmdPal.UI.ViewModels;
 public partial class ListItemViewModel : CommandItemViewModel
 {
     private const int MaxVisibleTags = 3;
+    private int _isCleanedUp;
 
     public new ExtensionObject<IListItem> Model { get; }
 
@@ -348,8 +349,13 @@ public partial class ListItemViewModel : CommandItemViewModel
 
     protected override void UnsafeCleanup()
     {
+        Volatile.Write(ref _isCleanedUp, 1);
         CleanupInitializationState();
+        CleanupInitializedProperties();
+    }
 
+    private void CleanupInitializedProperties()
+    {
         base.UnsafeCleanup();
 
         // Tags don't have event handlers or anything to cleanup
@@ -365,6 +371,8 @@ public partial class ListItemViewModel : CommandItemViewModel
             // piggy-backing off their PropChanged
         }
     }
+
+    internal bool IsCleanedUp => Volatile.Read(ref _isCleanedUp) != 0;
 
     protected void UpdateAccessibleName()
     {

@@ -914,7 +914,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
                     var initialized = await item.RequestInitializationAsync(ct).ConfigureAwait(false);
 
-                    if (!initialized || ct.IsCancellationRequested)
+                    if (!initialized || ct.IsCancellationRequested || item.IsCleanedUp)
                     {
                         if (!ct.IsCancellationRequested)
                         {
@@ -936,7 +936,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
                         return;
                     }
 
-                    if (ct.IsCancellationRequested)
+                    if (ct.IsCancellationRequested || item.IsCleanedUp)
                     {
                         return;
                     }
@@ -955,7 +955,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
                     var suggestion = item.TextToSuggest;
                     DoOnUiThread(() =>
                     {
-                        if (ct.IsCancellationRequested)
+                        if (ct.IsCancellationRequested || item.IsCleanedUp)
                         {
                             return;
                         }
