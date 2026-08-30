@@ -60,21 +60,39 @@ KeyboardManager::KeyboardManager()
             return;
 
         const bool newHasRemappings = HasRegisteredRemappingsUnchecked();
-        // We didn't have any bindings before and we have now
-        if (newHasRemappings && !hookHandle)
-            PostThreadMessageW(mainThreadId, StartHookMessageID, 0, 0);
-
-        // All bindings were removed
-        if (!newHasRemappings && hookHandle)
+        if (newHasRemappings)
+        {
+            std::lock_guard<std::mutex> lock(hookLifecycleMutex);
+            if (!hookHandle)
+            {
+                PostThreadMessageW(mainThreadId, StartHookMessageID, 0, 0);
+            }
+        }
+        else
+        {
             StopLowlevelKeyboardHook();
+        }
     };
 
     editorIsRunningEvent = CreateEvent(nullptr, true, false, KeyboardManagerConstants::EditorWindowEventName.c_str());
     settingsEventWaiter.start(KeyboardManagerConstants::SettingsEventName, changeSettingsCallback);
 }
 
+KeyboardManager::~KeyboardManager()
+{
+    settingsEventWaiter.stop();
+    StopLowlevelKeyboardHook();
+
+    if (editorIsRunningEvent)
+    {
+        CloseHandle(editorIsRunningEvent);
+    }
+}
+
 void KeyboardManager::LoadSettings()
 {
+    std::lock_guard<std::mutex> lock(stateMutex);
+
     bool loadedSuccessful = state.LoadSettings();
     if (!loadedSuccessful)
     {
@@ -135,26 +153,115 @@ void KeyboardManager::StartLowlevelKeyboardHook()
     }
 #endif
 
-    if (!hookHandle)
+    std::lock_guard<std::mutex> lock(hookLifecycleMutex);
+    if (hookHandle)
     {
-        hookHandle = SetWindowsHookEx(WH_KEYBOARD_LL, HookProc, GetModuleHandle(NULL), NULL);
-        hookHandleCopy = hookHandle;
-        if (!hookHandle)
+        return;
+    }
+
+    if (!HasRegisteredRemappingsUnchecked())
+    {
+        return;
+    }
+
+    HANDLE realHandle = nullptr;
+    if (DuplicateHandle(GetCurrentProcess(), GetCurrentThread(),
+                        GetCurrentProcess(), &realHandle,
+                        THREAD_SET_INFORMATION | THREAD_QUERY_INFORMATION, FALSE, 0))
+    {
+        const int savedPriority = GetThreadPriority(realHandle);
+        if (savedPriority == THREAD_PRIORITY_ERROR_RETURN)
         {
             DWORD errorCode = GetLastError();
-            show_last_error_message(L"SetWindowsHookEx", errorCode, L"PowerToys - Keyboard Manager");
-            auto errorMessage = get_last_error_message(errorCode);
-            Trace::Error(errorCode, errorMessage.has_value() ? errorMessage.value() : L"", L"StartLowlevelKeyboardHook::SetWindowsHookEx");
+            Logger::warn(L"GetThreadPriority() failed ({}); keyboard hook thread priority will not be elevated.", errorCode);
+            CloseHandle(realHandle);
+            realHandle = nullptr;
         }
+        else if (SetThreadPriority(realHandle, THREAD_PRIORITY_HIGHEST))
+        {
+            hookThreadPriorityBeforeElevation = savedPriority;
+        }
+        else
+        {
+            DWORD errorCode = GetLastError();
+            Logger::warn(L"SetThreadPriority(HIGHEST) failed ({}); hook may miss events under high CPU load.", errorCode);
+            CloseHandle(realHandle);
+            realHandle = nullptr;
+        }
+    }
+    else
+    {
+        DWORD errorCode = GetLastError();
+        Logger::warn(L"DuplicateHandle failed ({}); keyboard hook thread priority will not be elevated.", errorCode);
+    }
+
+    hookHandle = SetWindowsHookEx(WH_KEYBOARD_LL, HookProc, GetModuleHandle(NULL), NULL);
+    hookHandleCopy = hookHandle;
+    if (!hookHandle)
+    {
+        // Capture the error immediately before any other Win32 call can overwrite it.
+        DWORD errorCode = GetLastError();
+
+        show_last_error_message(L"SetWindowsHookEx", errorCode, L"PowerToys - Keyboard Manager");
+        auto errorMessage = get_last_error_message(errorCode);
+        Trace::Error(errorCode, errorMessage.has_value() ? errorMessage.value() : L"", L"StartLowlevelKeyboardHook::SetWindowsHookEx");
+
+        if (realHandle)
+        {
+            SetThreadPriority(realHandle, hookThreadPriorityBeforeElevation);
+            CloseHandle(realHandle);
+        }
+    }
+    else
+    {
+        hookThreadHandle = realHandle;
     }
 }
 
 void KeyboardManager::StopLowlevelKeyboardHook()
 {
-    if (hookHandle)
+    std::lock_guard<std::mutex> lock(hookLifecycleMutex);
+    if (!hookHandle)
     {
-        UnhookWindowsHookEx(hookHandle);
-        hookHandle = nullptr;
+        return;
+    }
+
+    if (!UnhookWindowsHookEx(hookHandle))
+    {
+        DWORD errorCode = GetLastError();
+        Logger::warn(L"UnhookWindowsHookEx() failed ({}); keeping hook lifecycle state so stop can be retried.", errorCode);
+
+        // If the handle is already invalid, local state is stale; clean it up.
+        if (errorCode == ERROR_INVALID_HOOK_HANDLE)
+        {
+            hookHandle = nullptr;
+            hookHandleCopy = nullptr;
+            if (hookThreadHandle)
+            {
+                if (!SetThreadPriority(hookThreadHandle, hookThreadPriorityBeforeElevation))
+                {
+                    DWORD restoreErrorCode = GetLastError();
+                    Logger::warn(L"SetThreadPriority() failed while restoring thread priority after stale hook handle cleanup (error {}).", restoreErrorCode);
+                }
+                CloseHandle(hookThreadHandle);
+                hookThreadHandle = nullptr;
+            }
+        }
+
+        return;
+    }
+
+    hookHandle = nullptr;
+    hookHandleCopy = nullptr;
+    if (hookThreadHandle)
+    {
+        if (!SetThreadPriority(hookThreadHandle, hookThreadPriorityBeforeElevation))
+        {
+            DWORD errorCode = GetLastError();
+            Logger::warn(L"SetThreadPriority() failed while restoring thread priority after unhooking (error {}).", errorCode);
+        }
+        CloseHandle(hookThreadHandle);
+        hookThreadHandle = nullptr;
     }
 }
 
@@ -181,12 +288,20 @@ bool KeyboardManager::HasRegisteredRemappings() const
 
 bool KeyboardManager::HasRegisteredRemappingsUnchecked() const
 {
+    std::lock_guard<std::mutex> lock(stateMutex);
+
     return !(state.appSpecificShortcutReMap.empty() && state.appSpecificShortcutReMapSortedKeys.empty() && state.osLevelShortcutReMap.empty() && state.osLevelShortcutReMapSortedKeys.empty() && state.singleKeyReMap.empty() && state.singleKeyToTextReMap.empty());
 }
 
 intptr_t KeyboardManager::HandleKeyboardHookEvent(LowlevelKeyboardEvent* data) noexcept
 {
     if (loadingSettings)
+    {
+        return 0;
+    }
+
+    std::unique_lock<std::mutex> stateLock(stateMutex, std::try_to_lock);
+    if (!stateLock || loadingSettings)
     {
         return 0;
     }

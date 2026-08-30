@@ -2,6 +2,7 @@
 #include <common/hooks/LowlevelKeyboardEvent.h>
 #include <common/utils/EventWaiter.h>
 #include <keyboardmanager/common/Input.h>
+#include <mutex>
 #include "State.h"
 
 class KeyboardManager
@@ -12,13 +13,7 @@ public:
     // Constructor
     KeyboardManager();
 
-    ~KeyboardManager()
-    {
-        if (editorIsRunningEvent)
-        {
-            CloseHandle(editorIsRunningEvent);
-        }
-    }
+    ~KeyboardManager();
 
     void StartLowlevelKeyboardHook();
     void StopLowlevelKeyboardHook();
@@ -45,6 +40,8 @@ private:
     // Variable which stores all the state information to be shared between the UI and back-end
     State state;
 
+    mutable std::mutex stateMutex;
+
     // Object of class which implements InputInterface. Required for calling library functions while enabling testing
     KeyboardManagerInput::Input inputHandler;
 
@@ -54,6 +51,17 @@ private:
     std::atomic_bool loadingSettings = false;
 
     HANDLE editorIsRunningEvent = nullptr;
+
+    // Protects hook lifecycle state when StartLowlevelKeyboardHook and
+    // StopLowlevelKeyboardHook are called from different threads.
+    mutable std::mutex hookLifecycleMutex;
+
+    // Real handle to the thread that installed the WH_KEYBOARD_LL hook (obtained via
+    // DuplicateHandle so it remains valid even when called from another thread).
+    // Used to restore the hook thread's scheduling priority from any thread.
+    HANDLE hookThreadHandle = nullptr;
+
+    int hookThreadPriorityBeforeElevation = THREAD_PRIORITY_NORMAL;
 
     // Hook procedure definition
     static LRESULT CALLBACK HookProc(int nCode, WPARAM wParam, LPARAM lParam);
