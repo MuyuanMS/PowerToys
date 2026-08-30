@@ -506,7 +506,7 @@ public class IconLoadDiagnosticsTests
             $"    Removal reasons{Environment.NewLine}" +
             "      Explicit: 1";
         StringAssert.Contains(glyphSection, expectedRemovalReason);
-        var otherSection = GetTextBetween(report.Text, "  20x20 Other cache, capacity 16", "Provider resolution");
+        var otherSection = GetTextBetween(report.Text, "  20x20 Other cache, capacity 16", "Request origins");
         StringAssert.Contains(otherSection, "    Lookups: 2");
         StringAssert.Contains(otherSection, "    Hits: 1");
         StringAssert.Contains(otherSection, "    Misses: 1");
