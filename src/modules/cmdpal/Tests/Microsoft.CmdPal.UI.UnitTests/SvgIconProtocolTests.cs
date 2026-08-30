@@ -268,13 +268,13 @@ public class SvgIconProtocolTests
     [DataTestMethod]
     [DataRow(false)]
     [DataRow(true)]
-    public void ThemedSvgFileHonorsUtf16EncodingWithoutByteOrderMark(bool bigEndian)
+    public void ThemedSvgFileHonorsUtf16EncodingWithoutByteOrderMarkAfterWhitespace(bool bigEndian)
     {
         var path = Path.Combine(Path.GetTempPath(), $"CmdPal-{Guid.NewGuid():N}.svg");
         try
         {
             var encoding = new UnicodeEncoding(bigEndian, byteOrderMark: false);
-            File.WriteAllBytes(path, encoding.GetBytes(Template));
+            File.WriteAllBytes(path, encoding.GetBytes(Environment.NewLine + Template));
 
             Assert.IsTrue(SvgIconProtocol.TryCreateSvg($"|ThemedSvg|success|{path}", ElementTheme.Dark, out var svg));
 
@@ -291,13 +291,13 @@ public class SvgIconProtocolTests
     [DataTestMethod]
     [DataRow(false)]
     [DataRow(true)]
-    public void ThemedSvgFileHonorsUtf32EncodingWithoutByteOrderMark(bool bigEndian)
+    public void ThemedSvgFileHonorsUtf32EncodingWithoutByteOrderMarkAfterWhitespace(bool bigEndian)
     {
         var path = Path.Combine(Path.GetTempPath(), $"CmdPal-{Guid.NewGuid():N}.svg");
         try
         {
             var encoding = new UTF32Encoding(bigEndian, byteOrderMark: false);
-            File.WriteAllBytes(path, encoding.GetBytes(Template));
+            File.WriteAllBytes(path, encoding.GetBytes(Environment.NewLine + Template));
 
             Assert.IsTrue(SvgIconProtocol.TryCreateSvg($"|ThemedSvg|success|{path}", ElementTheme.Dark, out var svg));
 
