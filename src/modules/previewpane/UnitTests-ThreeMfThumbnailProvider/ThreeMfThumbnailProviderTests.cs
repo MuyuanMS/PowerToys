@@ -148,7 +148,8 @@ namespace ThreeMfThumbnailProviderUnitTests
                 thumbnailPng: null,
                 thumbnailWidth: 0,
                 thumbnailHeight: 0,
-                heuristicThumbnailPng: CreatePng(16, 12, System.Drawing.Color.Red));
+                heuristicThumbnailPng: CreatePng(16, 12, System.Drawing.Color.Red),
+                unrelatedMetadataPng: CreatePng(8, 6, System.Drawing.Color.Blue));
 
             using Bitmap thumbnail = ThreeMfThumbnailProvider.GetThumbnail(stream, 256);
 
@@ -192,22 +193,20 @@ namespace ThreeMfThumbnailProviderUnitTests
             settingsUtils
                 .Setup(utils => utils.GetSettings<PowerPreviewSettings>(PowerPreviewSettings.ModuleName, SettingsUtils.DefaultFileName))
                 .Returns(configuredSettings);
-            var materialColor = ThreeMfThumbnailProvider.GetMaterialColor(settingsUtils.Object);
+            System.Windows.Media.Color observedColor = default;
 
-            var loaderType = typeof(ThreeMfThumbnailProvider).Assembly.GetType("Microsoft.PowerToys.ThumbnailHandler.ThreeMf.ThreeMfModelLoader");
-            var loadModel = loaderType.GetMethod("LoadModel", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-            var model = loadModel.Invoke(null, new object[] { stream, materialColor }) as System.Windows.Media.Media3D.Model3DGroup;
-            Assert.IsNotNull(model);
+            using Bitmap thumbnail = ThreeMfThumbnailProvider.GetThumbnail(
+                stream,
+                256,
+                () => ThreeMfThumbnailProvider.GetMaterialColor(settingsUtils.Object),
+                (modelStream, materialColor) =>
+                {
+                    observedColor = materialColor;
+                    return ThreeMfModelLoader.LoadModel(modelStream, materialColor);
+                });
 
-            var geometry = model.Children[0] as System.Windows.Media.Media3D.GeometryModel3D;
-            Assert.IsNotNull(geometry);
-
-            var material = geometry.Material as System.Windows.Media.Media3D.DiffuseMaterial;
-            Assert.IsNotNull(material);
-
-            var brush = material.Brush as System.Windows.Media.SolidColorBrush;
-            Assert.IsNotNull(brush);
-            Assert.AreEqual(expectedColor, brush.Color);
+            Assert.IsNotNull(thumbnail);
+            Assert.AreEqual(expectedColor, observedColor);
         }
 
         [TestMethod]
@@ -462,7 +461,8 @@ namespace ThreeMfThumbnailProviderUnitTests
             int thumbnailHeight,
             string modelPath = "3D/3dmodel.model",
             string relationshipTarget = "/3D/3dmodel.model",
-            byte[] heuristicThumbnailPng = null)
+            byte[] heuristicThumbnailPng = null,
+            byte[] unrelatedMetadataPng = null)
         {
             _ = thumbnailWidth;
             _ = thumbnailHeight;
@@ -490,6 +490,11 @@ namespace ThreeMfThumbnailProviderUnitTests
                 if (thumbnailPng != null)
                 {
                     WriteEntry(archive, "Auxiliaries/preview.png", thumbnailPng);
+                }
+
+                if (unrelatedMetadataPng != null)
+                {
+                    WriteEntry(archive, "VendorMetadata/preview.png", unrelatedMetadataPng);
                 }
 
                 if (heuristicThumbnailPng != null)

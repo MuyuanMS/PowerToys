@@ -220,7 +220,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                 }
 
                 if (metadataFallback == null &&
-                    name.Contains("Metadata/", StringComparison.OrdinalIgnoreCase) &&
+                    name.StartsWith("Metadata/", StringComparison.OrdinalIgnoreCase) &&
                     ThumbnailExtensions.Any(ext => name.EndsWith(ext, StringComparison.OrdinalIgnoreCase)))
                 {
                     metadataFallback = entry;

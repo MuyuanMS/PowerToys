@@ -53,6 +53,15 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
         /// <returns>A thumbnail rendered from the ThreeMf model.</returns>
         public static Bitmap GetThumbnail(Stream stream, uint cx)
         {
+            return GetThumbnail(stream, cx, () => DefaultMaterialColor, ThreeMfModelLoader.LoadModel);
+        }
+
+        internal static Bitmap GetThumbnail(
+            Stream stream,
+            uint cx,
+            Func<Color> materialColorProvider,
+            Func<Stream, Color, Model3DGroup> modelLoader)
+        {
             if (cx == 0 || cx > MaxThumbnailSize || stream == null || !stream.CanRead)
             {
                 return null;
@@ -86,7 +95,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
                     workingStream.Position = 0;
                 }
 
-                var model = ThreeMfModelLoader.LoadModel(workingStream, DefaultMaterialColor);
+                var model = modelLoader(workingStream, materialColorProvider());
                 if (model == null || model.Children.Count == 0 || model.Bounds == Rect3D.Empty)
                 {
                     return null;
