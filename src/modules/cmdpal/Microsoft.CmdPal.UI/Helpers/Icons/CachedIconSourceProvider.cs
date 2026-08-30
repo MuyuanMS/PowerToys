@@ -165,7 +165,7 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
             || demand is not IIconRequestProgress progress
             || !ShellItemIconTypeRequest.TryCreate(request, out var typeRequest))
         {
-            return GetShellItemIconSource(
+            return GetDeferredShellItemIconSource(
                 request,
                 icon,
                 scale,
@@ -514,7 +514,8 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
         IconRequestMeasurement diagnostics,
         IIconRequestDemand? demand,
         ShellIconMeasurement shellDiagnostics,
-        LocatedShellIcon knownLocation)
+        LocatedShellIcon? knownLocation,
+        bool locationAlreadyChecked = true)
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         return await GetShellItemIconSource(
@@ -525,7 +526,7 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
             demand,
             shellDiagnostics,
             knownLocation,
-            locationAlreadyChecked: true).ConfigureAwait(false);
+            locationAlreadyChecked).ConfigureAwait(false);
     }
 
     private IconLoadMeasurement? CreateLoadDiagnostics(

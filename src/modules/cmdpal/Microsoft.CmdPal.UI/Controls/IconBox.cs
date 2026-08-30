@@ -830,8 +830,23 @@ public partial class IconBox : ContentControl
             return false;
         }
 
-        var replaced = Interlocked.Exchange(ref _pendingIntermediatePresentation, presentation);
-        CompleteIntermediatePresentation(replaced, applied: false);
+        while (true)
+        {
+            var current = Volatile.Read(ref _pendingIntermediatePresentation);
+            if (current is not null && current.RequestVersion > requestVersion)
+            {
+                CompleteIntermediatePresentation(presentation, applied: false);
+                return false;
+            }
+
+            if (ReferenceEquals(
+                    Interlocked.CompareExchange(ref _pendingIntermediatePresentation, presentation, current),
+                    current))
+            {
+                CompleteIntermediatePresentation(current, applied: false);
+                break;
+            }
+        }
 
         // Dispatcher shutdown is permanent for this control. Recheck after publishing so a
         // producer that raced a failed enqueue cannot strand an unscheduled presentation.
