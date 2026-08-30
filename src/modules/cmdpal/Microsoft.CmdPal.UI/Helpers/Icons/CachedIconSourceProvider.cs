@@ -323,9 +323,20 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
         // cache this key: once resolved, the canonical Shell identity owns the entry.
         var rawKey = new IconCacheKey(icon, request.CacheIdentity, scale, ElementTheme.Default);
         var candidate = new InFlightIconLoad();
-        var pending = _inFlight.GetOrAdd(rawKey, candidate);
-        if (!ReferenceEquals(pending, candidate))
+        InFlightIconLoad pending;
+        while (true)
         {
+            pending = _inFlight.GetOrAdd(rawKey, candidate);
+            if (ReferenceEquals(pending, candidate))
+            {
+                break;
+            }
+
+            if (TryRemoveCompletedNonCacheableLoad(rawKey, pending))
+            {
+                continue;
+            }
+
             shellDiagnostics.RawInFlightJoin();
             pending.Demand.Attach(demand);
             diagnostics.RecordProviderResolution(IconProviderResolution.InFlight, pending.Task);
@@ -669,7 +680,7 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
                     pending.Task);
             }
 
-            if (TryRemoveCompletedNonCacheableCanonicalLoad(canonicalKey, pending))
+            if (TryRemoveCompletedNonCacheableLoad(canonicalKey, pending))
             {
                 continue;
             }
@@ -682,7 +693,7 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
         }
     }
 
-    private bool TryRemoveCompletedNonCacheableCanonicalLoad(IconCacheKey key, InFlightIconLoad pending)
+    private bool TryRemoveCompletedNonCacheableLoad(IconCacheKey key, InFlightIconLoad pending)
     {
         if (!pending.Task.IsCompleted)
         {
