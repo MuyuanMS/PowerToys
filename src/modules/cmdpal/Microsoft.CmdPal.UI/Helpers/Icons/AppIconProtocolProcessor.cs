@@ -72,6 +72,17 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
             }
         }
 
-        return IconProtocolProcessingResult.FromFallbackIconString(candidates[0]);
+        foreach (var candidate in candidates)
+        {
+            var prepared = IconPathConverter.Prepare(candidate, null, targetSize, theme);
+            if (prepared.Kind != IconPathConverter.PreparedIconKind.Empty)
+            {
+                return IconProtocolProcessingResult.FromPreparedIcon(prepared);
+            }
+
+            prepared.Dispose();
+        }
+
+        return IconProtocolProcessingResult.Empty();
     }
 }

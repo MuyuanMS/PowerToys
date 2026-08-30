@@ -262,7 +262,7 @@ internal static class IconLoadDiagnostics
         int workerCount,
         int reservedWorkerSlots)
     {
-        var session = Volatile.Read(ref _activeSession);
+        var session = GetCurrentSession();
         if (session is null)
         {
             return null;
@@ -464,7 +464,7 @@ internal static class IconLoadDiagnostics
             _workerCount = workerCount;
         }
 
-        public bool IsForActiveSession => ReferenceEquals(_session, Volatile.Read(ref _activeSession));
+        public bool IsForActiveSession => IsCurrentSession(_session);
 
         public void Observe(int speculativeQueueDepth, int reservedWorkerSlots)
         {

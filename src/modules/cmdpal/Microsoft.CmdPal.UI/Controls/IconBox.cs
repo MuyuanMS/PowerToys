@@ -42,6 +42,7 @@ public partial class IconBox : ContentControl
     private long _diagnosticId;
     private IconRequestSite _derivedRequestSite;
     private bool _hasDerivedRequestSite;
+    private XamlRoot? _subscribedXamlRoot;
 
     /// <summary>
     /// Gets or sets the semantic UI surface used to group this control's diagnostic measurements.
@@ -211,9 +212,18 @@ public partial class IconBox : ContentControl
         _lastScale = newScale;
         UpdateLastFontSize();
 
-        if (XamlRoot is not null)
+        if (!ReferenceEquals(_subscribedXamlRoot, XamlRoot))
         {
-            XamlRoot.Changed += OnXamlRootChanged;
+            if (_subscribedXamlRoot is not null)
+            {
+                _subscribedXamlRoot.Changed -= OnXamlRootChanged;
+            }
+
+            _subscribedXamlRoot = XamlRoot;
+            if (_subscribedXamlRoot is not null)
+            {
+                _subscribedXamlRoot.Changed += OnXamlRootChanged;
+            }
         }
 
         if (SourceKey is not null && (changedTheme || changedScale))
@@ -246,9 +256,10 @@ public partial class IconBox : ContentControl
             return;
         }
 
-        if (XamlRoot is not null)
+        if (_subscribedXamlRoot is not null)
         {
-            XamlRoot.Changed -= OnXamlRootChanged;
+            _subscribedXamlRoot.Changed -= OnXamlRootChanged;
+            _subscribedXamlRoot = null;
         }
 
         if (_activeRequestDemand is not null)
