@@ -152,14 +152,7 @@ namespace ShortcutGuide.Helpers
 
             foreach (var item in GetCachedIndexYamlFile().Index.Where((s) => s.BackgroundProcess))
             {
-                string filter = item.WindowFilter;
-
-                if (filter.EndsWith(".exe", StringComparison.InvariantCultureIgnoreCase))
-                {
-                    filter = filter[..^4];
-                }
-
-                if (filter == "*")
+                if (item.WindowFilter == "*")
                 {
                     foreach (var app in item.Apps)
                     {
@@ -169,32 +162,35 @@ namespace ShortcutGuide.Helpers
                     continue;
                 }
 
-                Process[] foundProcesses = [];
-
-                try
+                foreach (string filter in GetProcessFilters(item.WindowFilter))
                 {
-                    foundProcesses = Process.GetProcessesByName(filter);
-                    if (foundProcesses.Length > 0)
+                    Process[] foundProcesses = [];
+
+                    try
                     {
-                        foreach (var app in item.Apps)
+                        foundProcesses = Process.GetProcessesByName(filter);
+                        if (foundProcesses.Length > 0)
                         {
-                            applicationIds[app] = foundProcesses[0].MainModule?.FileName;
+                            foreach (var app in item.Apps)
+                            {
+                                applicationIds[app] = foundProcesses[0].MainModule?.FileName;
+                            }
                         }
                     }
-                }
-                catch (Win32Exception ex)
-                {
-                    Trace.WriteLine($"Failed to inspect background process '{filter}': {ex.Message}");
-                }
-                catch (InvalidOperationException ex)
-                {
-                    Trace.WriteLine($"Failed to inspect background process '{filter}': {ex.Message}");
-                }
-                finally
-                {
-                    foreach (var process in foundProcesses)
+                    catch (Win32Exception ex)
                     {
-                        process.Dispose();
+                        Trace.WriteLine($"Failed to inspect background process '{filter}': {ex.Message}");
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        Trace.WriteLine($"Failed to inspect background process '{filter}': {ex.Message}");
+                    }
+                    finally
+                    {
+                        foreach (var process in foundProcesses)
+                        {
+                            process.Dispose();
+                        }
                     }
                 }
             }
@@ -204,9 +200,15 @@ namespace ShortcutGuide.Helpers
 
         internal static bool IsMatch(string input, string filter)
         {
+            return GetProcessFilters(filter).Any(singleFilter => IsSingleMatch(input, singleFilter));
+        }
+
+        internal static string[] GetProcessFilters(string filter)
+        {
             return filter
                 .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Any(singleFilter => IsSingleMatch(input, singleFilter));
+                .Select(RemoveExecutableExtension)
+                .ToArray();
         }
 
         private static bool IsSingleMatch(string input, string filter)
@@ -221,12 +223,14 @@ namespace ShortcutGuide.Helpers
                 input = input[..^4];
             }
 
-            if (filter.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-            {
-                filter = filter[..^4];
-            }
+            filter = RemoveExecutableExtension(filter);
 
             return string.Equals(input, filter, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string RemoveExecutableExtension(string filter)
+        {
+            return filter.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? filter[..^4] : filter;
         }
     }
 }
