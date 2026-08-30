@@ -154,7 +154,7 @@ public class GeneratedIconProtocolTests
     }
 
     [TestMethod]
-    public async Task InitialsCreatesVectorGlyphForGuaranteedAsciiFont()
+    public void InitialsCreatesVectorGlyphForGuaranteedAsciiFont()
     {
         Assert.IsTrue(GeneratedIconProtocol.TryCreateInitialsSvg(
             "|Initials|A|#0067C0|circle|",
