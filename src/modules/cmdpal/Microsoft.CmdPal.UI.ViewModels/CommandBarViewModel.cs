@@ -130,9 +130,13 @@ public sealed partial class CommandBarViewModel : ObservableObject,
         OnPropertyChanged(nameof(ShouldShowMoreCommandsButton));
     }
 
-    // The first command in MoreCommands is already surfaced as SecondaryButton.
+    // MoreCommands can include separators and, for content pages, the primary command.
+    // Only command items after the secondary command belong in the More menu.
     internal static bool ShouldShowMoreCommandsButtonFor(ICommandBarContext context) =>
-        context.MoreCommands.OfType<CommandContextItemViewModel>().Skip(1).Any();
+        context.MoreCommands
+               .SkipWhile(item => !ReferenceEquals(item, context.SecondaryCommand))
+               .Skip(1)
+               .Any(item => item is CommandContextItemViewModel);
 
     // InvokeItemCommand is what this will be in Xaml due to source generator
     // this comes in when an item in the list is tapped
