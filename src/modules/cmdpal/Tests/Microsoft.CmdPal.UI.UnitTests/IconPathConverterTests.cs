@@ -2,7 +2,9 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Text;
 using Microsoft.CmdPal.UI.Helpers;
+using Microsoft.UI.Xaml;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Windows.Graphics.Imaging;
 
@@ -80,6 +82,9 @@ public class IconPathConverterTests
         using var glyph = IconPathConverter.PreparedIcon.FromGlyph("\uE700", "Segoe Fluent Icons", targetSize: 20);
         Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(glyph));
 
+        using var svgData = IconPathConverter.PreparedIcon.FromSvgData([], targetSize: 20);
+        Assert.IsTrue(IconPathConverter.RequiresAsynchronousMaterialization(svgData));
+
         using var emptyBinary = IconPathConverter.PreparedIcon.FromBinary(null);
         Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(emptyBinary));
 
@@ -100,5 +105,16 @@ public class IconPathConverterTests
         Assert.IsNull(binary.SoftwareBitmap);
         Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(binary));
         Assert.IsNull(binary.TakeSoftwareBitmap());
+    }
+
+    [TestMethod]
+    public void GeneratedInitialsDoNotShapeInSynchronousConverter()
+    {
+        using var prepared = IconPathConverter.Prepare(
+            "|Initials|CP|#FF005FB8|#FF60CDFF|square|",
+            null,
+            20,
+            ElementTheme.Dark);
+        Assert.AreEqual(IconPathConverter.PreparedIconKind.Empty, prepared.Kind);
     }
 }

@@ -32,29 +32,31 @@ public class AppIconProtocolTests
         const string primary = "C:\\Icons\\🪄.ico";
         const string fallback = "C:\\Program Files\\Example\\app.exe";
         const string finalFallback = "https://example.test/icon|large";
-        const string terminalFallback = "\uE737";
 
-        var value = AppIconProtocol.CreateJumbo(primary, fallback, finalFallback, terminalFallback);
+        var value = AppIconProtocol.CreateJumbo(primary, fallback, finalFallback);
         var parsed = AppIconProtocol.TryParse(value, out var candidates, out var jumbo);
 
         Assert.IsTrue(parsed);
         Assert.IsTrue(jumbo);
-        CollectionAssert.AreEqual(new[] { primary, fallback, finalFallback, terminalFallback }, candidates);
+        CollectionAssert.AreEqual(new[] { primary, fallback, finalFallback }, candidates);
     }
 
     [TestMethod]
-    public void StandardRequestPreservesThreeCandidates()
+    public void JumboRequestPreservesFourCandidates()
     {
         const string primary = "C:\\Icons\\primary.ico";
-        const string fallback = "C:\\Program Files\\Example\\app.exe";
-        const string finalFallback = "\uE737";
+        const string fallback = "C:\\Icons\\fallback.ico";
+        const string secondaryFallback = "C:\\Program Files\\Example\\app.exe";
+        const string finalFallback = "ms-appx:///Assets/icon.svg";
 
-        var value = AppIconProtocol.Create(primary, fallback, finalFallback);
+        var value = AppIconProtocol.CreateJumbo(primary, fallback, secondaryFallback, finalFallback);
         var parsed = AppIconProtocol.TryParse(value, out var candidates, out var jumbo);
 
         Assert.IsTrue(parsed);
-        Assert.IsFalse(jumbo);
-        CollectionAssert.AreEqual(new[] { primary, fallback, finalFallback }, candidates);
+        Assert.IsTrue(jumbo);
+        CollectionAssert.AreEqual(
+            new[] { primary, fallback, secondaryFallback, finalFallback },
+            candidates);
     }
 
     [DataTestMethod]

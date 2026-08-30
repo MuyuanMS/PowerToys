@@ -29,7 +29,6 @@ public partial class IconBox : ContentControl
     private long _requestVersion;
     private IconRequestMeasurement _activeRequestDiagnostics;
     private IIconRequestDemand? _activeRequestDemand;
-    private XamlRoot? _subscribedXamlRoot;
 
     // ImageIconSource does not render through IconSourceElement. Reassigning Source on
     // one realized Image left recycled rows intermittently blank in testing. Keep a
@@ -43,6 +42,7 @@ public partial class IconBox : ContentControl
     private long _diagnosticId;
     private IconRequestSite _derivedRequestSite;
     private bool _hasDerivedRequestSite;
+    private XamlRoot? _subscribedXamlRoot;
 
     /// <summary>
     /// Gets or sets the semantic UI surface used to group this control's diagnostic measurements.
@@ -212,15 +212,18 @@ public partial class IconBox : ContentControl
         _lastScale = newScale;
         UpdateLastFontSize();
 
-        if (_subscribedXamlRoot is not null)
+        if (!ReferenceEquals(_subscribedXamlRoot, XamlRoot))
         {
-            _subscribedXamlRoot.Changed -= OnXamlRootChanged;
-        }
+            if (_subscribedXamlRoot is not null)
+            {
+                _subscribedXamlRoot.Changed -= OnXamlRootChanged;
+            }
 
-        _subscribedXamlRoot = XamlRoot;
-        if (_subscribedXamlRoot is not null)
-        {
-            _subscribedXamlRoot.Changed += OnXamlRootChanged;
+            _subscribedXamlRoot = XamlRoot;
+            if (_subscribedXamlRoot is not null)
+            {
+                _subscribedXamlRoot.Changed += OnXamlRootChanged;
+            }
         }
 
         if (SourceKey is not null && (changedTheme || changedScale))

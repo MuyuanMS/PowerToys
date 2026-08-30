@@ -244,19 +244,9 @@ internal sealed partial class IconLoaderService : IIconLoaderService
                     }
 
                     preparedIcon = protocolResult.TakePreparedIcon();
-                    if (preparedIcon is null)
+                    if (preparedIcon is null && protocolResult.FallbackIconString is { } fallbackIconString)
                     {
-                        foreach (var fallbackIconString in protocolResult.FallbackIconStrings)
-                        {
-                            preparedIcon = IconPathConverter.Prepare(fallbackIconString, fontFamily, targetSize, theme);
-                            if (ProtocolFallbackPreparedIconPolicy.ShouldUse(preparedIcon))
-                            {
-                                break;
-                            }
-
-                            preparedIcon.Dispose();
-                            preparedIcon = null;
-                        }
+                        preparedIcon = IconPathConverter.Prepare(fallbackIconString, fontFamily, targetSize, theme);
                     }
                 }
 
@@ -406,6 +396,7 @@ internal sealed partial class IconLoaderService : IIconLoaderService
             IconPathConverter.PreparedIconKind.SvgUri => IconDispatcherMaterializationKind.SvgUri,
             IconPathConverter.PreparedIconKind.Glyph => IconDispatcherMaterializationKind.Glyph,
             IconPathConverter.PreparedIconKind.Binary => IconDispatcherMaterializationKind.Binary,
+            IconPathConverter.PreparedIconKind.SvgData => IconDispatcherMaterializationKind.SvgData,
             _ => IconDispatcherMaterializationKind.Unknown,
         };
 

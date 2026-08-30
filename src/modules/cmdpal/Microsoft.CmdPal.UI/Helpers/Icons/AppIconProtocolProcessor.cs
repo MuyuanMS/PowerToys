@@ -28,6 +28,8 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
 
     public ReadOnlySpan<string> ProtocolPrefixes => AppIconProtocol.ProtocolPrefixes;
 
+    public string GetCacheIdentity(string value) => value;
+
     public ElementTheme GetCacheTheme(string value, ElementTheme theme) => ElementTheme.Default;
 
     public IconLoadInputKind ClassifyInput(string value) => IconLoadInputKind.SpecializedAppIcon;
@@ -55,22 +57,60 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
             return IconProtocolProcessingResult.Empty();
         }
 
-        if (candidates.Length == 0)
+        foreach (var candidate in candidates)
         {
-            return IconProtocolProcessingResult.Empty();
-        }
-
-        try
-        {
-            if (await _getThumbnail(candidates[0], jumbo).ConfigureAwait(false) is { } stream)
+            try
             {
-                return IconProtocolProcessingResult.FromBitmapStream(stream);
+                if (await _getThumbnail(candidate, jumbo).ConfigureAwait(false) is { } stream)
+                {
+                    return IconProtocolProcessingResult.FromBitmapStream(stream);
+                }
+            }
+            catch
+            {
+                // Continue with the next candidate before using the ordinary converter.
             }
         }
-        catch
+
+        foreach (var candidate in candidates)
         {
+            var prepared = IconPathConverter.Prepare(candidate, null, targetSize, theme);
+            if (prepared.Kind == IconPathConverter.PreparedIconKind.Glyph
+                && IsUsableFallback(prepared))
+            {
+                prepared.Dispose();
+                return IconProtocolProcessingResult.FromFallbackIconString(candidate);
+            }
+
+            if (IsUsableFallback(prepared))
+            {
+                return IconProtocolProcessingResult.FromPreparedIcon(prepared);
+            }
+
+            prepared.Dispose();
         }
 
-        return IconProtocolProcessingResult.FromFallbackIconStrings(candidates);
+        return IconProtocolProcessingResult.FromFallbackIconString(candidates[0]);
     }
+
+    private static bool IsUsableFallback(IconPathConverter.PreparedIcon preparedIcon) =>
+        preparedIcon.Kind switch
+        {
+            IconPathConverter.PreparedIconKind.BitmapUri or IconPathConverter.PreparedIconKind.SvgUri
+                => preparedIcon.Uri is { } uri
+                    && IsSupportedFallbackUri(uri)
+                    && (!uri.IsFile || File.Exists(uri.LocalPath)),
+            IconPathConverter.PreparedIconKind.SvgData or
+            IconPathConverter.PreparedIconKind.Glyph => preparedIcon.Glyph != "\u25CC",
+            IconPathConverter.PreparedIconKind.Binary => preparedIcon.SoftwareBitmap is not null,
+            _ => false,
+        };
+
+    private static bool IsSupportedFallbackUri(Uri uri) =>
+        uri.IsFile
+        || uri.Scheme.Equals("ms-appx", StringComparison.OrdinalIgnoreCase)
+        || uri.Scheme.Equals("ms-appdata", StringComparison.OrdinalIgnoreCase)
+        || uri.Scheme.Equals("ms-resource", StringComparison.OrdinalIgnoreCase)
+        || uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+        || uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
 }

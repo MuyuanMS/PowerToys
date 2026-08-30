@@ -244,6 +244,34 @@ public class IconLoadDiagnosticsTests
         Assert.IsFalse(report.Text.Contains("shell32", StringComparison.OrdinalIgnoreCase));
     }
 
+    [DataTestMethod]
+    [DataRow("|Swatch|#FF0067C0|", "GeneratedSwatch")]
+    [DataRow("|Initials|CP|#FF005FB8|square|", "GeneratedInitials")]
+    public void GeneratedIconProtocolUsesSpecificInputKind(string icon, string expectedKind)
+    {
+        IconLoadDiagnostics.Start();
+        var request = IconLoadDiagnostics.BeginRequest(IconRequestReason.SourceChanged, 1.0);
+        var load = IconLoadDiagnostics.CreateLoad(
+            request,
+            icon,
+            hasStream: false,
+            width: 20,
+            height: 20,
+            scale: 1.0);
+
+        Assert.IsNotNull(load);
+        request.RecordProviderResolution(IconProviderResolution.NewLoad, load);
+        load.SetResult(null);
+        load.Complete();
+        request.Complete(IconRequestStatus.Empty);
+
+        var report = IconLoadDiagnostics.StopAndCreateReport();
+
+        Assert.IsNotNull(report);
+        StringAssert.Contains(report.Text, $"  {expectedKind}: 1");
+        Assert.IsFalse(report.Text.Contains(icon, StringComparison.Ordinal));
+    }
+
     [TestMethod]
     [Timeout(5_000)]
     public async Task SchedulerReportCapturesCoordinatorAndWorkerHandoff()
@@ -444,20 +472,15 @@ public class IconLoadDiagnosticsTests
         IconLoadDiagnostics.RecordCacheLookup(size, IconCachePartition.Glyph, capacity: 16, hit: false);
         IconLoadDiagnostics.RecordCacheEntryAdded(size, IconCachePartition.Glyph, capacity: 16, entryCount: 1);
         IconLoadDiagnostics.RecordCacheLookup(size, IconCachePartition.Glyph, capacity: 16, hit: true);
+        IconLoadDiagnostics.RecordCacheLookup(size, IconCachePartition.Other, capacity: 16, hit: false);
+        IconLoadDiagnostics.RecordCacheEntryAdded(size, IconCachePartition.Other, capacity: 16, entryCount: 1);
+        IconLoadDiagnostics.RecordCacheLookup(size, IconCachePartition.Other, capacity: 16, hit: true);
         IconLoadDiagnostics.RecordCacheEntryRemoved(
             size,
             IconCachePartition.Glyph,
             capacity: 16,
             entryCount: 0,
             AdaptiveCacheRemovalReason.Explicit);
-        IconLoadDiagnostics.RecordCacheLookup(size, IconCachePartition.Other, capacity: 16, hit: false);
-        IconLoadDiagnostics.RecordCacheEntryAdded(size, IconCachePartition.Other, capacity: 16, entryCount: 2);
-        IconLoadDiagnostics.RecordCacheEntryRemoved(
-            size,
-            IconCachePartition.Other,
-            capacity: 16,
-            entryCount: 1,
-            AdaptiveCacheRemovalReason.LowScore);
 
         var report = IconLoadDiagnostics.StopAndCreateReport();
 
@@ -479,14 +502,12 @@ public class IconLoadDiagnosticsTests
             $"    Removal reasons{Environment.NewLine}" +
             "      Explicit: 1";
         StringAssert.Contains(glyphSection, expectedRemovalReason);
-
         var otherSection = GetTextBetween(report.Text, "  20x20 Other cache, capacity 16", "Request origins");
-        StringAssert.Contains(otherSection, "    Lookups: 1");
-        StringAssert.Contains(otherSection, "    Hits: 0");
+        StringAssert.Contains(otherSection, "    Lookups: 2");
+        StringAssert.Contains(otherSection, "    Hits: 1");
         StringAssert.Contains(otherSection, "    Misses: 1");
-        StringAssert.Contains(otherSection, "    Maximum observed entries: 2");
-        StringAssert.Contains(otherSection, "    Removal reasons");
-        StringAssert.Contains(otherSection, "      LowScore: 1");
+        StringAssert.Contains(otherSection, "    Hit rate: 50 %");
+        StringAssert.Contains(otherSection, "    Maximum observed entries: 1");
     }
 
     [TestMethod]

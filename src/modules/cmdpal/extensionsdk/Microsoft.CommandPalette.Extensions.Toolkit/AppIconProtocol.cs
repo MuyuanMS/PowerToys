@@ -37,7 +37,7 @@ public static class AppIconProtocol
     /// <param name="fallback">An optional candidate to try if the primary candidate cannot provide an icon.</param>
     /// <returns>A protocol string that can be passed to <see cref="IconData"/> or <see cref="IconInfo"/>.</returns>
     public static string Create(string primary, string? fallback = null) =>
-        CreateCore(AppIconPrefix, primary, fallback);
+        CreateCore(AppIconPrefix, primary, fallback, null);
 
     /// <summary>
     /// Creates a standard app-icon request with up to two fallback candidates.
@@ -46,7 +46,10 @@ public static class AppIconProtocol
     /// <param name="fallback">An optional candidate to try if the primary candidate cannot provide an icon.</param>
     /// <param name="finalFallback">An optional final candidate.</param>
     /// <returns>A protocol string that can be passed to <see cref="IconData"/> or <see cref="IconInfo"/>.</returns>
-    public static string Create(string primary, string? fallback, string? finalFallback) =>
+    public static string Create(
+        string primary,
+        string? fallback,
+        string? finalFallback) =>
         CreateCore(AppIconPrefix, primary, fallback, finalFallback);
 
     /// <summary>
@@ -153,7 +156,8 @@ public static class AppIconProtocol
     private static string CreateCore(
         string prefix,
         string primary,
-        params string?[] fallbacks)
+        string? fallback,
+        string? finalFallback)
     {
         ArgumentException.ThrowIfNullOrEmpty(primary);
 
@@ -162,28 +166,52 @@ public static class AppIconProtocol
         builder.Append(WireVersion);
         AppendCandidate(builder, primary);
 
-        for (var fallbackIndex = 0; fallbackIndex < fallbacks.Length; fallbackIndex++)
+        if (!string.IsNullOrEmpty(fallback)
+            && !string.Equals(fallback, primary, StringComparison.Ordinal))
         {
-            var fallback = fallbacks[fallbackIndex];
-            if (string.IsNullOrEmpty(fallback)
-                || string.Equals(fallback, primary, StringComparison.Ordinal))
+            AppendCandidate(builder, fallback);
+        }
+
+        if (!string.IsNullOrEmpty(finalFallback)
+            && !string.Equals(finalFallback, primary, StringComparison.Ordinal)
+            && !string.Equals(finalFallback, fallback, StringComparison.Ordinal))
+        {
+            AppendCandidate(builder, finalFallback);
+        }
+
+        return builder.ToString();
+    }
+
+    private static string CreateCore(
+        string prefix,
+        string primary,
+        params string?[] fallbacks)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(primary);
+
+        var builder = new StringBuilder(prefix.Length + WireVersion.Length + primary.Length + (fallbacks.Length * 12));
+        builder.Append(prefix);
+        builder.Append(WireVersion);
+        AppendCandidate(builder, primary);
+
+        var appendedCandidates = 1;
+        var seenCandidates = new HashSet<string>(StringComparer.Ordinal)
+        {
+            primary,
+        };
+
+        foreach (var candidate in fallbacks)
+        {
+            if (appendedCandidates == MaximumCandidateCount)
             {
-                continue;
+                break;
             }
 
-            var duplicate = false;
-            for (var previousIndex = 0; previousIndex < fallbackIndex; previousIndex++)
+            if (!string.IsNullOrEmpty(candidate)
+                && seenCandidates.Add(candidate))
             {
-                if (string.Equals(fallback, fallbacks[previousIndex], StringComparison.Ordinal))
-                {
-                    duplicate = true;
-                    break;
-                }
-            }
-
-            if (!duplicate)
-            {
-                AppendCandidate(builder, fallback);
+                AppendCandidate(builder, candidate);
+                appendedCandidates++;
             }
         }
 
