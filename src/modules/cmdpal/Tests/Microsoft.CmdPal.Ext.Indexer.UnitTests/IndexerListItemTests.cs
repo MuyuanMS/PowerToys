@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using Microsoft.CmdPal.Ext.Indexer.Data;
+using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Microsoft.CmdPal.Ext.Indexer.UnitTests;
@@ -21,5 +22,21 @@ public class IndexerListItemTests
             });
 
         Assert.IsNull(item.Icon);
+    }
+
+    [TestMethod]
+    public void NonEmptyPathCreatesShellIconRequest()
+    {
+        const string Path = @"C:\Files\bookmark.txt";
+        var item = new IndexerListItem(
+            new IndexerItem
+            {
+                FileName = "bookmark.txt",
+                FullPath = Path,
+            });
+
+        Assert.IsNotNull(item.Icon);
+        Assert.IsTrue(ShellItemIconProtocol.TryParse(item.Icon.Light.Icon, out var itemPath, out _));
+        Assert.AreEqual(Path, itemPath);
     }
 }
