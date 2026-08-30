@@ -24,7 +24,7 @@ internal sealed class ListItemInitializationDemand(
         while (!cancellationToken.IsCancellationRequested)
         {
             var referenceCount = Volatile.Read(ref _referenceCount);
-            if (referenceCount < 0)
+            if (referenceCount <= 0)
             {
                 return false;
             }

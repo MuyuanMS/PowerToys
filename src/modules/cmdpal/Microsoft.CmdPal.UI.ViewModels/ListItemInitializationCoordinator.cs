@@ -51,11 +51,8 @@ internal sealed class ListItemInitializationCoordinator
                 return false;
             }
 
-            if (RemoveInactiveRequestsAndFindItem(_incomingRequests, demand.Item, out _incomingRequests)
-                || RemoveInactiveRequestsAndFindItem(_priorityRequests, demand.Item, out _priorityRequests))
-            {
-                return true;
-            }
+            _ = PruneInactiveRequests(_incomingRequests, out _incomingRequests);
+            _ = PruneInactiveRequests(_priorityRequests, out _priorityRequests);
 
             _incomingRequests = new ListItemInitializationDemandNode(demand)
             {
@@ -204,21 +201,20 @@ internal sealed class ListItemInitializationCoordinator
         }
     }
 
-    private static bool RemoveInactiveRequestsAndFindItem(
+    private static int PruneInactiveRequests(
         ListItemInitializationDemandNode? head,
-        ListItemViewModel item,
         out ListItemInitializationDemandNode? newHead)
     {
-        var found = false;
+        var retainedCount = 0;
         ListItemInitializationDemandNode? retainedHead = null;
         while (head is not null)
         {
             var next = head.Next;
             if (head.Demand.IsActive)
             {
-                found |= ReferenceEquals(head.Demand.Item, item);
                 head.Next = retainedHead;
                 retainedHead = head;
+                retainedCount++;
             }
 
             head = next;
@@ -233,6 +229,6 @@ internal sealed class ListItemInitializationCoordinator
             retainedHead = next;
         }
 
-        return found;
+        return retainedCount;
     }
 }
