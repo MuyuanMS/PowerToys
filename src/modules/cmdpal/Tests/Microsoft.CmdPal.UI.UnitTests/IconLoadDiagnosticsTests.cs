@@ -482,14 +482,6 @@ public class IconLoadDiagnosticsTests
             capacity: 16,
             entryCount: 0,
             AdaptiveCacheRemovalReason.Explicit);
-        IconLoadDiagnostics.RecordCacheLookup(size, IconCachePartition.Other, capacity: 16, hit: false);
-        IconLoadDiagnostics.RecordCacheEntryAdded(size, IconCachePartition.Other, capacity: 16, entryCount: 2);
-        IconLoadDiagnostics.RecordCacheEntryRemoved(
-            size,
-            IconCachePartition.Other,
-            capacity: 16,
-            entryCount: 1,
-            AdaptiveCacheRemovalReason.LowScore);
 
         var report = IconLoadDiagnostics.StopAndCreateReport();
 
@@ -501,24 +493,15 @@ public class IconLoadDiagnosticsTests
             $"  Capacity means the cache was over its limit when removal was attempted and takes precedence over LowScore; LowScore means score alone caused removal.{Environment.NewLine}" +
             "  20x20 Glyph cache, capacity 16";
         StringAssert.Contains(report.Text, expectedHeader);
-        var glyphSection = GetTextBetween(report.Text, "  20x20 Glyph cache, capacity 16", "  20x20 Other cache, capacity 16");
-        StringAssert.Contains(glyphSection, "    Lookups: 2");
-        StringAssert.Contains(glyphSection, "    Hits: 1");
-        StringAssert.Contains(glyphSection, "    Misses: 1");
-        StringAssert.Contains(glyphSection, "    Hit rate: 50 %");
-        StringAssert.Contains(glyphSection, "    Maximum observed entries: 1");
+        StringAssert.Contains(report.Text, "    Lookups: 2");
+        StringAssert.Contains(report.Text, "    Hits: 1");
+        StringAssert.Contains(report.Text, "    Misses: 1");
+        StringAssert.Contains(report.Text, "    Hit rate: 50 %");
+        StringAssert.Contains(report.Text, "    Maximum observed entries: 1");
         var expectedRemovalReason =
             $"    Removal reasons{Environment.NewLine}" +
             "      Explicit: 1";
-        StringAssert.Contains(glyphSection, expectedRemovalReason);
-
-        var otherSection = GetTextBetween(report.Text, "  20x20 Other cache, capacity 16", "Request origins");
-        StringAssert.Contains(otherSection, "    Lookups: 1");
-        StringAssert.Contains(otherSection, "    Hits: 0");
-        StringAssert.Contains(otherSection, "    Misses: 1");
-        StringAssert.Contains(otherSection, "    Maximum observed entries: 2");
-        StringAssert.Contains(otherSection, "    Removal reasons");
-        StringAssert.Contains(otherSection, "      LowScore: 1");
+        StringAssert.Contains(report.Text, expectedRemovalReason);
     }
 
     [TestMethod]

@@ -14,7 +14,7 @@ namespace Microsoft.CmdPal.UI.UnitTests;
 public class AppIconProtocolProcessorTests
 {
     [TestMethod]
-    public async Task UsesThumbnailFromFirstCandidateWhenAvailable()
+    public async Task TriesCandidatesInOrderUntilThumbnailSucceeds()
     {
         const string primary = "C:\\Icons\\missing.ico";
         const string fallback = "steam://run/123|variant";
@@ -23,7 +23,9 @@ public class AppIconProtocolProcessorTests
         var processor = new AppIconProtocolProcessor((candidate, jumbo) =>
         {
             attempts.Add((candidate, jumbo));
-            return Task.FromResult<IRandomAccessStream?>(stream);
+            return candidate == primary
+                ? Task.FromException<IRandomAccessStream?>(new IOException("Primary failed"))
+                : Task.FromResult<IRandomAccessStream?>(stream);
         });
 
         using var result = await processor.PrepareAsync(
@@ -32,51 +34,26 @@ public class AppIconProtocolProcessorTests
             ElementTheme.Default);
 
         CollectionAssert.AreEqual(
-            new[] { (primary, true) },
+            new[] { (primary, true), (fallback, true) },
             attempts);
         Assert.AreEqual(IconProtocolProcessingResult.ResultKind.BitmapStream, result.Kind);
         Assert.AreSame(stream, result.BitmapStream);
     }
 
     [TestMethod]
-    public async Task PreservesCandidateOrderAfterFirstThumbnailMiss()
+    public async Task FallsBackToPrimaryAfterEveryThumbnailMisses()
     {
         const string primary = "C:\\Icons\\primary.ico";
-        const string fallback = "ms-appx:///Assets/fallback.png";
-        var attempts = new List<(string Candidate, bool Jumbo)>();
+        const string fallback = "C:\\Program Files\\Example\\app.exe";
         var processor = new AppIconProtocolProcessor(
-            (candidate, jumbo) =>
-            {
-                attempts.Add((candidate, jumbo));
-                return Task.FromResult<IRandomAccessStream?>(null);
-            });
-
-        using var result = await processor.PrepareAsync(
-            AppIconProtocol.CreateJumbo(primary, fallback),
-            20,
-            ElementTheme.Default);
-
-        CollectionAssert.AreEqual(
-            new[] { (primary, true) },
-            attempts);
-        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.FallbackIconStrings, result.Kind);
-        CollectionAssert.AreEqual(new[] { primary, fallback }, result.FallbackIconStrings.ToArray());
-    }
-
-    [TestMethod]
-    public async Task PreservesCandidateOrderWhenThumbnailThrows()
-    {
-        const string primary = "C:\\Icons\\primary.ico";
-        const string fallback = "ms-appx:///Assets/fallback.png";
-        var processor = new AppIconProtocolProcessor(
-            (_, _) => Task.FromException<IRandomAccessStream?>(new IOException("Primary failed")));
+            (_, _) => Task.FromResult<IRandomAccessStream?>(null));
 
         using var result = await processor.PrepareAsync(
             AppIconProtocol.Create(primary, fallback),
             20,
             ElementTheme.Default);
 
-        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.FallbackIconStrings, result.Kind);
-        CollectionAssert.AreEqual(new[] { primary, fallback }, result.FallbackIconStrings.ToArray());
+        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.FallbackIconString, result.Kind);
+        Assert.AreEqual(primary, result.FallbackIconString);
     }
 }

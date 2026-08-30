@@ -41,6 +41,7 @@
     <Compile Include="..\..\Microsoft.CmdPal.UI\Helpers\Icons\FontIconSizeCalculator.cs" Link="Helpers\Icons\FontIconSizeCalculator.cs" />
     <Compile Include="..\..\Microsoft.CmdPal.UI\Helpers\Icons\GeneratedIconProtocol.cs" Link="Helpers\Icons\GeneratedIconProtocol.cs" />
     <Compile Include="..\..\Microsoft.CmdPal.UI\Helpers\Icons\GeneratedIconProtocolProcessor.cs" Link="Helpers\Icons\GeneratedIconProtocolProcessor.cs" />
+    <Compile Include="..\..\Microsoft.CmdPal.UI\Helpers\Icons\InitialsPathFactory.cs" Link="Helpers\Icons\InitialsPathFactory.cs" />
     <Compile Include="..\..\Microsoft.CmdPal.UI\Helpers\Icons\InitialsTextRenderer.cs" Link="Helpers\Icons\InitialsTextRenderer.cs" />
     <Compile Include="..\..\Microsoft.CmdPal.UI\Helpers\Icons\SemanticIconColor.cs" Link="Helpers\Icons\SemanticIconColor.cs" />
     <Compile Include="..\..\Microsoft.CmdPal.UI\Helpers\Icons\SvgFileTextReader.cs" Link="Helpers\Icons\SvgFileTextReader.cs" />
@@ -73,7 +74,6 @@
     <Compile Include="..\..\Microsoft.CmdPal.UI\Helpers\Icons\IconRequestDemandState.cs" Link="Helpers\Icons\IconRequestDemandState.cs" />
     <Compile Include="..\..\Microsoft.CmdPal.UI\Helpers\Icons\IconSourceProvider.cs" Link="Helpers\Icons\IconSourceProvider.cs" />
     <Compile Include="..\..\Microsoft.CmdPal.UI\Helpers\Icons\IconUiResponsivenessProbe.cs" Link="Helpers\Icons\IconUiResponsivenessProbe.cs" />
-    <Compile Include="..\..\Microsoft.CmdPal.UI\Helpers\Icons\ProtocolFallbackPreparedIconPolicy.cs" Link="Helpers\Icons\ProtocolFallbackPreparedIconPolicy.cs" />
     <Compile Include="..\..\Microsoft.CmdPal.UI\Helpers\Icons\IIconLoaderService.cs" Link="Helpers\Icons\IIconLoaderService.cs" />
     <Compile Include="..\..\Microsoft.CmdPal.UI\Helpers\Icons\IIconProtocolProcessor.cs" Link="Helpers\Icons\IIconProtocolProcessor.cs" />
     <Compile Include="..\..\Microsoft.CmdPal.UI\Helpers\Icons\IIconRequestDemand.cs" Link="Helpers\Icons\IIconRequestDemand.cs" />

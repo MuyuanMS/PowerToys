@@ -32,7 +32,7 @@ internal sealed class IconLoadQueue
 
     private TaskCompletionSource<bool>? _faultedEnqueuePublishersDrained;
     private int _accepting = 1;
-    private int _activeWorkers;
+    private int _activeDequeuers;
     private int _activeEnqueuePublishers;
     private int _completionCommandPublished;
     private int _coordinatorFailed;
@@ -51,7 +51,7 @@ internal sealed class IconLoadQueue
 
         // Keep one consumer waiting for live demand while only speculative work is
         // queued. At two workers this deliberately halves speculative concurrency:
-        // reserving no slot would let speculative loads that cannot be preempted occupy all
+        // reserving no slot would let non-preemptible speculative loads occupy all
         // capacity. A single-worker queue must still make progress.
         _workerSlotsReservedForDemand = workerCount > 1 ? 1 : 0;
         _readyWork = Channel.CreateUnbounded<Operation>(new UnboundedChannelOptions
@@ -131,10 +131,10 @@ internal sealed class IconLoadQueue
     /// </remarks>
     public async ValueTask<Operation?> DequeueAsync()
     {
-        var activeWorkers = Interlocked.Increment(ref _activeWorkers);
-        if (activeWorkers > _workerCount)
+        var activeDequeuers = Interlocked.Increment(ref _activeDequeuers);
+        if (activeDequeuers > _workerCount)
         {
-            Interlocked.Decrement(ref _activeWorkers);
+            Interlocked.Decrement(ref _activeDequeuers);
             throw new InvalidOperationException("The icon queue has more active consumers than configured workers.");
         }
 
@@ -153,7 +153,7 @@ internal sealed class IconLoadQueue
         }
         finally
         {
-            Interlocked.Decrement(ref _activeWorkers);
+            Interlocked.Decrement(ref _activeDequeuers);
         }
     }
 
