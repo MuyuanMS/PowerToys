@@ -159,6 +159,28 @@ namespace ThreeMfThumbnailProviderUnitTests
         }
 
         [TestMethod]
+        public void GetThumbnailIgnoresDuplicateRootRelationshipPart()
+        {
+            const string model =
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+                "<model unit=\"millimeter\" xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\">" +
+                "<resources><object id=\"1\" type=\"model\"><mesh>" +
+                "<vertices><vertex x=\"0\" y=\"0\" z=\"0\"/><vertex x=\"1\" y=\"0\" z=\"0\"/><vertex x=\"0\" y=\"1\" z=\"0\"/></vertices>" +
+                "<triangles><triangle v1=\"0\" v2=\"1\" v3=\"2\"/></triangles>" +
+                "</mesh></object></resources><build><item objectid=\"1\"/></build></model>";
+            using var stream = BuildPackage(
+                model,
+                thumbnailPng: null,
+                thumbnailWidth: 0,
+                thumbnailHeight: 0,
+                duplicateRootThumbnailPng: CreatePng(8, 6, System.Drawing.Color.Red));
+
+            using Bitmap thumbnail = ThreeMfModelLoader.TryLoadEmbeddedThumbnail(stream, 256);
+
+            Assert.IsNull(thumbnail);
+        }
+
+        [TestMethod]
         public void GetThumbnailPathChangesOnlyTerminalExtension()
         {
             const string input = @"C:\profile.3mf\model.3mf";
@@ -462,7 +484,8 @@ namespace ThreeMfThumbnailProviderUnitTests
             string modelPath = "3D/3dmodel.model",
             string relationshipTarget = "/3D/3dmodel.model",
             byte[] heuristicThumbnailPng = null,
-            byte[] unrelatedMetadataPng = null)
+            byte[] unrelatedMetadataPng = null,
+            byte[] duplicateRootThumbnailPng = null)
         {
             _ = thumbnailWidth;
             _ = thumbnailHeight;
@@ -500,6 +523,17 @@ namespace ThreeMfThumbnailProviderUnitTests
                 if (heuristicThumbnailPng != null)
                 {
                     WriteEntry(archive, "Metadata/thumbnail.png", heuristicThumbnailPng);
+                }
+
+                if (duplicateRootThumbnailPng != null)
+                {
+                    const string duplicateRelationships =
+                        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+                        "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
+                        "<Relationship Id=\"thumbnail\" Type=\"http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail\" Target=\"/Vendor/duplicate.png\"/>" +
+                        "</Relationships>";
+                    WriteEntry(archive, "_rels/.rels", Encoding.UTF8.GetBytes(duplicateRelationships));
+                    WriteEntry(archive, "Vendor/duplicate.png", duplicateRootThumbnailPng);
                 }
             }
 

@@ -355,55 +355,52 @@ namespace Microsoft.PowerToys.ThumbnailHandler.ThreeMf
         private static IEnumerable<string> GetTargetsFromRelationships(ZipArchive archive, string[] relationshipTypes)
         {
             var targets = new List<string>();
-            foreach (var entry in archive.Entries)
+            var entry = archive.Entries.FirstOrDefault(candidate =>
             {
                 // Package thumbnail / root-model discovery must read only the package relationship part
                 // (_rels/.rels). Part-level .rels are scoped to their own source part and would require
                 // source-relative resolution; merging them here could select a part-level thumbnail or
                 // a non-root model as if it were package-level.
-                var name = entry.FullName.Replace('\\', '/');
-                if (!string.Equals(name.TrimStart('/'), "_rels/.rels", StringComparison.OrdinalIgnoreCase))
+                var name = candidate.FullName.Replace('\\', '/');
+                return string.Equals(name.TrimStart('/'), "_rels/.rels", StringComparison.OrdinalIgnoreCase);
+            });
+
+            // ZIP archives can contain duplicate names. Process only the first canonical root
+            // relationship part so duplicates cannot multiply decompression and XML parsing work.
+            if (entry == null || entry.Length > MaxUncompressedRelationshipBytes)
+            {
+                return targets;
+            }
+
+            XDocument document;
+            using (var relStream = entry.Open())
+            using (var boundedStream = new MemoryStream())
+            {
+                CopyWithLimit(relStream, boundedStream, MaxUncompressedRelationshipBytes);
+                boundedStream.Position = 0;
+                document = LoadXmlSafe(boundedStream);
+            }
+
+            foreach (var relationship in document.Descendants().Where(element => element.Name.LocalName == "Relationship"))
+            {
+                var type = relationship.Attribute("Type")?.Value ?? string.Empty;
+                if (!relationshipTypes.Any(known => string.Equals(type, known, StringComparison.OrdinalIgnoreCase)))
                 {
                     continue;
                 }
 
-                // Bound relationship parts before parsing: reject an oversized declared length and
-                // copy through a size-limited buffer so a compressed .rels bomb cannot exhaust memory.
-                if (entry.Length > MaxUncompressedRelationshipBytes)
+                // Ignore relationships that point outside the package; those parts are not present
+                // in the archive and must never be dereferenced by the provider.
+                var targetMode = relationship.Attribute("TargetMode")?.Value;
+                if (string.Equals(targetMode, "External", StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
 
-                XDocument document;
-                using (var relStream = entry.Open())
-                using (var boundedStream = new MemoryStream())
+                var target = relationship.Attribute("Target")?.Value;
+                if (!string.IsNullOrWhiteSpace(target))
                 {
-                    CopyWithLimit(relStream, boundedStream, MaxUncompressedRelationshipBytes);
-                    boundedStream.Position = 0;
-                    document = LoadXmlSafe(boundedStream);
-                }
-
-                foreach (var relationship in document.Descendants().Where(element => element.Name.LocalName == "Relationship"))
-                {
-                    var type = relationship.Attribute("Type")?.Value ?? string.Empty;
-                    if (!relationshipTypes.Any(known => string.Equals(type, known, StringComparison.OrdinalIgnoreCase)))
-                    {
-                        continue;
-                    }
-
-                    // Ignore relationships that point outside the package; those parts are not present
-                    // in the archive and must never be dereferenced by the provider.
-                    var targetMode = relationship.Attribute("TargetMode")?.Value;
-                    if (string.Equals(targetMode, "External", StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    var target = relationship.Attribute("Target")?.Value;
-                    if (!string.IsNullOrWhiteSpace(target))
-                    {
-                        targets.Add(target.Replace('\\', '/'));
-                    }
+                    targets.Add(target.Replace('\\', '/'));
                 }
             }
 
