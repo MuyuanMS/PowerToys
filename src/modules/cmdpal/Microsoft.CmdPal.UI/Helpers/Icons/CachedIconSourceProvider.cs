@@ -73,7 +73,7 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
                     {
                         var shellDiagnostics = IconLoadDiagnostics.BeginShellIconRequest(cachedLocation.Request);
                         shellDiagnostics.LocationCacheHit();
-                        return GetShellItemIconSource(
+                        return GetDeferredShellItemIconSource(
                             cachedLocation.Request,
                             icon,
                             scale,
@@ -378,6 +378,17 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
         IIconRequestDemand? demand,
         ShellIconMeasurement shellDiagnostics)
     {
+        if (!_loader.ShellIconLocations.IsCurrent(locatedIcon))
+        {
+            return GetShellItemIconSourceProgressively(
+                request,
+                icon,
+                scale,
+                diagnostics,
+                demand,
+                shellDiagnostics);
+        }
+
         var candidate = new InFlightIconLoad();
         var arbitration = ArbitrateCanonicalShellLoad(
             locatedIcon,
@@ -495,6 +506,27 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
         }
 
         return task;
+    }
+
+    private async Task<IconSource?> GetDeferredShellItemIconSource(
+        ShellItemIconRequest request,
+        IconDataViewModel icon,
+        double scale,
+        IconRequestMeasurement diagnostics,
+        IIconRequestDemand? demand,
+        ShellIconMeasurement shellDiagnostics,
+        LocatedShellIcon knownLocation)
+    {
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+        return await GetShellItemIconSource(
+            request,
+            icon,
+            scale,
+            diagnostics,
+            demand,
+            shellDiagnostics,
+            knownLocation,
+            locationAlreadyChecked: true).ConfigureAwait(false);
     }
 
     private IconLoadMeasurement? CreateLoadDiagnostics(

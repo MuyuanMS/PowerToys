@@ -7,4 +7,5 @@ namespace Microsoft.CmdPal.UI.Helpers;
 internal readonly record struct LocatedShellIcon(
     ShellItemIconRequest Request,
     ShellIconIdentity Identity,
-    bool CacheRawRequestAlias = true);
+    bool CacheRawRequestAlias = true,
+    long CachedAtTimestamp = 0);
