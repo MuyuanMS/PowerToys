@@ -981,6 +981,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     private void SelectedItemPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        if (!IsWorkActive)
+        {
+            return;
+        }
+
         var item = _lastSelectedItem;
         if (item is null)
         {
