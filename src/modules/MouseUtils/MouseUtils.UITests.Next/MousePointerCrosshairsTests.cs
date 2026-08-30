@@ -212,7 +212,7 @@ public class MousePointerCrosshairsTests : UITestBase
         MouseHelper.MoveTo(centerX, centerY);
         var probeX = centerX + 60;
         Color? previous = null;
-        var baseline = WaitHelper.WaitForStable(
+        var baselineResult = WaitHelper.WaitForStable(
             () => WindowHelper.GetPixelColor(probeX, centerY),
             color =>
             {
@@ -222,7 +222,11 @@ public class MousePointerCrosshairsTests : UITestBase
             },
             2_000,
             requiredConsecutiveMatches: 4,
-            pollIntervalMS: 100).LastObservation;
+            pollIntervalMS: 100);
+        Assert.IsTrue(
+            baselineResult.Succeeded,
+            $"Desktop pixel at ({probeX},{centerY}) did not stabilize before capturing the Crosshairs opacity baseline. Last observation: {baselineResult.LastObservation}.");
+        var baseline = baselineResult.LastObservation;
 
         Assert.IsTrue(NamedEventHelper.WaitAndSignal(NamedEventHelper.MouseCrosshairsToggle), "Crosshairs trigger event was unavailable.");
         var expected = Blend(Color.Red, baseline, 128);

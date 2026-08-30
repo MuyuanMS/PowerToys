@@ -194,6 +194,9 @@ internal static class MouseUtilsTestHelper
             2_000,
             requiredConsecutiveMatches: 4,
             pollIntervalMS: 100);
+        Assert.IsTrue(
+            result.Succeeded,
+            $"Desktop pixel at ({x},{y}) did not stabilize before capturing the visual baseline. Last observation: {result.LastObservation}.");
         return result.LastObservation;
     }
 
