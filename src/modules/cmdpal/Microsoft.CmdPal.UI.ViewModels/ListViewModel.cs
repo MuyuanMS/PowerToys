@@ -1040,6 +1040,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
             return; // throw?
         }
 
+        if (RollbackInitializationIfStopped(model))
+        {
+            return;
+        }
+
         _isDynamic = model is IDynamicListPage;
 
         IsGridView = model.GridProperties is not null;
@@ -1076,15 +1081,69 @@ public partial class ListViewModel : PageViewModel, IDisposable
         }
 
         FetchItems(keepSelection: true, ensureSelectionVisible: true);
-        if (IsWorkStopped)
+        if (RollbackInitializationIfStopped(model))
         {
             return;
         }
 
         model.ItemsChanged += Model_ItemsChanged;
-        if (IsWorkStopped)
+        if (RollbackInitializationIfStopped(model))
         {
-            model.ItemsChanged -= Model_ItemsChanged;
+            return;
+        }
+    }
+
+    private bool RollbackInitializationIfStopped(IListPage model)
+    {
+        if (!IsWorkStopped)
+        {
+            return false;
+        }
+
+        model.ItemsChanged -= Model_ItemsChanged;
+        base.UnsafeCleanup();
+
+        EmptyContent?.SafeCleanup();
+        EmptyContent = new(new(null), PageContext, contextMenuFactory: null);
+
+        Filters?.PropertyChanged -= FiltersPropertyChanged;
+        Filters?.SafeCleanup();
+        Filters = null;
+
+        GridProperties = null;
+        CleanupListItemsOnUiThread();
+        return true;
+    }
+
+    private void CleanupListItemsOnUiThread()
+    {
+        void Cleanup()
+        {
+            lock (_listLock)
+            {
+                foreach (var item in Items)
+                {
+                    item.SafeCleanup();
+                }
+
+                Items.Clear();
+                RunFilteredItemsUpdate(() =>
+                {
+                    foreach (var item in FilteredItems)
+                    {
+                        item.SafeCleanup();
+                    }
+
+                    FilteredItems.Clear();
+                });
+            }
+
+            PublishVmCache(new(VmCacheComparer));
+        }
+
+        if (IsCurrentThreadUiThread() || !TryDoOnUiThread(Cleanup))
+        {
+            Cleanup();
         }
     }
 
