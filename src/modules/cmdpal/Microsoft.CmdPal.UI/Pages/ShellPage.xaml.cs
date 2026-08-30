@@ -241,6 +241,14 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
             if (!ViewModel.IsNested)
             {
                 // todo BODGY
+                foreach (var entry in RootFrame.BackStack)
+                {
+                    if (entry.Parameter is AsyncNavigationRequest { TargetViewModel: ListViewModel listViewModel })
+                    {
+                        listViewModel.SafeCleanup();
+                    }
+                }
+
                 RootFrame.BackStack.Clear();
             }
         });
