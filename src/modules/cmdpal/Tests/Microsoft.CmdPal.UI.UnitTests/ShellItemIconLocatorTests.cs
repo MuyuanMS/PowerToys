@@ -136,7 +136,7 @@ public class ShellItemIconLocatorTests
     [TestMethod]
     public void ImageThumbnailIdentityTracksFileFreshness()
     {
-        var path = Path.ChangeExtension(Path.GetTempFileName(), ".png");
+        var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
         try
         {
             File.WriteAllText(path, "first");

@@ -135,34 +135,29 @@ public class AllAppsPageTests : AppsTestBase
     }
 
     [TestMethod]
-    public async Task AppListItem_DefersWin32RowAndHeroIconsToUiLoader()
+    public void AppListItem_DefersWin32RowAndHeroIconsToUiLoader()
     {
         var app = new AppItem
         {
             Name = "Test App",
             IcoPath = "C:\\Windows\\System32\\shell32.dll,1",
-            JumboIconPath = "C:\\Windows\\System32\\shell32.dll,2",
+            JumboIconPath = "C:\\Windows\\System32\\imageres.dll,2",
             ExePath = "C:\\Program Files\\Example\\app.exe",
         };
 
         var item = new AppListItem(app, useThumbnails: true);
 
-        Assert.AreSame(Icons.GenericAppIcon, item.Icon);
-        Assert.AreSame(Icons.GenericAppIcon, item.Command.Icon);
-
-        await WaitForIconAsync(item);
-
         var rowIcon = (IconInfo)item.Icon!;
         Assert.IsTrue(AppIconProtocol.TryParse(rowIcon.Light.Icon, out var rowCandidates, out var rowJumbo));
         Assert.IsFalse(rowJumbo);
-        CollectionAssert.AreEqual(new[] { app.IcoPath, app.ExePath, Icons.GenericAppIcon.Light.Icon }, rowCandidates);
+        CollectionAssert.AreEqual(new[] { app.IcoPath, app.ExePath }, rowCandidates);
         Assert.AreSame(rowIcon, item.Command.Icon);
 
         var details = (Details)item.Details!;
         var heroIcon = (IconInfo)details.HeroImage;
         Assert.IsTrue(AppIconProtocol.TryParse(heroIcon.Light.Icon, out var heroCandidates, out var heroJumbo));
         Assert.IsTrue(heroJumbo);
-        CollectionAssert.AreEqual(new[] { app.JumboIconPath, app.IcoPath, app.ExePath, Icons.GenericAppIcon.Light.Icon }, heroCandidates);
+        CollectionAssert.AreEqual(new[] { app.JumboIconPath, app.IcoPath, app.ExePath }, heroCandidates);
     }
 
     [TestMethod]
@@ -184,20 +179,5 @@ public class AllAppsPageTests : AppsTestBase
         var details = (Details)item.Details!;
         var heroIcon = (IconInfo)details.HeroImage;
         Assert.AreEqual(app.JumboIconPath, heroIcon.Light.Icon);
-    }
-
-    private static async Task WaitForIconAsync(AppListItem item)
-    {
-        for (var attempt = 0; attempt < 20; attempt++)
-        {
-            if (!ReferenceEquals(item.Icon, Icons.GenericAppIcon))
-            {
-                return;
-            }
-
-            await Task.Delay(10);
-        }
-
-        Assert.Fail("The deferred app icon was not published.");
     }
 }

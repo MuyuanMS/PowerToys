@@ -131,7 +131,7 @@ internal static partial class IconPathConverter
                     return true;
 
                 case PreparedIconKind.Binary:
-                    if (RequiresAsynchronousMaterialization(icon))
+                    if (icon.SoftwareBitmap is not null)
                     {
                         iconSource = null!;
                         return false;

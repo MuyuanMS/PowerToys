@@ -57,22 +57,21 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
             return IconProtocolProcessingResult.Empty();
         }
 
-        if (candidates.Length == 0)
+        foreach (var candidate in candidates)
         {
-            return IconProtocolProcessingResult.Empty();
-        }
-
-        try
-        {
-            if (await _getThumbnail(candidates[0], jumbo).ConfigureAwait(false) is { } stream)
+            try
             {
-                return IconProtocolProcessingResult.FromBitmapStream(stream);
+                if (await _getThumbnail(candidate, jumbo).ConfigureAwait(false) is { } stream)
+                {
+                    return IconProtocolProcessingResult.FromBitmapStream(stream);
+                }
+            }
+            catch
+            {
+                // Continue with the next candidate before using the ordinary converter.
             }
         }
-        catch
-        {
-        }
 
-        return IconProtocolProcessingResult.FromFallbackIconStrings(candidates);
+        return IconProtocolProcessingResult.FromFallbackIconString(candidates[0]);
     }
 }
