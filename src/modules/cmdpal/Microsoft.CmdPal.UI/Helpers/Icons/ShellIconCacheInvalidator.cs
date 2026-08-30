@@ -14,6 +14,7 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
 {
     private const int ShcnrfShellLevel = 0x0002;
     private const int ShcnrfNewDelivery = 0x8000;
+    private static readonly TimeSpan DegradedRefreshInterval = TimeSpan.FromMinutes(5);
     internal const int ShcneAssocChanged = 0x08000000;
     internal const int ShcneUpdateImage = 0x00008000;
     internal const int ShellIconChangeEvents = ShcneAssocChanged | ShcneUpdateImage;
@@ -24,6 +25,7 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
     private readonly uint _messageId;
     private readonly ShellIconLocationCache _locations;
     private uint _registrationId;
+    private Timer? _degradedRefreshTimer;
 
     public ShellIconCacheInvalidator(
         nint windowHandle,
@@ -83,6 +85,7 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
     {
         if (_registrationId != 0 || _windowHandle == 0 || _messageId == 0)
         {
+            StopDegradedRefreshTimer();
             return;
         }
 
@@ -96,6 +99,7 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
         if (result < 0 || desktopItemIdList == 0)
         {
             Logger.LogWarning("Failed to resolve the Shell desktop for icon association notifications; Shell icon aliases will expire normally");
+            StartDegradedRefreshTimer();
             return;
         }
 
@@ -122,6 +126,11 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
         if (_registrationId == 0)
         {
             Logger.LogWarning("Failed to register for Shell icon association changes; Shell icon aliases will expire normally");
+            StartDegradedRefreshTimer();
+        }
+        else
+        {
+            StopDegradedRefreshTimer();
         }
     }
 
@@ -133,6 +142,27 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
         {
             _ = NativeMethods.SHChangeNotifyDeregister(registrationId);
         }
+
+        StopDegradedRefreshTimer();
+    }
+
+    private void StartDegradedRefreshTimer()
+    {
+        if (_degradedRefreshTimer is not null)
+        {
+            return;
+        }
+
+        _degradedRefreshTimer = new Timer(
+            _ => Invalidate(ShellIconCacheInvalidationReason.RegistrationUnavailableRefresh),
+            null,
+            DegradedRefreshInterval,
+            DegradedRefreshInterval);
+    }
+
+    private void StopDegradedRefreshTimer()
+    {
+        Interlocked.Exchange(ref _degradedRefreshTimer, null)?.Dispose();
     }
 
     private static unsafe nint LockNotification(nint wParam, nint lParam, out int eventId)
