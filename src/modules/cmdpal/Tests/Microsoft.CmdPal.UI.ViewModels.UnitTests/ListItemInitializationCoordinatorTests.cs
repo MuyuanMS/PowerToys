@@ -695,6 +695,32 @@ public sealed partial class ListItemInitializationCoordinatorTests
 
     [TestMethod]
     [Timeout(15000)]
+    public async Task RemovingInProgressItemSettlesItsWaiterAsFailed()
+    {
+        using var initializationStarted = new ManualResetEventSlim();
+        using var continueInitialization = new ManualResetEventSlim();
+        var order = new ConcurrentQueue<int>();
+        var (models, viewModels) = CreateItems(1, order, initializationStarted, continueInitialization);
+        var worker = Task.Run(viewModels[0].InitializePropertiesOnce);
+        try
+        {
+            Assert.IsTrue(initializationStarted.Wait(TimeSpan.FromSeconds(2)));
+            var selected = viewModels[0].RequestInitializationAsync(CancellationToken.None);
+
+            viewModels[0].SafeCleanup();
+
+            Assert.IsFalse(await selected.WaitAsync(TimeSpan.FromSeconds(2)));
+            Assert.IsFalse(viewModels[0].InitializationWasSuccessful);
+        }
+        finally
+        {
+            continueInitialization.Set();
+            await worker.WaitAsync(TimeSpan.FromSeconds(2));
+        }
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
     public void NewPriorityBatchDoesNotOvertakeAlreadyPublishedRequests()
     {
         var order = new ConcurrentQueue<int>();

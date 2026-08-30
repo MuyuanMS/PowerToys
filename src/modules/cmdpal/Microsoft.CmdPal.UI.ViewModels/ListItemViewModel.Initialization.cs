@@ -151,9 +151,15 @@ public partial class ListItemViewModel
             // The base phase flag is set before the derived tags/section work ends.
             // This separate latch covers the whole call. Its full fence pairs with
             // the waiter's completion-source publication so neither can miss the other.
-            Interlocked.Exchange(ref _initializationState, succeeded ? InitializationSucceeded : InitializationFailed);
+            var state = Interlocked.CompareExchange(
+                ref _initializationState,
+                succeeded ? InitializationSucceeded : InitializationFailed,
+                InitializationInProgress);
+            var completedSuccessfully = state == InitializationInProgress
+                ? succeeded
+                : state == InitializationSucceeded;
             Interlocked.Exchange(ref _initializationDemands, null);
-            Volatile.Read(ref _initializationCompletion)?.TrySetResult(succeeded);
+            Volatile.Read(ref _initializationCompletion)?.TrySetResult(completedSuccessfully);
         }
     }
 
@@ -192,9 +198,20 @@ public partial class ListItemViewModel
     {
         Interlocked.Exchange(ref _initializationCoordinator, null);
         Interlocked.Exchange(ref _initializationDemands, null);
-        if (Interlocked.CompareExchange(ref _initializationState, InitializationFailed, InitializationNotStarted) == InitializationNotStarted)
+
+        while (true)
         {
-            Volatile.Read(ref _initializationCompletion)?.TrySetResult(false);
+            var state = Volatile.Read(ref _initializationState);
+            if (state >= InitializationSucceeded)
+            {
+                return;
+            }
+
+            if (Interlocked.CompareExchange(ref _initializationState, InitializationFailed, state) == state)
+            {
+                Volatile.Read(ref _initializationCompletion)?.TrySetResult(false);
+                return;
+            }
         }
     }
 
