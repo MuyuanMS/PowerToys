@@ -108,7 +108,7 @@ public static class KeyboardHelper
 
     /// <summary>
     /// Send a chord of keys. LWIN and side-specific Ctrl keys are held via <c>keybd_event</c> while
-    /// the remaining keys are sent via <see cref="FormsSendKeys.SendWait"/>. Otherwise everything
+    /// the remaining keys are sent via <see cref="FormsSendKeys.SendWait"/>. Otherwise, everything
     /// goes through SendKeys.SendWait (the modifier-aware Windows path).
     /// </summary>
     public static void SendKeys(params Key[] keys)

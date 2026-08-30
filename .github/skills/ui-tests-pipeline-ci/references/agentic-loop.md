@@ -266,7 +266,7 @@ identity on every read, polls every 120 seconds, requests system sleep preventio
 terminal status, timeout, or a genuine query failure.
 
 Read the waiter's JSON-lines `Event`: `progress` is a successful nonterminal read, `query-error` is a
-retryable read failure, `terminal` means every build completed, and `timeout` ends the bounded wait.
+read failure that can be retried, `terminal` means every build completed, and `timeout` ends the bounded wait.
 Require at least one `progress` or `terminal` record before attributing a nonzero exit to Azure DevOps;
 otherwise diagnose the waiter invocation itself. On `terminal`, immediately query timeline, logs,
 tests, and artifacts and apply the completion standard. If it times out while builds are progressing,
