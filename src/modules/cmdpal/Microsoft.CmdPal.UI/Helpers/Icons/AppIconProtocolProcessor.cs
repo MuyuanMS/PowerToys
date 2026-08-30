@@ -75,7 +75,7 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
         foreach (var candidate in candidates)
         {
             var prepared = IconPathConverter.Prepare(candidate, null, targetSize, theme);
-            if (prepared.Kind != IconPathConverter.PreparedIconKind.Empty)
+            if (IsUsableFallback(prepared))
             {
                 return IconProtocolProcessingResult.FromPreparedIcon(prepared);
             }
@@ -83,6 +83,17 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
             prepared.Dispose();
         }
 
-        return IconProtocolProcessingResult.Empty();
+        return IconProtocolProcessingResult.FromFallbackIconString(candidates[0]);
     }
+
+    private static bool IsUsableFallback(IconPathConverter.PreparedIcon preparedIcon) =>
+        preparedIcon.Kind switch
+        {
+            IconPathConverter.PreparedIconKind.BitmapUri or
+            IconPathConverter.PreparedIconKind.SvgUri or
+            IconPathConverter.PreparedIconKind.SvgData or
+            IconPathConverter.PreparedIconKind.Glyph => true,
+            IconPathConverter.PreparedIconKind.Binary => preparedIcon.SoftwareBitmap is not null,
+            _ => false,
+        };
 }
