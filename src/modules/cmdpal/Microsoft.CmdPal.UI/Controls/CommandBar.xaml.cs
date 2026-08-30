@@ -57,8 +57,12 @@ public sealed partial class CommandBar : UserControl,
             _ = DispatcherQueue.TryEnqueue(
                 () =>
                 {
+                    var target = ViewModel.ShouldShowMoreCommandsButton ?
+                        MoreCommandsButton :
+                        ViewModel.HasSecondaryCommand ? SecondaryButton : PrimaryButton;
+
                     ContextMenuFlyout.ShowAt(
-                        MoreCommandsButton,
+                        target,
                         new FlyoutShowOptions()
                         {
                             ShowMode = FlyoutShowMode.Standard,
