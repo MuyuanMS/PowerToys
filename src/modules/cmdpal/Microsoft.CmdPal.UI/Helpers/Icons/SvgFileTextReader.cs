@@ -74,6 +74,11 @@ internal static class SvgFileTextReader
 
         // StreamReader handles byte-order marks. These signatures cover BOM-less UTF-16 and
         // UTF-32, whose zero bytes prevent reading the declaration as ASCII.
+        if (TryGetBomlessUnicodeEncoding(prefix, out encoding))
+        {
+            return true;
+        }
+
         if (prefix.Length >= 4)
         {
             if (prefix[0] == 0x00 && prefix[1] == 0x00 && prefix[2] == 0x00 && prefix[3] == 0x3C)
@@ -108,6 +113,79 @@ internal static class SvgFileTextReader
 
         return encodingName is null || TryResolveEncoding(encodingName, out encoding);
     }
+
+    private static bool TryGetBomlessUnicodeEncoding(ReadOnlySpan<byte> prefix, out Encoding encoding)
+    {
+        if (StartsWithEncodedXml(prefix, bytesPerCharacter: 4, bigEndian: true))
+        {
+            encoding = Utf32BigEndian;
+            return true;
+        }
+
+        if (StartsWithEncodedXml(prefix, bytesPerCharacter: 4, bigEndian: false))
+        {
+            encoding = Utf32LittleEndian;
+            return true;
+        }
+
+        if (StartsWithEncodedXml(prefix, bytesPerCharacter: 2, bigEndian: true))
+        {
+            encoding = Encoding.BigEndianUnicode;
+            return true;
+        }
+
+        if (StartsWithEncodedXml(prefix, bytesPerCharacter: 2, bigEndian: false))
+        {
+            encoding = Encoding.Unicode;
+            return true;
+        }
+
+        encoding = Encoding.UTF8;
+        return false;
+    }
+
+    private static bool StartsWithEncodedXml(
+        ReadOnlySpan<byte> prefix,
+        int bytesPerCharacter,
+        bool bigEndian)
+    {
+        for (var offset = 0; offset + bytesPerCharacter <= prefix.Length; offset += bytesPerCharacter)
+        {
+            var codePoint = ReadCodePoint(prefix.Slice(offset, bytesPerCharacter), bigEndian);
+            if (IsXmlWhitespace(codePoint))
+            {
+                continue;
+            }
+
+            return codePoint == '<';
+        }
+
+        return false;
+    }
+
+    private static int ReadCodePoint(ReadOnlySpan<byte> bytes, bool bigEndian)
+    {
+        var codePoint = 0;
+        if (bigEndian)
+        {
+            foreach (var value in bytes)
+            {
+                codePoint = (codePoint << 8) | value;
+            }
+        }
+        else
+        {
+            for (var index = bytes.Length - 1; index >= 0; index--)
+            {
+                codePoint = (codePoint << 8) | bytes[index];
+            }
+        }
+
+        return codePoint;
+    }
+
+    private static bool IsXmlWhitespace(int codePoint) =>
+        codePoint is 0x09 or 0x0A or 0x0D or 0x20;
 
     private static bool TryGetDeclaredEncodingName(
         ReadOnlySpan<byte> prefix,
