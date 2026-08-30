@@ -1220,7 +1220,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
     {
         if (TryChangeWorkStatus(ListPageWorkStatus.Active, ListPageWorkStatus.Suspended) is not null)
         {
-            CancelPendingWork();
+            CancelPendingWork(cancelFilterUpdate: false);
         }
     }
 
@@ -1373,14 +1373,18 @@ public partial class ListViewModel : PageViewModel, IDisposable
         }
     }
 
-    private void CancelPendingWork()
+    private void CancelPendingWork(bool cancelFilterUpdate)
     {
         // The status transition already invalidated callbacks and retained their
         // unfinished phase atomically. Never take worker-owned locks on navigation.
         CancelAndDisposeTokenSource(ref _selectedItemCts);
         CancelAndDisposeTokenSource(ref _cancellationTokenSource);
         Interlocked.Exchange(ref _itemInitializationCoordinator, null)?.Stop();
-        CancelAndDisposeTokenSource(ref filterCancellationTokenSource);
+        if (cancelFilterUpdate)
+        {
+            CancelAndDisposeTokenSource(ref filterCancellationTokenSource);
+        }
+
         CancelAndDisposeTokenSource(ref _fetchItemsCancellationTokenSource);
     }
 
@@ -1406,7 +1410,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
             }
         }
 
-        CancelPendingWork();
+        CancelPendingWork(cancelFilterUpdate: true);
     }
 
     protected override void UnsafeCleanup()

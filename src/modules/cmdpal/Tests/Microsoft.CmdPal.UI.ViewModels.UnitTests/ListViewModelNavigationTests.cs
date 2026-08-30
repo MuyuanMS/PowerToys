@@ -920,6 +920,35 @@ public sealed partial class ListViewModelNavigationTests
         }
     }
 
+    [TestMethod]
+    [Timeout(15000)]
+    public async Task PendingDynamicSearchTextUpdateSurvivesNavigationSuspension()
+    {
+        var scheduler = new QueuedTaskScheduler();
+        var page = new SearchPage();
+        var viewModel = CreateViewModel(page, scheduler);
+
+        try
+        {
+            viewModel.InitializeProperties();
+            scheduler.Drain();
+
+            viewModel.SearchTextBox = "Recovered";
+            viewModel.SuspendForNavigation();
+            await viewModel.ResumeAfterNavigation();
+            scheduler.Drain();
+
+            Assert.AreEqual("Recovered", page.SearchText);
+            Assert.AreEqual("Recovered", viewModel.FilteredItems.Single().Title);
+        }
+        finally
+        {
+            viewModel.Dispose();
+            scheduler.Drain();
+            viewModel.SafeCleanup();
+        }
+    }
+
     private static ListPageWorkState GetWorkState(ListViewModel viewModel) =>
         GetPrivateField<ListPageWorkState>(viewModel, "_workState");
 

@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using Microsoft.CmdPal.Common.Services;
 using Microsoft.CmdPal.Ext.Run;
 using Microsoft.CmdPal.Ext.UnitTestBase;
+using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
@@ -685,6 +686,26 @@ public class RunPageTests : CommandPaletteUnitTestBase
         // Should match folders in parent that start with user profile folder name
         // or be empty if no matches
         Assert.IsNotNull(commandList);
+    }
+
+    [TestMethod]
+    [Timeout(5000)]
+    public void FileItemUsesShellItemIconProtocol()
+    {
+        var item = new RunExeItem(
+            "test.exe",
+            string.Empty,
+            @"C:\Tools\test.exe",
+            addToHistory: null);
+
+        _ = item.Icon;
+
+        Assert.IsTrue(
+            SpinWait.SpinUntil(() => item.Icon is IconInfo, TimeSpan.FromSeconds(2)),
+            "The file item did not publish an icon.");
+        var icon = (IconInfo)item.Icon!;
+        Assert.IsTrue(ShellItemIconProtocol.IsProtocol(icon.Light.Icon));
+        Assert.IsNull(icon.Light.Data);
     }
 
     [TestMethod]

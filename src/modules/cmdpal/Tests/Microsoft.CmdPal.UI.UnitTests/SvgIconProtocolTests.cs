@@ -88,6 +88,39 @@ public class SvgIconProtocolTests
         }
     }
 
+    [DataTestMethod]
+    [DataRow("|Svg|")]
+    [DataRow("|ThemedSvg|")]
+    public void OversizedSvgFilesAreRejected(string prefix)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"CmdPal-{Guid.NewGuid():N}.svg");
+        try
+        {
+            using (var stream = File.Create(path))
+            {
+                stream.SetLength(SvgFileTextReader.MaximumSvgFileSize + 1);
+            }
+
+            Assert.IsFalse(SvgIconProtocol.TryCreateSvg(prefix + path, ElementTheme.Light, out var svg));
+            Assert.AreEqual(0, svg.Length);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [DataTestMethod]
+    [DataRow("|Svg|")]
+    [DataRow("|ThemedSvg|")]
+    public void OversizedInlineSvgIsRejected(string prefix)
+    {
+        var payload = "<svg>" + new string(' ', SvgFileTextReader.MaximumSvgFileSize) + "</svg>";
+
+        Assert.IsFalse(SvgIconProtocol.TryCreateSvg(prefix + payload, ElementTheme.Light, out var svg));
+        Assert.AreEqual(0, svg.Length);
+    }
+
     [TestMethod]
     public void ThemedInlineSvgReplacesThemeAndDefaultInfoAccent()
     {
@@ -203,7 +236,7 @@ public class SvgIconProtocolTests
     }
 
     [TestMethod]
-    public void ThemedSvgFileHonorsBomlessXmlEncodingDeclaration()
+    public void ThemedSvgFileHonorsXmlEncodingDeclarationWithoutByteOrderMark()
     {
         var path = Path.Combine(Path.GetTempPath(), $"CmdPal-{Guid.NewGuid():N}.svg");
         try
@@ -223,6 +256,29 @@ public class SvgIconProtocolTests
             var resolved = Encoding.UTF8.GetString(svg);
             Assert.IsFalse(resolved.Contains("<?xml", StringComparison.OrdinalIgnoreCase));
             StringAssert.Contains(resolved, $"<title>{title}</title>");
+            StringAssert.Contains(resolved, "id=\"theme\" fill=\"#FFFFFF\"");
+            StringAssert.Contains(resolved, "id=\"accent\" fill=\"#6CCB5F\"");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ThemedSvgFileHonorsUtf32EncodingWithoutByteOrderMark(bool bigEndian)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"CmdPal-{Guid.NewGuid():N}.svg");
+        try
+        {
+            var encoding = new UTF32Encoding(bigEndian, byteOrderMark: false);
+            File.WriteAllBytes(path, encoding.GetBytes(Template));
+
+            Assert.IsTrue(SvgIconProtocol.TryCreateSvg($"|ThemedSvg|success|{path}", ElementTheme.Dark, out var svg));
+
+            var resolved = Encoding.UTF8.GetString(svg);
             StringAssert.Contains(resolved, "id=\"theme\" fill=\"#FFFFFF\"");
             StringAssert.Contains(resolved, "id=\"accent\" fill=\"#6CCB5F\"");
         }
