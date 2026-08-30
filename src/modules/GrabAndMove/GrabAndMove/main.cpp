@@ -63,7 +63,7 @@ enum class SnapTarget
     BottomRight,
 };
 
-static bool g_snapToEdges = true;
+static std::atomic_bool g_snapToEdges{ true };
 static bool g_snapArmed = false;
 static SnapTarget g_snapTarget = SnapTarget::None;
 static RECT g_snapTargetRect = {};
@@ -224,6 +224,7 @@ static HWINEVENTHOOK g_hWinEventHook = nullptr;
 
 static void StopDragging();
 static void StopResizing();
+static bool ComputeSnapTarget(POINT pt, RECT& target, SnapTarget& out);
 
 static void EndInteraction(bool endDrag, bool endResize)
 {
@@ -358,7 +359,7 @@ static void LoadSettingsFromFile()
 
         if (auto v = values.get_bool_value(L"snapToEdges"))
         {
-            g_snapToEdges = *v;
+            g_snapToEdges.store(*v);
         }
 
         if (auto v = values.get_int_value(L"modifierKey"))
@@ -1497,8 +1498,14 @@ static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
         // ----- Left Button Up: end drag -----
         if (wParam == WM_LBUTTONUP && g_dragging)
         {
+            SnapTarget snapTarget = SnapTarget::None;
+            RECT snapRect = {};
+            g_snapArmed = g_snapToEdges.load() && ComputeSnapTarget(ms->pt, snapRect, snapTarget);
+            g_snapTarget = g_snapArmed ? snapTarget : SnapTarget::None;
+            g_snapTargetRect = g_snapArmed ? snapRect : RECT{};
+
             // Edge-snap on release: snap the window into the armed target region.
-            if (g_snapArmed && g_snapToEdges)
+            if (g_snapArmed)
             {
                 const SnapTarget target = g_snapTarget;
                 const RECT targetRect = g_snapTargetRect;
@@ -1508,6 +1515,7 @@ static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
 
                 if (target == SnapTarget::Maximize)
                 {
+                    SetWindowPos(g_dragTarget, nullptr, targetRect.left, targetRect.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
                     ShowWindow(g_dragTarget, SW_MAXIMIZE);
                 }
                 else if (target != SnapTarget::None)
@@ -1768,7 +1776,7 @@ static void HandleDragMove(POINT pt)
     // dragged window (zero the frame margins/rounding so it hugs the screen edge).
     SnapTarget snapTarget = SnapTarget::None;
     RECT snapRect{};
-    const bool nowArmed = g_snapToEdges && ComputeSnapTarget(pt, snapRect, snapTarget);
+    const bool nowArmed = g_snapToEdges.load() && ComputeSnapTarget(pt, snapRect, snapTarget);
     const bool wasArmed = g_snapArmed;
 
     if (nowArmed)
