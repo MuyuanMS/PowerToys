@@ -77,4 +77,48 @@ public class AppIconProtocolProcessorTests
         Assert.AreEqual(IconPathConverter.PreparedIconKind.SvgUri, prepared.Kind);
         Assert.AreEqual(fallback, prepared.Uri?.OriginalString);
     }
+
+    [TestMethod]
+    public async Task SkipsUnsupportedUriFallbackCandidateAfterThumbnailMisses()
+    {
+        const string primary = "C:\\Icons\\primary.ico";
+        const string unsupportedFallback = "steam://run/123|variant";
+        const string supportedFallback = "ms-appx:///Assets/icon.svg";
+        var processor = new AppIconProtocolProcessor(
+            (_, _) => Task.FromResult<IRandomAccessStream?>(null));
+
+        using var result = await processor.PrepareAsync(
+            AppIconProtocol.Create(primary, unsupportedFallback, supportedFallback),
+            20,
+            ElementTheme.Default);
+
+        using var prepared = result.TakePreparedIcon();
+
+        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.PreparedIcon, result.Kind);
+        Assert.IsNotNull(prepared);
+        Assert.AreEqual(IconPathConverter.PreparedIconKind.SvgUri, prepared.Kind);
+        Assert.AreEqual(supportedFallback, prepared.Uri?.OriginalString);
+    }
+
+    [TestMethod]
+    public async Task SkipsInvalidGlyphFallbackCandidateAfterThumbnailMisses()
+    {
+        const string primary = "C:\\Icons\\primary.ico";
+        const string invalidGlyph = "not a glyph";
+        const string validGlyph = "\uE700";
+        var processor = new AppIconProtocolProcessor(
+            (_, _) => Task.FromResult<IRandomAccessStream?>(null));
+
+        using var result = await processor.PrepareAsync(
+            AppIconProtocol.Create(primary, invalidGlyph, validGlyph),
+            20,
+            ElementTheme.Default);
+
+        using var prepared = result.TakePreparedIcon();
+
+        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.PreparedIcon, result.Kind);
+        Assert.IsNotNull(prepared);
+        Assert.AreEqual(IconPathConverter.PreparedIconKind.Glyph, prepared.Kind);
+        Assert.AreEqual(validGlyph, prepared.Glyph);
+    }
 }
