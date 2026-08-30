@@ -618,6 +618,48 @@ public partial class CachedIconSourceProviderTests
 
     [TestMethod]
     [Timeout(5_000)]
+    public async Task CachedLegacyLocationHitMovesExactArbitrationOffCallingSynchronizationContext()
+    {
+        var loader = new ControllableIconLoader();
+        var provider = CreateProvider(loader);
+        var request = new ShellItemIconRequest(@"C:\Windows\System32\legacy.dll", jumbo: false);
+        var located = new LocatedShellIcon(
+            request,
+            ShellIconIdentity.FromSystemImageList(42, jumbo: false));
+        Assert.IsTrue(
+            loader.ShellIconLocations.TryAdd(
+                request,
+                located,
+                loader.ShellIconLocations.Generation,
+                out _));
+
+        var originalContext = SynchronizationContext.Current;
+        var callingThreadId = Environment.CurrentManagedThreadId;
+        Task<IconSource?> result;
+        SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
+        try
+        {
+            result = provider.GetIconSource(
+                new IconDataViewModel { Icon = request.ItemPath },
+                1.0);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(originalContext);
+        }
+
+        Assert.IsTrue(SpinWait.SpinUntil(
+            () => loader.ShellEnqueueCount == 1,
+            TimeSpan.FromSeconds(2)));
+        Assert.AreNotEqual(callingThreadId, loader.LastExactShellEnqueueThreadId);
+
+        var source = CreateTestIconSource();
+        loader.CompleteNextShellOwner(source);
+        Assert.AreSame(source, await result);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
     public async Task CanonicalJoinPinsExistingLoadDemanded()
     {
         var loader = new ControllableIconLoader();
