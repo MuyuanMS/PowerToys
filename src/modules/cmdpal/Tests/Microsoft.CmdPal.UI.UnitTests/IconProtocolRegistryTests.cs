@@ -6,6 +6,7 @@ using Microsoft.CmdPal.UI.Helpers;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.UI.Xaml;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Text;
 
 namespace Microsoft.CmdPal.UI.UnitTests;
 
@@ -160,6 +161,32 @@ public class IconProtocolRegistryTests
             ElementTheme.Light,
             out var preparedIcon));
         Assert.IsNull(preparedIcon);
+    }
+
+    [TestMethod]
+    public async Task SvgFileProtocolPreparesFileOnAsyncPath()
+    {
+        var path = Path.Combine(Environment.CurrentDirectory, $"CmdPal-{Guid.NewGuid():N}.svg");
+        try
+        {
+            const string Svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" />";
+            File.WriteAllText(path, Svg, Encoding.UTF8);
+            var value = $"|ThemedSvg|warning|{path}";
+            var processor = IconProtocolRegistry.Find(value);
+
+            Assert.IsNotNull(processor);
+            var result = await processor.PrepareAsync(value, 20, ElementTheme.Light);
+            using var preparedIcon = result.TakePreparedIcon();
+
+            Assert.IsNotNull(preparedIcon);
+            Assert.AreEqual(IconPathConverter.PreparedIconKind.SvgData, preparedIcon.Kind);
+            Assert.AreEqual(20, preparedIcon.TargetSize);
+            CollectionAssert.AreEqual(Encoding.UTF8.GetBytes(Svg), preparedIcon.SvgData);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [DataTestMethod]
