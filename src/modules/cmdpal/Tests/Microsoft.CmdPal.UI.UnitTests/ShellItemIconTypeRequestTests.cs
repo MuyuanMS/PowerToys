@@ -57,5 +57,11 @@ public class ShellItemIconTypeRequestTests
         Assert.IsFalse(ShellItemIconTypeRequest.TryCreate(
             new ShellItemIconRequest(@"C:\Files\TARGET.LNK", jumbo: true),
             out _));
+        Assert.IsFalse(ShellItemIconTypeRequest.TryCreate(
+            new ShellItemIconRequest(@"C:\Files\website.url", jumbo: false),
+            out _));
+        Assert.IsFalse(ShellItemIconTypeRequest.TryCreate(
+            new ShellItemIconRequest(@"C:\Files\WEBSITE.URL", jumbo: true),
+            out _));
     }
 }
