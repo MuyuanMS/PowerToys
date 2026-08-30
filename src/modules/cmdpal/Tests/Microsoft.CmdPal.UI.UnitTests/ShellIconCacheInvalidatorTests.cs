@@ -56,4 +56,12 @@ public class ShellIconCacheInvalidatorTests
         invalidator.OnShellRestarted();
         Assert.AreEqual(generation + 2, cache.Generation);
     }
+
+    [TestMethod]
+    public void RegistrationIncludesImageListUpdateNotifications()
+    {
+        Assert.AreEqual(
+            ShellIconCacheInvalidator.ShcneAssocChanged | ShellIconCacheInvalidator.ShcneUpdateImage,
+            ShellIconCacheInvalidator.ShellIconChangeEvents);
+    }
 }

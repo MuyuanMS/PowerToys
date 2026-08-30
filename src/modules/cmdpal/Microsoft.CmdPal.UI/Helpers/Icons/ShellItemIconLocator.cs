@@ -46,7 +46,8 @@ internal sealed partial class ShellItemIconLocator : IShellItemIconLocator
         {
             locatedIcon = new LocatedShellIcon(
                 request,
-                ShellIconIdentity.FromItemThumbnail(request.ItemPath, request.Jumbo));
+                ShellIconIdentity.FromItemThumbnail(request.ItemPath, request.Jumbo),
+                CacheRawRequestAlias: false);
             return true;
         }
 
@@ -61,6 +62,14 @@ internal sealed partial class ShellItemIconLocator : IShellItemIconLocator
             locatedIcon = new LocatedShellIcon(
                 request,
                 ShellIconIdentity.FromSystemImageList(iconIndex, request.Jumbo));
+            return true;
+        }
+
+        if (!IsFullyQualifiedFileSystemPath(request.ItemPath))
+        {
+            locatedIcon = new LocatedShellIcon(
+                request,
+                ShellIconIdentity.FromItemPath(request.ItemPath, request.Jumbo));
             return true;
         }
 
@@ -84,6 +93,23 @@ internal sealed partial class ShellItemIconLocator : IShellItemIconLocator
             ShellIconIdentity.FromItemPath(request.ItemPath, request.Jumbo));
         return true;
     }
+
+    private static bool IsFullyQualifiedFileSystemPath(string itemPath)
+    {
+        try
+        {
+            return itemPath.Length >= 2
+                && ((itemPath[1] == ':' && Path.IsPathFullyQualified(itemPath))
+                    || (IsDirectorySeparator(itemPath[0])
+                        && IsDirectorySeparator(itemPath[1])));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsDirectorySeparator(char value) => value is '\\' or '/';
 
     private static unsafe bool TryGetSystemImageListIndex(
         string itemPath,

@@ -68,6 +68,46 @@ public class IconPathConverterTests
     }
 
     [TestMethod]
+    public void IconSourceMaterializationContractSeparatesSynchronousKindsFromBinaryTransfer()
+    {
+        using var empty = IconPathConverter.PreparedIcon.Empty();
+        Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(empty));
+
+        using var bitmapUri = IconPathConverter.PreparedIcon.FromUri(new Uri("ms-appx:///Assets/icon.png"), isSvg: false, targetSize: 20);
+        Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(bitmapUri));
+
+        using var svgUri = IconPathConverter.PreparedIcon.FromUri(new Uri("ms-appx:///Assets/icon.svg"), isSvg: true, targetSize: 20);
+        Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(svgUri));
+
+        using var glyph = IconPathConverter.PreparedIcon.FromGlyph("\uE700", "Segoe Fluent Icons", targetSize: 20);
+        Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(glyph));
+
+        using var svgData = IconPathConverter.PreparedIcon.FromSvgData([], targetSize: 20);
+        Assert.IsTrue(IconPathConverter.RequiresAsynchronousMaterialization(svgData));
+
+        using var emptyBinary = IconPathConverter.PreparedIcon.FromBinary(null);
+        Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(emptyBinary));
+
+        using var bitmap = new SoftwareBitmap(
+            BitmapPixelFormat.Bgra8,
+            1,
+            1,
+            BitmapAlphaMode.Premultiplied);
+        using var binary = IconPathConverter.PreparedIcon.FromBinary(bitmap);
+
+        Assert.IsFalse(IconPathConverter.TryCreateIconSourceSynchronously(binary, out var binarySource));
+        Assert.IsNull(binarySource);
+        Assert.IsTrue(IconPathConverter.RequiresAsynchronousMaterialization(binary));
+
+        var transferred = binary.TakeSoftwareBitmap();
+
+        Assert.AreSame(bitmap, transferred);
+        Assert.IsNull(binary.SoftwareBitmap);
+        Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(binary));
+        Assert.IsNull(binary.TakeSoftwareBitmap());
+    }
+
+    [TestMethod]
     public void GeneratedInitialsDoNotShapeInSynchronousConverter()
     {
         using var prepared = IconPathConverter.Prepare(
@@ -75,7 +115,6 @@ public class IconPathConverterTests
             null,
             20,
             ElementTheme.Dark);
-
         Assert.AreEqual(IconPathConverter.PreparedIconKind.Empty, prepared.Kind);
     }
 

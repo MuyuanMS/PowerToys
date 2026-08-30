@@ -325,6 +325,16 @@ internal sealed partial class IconLoaderService : IIconLoaderService
                     extractionStartedAt,
                     locatedIcon.Value.Identity.Kind,
                     extractionResult.HasContent);
+                if (locatedIcon.Value.Identity.Kind == ShellIconIdentityKind.SystemImageList
+                    && !ShellIconLocations.IsCurrent(locatedIcon.Value))
+                {
+                    extractionResult.Dispose();
+                    diagnostics?.CompleteBackgroundPreparation(preparationStartedAt);
+                    var fallback = await GetShellItemFallbackSourceAsync(diagnostics).ConfigureAwait(false);
+                    diagnostics?.Complete();
+                    tcs.TrySetResult(fallback);
+                    return;
+                }
             }
             catch
             {
@@ -351,10 +361,18 @@ internal sealed partial class IconLoaderService : IIconLoaderService
                 if (extractionResult.TakeSoftwareBitmap() is { } softwareBitmap)
                 {
                     result = await CreateSoftwareBitmapIconSourceAsync(softwareBitmap, diagnostics).ConfigureAwait(false);
+                    if (result is ImageIconSource { ImageSource: null })
+                    {
+                        result = await GetShellItemFallbackSourceAsync(diagnostics).ConfigureAwait(false);
+                    }
                 }
                 else if (extractionResult.BitmapStream is { } bitmapStream)
                 {
                     result = await CreateImageIconSourceAsync(bitmapStream, scaledSize, diagnostics).ConfigureAwait(false);
+                    if (result is ImageIconSource { ImageSource: null })
+                    {
+                        result = await GetShellItemFallbackSourceAsync(diagnostics).ConfigureAwait(false);
+                    }
                 }
                 else
                 {

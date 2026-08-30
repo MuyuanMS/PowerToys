@@ -180,6 +180,11 @@ internal static class SvgIconProtocol
 
         if (IsInline(payload))
         {
+            if (!IsWithinSvgSizeLimit(payload))
+            {
+                return false;
+            }
+
             // Inline strings have no source encoding; UTF-8 is the protocol encoding.
             // Remove a declaration that would describe the caller's original bytes,
             // not the UTF-8 bytes emitted by this protocol.
@@ -195,8 +200,7 @@ internal static class SvgIconProtocol
         // IconPathConverter.Prepare invokes this on an icon-loader worker, so
         // filesystem access never blocks the WinUI STA thread. Reading bytes also
         // preserves the file's original encoding and XML declaration exactly.
-        svg = File.ReadAllBytes(payload);
-        return svg.Length > 0;
+        return SvgFileTextReader.TryReadBytes(payload, out svg);
     }
 
     private static bool TryCreateThemedSvg(string value, ElementTheme theme, out byte[] svg)
@@ -210,6 +214,11 @@ internal static class SvgIconProtocol
         string template;
         if (IsInline(payload))
         {
+            if (!IsWithinSvgSizeLimit(payload))
+            {
+                return false;
+            }
+
             template = payload;
         }
         else
@@ -334,6 +343,9 @@ internal static class SvgIconProtocol
 
     private static bool IsSvgPath(string value) =>
         Path.GetExtension(value).Equals(".svg", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsWithinSvgSizeLimit(string value) =>
+        Encoding.UTF8.GetByteCount(value) <= SvgFileTextReader.MaximumSvgFileSize;
 
     private static bool IsInline(string value) => IsInline(value.AsSpan());
 

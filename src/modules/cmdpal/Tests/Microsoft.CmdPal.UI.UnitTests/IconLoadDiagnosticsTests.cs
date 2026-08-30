@@ -564,6 +564,7 @@ public class IconLoadDiagnosticsTests
             $"    Association-change notifications received: 1{Environment.NewLine}" +
             $"    Invalidations by reason{Environment.NewLine}" +
             $"      AssociationChanged: 1{Environment.NewLine}" +
+            $"      SystemImageUpdated: 0{Environment.NewLine}" +
             "      ShellRestarted: 1";
         StringAssert.Contains(report.Text, invalidationBlock);
         var progressiveBlock =
@@ -590,7 +591,7 @@ public class IconLoadDiagnosticsTests
         StringAssert.Contains(report.Text, $"  Canonical source outcomes{Environment.NewLine}    Cache hits: 1{Environment.NewLine}    In-flight joins: 0{Environment.NewLine}    New loads: 1{Environment.NewLine}    Reuse rate: 50%");
         StringAssert.Contains(report.Text, $"  Shell extraction{Environment.NewLine}    Started: 1{Environment.NewLine}    Succeeded: 1{Environment.NewLine}    Empty: 0{Environment.NewLine}    Failed: 0");
         StringAssert.Contains(report.Text, $"    Extraction routes{Environment.NewLine}      SystemImageList: 1");
-        StringAssert.Contains(report.Text, "    Requests avoiding extraction: 50%");
+        Assert.IsFalse(report.Text.Contains("Requests avoiding extraction", StringComparison.Ordinal));
         var imageListBlock =
             $"    Direct system image-list extraction{Environment.NewLine}" +
             $"      Attempts: 1{Environment.NewLine}" +

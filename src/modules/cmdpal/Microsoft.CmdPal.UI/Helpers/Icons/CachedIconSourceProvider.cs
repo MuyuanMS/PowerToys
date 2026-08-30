@@ -197,7 +197,7 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
                     scale,
                     diagnostics: default,
                     demand: null,
-                    shellDiagnostics: shellDiagnostics.CreateSuboperation());
+                    shellDiagnostics: shellDiagnostics.CreateChildOperation());
                 intermediate = await typeTask.ConfigureAwait(false);
                 var canPublish = intermediate is not null
                     && !ShellItemIconFallback.IsFallback(intermediate);
@@ -261,7 +261,9 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
                 var exact = await exactTask.ConfigureAwait(false);
                 shellDiagnostics.ExactRefinementCompleted(
                     ReferenceEquals(intermediate, exact));
-                return exact ?? intermediate;
+                return exact is not null && !ShellItemIconFallback.IsFallback(exact)
+                    ? exact
+                    : intermediate ?? exact;
             }
             catch
             {

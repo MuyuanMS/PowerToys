@@ -134,6 +134,42 @@ public class ShellItemIconLocatorTests
     }
 
     [TestMethod]
+    public void ImageThumbnailIdentityTracksFileFreshness()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
+        try
+        {
+            File.WriteAllText(path, "first");
+            File.SetLastWriteTimeUtc(path, new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var firstRequest = new ShellItemIconRequest(path, jumbo: false);
+
+            Assert.IsTrue(ShellItemIconLocator.Instance.TryLocate(firstRequest, out var first));
+
+            File.SetLastWriteTimeUtc(path, new DateTime(2025, 1, 1, 0, 1, 0, DateTimeKind.Utc));
+            var secondRequest = new ShellItemIconRequest(path, jumbo: false);
+
+            Assert.IsTrue(ShellItemIconLocator.Instance.TryLocate(secondRequest, out var second));
+            Assert.AreEqual(ShellIconIdentityKind.ItemThumbnail, first.Identity.Kind);
+            Assert.AreEqual(ShellIconIdentityKind.ItemThumbnail, second.Identity.Kind);
+            Assert.AreNotEqual(first.Identity, second.Identity);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [TestMethod]
+    public void NonFileSystemParsingNamesUsePidlExtractionFallback()
+    {
+        var request = new ShellItemIconRequest("shell:Downloads", jumbo: false);
+
+        Assert.IsTrue(ShellItemIconLocator.Instance.TryLocate(request, out var located));
+        Assert.AreEqual(ShellIconIdentityKind.ItemPath, located.Identity.Kind);
+        Assert.AreEqual(request.ItemPath, located.Identity.ItemPath);
+    }
+
+    [TestMethod]
     public void CaseDistinctRawAliasesCanConvergeToSameShellIdentity()
     {
         var path = Path.GetTempFileName();
