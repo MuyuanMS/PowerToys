@@ -147,15 +147,14 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
             if (_loader.ShellIconLocations.TryGet(request, out var cachedLocation))
             {
                 shellDiagnostics.LocationCacheHit();
-                return GetShellItemIconSource(
+                return GetDeferredShellItemIconSource(
                     request,
                     icon,
                     scale,
                     diagnostics,
                     demand,
                     shellDiagnostics,
-                    cachedLocation,
-                    locationAlreadyChecked: true);
+                    cachedLocation);
             }
 
             shellDiagnostics.LocationCacheMiss();
