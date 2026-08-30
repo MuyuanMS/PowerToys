@@ -20,6 +20,7 @@ public partial class ListItemViewModel
     private TaskCompletionSource<bool>? _initializationCompletion;
     private ListItemInitializationCoordinator? _initializationCoordinator;
     private ListItemInitializationDemandNode? _initializationDemands;
+    private ListItemInitializationDemand? _realizationDemand;
 
     internal bool IsInitializationComplete => Volatile.Read(ref _initializationState) >= InitializationSucceeded;
 
@@ -66,10 +67,43 @@ public partial class ListItemViewModel
         return ReferenceEquals(Volatile.Read(ref _initializationCoordinator), coordinator);
     }
 
+    internal void PruneInitializationDemand(ListItemInitializationDemand demand)
+    {
+        while (true)
+        {
+            var head = Volatile.Read(ref _initializationDemands);
+            if (head is null || !ReferenceEquals(head.Demand, demand))
+            {
+                break;
+            }
+
+            if (ReferenceEquals(
+                    Interlocked.CompareExchange(ref _initializationDemands, head.Next, head),
+                    head))
+            {
+                break;
+            }
+        }
+
+        var previous = Volatile.Read(ref _initializationDemands);
+        while (previous?.Next is { } current)
+        {
+            if (ReferenceEquals(current.Demand, demand) || !current.Demand.IsActive)
+            {
+                previous.Next = current.Next;
+                continue;
+            }
+
+            previous = current;
+        }
+
+        Interlocked.CompareExchange(ref _realizationDemand, null, demand);
+    }
+
     public ListItemRealizationRegistration BeginRealization()
     {
-        var demand = CreateInitializationDemand(CancellationToken.None);
-        if (demand is not null)
+        var demand = CreateRealizationDemand(out var shouldEnqueue);
+        if (demand is not null && shouldEnqueue)
         {
             Volatile.Read(ref _initializationCoordinator)?.TryEnqueue(demand);
         }
@@ -196,22 +230,67 @@ public partial class ListItemViewModel
     // waiters, so removing a still-pending item cannot strand a selection.
     private void CleanupInitializationState()
     {
-        Interlocked.Exchange(ref _initializationCoordinator, null);
-        Interlocked.Exchange(ref _initializationDemands, null);
-
+        var completedAsFailed = false;
         while (true)
         {
             var state = Volatile.Read(ref _initializationState);
             if (state >= InitializationSucceeded)
             {
-                return;
+                break;
             }
 
             if (Interlocked.CompareExchange(ref _initializationState, InitializationFailed, state) == state)
             {
-                Volatile.Read(ref _initializationCompletion)?.TrySetResult(false);
-                return;
+                completedAsFailed = true;
+                break;
             }
+        }
+
+        Interlocked.Exchange(ref _initializationCoordinator, null);
+        Interlocked.Exchange(ref _initializationDemands, null);
+        Interlocked.Exchange(ref _realizationDemand, null);
+        if (completedAsFailed)
+        {
+            Volatile.Read(ref _initializationCompletion)?.TrySetResult(false);
+        }
+    }
+
+    private ListItemInitializationDemand? CreateRealizationDemand(out bool shouldEnqueue)
+    {
+        shouldEnqueue = false;
+        while (true)
+        {
+            if (IsInitializationComplete)
+            {
+                return null;
+            }
+
+            var existingDemand = Volatile.Read(ref _realizationDemand);
+            if (existingDemand?.TryAddReference() == true)
+            {
+                return existingDemand;
+            }
+
+            var newDemand = new ListItemInitializationDemand(
+                this,
+                CancellationToken.None,
+                pruneOnRelease: false);
+            if (!ReferenceEquals(
+                    Interlocked.CompareExchange(ref _realizationDemand, newDemand, existingDemand),
+                    existingDemand))
+            {
+                newDemand.Release();
+                continue;
+            }
+
+            if (PublishInitializationDemand(newDemand))
+            {
+                shouldEnqueue = true;
+                return newDemand;
+            }
+
+            Interlocked.CompareExchange(ref _realizationDemand, null, newDemand);
+            return null;
         }
     }
 
@@ -223,6 +302,16 @@ public partial class ListItemViewModel
         }
 
         var demand = new ListItemInitializationDemand(this, cancellationToken);
+        if (PublishInitializationDemand(demand))
+        {
+            return demand;
+        }
+
+        return null;
+    }
+
+    private bool PublishInitializationDemand(ListItemInitializationDemand demand)
+    {
         var node = new ListItemInitializationDemandNode(demand);
         ListItemInitializationDemandNode? head;
         do
@@ -238,9 +327,9 @@ public partial class ListItemViewModel
         {
             Interlocked.Exchange(ref _initializationDemands, null);
             demand.Release();
-            return null;
+            return false;
         }
 
-        return demand;
+        return true;
     }
 }

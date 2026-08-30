@@ -721,6 +721,18 @@ public sealed partial class ListItemInitializationCoordinatorTests
 
     [TestMethod]
     [Timeout(15000)]
+    public void ReleasedRealizationsReuseOneRetainedDemand()
+    {
+        var (_, viewModels) = CreateItems(1, new ConcurrentQueue<int>());
+        var item = viewModels[0];
+
+        AddReleasedRealizations(item, 64);
+
+        Assert.AreEqual(1, GetRetainedDemandNodes(item).Length);
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
     public void NewPriorityBatchDoesNotOvertakeAlreadyPublishedRequests()
     {
         var order = new ConcurrentQueue<int>();
