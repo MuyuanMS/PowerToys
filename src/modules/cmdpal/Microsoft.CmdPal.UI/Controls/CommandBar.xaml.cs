@@ -145,6 +145,17 @@ public sealed partial class CommandBar : UserControl,
         WeakReferenceMessenger.Default.Send<OpenContextMenuMessage>(new OpenContextMenuMessage(null, null, null, ContextMenuFilterLocation.Bottom));
     }
 
+    /// <summary>
+    /// Restores focus to a visible command bar button after closing the context menu.
+    /// </summary>
+    public void FocusMoreCommandsButton()
+    {
+        if (!MoreCommandsButton.Focus(FocusState.Programmatic) &&
+            !SecondaryButton.Focus(FocusState.Programmatic))
+        {
+            PrimaryButton.Focus(FocusState.Programmatic);
+        }
+    }
     private void ContextMenuFlyout_Opened(object sender, object e)
     {
         // Focus the filter box so the flyout captures keyboard input,
