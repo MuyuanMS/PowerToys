@@ -349,16 +349,12 @@ public sealed partial class ListItemInitializationCoordinatorTests
 
         try
         {
-            Assert.AreEqual(130, originalNodes.Length);
+            Assert.AreEqual(1, originalNodes.Length);
             replacement = new ListItemInitializationCoordinator(viewModels);
             previous.Stop();
 
-            // The inactive head is intentionally retained; live interior nodes are
-            // kept in place rather than copied or dropped with the released nodes.
-            CollectionAssert.AreEqual(
-                new[] { originalNodes[0], secondNode, firstNode },
-                GetRetainedDemandNodes(item));
-            Assert.IsFalse(originalNodes[0].Demand.IsActive);
+            CollectionAssert.AreEqual(new[] { firstNode }, GetRetainedDemandNodes(item));
+            Assert.AreSame(firstNode, secondNode);
             Assert.IsTrue(first.IsFor(item));
             Assert.IsTrue(second.IsFor(item));
 
@@ -397,9 +393,8 @@ public sealed partial class ListItemInitializationCoordinatorTests
                 previous.Stop();
 
                 var retained = GetRetainedDemandNodes(item);
-                Assert.AreEqual(2, retained.Length, "Each replay should retain only live demand and its captured head.");
-                Assert.IsFalse(retained[0].Demand.IsActive);
-                Assert.AreSame(liveNode, retained[1]);
+                Assert.AreEqual(1, retained.Length, "Each replay should retain only the shared live demand.");
+                Assert.AreSame(liveNode, retained[0]);
             }
 
             coordinator.Run(CancellationToken.None);
@@ -435,7 +430,8 @@ public sealed partial class ListItemInitializationCoordinatorTests
             replacement = new ListItemInitializationCoordinator(viewModels);
             previous.Stop();
 
-            CollectionAssert.AreEqual(new[] { retainedHead, liveNode }, GetRetainedDemandNodes(item));
+            CollectionAssert.AreEqual(new[] { liveNode }, GetRetainedDemandNodes(item));
+            Assert.AreSame(liveNode, retainedHead);
             Assert.IsTrue(visible.IsFor(item));
             replacement.Run(CancellationToken.None);
             CollectionAssert.AreEqual(EarlyRealizedPriorityOrder, order.ToArray());
@@ -885,7 +881,8 @@ public sealed partial class ListItemInitializationCoordinatorTests
                 finalCoordinator = new ListItemInitializationCoordinator(viewModels);
                 previous.Stop();
                 replacement.Stop();
-                CollectionAssert.AreEqual(new[] { arrivingNode, existingNode }, GetRetainedDemandNodes(item));
+                CollectionAssert.AreEqual(new[] { existingNode }, GetRetainedDemandNodes(item));
+                Assert.AreSame(existingNode, arrivingNode);
                 Assert.IsTrue(existing.IsFor(item));
                 Assert.IsTrue(arriving.IsFor(item));
 
