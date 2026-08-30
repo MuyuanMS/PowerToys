@@ -197,9 +197,10 @@ internal static class SvgIconProtocol
             return false;
         }
 
-        // IconPathConverter.Prepare invokes this on an icon-loader worker, so
-        // filesystem access never blocks the WinUI STA thread. Reading bytes also
-        // preserves the file's original encoding and XML declaration exactly.
+        // SvgIconProtocolProcessor.PrepareAsync invokes this on an offloaded
+        // icon-loader path, so filesystem access never blocks the WinUI STA thread.
+        // Reading bytes also preserves the file's original encoding and XML
+        // declaration exactly.
         return SvgFileTextReader.TryReadBytes(payload, out svg);
     }
 
