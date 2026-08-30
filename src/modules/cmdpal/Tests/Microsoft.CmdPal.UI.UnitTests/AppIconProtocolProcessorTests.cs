@@ -114,11 +114,7 @@ public class AppIconProtocolProcessorTests
             20,
             ElementTheme.Default);
 
-        using var prepared = result.TakePreparedIcon();
-
-        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.PreparedIcon, result.Kind);
-        Assert.IsNotNull(prepared);
-        Assert.AreEqual(IconPathConverter.PreparedIconKind.Glyph, prepared.Kind);
-        Assert.AreEqual(validGlyph, prepared.Glyph);
+        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.FallbackIconString, result.Kind);
+        Assert.AreEqual(validGlyph, result.FallbackIconString);
     }
 }
