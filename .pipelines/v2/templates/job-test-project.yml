@@ -30,7 +30,7 @@ parameters:
     default: []
   - name: condition
     type: string
-    default: ''
+    default: succeeded()
   - name: installMode
     type: string
     default: 'machine'
