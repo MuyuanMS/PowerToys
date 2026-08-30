@@ -6,16 +6,34 @@ namespace Microsoft.CmdPal.UI.ViewModels;
 
 public readonly struct ListItemRealizationRegistration
 {
-    private readonly ListItemInitializationDemand? _demand;
+    private readonly RegistrationState? _state;
 
     internal ListItemRealizationRegistration(ListItemInitializationDemand? demand)
     {
-        _demand = demand;
+        _state = demand is null ? null : new RegistrationState(demand);
     }
 
-    public bool IsValid => _demand?.IsActive == true;
+    public bool IsValid => _state?.IsValid == true;
 
-    public bool IsFor(ListItemViewModel item) => IsValid && ReferenceEquals(_demand!.Item, item);
+    public bool IsFor(ListItemViewModel item) => _state?.IsFor(item) == true;
 
-    public void Release() => _demand?.Release();
+    public void Release() => _state?.Release();
+
+    private sealed class RegistrationState(ListItemInitializationDemand demand)
+    {
+        private ListItemInitializationDemand? _demand = demand;
+
+        internal bool IsValid => Volatile.Read(ref _demand)?.IsActive == true;
+
+        internal bool IsFor(ListItemViewModel item)
+        {
+            var demand = Volatile.Read(ref _demand);
+            return demand?.IsActive == true && ReferenceEquals(demand.Item, item);
+        }
+
+        internal void Release()
+        {
+            Interlocked.Exchange(ref _demand, null)?.Release();
+        }
+    }
 }

@@ -1074,7 +1074,16 @@ public partial class ListViewModel : PageViewModel, IDisposable
         }
 
         FetchItems(keepSelection: true, ensureSelectionVisible: true);
+        if (!IsWorkActive)
+        {
+            return;
+        }
+
         model.ItemsChanged += Model_ItemsChanged;
+        if (!IsWorkActive)
+        {
+            model.ItemsChanged -= Model_ItemsChanged;
+        }
     }
 
     private static IGridPropertiesViewModel? LoadGridPropertiesViewModel(IGridProperties? gridProperties)

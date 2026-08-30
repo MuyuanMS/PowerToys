@@ -58,6 +58,7 @@ public partial class ListItemViewModel
                 continue;
             }
 
+            Interlocked.CompareExchange(ref _realizationDemand, null, current.Demand);
             previous.Next = current.Next;
         }
     }
