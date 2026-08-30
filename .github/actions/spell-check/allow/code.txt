@@ -33,6 +33,8 @@ bak
 HDP
 Bcl
 bgcode
+3mf
+threemf
 Deflatealgorithm
 exa
 exabyte
@@ -453,6 +455,13 @@ WIDGETBOARD
 
 # URIs
 actioncenter
+
+# 3MF
+dmodel
+megapixels
+rels
+threemf
+XXE
 
 # New+ shell PIDL type names
 PCUITEMID

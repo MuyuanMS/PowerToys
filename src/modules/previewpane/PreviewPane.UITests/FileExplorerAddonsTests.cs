@@ -32,6 +32,7 @@ public class FileExplorerAddonsTests : UITestBase
     private const string PdfThumbnailProvider = "{D8BB9942-93BD-412D-87E4-33FAB214DC1A}";
     private const string GcodeThumbnailProvider = "{F2847CBE-CD03-4C83-A359-1A8052C1B9D5}";
     private const string StlThumbnailProvider = "{77257004-6F25-4521-B602-50ECC6EC62A6}";
+    private const string ThreeMfThumbnailProvider = "{A96A6F91-B58D-4715-9E19-085D934D60C9}";
 
     private const int ExplorerTimeoutMS = 30_000;
     private const int ExplorerOpenAttempts = 3;
@@ -44,6 +45,18 @@ public class FileExplorerAddonsTests : UITestBase
     private const int MediumIconSize = 48;
     private const double PreviewRegionDifferenceThreshold = 0.75;
     private static readonly TimeSpan FailureRecordingTail = TimeSpan.FromSeconds(2);
+    private static readonly string[] ThumbnailFailureMarkers =
+    {
+        "Bmp file not generated",
+        "Failed to create temporary",
+        "Failed to load generated bitmap",
+        "Failed to read from source stream",
+        "Failed to start",
+        "Failed to write the temporary",
+        "PNG file not generated",
+        "Thumbnail generation timed out",
+        "3MF package exceeds",
+    };
 
     private static readonly string[] FileExplorerModule = { "File Explorer" };
     private static readonly (string Extension, string Clsid)[] ThumbnailProviders =
@@ -52,6 +65,7 @@ public class FileExplorerAddonsTests : UITestBase
         (".pdf", PdfThumbnailProvider),
         (".gcode", GcodeThumbnailProvider),
         (".stl", StlThumbnailProvider),
+        (".3mf", ThreeMfThumbnailProvider),
     };
 
     private static readonly object ExplorerPreparationLock = new();
@@ -97,6 +111,7 @@ public class FileExplorerAddonsTests : UITestBase
                         "pdf-thumbnail-toggle-setting",
                         "gcode-thumbnail-toggle-setting",
                         "stl-thumbnail-toggle-setting",
+                        "threemf-thumbnail-toggle-setting",
                     })
                     {
                         properties[settingName] = new JsonObject { ["value"] = true };
@@ -276,6 +291,21 @@ public class FileExplorerAddonsTests : UITestBase
             "stl");
     }
 
+    [TestMethod("FileExplorerAddons.Thumbnail.ThreeMf")]
+    [TestCategory("File Explorer Add-ons")]
+    [TestCategory("Icon Preview")]
+    public void ThreeMfThumbnailRendersAtMultipleIconSizes()
+    {
+        TestThumbnail(
+            ".3mf",
+            ThreeMfThumbnailProvider,
+            "sample.3mf",
+            "PowerToys.ThreeMfThumbnailProvider",
+            "3mf",
+            "PNG file not generated",
+            "PNG file generated");
+    }
+
     private void TestPreview(
         string extension,
         string expectedClsid,
@@ -324,7 +354,9 @@ public class FileExplorerAddonsTests : UITestBase
         string expectedClsid,
         string assetName,
         string providerProcessName,
-        string scenario)
+        string scenario,
+        string generationFailureMarker = "Bmp file not generated",
+        string? generationSuccessMarker = null)
     {
         AssertShellExtensionRegistration(extension, ThumbnailHandlerShellExtension, expectedClsid, "thumbnail provider");
         PrepareExplorerForRegisteredHandlers();
@@ -354,14 +386,15 @@ public class FileExplorerAddonsTests : UITestBase
         var providerLog = WaitForProviderLog(
             providerLogDirectory,
             $"Start {providerName}.exe",
-            ExplorerTimeoutMS);
+            ExplorerTimeoutMS,
+            generationSuccessMarker);
         Assert.IsNotNull(
             providerLog,
             $"Windows Shell did not invoke the PowerToys {providerName} shim for the cold {extension} thumbnail.");
         var providerLogText = ReadAllTextWithRetry(providerLog!);
         Assert.IsFalse(
-            providerLogText.Contains("Bmp file not generated", StringComparison.OrdinalIgnoreCase) ||
-            providerLogText.Contains("Failed to start", StringComparison.OrdinalIgnoreCase),
+            ThumbnailFailureMarkers.Any(marker => providerLogText.Contains(marker, StringComparison.OrdinalIgnoreCase)) ||
+            providerLogText.Contains(generationFailureMarker, StringComparison.OrdinalIgnoreCase),
             $"The PowerToys {providerName} shim reported a generation failure.{Environment.NewLine}{providerLogText}");
         var persistedLogPath = ArtifactPath($"{scenario}-provider", ".log");
         File.WriteAllText(persistedLogPath, providerLogText);
@@ -913,7 +946,11 @@ public class FileExplorerAddonsTests : UITestBase
             "the thumbnail appears blank or generic.");
     }
 
-    private static string? WaitForProviderLog(string logDirectory, string expectedText, int timeoutMS)
+    private static string? WaitForProviderLog(
+        string logDirectory,
+        string expectedText,
+        int timeoutMS,
+        string? terminalSuccessText = null)
     {
         var deadline = DateTime.UtcNow + TimeSpan.FromMilliseconds(timeoutMS);
         while (DateTime.UtcNow < deadline)
@@ -923,7 +960,14 @@ public class FileExplorerAddonsTests : UITestBase
                          : Array.Empty<string>())
             {
                 var contents = ReadAllTextWithRetry(path);
-                if (contents.Contains(expectedText, StringComparison.OrdinalIgnoreCase))
+                if (ThumbnailFailureMarkers.Any(marker => contents.Contains(marker, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return path;
+                }
+
+                if (contents.Contains(expectedText, StringComparison.OrdinalIgnoreCase) &&
+                    (terminalSuccessText is null ||
+                     contents.Contains(terminalSuccessText, StringComparison.OrdinalIgnoreCase)))
                 {
                     return path;
                 }

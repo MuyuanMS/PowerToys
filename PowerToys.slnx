@@ -1045,6 +1045,11 @@
       <Platform Solution="*|x64" Project="x64" />
     </Project>
     <Project Path="src/modules/previewpane/StlThumbnailProviderCpp/StlThumbnailProviderCpp.vcxproj" Id="d6dcc3ae-18c0-488a-b978-baa9e3cff09d" />
+    <Project Path="src/modules/previewpane/ThreeMfThumbnailProvider/ThreeMfThumbnailProvider.csproj">
+      <Platform Solution="*|ARM64" Project="ARM64" />
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="src/modules/previewpane/ThreeMfThumbnailProviderCpp/ThreeMfThumbnailProviderCpp.vcxproj" Id="2cb58140-c1c6-416a-be2d-6eb3f55f1cc6" />
     <Project Path="src/modules/previewpane/SvgPreviewHandler/SvgPreviewHandler.csproj">
       <Platform Solution="*|ARM64" Project="ARM64" />
       <Platform Solution="*|x64" Project="x64" />
@@ -1102,6 +1107,14 @@
       <Platform Solution="*|x64" Project="x64" />
     </Project>
     <Project Path="src/modules/previewpane/UnitTests-StlThumbnailProvider/Preview.StlThumbnailProvider.UnitTests.csproj">
+      <Platform Solution="*|ARM64" Project="ARM64" />
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="src/modules/previewpane/UnitTests-ThreeMfThumbnailProvider/Preview.ThreeMfThumbnailProvider.UnitTests.csproj">
+      <Platform Solution="*|ARM64" Project="ARM64" />
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="src/modules/previewpane/ThreeMfThumbnailProvider.FuzzTests/ThreeMfThumbnailProvider.FuzzTests.csproj">
       <Platform Solution="*|ARM64" Project="ARM64" />
       <Platform Solution="*|x64" Project="x64" />
     </Project>
@@ -1284,4 +1297,3 @@
   <Project Path="tools/CliShim/CliShim.vcxproj" Id="8a7fb7fa-65ea-4004-ba73-1b237435a57b" />
   <Project Path="tools/CliShim.UnitTests/CliShim.UnitTests.vcxproj" Id="d4b0ed68-867d-46b4-a03f-ec52b9fbebe5" />
 </Solution>
-
