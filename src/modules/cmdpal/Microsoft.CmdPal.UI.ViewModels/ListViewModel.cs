@@ -111,6 +111,8 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     private bool IsWorkActive => Volatile.Read(ref _workState).Status == ListPageWorkStatus.Active;
 
+    private bool IsWorkStopped => Volatile.Read(ref _workState).Status == ListPageWorkStatus.Stopped;
+
     // For cancelling the task to load the properties from the items in the list
     private CancellationTokenSource? _cancellationTokenSource;
 
@@ -1074,13 +1076,13 @@ public partial class ListViewModel : PageViewModel, IDisposable
         }
 
         FetchItems(keepSelection: true, ensureSelectionVisible: true);
-        if (!IsWorkActive)
+        if (IsWorkStopped)
         {
             return;
         }
 
         model.ItemsChanged += Model_ItemsChanged;
-        if (!IsWorkActive)
+        if (IsWorkStopped)
         {
             model.ItemsChanged -= Model_ItemsChanged;
         }
