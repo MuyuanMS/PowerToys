@@ -717,14 +717,14 @@ public sealed partial class ListItemInitializationCoordinatorTests
 
     [TestMethod]
     [Timeout(15000)]
-    public void ReleasedRealizationsReuseOneRetainedDemand()
+    public void ReleasedRealizationsDoNotRetainDemand()
     {
         var (_, viewModels) = CreateItems(1, new ConcurrentQueue<int>());
         var item = viewModels[0];
 
         AddReleasedRealizations(item, 64);
 
-        Assert.AreEqual(1, GetRetainedDemandNodes(item).Length);
+        Assert.AreEqual(0, GetRetainedDemandNodes(item).Length);
     }
 
     [TestMethod]
