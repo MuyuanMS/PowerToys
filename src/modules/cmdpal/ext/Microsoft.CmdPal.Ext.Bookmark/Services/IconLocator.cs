@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using ManagedCommon;
 using Microsoft.CmdPal.Ext.Bookmarks.Helpers;
 using Microsoft.CommandPalette.Extensions;
+using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.Win32;
 
 namespace Microsoft.CmdPal.Ext.Bookmarks.Services;
@@ -38,7 +39,9 @@ internal class IconLocator : IBookmarkIconLocator
             CommandKind.Protocol => await TryGetProtocolIcon(classification.Target),
             CommandKind.FileExecutable => await TryGetExecutableIcon(classification.Target),
             CommandKind.Unknown => FallbackIcon(classification),
-            _ => await MaybeGetIconForPath(classification.Target),
+            CommandKind.Aumid => FallbackIcon(classification),
+            CommandKind.VirtualShellItem when classification.FileSystemTarget is null => FallbackIcon(classification),
+            _ => await MaybeGetIconForPath(classification.FileSystemTarget ?? classification.Target),
         };
 
         return icon ?? FallbackIcon(classification);
@@ -162,22 +165,20 @@ internal class IconLocator : IBookmarkIconLocator
         };
     }
 
-    private static async Task<IconInfo?> MaybeGetIconForPath(string target)
+    private static Task<IconInfo?> MaybeGetIconForPath(string target)
     {
         try
         {
-            var stream = await ThumbnailHelper.GetThumbnail(target);
-            if (stream is not null)
+            if (TryCreateShellItemIcon(target, out var icon))
             {
-                return IconInfo.FromStream(stream);
+                return Task.FromResult<IconInfo?>(icon);
             }
 
             if (ShellNames.TryGetFileSystemPath(target, out var fileSystemPath))
             {
-                stream = await ThumbnailHelper.GetThumbnail(fileSystemPath);
-                if (stream is not null)
+                if (TryCreateShellItemIcon(fileSystemPath, out icon))
                 {
-                    return IconInfo.FromStream(stream);
+                    return Task.FromResult<IconInfo?>(icon);
                 }
             }
         }
@@ -186,7 +187,19 @@ internal class IconLocator : IBookmarkIconLocator
             Logger.LogDebug($"Failed to load icon for {target}\n" + ex);
         }
 
-        return null;
+        return Task.FromResult<IconInfo?>(null);
+    }
+
+    private static bool TryCreateShellItemIcon(string path, out IconInfo icon)
+    {
+        icon = null!;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        icon = new IconInfo(ShellItemIconProtocol.Create(path));
+        return true;
     }
 
     internal static class ProtocolIconResolver

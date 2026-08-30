@@ -5,7 +5,6 @@
 using Microsoft.CmdPal.Ext.Shell;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
-using Windows.Storage.Streams;
 
 namespace Microsoft.CmdPal.Ext.Run;
 
@@ -53,7 +52,7 @@ internal abstract partial class FileItem : ListItem, IFileItem
         });
     }
 
-    private async Task FetchIconAsync()
+    private Task FetchIconAsync()
     {
         // As of CmdPal Toolkit 0.5, the ThumbnailHelper.GetThumbnail converter
         // has a hard time with rooted file paths that don't include the drive
@@ -79,66 +78,12 @@ internal abstract partial class FileItem : ListItem, IFileItem
 
         if (string.IsNullOrEmpty(pathWithDrive))
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        var stream = await SafeGetThumbnailStream(pathWithDrive);
-
-        IconInfo? icon;
-        if (stream is not null)
-        {
-            icon = IconInfo.FromStream(stream);
-        }
-        else
-        {
-            // Failed to retrieve the icon from the shell.
-            // No matter. If we're a directory, fall back to using the Folder
-            // emoji.
-            // Historically, we also tried to use the exe itself as the icon
-            // here for files. This did lead to intermittent crashes,
-            // unfortunately. As of CmdPal Toolkit 0.6, ThumbnailHelper should
-            // be able to successfully get the icon of exes.
-            // For more context, see OsClient!14168447
-            var actuallyIsDir = (bool)(IsDirectory is null ?
-                Directory.Exists(pathWithDrive) :
-                (IsDirectory!));
-            icon = actuallyIsDir ? Icons.FolderIcon : null;
-        }
-
-        if (icon is not null)
-        {
-            _icon = icon;
-            OnPropertyChanged(nameof(Icon));
-        }
-    }
-
-    private static async Task<IRandomAccessStream?> SafeGetThumbnailStream(string path)
-    {
-        IRandomAccessStream? stream = null;
-        try
-        {
-            stream = await ThumbnailHelper.GetThumbnail(path);
-        }
-        catch (ObjectDisposedException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
-        }
-        catch (FileNotFoundException)
-        {
-        }
-        catch (PathTooLongException)
-        {
-        }
-        catch (IOException)
-        {
-        }
-        catch (OperationCanceledException)
-        {
-        }
-
-        return stream;
+        _icon = new IconInfo(ShellItemIconProtocol.Create(pathWithDrive));
+        OnPropertyChanged(nameof(Icon));
+        return Task.CompletedTask;
     }
 }
 
