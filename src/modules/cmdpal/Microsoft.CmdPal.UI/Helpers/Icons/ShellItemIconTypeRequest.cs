@@ -32,7 +32,8 @@ internal static class ShellItemIconTypeRequest
 
             // Shortcut icons are commonly specific to their targets. Avoid flashing the
             // registered generic shortcut icon before the exact Shell lookup completes.
-            if (extension.Equals(".lnk", StringComparison.OrdinalIgnoreCase))
+            if (extension.Equals(".lnk", StringComparison.OrdinalIgnoreCase)
+                || extension.Equals(".url", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }

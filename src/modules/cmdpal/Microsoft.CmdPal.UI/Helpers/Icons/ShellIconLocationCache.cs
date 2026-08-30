@@ -89,6 +89,7 @@ internal sealed class ShellIconLocationCache
         new(DefaultCapacity, TimeSpan.FromMinutes(60));
 
     private static bool IsFresh(LocatedShellIcon locatedIcon) =>
-        locatedIcon.CachedAtTimestamp != 0 &&
-        Stopwatch.GetElapsedTime(locatedIcon.CachedAtTimestamp) <= MaximumAliasAge;
+        !locatedIcon.CacheRawRequestAlias
+        || (locatedIcon.CachedAtTimestamp != 0
+            && Stopwatch.GetElapsedTime(locatedIcon.CachedAtTimestamp) <= MaximumAliasAge);
 }

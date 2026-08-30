@@ -49,4 +49,17 @@ public class ShellIconLocationCacheTests
 
         Assert.IsFalse(cache.IsCurrent(current));
     }
+
+    [TestMethod]
+    public void IsCurrentAcceptsUncachedLocationFromCurrentGeneration()
+    {
+        var cache = new ShellIconLocationCache();
+        var request = new ShellItemIconRequest("C:\\Files\\missing.txt", jumbo: false);
+        var resolved = new LocatedShellIcon(
+            request,
+            ShellIconIdentity.FromSystemImageList(42, jumbo: false, cache.Generation),
+            CacheRawRequestAlias: false);
+
+        Assert.IsTrue(cache.IsCurrent(resolved));
+    }
 }
