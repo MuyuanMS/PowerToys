@@ -40,6 +40,19 @@ public static class AppIconProtocol
         CreateCore(AppIconPrefix, primary, fallback, null);
 
     /// <summary>
+    /// Creates a standard app-icon request with up to two fallback candidates.
+    /// </summary>
+    /// <param name="primary">The first icon candidate to try.</param>
+    /// <param name="fallback">An optional candidate to try if the primary candidate cannot provide an icon.</param>
+    /// <param name="finalFallback">An optional final candidate.</param>
+    /// <returns>A protocol string that can be passed to <see cref="IconData"/> or <see cref="IconInfo"/>.</returns>
+    public static string Create(
+        string primary,
+        string? fallback,
+        string? finalFallback) =>
+        CreateCore(AppIconPrefix, primary, fallback, finalFallback);
+
+    /// <summary>
     /// Creates a large app-icon request with up to two fallback candidates.
     /// </summary>
     /// <param name="primary">The first icon candidate to try.</param>
