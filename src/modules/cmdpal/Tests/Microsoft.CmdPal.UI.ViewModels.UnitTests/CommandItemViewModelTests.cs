@@ -76,6 +76,47 @@ public class CommandItemViewModelTests
         Assert.IsTrue(viewModel.HasMoreCommands);
         Assert.IsNotNull(viewModel.SecondaryCommand);
         Assert.AreEqual("Secondary", viewModel.SecondaryCommand.Name);
+        Assert.IsFalse(CommandBarViewModel.ShouldShowMoreCommandsButtonFor(viewModel));
+    }
+
+    [TestMethod]
+    public void SingleMoreCommand_HidesMoreButtonButKeepsContextMenuAvailable()
+    {
+        var pageContext = new TestPageContext();
+        var item = new CommandItem(new NoOpCommand { Name = "Primary" })
+        {
+            Title = "Primary",
+            MoreCommands =
+            [
+                new CommandContextItem(new NoOpCommand { Name = "Secondary" }),
+            ],
+        };
+
+        var viewModel = new CommandItemViewModel(new(item), new(pageContext), DefaultContextMenuFactory.Instance);
+        viewModel.SlowInitializeProperties();
+
+        Assert.IsFalse(CommandBarViewModel.ShouldShowMoreCommandsButtonFor(viewModel));
+        Assert.IsTrue(viewModel.CanOpenContextMenu);
+    }
+
+    [TestMethod]
+    public void MultipleMoreCommands_ShowMoreButton()
+    {
+        var pageContext = new TestPageContext();
+        var item = new CommandItem(new NoOpCommand { Name = "Primary" })
+        {
+            Title = "Primary",
+            MoreCommands =
+            [
+                new CommandContextItem(new NoOpCommand { Name = "Secondary" }),
+                new CommandContextItem(new NoOpCommand { Name = "Additional" }),
+            ],
+        };
+
+        var viewModel = new CommandItemViewModel(new(item), new(pageContext), DefaultContextMenuFactory.Instance);
+        viewModel.SlowInitializeProperties();
+
+        Assert.IsTrue(CommandBarViewModel.ShouldShowMoreCommandsButtonFor(viewModel));
     }
 
     [TestMethod]

@@ -100,5 +100,6 @@ public partial class ContentPageViewModelTests
         Assert.AreEqual("Updated Primary", viewModel.PrimaryCommand?.Name);
         Assert.AreEqual("Updated Secondary", viewModel.SecondaryCommand?.Name);
         Assert.AreEqual("Updated Secondary", viewModel.SecondaryCommandName);
+        Assert.IsFalse(CommandBarViewModel.ShouldShowMoreCommandsButtonFor(viewModel));
     }
 }

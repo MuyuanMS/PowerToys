@@ -47,7 +47,7 @@ public sealed partial class CommandBar : UserControl,
         if (message.Element is null)
         {
             // This is invoked from the "More" button on the command bar
-            if (!ViewModel.ShouldShowContextMenu)
+            if (!(ViewModel.SelectedItem?.CanOpenContextMenu ?? false))
             {
                 return;
             }
@@ -57,8 +57,12 @@ public sealed partial class CommandBar : UserControl,
             _ = DispatcherQueue.TryEnqueue(
                 () =>
                 {
+                    var target = ViewModel.ShouldShowMoreCommandsButton ?
+                        MoreCommandsButton :
+                        ViewModel.HasSecondaryCommand ? SecondaryButton : PrimaryButton;
+
                     ContextMenuFlyout.ShowAt(
-                        MoreCommandsButton,
+                        target,
                         new FlyoutShowOptions()
                         {
                             ShowMode = FlyoutShowMode.Standard,
@@ -101,7 +105,7 @@ public sealed partial class CommandBar : UserControl,
 
     public void Receive(TryCommandKeybindingMessage msg)
     {
-        if (!ViewModel.ShouldShowContextMenu)
+        if (!(ViewModel.SelectedItem?.CanOpenContextMenu ?? false))
         {
             return;
         }
@@ -146,12 +150,15 @@ public sealed partial class CommandBar : UserControl,
     }
 
     /// <summary>
-    /// Sets focus to the "More" button after closing the context menu,
-    /// keeping keyboard navigation intuitive.
+    /// Restores focus to a visible command bar button after closing the context menu.
     /// </summary>
     public void FocusMoreCommandsButton()
     {
-        MoreCommandsButton?.Focus(FocusState.Programmatic);
+        if (!MoreCommandsButton.Focus(FocusState.Programmatic) &&
+            !SecondaryButton.Focus(FocusState.Programmatic))
+        {
+            PrimaryButton.Focus(FocusState.Programmatic);
+        }
     }
 
     private void ContextMenuFlyout_Opened(object sender, object e)
