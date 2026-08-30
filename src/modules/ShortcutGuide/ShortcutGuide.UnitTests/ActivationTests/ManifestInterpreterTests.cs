@@ -10,6 +10,8 @@ namespace ShortcutGuide.UnitTests.ActivationTests;
 [TestClass]
 public sealed class ManifestInterpreterTests
 {
+    private static readonly string[] ExpectedProcessFilters = ["Ableton Live 12 Suite", "Live"];
+
     [TestMethod]
     [DataRow("Ableton Live 12 Suite.exe")]
     [DataRow("Ableton Live 11 Standard.exe")]
@@ -27,5 +29,13 @@ public sealed class ManifestInterpreterTests
         Assert.IsFalse(ManifestInterpreter.IsMatch(
             "Ableton Live 10 Intro.exe",
             "Ableton Live 12 Suite.exe;Ableton Live 11 Standard.exe;Live.exe"));
+    }
+
+    [TestMethod]
+    public void GetProcessFilters_SemicolonSeparatedFilters_ReturnsProcessNamesWithoutExtensions()
+    {
+        CollectionAssert.AreEqual(
+            ExpectedProcessFilters,
+            ManifestInterpreter.GetProcessFilters("Ableton Live 12 Suite.exe;Live.exe"));
     }
 }

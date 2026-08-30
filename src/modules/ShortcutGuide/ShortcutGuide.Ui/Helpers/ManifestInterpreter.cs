@@ -192,6 +192,7 @@ namespace ShortcutGuide.Helpers
                             process.Dispose();
                         }
                     }
+                }
             }
 
             return applicationIds;
@@ -205,22 +206,24 @@ namespace ShortcutGuide.Helpers
         internal static string[] GetProcessFilters(string filter)
         {
             return filter
-                    .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                    .Select(RemoveExecutableExtension)
-                    .ToArray();
+                .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(RemoveExecutableExtension)
+                .ToArray();
         }
 
         private static bool IsSingleMatch(string input, string filter)
         {
             if (filter == "*")
             {
-                    return true;
+                return true;
             }
 
             if (input.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
             {
-                    input = input[..^4];
+                input = input[..^4];
             }
+
+            filter = RemoveExecutableExtension(filter);
 
             return string.Equals(input, filter, StringComparison.OrdinalIgnoreCase);
         }
