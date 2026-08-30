@@ -75,6 +75,13 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
         foreach (var candidate in candidates)
         {
             var prepared = IconPathConverter.Prepare(candidate, null, targetSize, theme);
+            if (prepared.Kind == IconPathConverter.PreparedIconKind.Glyph
+                && IsUsableFallback(prepared))
+            {
+                prepared.Dispose();
+                return IconProtocolProcessingResult.FromFallbackIconString(candidate);
+            }
+
             if (IsUsableFallback(prepared))
             {
                 return IconProtocolProcessingResult.FromPreparedIcon(prepared);
