@@ -225,6 +225,7 @@ static HWINEVENTHOOK g_hWinEventHook = nullptr;
 static void StopDragging();
 static void StopResizing();
 static bool ComputeSnapTarget(POINT pt, RECT& target, SnapTarget& out);
+static bool CanSnapToTarget(HWND hwnd, SnapTarget target);
 
 static void EndInteraction(bool endDrag, bool endResize)
 {
@@ -1500,7 +1501,7 @@ static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
         {
             SnapTarget snapTarget = SnapTarget::None;
             RECT snapRect = {};
-            g_snapArmed = g_snapToEdges.load() && ComputeSnapTarget(ms->pt, snapRect, snapTarget);
+            g_snapArmed = g_snapToEdges.load() && ComputeSnapTarget(ms->pt, snapRect, snapTarget) && CanSnapToTarget(g_dragTarget, snapTarget);
             g_snapTarget = g_snapArmed ? snapTarget : SnapTarget::None;
             g_snapTargetRect = g_snapArmed ? snapRect : RECT{};
 
@@ -1721,6 +1722,12 @@ static bool ComputeSnapTarget(POINT pt, RECT& target, SnapTarget& out)
     return false;
 }
 
+static bool CanSnapToTarget(HWND hwnd, SnapTarget target)
+{
+    const LONG style = GetWindowLongW(hwnd, GWL_STYLE);
+    return target == SnapTarget::Maximize ? (style & WS_MAXIMIZEBOX) != 0 : (style & WS_THICKFRAME) != 0;
+}
+
 // ---------------------------------------------------------------------------
 // Drag / resize move helpers – called directly from the LL mouse hook.
 // DeferWindowPos batches the target + overlay into one DWM composition pass.
@@ -1778,16 +1785,7 @@ static void HandleDragMove(POINT pt)
     // dragged window (zero the frame margins/rounding so it hugs the screen edge).
     SnapTarget snapTarget = SnapTarget::None;
     RECT snapRect{};
-    bool nowArmed = g_snapToEdges.load() && ComputeSnapTarget(pt, snapRect, snapTarget);
-    if (nowArmed)
-    {
-        const LONG style = GetWindowLongW(g_dragTarget, GWL_STYLE);
-        if ((snapTarget == SnapTarget::Maximize && !(style & WS_MAXIMIZEBOX)) ||
-            (snapTarget != SnapTarget::Maximize && !(style & WS_THICKFRAME)))
-        {
-            nowArmed = false;
-        }
-    }
+    const bool nowArmed = g_snapToEdges.load() && ComputeSnapTarget(pt, snapRect, snapTarget) && CanSnapToTarget(g_dragTarget, snapTarget);
     const bool wasArmed = g_snapArmed;
 
     if (nowArmed)
