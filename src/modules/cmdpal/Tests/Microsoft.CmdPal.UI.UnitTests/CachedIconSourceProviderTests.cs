@@ -660,6 +660,41 @@ public partial class CachedIconSourceProviderTests
 
     [TestMethod]
     [Timeout(5_000)]
+    public async Task ExactOnlyShellRequestMovesArbitrationOffCallingSynchronizationContext()
+    {
+        var loader = new ControllableIconLoader();
+        var provider = CreateProvider(loader);
+        var originalContext = SynchronizationContext.Current;
+        var callingThreadId = Environment.CurrentManagedThreadId;
+        Task<IconSource?> result;
+        SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
+        try
+        {
+            result = provider.GetIconSource(
+                new IconDataViewModel
+                {
+                    Icon = ShellItemIconProtocol.Create(@"C:\Windows\System32\shortcut.lnk"),
+                },
+                1.0);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(originalContext);
+        }
+
+        Assert.IsTrue(SpinWait.SpinUntil(
+            () => loader.ShellEnqueueCount == 1,
+            TimeSpan.FromSeconds(2)));
+        Assert.AreNotEqual(callingThreadId, loader.LastExactShellEnqueueThreadId);
+
+        loader.LocateNextShellItem(42, ShellItemIconLocationMode.ExactItem);
+        var source = CreateTestIconSource();
+        loader.CompleteNextShellOwner(source);
+        Assert.AreSame(source, await result);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
     public async Task CanonicalJoinPinsExistingLoadDemanded()
     {
         var loader = new ControllableIconLoader();
