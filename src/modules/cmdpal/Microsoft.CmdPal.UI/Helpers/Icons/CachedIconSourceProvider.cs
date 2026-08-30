@@ -652,26 +652,53 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
             IconCachePartition.Other,
             _otherCacheSize,
             hit: false);
-        var pending = _inFlight.GetOrAdd(canonicalKey, candidate);
-        if (!ReferenceEquals(pending, candidate))
+        while (true)
         {
+            var pending = _inFlight.GetOrAdd(canonicalKey, candidate);
+            if (ReferenceEquals(pending, candidate))
+            {
+                shellDiagnostics.CanonicalNewLoad();
+                ObserveCompletedLoad(
+                    canonicalKey,
+                    pending,
+                    IconCachePartition.Other,
+                    cacheFallbackResults: false);
+                return new CanonicalShellLoadArbitration(
+                    CanonicalShellLoadArbitrationKind.NewLoad,
+                    pending,
+                    pending.Task);
+            }
+
+            if (TryRemoveCompletedNonCacheableCanonicalLoad(canonicalKey, pending))
+            {
+                continue;
+            }
+
             shellDiagnostics.CanonicalInFlightJoin();
             return new CanonicalShellLoadArbitration(
                 CanonicalShellLoadArbitrationKind.InFlightJoin,
                 pending,
                 pending.Task);
         }
+    }
 
-        shellDiagnostics.CanonicalNewLoad();
-        ObserveCompletedLoad(
-            canonicalKey,
-            pending,
-            IconCachePartition.Other,
-            cacheFallbackResults: false);
-        return new CanonicalShellLoadArbitration(
-            CanonicalShellLoadArbitrationKind.NewLoad,
-            pending,
-            pending.Task);
+    private bool TryRemoveCompletedNonCacheableCanonicalLoad(IconCacheKey key, InFlightIconLoad pending)
+    {
+        if (!pending.Task.IsCompleted)
+        {
+            return false;
+        }
+
+        if (pending.Task.IsCompletedSuccessfully)
+        {
+            var result = pending.Task.Result;
+            if (result is not null && !ShellItemIconFallback.IsFallback(result))
+            {
+                return false;
+            }
+        }
+
+        return _inFlight.TryRemove(new KeyValuePair<IconCacheKey, InFlightIconLoad>(key, pending));
     }
 
     private static IconCachePartition ClassifyCachePartition(

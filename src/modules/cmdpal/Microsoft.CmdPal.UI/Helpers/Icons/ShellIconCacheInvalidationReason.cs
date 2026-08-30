@@ -9,4 +9,5 @@ internal enum ShellIconCacheInvalidationReason
     AssociationChanged,
     SystemImageUpdated,
     ShellRestarted,
+    RegistrationUnavailableRefresh,
 }
