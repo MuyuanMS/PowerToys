@@ -169,12 +169,13 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
     {
         // New-delivery notifications use Shell-owned shared memory. We do not need the
         // PIDLs for this global event, but locking and unlocking acknowledges the payload.
+        var itemIdLists = stackalloc nint[2];
         var eventIdStorage = stackalloc int[1];
         eventIdStorage[0] = 0;
         var notificationLock = NativeMethods.SHChangeNotification_Lock(
             wParam,
             unchecked((uint)lParam),
-            null,
+            itemIdLists,
             eventIdStorage);
         eventId = eventIdStorage[0];
         return notificationLock;

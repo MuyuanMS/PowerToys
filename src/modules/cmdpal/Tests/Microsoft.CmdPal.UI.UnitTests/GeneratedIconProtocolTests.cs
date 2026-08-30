@@ -156,7 +156,10 @@ public class GeneratedIconProtocolTests
     [TestMethod]
     public async Task InitialsCreatesVectorGlyphForGuaranteedAsciiFont()
     {
-        var svg = await CreateSvgAsync("|Initials|A|#0067C0|circle|", ElementTheme.Light);
+        Assert.IsTrue(GeneratedIconProtocol.TryCreateInitialsSvg(
+            "|Initials|A|#0067C0|circle|",
+            ElementTheme.Light,
+            out var svg));
 
         var path = ParseSvg(svg).Element(SvgName("path"));
         Assert.IsNotNull(path);
