@@ -2,6 +2,8 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Diagnostics;
+
 namespace Microsoft.CmdPal.UI.Helpers;
 
 /// <summary>
@@ -11,6 +13,7 @@ namespace Microsoft.CmdPal.UI.Helpers;
 internal sealed class ShellIconLocationCache
 {
     private const int DefaultCapacity = 8192;
+    private static readonly TimeSpan MaximumAliasAge = TimeSpan.FromMinutes(5);
 
     private AdaptiveCache<string, LocatedShellIcon> _cache = CreateCache();
     private int _generation;
@@ -23,6 +26,7 @@ internal sealed class ShellIconLocationCache
         var cache = Volatile.Read(ref _cache);
         if (cache.TryGet(cacheIdentity, out locatedIcon)
             && locatedIcon.Identity.CacheGeneration == generation
+            && IsFresh(locatedIcon)
             && generation == Generation
             && ReferenceEquals(cache, Volatile.Read(ref _cache)))
         {
@@ -45,6 +49,7 @@ internal sealed class ShellIconLocationCache
         cachedLocation = locatedIcon with
         {
             Identity = locatedIcon.Identity.WithCacheGeneration(expectedGeneration),
+            CachedAtTimestamp = Stopwatch.GetTimestamp(),
         };
 
         if (expectedGeneration != Generation)
@@ -69,7 +74,7 @@ internal sealed class ShellIconLocationCache
     }
 
     public bool IsCurrent(LocatedShellIcon locatedIcon) =>
-        locatedIcon.Identity.CacheGeneration == Generation;
+        locatedIcon.Identity.CacheGeneration == Generation && IsFresh(locatedIcon);
 
     public void Clear()
     {
@@ -82,4 +87,8 @@ internal sealed class ShellIconLocationCache
 
     private static AdaptiveCache<string, LocatedShellIcon> CreateCache() =>
         new(DefaultCapacity, TimeSpan.FromMinutes(60));
+
+    private static bool IsFresh(LocatedShellIcon locatedIcon) =>
+        locatedIcon.CachedAtTimestamp != 0 &&
+        Stopwatch.GetElapsedTime(locatedIcon.CachedAtTimestamp) <= MaximumAliasAge;
 }
