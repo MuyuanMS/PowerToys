@@ -276,10 +276,7 @@ public partial class ListItemViewModel
                 return existingDemand;
             }
 
-            var newDemand = new ListItemInitializationDemand(
-                this,
-                CancellationToken.None,
-                pruneOnRelease: false);
+            var newDemand = new ListItemInitializationDemand(this, CancellationToken.None);
             if (!ReferenceEquals(
                     Interlocked.CompareExchange(ref _realizationDemand, newDemand, existingDemand),
                     existingDemand))
