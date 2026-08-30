@@ -48,6 +48,6 @@ public class IconLocatorTests
             IsPlaceholder: false));
 
         var concrete = (IconInfo)icon;
-        Assert.AreEqual(Icons.BookmarkTypes.Application.Icon, concrete.Light.Icon);
+        Assert.AreEqual(Icons.BookmarkTypes.Application.Light.Icon, concrete.Light.Icon);
     }
 }
