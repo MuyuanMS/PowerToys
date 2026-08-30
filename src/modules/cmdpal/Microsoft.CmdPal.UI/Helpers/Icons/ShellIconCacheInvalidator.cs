@@ -43,16 +43,17 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
             return false;
         }
 
-        var reason = ShellIconCacheInvalidationReason.AssociationChanged;
         var notificationLock = LockNotification(wParam, lParam, out var eventId);
-        if (notificationLock != 0)
+        if (notificationLock == 0)
         {
-            _ = NativeMethods.SHChangeNotification_Unlock(notificationLock);
-            if ((eventId & ShcneUpdateImage) != 0)
-            {
-                reason = ShellIconCacheInvalidationReason.SystemImageUpdated;
-            }
+            _locations.Clear();
+            return true;
         }
+
+        _ = NativeMethods.SHChangeNotification_Unlock(notificationLock);
+        var reason = (eventId & ShcneUpdateImage) != 0
+            ? ShellIconCacheInvalidationReason.SystemImageUpdated
+            : ShellIconCacheInvalidationReason.AssociationChanged;
 
         if ((eventId & ShcneAssocChanged) != 0)
         {

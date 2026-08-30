@@ -66,6 +66,21 @@ public static class AppIconProtocol
         CreateCore(JumboAppIconPrefix, primary, fallback, finalFallback);
 
     /// <summary>
+    /// Creates a large app-icon request with up to three fallback candidates.
+    /// </summary>
+    /// <param name="primary">The first icon candidate to try.</param>
+    /// <param name="fallback">An optional candidate to try if the primary candidate cannot provide an icon.</param>
+    /// <param name="secondaryFallback">An optional secondary fallback candidate.</param>
+    /// <param name="finalFallback">An optional final candidate.</param>
+    /// <returns>A protocol string that can be passed to <see cref="IconData"/> or <see cref="IconInfo"/>.</returns>
+    public static string CreateJumbo(
+        string primary,
+        string? fallback,
+        string? secondaryFallback,
+        string? finalFallback) =>
+        CreateCore(JumboAppIconPrefix, primary, fallback, secondaryFallback, finalFallback);
+
+    /// <summary>
     /// Determines whether a value is claimed by the app-icon protocol.
     /// </summary>
     /// <remarks>
@@ -162,6 +177,42 @@ public static class AppIconProtocol
             && !string.Equals(finalFallback, fallback, StringComparison.Ordinal))
         {
             AppendCandidate(builder, finalFallback);
+        }
+
+        return builder.ToString();
+    }
+
+    private static string CreateCore(
+        string prefix,
+        string primary,
+        params string?[] fallbacks)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(primary);
+
+        var builder = new StringBuilder(prefix.Length + WireVersion.Length + primary.Length + (fallbacks.Length * 12));
+        builder.Append(prefix);
+        builder.Append(WireVersion);
+        AppendCandidate(builder, primary);
+
+        var appendedCandidates = 1;
+        var seenCandidates = new HashSet<string>(StringComparer.Ordinal)
+        {
+            primary,
+        };
+
+        foreach (var candidate in fallbacks)
+        {
+            if (appendedCandidates == MaximumCandidateCount)
+            {
+                break;
+            }
+
+            if (!string.IsNullOrEmpty(candidate)
+                && seenCandidates.Add(candidate))
+            {
+                AppendCandidate(builder, candidate);
+                appendedCandidates++;
+            }
         }
 
         return builder.ToString();

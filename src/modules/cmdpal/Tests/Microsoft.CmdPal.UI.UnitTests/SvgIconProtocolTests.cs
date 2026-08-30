@@ -268,6 +268,29 @@ public class SvgIconProtocolTests
     [DataTestMethod]
     [DataRow(false)]
     [DataRow(true)]
+    public void ThemedSvgFileHonorsUtf16EncodingWithoutByteOrderMark(bool bigEndian)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"CmdPal-{Guid.NewGuid():N}.svg");
+        try
+        {
+            var encoding = new UnicodeEncoding(bigEndian, byteOrderMark: false);
+            File.WriteAllBytes(path, encoding.GetBytes(Template));
+
+            Assert.IsTrue(SvgIconProtocol.TryCreateSvg($"|ThemedSvg|success|{path}", ElementTheme.Dark, out var svg));
+
+            var resolved = Encoding.UTF8.GetString(svg);
+            StringAssert.Contains(resolved, "id=\"theme\" fill=\"#FFFFFF\"");
+            StringAssert.Contains(resolved, "id=\"accent\" fill=\"#6CCB5F\"");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
     public void ThemedSvgFileHonorsUtf32EncodingWithoutByteOrderMark(bool bigEndian)
     {
         var path = Path.Combine(Path.GetTempPath(), $"CmdPal-{Guid.NewGuid():N}.svg");
