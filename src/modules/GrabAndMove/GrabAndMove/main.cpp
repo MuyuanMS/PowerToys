@@ -1501,7 +1501,7 @@ static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
         {
             SnapTarget snapTarget = SnapTarget::None;
             RECT snapRect = {};
-            g_snapArmed = g_snapToEdges.load() && ComputeSnapTarget(ms->pt, snapRect, snapTarget) && CanSnapToTarget(g_dragTarget, snapTarget);
+            g_snapArmed = !g_dragFirstMove && g_snapToEdges.load() && ComputeSnapTarget(ms->pt, snapRect, snapTarget) && CanSnapToTarget(g_dragTarget, snapTarget);
             g_snapTarget = g_snapArmed ? snapTarget : SnapTarget::None;
             g_snapTargetRect = g_snapArmed ? snapRect : RECT{};
 
