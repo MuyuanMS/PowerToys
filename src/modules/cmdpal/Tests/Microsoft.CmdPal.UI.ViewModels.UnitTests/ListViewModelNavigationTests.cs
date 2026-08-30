@@ -936,7 +936,7 @@ public sealed partial class ListViewModelNavigationTests
             viewModel.SearchTextBox = "Recovered";
             viewModel.SuspendForNavigation();
             await viewModel.ResumeAfterNavigation();
-            scheduler.Drain();
+            scheduler.DrainUntil(() => viewModel.FilteredItems.Single().Title == "Recovered");
 
             Assert.AreEqual("Recovered", page.SearchText);
             Assert.AreEqual("Recovered", viewModel.FilteredItems.Single().Title);
