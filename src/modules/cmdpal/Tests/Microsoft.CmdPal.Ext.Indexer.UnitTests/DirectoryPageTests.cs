@@ -25,7 +25,8 @@ public class DirectoryPageTests
         var page = new DirectoryPage(Path);
 
         Assert.IsNotNull(page.Icon);
-        Assert.IsTrue(ShellItemIconProtocol.TryParse(page.Icon.Light.Icon, out var itemPath, out _));
+        Assert.IsTrue(ShellItemIconProtocol.TryParse(page.Icon.Light.Icon, out var itemPath, out var jumbo));
         Assert.AreEqual(Path, itemPath);
+        Assert.IsFalse(jumbo);
     }
 }

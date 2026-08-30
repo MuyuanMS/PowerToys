@@ -36,7 +36,8 @@ public class IndexerListItemTests
             });
 
         Assert.IsNotNull(item.Icon);
-        Assert.IsTrue(ShellItemIconProtocol.TryParse(item.Icon.Light.Icon, out var itemPath, out _));
+        Assert.IsTrue(ShellItemIconProtocol.TryParse(item.Icon.Light.Icon, out var itemPath, out var jumbo));
         Assert.AreEqual(Path, itemPath);
+        Assert.IsFalse(jumbo);
     }
 }
