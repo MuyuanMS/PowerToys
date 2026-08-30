@@ -1515,8 +1515,8 @@ static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
 
                 if (target == SnapTarget::Maximize)
                 {
-                    SetWindowPos(g_dragTarget, nullptr, targetRect.left, targetRect.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-                    ShowWindow(g_dragTarget, SW_MAXIMIZE);
+                    SetWindowPos(g_dragTarget, nullptr, targetRect.left, targetRect.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
+                    ShowWindowAsync(g_dragTarget, SW_MAXIMIZE);
                 }
                 else if (target != SnapTarget::None)
                 {
@@ -1531,7 +1531,7 @@ static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
                     windowRect.top -= g_overlayMarginT;
                     windowRect.right += g_overlayMarginR;
                     windowRect.bottom += g_overlayMarginB;
-                    SetWindowPos(g_dragTarget, nullptr, windowRect.left, windowRect.top, windowRect.right - windowRect.left, windowRect.bottom - windowRect.top, SWP_NOZORDER | SWP_NOACTIVATE);
+                    SetWindowPos(g_dragTarget, nullptr, windowRect.left, windowRect.top, windowRect.right - windowRect.left, windowRect.bottom - windowRect.top, SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
                 }
 
                 EndInteraction(true, false);
@@ -1640,7 +1640,7 @@ forward:
 // ---------------------------------------------------------------------------
 // Edge-snap helpers
 // ---------------------------------------------------------------------------
-static bool GetWorkAreaForPoint(POINT pt, RECT& out)
+static bool GetMonitorAreasForPoint(POINT pt, RECT& workArea, RECT& monitorArea)
 {
     HMONITOR monitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
     MONITORINFO mi{};
@@ -1649,7 +1649,8 @@ static bool GetWorkAreaForPoint(POINT pt, RECT& out)
     {
         return false;
     }
-    out = mi.rcWork;
+    workArea = mi.rcWork;
+    monitorArea = mi.rcMonitor;
     return true;
 }
 
@@ -1659,7 +1660,8 @@ static bool GetWorkAreaForPoint(POINT pt, RECT& out)
 static bool ComputeSnapTarget(POINT pt, RECT& target, SnapTarget& out)
 {
     RECT work{};
-    if (!GetWorkAreaForPoint(pt, work))
+    RECT monitor{};
+    if (!GetMonitorAreasForPoint(pt, work, monitor))
     {
         return false;
     }
@@ -1667,10 +1669,10 @@ static bool ComputeSnapTarget(POINT pt, RECT& target, SnapTarget& out)
     const int midX = (work.left + work.right) / 2;
     const int midY = (work.top + work.bottom) / 2;
 
-    const bool nearLeft = pt.x <= work.left + SNAP_EDGE_THRESHOLD;
-    const bool nearRight = pt.x >= work.right - SNAP_EDGE_THRESHOLD;
-    const bool nearTop = pt.y <= work.top + SNAP_EDGE_THRESHOLD;
-    const bool nearBottom = pt.y >= work.bottom - SNAP_EDGE_THRESHOLD;
+    const bool nearLeft = pt.x <= monitor.left + SNAP_EDGE_THRESHOLD;
+    const bool nearRight = pt.x >= monitor.right - SNAP_EDGE_THRESHOLD;
+    const bool nearTop = pt.y <= monitor.top + SNAP_EDGE_THRESHOLD;
+    const bool nearBottom = pt.y >= monitor.bottom - SNAP_EDGE_THRESHOLD;
 
     if (nearLeft && nearTop)
     {
@@ -1776,7 +1778,16 @@ static void HandleDragMove(POINT pt)
     // dragged window (zero the frame margins/rounding so it hugs the screen edge).
     SnapTarget snapTarget = SnapTarget::None;
     RECT snapRect{};
-    const bool nowArmed = g_snapToEdges.load() && ComputeSnapTarget(pt, snapRect, snapTarget);
+    bool nowArmed = g_snapToEdges.load() && ComputeSnapTarget(pt, snapRect, snapTarget);
+    if (nowArmed)
+    {
+        const LONG style = GetWindowLongW(g_dragTarget, GWL_STYLE);
+        if ((snapTarget == SnapTarget::Maximize && !(style & WS_MAXIMIZEBOX)) ||
+            (snapTarget != SnapTarget::Maximize && !(style & WS_THICKFRAME)))
+        {
+            nowArmed = false;
+        }
+    }
     const bool wasArmed = g_snapArmed;
 
     if (nowArmed)
