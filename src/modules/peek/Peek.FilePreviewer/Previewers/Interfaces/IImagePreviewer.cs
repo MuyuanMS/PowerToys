@@ -7,9 +7,11 @@ using Windows.Foundation;
 
 namespace Peek.FilePreviewer.Previewers.Interfaces
 {
-    public interface IImagePreviewer : IPreviewer, IPreviewTarget
+    public interface IImagePreviewer : IPreviewer, IPreviewTarget, IReusablePreviewer
     {
         public ImageSource? Preview { get; }
+
+        public Size? ImageSize { get; set; }
 
         public double ScalingFactor { get; set; }
 
