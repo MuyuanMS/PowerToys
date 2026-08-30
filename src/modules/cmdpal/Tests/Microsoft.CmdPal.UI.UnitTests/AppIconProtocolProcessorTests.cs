@@ -56,4 +56,25 @@ public class AppIconProtocolProcessorTests
         Assert.AreEqual(IconProtocolProcessingResult.ResultKind.FallbackIconString, result.Kind);
         Assert.AreEqual(primary, result.FallbackIconString);
     }
+
+    [TestMethod]
+    public async Task FallsBackToLaterOrdinaryIconCandidateAfterThumbnailMisses()
+    {
+        const string primary = "C:\\Icons\\primary.ico";
+        const string fallback = "ms-appx:///Assets/icon.svg";
+        var processor = new AppIconProtocolProcessor(
+            (_, _) => Task.FromResult<IRandomAccessStream?>(null));
+
+        using var result = await processor.PrepareAsync(
+            AppIconProtocol.Create(primary, fallback),
+            20,
+            ElementTheme.Default);
+
+        using var prepared = result.TakePreparedIcon();
+
+        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.PreparedIcon, result.Kind);
+        Assert.IsNotNull(prepared);
+        Assert.AreEqual(IconPathConverter.PreparedIconKind.SvgUri, prepared.Kind);
+        Assert.AreEqual(fallback, prepared.Uri?.OriginalString);
+    }
 }
