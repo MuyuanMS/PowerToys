@@ -154,6 +154,16 @@ public class GeneratedIconProtocolTests
     }
 
     [TestMethod]
+    public async Task InitialsCreatesVectorGlyphForGuaranteedAsciiFont()
+    {
+        var svg = await CreateSvgAsync("|Initials|A|#0067C0|circle|", ElementTheme.Light);
+
+        var path = ParseSvg(svg).Element(SvgName("path"));
+        Assert.IsNotNull(path);
+        Assert.IsFalse(string.IsNullOrEmpty(path.Attribute("d")?.Value));
+    }
+
+    [TestMethod]
     public async Task SwatchAndInitialsShareCircleAndSquareBackgroundGeometry()
     {
         Assert.IsTrue(GeneratedIconProtocol.TryCreateSwatchSvg("|Swatch|#0067C0|", ElementTheme.Light, out var circleSwatch));
