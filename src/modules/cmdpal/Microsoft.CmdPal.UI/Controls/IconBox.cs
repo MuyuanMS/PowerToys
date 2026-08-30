@@ -29,7 +29,6 @@ public partial class IconBox : ContentControl
     private long _requestVersion;
     private IconRequestMeasurement _activeRequestDiagnostics;
     private IIconRequestDemand? _activeRequestDemand;
-    private XamlRoot? _subscribedXamlRoot;
 
     // ImageIconSource does not render through IconSourceElement. Reassigning Source on
     // one realized Image left recycled rows intermittently blank in testing. Keep a
@@ -212,15 +211,9 @@ public partial class IconBox : ContentControl
         _lastScale = newScale;
         UpdateLastFontSize();
 
-        if (_subscribedXamlRoot is not null)
+        if (XamlRoot is not null)
         {
-            _subscribedXamlRoot.Changed -= OnXamlRootChanged;
-        }
-
-        _subscribedXamlRoot = XamlRoot;
-        if (_subscribedXamlRoot is not null)
-        {
-            _subscribedXamlRoot.Changed += OnXamlRootChanged;
+            XamlRoot.Changed += OnXamlRootChanged;
         }
 
         if (SourceKey is not null && (changedTheme || changedScale))
@@ -253,10 +246,9 @@ public partial class IconBox : ContentControl
             return;
         }
 
-        if (_subscribedXamlRoot is not null)
+        if (XamlRoot is not null)
         {
-            _subscribedXamlRoot.Changed -= OnXamlRootChanged;
-            _subscribedXamlRoot = null;
+            XamlRoot.Changed -= OnXamlRootChanged;
         }
 
         if (_activeRequestDemand is not null)

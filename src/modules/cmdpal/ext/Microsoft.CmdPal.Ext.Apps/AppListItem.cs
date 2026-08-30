@@ -16,12 +16,9 @@ namespace Microsoft.CmdPal.Ext.Apps.Programs;
 
 public sealed partial class AppListItem : ListItem, IPrecomputedListItem
 {
-    private readonly AppCommand _appCommand;
     private readonly AppItem _app;
-    private readonly Lazy<Task<IconInfo>> _iconLoadTask;
     private readonly Lazy<Task<Details>> _detailsLoadTask;
 
-    private InterlockedBoolean _isLoadingIcon;
     private InterlockedBoolean _isLoadingDetails;
 
     private FuzzyTargetCache _titleCache;
@@ -67,45 +64,21 @@ public sealed partial class AppListItem : ListItem, IPrecomputedListItem
         set => base.Details = value;
     }
 
-    public override IIconInfo? Icon
-    {
-        get
-        {
-            if (_isLoadingIcon.Set())
-            {
-                _ = LoadIconAsync();
-            }
-
-            return base.Icon;
-        }
-        set => base.Icon = value;
-    }
-
     public string AppIdentifier => _app.AppIdentifier;
 
     public AppItem App => _app;
 
     public AppListItem(AppItem app, bool useThumbnails)
     {
-        Command = _appCommand = new AppCommand(app);
+        var appCommand = new AppCommand(app);
+        Command = appCommand;
         _app = app;
         Title = app.Name;
         Subtitle = app.Subtitle;
-        var icon = CreateIcon(app, useThumbnails);
-        var deferIconLoad = !app.IsPackaged && useThumbnails && !ReferenceEquals(icon, Icons.GenericAppIcon);
-        Icon = _appCommand.Icon = deferIconLoad ? Icons.GenericAppIcon : icon;
+        Icon = appCommand.Icon = CreateIcon(app, useThumbnails);
 
         MoreCommands = _app.Commands?.ToArray() ?? [];
 
-        _iconLoadTask = new Lazy<Task<IconInfo>>(async () =>
-        {
-            if (deferIconLoad)
-            {
-                await Task.Yield();
-            }
-
-            return icon;
-        });
         _detailsLoadTask = new Lazy<Task<Details>>(BuildDetails);
     }
 
@@ -118,18 +91,6 @@ public sealed partial class AppListItem : ListItem, IPrecomputedListItem
         catch (Exception ex)
         {
             Logger.LogWarning($"Failed to load details for {AppIdentifier}\n{ex}");
-        }
-    }
-
-    private async Task LoadIconAsync()
-    {
-        try
-        {
-            Icon = _appCommand.Icon = CoalesceIcon(await _iconLoadTask.Value);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning($"Failed to load icon for {AppIdentifier}\n{ex}");
         }
     }
 
@@ -179,7 +140,6 @@ public sealed partial class AppListItem : ListItem, IPrecomputedListItem
     private static IconInfo CreateIcon(AppItem app, bool useThumbnails)
     {
         var iconPath = !string.IsNullOrEmpty(app.IcoPath) ? app.IcoPath : app.ExePath;
-        var genericAppIcon = Icons.GenericAppIcon.Light.Icon;
         if (string.IsNullOrEmpty(iconPath))
         {
             return Icons.GenericAppIcon;
@@ -187,20 +147,18 @@ public sealed partial class AppListItem : ListItem, IPrecomputedListItem
 
         return new IconInfo(
             !app.IsPackaged && useThumbnails
-                ? AppIconProtocol.Create(iconPath, app.ExePath, genericAppIcon)
+                ? AppIconProtocol.Create(iconPath, app.ExePath)
                 : iconPath);
     }
 
     private static IconInfo? CreateHeroIcon(AppItem app)
     {
-        var genericAppIcon = Icons.GenericAppIcon.Light.Icon;
-
         if (!string.IsNullOrEmpty(app.JumboIconPath))
         {
             return new IconInfo(
                 app.IsPackaged
                     ? app.JumboIconPath
-                    : AppIconProtocol.CreateJumbo(app.JumboIconPath, app.IcoPath, app.ExePath, genericAppIcon));
+                    : AppIconProtocol.CreateJumbo(app.JumboIconPath, app.IcoPath, app.ExePath));
         }
 
         if (!string.IsNullOrEmpty(app.IcoPath))
@@ -208,7 +166,7 @@ public sealed partial class AppListItem : ListItem, IPrecomputedListItem
             return new IconInfo(
                 app.IsPackaged
                     ? app.IcoPath
-                    : AppIconProtocol.CreateJumbo(app.IcoPath, app.ExePath, genericAppIcon));
+                    : AppIconProtocol.CreateJumbo(app.IcoPath, app.ExePath));
         }
 
         if (!string.IsNullOrEmpty(app.ExePath))
@@ -216,7 +174,7 @@ public sealed partial class AppListItem : ListItem, IPrecomputedListItem
             return new IconInfo(
                 app.IsPackaged
                     ? app.ExePath
-                    : AppIconProtocol.CreateJumbo(app.ExePath, genericAppIcon));
+                    : AppIconProtocol.CreateJumbo(app.ExePath));
         }
 
         return null;
