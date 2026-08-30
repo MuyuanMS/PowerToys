@@ -32,4 +32,22 @@ public class IconLocatorTests
         Assert.IsTrue(ShellItemIconProtocol.IsProtocol(concrete.Light.Icon));
         Assert.IsNull(concrete.Light.Data);
     }
+
+    [TestMethod]
+    public async Task AumidBookmarksUseApplicationFallbackIcon()
+    {
+        var locator = new IconLocator();
+
+        var icon = await locator.GetIconForPath(new Classification(
+            CommandKind.Aumid,
+            "Contoso.App_123!App",
+            "Contoso.App_123!App",
+            string.Empty,
+            LaunchMethod.ActivateAppId,
+            WorkingDirectory: null,
+            IsPlaceholder: false));
+
+        var concrete = (IconInfo)icon;
+        Assert.AreEqual(Icons.BookmarkTypes.Application.Icon, concrete.Light.Icon);
+    }
 }
