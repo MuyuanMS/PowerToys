@@ -110,6 +110,7 @@ public partial class CommandItemViewModelTests
         Assert.IsTrue(viewModel.HasSubmenu);
         Assert.IsNotNull(viewModel.SecondaryCommand);
         Assert.AreEqual("Secondary", viewModel.SecondaryCommand.Name);
+        Assert.IsFalse(CommandBarViewModel.ShouldShowMoreCommandsButtonFor(viewModel));
     }
 
     [TestMethod]
