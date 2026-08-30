@@ -622,7 +622,7 @@ public partial class CachedIconSourceProviderTests
     {
         var loader = new ControllableIconLoader();
         var provider = CreateProvider(loader);
-        var request = new ShellItemIconRequest(@"C:\Windows\System32\legacy.dll", jumbo: false);
+        var request = new ShellItemIconRequest(@"C:\Windows\System32\legacy.txt", jumbo: false);
         var located = new LocatedShellIcon(
             request,
             ShellIconIdentity.FromSystemImageList(42, jumbo: false));
