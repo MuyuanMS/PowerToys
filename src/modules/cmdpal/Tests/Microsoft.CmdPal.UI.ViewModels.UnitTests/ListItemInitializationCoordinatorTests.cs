@@ -729,6 +729,34 @@ public sealed partial class ListItemInitializationCoordinatorTests
 
     [TestMethod]
     [Timeout(15000)]
+    public async Task CanceledSelectionRequestsAreCoalescedWhileWorkerIsBlocked()
+    {
+        var (_, viewModels) = CreateItems(2, new ConcurrentQueue<int>());
+        var coordinator = new ListItemInitializationCoordinator(viewModels);
+        var item = viewModels[1];
+
+        try
+        {
+            for (var i = 0; i < 64; i++)
+            {
+                using var cancellation = new CancellationTokenSource();
+                var request = item.RequestInitializationAsync(cancellation.Token);
+                cancellation.Cancel();
+                await Assert.ThrowsExceptionAsync<TaskCanceledException>(async () => await request);
+            }
+
+            Assert.IsTrue(
+                GetCoordinatorRequestNodeCount(coordinator) <= 1,
+                "Canceled selections should not accumulate unbounded coordinator request nodes.");
+        }
+        finally
+        {
+            coordinator.Stop();
+        }
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
     public void NewPriorityBatchDoesNotOvertakeAlreadyPublishedRequests()
     {
         var order = new ConcurrentQueue<int>();
@@ -1097,6 +1125,24 @@ public sealed partial class ListItemInitializationCoordinatorTests
         }
 
         return nodes.ToArray();
+    }
+
+    private static int GetCoordinatorRequestNodeCount(ListItemInitializationCoordinator coordinator)
+    {
+        return GetNodeCount("_incomingRequests") + GetNodeCount("_priorityRequests");
+
+        int GetNodeCount(string fieldName)
+        {
+            var field = typeof(ListItemInitializationCoordinator).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new AssertFailedException("The coordinator request storage was not found.");
+            var count = 0;
+            for (var node = (ListItemInitializationDemandNode?)field.GetValue(coordinator); node is not null; node = node.Next)
+            {
+                count++;
+            }
+
+            return count;
+        }
     }
 
     private static (TrackingListItem[] Models, ListItemViewModel[] ViewModels) CreateItems(

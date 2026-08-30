@@ -14,6 +14,7 @@ internal sealed class ListItemInitializationCoordinator
 
     private readonly ListItemViewModel[] _items;
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly object _requestLock = new();
     private ListItemInitializationDemandNode? _incomingRequests;
     private ListItemInitializationDemandNode? _priorityRequests;
     private int _accepting = 1;
@@ -39,25 +40,30 @@ internal sealed class ListItemInitializationCoordinator
             return false;
         }
 
-        // Producers include the UI thread. Unlike ConcurrentQueue segment growth,
-        // publishing a node never takes a worker-owned lock. The single consumer
-        // reverses each detached batch to preserve publication order.
-        var entry = new ListItemInitializationDemandNode(demand);
-        ListItemInitializationDemandNode? head;
-        do
+        // Producers include the UI thread. Keep this lock independent from the
+        // worker's extension calls, and coalesce one pending priority request per
+        // item so repeated canceled selections cannot accumulate behind a blocked
+        // initializer.
+        lock (_requestLock)
         {
-            head = Volatile.Read(ref _incomingRequests);
-            entry.Next = head;
-        }
-        while (Interlocked.CompareExchange(ref _incomingRequests, entry, head) != head);
+            if (Volatile.Read(ref _accepting) == 0 || !IsDemandServiceable(demand))
+            {
+                return false;
+            }
 
-        if (Volatile.Read(ref _accepting) == 0)
-        {
-            Interlocked.Exchange(ref _incomingRequests, null);
-            return false;
-        }
+            if (RemoveInactiveRequestsAndFindItem(_incomingRequests, demand.Item, out _incomingRequests)
+                || RemoveInactiveRequestsAndFindItem(_priorityRequests, demand.Item, out _priorityRequests))
+            {
+                return true;
+            }
 
-        return true;
+            _incomingRequests = new ListItemInitializationDemandNode(demand)
+            {
+                Next = _incomingRequests,
+            };
+
+            return Volatile.Read(ref _accepting) != 0;
+        }
     }
 
     internal void Run(CancellationToken cancellationToken)
@@ -132,7 +138,11 @@ internal sealed class ListItemInitializationCoordinator
     private void StopAccepting()
     {
         Interlocked.Exchange(ref _accepting, 0);
-        Interlocked.Exchange(ref _incomingRequests, null);
+        lock (_requestLock)
+        {
+            _incomingRequests = null;
+            _priorityRequests = null;
+        }
     }
 
     // Publishes "the executor has returned". Callers must own that transition:
@@ -157,25 +167,32 @@ internal sealed class ListItemInitializationCoordinator
     {
         while (true)
         {
-            if (_priorityRequests is null)
+            ListItemInitializationDemandNode entry;
+            lock (_requestLock)
             {
-                var incoming = Interlocked.Exchange(ref _incomingRequests, null);
-                while (incoming is not null)
+                if (_priorityRequests is null)
                 {
-                    var next = incoming.Next;
-                    incoming.Next = _priorityRequests;
-                    _priorityRequests = incoming;
-                    incoming = next;
+                    var incoming = _incomingRequests;
+                    _incomingRequests = null;
+                    while (incoming is not null)
+                    {
+                        var next = incoming.Next;
+                        incoming.Next = _priorityRequests;
+                        _priorityRequests = incoming;
+                        incoming = next;
+                    }
                 }
+
+                if (_priorityRequests is not { } nextEntry)
+                {
+                    item = null!;
+                    return false;
+                }
+
+                entry = nextEntry;
+                _priorityRequests = entry.Next;
             }
 
-            if (_priorityRequests is not { } entry)
-            {
-                item = null!;
-                return false;
-            }
-
-            _priorityRequests = entry.Next;
             var demand = entry.Demand;
             if (!IsDemandServiceable(demand))
             {
@@ -185,5 +202,37 @@ internal sealed class ListItemInitializationCoordinator
             item = demand.Item;
             return true;
         }
+    }
+
+    private static bool RemoveInactiveRequestsAndFindItem(
+        ListItemInitializationDemandNode? head,
+        ListItemViewModel item,
+        out ListItemInitializationDemandNode? newHead)
+    {
+        var found = false;
+        ListItemInitializationDemandNode? retainedHead = null;
+        while (head is not null)
+        {
+            var next = head.Next;
+            if (head.Demand.IsActive)
+            {
+                found |= ReferenceEquals(head.Demand.Item, item);
+                head.Next = retainedHead;
+                retainedHead = head;
+            }
+
+            head = next;
+        }
+
+        newHead = null;
+        while (retainedHead is not null)
+        {
+            var next = retainedHead.Next;
+            retainedHead.Next = newHead;
+            newHead = retainedHead;
+            retainedHead = next;
+        }
+
+        return found;
     }
 }
