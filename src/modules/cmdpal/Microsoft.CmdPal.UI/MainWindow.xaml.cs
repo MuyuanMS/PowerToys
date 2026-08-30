@@ -1711,12 +1711,9 @@ public sealed partial class MainWindow : WindowEx,
             case PInvoke.WM_NCLBUTTONDBLCLK:
                 return (LRESULT)IntPtr.Zero;
 
-            // LOAD BEARING:
-            // This is necessary to prevent rapid deceleration of the machine running CmdPal.
-            // Handle unmatched menu characters here instead of letting DefWindowProc ignore
-            // them and play the system chime. Repeated chimes may otherwise cause the machine
-            // to experience sudden contact with the floor and subsequent rapid disassembly.
-            case PInvoke.WM_MENUCHAR:
+            // Suppress the system chime for the shelf's Alt+0 through Alt+9 access keys,
+            // while preserving the normal handling of other window mnemonics.
+            case PInvoke.WM_MENUCHAR when wParam.Value is >= (nuint)'0' and <= (nuint)'9':
                 return (LRESULT)(1 << 16); // MAKELRESULT(0, MNC_CLOSE)
 
             // When restoring a saved position across monitors with different DPIs,
