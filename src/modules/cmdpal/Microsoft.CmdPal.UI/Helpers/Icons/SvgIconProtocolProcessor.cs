@@ -42,7 +42,7 @@ internal sealed class SvgIconProtocolProcessor : IIconProtocolProcessor
         var kind = SvgIconProtocol.Classify(value);
         if (kind is SvgIconProtocol.Kind.PlainFile or SvgIconProtocol.Kind.ThemedFile)
         {
-            preparedIcon = IconPathConverter.PreparedIcon.Empty();
+            preparedIcon = null!;
             return false;
         }
 
