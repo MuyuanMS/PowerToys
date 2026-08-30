@@ -146,12 +146,15 @@ public sealed partial class CommandBar : UserControl,
     }
 
     /// <summary>
-    /// Sets focus to the "More" button after closing the context menu,
-    /// keeping keyboard navigation intuitive.
+    /// Restores focus to a visible command bar button after closing the context menu.
     /// </summary>
     public void FocusMoreCommandsButton()
     {
-        MoreCommandsButton?.Focus(FocusState.Programmatic);
+        if (!MoreCommandsButton.Focus(FocusState.Programmatic) &&
+            !SecondaryButton.Focus(FocusState.Programmatic))
+        {
+            PrimaryButton.Focus(FocusState.Programmatic);
+        }
     }
 
     private void ContextMenuFlyout_Opened(object sender, object e)
