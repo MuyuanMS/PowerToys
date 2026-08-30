@@ -159,7 +159,10 @@ public class IconProtocolRegistryTests
             20,
             ElementTheme.Light,
             out var preparedIcon));
-        Assert.IsNull(preparedIcon);
+        using (preparedIcon)
+        {
+            Assert.AreEqual(IconPathConverter.PreparedIconKind.Empty, preparedIcon.Kind);
+        }
     }
 
     [DataTestMethod]
