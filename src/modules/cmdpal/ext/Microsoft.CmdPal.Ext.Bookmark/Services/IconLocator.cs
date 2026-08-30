@@ -39,7 +39,9 @@ internal class IconLocator : IBookmarkIconLocator
             CommandKind.Protocol => await TryGetProtocolIcon(classification.Target),
             CommandKind.FileExecutable => await TryGetExecutableIcon(classification.Target),
             CommandKind.Unknown => FallbackIcon(classification),
-            _ => await MaybeGetIconForPath(classification.Target),
+            CommandKind.Aumid => FallbackIcon(classification),
+            CommandKind.VirtualShellItem when classification.FileSystemTarget is null => FallbackIcon(classification),
+            _ => await MaybeGetIconForPath(classification.FileSystemTarget ?? classification.Target),
         };
 
         return icon ?? FallbackIcon(classification);
