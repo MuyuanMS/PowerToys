@@ -70,15 +70,15 @@ public static class AppIconProtocol
     /// </summary>
     /// <param name="primary">The first icon candidate to try.</param>
     /// <param name="fallback">An optional candidate to try if the primary candidate cannot provide an icon.</param>
-    /// <param name="secondaryFallback">An optional secondary fallback candidate.</param>
     /// <param name="finalFallback">An optional final candidate.</param>
+    /// <param name="terminalFallback">An optional terminal candidate.</param>
     /// <returns>A protocol string that can be passed to <see cref="IconData"/> or <see cref="IconInfo"/>.</returns>
     public static string CreateJumbo(
         string primary,
         string? fallback,
-        string? secondaryFallback,
-        string? finalFallback) =>
-        CreateCore(JumboAppIconPrefix, primary, fallback, secondaryFallback, finalFallback);
+        string? finalFallback,
+        string? terminalFallback) =>
+        CreateCore(JumboAppIconPrefix, primary, fallback, finalFallback, terminalFallback);
 
     /// <summary>
     /// Determines whether a value is claimed by the app-icon protocol.

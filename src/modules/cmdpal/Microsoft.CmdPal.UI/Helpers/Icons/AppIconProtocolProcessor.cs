@@ -90,11 +90,20 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
         preparedIcon.Kind switch
         {
             IconPathConverter.PreparedIconKind.BitmapUri or IconPathConverter.PreparedIconKind.SvgUri
-                => preparedIcon.Uri is { IsFile: false }
-                    || (preparedIcon.Uri is { } fileUri && File.Exists(fileUri.LocalPath)),
+                => preparedIcon.Uri is { } uri
+                    && IsSupportedFallbackUri(uri)
+                    && (!uri.IsFile || File.Exists(uri.LocalPath)),
             IconPathConverter.PreparedIconKind.SvgData or
-            IconPathConverter.PreparedIconKind.Glyph => true,
+            IconPathConverter.PreparedIconKind.Glyph => preparedIcon.Glyph != "\u25CC",
             IconPathConverter.PreparedIconKind.Binary => preparedIcon.SoftwareBitmap is not null,
             _ => false,
         };
+
+    private static bool IsSupportedFallbackUri(Uri uri) =>
+        uri.IsFile
+        || uri.Scheme.Equals("ms-appx", StringComparison.OrdinalIgnoreCase)
+        || uri.Scheme.Equals("ms-appdata", StringComparison.OrdinalIgnoreCase)
+        || uri.Scheme.Equals("ms-resource", StringComparison.OrdinalIgnoreCase)
+        || uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+        || uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
 }
