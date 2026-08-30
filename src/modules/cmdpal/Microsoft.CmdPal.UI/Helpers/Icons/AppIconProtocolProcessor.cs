@@ -89,8 +89,8 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
     private static bool IsUsableFallback(IconPathConverter.PreparedIcon preparedIcon) =>
         preparedIcon.Kind switch
         {
-            IconPathConverter.PreparedIconKind.BitmapUri or
-            IconPathConverter.PreparedIconKind.SvgUri or
+            IconPathConverter.PreparedIconKind.BitmapUri or IconPathConverter.PreparedIconKind.SvgUri
+                => preparedIcon.Uri is { IsFile: false } || File.Exists(preparedIcon.Uri.LocalPath),
             IconPathConverter.PreparedIconKind.SvgData or
             IconPathConverter.PreparedIconKind.Glyph => true,
             IconPathConverter.PreparedIconKind.Binary => preparedIcon.SoftwareBitmap is not null,
