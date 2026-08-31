@@ -995,6 +995,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 "azureaiinference" => "https://azure.microsoft.com/products/ai-services/ai-inference",
                 "mistral" => "https://console.mistral.ai/account/api-keys",
                 "google" => "https://ai.google.dev/",
+                "anthropic" => "https://console.anthropic.com/settings/keys",
                 "ollama" => "https://ollama.com/",
                 _ => "https://platform.openai.com/api-keys",
             };
