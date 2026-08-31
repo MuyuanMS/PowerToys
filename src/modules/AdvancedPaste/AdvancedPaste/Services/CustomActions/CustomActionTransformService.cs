@@ -68,6 +68,14 @@ namespace AdvancedPaste.Services.CustomActions
                 return new CustomActionTransformResult(string.Empty, AIServiceUsage.None);
             }
 
+            if (!IsProviderAllowedByGPO(providerConfig.ProviderType))
+            {
+                throw new PasteActionException(
+                    "AI provider is disabled by policy",
+                    new InvalidOperationException($"Advanced Paste AI provider '{providerConfig.ProviderType}' is disabled by policy."),
+                    aiServiceMessage: "This AI provider is disabled by your organization's policy.");
+            }
+
             var systemPrompt = providerConfig.SystemPrompt ?? DefaultSystemPrompt;
 
             var fullPrompt = (systemPrompt ?? string.Empty) + "\n\n" + (inputText ?? string.Empty);
@@ -209,6 +217,29 @@ namespace AdvancedPaste.Services.CustomActions
                 AIServiceType.Ollama => false,
                 AIServiceType.FoundryLocal => false,
                 AIServiceType.PhiSilica => false,
+                _ => true,
+            };
+        }
+
+        private static bool IsProviderAllowedByGPO(AIServiceType serviceType)
+        {
+            var metadata = AIServiceTypeRegistry.GetMetadata(serviceType);
+            if (metadata.IsOnlineService &&
+                PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOnlineAIModelsValue() == PowerToys.GPOWrapper.GpoRuleConfigured.Disabled)
+            {
+                return false;
+            }
+
+            return serviceType switch
+            {
+                AIServiceType.OpenAI => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOpenAIValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.AzureOpenAI => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteAzureOpenAIValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.AzureAIInference => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteAzureAIInferenceValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.Mistral => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteMistralValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.Google => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteGoogleValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.Ollama => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOllamaValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.FoundryLocal => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteFoundryLocalValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.Anthropic => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteAnthropicValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
                 _ => true,
             };
         }

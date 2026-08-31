@@ -53,7 +53,7 @@ We use the Anthropic NuGet package to access Anthropic services.
 
 MIT License
 
-Copyright 2026 Anthropic
+Copyright 2023 Anthropic, PBC.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
