@@ -423,7 +423,7 @@ namespace KeyboardManagerEditorUI.Pages
             return actionType switch
             {
                 UnifiedMappingControl.ActionType.KeyOrShortcut => ValidationHelper.ValidateKeyMapping(
-                    triggerKeys, UnifiedMappingControl.GetActionKeys(), isAppSpecific, appName, _mappingService!, _isEditMode, editingId, UnifiedMappingControl.GetCondition()),
+                    triggerKeys, UnifiedMappingControl.GetActionKeys(), isAppSpecific, appName, _mappingService!, _isEditMode, editingId),
                 UnifiedMappingControl.ActionType.Text => ValidationHelper.ValidateTextMapping(
                     triggerKeys, UnifiedMappingControl.GetTextContent(), isAppSpecific, appName, _mappingService!, _isEditMode, editingId),
                 UnifiedMappingControl.ActionType.OpenUrl => ValidationHelper.ValidateUrlMapping(
@@ -431,7 +431,7 @@ namespace KeyboardManagerEditorUI.Pages
                 UnifiedMappingControl.ActionType.OpenApp => ValidationHelper.ValidateAppMapping(
                     triggerKeys, UnifiedMappingControl.GetProgramPath(), isAppSpecific, appName, _mappingService!, _isEditMode, editingId),
                 UnifiedMappingControl.ActionType.Disable => ValidationHelper.ValidateDisableMapping(
-                    triggerKeys, isAppSpecific, appName, _mappingService!, _isEditMode, editingId, UnifiedMappingControl.GetCondition()),
+                    triggerKeys, isAppSpecific, appName, _mappingService!, _isEditMode, editingId),
                 _ => ValidationErrorType.NoError,
             };
         }
