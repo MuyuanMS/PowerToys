@@ -1582,6 +1582,7 @@ namespace KeyboardManagerEditorUI.Pages
                 Logger.LogError("Error during bulk delete: " + ex.Message);
             }
 
+            ClearAllSelections();
             IsSelectionMode = false;
             SelectionModeToggle.IsChecked = false;
             LoadAllMappings();
