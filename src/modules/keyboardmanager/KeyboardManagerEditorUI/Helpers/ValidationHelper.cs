@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using static KeyboardManagerEditorUI.Interop.ShortcutKeyMapping;
 using KeyboardManagerEditorUI.Interop;
 using KeyboardManagerEditorUI.Settings;
 using ManagedCommon;
@@ -42,7 +43,8 @@ namespace KeyboardManagerEditorUI.Helpers
             string appName,
             KeyboardMappingService mappingService,
             bool isEditMode = false,
-            string? editingId = null)
+            string? editingId = null,
+            SingleKeyRemapCondition condition = SingleKeyRemapCondition.Always)
         {
             if (originalKeys == null || originalKeys.Count == 0)
             {
@@ -70,7 +72,7 @@ namespace KeyboardManagerEditorUI.Helpers
                 return ValidationErrorType.IllegalShortcut;
             }
 
-            if (IsDuplicateMapping(originalKeys, isEditMode, mappingService, appName, editingId))
+            if (IsDuplicateMapping(originalKeys, isEditMode, mappingService, appName, editingId, condition))
             {
                 return ValidationErrorType.DuplicateMapping;
             }
@@ -94,7 +96,8 @@ namespace KeyboardManagerEditorUI.Helpers
             string appName,
             KeyboardMappingService mappingService,
             bool isEditMode = false,
-            string? editingId = null)
+            string? editingId = null,
+            SingleKeyRemapCondition condition = SingleKeyRemapCondition.Always)
         {
             if (originalKeys == null || originalKeys.Count == 0)
             {
@@ -116,7 +119,7 @@ namespace KeyboardManagerEditorUI.Helpers
                 return ValidationErrorType.IllegalShortcut;
             }
 
-            if (IsDuplicateMapping(originalKeys, isEditMode, mappingService, appName, editingId))
+            if (IsDuplicateMapping(originalKeys, isEditMode, mappingService, appName, editingId, condition))
             {
                 return ValidationErrorType.DuplicateMapping;
             }
@@ -205,12 +208,19 @@ namespace KeyboardManagerEditorUI.Helpers
             return ValidateProgramOrUrlMapping(originalKeys, isAppSpecific, appName, mappingService, isEditMode, editingId);
         }
 
-        public static bool IsDuplicateMapping(List<string> keys, bool isEditMode, KeyboardMappingService mappingService, string appName, string? editingId = null)
+        public static bool IsDuplicateMapping(
+            List<string> keys,
+            bool isEditMode,
+            KeyboardMappingService mappingService,
+            string appName,
+            string? editingId = null,
+            SingleKeyRemapCondition condition = SingleKeyRemapCondition.Always)
         {
             string shortcutKeysString = BuildKeyCodeString(keys, mappingService);
             int matches = SettingsManager.EditorSettings.ShortcutSettingsDictionary
                 .Where(kvp => editingId == null || kvp.Key != editingId)
                 .Count(kvp => KeyboardManagerInterop.AreShortcutsEqual(kvp.Value.Shortcut.OriginalKeys, shortcutKeysString) &&
+                              kvp.Value.Shortcut.Condition == condition &&
                               (string.IsNullOrEmpty(kvp.Value.Shortcut.TargetApp) || string.IsNullOrEmpty(appName) || kvp.Value.Shortcut.TargetApp == appName));
 
             // With the edited row's identity we exclude exactly that row above, so any remaining match is
