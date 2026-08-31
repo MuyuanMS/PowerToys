@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using static KeyboardManagerEditorUI.Interop.ShortcutKeyMapping;
 using KeyboardManagerEditorUI.Interop;
 using KeyboardManagerEditorUI.Settings;
 using ManagedCommon;
