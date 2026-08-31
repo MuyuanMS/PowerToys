@@ -127,14 +127,14 @@ HRESULT PowerDisplayProcessManager::start_process(const std::wstring& pipe_name)
 
 HRESULT PowerDisplayProcessManager::start_named_pipe_server(const std::wstring& pipe_name)
 {
-    m_write_pipe = nullptr;
+    m_write_pipe.reset();
 
     const auto full_pipe_name = std::format(L"\\\\.\\pipe\\{}", pipe_name);
 
-    m_write_pipe = new TwoWayPipeMessageIPC(L"", full_pipe_name, [](const std::wstring&) {});
+    m_write_pipe = std::make_unique<TwoWayPipeMessageIPC>(L"", full_pipe_name, [](const std::wstring&) {});
 
     const auto clean_up_and_fail = [&]() {
-        m_write_pipe->end();
+        m_write_pipe.reset();
         return E_FAIL;
     };
 
@@ -169,15 +169,14 @@ void PowerDisplayProcessManager::refresh()
             return;
         }
 
-        if (start_process(pipe_name.value()) != S_OK)
+        if (start_named_pipe_server(pipe_name.value()) != S_OK)
         {
             return;
         }
 
-        if (start_named_pipe_server(pipe_name.value()) != S_OK)
+        if (start_process(pipe_name.value()) != S_OK)
         {
-            Logger::error(L"Named pipe initialization failed; terminating PowerDisplay process");
-            terminate_process();
+            m_write_pipe.reset();
         }
     }
     else
@@ -197,6 +196,7 @@ void PowerDisplayProcessManager::refresh()
         }
 
         terminate_process();
+        m_write_pipe.reset();
     }
 }
 
@@ -204,7 +204,7 @@ void PowerDisplayProcessManager::send_named_pipe_message(const std::wstring& mes
 {
     if (m_write_pipe)
     {
-        const auto message = message_arg.empty() ? std::format(L"{}\r\n", message_type) : std::format(L"{} {}\r\n", message_type, message_arg);
+        const auto message = message_arg.empty() ? message_type : std::format(L"{} {}", message_type, message_arg);
         m_write_pipe->send(message);
     }
 }

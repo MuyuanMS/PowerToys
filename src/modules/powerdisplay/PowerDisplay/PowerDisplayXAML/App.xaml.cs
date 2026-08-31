@@ -23,13 +23,15 @@ namespace PowerDisplay
     /// <summary>
     /// PowerDisplay application main class
     /// </summary>
-    public partial class App : Application
+    public partial class App : Application, IDisposable
     {
         private readonly SettingsUtils _settingsUtils = SettingsUtils.Default;
         private Window? _mainWindow;
         private int _powerToysRunnerPid;
         private string? _pipeName;
         private TrayIconService? _trayIconService;
+        private TwoWayPipeMessageIPCManaged? _ipc;
+        private bool _disposed;
 
         public App(int runnerPid, string? pipeName)
         {
@@ -139,17 +141,6 @@ namespace PowerDisplay
                 RegisterViewModelEvent(PathConstants.LightSwitchDarkThemeEventName, vm => vm.ApplyLightSwitchProfile(isLightMode: false), "LightSwitch-Dark");
                 Logger.LogInfo("OnLaunched: All Windows Events registered");
 
-                // Connect to Named Pipe for IPC with module DLL (if pipe name provided)
-                if (!string.IsNullOrEmpty(_pipeName))
-                {
-                    Logger.LogInfo($"OnLaunched: Starting Named Pipe processing for pipe: {_pipeName}");
-                    ProcessNamedPipe(_pipeName);
-                }
-                else
-                {
-                    Logger.LogInfo("OnLaunched: No pipe name provided, skipping Named Pipe setup");
-                }
-
                 // Monitor Runner process (backup exit mechanism)
                 if (_powerToysRunnerPid > 0)
                 {
@@ -171,6 +162,17 @@ namespace PowerDisplay
                 var mainWindow = new MainWindow();
                 _mainWindow = mainWindow;
                 Logger.LogInfo("OnLaunched: MainWindow created");
+
+                // Connect only after the window is available so the first IPC message cannot be dropped.
+                if (!string.IsNullOrEmpty(_pipeName))
+                {
+                    Logger.LogInfo($"OnLaunched: Starting Named Pipe processing for pipe: {_pipeName}");
+                    ProcessNamedPipe(_pipeName);
+                }
+                else
+                {
+                    Logger.LogInfo("OnLaunched: No pipe name provided, skipping Named Pipe setup");
+                }
 
                 // Initialize tray icon service
                 Logger.LogTrace("OnLaunched: Initializing TrayIconService");
@@ -346,6 +348,7 @@ namespace PowerDisplay
         {
             Logger.LogInfo("PowerDisplay shutting down");
             _trayIconService?.Destroy();
+            Dispose();
 
             // Stop the CLI pipe server before exiting.
             if (_mainWindow is MainWindow mw)
@@ -356,6 +359,17 @@ namespace PowerDisplay
             Environment.Exit(0);
         }
 
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                _ipc?.End();
+                _ipc = null;
+                _disposed = true;
+                GC.SuppressFinalize(this);
+            }
+        }
+
         /// <summary>
         /// Connect to Named Pipe and process messages from module DLL
         /// </summary>
@@ -363,8 +377,8 @@ namespace PowerDisplay
         {
             void OnMessage(string message) => _mainWindow?.DispatcherQueue.TryEnqueue(async () => await OnNamedPipeMessage(message));
 
-            TwoWayPipeMessageIPCManaged ipc = new(@"\\.\pipe\" + pipeName, string.Empty, (m) => OnMessage(m));
-            ipc.Start();
+            _ipc = new TwoWayPipeMessageIPCManaged(@"\\.\pipe\" + pipeName, string.Empty, (m) => OnMessage(m));
+            _ipc.Start();
         }
 
         /// <summary>
@@ -372,7 +386,7 @@ namespace PowerDisplay
         /// </summary>
         private async Task OnNamedPipeMessage(string message)
         {
-            var messageParts = message.Split(' ', 2);
+            var messageParts = message.Trim().Split(' ', 2);
             var messageType = messageParts[0];
 
             Logger.LogInfo($"[NamedPipe] Processing message type: {messageType}");

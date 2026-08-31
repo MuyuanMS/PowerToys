@@ -4,7 +4,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO.Abstractions;
 using System.Linq;
@@ -53,6 +52,7 @@ namespace AdvancedPaste
 
         private readonly DispatcherQueue _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         private readonly OptionsViewModel viewModel;
+        private TwoWayPipeMessageIPCManaged ipc;
 
         private MainWindow window;
 
@@ -134,7 +134,7 @@ namespace AdvancedPaste
 
             if (cmdArgs?.Length > 2)
             {
-                TwoWayPipeMessageIPCManaged ipc = new(@"\\.\pipe\" + cmdArgs[2], string.Empty, async (m) => await OnNamedPipeMessage(m));
+                ipc = new TwoWayPipeMessageIPCManaged(@"\\.\pipe\" + cmdArgs[2], string.Empty, async (m) => await OnNamedPipeMessage(m));
                 ipc.Start();
             }
         }
@@ -271,6 +271,8 @@ namespace AdvancedPaste
             {
                 if (disposing)
                 {
+                    ipc?.End();
+                    ipc = null;
                     EtwTrace?.Dispose();
                     window?.Dispose();
                 }
