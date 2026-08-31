@@ -16,6 +16,8 @@ namespace AdvancedPaste.Services.CustomActions
 {
     public sealed class AnthropicPasteProvider : IPasteAIProvider
     {
+        private const int DefaultMaxOutputTokens = 4096;
+
         private static readonly IReadOnlyCollection<AIServiceType> SupportedTypes = new[]
         {
             AIServiceType.Anthropic,
@@ -66,17 +68,11 @@ namespace AdvancedPaste.Services.CustomActions
 
             var endpoint = string.IsNullOrWhiteSpace(_config.Endpoint) ? null : _config.Endpoint.Trim();
 
-            AnthropicClient client = new()
-            {
-                ApiKey = apiKey,
-            };
+            using AnthropicClient client = !string.IsNullOrWhiteSpace(endpoint)
+                ? new AnthropicClient { ApiKey = apiKey, BaseUrl = endpoint }
+                : new AnthropicClient { ApiKey = apiKey };
 
-            if (!string.IsNullOrWhiteSpace(endpoint))
-            {
-                client.BaseUrl = endpoint;
-            }
-
-            using var chatClient = client.AsIChatClient(modelId);
+            using var chatClient = client.AsIChatClient(modelId, DefaultMaxOutputTokens);
             var messages = new List<ChatMessage>();
 
             messages.Add(new ChatMessage(ChatRole.System, systemPrompt));
@@ -111,6 +107,14 @@ namespace AdvancedPaste.Services.CustomActions
             var response = await chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
 
             request.Usage = new AIServiceUsage((int)(response.Usage?.InputTokenCount ?? 0), (int)(response.Usage?.OutputTokenCount ?? 0));
+
+            if (string.Equals(response.FinishReason?.Value, ChatFinishReason.Length.Value, StringComparison.Ordinal))
+            {
+                throw new PasteActionException(
+                    "Anthropic response was truncated",
+                    new InvalidOperationException("Anthropic response exceeded the configured output token limit."),
+                    aiServiceMessage: "The Anthropic response was truncated. Try a shorter clipboard selection or prompt.");
+            }
 
             return response.Text ?? string.Empty;
         }
