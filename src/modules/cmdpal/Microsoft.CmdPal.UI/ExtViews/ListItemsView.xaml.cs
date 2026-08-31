@@ -254,7 +254,7 @@ public sealed partial class ListItemsView : UserControl,
         _stickySelectedItem = li;
         if (!_isGridNavigationSelection)
         {
-            _gridNavigationColumn = null;
+            CancelPendingGridActions();
         }
 
         // User explicitly changed selection — any pending force-first intent
