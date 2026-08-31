@@ -28,7 +28,11 @@ public sealed partial class ListItemsView
 
     public GridItemsViewModel GridItems { get; private set; } = new();
 
-    public CollectionViewSource GridItemsSource { get; } = new() { IsSourceGrouped = true };
+    public CollectionViewSource GridItemsSource { get; } = new()
+    {
+        IsSourceGrouped = true,
+        ItemsPath = new PropertyPath(nameof(GridItemGroupViewModel.Items)),
+    };
 
     private double GridHeaderHeight => (double)Resources["ListViewSectionHeight"] + (double)Resources["GridItemSpacing"];
 
@@ -142,7 +146,8 @@ public sealed partial class ListItemsView
             {
                 // The regular ItemsUpdated path normally synchronizes first.
                 // This path also covers late header initialization/property changes.
-                Page_ItemsUpdated(vm, new ItemsUpdatedEventArgs(forceFirstItem: false, ensureSelectionVisible: false));
+                var version = Volatile.Read(ref _itemsUpdatedVersion);
+                ProcessItemsUpdated(vm, new ItemsUpdatedEventArgs(forceFirstItem: false, ensureSelectionVisible: false), version);
             }
         }))
         {
@@ -261,13 +266,20 @@ public sealed partial class ListItemsView
                 return false;
             }
 
+            var viewportHeight = CurrentScrollViewer?.ViewportHeight ?? 0;
+            if (key is VirtualKey.PageUp or VirtualKey.PageDown &&
+                (!double.IsFinite(viewportHeight) || viewportHeight <= 0))
+            {
+                return false;
+            }
+
             var column = _gridNavigationColumn ??= layout.GetColumn(current);
             target = key switch
             {
                 VirtualKey.Up => layout.MoveVertical(current, down: false, column, wrap: true),
                 VirtualKey.Down => layout.MoveVertical(current, down: true, column, wrap: true),
-                VirtualKey.PageUp => layout.MovePage(current, down: false, column, _itemsScrollViewer?.ViewportHeight ?? 0),
-                VirtualKey.PageDown => layout.MovePage(current, down: true, column, _itemsScrollViewer?.ViewportHeight ?? 0),
+                VirtualKey.PageUp => layout.MovePage(current, down: false, column, viewportHeight),
+                VirtualKey.PageDown => layout.MovePage(current, down: true, column, viewportHeight),
                 _ => current,
             };
         }
