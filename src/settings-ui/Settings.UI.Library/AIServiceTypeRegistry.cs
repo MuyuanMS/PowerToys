@@ -23,7 +23,7 @@ public static class AIServiceTypeRegistry
             IsOnlineService = true,
             LegalDescription = "AdvancedPaste_Anthropic_LegalDescription",
             TermsLabel = "AdvancedPaste_Anthropic_TermsLabel",
-            TermsUri = new Uri("https://www.anthropic.com/legal/consumer-terms"),
+            TermsUri = new Uri("https://www.anthropic.com/legal/commercial-terms"),
             PrivacyLabel = "AdvancedPaste_Anthropic_PrivacyLabel",
             PrivacyUri = new Uri("https://www.anthropic.com/legal/privacy"),
         },

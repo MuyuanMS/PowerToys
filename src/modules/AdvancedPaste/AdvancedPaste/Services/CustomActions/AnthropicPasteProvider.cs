@@ -66,23 +66,17 @@ namespace AdvancedPaste.Services.CustomActions
 
             var endpoint = string.IsNullOrWhiteSpace(_config.Endpoint) ? null : _config.Endpoint.Trim();
 
-            // Setup Anthropic client.
-            AnthropicClient client;
+            AnthropicClient client = new()
+            {
+                ApiKey = apiKey,
+            };
+
             if (!string.IsNullOrWhiteSpace(endpoint))
             {
-                 var options = new AnthropicClientOptions
-                 {
-                     Endpoint = new Uri(endpoint),
-                 };
-                 client = new AnthropicClient(apiKey, options);
-            }
-            else
-            {
-                 client = new AnthropicClient(apiKey);
+                client.BaseUrl = endpoint;
             }
 
-            IChatClient chatClient = client.AsChatClient(modelId);
-
+            using var chatClient = client.AsIChatClient(modelId);
             var messages = new List<ChatMessage>();
 
             messages.Add(new ChatMessage(ChatRole.System, systemPrompt));
@@ -114,11 +108,11 @@ namespace AdvancedPaste.Services.CustomActions
                 messages.Add(new ChatMessage(ChatRole.User, userMessageContent));
             }
 
-            ChatCompletion response = await chatClient.CompleteAsync(messages, cancellationToken: cancellationToken);
+            var response = await chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
 
-            request.Usage = new AIServiceUsage(response.Usage?.InputTokenCount ?? 0, response.Usage?.OutputTokenCount ?? 0);
+            request.Usage = new AIServiceUsage((int)(response.Usage?.InputTokenCount ?? 0), (int)(response.Usage?.OutputTokenCount ?? 0));
 
-            return response.Message.Text ?? string.Empty;
+            return response.Text ?? string.Empty;
         }
     }
 }
