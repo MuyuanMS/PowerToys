@@ -570,6 +570,10 @@
     <value>Delete selected ({0})</value>
     <comment>{0} is the number of selected remappings. Label of the button that deletes them.</comment>
   </data>
+  <data name="BulkDelete_SelectedSingular" xml:space="preserve">
+    <value>Delete selected (1)</value>
+    <comment>Label of the button when exactly one remapping is selected for deletion.</comment>
+  </data>
   <data name="BulkDeleteConfirmationDialog.Title" xml:space="preserve">
     <value>Delete selected remappings?</value>
   </data>
@@ -582,6 +586,10 @@
   <data name="BulkDeleteConfirmation_Format" xml:space="preserve">
     <value>You are about to delete {0} remappings. This cannot be undone.</value>
     <comment>{0} is the number of remappings to delete</comment>
+  </data>
+  <data name="BulkDeleteConfirmation_Singular" xml:space="preserve">
+    <value>You are about to delete 1 remapping. This cannot be undone.</value>
+    <comment>Confirmation text shown when exactly one remapping is selected for deletion.</comment>
   </data>
   <data name="NoResultsTitle.Text" xml:space="preserve">
     <value>No remappings match your filters</value>

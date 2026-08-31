@@ -186,6 +186,11 @@ namespace KeyboardManagerEditorUI.Pages
         {
             get
             {
+                if (_selectedCount == 1)
+                {
+                    return ResourceHelper.GetString("BulkDelete_SelectedSingular");
+                }
+
                 _deleteSelectedFormat ??= CompositeFormat.Parse(ResourceHelper.GetString("BulkDelete_SelectedFormat"));
                 return string.Format(CultureInfo.CurrentCulture, _deleteSelectedFormat, _selectedCount);
             }
@@ -1376,7 +1381,16 @@ namespace KeyboardManagerEditorUI.Pages
             }
             else if (previous != null)
             {
-                int found = AppFilterOptions.IndexOf(previous);
+                int found = -1;
+                for (int i = 2; i < AppFilterOptions.Count; i++)
+                {
+                    if (string.Equals(AppFilterOptions[i], previous, StringComparison.OrdinalIgnoreCase))
+                    {
+                        found = i;
+                        break;
+                    }
+                }
+
                 index = found >= 0 ? found : 0;
             }
 
@@ -1520,8 +1534,9 @@ namespace KeyboardManagerEditorUI.Pages
                 return;
             }
 
-            _bulkDeleteConfirmationFormat ??= CompositeFormat.Parse(ResourceHelper.GetString("BulkDeleteConfirmation_Format"));
-            BulkDeleteConfirmationText.Text = string.Format(CultureInfo.CurrentCulture, _bulkDeleteConfirmationFormat, SelectedCount);
+            BulkDeleteConfirmationText.Text = SelectedCount == 1
+                ? ResourceHelper.GetString("BulkDeleteConfirmation_Singular")
+                : string.Format(CultureInfo.CurrentCulture, _bulkDeleteConfirmationFormat ??= CompositeFormat.Parse(ResourceHelper.GetString("BulkDeleteConfirmation_Format")), SelectedCount);
 
             if (await BulkDeleteConfirmationDialog.ShowAsync() != ContentDialogResult.Primary)
             {
