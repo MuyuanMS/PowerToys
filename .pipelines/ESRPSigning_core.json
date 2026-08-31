@@ -392,6 +392,7 @@
                 "TestableIO.System.IO.Abstractions.Wrappers.dll",
                 "WinUI3Apps\\TestableIO.System.IO.Abstractions.Wrappers.dll",
                 "WinUI3Apps\\OpenAI.dll",
+                "WinUI3Apps\\Anthropic.dll",
                 "Testably.Abstractions.FileSystem.Interface.dll",
                 "WinUI3Apps\\Testably.Abstractions.FileSystem.Interface.dll",
                 "ColorCode.Core.dll", 
