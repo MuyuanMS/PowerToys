@@ -1043,6 +1043,8 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
             QuickAccessShelfRemoveDropTarget.BorderThickness = new Thickness(1);
             QuickAccessShelfRemoveDropTarget.Visibility = Visibility.Visible;
             QuickAccessShelfPinDropTarget.BorderThickness = new Thickness(1);
+            QuickAccessShelfPinDropTarget.Visibility = Visibility.Collapsed;
+            UpdateQuickAccessShelfCapacity();
             QuickAccessShelfPinDropTarget.Visibility = item.CanPin && !QuickAccessShelf.VisibleItems.Any(visibleItem => visibleItem.IsPinned)
                 ? Visibility.Visible
                 : Visibility.Collapsed;
