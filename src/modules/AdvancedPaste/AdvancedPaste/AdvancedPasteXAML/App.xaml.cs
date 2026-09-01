@@ -271,7 +271,7 @@ namespace AdvancedPaste
             {
                 if (disposing)
                 {
-                    ipc?.End();
+                    ipc?.Dispose();
                     ipc = null;
                     EtwTrace?.Dispose();
                     window?.Dispose();

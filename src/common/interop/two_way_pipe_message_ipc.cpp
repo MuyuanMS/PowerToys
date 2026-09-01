@@ -387,6 +387,12 @@ void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::send_pipe_message(std::wstr
         // Keep the queued message until the server appears instead of dropping it.
         DWORD curr_error = 0;
         curr_error = GetLastError();
+#ifdef TWO_WAY_PIPE_MESSAGE_IPC_TESTS
+        if (const HANDLE event = wait_named_pipe_entered_event.load())
+        {
+            SetEvent(event);
+        }
+#endif
         if (curr_error == ERROR_FILE_NOT_FOUND)
         {
             Sleep(PipeWaitIntervalMs);
@@ -400,12 +406,6 @@ void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::send_pipe_message(std::wstr
 
         // Use short waits so end() can promptly join the output thread instead of waiting for a
         // long unavailable-pipe timeout.
-#ifdef TWO_WAY_PIPE_MESSAGE_IPC_TESTS
-        if (const HANDLE event = wait_named_pipe_entered_event.load())
-        {
-            SetEvent(event);
-        }
-#endif
         if (!WaitNamedPipe(lpszPipename, PipeWaitIntervalMs) && GetLastError() != ERROR_SEM_TIMEOUT)
         {
             return;
