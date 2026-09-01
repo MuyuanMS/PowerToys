@@ -678,12 +678,14 @@ internal static class PowerAccentTestHelper
     {
         private readonly UITestBase testBase;
         private readonly string filePath;
+        private readonly int? ownedProcessId;
         private bool disposed;
 
-        private NotepadFixture(UITestBase testBase, string filePath, Session window)
+        private NotepadFixture(UITestBase testBase, string filePath, Session window, int? ownedProcessId)
         {
             this.testBase = testBase;
             this.filePath = filePath;
+            this.ownedProcessId = ownedProcessId;
             Window = window;
         }
 
@@ -725,7 +727,11 @@ internal static class PowerAccentTestHelper
                 }
 
                 Assert.IsNotNull(window, $"Notepad did not open the fixture document '{fileName}'.");
-                return new NotepadFixture(testBase, filePath, window);
+                return new NotepadFixture(
+                    testBase,
+                    filePath,
+                    window,
+                    launchedProcessIds.Contains(window.ProcessId) ? window.ProcessId : null);
             }
             catch
             {
@@ -810,15 +816,10 @@ internal static class PowerAccentTestHelper
             disposed = true;
             try
             {
-                using var process = Process.GetProcessById(Window.ProcessId);
-                process.Kill(entireProcessTree: true);
-                process.WaitForExit(5_000);
-            }
-            catch (ArgumentException)
-            {
-            }
-            catch (InvalidOperationException)
-            {
+                if (!WindowControl.TryCloseWindow(Window.WindowHandle) && ownedProcessId is int processId)
+                {
+                    TryTerminateProcess(processId);
+                }
             }
             finally
             {
@@ -881,7 +882,14 @@ internal static class PowerAccentTestHelper
             }
 
             disposed = true;
-            ClipboardHelper.SetText(originalText);
+            if (string.IsNullOrEmpty(originalText))
+            {
+                ClipboardHelper.Clear();
+            }
+            else
+            {
+                ClipboardHelper.SetText(originalText);
+            }
         }
     }
 

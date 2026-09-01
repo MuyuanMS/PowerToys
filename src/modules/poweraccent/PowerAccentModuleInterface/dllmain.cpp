@@ -180,6 +180,7 @@ public:
                 // Auto-reset events clear when a waiter consumes the signal; resetting here can race the listener.
                 CloseHandle(exitEvent);
                 CloseHandle(p_info.hProcess);
+                p_info.hProcess = nullptr;
             }
         }
 
