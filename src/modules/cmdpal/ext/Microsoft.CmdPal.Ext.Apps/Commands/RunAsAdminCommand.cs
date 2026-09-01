@@ -5,6 +5,7 @@
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using ManagedCommon;
 using Microsoft.CmdPal.Ext.Apps.Properties;
 using Microsoft.CmdPal.Ext.Apps.Utils;
 using Microsoft.CommandPalette.Extensions.Toolkit;
@@ -27,25 +28,34 @@ internal sealed partial class RunAsAdminCommand : InvokableCommand
         _packaged = packaged;
     }
 
-    internal static async Task RunAsAdmin(string target, string parentDir, bool packaged)
+    internal static async Task RunAsAdmin(string target, string parentDir, bool packaged, Func<ProcessStartInfo, Process?>? startProcess = null)
     {
         await Task.Run(() =>
         {
-            if (packaged)
+            try
             {
-                var command = "shell:AppsFolder\\" + target;
-                command = Environment.ExpandEnvironmentVariables(command.Trim());
+                startProcess ??= Process.Start;
 
-                var info = ShellCommand.SetProcessStartInfo(command, verb: "runas");
-                info.UseShellExecute = true;
-                info.Arguments = string.Empty;
-                Process.Start(info);
+                if (packaged)
+                {
+                    var command = "shell:AppsFolder\\" + target;
+                    command = Environment.ExpandEnvironmentVariables(command.Trim());
+
+                    var info = ShellCommand.SetProcessStartInfo(command, verb: "runas");
+                    info.UseShellExecute = true;
+                    info.Arguments = string.Empty;
+                    startProcess(info);
+                }
+                else
+                {
+                    var info = ShellCommand.GetProcessStartInfo(target, parentDir, string.Empty, ShellCommand.RunAsType.Administrator);
+
+                    startProcess(info);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                var info = ShellCommand.GetProcessStartInfo(target, parentDir, string.Empty, ShellCommand.RunAsType.Administrator);
-
-                Process.Start(info);
+                Logger.LogError(ex.Message);
             }
         });
     }
