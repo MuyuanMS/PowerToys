@@ -16,7 +16,7 @@ internal static class TopLevelCommandResolver
 
     internal static Sections<IListItem> Resolve(
         IEnumerable<PinnedCommandSettings> pinnedCommands,
-        IEnumerable<string> recentCommandIds,
+        IEnumerable<RecentCommandIdentity> recentCommands,
         IEnumerable<TopLevelViewModel> availableCommands,
         bool includeApps,
         int pinnedCommandLimit = int.MaxValue,
@@ -29,7 +29,7 @@ internal static class TopLevelCommandResolver
         Func<string, IListItem?>? additionalRecentResolver = includeApps ? ResolveRecentApp : null;
         return Resolve<IListItem>(
             pinnedCommands,
-            recentCommandIds,
+            recentCommands,
             availableCommands,
             GetProviderId,
             GetCommandId,
@@ -53,7 +53,7 @@ internal static class TopLevelCommandResolver
 
     internal static Sections<TCommand> Resolve<TCommand>(
         IEnumerable<PinnedCommandSettings> pinnedCommands,
-        IEnumerable<string> recentCommandIds,
+        IEnumerable<RecentCommandIdentity> recentCommands,
         IEnumerable<TCommand> availableCommands,
         Func<TCommand, string> providerIdSelector,
         Func<TCommand, string> commandIdSelector,
@@ -91,7 +91,6 @@ internal static class TopLevelCommandResolver
         }
 
         var featuredCommandKeys = new HashSet<(string ProviderId, string CommandId)>();
-        var featuredCommandIds = new HashSet<string>(StringComparer.Ordinal);
         var pinned = new List<TCommand>();
         var recent = new List<TCommand>();
 
@@ -107,11 +106,6 @@ internal static class TopLevelCommandResolver
                     {
                         pinned.Add(command);
                     }
-
-                    if (!string.IsNullOrEmpty(pinnedCommand.CommandId))
-                    {
-                        featuredCommandIds.Add(pinnedCommand.CommandId);
-                    }
                 }
             }
         }
@@ -123,32 +117,58 @@ internal static class TopLevelCommandResolver
                 return;
             }
 
-            foreach (var commandId in recentCommandIds)
+            var ambiguousLegacyIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var recentCommand in recentCommands)
             {
                 if (recent.Count == recentCommandLimit)
                 {
                     break;
                 }
 
-                if (string.IsNullOrEmpty(commandId) || featuredCommandIds.Contains(commandId))
+                var commandId = recentCommand.CommandId;
+                if (string.IsNullOrEmpty(commandId))
                 {
                     continue;
                 }
 
-                if (!commandsById.TryGetValue(commandId, out var command))
+                TCommand? command;
+                if (recentCommand.IsProviderQualified)
                 {
-                    command = resolveAdditionalRecentCommand?.Invoke(commandId);
-                    if (command is null || !isEligible(command))
+                    var recentKey = (recentCommand.ProviderId!, commandId);
+                    if (featuredCommandKeys.Contains(recentKey))
                     {
                         continue;
                     }
+
+                    commandsByProviderAndId.TryGetValue(recentKey, out command);
+                    if (command is null &&
+                        recentCommand.ProviderId == AllAppsCommandProvider.WellKnownId)
+                    {
+                        command = resolveAdditionalRecentCommand?.Invoke(commandId);
+                    }
+                }
+                else
+                {
+                    if (ambiguousLegacyIds.Contains(commandId) ||
+                        featuredCommandKeys.Any(key => key.CommandId == commandId))
+                    {
+                        continue;
+                    }
+
+                    commandsById.TryGetValue(commandId, out command);
+                    command ??= resolveAdditionalRecentCommand?.Invoke(commandId);
+                    ambiguousLegacyIds.Add(commandId);
+                }
+
+                if (command is null || !isEligible(command))
+                {
+                    continue;
                 }
 
                 var key = (providerIdSelector(command), commandIdSelector(command));
                 if (featuredCommandKeys.Add(key))
                 {
                     recent.Add(command);
-                    featuredCommandIds.Add(commandId);
                 }
             }
         }

@@ -20,6 +20,8 @@ public sealed partial class RecentCommandListItem : IListItem, IExtendedAttribut
 
     public string CommandId { get; }
 
+    public string ProviderId { get; }
+
     public ICommand? Command => Source.Command;
 
     public IContextItem?[] MoreCommands => Source.MoreCommands;
@@ -38,15 +40,17 @@ public sealed partial class RecentCommandListItem : IListItem, IExtendedAttribut
 
     public string TextToSuggest => Source.TextToSuggest;
 
-    public RecentCommandListItem(IListItem source, string commandId)
+    public RecentCommandListItem(IListItem source, string providerId, string commandId)
     {
         Source = source;
+        ProviderId = providerId;
         CommandId = commandId;
     }
 
     internal static RecentCommandListItem CreateOrReuse(
         IReadOnlyList<IListItem>? existingItems,
         IListItem source,
+        string providerId,
         string commandId)
     {
         if (existingItems is not null)
@@ -55,6 +59,7 @@ public sealed partial class RecentCommandListItem : IListItem, IExtendedAttribut
             {
                 if (existingItem is RecentCommandListItem recentItem &&
                     ReferenceEquals(recentItem.Source, source) &&
+                    string.Equals(recentItem.ProviderId, providerId, StringComparison.Ordinal) &&
                     string.Equals(recentItem.CommandId, commandId, StringComparison.Ordinal))
                 {
                     return recentItem;
@@ -62,7 +67,7 @@ public sealed partial class RecentCommandListItem : IListItem, IExtendedAttribut
             }
         }
 
-        return new RecentCommandListItem(source, commandId);
+        return new RecentCommandListItem(source, providerId, commandId);
     }
 
     public event TypedEventHandler<object, IPropChangedEventArgs>? PropChanged
