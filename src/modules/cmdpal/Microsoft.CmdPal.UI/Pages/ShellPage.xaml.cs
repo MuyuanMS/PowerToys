@@ -1011,8 +1011,9 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         }
     }
 
-    private void QuickAccessShelfItem_DragStarting(UIElement sender, DragStartingEventArgs args)
+    private async void QuickAccessShelfItem_DragStarting(UIElement sender, DragStartingEventArgs args)
     {
+        var deferral = args.GetDeferral();
         try
         {
             if (sender is not Button { Tag: QuickAccessShelfItem item })
@@ -1025,7 +1026,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
             _quickAccessShelfDragToken = Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture);
             if (item.DataPackage is not null)
             {
-                DataPackageTransfer.Copy(item.DataPackage, args.Data);
+                await DataPackageTransfer.CopyAsync(item.DataPackage, args.Data);
                 args.AllowedOperations = args.Data.RequestedOperation == DataPackageOperation.None
                     ? DataPackageOperation.Copy
                     : args.Data.RequestedOperation;
@@ -1058,6 +1059,10 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
             args.Cancel = true;
             CompleteQuickAccessShelfDrag();
             Logger.LogError("Failed to start dragging a quick access item", ex);
+        }
+        finally
+        {
+            deferral.Complete();
         }
     }
 
