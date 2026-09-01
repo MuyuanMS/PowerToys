@@ -23,7 +23,12 @@ namespace Microsoft.PowerToys.Settings.UI
 {
     public sealed partial class MainWindow : WindowEx
     {
-        public MainWindow(bool createHidden = false)
+        private const bool WaitForInitialContentBeforeActivation = true;
+
+        private DispatcherQueueTimer _activationFallbackTimer;
+        private DeferredWindowActivation _deferredActivation;
+
+        public MainWindow()
         {
             var bootTime = new System.Diagnostics.Stopwatch();
             bootTime.Start();
@@ -40,13 +45,7 @@ namespace Microsoft.PowerToys.Settings.UI
 
             var hWnd = WindowNative.GetWindowHandle(this);
             var placement = WindowHelper.DeserializePlacementOrDefault(hWnd);
-            if (createHidden)
-            {
-                placement.ShowCmd = NativeMethods.SW_HIDE;
-
-                // Restore the last known placement on the first activation
-                this.Activated += Window_Activated;
-            }
+            placement.ShowCmd = NativeMethods.SW_HIDE;
 
             NativeMethods.SetWindowPlacement(hWnd, ref placement);
 
@@ -109,6 +108,13 @@ namespace Microsoft.PowerToys.Settings.UI
 
             this.InitializeComponent();
             SetTitleBar();
+            _deferredActivation = new DeferredWindowActivation(
+                ActivatePreparedWindowCore,
+                StartActivationFallbackTimer,
+                StopActivationFallbackTimer,
+                SubscribeInitialContentLoaded,
+                UnsubscribeInitialContentLoaded,
+                Close);
 
             // receive IPC Message
             App.IPCMessageReceivedCallback = (string msg) =>
@@ -148,6 +154,15 @@ namespace Microsoft.PowerToys.Settings.UI
             ShellPage.Navigate(type);
         }
 
+        public void ActivateWhenReady(bool bringToForeground = false)
+        {
+            var hWnd = WindowNative.GetWindowHandle(this);
+            _deferredActivation.RequestActivation(
+                !WaitForInitialContentBeforeActivation || NativeMethods.IsWindowVisible(hWnd),
+                shellPage.IsInitialContentLoaded,
+                bringToForeground);
+        }
+
         public void BeginWindowSession()
         {
             shellPage.BeginWindowSession();
@@ -156,10 +171,7 @@ namespace Microsoft.PowerToys.Settings.UI
         public void CloseHiddenWindow()
         {
             var hWnd = WindowNative.GetWindowHandle(this);
-            if (!NativeMethods.IsWindowVisible(hWnd))
-            {
-                Close();
-            }
+            _deferredActivation.CloseHiddenWindow(NativeMethods.IsWindowVisible(hWnd));
         }
 
         private void Window_Closed(object sender, WindowEventArgs args)
@@ -169,33 +181,79 @@ namespace Microsoft.PowerToys.Settings.UI
 
             if (!App.IsSecondaryWindowOpen())
             {
+                _deferredActivation.OnWindowClosed();
                 shellPage.Dispose();
                 App.ClearSettingsWindow();
+
+                App.ThemeService.ThemeChanged -= OnThemeChanged;
             }
             else
             {
                 args.Handled = true;
                 NativeMethods.ShowWindow(hWnd, NativeMethods.SW_HIDE);
             }
+        }
 
-            App.ThemeService.ThemeChanged -= OnThemeChanged;
+        private void ShellPage_InitialContentLoaded(object sender, EventArgs e)
+        {
+            DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, _deferredActivation.OnInitialContentLoaded);
+        }
+
+        private void ActivationFallbackTimer_Tick(DispatcherQueueTimer sender, object args)
+        {
+            _deferredActivation.OnFallbackTimer();
+        }
+
+        private void StartActivationFallbackTimer()
+        {
+            _activationFallbackTimer ??= DispatcherQueue.CreateTimer();
+            if (!_activationFallbackTimer.IsRunning)
+            {
+                _activationFallbackTimer.Interval = TimeSpan.FromSeconds(2);
+                _activationFallbackTimer.IsRepeating = false;
+                _activationFallbackTimer.Tick -= ActivationFallbackTimer_Tick;
+                _activationFallbackTimer.Tick += ActivationFallbackTimer_Tick;
+                _activationFallbackTimer.Start();
+            }
+        }
+
+        private void StopActivationFallbackTimer()
+        {
+            _activationFallbackTimer?.Stop();
+        }
+
+        private void SubscribeInitialContentLoaded()
+        {
+            shellPage.InitialContentLoaded -= ShellPage_InitialContentLoaded;
+            shellPage.InitialContentLoaded += ShellPage_InitialContentLoaded;
+        }
+
+        private void UnsubscribeInitialContentLoaded()
+        {
+            shellPage.InitialContentLoaded -= ShellPage_InitialContentLoaded;
+        }
+
+        private void ActivatePreparedWindowCore()
+        {
+            var hWnd = WindowNative.GetWindowHandle(this);
+            if (!NativeMethods.IsWindowVisible(hWnd))
+            {
+                var placement = WindowHelper.DeserializePlacementOrDefault(hWnd);
+                NativeMethods.SetWindowPlacement(hWnd, ref placement);
+            }
+
+            Activate();
+            if (_deferredActivation.ConsumeBringToForeground())
+            {
+                // https://github.com/microsoft/microsoft-ui-xaml/issues/7595 - Activate doesn't bring window to the foreground
+                WindowHelpers.BringToForeground(hWnd);
+            }
         }
 
         private void Window_Activated_SetIcon(object sender, WindowActivatedEventArgs args)
         {
             // Set window icon
             this.SetIcon("Assets\\Settings\\icon.ico");
-        }
-
-        private void Window_Activated(object sender, WindowActivatedEventArgs args)
-        {
-            if (args.WindowActivationState != WindowActivationState.Deactivated)
-            {
-                this.Activated -= Window_Activated;
-                var hWnd = WindowNative.GetWindowHandle(this);
-                var placement = WindowHelper.DeserializePlacementOrDefault(hWnd);
-                NativeMethods.SetWindowPlacement(hWnd, ref placement);
-            }
         }
 
         private void OnThemeChanged(object sender, ElementTheme theme)
