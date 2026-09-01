@@ -994,6 +994,15 @@ LRESULT FancyZones::WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lpa
                 Logger::info(L"Window destroyed during drag - aborting drag");
                 AbortMoveSize();
             }
+
+            for (const auto& [_, workArea] : m_workAreaConfiguration.GetAllWorkAreas())
+            {
+                if (workArea && !workArea->GetLayoutWindows().GetZoneIndexSetFromWindow(hwnd).empty())
+                {
+                    workArea->Unsnap(hwnd, true);
+                    break;
+                }
+            }
         }
         else if (message == WM_PRIV_LAYOUT_HOTKEYS_FILE_UPDATE)
         {
