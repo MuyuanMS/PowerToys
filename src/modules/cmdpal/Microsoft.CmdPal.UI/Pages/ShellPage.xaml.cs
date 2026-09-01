@@ -1086,6 +1086,11 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
                 break;
             case VirtualKey.Down when modifiers.OnlyAlt:
+                if (IsDescendantOf(e.OriginalSource as DependencyObject, shellPage.FiltersDropDown))
+                {
+                    goto default;
+                }
+
                 if (shellPage.TryExpandCollapsedCompact())
                 {
                     e.Handled = true;
@@ -1120,6 +1125,21 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
                     break;
                 }
         }
+    }
+
+    private static bool IsDescendantOf(DependencyObject? element, DependencyObject ancestor)
+    {
+        while (element is not null)
+        {
+            if (ReferenceEquals(element, ancestor))
+            {
+                return true;
+            }
+
+            element = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(element);
+        }
+
+        return false;
     }
 
     private void ShellPage_OnKeyDown(object sender, KeyRoutedEventArgs e)
