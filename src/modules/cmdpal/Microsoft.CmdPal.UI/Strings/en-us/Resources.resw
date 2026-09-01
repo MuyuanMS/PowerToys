@@ -446,7 +446,7 @@ Right-click to remove the key combination, thereby deactivating the shortcut.</v
     <value>Maximum recent items</value>
   </data>
   <data name="Settings_GeneralPage_RecentCommandsDisplayLimit_SettingsCard.Description" xml:space="preserve">
-    <value>Choose how many recently used commands and launched apps, from 1 through 10, can appear on Home and the quick access shelf.</value>
+    <value>Choose how many recently used commands and launched apps, from 1 through 10, can appear on Home. The quick access shelf shows at most five.</value>
   </data>
   <data name="Settings_GeneralPage_ClearRecentCommands_SettingsCard.Header" xml:space="preserve">
     <value>Recent history</value>
