@@ -13,18 +13,25 @@
 extern HINSTANCE g_hInst;
 extern long g_cDllRef;
 
-PreviewHandler::PreviewHandler(std::string name, std::wstring logFilePath, const wchar_t* resizeEvent, std::wstring exeName) :
+PreviewHandler::PreviewHandler(std::string, std::wstring, const wchar_t* resizeEvent, std::wstring exeName) :
     m_cRef(1), m_hwndParent(NULL), m_rcParent(), m_punkSite(NULL), m_process(NULL), m_exeName(exeName)
 {
     m_resizeEvent = CreateEvent(nullptr, false, false, resizeEvent);
-
-    Logger::init(name, logFilePath, PTSettingsHelper::get_log_settings_file_location());
 
     InterlockedIncrement(&g_cDllRef);
 }
 
 PreviewHandler::~PreviewHandler()
 {
+    Unload();
+    if (m_resizeEvent)
+    {
+        CloseHandle(m_resizeEvent);
+    }
+    if (m_punkSite)
+    {
+        m_punkSite->Release();
+    }
     InterlockedDecrement(&g_cDllRef);
 }
 
@@ -133,7 +140,7 @@ IFACEMETHODIMP PreviewHandler::SetRect(const RECT* prc)
         }
         if (!m_resizeEvent)
         {
-            Logger::error(L"Failed to create resize event for BgcodePreviewHandler");
+            Logger::error(L"Failed to create resize event for {}", m_exeName);
         }
         else
         {
@@ -141,7 +148,7 @@ IFACEMETHODIMP PreviewHandler::SetRect(const RECT* prc)
             {
                 if (!SetEvent(m_resizeEvent))
                 {
-                    Logger::error(L"Failed to signal resize event for BgcodePreviewHandler");
+                    Logger::error(L"Failed to signal resize event for {}", m_exeName);
                 }
             }
         }
@@ -190,6 +197,7 @@ IFACEMETHODIMP PreviewHandler::DoPreview()
         if (m_process)
         {
             TerminateProcess(m_process, 0);
+            CloseHandle(m_process);
         }
 
         m_process = sei.hProcess;
@@ -208,7 +216,12 @@ IFACEMETHODIMP PreviewHandler::Unload()
     Logger::info(L"Unload and terminate .exe");
 
     m_hwndParent = NULL;
-    TerminateProcess(m_process, 0);
+    if (m_process)
+    {
+        TerminateProcess(m_process, 0);
+        CloseHandle(m_process);
+        m_process = NULL;
+    }
     return S_OK;
 }
 
