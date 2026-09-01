@@ -125,7 +125,7 @@
                                         Visibility="{TemplateBinding TextVisibility}">
                                         <TextBlock
                                             x:Name="TitleText"
-                                            MinWidth="24"
+                                            MinWidth="40"
                                             MaxWidth="100"
                                             HorizontalAlignment="Stretch"
                                             VerticalAlignment="Center"
