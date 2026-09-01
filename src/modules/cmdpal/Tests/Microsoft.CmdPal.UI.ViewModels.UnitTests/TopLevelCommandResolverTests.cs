@@ -99,7 +99,7 @@ public class TopLevelCommandResolverTests
 
         CollectionAssert.AreEqual(new[] { commands[0], commands[1] }, sections.Pinned.ToArray());
         CollectionAssert.AreEqual(new[] { commands[3] }, sections.Recent.ToArray());
-        Assert.AreEqual(0, sections.Regular.Count);
+        CollectionAssert.AreEqual(new[] { commands[2] }, sections.Regular.ToArray());
     }
 
     [TestMethod]
