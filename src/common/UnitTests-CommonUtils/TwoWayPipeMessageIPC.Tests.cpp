@@ -1241,12 +1241,25 @@ namespace UnitTestsCommonUtils
 
             wchar_t message[32]{};
             DWORD bytes_read = 0;
-            Assert::IsTrue(ReadFile(receiver, message, sizeof(message), &bytes_read, nullptr) == TRUE,
-                           L"failed to read the queued message");
+            HANDLE read_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+            Assert::IsNotNull(read_event);
+            OVERLAPPED read_overlapped{};
+            read_overlapped.hEvent = read_event;
+            const BOOL read = ReadFile(receiver, message, sizeof(message), &bytes_read, &read_overlapped);
+            const DWORD read_error = read ? ERROR_SUCCESS : GetLastError();
+            Assert::IsTrue(read || read_error == ERROR_IO_PENDING, L"failed to begin reading the queued message");
+            if (!read)
+            {
+                Assert::AreEqual(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(read_event, 2'000),
+                                 L"the queued message was not delivered");
+                Assert::IsTrue(GetOverlappedResult(receiver, &read_overlapped, &bytes_read, FALSE) == TRUE,
+                               L"failed to finish reading the queued message");
+            }
             Assert::AreEqual(std::wstring(L"queued message"), std::wstring(message, bytes_read / sizeof(wchar_t)));
 
             sender.end();
             two_way_pipe_message_ipc_test::SetWaitNamedPipeEnteredEvent(nullptr);
+            CloseHandle(read_event);
             CloseHandle(connected_event);
             CloseHandle(receiver);
             CloseHandle(wait_entered);
