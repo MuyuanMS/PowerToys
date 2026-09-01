@@ -122,7 +122,7 @@ namespace winrt::PowerRenameUI::implementation
         HRESULT OnRegExStarted(_In_ DWORD) { return S_OK; }
         HRESULT OnRegExCanceled(_In_ DWORD) { return S_OK; }
         HRESULT OnRegExCompleted(_In_ DWORD threadId);
-        HRESULT OnRenameStarted() { return S_OK; }
+        HRESULT OnRenameStarted();
         HRESULT OnRenameCompleted(bool closeUIWindowAfterRenaming);
 
         enum class UpdateFlagCommand
@@ -170,6 +170,7 @@ namespace winrt::PowerRenameUI::implementation
 
 
         bool m_flagValidationInProgress = false;
+        bool m_postRenamePreviewPending = false;
 
     public:
         void RegExItemClick(winrt::Windows::Foundation::IInspectable const& sender, winrt::Microsoft::UI::Xaml::Controls::ItemClickEventArgs const& e);
@@ -188,4 +189,3 @@ namespace winrt::PowerRenameUI::factory_implementation
     {
     };
 }
-

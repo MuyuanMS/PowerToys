@@ -5,6 +5,7 @@
 #include <ShlGuid.h>
 #include <cstring>
 #include <filesystem>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <algorithm>
@@ -16,6 +17,117 @@ namespace
     const int MAX_INPUT_STRING_LEN = 1024;
 
     const wchar_t c_rootRegPath[] = L"Software\\Microsoft\\PowerRename";
+
+    // Thread-safe, locale-aware case helpers using LCMapStringEx with the user default locale.
+    // These replace CRT ::towupper / ::towlower which read global C locale state (set by setlocale)
+    // and are therefore unsafe when called concurrently from worker threads.
+
+    // Get the user default locale name; falls back to nullptr (system user-default) on failure.
+    LPCWSTR GetUserLocale(wchar_t (&buf)[LOCALE_NAME_MAX_LENGTH])
+    {
+        return (GetUserDefaultLocaleName(buf, LOCALE_NAME_MAX_LENGTH) > 0) ? buf : nullptr;
+    }
+
+    bool MapStringCase(std::wstring_view source, DWORD mapFlags, std::wstring& destination)
+    {
+        destination.clear();
+        if (source.empty())
+        {
+            return true;
+        }
+
+        wchar_t localeName[LOCALE_NAME_MAX_LENGTH];
+        const auto locale = GetUserLocale(localeName);
+        const auto flags = mapFlags | LCMAP_LINGUISTIC_CASING;
+        const auto sourceLength = static_cast<int>(source.size());
+
+        const int requiredLength = LCMapStringEx(locale, flags, source.data(), sourceLength, nullptr, 0, nullptr, nullptr, 0);
+        if (requiredLength <= 0)
+        {
+            return false;
+        }
+
+        destination.resize(static_cast<size_t>(requiredLength));
+        const int writtenLength = LCMapStringEx(locale, flags, source.data(), sourceLength, destination.data(), requiredLength, nullptr, nullptr, 0);
+        if (writtenLength <= 0)
+        {
+            destination.clear();
+            return false;
+        }
+
+        destination.resize(static_cast<size_t>(writtenLength));
+        return true;
+    }
+
+    // Convert a single wide character to uppercase using the user default locale.
+    wchar_t CharToUpper(wchar_t ch)
+    {
+        std::wstring mapped;
+        if (MapStringCase(std::wstring_view(&ch, 1), LCMAP_UPPERCASE, mapped) && !mapped.empty())
+        {
+            return mapped.front();
+        }
+
+        return ch;
+    }
+
+    // Convert a single wide character to lowercase using the user default locale.
+    wchar_t CharToLower(wchar_t ch)
+    {
+        std::wstring mapped;
+        if (MapStringCase(std::wstring_view(&ch, 1), LCMAP_LOWERCASE, mapped) && !mapped.empty())
+        {
+            return mapped.front();
+        }
+
+        return ch;
+    }
+
+    // Convert a wstring to uppercase in-place using the user default locale.
+    void StringToUpper(std::wstring& str)
+    {
+        std::wstring mapped;
+        if (MapStringCase(str, LCMAP_UPPERCASE, mapped))
+        {
+            str = std::move(mapped);
+        }
+    }
+
+    // Convert a wstring to lowercase in-place using the user default locale.
+    void StringToLower(std::wstring& str)
+    {
+        std::wstring mapped;
+        if (MapStringCase(str, LCMAP_LOWERCASE, mapped))
+        {
+            str = std::move(mapped);
+        }
+    }
+
+    HRESULT MapBufferCase(_Inout_updates_z_(cchBuffer) PWSTR buffer, size_t cchBuffer, DWORD mapFlags)
+    {
+        if (!buffer || !*buffer)
+        {
+            return S_OK;
+        }
+
+        std::wstring mapped;
+        if (!MapStringCase(buffer, mapFlags, mapped))
+        {
+            return E_FAIL;
+        }
+
+        return StringCchCopy(buffer, cchBuffer, mapped.c_str());
+    }
+
+    HRESULT PwstrToUpper(_Inout_updates_z_(cchBuffer) PWSTR str, size_t cchBuffer)
+    {
+        return MapBufferCase(str, cchBuffer, LCMAP_UPPERCASE);
+    }
+
+    HRESULT PwstrToLower(_Inout_updates_z_(cchBuffer) PWSTR str, size_t cchBuffer)
+    {
+        return MapBufferCase(str, cchBuffer, LCMAP_LOWERCASE);
+    }
 
     // Helper function: Find the longest matching pattern starting at the given position
     // Returns the matched pattern name, or empty string if no match found
@@ -92,7 +204,6 @@ HRESULT GetTrimmedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR source)
 
 HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR source, DWORD flags, bool isFolder)
 {
-    std::locale::global(std::locale(""));
     HRESULT hr = E_INVALIDARG;
 
     auto contractionOrSingleQuotedWordCheck = [](std::wstring stem, size_t i) {
@@ -108,7 +219,7 @@ HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR sour
                 hr = StringCchCopy(result, cchMax, source);
                 if (SUCCEEDED(hr))
                 {
-                    std::transform(result, result + wcslen(result), result, ::towupper);
+                    hr = PwstrToUpper(result, cchMax);
                 }
             }
             else
@@ -116,7 +227,7 @@ HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR sour
                 if (flags & NameOnly)
                 {
                     std::wstring stem = fs::path(source).stem().wstring();
-                    std::transform(stem.begin(), stem.end(), stem.begin(), ::towupper);
+                    StringToUpper(stem);
                     hr = StringCchPrintf(result, cchMax, L"%s%s", stem.c_str(), fs::path(source).extension().c_str());
                 }
                 else if (flags & ExtensionOnly)
@@ -124,7 +235,7 @@ HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR sour
                     std::wstring extension = fs::path(source).extension().wstring();
                     if (!extension.empty())
                     {
-                        std::transform(extension.begin(), extension.end(), extension.begin(), ::towupper);
+                        StringToUpper(extension);
                         hr = StringCchPrintf(result, cchMax, L"%s%s", fs::path(source).stem().c_str(), extension.c_str());
                     }
                     else
@@ -132,7 +243,7 @@ HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR sour
                         hr = StringCchCopy(result, cchMax, source);
                         if (SUCCEEDED(hr))
                         {
-                            std::transform(result, result + wcslen(result), result, ::towupper);
+                            hr = PwstrToUpper(result, cchMax);
                         }
                     }
                 }
@@ -141,7 +252,7 @@ HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR sour
                     hr = StringCchCopy(result, cchMax, source);
                     if (SUCCEEDED(hr))
                     {
-                        std::transform(result, result + wcslen(result), result, ::towupper);
+                        hr = PwstrToUpper(result, cchMax);
                     }
                 }
             }
@@ -153,7 +264,7 @@ HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR sour
                 hr = StringCchCopy(result, cchMax, source);
                 if (SUCCEEDED(hr))
                 {
-                    std::transform(result, result + wcslen(result), result, ::towlower);
+                    hr = PwstrToLower(result, cchMax);
                 }
             }
             else
@@ -161,7 +272,7 @@ HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR sour
                 if (flags & NameOnly)
                 {
                     std::wstring stem = fs::path(source).stem().wstring();
-                    std::transform(stem.begin(), stem.end(), stem.begin(), ::towlower);
+                    StringToLower(stem);
                     hr = StringCchPrintf(result, cchMax, L"%s%s", stem.c_str(), fs::path(source).extension().c_str());
                 }
                 else if (flags & ExtensionOnly)
@@ -169,7 +280,7 @@ HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR sour
                     std::wstring extension = fs::path(source).extension().wstring();
                     if (!extension.empty())
                     {
-                        std::transform(extension.begin(), extension.end(), extension.begin(), ::towlower);
+                        StringToLower(extension);
                         hr = StringCchPrintf(result, cchMax, L"%s%s", fs::path(source).stem().c_str(), extension.c_str());
                     }
                     else
@@ -177,7 +288,7 @@ HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR sour
                         hr = StringCchCopy(result, cchMax, source);
                         if (SUCCEEDED(hr))
                         {
-                            std::transform(result, result + wcslen(result), result, ::towlower);
+                            hr = PwstrToLower(result, cchMax);
                         }
                     }
                 }
@@ -186,7 +297,7 @@ HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR sour
                     hr = StringCchCopy(result, cchMax, source);
                     if (SUCCEEDED(hr))
                     {
-                        std::transform(result, result + wcslen(result), result, ::towlower);
+                        hr = PwstrToLower(result, cchMax);
                     }
                 }
             }
@@ -222,20 +333,20 @@ HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR sour
                         }
 
                         auto subStr = stem.substr(i, wordLength);
-                        std::transform(subStr.begin(), subStr.end(), subStr.begin(), ::towlower);
+                        StringToLower(subStr);
                         if (isFirstWord || i + wordLength == stemLength || std::find(exceptions.begin(), exceptions.end(), subStr) == exceptions.end())
                         {
-                            stem[i] = towupper(stem[i]);
+                            stem[i] = CharToUpper(stem[i]);
                             isFirstWord = false;
                         }
                         else
                         {
-                            stem[i] = towlower(stem[i]);
+                            stem[i] = CharToLower(stem[i]);
                         }
                     }
                     else
                     {
-                        stem[i] = towlower(stem[i]);
+                        stem[i] = CharToLower(stem[i]);
                     }
                 }
                 hr = StringCchPrintf(result, cchMax, L"%s%s", stem.c_str(), extension.c_str());
@@ -269,12 +380,12 @@ HRESULT GetTransformedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR sour
                         }
                         else
                         {
-                            stem[i] = towupper(stem[i]);
+                            stem[i] = CharToUpper(stem[i]);
                         }
                     }
                     else
                     {
-                        stem[i] = towlower(stem[i]);
+                        stem[i] = CharToLower(stem[i]);
                     }
                 }
                 hr = StringCchPrintf(result, cchMax, L"%s%s", stem.c_str(), extension.c_str());
@@ -343,7 +454,7 @@ bool isMetadataUsed(_In_ PCWSTR source, PowerRenameLib::MetadataType metadataTyp
         std::wstring extension = fs::path(filePath).extension().wstring();
         
         // Convert to lowercase for case-insensitive comparison
-        std::transform(extension.begin(), extension.end(), extension.begin(), ::towlower);
+        StringToLower(extension);
 
         // According to the metadata support table, only these formats support metadata extraction:
         // - JPEG (IFD, Exif, XMP, GPS, IPTC) - supports fast metadata encoding
@@ -392,7 +503,6 @@ bool isMetadataUsed(_In_ PCWSTR source, PowerRenameLib::MetadataType metadataTyp
 
 HRESULT GetDatedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR source, SYSTEMTIME fileTime)
 {
-    std::locale::global(std::locale(""));
     HRESULT hr = E_INVALIDARG;
     if (source && wcslen(source) > 0)
     {
@@ -425,12 +535,12 @@ HRESULT GetDatedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR source, SY
 
         // Months.
         GetDateFormatEx(localeName, NULL, &fileTime, L"MMMM", formattedDate, MAX_PATH, NULL);
-        formattedDate[0] = towupper(formattedDate[0]);
+        formattedDate[0] = CharToUpper(formattedDate[0]);
         StringCchPrintf(replaceTerm, MAX_PATH, TEXT("%s%s"), L"$01", formattedDate);
         res = regex_replace(res, std::wregex(L"(([^\\$]|^)(\\$\\$)*)\\$MMMM"), replaceTerm);
 
         GetDateFormatEx(localeName, NULL, &fileTime, L"MMM", formattedDate, MAX_PATH, NULL);
-        formattedDate[0] = towupper(formattedDate[0]);
+        formattedDate[0] = CharToUpper(formattedDate[0]);
         StringCchPrintf(replaceTerm, MAX_PATH, TEXT("%s%s"), L"$01", formattedDate);
         res = regex_replace(res, std::wregex(L"(([^\\$]|^)(\\$\\$)*)\\$MMM"), replaceTerm);
 
@@ -442,12 +552,12 @@ HRESULT GetDatedFileName(_Out_ PWSTR result, UINT cchMax, _In_ PCWSTR source, SY
 
         // Days.
         GetDateFormatEx(localeName, NULL, &fileTime, L"dddd", formattedDate, MAX_PATH, NULL);
-        formattedDate[0] = towupper(formattedDate[0]);
+        formattedDate[0] = CharToUpper(formattedDate[0]);
         StringCchPrintf(replaceTerm, MAX_PATH, TEXT("%s%s"), L"$01", formattedDate);
         res = regex_replace(res, std::wregex(L"(([^\\$]|^)(\\$\\$)*)\\$DDDD"), replaceTerm);
 
         GetDateFormatEx(localeName, NULL, &fileTime, L"ddd", formattedDate, MAX_PATH, NULL);
-        formattedDate[0] = towupper(formattedDate[0]);
+        formattedDate[0] = CharToUpper(formattedDate[0]);
         StringCchPrintf(replaceTerm, MAX_PATH, TEXT("%s%s"), L"$01", formattedDate);
         res = regex_replace(res, std::wregex(L"(([^\\$]|^)(\\$\\$)*)\\$DDD"), replaceTerm);
 
