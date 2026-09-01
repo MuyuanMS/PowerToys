@@ -4,7 +4,9 @@
 
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using ManagedCommon;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -58,6 +60,9 @@ namespace Peek.UI
 
             InitializeComponent();
             Logger.InitializeLogger("\\Peek\\Logs");
+
+            AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+            TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
 
             Host = Microsoft.Extensions.Hosting.Host
                 .CreateDefaultBuilder()
@@ -144,7 +149,33 @@ namespace Peek.UI
 
         private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
         {
+            Logger.LogError("Unhandled UI exception", e.Exception);
             PowerToysTelemetry.Log.WriteEvent(new ErrorEvent() { HResult = (Common.Models.HResult)e.Exception.HResult, Failure = ErrorEvent.FailureType.AppCrash });
+
+            // Only suppress CoreMessaging/COM exceptions to prevent the crash dialog for known transient issues.
+            // Let other unexpected exceptions propagate to avoid masking corrupted application state.
+            if (e.Exception is COMException)
+            {
+                e.Handled = true;
+            }
+        }
+
+        private static void CurrentDomain_UnhandledException(object sender, System.UnhandledExceptionEventArgs e)
+        {
+            if (e.ExceptionObject is Exception ex)
+            {
+                Logger.LogError("AppDomain unhandled exception", ex);
+            }
+            else
+            {
+                Logger.LogError("AppDomain unhandled exception: " + (e.ExceptionObject?.ToString() ?? "null"));
+            }
+        }
+
+        private static void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+        {
+            Logger.LogError("Unobserved task exception", e.Exception);
+            e.SetObserved();
         }
 
         /// <summary>
