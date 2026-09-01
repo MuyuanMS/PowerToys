@@ -65,6 +65,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Microsoft.CmdPal.Ext.Indexer.UnitTests" />
+    <InternalsVisibleTo Include="Microsoft.CmdPal.Ext.Bookmarks" />
   </ItemGroup>
 
 </Project>

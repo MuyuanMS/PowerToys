@@ -14,7 +14,7 @@ using File = System.IO.File;
 
 namespace Microsoft.CmdPal.Ext.Indexer.Helpers;
 
-public static class DataPackageHelper
+internal static class DataPackageHelper
 {
     public static DataPackage? CreateDataPackageForPath(ICommandItem listItem, string? path)
     {
