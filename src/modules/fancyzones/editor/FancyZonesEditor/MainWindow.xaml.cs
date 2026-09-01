@@ -241,7 +241,10 @@ namespace FancyZonesEditor
             Logger.LogTrace();
 
             var dataContext = ((FrameworkElement)sender).DataContext;
-            EditLayoutDialog.Hide();
+            if (_openedDialog != null && _openedDialog == EditLayoutDialog)
+            {
+                EditLayoutDialog.Hide();
+            }
 
             if (dataContext is not LayoutModel model)
             {
@@ -326,7 +329,11 @@ namespace FancyZonesEditor
         private void DeleteLayout_Click(object sender, RoutedEventArgs e)
         {
             Logger.LogTrace();
-            EditLayoutDialog.Hide();
+            if (_openedDialog != null && _openedDialog == EditLayoutDialog)
+            {
+                EditLayoutDialog.Hide();
+            }
+
             DeleteLayout((FrameworkElement)sender);
         }
 
@@ -355,7 +362,11 @@ namespace FancyZonesEditor
             Logger.LogTrace();
             var dataContext = ((FrameworkElement)sender).DataContext;
             Select((LayoutModel)dataContext);
-            EditLayoutDialog.Hide();
+            if (_openedDialog != null && _openedDialog == EditLayoutDialog)
+            {
+                EditLayoutDialog.Hide();
+            }
+
             Hide();
             App.Overlay.OpenEditor(_settings.SelectedModel);
         }
