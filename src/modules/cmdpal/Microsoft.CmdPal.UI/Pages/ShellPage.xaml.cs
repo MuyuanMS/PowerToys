@@ -1046,6 +1046,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
             QuickAccessShelfPinDropTarget.Visibility = item.CanPin && !QuickAccessShelf.VisibleItems.Any(visibleItem => visibleItem.IsPinned)
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+            UpdateQuickAccessShelfCapacity();
 
             _quickAccessShelfDragStarted = true;
             WeakReferenceMessenger.Default.Send(new DragStartedMessage());
@@ -1246,6 +1247,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         QuickAccessShelfPinDropTarget.BorderThickness = new Thickness(1);
         QuickAccessShelfRemoveDropTarget.Visibility = Visibility.Collapsed;
         QuickAccessShelfRemoveDropTarget.BorderThickness = new Thickness(1);
+        UpdateQuickAccessShelfCapacity();
         _draggedQuickAccessShelfItem = null;
         _quickAccessShelfDragToken = null;
         _quickAccessShelfDropOperation = DataPackageOperation.None;
@@ -1264,12 +1266,19 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
     private void QuickAccessShelfItemsHost_SizeChanged(object sender, SizeChangedEventArgs e)
     {
-        QuickAccessShelf.UpdateVisibleCapacity(e.NewSize.Width, QuickAccessShelfButtonWidth, QuickAccessShelfSpacing);
+        UpdateQuickAccessShelfCapacity();
     }
 
     private void UpdateQuickAccessShelfCapacity()
     {
-        QuickAccessShelf.UpdateVisibleCapacity(QuickAccessShelfItemsHost.ActualWidth, QuickAccessShelfButtonWidth, QuickAccessShelfSpacing);
+        var visibleDropTargetCount =
+            (QuickAccessShelfPinDropTarget.Visibility == Visibility.Visible ? 1 : 0) +
+            (QuickAccessShelfRemoveDropTarget.Visibility == Visibility.Visible ? 1 : 0);
+        var dropTargetWidth = visibleDropTargetCount * (QuickAccessShelfButtonWidth + QuickAccessShelfSpacing);
+        QuickAccessShelf.UpdateVisibleCapacity(
+            Math.Max(0, QuickAccessShelfItemsHost.ActualWidth - dropTargetWidth),
+            QuickAccessShelfButtonWidth,
+            QuickAccessShelfSpacing);
     }
 
     private void QuickAccessOverflowFlyout_Opening(object sender, object e)
