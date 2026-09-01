@@ -16,16 +16,22 @@
 extern HINSTANCE g_hInst;
 extern long g_cDllRef;
 
-ThumbnailProvider::ThumbnailProvider(std::string name, std::wstring logFilePath, std::wstring exeName, std::wstring tempFolderName, std::wstring extension) :
+ThumbnailProvider::ThumbnailProvider(std::string, std::wstring, std::wstring exeName, std::wstring tempFolderName, std::wstring extension) :
     m_cRef(1), m_pStream(NULL), m_process(NULL), m_exeName(exeName), m_tempFolderName(tempFolderName), m_extension(extension)
 {
-    Logger::init(name, logFilePath, PTSettingsHelper::get_log_settings_file_location());
-
     InterlockedIncrement(&g_cDllRef);
 }
 
 ThumbnailProvider::~ThumbnailProvider()
 {
+    if (m_pStream)
+    {
+        m_pStream->Release();
+    }
+    if (m_process)
+    {
+        CloseHandle(m_process);
+    }
     InterlockedDecrement(&g_cDllRef);
 }
 
@@ -147,6 +153,8 @@ IFACEMETHODIMP ThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_ALPH
                 ShellExecuteEx(&sei);
                 m_process = sei.hProcess;
                 WaitForSingleObject(m_process, INFINITE);
+                CloseHandle(m_process);
+                m_process = NULL;
                 std::filesystem::remove(fileName);
 
 
@@ -180,5 +188,4 @@ IFACEMETHODIMP ThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_ALPH
 
     return S_OK;
 }
-
 
