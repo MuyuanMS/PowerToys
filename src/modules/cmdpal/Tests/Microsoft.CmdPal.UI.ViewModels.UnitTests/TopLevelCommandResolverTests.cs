@@ -71,7 +71,7 @@ public class TopLevelCommandResolverTests
     }
 
     [TestMethod]
-    public void Resolve_RecentFirstExcludesRecentItemsFromPinsAndBackfillsPinnedLimit()
+    public void Resolve_RecentPlacementDoesNotChangePinnedOwnership()
     {
         var pins = new[]
         {
@@ -95,11 +95,10 @@ public class TopLevelCommandResolverTests
             static command => command.CommandId,
             static command => command.IsEligible,
             pinnedCommandLimit: 2,
-            recentCommandLimit: 2,
-            recentCommandsFirst: true);
+            recentCommandLimit: 2);
 
-        CollectionAssert.AreEqual(new[] { commands[0], commands[3] }, sections.Recent.ToArray());
-        CollectionAssert.AreEqual(new[] { commands[1], commands[2] }, sections.Pinned.ToArray());
+        CollectionAssert.AreEqual(new[] { commands[0], commands[1] }, sections.Pinned.ToArray());
+        CollectionAssert.AreEqual(new[] { commands[3] }, sections.Recent.ToArray());
         Assert.AreEqual(0, sections.Regular.Count);
     }
 

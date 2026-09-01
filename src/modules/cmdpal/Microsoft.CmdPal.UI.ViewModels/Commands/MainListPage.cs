@@ -538,8 +538,7 @@ public sealed partial class MainListPage : DynamicListPage,
             recentCommandIds,
             allCommands,
             includeApps: _includeApps,
-            recentCommandLimit: _recentCommandsDisplayLimit,
-            recentCommandsFirst: _recentCommandsOnHome == RecentCommandsPlacement.BeforePinned);
+            recentCommandLimit: _recentCommandsDisplayLimit);
 
         var recent = sections.Recent
             .Select(item => (IListItem)RecentCommandListItem.CreateOrReuse(

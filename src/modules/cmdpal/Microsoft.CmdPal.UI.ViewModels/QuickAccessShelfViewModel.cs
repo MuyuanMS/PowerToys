@@ -191,8 +191,7 @@ public sealed partial class QuickAccessShelfViewModel : ObservableObject, IDispo
             includeApps: includeRecentCommands && _topLevelCommandManager.IsProviderActive(AllAppsCommandProvider.WellKnownId),
             pinnedCommandLimit: configuration.PinnedCommandLimit,
             recentCommandLimit: configuration.RecentCommandLimit,
-            includeRegular: false,
-            recentCommandsFirst: configuration.RecentCommandsPlacement == RecentCommandsPlacement.BeforePinned);
+            includeRegular: false);
 
         var resolvedItems = QuickAccessShelfResolver.ComposeSections(
             sections.Pinned,

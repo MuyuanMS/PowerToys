@@ -67,7 +67,7 @@ public partial class QuickAccessShelfResolverTests
     }
 
     [TestMethod]
-    public void ComposeSections_RecentFirstAssignsRowShortcuts()
+    public void ComposeSections_RecentFirstKeepsPinnedShortcutsStable()
     {
         var result = QuickAccessShelfResolver.ComposeSections(
             ["pinned-1", "pinned-2"],
@@ -75,7 +75,7 @@ public partial class QuickAccessShelfResolverTests
             RecentCommandsPlacement.BeforePinned);
 
         string[] expectedItems = ["recent-1", "recent-2", "pinned-1", "pinned-2"];
-        int[] expectedShortcutIndexes = [0, 1, 2, 3];
+        int[] expectedShortcutIndexes = [2, 3, 0, 1];
         bool[] expectedSectionStarts = [false, false, true, false];
         bool[] expectedPinnedState = [false, false, true, true];
         CollectionAssert.AreEqual(expectedItems, result.Select(item => item.Item).ToArray());
