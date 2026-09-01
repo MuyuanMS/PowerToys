@@ -695,6 +695,7 @@ internal static class PowerAccentTestHelper
             File.WriteAllText(filePath, string.Empty);
             var fileName = Path.GetFileName(filePath);
             var baseFileName = Path.GetFileNameWithoutExtension(filePath);
+            var launchedProcessIds = new List<int>();
 
             try
             {
@@ -709,6 +710,7 @@ internal static class PowerAccentTestHelper
                         UseShellExecute = true,
                     });
                     Assert.IsNotNull(launcher, "Could not start the Notepad fixture.");
+                    launchedProcessIds.Add(launcher.Id);
 
                     window = WindowsFinder.WaitForWindowByApp(
                         "notepad",
@@ -716,6 +718,10 @@ internal static class PowerAccentTestHelper
                             candidate.Title.Contains(fileName, StringComparison.OrdinalIgnoreCase) ||
                             candidate.Title.Contains(baseFileName, StringComparison.OrdinalIgnoreCase),
                         timeoutMS: 15_000);
+                    if (window is null)
+                    {
+                        TryTerminateProcess(launcher.Id);
+                    }
                 }
 
                 Assert.IsNotNull(window, $"Notepad did not open the fixture document '{fileName}'.");
@@ -723,6 +729,11 @@ internal static class PowerAccentTestHelper
             }
             catch
             {
+                foreach (var processId in launchedProcessIds)
+                {
+                    TryTerminateProcess(processId);
+                }
+
                 File.Delete(filePath);
                 throw;
             }
@@ -838,6 +849,22 @@ internal static class PowerAccentTestHelper
             }
 
             Thread.Sleep(50);
+        }
+
+        private static void TryTerminateProcess(int processId)
+        {
+            try
+            {
+                using var process = Process.GetProcessById(processId);
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit(5_000);
+            }
+            catch (ArgumentException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+            }
         }
     }
 

@@ -163,6 +163,21 @@ public sealed class PowerAccentEndToEndTests : UITestBase
         using var clipboard = PreserveClipboardText();
         using var notepad = NotepadFixture.Start(this);
 
+        if (activation == ActivationKey.LeftRightArrow)
+        {
+            Assert.AreEqual(
+                "a ",
+                RunSuppressedGesture(this, notepad, Key.A, Key.Space),
+                "Arrow-only activation should not consume Space or reveal the Quick Accent toolbar.");
+        }
+        else if (activation == ActivationKey.Space)
+        {
+            Assert.AreEqual(
+                "a",
+                RunSuppressedGesture(this, notepad, Key.A, Key.Right),
+                "Space-only activation should not consume an arrow or reveal the Quick Accent toolbar.");
+        }
+
         string result;
         if (activation == ActivationKey.PressAndHold)
         {
