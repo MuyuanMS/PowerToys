@@ -932,6 +932,7 @@ lcid
 LCIDTo
 lcl
 Lclean
+lctrl
 Ldone
 Ldr
 LEFTALIGN
@@ -1040,7 +1041,6 @@ manifestdependency
 MAPPEDTOSAMEKEY
 MAPTOSAMESHORTCUT
 MAPVK
-MARKDOWNPREVIEWHANDLERCPP
 maximizebox
 MAXSHORTCUTSIZE
 maxversiontested
@@ -1535,6 +1535,7 @@ RAWPATH
 rbhid
 Rbuttondown
 rclsid
+rctrl
 RCW
 RCZOOMIT
 rdp
