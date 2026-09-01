@@ -59,9 +59,21 @@ public record SettingsModel
 
     public bool ShowQuickAccessShelf { get; init; }
 
-    public RecentCommandsPlacement RecentCommandsOnQuickAccessShelf { get; init; }
+    private RecentCommandsPlacement _recentCommandsOnQuickAccessShelf;
 
-    public RecentCommandsPlacement RecentCommandsOnHome { get; init; }
+    public RecentCommandsPlacement RecentCommandsOnQuickAccessShelf
+    {
+        get => _recentCommandsOnQuickAccessShelf;
+        init => _recentCommandsOnQuickAccessShelf = NormalizeRecentCommandsPlacement(value);
+    }
+
+    private RecentCommandsPlacement _recentCommandsOnHome;
+
+    public RecentCommandsPlacement RecentCommandsOnHome
+    {
+        get => _recentCommandsOnHome;
+        init => _recentCommandsOnHome = NormalizeRecentCommandsPlacement(value);
+    }
 
     private int _quickAccessShelfPinnedCommandLimit = DefaultQuickAccessShelfPinnedCommandLimit;
 
@@ -225,6 +237,11 @@ public record SettingsModel
     public SettingsModel()
     {
     }
+
+    private static RecentCommandsPlacement NormalizeRecentCommandsPlacement(RecentCommandsPlacement value) =>
+        value is RecentCommandsPlacement.BeforePinned or RecentCommandsPlacement.AfterPinned
+            ? value
+            : RecentCommandsPlacement.Hidden;
 
     public (SettingsModel Model, ProviderSettings Settings) GetProviderSettings(CommandProviderWrapper provider)
     {
