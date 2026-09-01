@@ -232,7 +232,7 @@ public sealed class PowerAccentEndToEndTests : UITestBase
                 Assert.AreEqual("$", GetSelectedCharacter(toolbar, CurrencySCharacters));
                 CollectionAssert.AreEqual(
                     CurrencySCharacters,
-                    GetCharactersInVisualOrder(toolbar, CurrencySCharacters).ToArray(),
+                    GetAllCharactersInVisualOrder(toolbar).ToArray(),
                     "Currency should expose only the configured S mappings in source order.");
             });
         Assert.AreEqual("$", result, "Currency should commit the first S currency character.");

@@ -5,6 +5,7 @@
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.PowerToys.UITest.Next;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -445,6 +446,20 @@ internal static class PowerAccentTestHelper
             .ToList();
     }
 
+    internal static IReadOnlyList<string> GetAllCharactersInVisualOrder(Session toolbar)
+    {
+        var characterList = FindInspectElementByProperty(toolbar.Inspect(depth: 8, hideOffscreen: true), "QuickAccentCharacterList")
+            ?? throw new AssertFailedException("Quick Accent character list was not found in the UIA tree.");
+        var items = new List<(string Character, int X)>();
+        CollectListItems(characterList, items);
+        Assert.AreNotEqual(0, items.Count, "Quick Accent character list did not expose any list items.");
+
+        return items
+            .OrderBy(item => item.X)
+            .Select(item => item.Character)
+            .ToList();
+    }
+
     internal static void AssertToolbarPlacement(
         UITestBase testBase,
         Session toolbar,
@@ -667,6 +682,84 @@ internal static class PowerAccentTestHelper
             .FirstOrDefault(element =>
                 element.ControlType.Equals("ListItem", StringComparison.OrdinalIgnoreCase) ||
                 element.ClassName.Equals("ListViewItem", StringComparison.OrdinalIgnoreCase));
+
+    private static JsonElement? FindInspectElementByProperty(JsonElement element, string value)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (property.Value.ValueKind == JsonValueKind.String &&
+                    string.Equals(property.Value.GetString(), value, StringComparison.Ordinal))
+                {
+                    return element;
+                }
+
+                if (property.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
+                {
+                    var match = FindInspectElementByProperty(property.Value, value);
+                    if (match is not null)
+                    {
+                        return match;
+                    }
+                }
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var child in element.EnumerateArray())
+            {
+                var match = FindInspectElementByProperty(child, value);
+                if (match is not null)
+                {
+                    return match;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static void CollectListItems(JsonElement element, List<(string Character, int X)> items)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            var type = ReadStringProperty(element, "type");
+            var className = ReadStringProperty(element, "className");
+            var name = ReadStringProperty(element, "name");
+            if (!string.IsNullOrEmpty(name) &&
+                (string.Equals(type, "ListItem", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(className, "ListViewItem", StringComparison.OrdinalIgnoreCase)))
+            {
+                items.Add((name, ReadIntProperty(element, "x")));
+            }
+
+            foreach (var property in element.EnumerateObject())
+            {
+                if (property.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
+                {
+                    CollectListItems(property.Value, items);
+                }
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var child in element.EnumerateArray())
+            {
+                CollectListItems(child, items);
+            }
+        }
+    }
+
+    private static string ReadStringProperty(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
+            ? property.GetString() ?? string.Empty
+            : string.Empty;
+
+    private static int ReadIntProperty(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.Number
+            ? property.GetInt32()
+            : 0;
 
     private static string FormatObservation(OverlayObservation? observation) =>
         observation is null
