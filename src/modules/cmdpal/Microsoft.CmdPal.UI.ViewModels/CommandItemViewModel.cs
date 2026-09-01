@@ -11,6 +11,7 @@ using Microsoft.CmdPal.UI.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage.Streams;
 
 namespace Microsoft.CmdPal.UI.ViewModels;
 
@@ -122,7 +123,7 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
     public DataPackageView? DataPackage { get; private set; }
 
-    public IReadOnlyList<IContextItemViewModel> AllCommands => _snapshot.AllCommands;
+    public Task<IReadOnlyDictionary<string, RandomAccessStreamReference>?>? DataPackageResourceMapTask { get; private set; }`r`n`r`n    public IReadOnlyList<IContextItemViewModel> AllCommands => _snapshot.AllCommands
 
     private static readonly IconInfoViewModel _errorIcon;
 
@@ -530,6 +531,7 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
             dataPackageView is DataPackageView view
                 ? view
                 : null;
+        DataPackageResourceMapTask = DataPackage is null ? null : DataPackageTransfer.PrepareResourceMapAsync(DataPackage);
         UpdateProperty(nameof(DataPackage));
     }
 

@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CommandPalette.Extensions.Toolkit;
@@ -110,6 +111,21 @@ public partial class QuickAccessShelfResolverTests
         var destinationResourceMap = await destination.GetView().GetResourceMapAsync();
         Assert.AreEqual(1, destinationResourceMap.Count);
         Assert.AreSame(resource, destinationResourceMap["image.png"]);
+    }
+
+    [TestMethod]
+    public async Task DataPackageTransfer_TryCopyRequiresPreparedResourceMap()
+    {
+        var source = new DataPackage();
+        source.ResourceMap["image.png"] = RandomAccessStreamReference.CreateFromUri(new Uri("https://example.com/image.png"));
+        var pendingResourceMap = new TaskCompletionSource<IReadOnlyDictionary<string, RandomAccessStreamReference>?>();
+
+        Assert.IsFalse(DataPackageTransfer.TryCopy(source.GetView(), new DataPackage(), pendingResourceMap.Task));
+
+        var preparedResourceMap = await DataPackageTransfer.PrepareResourceMapAsync(source.GetView());
+        var destination = new DataPackage();
+        Assert.IsTrue(DataPackageTransfer.TryCopy(source.GetView(), destination, Task.FromResult(preparedResourceMap)));
+        Assert.AreEqual(1, (await destination.GetView().GetResourceMapAsync()).Count);
     }
 
     [TestMethod]
