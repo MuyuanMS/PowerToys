@@ -135,7 +135,7 @@ namespace auto_hide_cursor
                 xorMask.data());
         }
 
-        inline static constexpr std::array<DWORD, 13> systemCursorIds = {
+        inline static constexpr std::array<DWORD, 14> systemCursorIds = {
             32512, // OCR_NORMAL
             32513, // OCR_IBEAM
             32514, // OCR_WAIT
@@ -149,6 +149,7 @@ namespace auto_hide_cursor
             32648, // OCR_NO
             32649, // OCR_HAND
             32650, // OCR_APPSTARTING
+            32651, // OCR_HELP
         };
 
         bool m_hidden = false;

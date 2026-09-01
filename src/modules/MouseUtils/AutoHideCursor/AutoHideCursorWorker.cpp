@@ -125,7 +125,7 @@ namespace
                     running = false;
                 }
 
-                if (running && waitResult == WAIT_TIMEOUT)
+                if (running)
                 {
                     QueueAction(m_state.OnTimer(GetTickCount64(), GetCursorPosition()));
                     ProcessMessages();
