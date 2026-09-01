@@ -1200,6 +1200,71 @@ namespace UnitTestsCommonUtils
                            L"end waited too long for an unavailable output pipe");
         }
 
+        TEST_METHOD(SendWaitsForOutputPipeCreation)
+        {
+            FaultInjectionReset reset;
+            const std::wstring output_pipe_name = UniquePipeName();
+
+            HANDLE wait_entered = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+            Assert::IsNotNull(wait_entered);
+            two_way_pipe_message_ipc_test::SetWaitNamedPipeEnteredEvent(wait_entered);
+
+            TwoWayPipeMessageIPC sender(UniquePipeName(), output_pipe_name, nullptr);
+            sender.start(nullptr);
+            sender.send(L"queued message");
+            Assert::AreEqual(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(wait_entered, 2'000),
+                             L"the output worker did not observe the missing peer pipe");
+
+            HANDLE receiver = CreateNamedPipeW(output_pipe_name.c_str(),
+                                               PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE | FILE_FLAG_OVERLAPPED,
+                                               PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
+                                               1,
+                                               4096,
+                                               4096,
+                                               0,
+                                               nullptr);
+            Assert::IsTrue(receiver != INVALID_HANDLE_VALUE, L"failed to create the delayed peer pipe");
+
+            HANDLE connected_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+            Assert::IsNotNull(connected_event);
+            OVERLAPPED overlapped{};
+            overlapped.hEvent = connected_event;
+            const BOOL connected = ConnectNamedPipe(receiver, &overlapped);
+            const DWORD connect_error = connected ? ERROR_SUCCESS : GetLastError();
+            Assert::IsTrue(connected || connect_error == ERROR_IO_PENDING || connect_error == ERROR_PIPE_CONNECTED,
+                           L"failed to begin connecting the delayed peer pipe");
+            if (!connected && connect_error == ERROR_IO_PENDING)
+            {
+                Assert::AreEqual(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(connected_event, 2'000),
+                                 L"the sender did not connect after the peer pipe was created");
+            }
+
+            wchar_t message[32]{};
+            DWORD bytes_read = 0;
+            HANDLE read_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+            Assert::IsNotNull(read_event);
+            OVERLAPPED read_overlapped{};
+            read_overlapped.hEvent = read_event;
+            const BOOL read = ReadFile(receiver, message, sizeof(message), &bytes_read, &read_overlapped);
+            const DWORD read_error = read ? ERROR_SUCCESS : GetLastError();
+            Assert::IsTrue(read || read_error == ERROR_IO_PENDING, L"failed to begin reading the queued message");
+            if (!read)
+            {
+                Assert::AreEqual(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(read_event, 2'000),
+                                 L"the queued message was not delivered");
+                Assert::IsTrue(GetOverlappedResult(receiver, &read_overlapped, &bytes_read, FALSE) == TRUE,
+                               L"failed to finish reading the queued message");
+            }
+            Assert::AreEqual(std::wstring(L"queued message"), std::wstring(message, bytes_read / sizeof(wchar_t)));
+
+            sender.end();
+            two_way_pipe_message_ipc_test::SetWaitNamedPipeEnteredEvent(nullptr);
+            CloseHandle(read_event);
+            CloseHandle(connected_event);
+            CloseHandle(receiver);
+            CloseHandle(wait_entered);
+        }
+
         TEST_METHOD(DestructorCancelsPendingOutputWrite)
         {
             FaultInjectionReset reset;
