@@ -137,7 +137,7 @@ namespace auto_hide_cursor
 
         inline static constexpr std::array<DWORD, 16> systemCursorIds = {
             32512, // OCR_NORMAL
-            32513, // OCR_IBEAM
+            32513, // Text select
             32514, // OCR_WAIT
             32515, // OCR_CROSS
             32516, // OCR_UP
@@ -148,7 +148,7 @@ namespace auto_hide_cursor
             32646, // OCR_SIZEALL
             32648, // OCR_NO
             32649, // OCR_HAND
-            32650, // OCR_APPSTARTING
+            32650, // Working in background
             32651, // OCR_HELP
             32671, // OCR_PIN
             32672, // OCR_PERSON
