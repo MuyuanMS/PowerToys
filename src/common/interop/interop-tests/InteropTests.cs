@@ -72,6 +72,37 @@ namespace Microsoft.Interop.Tests
             }
         }
 
+        [TestMethod]
+        public void TestSendBeforePeerStarts()
+        {
+            var testString = "This message was queued before the peer started";
+            using (var reset = new AutoResetEvent(false))
+            {
+                ClientPipe.Start();
+                ClientPipe.Send(testString);
+
+                // Let the sender observe that the peer pipe does not exist yet.
+                Thread.Sleep(500);
+
+                using (var serverPipe = new TwoWayPipeMessageIPCManaged(
+                    ServerSidePipe,
+                    ClientSidePipe,
+                    (string msg) =>
+                    {
+                        Assert.AreEqual(testString, msg);
+                        reset.Set();
+                    }))
+                {
+                    serverPipe.Start();
+
+                    var timeoutMessage = $"Queued pipe message was not delivered within {MessageWaitTimeout.TotalSeconds}s. Server='{ServerSidePipe}' Client='{ClientSidePipe}'.";
+                    Assert.IsTrue(reset.WaitOne(MessageWaitTimeout), timeoutMessage);
+
+                    serverPipe.End();
+                }
+            }
+        }
+
         protected virtual void Dispose(bool disposing)
         {
             if (!disposedValue)

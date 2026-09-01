@@ -383,9 +383,17 @@ void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::send_pipe_message(std::wstr
         if (output_pipe.valid())
             break;
 
-        // Exit if an error other than ERROR_PIPE_BUSY occurs.
+        // The server may not have created its pipe yet during a child-process cold start.
+        // Keep the queued message until the server appears instead of dropping it.
         DWORD curr_error = 0;
-        if ((curr_error = GetLastError()) != ERROR_PIPE_BUSY)
+        curr_error = GetLastError();
+        if (curr_error == ERROR_FILE_NOT_FOUND)
+        {
+            Sleep(PipeWaitIntervalMs);
+            continue;
+        }
+
+        if (curr_error != ERROR_PIPE_BUSY)
         {
             return;
         }
