@@ -1713,7 +1713,7 @@ public sealed partial class MainWindow : WindowEx,
 
             // Suppress the system chime for the shelf's Alt+0 through Alt+9 access keys,
             // while preserving the normal handling of other window mnemonics.
-            case PInvoke.WM_MENUCHAR when wParam.Value is >= (nuint)'0' and <= (nuint)'9':
+            case PInvoke.WM_MENUCHAR when (wParam.Value & 0xFFFF) is >= (nuint)'0' and <= (nuint)'9':
                 return (LRESULT)(1 << 16); // MAKELRESULT(0, MNC_CLOSE)
 
             // When restoring a saved position across monitors with different DPIs,
