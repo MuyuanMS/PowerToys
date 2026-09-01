@@ -363,7 +363,7 @@ namespace PowerDisplay
         {
             if (!_disposed)
             {
-                _ipc?.End();
+                _ipc?.Dispose();
                 _ipc = null;
                 _disposed = true;
                 GC.SuppressFinalize(this);
