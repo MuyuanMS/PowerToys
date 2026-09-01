@@ -378,7 +378,7 @@
     </policy>
     <policy name="ConfigureEnabledUtilityAutoHideCursor" class="Both" displayName="$(string.ConfigureEnabledUtilityAutoHideCursor)" explainText="$(string.ConfigureEnabledUtilityDescription)" key="Software\Policies\PowerToys" valueName="ConfigureEnabledUtilityAutoHideCursor">
       <parentCategory ref="PowerToys" />
-      <supportedOn ref="SUPPORTED_POWERTOYS_0_97_0" />
+      <supportedOn ref="SUPPORTED_POWERTOYS_0_101_0" />
       <enabledValue>
         <decimal value="1" />
       </enabledValue>
