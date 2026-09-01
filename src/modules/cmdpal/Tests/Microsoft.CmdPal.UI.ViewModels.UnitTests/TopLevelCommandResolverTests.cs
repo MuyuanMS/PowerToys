@@ -41,7 +41,7 @@ public class TopLevelCommandResolverTests
     }
 
     [TestMethod]
-    public void Resolve_PinnedLimitCountsResolvedPinsAndLetsDroppedPinsAppearInRecent()
+    public void Resolve_PinnedLimitCountsResolvedPinsAndKeepsDroppedPinsReserved()
     {
         var pins = new[]
         {
@@ -66,7 +66,7 @@ public class TopLevelCommandResolverTests
             recentCommandLimit: 2);
 
         CollectionAssert.AreEqual(new[] { commands[0] }, sections.Pinned.ToArray());
-        CollectionAssert.AreEqual(new[] { commands[1] }, sections.Recent.ToArray());
+        Assert.AreEqual(0, sections.Recent.Count);
         Assert.AreEqual(0, sections.Regular.Count);
     }
 
@@ -99,7 +99,7 @@ public class TopLevelCommandResolverTests
 
         CollectionAssert.AreEqual(new[] { commands[0], commands[1] }, sections.Pinned.ToArray());
         CollectionAssert.AreEqual(new[] { commands[3] }, sections.Recent.ToArray());
-        CollectionAssert.AreEqual(new[] { commands[2] }, sections.Regular.ToArray());
+        Assert.AreEqual(0, sections.Regular.Count);
     }
 
     [TestMethod]

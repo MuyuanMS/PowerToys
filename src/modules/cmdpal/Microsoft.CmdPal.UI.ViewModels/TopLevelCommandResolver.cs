@@ -100,15 +100,14 @@ internal static class TopLevelCommandResolver
             var effectivePinnedCommandLimit = Math.Max(0, pinnedCommandLimit);
             foreach (var pinnedCommand in pinnedCommands)
             {
-                if (pinned.Count >= effectivePinnedCommandLimit)
-                {
-                    break;
-                }
-
                 var key = (pinnedCommand.ProviderId, pinnedCommand.CommandId);
                 if (commandsByProviderAndId.TryGetValue(key, out var command) && featuredCommandKeys.Add(key))
                 {
-                    pinned.Add(command);
+                    if (pinned.Count < effectivePinnedCommandLimit)
+                    {
+                        pinned.Add(command);
+                    }
+
                     if (!string.IsNullOrEmpty(pinnedCommand.CommandId))
                     {
                         featuredCommandIds.Add(pinnedCommand.CommandId);
