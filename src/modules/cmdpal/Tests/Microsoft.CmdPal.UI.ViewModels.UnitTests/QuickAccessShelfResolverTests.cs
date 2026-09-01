@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage.Streams;
 
 namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
 
@@ -88,12 +89,27 @@ public partial class QuickAccessShelfResolverTests
         var shelfItem = QuickAccessShelfItem.CreateOrReuse([], item, shortcutIndex: 0, startsNewSection: false);
         var destination = new DataPackage();
 
-        DataPackageTransfer.Copy(shelfItem.DataPackage!, destination);
+        await DataPackageTransfer.CopyAsync(shelfItem.DataPackage!, destination);
 
         var destinationView = destination.GetView();
         Assert.AreEqual(DataPackageOperation.Link, destinationView.RequestedOperation);
         Assert.AreEqual("TestValue", destinationView.Properties["TestProperty"]);
         Assert.AreEqual("Test payload", await destinationView.GetTextAsync().AsTask());
+    }
+
+    [TestMethod]
+    public async Task ShelfItemDataPackage_PreservesResourceMap()
+    {
+        var source = new DataPackage();
+        var resource = RandomAccessStreamReference.CreateFromUri(new Uri("https://example.com/image.png"));
+        source.ResourceMap["image.png"] = resource;
+        var destination = new DataPackage();
+
+        await DataPackageTransfer.CopyAsync(source.GetView(), destination);
+
+        var destinationResourceMap = await destination.GetView().GetResourceMapAsync();
+        Assert.AreEqual(1, destinationResourceMap.Count);
+        Assert.AreSame(resource, destinationResourceMap["image.png"]);
     }
 
     [TestMethod]
