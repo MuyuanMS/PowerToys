@@ -133,7 +133,10 @@ internal sealed partial class CommandPaletteContextMenuFactory : IContextMenuFac
                 moreCommands.Add(new Separator());
             }
 
-            moreCommands.Add(new CommandContextItem(new RemoveFromRecentCommand(recentCommandItem.CommandId, _appStateService))
+            moreCommands.Add(new CommandContextItem(new RemoveFromRecentCommand(
+                recentCommandItem.ProviderId,
+                recentCommandItem.CommandId,
+                _appStateService))
             {
                 IsCritical = true,
             });
@@ -354,14 +357,16 @@ internal sealed partial class CommandPaletteContextMenuFactory : IContextMenuFac
     private sealed partial class RemoveFromRecentCommand : InvokableCommand
     {
         private readonly string _commandId;
+        private readonly string _providerId;
         private readonly IAppStateService _appStateService;
 
         public override IconInfo Icon => Icons.DeleteIcon;
 
         public override string Name => RS_.GetString("recent_commands_remove_name");
 
-        public RemoveFromRecentCommand(string commandId, IAppStateService appStateService)
+        public RemoveFromRecentCommand(string providerId, string commandId, IAppStateService appStateService)
         {
+            _providerId = providerId;
             _commandId = commandId;
             _appStateService = appStateService;
         }
@@ -369,14 +374,14 @@ internal sealed partial class CommandPaletteContextMenuFactory : IContextMenuFac
         public override CommandResult Invoke()
         {
             var current = _appStateService.State.RecentCommands;
-            if (ReferenceEquals(current, current.WithoutHistoryItem(_commandId)))
+            if (ReferenceEquals(current, current.WithoutHistoryItem(_providerId, _commandId)))
             {
                 return CommandResult.KeepOpen();
             }
 
             _appStateService.UpdateState(state => state with
             {
-                RecentCommands = state.RecentCommands.WithoutHistoryItem(_commandId),
+                RecentCommands = state.RecentCommands.WithoutHistoryItem(_providerId, _commandId),
             });
             return CommandResult.KeepOpen();
         }

@@ -12,6 +12,15 @@ namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
 public partial class QuickAccessShelfResolverTests
 {
     [DataTestMethod]
+    [DataRow(1, 1)]
+    [DataRow(5, 5)]
+    [DataRow(10, 5)]
+    public void NormalizeRecentCommandLimit_CapsShelfAtFive(int limit, int expected)
+    {
+        Assert.AreEqual(expected, QuickAccessShelfResolver.NormalizeRecentCommandLimit(limit));
+    }
+
+    [DataTestMethod]
     [DataRow(0, "1")]
     [DataRow(8, "9")]
     [DataRow(9, "")]
