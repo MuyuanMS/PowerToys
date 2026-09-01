@@ -28,8 +28,8 @@ public static class QuickAccessShelfShortcuts
         !ctrl &&
         !win;
 
-    public static bool IsSelectionShortcut(VirtualKey key, bool ctrl, bool alt, bool shift, bool win) =>
-        alt &&
+    public static bool IsSelectionShortcut(VirtualKey key, bool ctrl, bool alt, bool shift, bool win, bool isKeyTipDisplayMode = false) =>
+        (alt || isKeyTipDisplayMode) &&
         IsSelectionAccessKey(ctrl, shift, win) &&
         GetTopRowShortcutIndex(key) >= 0;
 
@@ -39,9 +39,10 @@ public static class QuickAccessShelfShortcuts
         bool alt,
         bool shift,
         bool win,
-        int visibleItemCount)
+        int visibleItemCount,
+        bool isKeyTipDisplayMode = false)
     {
-        if (!IsSelectionShortcut(key, ctrl, alt, shift, win))
+        if (!IsSelectionShortcut(key, ctrl, alt, shift, win, isKeyTipDisplayMode))
         {
             return SelectionShortcutTarget.None;
         }

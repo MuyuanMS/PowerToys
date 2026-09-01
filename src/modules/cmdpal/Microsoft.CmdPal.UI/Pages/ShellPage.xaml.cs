@@ -1666,7 +1666,8 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
             modifiers.Alt,
             modifiers.Shift,
             modifiers.Win,
-            QuickAccessShelf.VisibleItemCount))
+            QuickAccessShelf.VisibleItemCount,
+            isKeyTipDisplayMode: AccessKeyManager.IsDisplayModeEnabled))
         {
             case QuickAccessShelfShortcuts.SelectionShortcutTarget.Visible:
                 // Let the matching native access key move focus to the requested shelf item.

@@ -47,6 +47,7 @@ public partial class QuickAccessShelfResolverTests
         Assert.IsFalse(QuickAccessShelfShortcuts.IsSelectionShortcut(VirtualKey.Number4, ctrl: false, alt: true, shift: false, win: false));
         Assert.IsFalse(QuickAccessShelfShortcuts.IsSelectionShortcut(VirtualKey.Number4, ctrl: false, alt: true, shift: true, win: true));
         Assert.IsFalse(QuickAccessShelfShortcuts.IsSelectionShortcut(VirtualKey.Number0, ctrl: false, alt: true, shift: true, win: false));
+        Assert.IsTrue(QuickAccessShelfShortcuts.IsSelectionShortcut(VirtualKey.Number4, ctrl: false, alt: false, shift: true, win: false, isKeyTipDisplayMode: true));
     }
 
     [DataTestMethod]
@@ -82,6 +83,21 @@ public partial class QuickAccessShelfResolverTests
         Assert.IsFalse(QuickAccessShelfShortcuts.IsSelectionAccessKey(ctrl: false, shift: false, win: false));
         Assert.IsFalse(QuickAccessShelfShortcuts.IsSelectionAccessKey(ctrl: true, shift: true, win: false));
         Assert.IsFalse(QuickAccessShelfShortcuts.IsSelectionAccessKey(ctrl: false, shift: true, win: true));
+    }
+
+    [TestMethod]
+    public void ResolveSelectionShortcut_AcceptsReleasedAltKeyTipMode()
+    {
+        Assert.AreEqual(
+            QuickAccessShelfShortcuts.SelectionShortcutTarget.Visible,
+            QuickAccessShelfShortcuts.ResolveSelectionShortcut(
+                VirtualKey.Number4,
+                ctrl: false,
+                alt: false,
+                shift: true,
+                win: false,
+                visibleItemCount: 4,
+                isKeyTipDisplayMode: true));
     }
 
     [TestMethod]
