@@ -22,8 +22,7 @@ internal static class TopLevelCommandResolver
         bool includeApps,
         int pinnedCommandLimit = int.MaxValue,
         int recentCommandLimit = SettingsModel.DefaultRecentCommandsDisplayLimit,
-        bool includeRegular = true,
-        bool recentCommandsFirst = false)
+        bool includeRegular = true)
     {
         Func<string, IListItem?>? additionalRecentResolver = includeApps ? ResolveRecentApp : null;
         return Resolve<IListItem>(
@@ -36,8 +35,7 @@ internal static class TopLevelCommandResolver
             additionalRecentResolver,
             pinnedCommandLimit,
             recentCommandLimit,
-            includeRegular,
-            recentCommandsFirst);
+            includeRegular);
 
         IListItem? ResolveRecentApp(string commandId)
         {
@@ -71,8 +69,7 @@ internal static class TopLevelCommandResolver
         Func<string, TCommand?>? resolveAdditionalRecentCommand = null,
         int pinnedCommandLimit = int.MaxValue,
         int recentCommandLimit = SettingsModel.DefaultRecentCommandsDisplayLimit,
-        bool includeRegular = true,
-        bool recentCommandsFirst = false)
+        bool includeRegular = true)
         where TCommand : class
     {
         var eligibleCommands = new List<(TCommand Command, (string ProviderId, string CommandId) Key)>();
@@ -165,18 +162,10 @@ internal static class TopLevelCommandResolver
             }
         }
 
-        // Resolve in presentation order so the first section owns duplicates and the second
-        // section can continue scanning to fill its configured limit with distinct items.
-        if (recentCommandsFirst)
-        {
-            ResolveRecentCommands();
-            ResolvePinnedCommands();
-        }
-        else
-        {
-            ResolvePinnedCommands();
-            ResolveRecentCommands();
-        }
+        // Pins always own duplicates. Presentation order is applied after resolution so moving
+        // the recent section does not turn pinned commands into recent commands.
+        ResolvePinnedCommands();
+        ResolveRecentCommands();
 
         IReadOnlyList<TCommand> regular = [];
         if (includeRegular)
