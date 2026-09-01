@@ -15,9 +15,10 @@
 
 extern HINSTANCE g_hInst;
 extern long g_cDllRef;
+extern std::mutex g_loggerMutex;
 
-ThumbnailProvider::ThumbnailProvider(std::string, std::wstring, std::wstring exeName, std::wstring tempFolderName, std::wstring extension) :
-    m_cRef(1), m_pStream(NULL), m_process(NULL), m_exeName(exeName), m_tempFolderName(tempFolderName), m_extension(extension)
+ThumbnailProvider::ThumbnailProvider(std::string name, std::wstring logFilePath, std::wstring exeName, std::wstring tempFolderName, std::wstring extension) :
+    m_cRef(1), m_pStream(NULL), m_process(NULL), m_loggerName(name), m_logFilePath(logFilePath), m_exeName(exeName), m_tempFolderName(tempFolderName), m_extension(extension)
 {
     InterlockedIncrement(&g_cDllRef);
 }
@@ -90,7 +91,10 @@ IFACEMETHODIMP ThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_ALPH
     char buffer[4096];
     ULONG cbRead;
 
-    Logger::trace(L"Begin");
+    {
+        auto loggerLock = LockLogger();
+        Logger::trace(L"Begin");
+    }
 
     GUID guid;
     if (CoCreateGuid(&guid) == S_OK)
@@ -98,7 +102,10 @@ IFACEMETHODIMP ThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_ALPH
         wil::unique_cotaskmem_string guidString;
         if (SUCCEEDED(StringFromCLSID(guid, &guidString)))
         {
-            Logger::info(L"Read stream and save to tmp file.");
+            {
+                auto loggerLock = LockLogger();
+                Logger::info(L"Read stream and save to tmp file.");
+            }
 
             // {CLSID} -> CLSID
             std::wstring guid = std::wstring(guidString.get()).substr(1, std::wstring(guidString.get()).size() - 2);
@@ -109,7 +116,7 @@ IFACEMETHODIMP ThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_ALPH
             }
 
             std::wstring fileName = filePath + guid + m_extension;
-            
+
             // Write data to tmp file
             std::fstream file;
             file.open(fileName, std::ios_base::out | std::ios_base::binary);
@@ -125,7 +132,7 @@ IFACEMETHODIMP ThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_ALPH
 
                 file.write(buffer, cbRead);
                 if (result == S_FALSE)
-                {               
+                {
                     break;
                 }
             }
@@ -136,7 +143,10 @@ IFACEMETHODIMP ThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_ALPH
 
             try
             {
-                Logger::info(L"Start " + m_exeName);
+                {
+                    auto loggerLock = LockLogger();
+                    Logger::info(L"Start " + m_exeName);
+                }
 
                 STARTUPINFO info = { sizeof(info) };
                 std::wstring cmdLine{ L"\"" + fileName + L"\"" };
@@ -167,6 +177,7 @@ IFACEMETHODIMP ThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_ALPH
                 }
                 else
                 {
+                    auto loggerLock = LockLogger();
                     Logger::info(L"Bmp file not generated.");
                     return E_FAIL;
                 }
@@ -174,6 +185,7 @@ IFACEMETHODIMP ThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_ALPH
             catch (std::exception& e)
             {
                 std::wstring errorMessage = std::wstring{ winrt::to_hstring(e.what()) };
+                auto loggerLock = LockLogger();
                 Logger::error(L"Failed to start {}. Error: {}", m_exeName, errorMessage);
             }
         }
@@ -189,3 +201,9 @@ IFACEMETHODIMP ThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_ALPH
     return S_OK;
 }
 
+std::unique_lock<std::mutex> ThumbnailProvider::LockLogger() const
+{
+    std::unique_lock lock(g_loggerMutex);
+    Logger::init(m_loggerName, m_logFilePath, PTSettingsHelper::get_log_settings_file_location());
+    return lock;
+}

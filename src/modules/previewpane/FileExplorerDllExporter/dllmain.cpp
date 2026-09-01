@@ -5,12 +5,11 @@
 #include <filesystem>
 #include <mutex>
 #include <common/SettingsAPI/settings_helpers.h>
-#include <common/logger/logger.h>
 #include <common/logger/logger_settings.h>
 
 HINSTANCE g_hInst = NULL;
 long g_cDllRef = 0;
-std::once_flag g_loggerInitFlag;
+std::mutex g_loggerMutex;
 
 // {0e6d5bdd-d5f8-4692-a089-8bb88cdd37f4}
 static const GUID CLSID_BgcodePreviewHandler = { 0x0e6d5bdd, 0xd5f8, 0x4692, { 0xa0, 0x89, 0x8b, 0xb8, 0x8c, 0xdd, 0x37, 0xf4 } };
@@ -86,12 +85,6 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, void** ppv)
 {
     HRESULT hr = E_OUTOFMEMORY;
-
-    std::call_once(g_loggerInitFlag, [] {
-        std::filesystem::path exporterLogPath(PTSettingsHelper::get_local_low_folder_location());
-        exporterLogPath.append(LogSettings::fileExplorerLogPath);
-        Logger::init(LogSettings::fileExplorerLoggerName, exporterLogPath.wstring(), PTSettingsHelper::get_log_settings_file_location());
-    });
 
     std::filesystem::path logFilePath(PTSettingsHelper::get_local_low_folder_location());
 
