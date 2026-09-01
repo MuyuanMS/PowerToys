@@ -46,13 +46,13 @@ public record RecentCommandsManager : IRecentCommandsManager
 
     private ImmutableList<HistoryItem>? _history = ImmutableList<HistoryItem>.Empty;
 
-    // Cached commandId -> entry lookup over History, rebuilt lazily whenever History is
+    // Cached providerId + commandId -> entry lookup over History, rebuilt lazily whenever History is
     // (re)assigned and never persisted. ScoreTopLevelItem calls GetCommandHistoryWeight for
     // every candidate item on every keystroke, and History can hold up to MaxHistoryEntries
     // (500) entries, so a plain linear scan would be O(items x history) per keystroke. The
     // dictionary keeps each lookup O(1) so the hot path stays cheap as the store grows.
     [JsonIgnore]
-    private Dictionary<string, HistoryItem>? _index;
+    private Dictionary<(string? ProviderId, string CommandId), HistoryItem>? _index;
 
     // Persisted so recent-command frecency (including the LastUsed timestamps) survives a
     // restart. [JsonInclude] is required because the property is internal; without it the
@@ -73,20 +73,21 @@ public record RecentCommandsManager : IRecentCommandsManager
         }
     }
 
-    private Dictionary<string, HistoryItem> Index
+    private Dictionary<(string? ProviderId, string CommandId), HistoryItem> Index
     {
         get
         {
             if (_index is null)
             {
                 // Ordinal to match the string '==' comparison the previous linear scan used.
-                var map = new Dictionary<string, HistoryItem>(StringComparer.Ordinal);
+                var map = new Dictionary<(string? ProviderId, string CommandId), HistoryItem>();
                 foreach (var item in History)
                 {
                     // History is most-recent-first and command ids are unique in it, but keep
                     // the first (most recent) occurrence if a duplicate ever slips in so the
                     // lookup matches the old FirstOrDefault behavior.
-                    map.TryAdd(item.CommandId, item);
+                    var providerId = string.IsNullOrEmpty(item.ProviderId) ? null : item.ProviderId;
+                    map.TryAdd((providerId, item.CommandId), item);
                 }
 
                 _index = map;
@@ -106,8 +107,31 @@ public record RecentCommandsManager : IRecentCommandsManager
     /// </summary>
     public void PrewarmIndex() => _ = Index;
 
+    /// <summary>
+    /// Enumerates command ids from most recently used to least recently used without copying the
+    /// persisted history. Consumers can stop as soon as they have resolved enough visible items.
+    /// </summary>
+    public IEnumerable<string> EnumerateRecentCommandIds()
+    {
+        foreach (var item in History)
+        {
+            yield return item.CommandId;
+        }
+    }
+
+    public IEnumerable<RecentCommandIdentity> EnumerateRecentCommands()
+    {
+        foreach (var item in History)
+        {
+            yield return new(item.ProviderId, item.CommandId);
+        }
+    }
+
     public int GetCommandHistoryWeight(string commandId)
         => GetCommandHistoryWeight(commandId, DateTimeOffset.UtcNow);
+
+    public int GetCommandHistoryWeight(string providerId, string commandId)
+        => GetCommandHistoryWeight(providerId, commandId, DateTimeOffset.UtcNow);
 
     /// <summary>
     /// Computes the time-decayed frecency weight for a command relative to <paramref name="now"/>.
@@ -117,11 +141,27 @@ public record RecentCommandsManager : IRecentCommandsManager
     /// </summary>
     public int GetCommandHistoryWeight(string commandId, DateTimeOffset now)
     {
-        if (!Index.TryGetValue(commandId, out var entry))
+        if (!Index.TryGetValue((null, commandId), out var entry))
         {
             return 0;
         }
 
+        return CalculateWeight(entry, now);
+    }
+
+    public int GetCommandHistoryWeight(string providerId, string commandId, DateTimeOffset now)
+    {
+        if (!Index.TryGetValue((providerId, commandId), out var entry) &&
+            !Index.TryGetValue((null, commandId), out entry))
+        {
+            return 0;
+        }
+
+        return CalculateWeight(entry, now);
+    }
+
+    private static int CalculateWeight(HistoryItem entry, DateTimeOffset now)
+    {
         // Migrate items with a default (missing) timestamp to a mild backdate so they degrade
         // to Uses-ordering instead of appearing brand-new or invisible. See LegacyBackdate.
         var lastUsed = entry.LastUsed == default ? now - LegacyBackdate : entry.LastUsed;
@@ -146,6 +186,42 @@ public record RecentCommandsManager : IRecentCommandsManager
     /// </summary>
     public RecentCommandsManager WithHistoryItem(string commandId)
         => WithHistoryItem(commandId, DateTimeOffset.UtcNow);
+
+    public RecentCommandsManager WithHistoryItem(string providerId, string commandId)
+        => WithHistoryItem(providerId, commandId, DateTimeOffset.UtcNow);
+
+    /// <summary>
+    /// Returns a new RecentCommandsManager without the given command, or this instance when the
+    /// command is not present. Pure function - does not mutate this instance.
+    /// </summary>
+    public RecentCommandsManager WithoutHistoryItem(string commandId)
+    {
+        var updated = History.RemoveAll(item => item.CommandId == commandId);
+        return updated.Count == History.Count
+            ? this
+            : this with { History = updated };
+    }
+
+    public RecentCommandsManager WithoutHistoryItem(string providerId, string commandId)
+    {
+        var updated = History.RemoveAll(
+            item => item.CommandId == commandId &&
+                (string.IsNullOrEmpty(item.ProviderId) || item.ProviderId == providerId));
+        return updated.Count == History.Count
+            ? this
+            : this with { History = updated };
+    }
+
+    /// <summary>
+    /// Returns an empty recent-command history, or this instance when it is already empty.
+    /// Pure function - does not mutate this instance.
+    /// </summary>
+    public RecentCommandsManager ClearHistory() =>
+        History.Count == 0
+            ? this
+            : this with { History = ImmutableList<HistoryItem>.Empty };
+
+    public bool IsEmpty => History.Count == 0;
 
     /// <summary>
     /// Records a use of <paramref name="commandId"/> at the explicit time <paramref name="now"/>.
@@ -176,6 +252,31 @@ public record RecentCommandsManager : IRecentCommandsManager
 
         return this with { History = newHistory };
     }
+
+    internal RecentCommandsManager WithHistoryItem(string providerId, string commandId, DateTimeOffset now)
+    {
+        var matching = History.Where(
+            item => item.CommandId == commandId &&
+                (item.ProviderId == providerId || string.IsNullOrEmpty(item.ProviderId))).ToArray();
+        var uses = matching.Sum(item => item.Uses) + 1;
+        var newHistory = History.RemoveAll(item => matching.Contains(item));
+        newHistory = newHistory.Insert(
+            0,
+            new HistoryItem
+            {
+                ProviderId = providerId,
+                CommandId = commandId,
+                Uses = uses,
+                LastUsed = now,
+            });
+
+        if (newHistory.Count > MaxHistoryEntries)
+        {
+            newHistory = newHistory.RemoveRange(MaxHistoryEntries, newHistory.Count - MaxHistoryEntries);
+        }
+
+        return this with { History = newHistory };
+    }
 }
 
 public interface IRecentCommandsManager
@@ -188,7 +289,17 @@ public interface IRecentCommandsManager
     /// </summary>
     int GetCommandHistoryWeight(string commandId, DateTimeOffset now);
 
+    int GetCommandHistoryWeight(string providerId, string commandId, DateTimeOffset now);
+
     RecentCommandsManager WithHistoryItem(string commandId);
+
+    RecentCommandsManager WithHistoryItem(string providerId, string commandId);
+
+    RecentCommandsManager WithoutHistoryItem(string commandId);
+
+    RecentCommandsManager WithoutHistoryItem(string providerId, string commandId);
+
+    RecentCommandsManager ClearHistory();
 
     /// <summary>
     /// Builds any lazy internal state on the calling thread. Call it once before scoring items in
