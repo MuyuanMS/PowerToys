@@ -3,6 +3,7 @@
 #include "pch.h"
 
 #include <ShlObj.h>
+#include <mutex>
 #include <string>
 
 class PreviewHandler :
@@ -48,6 +49,8 @@ protected:
     ~PreviewHandler();
 
 private:
+    std::unique_lock<std::mutex> LockLogger() const;
+
     // Reference count of component.
     long m_cRef;
 
@@ -66,5 +69,7 @@ private:
     HANDLE m_process;
     HANDLE m_resizeEvent;
 
+    std::string m_loggerName;
+    std::wstring m_logFilePath;
     std::wstring m_exeName;
 };

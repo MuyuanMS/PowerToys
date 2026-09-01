@@ -12,9 +12,10 @@
 
 extern HINSTANCE g_hInst;
 extern long g_cDllRef;
+extern std::mutex g_loggerMutex;
 
-PreviewHandler::PreviewHandler(std::string, std::wstring, const wchar_t* resizeEvent, std::wstring exeName) :
-    m_cRef(1), m_hwndParent(NULL), m_rcParent(), m_punkSite(NULL), m_process(NULL), m_exeName(exeName)
+PreviewHandler::PreviewHandler(std::string name, std::wstring logFilePath, const wchar_t* resizeEvent, std::wstring exeName) :
+    m_cRef(1), m_hwndParent(NULL), m_rcParent(), m_punkSite(NULL), m_process(NULL), m_loggerName(name), m_logFilePath(logFilePath), m_exeName(exeName)
 {
     m_resizeEvent = CreateEvent(nullptr, false, false, resizeEvent);
 
@@ -140,6 +141,7 @@ IFACEMETHODIMP PreviewHandler::SetRect(const RECT* prc)
         }
         if (!m_resizeEvent)
         {
+            auto loggerLock = LockLogger();
             Logger::error(L"Failed to create resize event for {}", m_exeName);
         }
         else
@@ -148,6 +150,7 @@ IFACEMETHODIMP PreviewHandler::SetRect(const RECT* prc)
             {
                 if (!SetEvent(m_resizeEvent))
                 {
+                    auto loggerLock = LockLogger();
                     Logger::error(L"Failed to signal resize event for {}", m_exeName);
                 }
             }
@@ -167,7 +170,10 @@ IFACEMETHODIMP PreviewHandler::DoPreview()
             // Postponing Start BgcodePreviewHandler.exe, parent and position not yet initialized. Preview will be done after initialisation.
             return S_OK;
         }
-        Logger::info(L"Starting " + m_exeName);
+        {
+            auto loggerLock = LockLogger();
+            Logger::info(L"Starting " + m_exeName);
+        }
 
         STARTUPINFO info = { sizeof(info) };
         std::wstring cmdLine{ L"\"" + m_filePath + L"\"" };
@@ -205,6 +211,7 @@ IFACEMETHODIMP PreviewHandler::DoPreview()
     catch (std::exception& e)
     {
         std::wstring errorMessage = std::wstring{ winrt::to_hstring(e.what()) };
+        auto loggerLock = LockLogger();
         Logger::error(L"Failed to start {} Error: {}", m_exeName, errorMessage);
     }
 
@@ -213,7 +220,10 @@ IFACEMETHODIMP PreviewHandler::DoPreview()
 
 IFACEMETHODIMP PreviewHandler::Unload()
 {
-    Logger::info(L"Unload and terminate .exe");
+    {
+        auto loggerLock = LockLogger();
+        Logger::info(L"Unload and terminate .exe");
+    }
 
     m_hwndParent = NULL;
     if (m_process)
@@ -289,5 +299,12 @@ IFACEMETHODIMP PreviewHandler::GetSite(REFIID riid, void** ppv)
 #pragma endregion
 
 #pragma region Helper Functions
+
+std::unique_lock<std::mutex> PreviewHandler::LockLogger() const
+{
+    std::unique_lock lock(g_loggerMutex);
+    Logger::init(m_loggerName, m_logFilePath, PTSettingsHelper::get_log_settings_file_location());
+    return lock;
+}
 
 #pragma endregion
