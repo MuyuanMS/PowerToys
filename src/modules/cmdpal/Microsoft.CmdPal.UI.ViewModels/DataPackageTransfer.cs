@@ -9,7 +9,7 @@ namespace Microsoft.CmdPal.UI.ViewModels;
 
 public static class DataPackageTransfer
 {
-    public static void Copy(DataPackageView source, DataPackage destination)
+    public static async Task CopyAsync(DataPackageView source, DataPackage destination)
     {
         destination.RequestedOperation = source.RequestedOperation;
 
@@ -25,48 +25,57 @@ public static class DataPackageTransfer
             }
         }
 
+        var resourceMapTask = CopyResourceMapAsync(source, destination);
+
         foreach (var format in source.AvailableFormats)
         {
             try
             {
-                destination.SetDataProvider(format, request => DelayRenderer(request, source, format));
+                destination.SetDataProvider(format, request => DelayRenderer(request, source, format, resourceMapTask));
             }
             catch (Exception)
             {
                 // Skip formats that cannot be registered on the drag data package.
             }
         }
+
+        await resourceMapTask;
     }
 
-    private static void DelayRenderer(DataProviderRequest request, DataPackageView source, string format)
+    private static async Task CopyResourceMapAsync(DataPackageView source, DataPackage destination)
+    {
+        try
+        {
+            var resourceMap = await source.GetResourceMapAsync();
+            foreach (var (key, value) in resourceMap)
+            {
+                destination.ResourceMap[key] = value;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Failed to copy the resource map during drag-and-drop", ex);
+        }
+    }
+
+    private static async void DelayRenderer(
+        DataProviderRequest request,
+        DataPackageView source,
+        string format,
+        Task resourceMapTask)
     {
         var deferral = request.GetDeferral();
         try
         {
-            source.GetDataAsync(format)
-                .AsTask()
-                .ContinueWith(dataTask =>
-                {
-                    try
-                    {
-                        if (dataTask.IsCompletedSuccessfully)
-                        {
-                            request.SetData(dataTask.Result);
-                        }
-                        else if (dataTask.IsFaulted && dataTask.Exception is not null)
-                        {
-                            Logger.LogError($"Failed to get data for format '{format}' during drag-and-drop", dataTask.Exception);
-                        }
-                    }
-                    finally
-                    {
-                        deferral.Complete();
-                    }
-                });
+            await resourceMapTask;
+            request.SetData(await source.GetDataAsync(format));
         }
         catch (Exception ex)
         {
             Logger.LogError($"Failed to set data for format '{format}' during drag-and-drop", ex);
+        }
+        finally
+        {
             deferral.Complete();
         }
     }

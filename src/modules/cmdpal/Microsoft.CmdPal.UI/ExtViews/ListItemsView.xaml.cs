@@ -1219,7 +1219,7 @@ public sealed partial class ListItemsView : UserControl,
         }
     }
 
-    private void Items_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
+    private async void Items_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
     {
         try
         {
@@ -1229,7 +1229,7 @@ public sealed partial class ListItemsView : UserControl,
                 return;
             }
 
-            DataPackageTransfer.Copy(item.DataPackage, e.Data);
+            await DataPackageTransfer.CopyAsync(item.DataPackage, e.Data);
 
             WeakReferenceMessenger.Default.Send(new DragStartedMessage());
         }
