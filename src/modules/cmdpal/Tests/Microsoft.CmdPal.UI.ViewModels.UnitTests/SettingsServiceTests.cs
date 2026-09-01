@@ -148,6 +148,18 @@ public class SettingsServiceTests
     }
 
     [TestMethod]
+    public void RecentCommandPlacements_InvalidPersistedValuesAreHidden()
+    {
+        var settings = System.Text.Json.JsonSerializer.Deserialize(
+            "{ \"RecentCommandsOnQuickAccessShelf\": -1, \"RecentCommandsOnHome\": 99 }",
+            JsonSerializationContext.Default.SettingsModel);
+
+        Assert.IsNotNull(settings);
+        Assert.AreEqual(RecentCommandsPlacement.Hidden, settings.RecentCommandsOnQuickAccessShelf);
+        Assert.AreEqual(RecentCommandsPlacement.Hidden, settings.RecentCommandsOnHome);
+    }
+
+    [TestMethod]
     public void Save_DelegatesToPersistenceService()
     {
         // Arrange
