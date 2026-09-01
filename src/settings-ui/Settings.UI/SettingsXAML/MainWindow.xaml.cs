@@ -154,11 +154,6 @@ namespace Microsoft.PowerToys.Settings.UI
             ShellPage.Navigate(type);
         }
 
-        public void BeginWindowSession()
-        {
-            shellPage.BeginWindowSession();
-        }
-
         public void ActivateWhenReady(bool bringToForeground = false)
         {
             var hWnd = WindowNative.GetWindowHandle(this);
@@ -166,6 +161,11 @@ namespace Microsoft.PowerToys.Settings.UI
                 !WaitForInitialContentBeforeActivation || NativeMethods.IsWindowVisible(hWnd),
                 shellPage.IsInitialContentLoaded,
                 bringToForeground);
+        }
+
+        public void BeginWindowSession()
+        {
+            shellPage.BeginWindowSession();
         }
 
         public void CloseHiddenWindow()
