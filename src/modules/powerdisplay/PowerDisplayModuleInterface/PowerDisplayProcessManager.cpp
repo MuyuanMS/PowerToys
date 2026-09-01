@@ -153,7 +153,20 @@ HRESULT PowerDisplayProcessManager::start_named_pipe_server(const std::wstring& 
 
 void PowerDisplayProcessManager::refresh()
 {
-    if (m_enabled == is_process_running())
+    const bool process_running = is_process_running();
+    if (!m_enabled && !process_running)
+    {
+        if (m_hProcess != 0)
+        {
+            CloseHandle(m_hProcess);
+            m_hProcess = 0;
+        }
+
+        m_write_pipe.reset();
+        return;
+    }
+
+    if (m_enabled == process_running)
     {
         return;
     }
