@@ -25,8 +25,10 @@ internal static class PowerAccentTestHelper
 
     private const int DwmCloakedAttribute = 14;
     private const int DwmExtendedFrameBoundsAttribute = 9;
+    private const int EnglishUnitedStatesLanguageId = 0x0409;
     private const int OverlayStartupTimeoutMs = 30_000;
-    private const int SettingsReloadDelayMs = 2_000;
+    private const int SettingsReloadTimeoutMs = 30_000;
+    private const int VkCapital = 0x14;
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out int value, int valueSize);
@@ -36,6 +38,12 @@ internal static class PowerAccentTestHelper
 
     [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetKeyboardLayout(uint threadId);
+
+    [DllImport("user32.dll")]
+    private static extern short GetKeyState(int virtualKey);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativeRect
@@ -71,17 +79,31 @@ internal static class PowerAccentTestHelper
 
     internal static void PrepareDefaultState()
     {
-        WriteSettings(new Settings(), waitForReload: false);
+        WriteSettings(new Settings());
         File.Delete(UsageInfoPath);
     }
 
     internal static void ReplaceSettings(UITestBase testBase, Settings settings)
     {
         WaitForOverlayState(testBase, revealed: false, timeoutMs: OverlayStartupTimeoutMs);
-        WriteSettings(settings, waitForReload: true);
+        var logOffsets = CaptureQuickAccentLogOffsets();
+        WriteSettings(settings);
+        WaitForSettingsReload(testBase, settings.SelectedLanguage, logOffsets);
     }
 
-    private static void WriteSettings(Settings settings, bool waitForReload)
+    internal static void AssertInputEnvironment()
+    {
+        var languageId = (int)(GetKeyboardLayout(0).ToInt64() & 0xFFFF);
+        Assert.AreEqual(
+            EnglishUnitedStatesLanguageId,
+            languageId,
+            $"Quick Accent UI tests require the en-US keyboard layout (0x0409), but the active layout is 0x{languageId:X4}.");
+        Assert.IsFalse(
+            (GetKeyState(VkCapital) & 1) != 0,
+            "Quick Accent UI tests require Caps Lock to be off because raw virtual-key input is asserted as lowercase text.");
+    }
+
+    private static void WriteSettings(Settings settings)
     {
         var desired = CreateSettings(settings);
         SettingsConfigHelper.UpdateModuleSettings(
@@ -95,14 +117,85 @@ internal static class PowerAccentTestHelper
                     current[property.Key] = property.Value?.DeepClone();
                 }
             });
-
-        if (waitForReload)
-        {
-            Thread.Sleep(SettingsReloadDelayMs);
-        }
     }
 
-    internal static IDisposable PreserveUsageInfo() => new FileSnapshot(UsageInfoPath);
+    private static IReadOnlyDictionary<string, long> CaptureQuickAccentLogOffsets()
+    {
+        var offsets = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        if (!Directory.Exists(QuickAccentLogRoot))
+        {
+            return offsets;
+        }
+
+        foreach (var path in Directory.EnumerateFiles(QuickAccentLogRoot, "*.log", SearchOption.AllDirectories))
+        {
+            try
+            {
+                offsets[path] = new FileInfo(path).Length;
+            }
+            catch (FileNotFoundException)
+            {
+                // A logger rotated the file between enumeration and inspection.
+            }
+        }
+
+        return offsets;
+    }
+
+    private static void WaitForSettingsReload(
+        UITestBase testBase,
+        string selectedLanguage,
+        IReadOnlyDictionary<string, long> logOffsets)
+    {
+        var languages = selectedLanguage
+            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(language => language.Trim().ToUpperInvariant());
+        var acknowledgement = $"Languages selected: {string.Join(", ", languages)}";
+
+        var result = WaitHelper.WaitForStable(
+            () => FindSettingsReloadAcknowledgement(logOffsets, acknowledgement),
+            matchedLog => matchedLog is not null,
+            SettingsReloadTimeoutMs,
+            pollIntervalMS: 100,
+            shouldRetryException: ex => ex is IOException or UnauthorizedAccessException);
+        var failure = $"Quick Accent did not acknowledge its settings reload within {SettingsReloadTimeoutMs} ms. " +
+                      $"Expected a new '{acknowledgement}' log entry under '{QuickAccentLogRoot}'. " +
+                      $"Last read error: {result.LastException?.Message ?? "(none)"}.";
+        Assert.IsTrue(
+            result.Succeeded,
+            failure);
+        Step(testBase, $"Quick Accent acknowledged settings reload in '{result.LastObservation}'.");
+    }
+
+    private static string? FindSettingsReloadAcknowledgement(
+        IReadOnlyDictionary<string, long> logOffsets,
+        string acknowledgement)
+    {
+        if (!Directory.Exists(QuickAccentLogRoot))
+        {
+            return null;
+        }
+
+        foreach (var path in Directory.EnumerateFiles(QuickAccentLogRoot, "*.log", SearchOption.AllDirectories))
+        {
+            using var stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            var originalLength = logOffsets.TryGetValue(path, out var length) ? length : 0;
+            stream.Position = Math.Min(originalLength, stream.Length);
+            using var reader = new StreamReader(stream);
+            if (reader.ReadToEnd().Contains(acknowledgement, StringComparison.Ordinal))
+            {
+                return path;
+            }
+        }
+
+        return null;
+    }
+
+    internal static IDisposable PreserveUsageInfo() => SettingsConfigHelper.PreserveFile(UsageInfoPath);
 
     internal static void DisposeAll(params IDisposable[] snapshots)
     {
@@ -128,6 +221,44 @@ internal static class PowerAccentTestHelper
         if (failures is not null)
         {
             throw new AggregateException("Quick Accent test state could not be fully restored.", failures);
+        }
+    }
+
+    internal static void RunWithCleanup(Action action, Action cleanup)
+    {
+        Exception? actionFailure = null;
+        try
+        {
+            action();
+        }
+        catch (Exception ex)
+        {
+            actionFailure = ex;
+        }
+
+        Exception? cleanupFailure = null;
+        try
+        {
+            cleanup();
+        }
+        catch (Exception ex)
+        {
+            cleanupFailure = ex;
+        }
+
+        if (actionFailure is not null)
+        {
+            if (cleanupFailure is not null)
+            {
+                throw new AggregateException("The test action and its state restoration both failed.", actionFailure, cleanupFailure);
+            }
+
+            ExceptionDispatchInfo.Capture(actionFailure).Throw();
+        }
+
+        if (cleanupFailure is not null)
+        {
+            ExceptionDispatchInfo.Capture(cleanupFailure).Throw();
         }
     }
 
@@ -473,7 +604,10 @@ internal static class PowerAccentTestHelper
         var characterList = toolbar.Find<Element>(By.AccessibilityId("QuickAccentCharacterList"), 5_000);
         var dpiScale = Math.Max(1d, GetDpiForWindow(handle) / 96d);
 
-        const int edgeOffset = 24;
+        const int edgeOffset = 24; // Calculation.GetRawCoordinatesFromPosition offset.
+
+        // SelectorControl.HorizontalSurfaceOverheadDip (24 + 24 margin, 1 + 1 border)
+        // plus MainWindow.LayoutRoundingDip (1).
         const int horizontalChromeDip = 51;
         const int tolerance = 4;
         var positioningWidth = characterList.Width + (int)Math.Ceiling(horizontalChromeDip * dpiScale);
@@ -527,6 +661,11 @@ internal static class PowerAccentTestHelper
         ModuleName,
         "UsageInfo.json");
 
+    private static string QuickAccentLogRoot => Path.Combine(
+        SettingsConfigHelper.PowerToysSettingsRoot,
+        ModuleName,
+        "Logs");
+
     private static JsonObject CreateSettings(Settings settings) =>
         new()
         {
@@ -558,7 +697,8 @@ internal static class PowerAccentTestHelper
             observation => observation is not null && observation.IsCloaked == !revealed,
             timeoutMs,
             requiredConsecutiveMatches: 3,
-            pollIntervalMS: 100);
+            pollIntervalMS: 100,
+            shouldRetryException: ex => ex is InvalidOperationException);
 
         var last = result.LastObservation;
         var stateName = revealed ? "revealed" : "cloaked";
@@ -610,8 +750,13 @@ internal static class PowerAccentTestHelper
             },
             timeoutMS: 5_000,
             requiredConsecutiveMatches: 3,
-            pollIntervalMS: 100);
-        Assert.IsTrue(result.Succeeded, $"Quick Accent toolbar bounds did not stabilize. Last bounds: {result.LastObservation}.");
+            pollIntervalMS: 100,
+            shouldRetryException: ex => ex is InvalidOperationException);
+        var failure = $"Quick Accent toolbar bounds did not stabilize. Last bounds: {result.LastObservation}. " +
+                      $"Last DWM error: {result.LastException?.Message ?? "(none)"}.";
+        Assert.IsTrue(
+            result.Succeeded,
+            failure);
         return result.LastObservation;
     }
 
@@ -800,7 +945,9 @@ internal static class PowerAccentTestHelper
                     Step(testBase, $"Opening Notepad fixture (attempt {attempt}/2)");
                     using var launcher = Process.Start(new ProcessStartInfo
                     {
-                        FileName = "notepad.exe",
+                        FileName = Path.Combine(
+                            Environment.GetFolderPath(Environment.SpecialFolder.System),
+                            "notepad.exe"),
                         Arguments = $"\"{filePath}\"",
                         UseShellExecute = true,
                     });
@@ -982,40 +1129,6 @@ internal static class PowerAccentTestHelper
             else
             {
                 ClipboardHelper.SetText(originalText);
-            }
-        }
-    }
-
-    private sealed class FileSnapshot : IDisposable
-    {
-        private readonly string path;
-        private readonly bool existed;
-        private readonly byte[]? content;
-        private bool disposed;
-
-        internal FileSnapshot(string path)
-        {
-            this.path = path;
-            existed = File.Exists(path);
-            content = existed ? File.ReadAllBytes(path) : null;
-        }
-
-        public void Dispose()
-        {
-            if (disposed)
-            {
-                return;
-            }
-
-            disposed = true;
-            if (existed)
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                File.WriteAllBytes(path, content!);
-            }
-            else
-            {
-                File.Delete(path);
             }
         }
     }

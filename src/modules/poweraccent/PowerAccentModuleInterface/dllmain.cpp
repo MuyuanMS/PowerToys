@@ -50,10 +50,10 @@ private:
 
     bool is_process_running()
     {
-        return WaitForSingleObject(p_info.hProcess, 0) == WAIT_TIMEOUT;
+        return p_info.hProcess && WaitForSingleObject(p_info.hProcess, 0) == WAIT_TIMEOUT;
     }
 
-    void launch_process()
+    bool launch_process()
     {
         Logger::trace(L"Launching PowerToys QuickAccent process");
         unsigned long powertoys_pid = GetCurrentProcessId();
@@ -71,7 +71,10 @@ private:
             std::wstring message = L"PowerToys QuickAccent failed to start with error: ";
             message += std::to_wstring(error);
             Logger::error(message);
+            return false;
         }
+
+        return true;
     }
 
 public:
@@ -134,9 +137,8 @@ public:
 
     virtual void enable()
     {
-        launch_process();
-        m_enabled = true;
-        Trace::EnablePowerAccent(true);
+        m_enabled = launch_process();
+        Trace::EnablePowerAccent(m_enabled);
     };
 
     virtual void disable()
@@ -159,7 +161,7 @@ public:
                     Logger::warn(L"Failed to signal exit event for PowerToys QuickAccent. {}", get_last_error_or_default(GetLastError()));
                     forceTerminate = true;
                 }
-                else if (WaitForSingleObject(p_info.hProcess, 5000) != WAIT_OBJECT_0)
+                else if (WaitForSingleObject(p_info.hProcess, 1500) != WAIT_OBJECT_0)
                 {
                     Logger::warn(L"PowerToys QuickAccent did not exit after the exit event; terminating it.");
                     forceTerminate = true;
@@ -173,7 +175,7 @@ public:
                     }
                     else
                     {
-                        WaitForSingleObject(p_info.hProcess, 5000);
+                        WaitForSingleObject(p_info.hProcess, 500);
                     }
                 }
 
