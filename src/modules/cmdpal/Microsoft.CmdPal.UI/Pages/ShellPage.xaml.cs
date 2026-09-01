@@ -24,6 +24,8 @@ using Microsoft.PowerToys.Telemetry;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Animation;
@@ -1011,6 +1013,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
                 SourceKey = item.Command.IconViewModel,
             };
             iconBox.SourceRequested += IconProvider.SourceRequested16;
+            AutomationProperties.SetAccessibilityView(iconBox, AccessibilityView.Raw);
 
             var menuItem = new MenuFlyoutItem
             {
