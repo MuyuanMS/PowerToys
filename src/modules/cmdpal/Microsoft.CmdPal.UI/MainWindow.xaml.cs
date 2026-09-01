@@ -1589,31 +1589,41 @@ public sealed partial class MainWindow : WindowEx,
 
     private void HandleSummon(string commandId)
     {
-        var isRootHotkey = string.IsNullOrEmpty(commandId);
-        if (isRootHotkey && IsPaletteVisibleToUser())
-        {
-            HandleSummonCore(commandId);
-            return;
-        }
+        // HandleSummon may be invoked directly from a WH_KEYBOARD_LL hook callback
+        // (via KeyboardListener/ProcessCommand), which is an input-synchronous context
+        // where outgoing COM calls are forbidden (RPC_E_CANTCALLOUT_ININPUTSYNCCALL).
+        // Dispatching to the UI thread ensures that all WinUI/COM work (e.g. HideWindow,
+        // ShowWindow) is performed outside the hook, preventing the crash.
+        DispatcherQueue.TryEnqueue(HandleSummonOnUiThread);
 
-        var notificationFlags = WindowHelper.GetUserNotificationFlags();
-        var shouldSuppress =
-            (_ignoreHotKeyWhenFullScreen && notificationFlags.IsFullscreenState) ||
-            (_ignoreHotKeyWhenBusy && notificationFlags.IsBusy);
-
-        if (shouldSuppress)
+        void HandleSummonOnUiThread()
         {
-            if (_allowBreakthroughShortcut && IsBreakthroughTriggered())
+            var isRootHotkey = string.IsNullOrEmpty(commandId);
+            if (isRootHotkey && IsPaletteVisibleToUser())
             {
-                // Rapid-press breakthrough: let it through
-            }
-            else
-            {
+                HandleSummonCore(commandId);
                 return;
             }
-        }
 
-        HandleSummonCore(commandId);
+            var notificationFlags = WindowHelper.GetUserNotificationFlags();
+            var shouldSuppress =
+                (_ignoreHotKeyWhenFullScreen && notificationFlags.IsFullscreenState) ||
+                (_ignoreHotKeyWhenBusy && notificationFlags.IsBusy);
+
+            if (shouldSuppress)
+            {
+                if (_allowBreakthroughShortcut && IsBreakthroughTriggered())
+                {
+                    // Rapid-press breakthrough: let it through
+                }
+                else
+                {
+                    return;
+                }
+            }
+
+            HandleSummonCore(commandId);
+        }
     }
 
     private bool IsPaletteVisibleToUser()
