@@ -2,6 +2,7 @@
 #include "LightSwitchStateManager.h"
 #include <logger.h>
 #include <LightSwitchUtils.h>
+#include "SunTimeUpdater.h"
 #include "ThemeScheduler.h"
 #include <ThemeHelper.h>
 #include <common/interop/shared_constants.h>
@@ -128,36 +129,37 @@ void LightSwitchStateManager::SyncInitialThemeState()
     EvaluateAndApplyIfNeeded();
 }
 
-static std::pair<int, int> update_sun_times(auto& settings)
+static std::optional<std::pair<int, int>> update_sun_times(auto& settings)
 {
-    double latitude = std::stod(settings.latitude);
-    double longitude = std::stod(settings.longitude);
+    auto saveSunTimes = [](int newLightTime, int newDarkTime) {
+        try
+        {
+            auto values = PowerToysSettings::PowerToyValues::load_from_settings_file(L"LightSwitch");
+            values.add_property(L"lightTime", newLightTime);
+            values.add_property(L"darkTime", newDarkTime);
+            values.save_to_settings_file();
 
-    SYSTEMTIME st;
-    GetLocalTime(&st);
+            Logger::info(L"[LightSwitchService] Updated sun times and saved to config.");
+        }
+        catch (const std::exception& e)
+        {
+            std::string msg = e.what();
+            std::wstring wmsg(msg.begin(), msg.end());
+            Logger::error(L"[LightSwitchService] Exception during sun time update: {}", wmsg);
+        }
+        catch (...)
+        {
+            Logger::error(L"[LightSwitchService] Unknown exception during sun time save.");
+        }
+    };
 
-    SunTimes newTimes = CalculateSunriseSunset(latitude, longitude, st.wYear, st.wMonth, st.wDay);
-
-    int newLightTime = newTimes.sunriseHour * 60 + newTimes.sunriseMinute;
-    int newDarkTime = newTimes.sunsetHour * 60 + newTimes.sunsetMinute;
-
-    try
+    auto newTimes = LightSwitch::TryUpdateSunTimes(settings.latitude, settings.longitude, CalculateSunriseSunset, saveSunTimes);
+    if (!newTimes)
     {
-        auto values = PowerToysSettings::PowerToyValues::load_from_settings_file(L"LightSwitch");
-        values.add_property(L"lightTime", newLightTime);
-        values.add_property(L"darkTime", newDarkTime);
-        values.save_to_settings_file();
-
-        Logger::info(L"[LightSwitchService] Updated sun times and saved to config.");
-    }
-    catch (const std::exception& e)
-    {
-        std::string msg = e.what();
-        std::wstring wmsg(msg.begin(), msg.end());
-        Logger::error(L"[LightSwitchService] Exception during sun time update: {}", wmsg);
+        Logger::error(L"[LightSwitchService] Failed to parse coordinates for sun time calculation.");
     }
 
-    return { newLightTime, newDarkTime };
+    return newTimes;
 }
 
 // Internal: decide what should happen now
@@ -187,10 +189,17 @@ void LightSwitchStateManager::EvaluateAndApplyIfNeeded()
 
         if (newDay || modeChangedToSun)
         {
-            auto [newLightTime, newDarkTime] = update_sun_times(_currentSettings);
-            _state.lastEvaluatedDay = st.wDay;
-            _state.effectiveLightMinutes = newLightTime + _currentSettings.sunrise_offset;
-            _state.effectiveDarkMinutes = newDarkTime + _currentSettings.sunset_offset;
+            if (auto newTimes = update_sun_times(_currentSettings))
+            {
+                _state.lastEvaluatedDay = st.wDay;
+                _state.effectiveLightMinutes = newTimes->first + _currentSettings.sunrise_offset;
+                _state.effectiveDarkMinutes = newTimes->second + _currentSettings.sunset_offset;
+            }
+            else
+            {
+                _state.effectiveLightMinutes = _currentSettings.lightTime + _currentSettings.sunrise_offset;
+                _state.effectiveDarkMinutes = _currentSettings.darkTime + _currentSettings.sunset_offset;
+            }
         }
         else
         {
