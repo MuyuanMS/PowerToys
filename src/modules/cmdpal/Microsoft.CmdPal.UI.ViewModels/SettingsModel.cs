@@ -274,6 +274,23 @@ public record SettingsModel
         return WithPinnedCommands(pinnedCommands);
     }
 
+    public SettingsModel NormalizeRecentCommandsPlacement()
+    {
+        var normalized = this;
+
+        if (RecentCommandsOnQuickAccessShelf == RecentCommandsPlacement.BeforePinned)
+        {
+            normalized = normalized with { RecentCommandsOnQuickAccessShelf = RecentCommandsPlacement.AfterPinned };
+        }
+
+        if (RecentCommandsOnHome == RecentCommandsPlacement.BeforePinned)
+        {
+            normalized = normalized with { RecentCommandsOnHome = RecentCommandsPlacement.AfterPinned };
+        }
+
+        return normalized;
+    }
+
     public SettingsModel WithPinnedCommands(ImmutableList<PinnedCommandSettings> pinnedCommands)
     {
         var groupedPinnedCommands = pinnedCommands
