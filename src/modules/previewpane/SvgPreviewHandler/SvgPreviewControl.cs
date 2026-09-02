@@ -43,6 +43,10 @@ namespace Microsoft.PowerToys.PreviewHandler.Svg
         /// </summary>
         private CoreWebView2Environment _webView2Environment;
 
+        private FileStream _cacheLease;
+
+        private string _transientFilePath = string.Empty;
+
         /// <summary>
         /// Name of the virtual host
         /// </summary>
@@ -253,37 +257,46 @@ namespace Microsoft.PowerToys.PreviewHandler.Svg
                     _browser.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
                     _browser.CoreWebView2.WebResourceRequested += CoreWebView2_BlockExternalResources;
 
+                    var settings = new SvgHTMLPreviewGenerator.SettingsSnapshot(
+                        _settings.ColorMode,
+                        _settings.SolidColor,
+                        _settings.ThemeColor,
+                        _settings.CheckeredShade);
                     var cacheKey = SvgPreviewCacheHelper.BuildCacheKey(
-                        "v1",
+                        "v2",
                         VirtualHostName,
                         svgData,
-                        _settings.ColorMode.ToString(CultureInfo.InvariantCulture),
-                        _settings.ThemeColor.ToArgb().ToString(CultureInfo.InvariantCulture),
-                        _settings.SolidColor.ToArgb().ToString(CultureInfo.InvariantCulture),
-                        _settings.CheckeredShade.ToString(CultureInfo.InvariantCulture));
+                        settings.ColorMode.ToString(CultureInfo.InvariantCulture),
+                        settings.ThemeColor.ToArgb().ToString(CultureInfo.InvariantCulture),
+                        settings.SolidColor.ToArgb().ToString(CultureInfo.InvariantCulture),
+                        settings.CheckeredShade.ToString(CultureInfo.InvariantCulture));
 
-                    var cacheFolder = Path.Combine(_webView2UserDataFolder, "SvgPreviewCache");
-                    var cacheFilePath = SvgPreviewCacheHelper.GetCacheFilePath(cacheFolder, cacheKey);
-
-                    bool useCacheFile = true;
-                    if (!File.Exists(cacheFilePath) || new FileInfo(cacheFilePath).Length == 0)
+                    var cacheFolder = SvgPreviewCacheHelper.GetCacheFolderPath(_webView2UserDataFolder);
+                    if (SvgPreviewCacheHelper.TryGetCacheFile(cacheFolder, cacheKey, out var cacheFilePath, out var cacheLease))
                     {
-                        string generatedPreview = _previewGenerator.GeneratePreview(svgData);
-                        useCacheFile = SvgPreviewCacheHelper.WriteCacheFileAtomic(cacheFilePath, generatedPreview);
-                        if (useCacheFile)
+                        TrackCacheResources(cacheLease, string.Empty);
+                        _localFileURI = new Uri(cacheFilePath);
+                        _browser.Source = _localFileURI;
+                    }
+                    else
+                    {
+                        string generatedPreview = _previewGenerator.GeneratePreview(svgData, settings);
+                        if (SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, generatedPreview, out cacheFilePath, out cacheLease))
                         {
-                            SvgPreviewCacheHelper.ManageCacheSize(cacheFolder);
+                            TrackCacheResources(cacheLease, string.Empty);
+                            _localFileURI = new Uri(cacheFilePath);
+                            _browser.Source = _localFileURI;
+                        }
+                        else if (SvgPreviewCacheHelper.TryWriteTransientFile(_webView2UserDataFolder, generatedPreview, out var transientFilePath))
+                        {
+                            TrackCacheResources(null, transientFilePath);
+                            _localFileURI = new Uri(transientFilePath);
+                            _browser.Source = _localFileURI;
                         }
                         else
                         {
                             _browser.NavigateToString(generatedPreview);
                         }
-                    }
-
-                    if (useCacheFile)
-                    {
-                        _localFileURI = new Uri(cacheFilePath);
-                        _browser.Source = _localFileURI;
                     }
 
                     Controls.Add(_browser);
@@ -334,17 +347,43 @@ namespace Microsoft.PowerToys.PreviewHandler.Svg
         }
 
         /// <summary>
-        /// Ensures the WebView2 user data folder exists.
+        /// Ensures the WebView2 user-data and SVG preview cache folders exist.
         /// </summary>
         private void EnsureWebView2UserDataFolder()
         {
-            try
+            SvgPreviewCacheHelper.EnsureCacheFolder(_webView2UserDataFolder);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
             {
-                Directory.CreateDirectory(_webView2UserDataFolder);
+                ReleaseCacheResources();
             }
-            catch (Exception)
-            {
-            }
+
+            base.Dispose(disposing);
+        }
+
+        private void TrackCacheResources(FileStream cacheLease, string transientFilePath)
+        {
+            ReleaseCacheResources();
+            _cacheLease = cacheLease;
+            _transientFilePath = transientFilePath;
+            _browser.NavigationCompleted += Browser_NavigationCompleted;
+        }
+
+        private void Browser_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs args)
+        {
+            _browser.NavigationCompleted -= Browser_NavigationCompleted;
+            ReleaseCacheResources();
+        }
+
+        private void ReleaseCacheResources()
+        {
+            _cacheLease?.Dispose();
+            _cacheLease = null;
+            SvgPreviewCacheHelper.DeleteTransientFile(_transientFilePath);
+            _transientFilePath = string.Empty;
         }
     }
 }

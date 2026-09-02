@@ -2,7 +2,6 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -109,6 +108,8 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
             }
 
             Bitmap thumbnail = null;
+            string transientFilePath = string.Empty;
+            FileStream cacheLease = null;
 
             var thumbnailDone = new ManualResetEventSlim(false);
 
@@ -117,7 +118,6 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
             _browser.Visible = true;
             _browser.Width = (int)cx;
             _browser.Height = (int)cx;
-            _browser.DefaultBackgroundColor = Color.Transparent;
             _browser.NavigationCompleted += async (object sender, CoreWebView2NavigationCompletedEventArgs args) =>
             {
                 var a = await _browser.ExecuteScriptAsync($"document.getElementsByTagName('svg')[0].viewBox;");
@@ -186,28 +186,23 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
                         return;
                     }
 
-                    var cacheKey = SvgPreviewCacheHelper.BuildCacheKey("v1", VirtualHostName, SvgContents);
-                    var cacheFolder = Path.Combine(_webView2UserDataFolder, "SvgPreviewCache");
-                    var cacheFilePath = SvgPreviewCacheHelper.GetCacheFilePath(cacheFolder, cacheKey);
+                    var cacheKey = SvgPreviewCacheHelper.BuildCacheKey("v2", VirtualHostName, SvgContents);
+                    var cacheFolder = SvgPreviewCacheHelper.GetCacheFolderPath(_webView2UserDataFolder);
 
-                    bool useCacheFile = true;
-                    if (!File.Exists(cacheFilePath) || new FileInfo(cacheFilePath).Length == 0)
-                    {
-                        useCacheFile = SvgPreviewCacheHelper.WriteCacheFileAtomic(cacheFilePath, SvgContents);
-                        if (useCacheFile)
-                        {
-                            SvgPreviewCacheHelper.ManageCacheSize(cacheFolder);
-                        }
-                        else
-                        {
-                            _browser.NavigateToString(SvgContents);
-                        }
-                    }
-
-                    if (useCacheFile)
+                    if (SvgPreviewCacheHelper.TryGetCacheFile(cacheFolder, cacheKey, out var cacheFilePath, out cacheLease) ||
+                        SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, SvgContents, out cacheFilePath, out cacheLease))
                     {
                         _localFileURI = new Uri(cacheFilePath);
                         _browser.Source = _localFileURI;
+                    }
+                    else if (SvgPreviewCacheHelper.TryWriteTransientFile(_webView2UserDataFolder, SvgContents, out transientFilePath))
+                    {
+                        _localFileURI = new Uri(transientFilePath);
+                        _browser.Source = _localFileURI;
+                    }
+                    else
+                    {
+                        _browser.NavigateToString(SvgContents);
                     }
                 }
                 catch (Exception ex)
@@ -223,6 +218,8 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
             }
 
             _browser.Dispose();
+            cacheLease?.Dispose();
+            SvgPreviewCacheHelper.DeleteTransientFile(transientFilePath);
 
             return thumbnail;
         }
@@ -269,7 +266,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
                 return null;
             }
 
-            Bitmap destImage = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+            Bitmap destImage = new Bitmap(width, height);
 
             destImage.SetResolution(image.HorizontalResolution, image.VerticalResolution);
 
@@ -281,10 +278,9 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
                 graphics.SmoothingMode = SmoothingMode.HighQuality;
                 graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
 
+                graphics.Clear(Color.White);
                 graphics.DrawImage(image, 0, 0, width, height);
             }
-
-            image.Dispose();
 
             return destImage;
         }
@@ -354,17 +350,11 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
         }
 
         /// <summary>
-        /// Ensures the WebView2 user data folder exists.
+        /// Ensures the WebView2 user-data and SVG preview cache folders exist.
         /// </summary>
         private void EnsureWebView2UserDataFolder()
         {
-            try
-            {
-                Directory.CreateDirectory(_webView2UserDataFolder);
-            }
-            catch (Exception)
-            {
-            }
+            SvgPreviewCacheHelper.EnsureCacheFolder(_webView2UserDataFolder);
         }
     }
 }
