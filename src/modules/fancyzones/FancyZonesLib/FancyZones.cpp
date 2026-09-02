@@ -328,7 +328,7 @@ private:
     bool MoveToAppLastZone(HWND window, HMONITOR monitor, GUID currentVirtualDesktop) noexcept;
 
     void RefreshLayouts() noexcept;
-    bool ShouldProcessSnapHotkey(DWORD vkCode) noexcept;
+    bool ShouldProcessSnapHotkey(DWORD vkCode, bool alt) noexcept;
     void ApplyQuickLayout(int key) noexcept;
     void FlashZones() noexcept;
 
@@ -702,7 +702,7 @@ FancyZones::OnKeyDown(PKBDLLHOOKSTRUCT info) noexcept
     {
         if ((info->vkCode == VK_RIGHT) || (info->vkCode == VK_LEFT) || (info->vkCode == VK_UP) || (info->vkCode == VK_DOWN))
         {
-            if (ShouldProcessSnapHotkey(info->vkCode))
+            if (ShouldProcessSnapHotkey(info->vkCode, alt))
             {
                 Trace::FancyZones::OnKeyDown(info->vkCode, win, ctrl, false /*inMoveSize*/);
                 // Win+Left, Win+Right will cycle through Zones in the active ZoneSet when WM_PRIV_SNAP_HOTKEY's handled
@@ -1613,7 +1613,7 @@ void FancyZones::RefreshLayouts() noexcept
     }
 }
 
-bool FancyZones::ShouldProcessSnapHotkey(DWORD vkCode) noexcept
+bool FancyZones::ShouldProcessSnapHotkey(DWORD vkCode, bool alt) noexcept
 {
     if (!FancyZonesSettings::settings().overrideSnapHotkeys)
     {
@@ -1647,7 +1647,7 @@ bool FancyZones::ShouldProcessSnapHotkey(DWORD vkCode) noexcept
         if (vkCode == VK_UP || vkCode == VK_DOWN)
         {
             return FancyZonesSettings::settings().moveWindowsBasedOnPosition ||
-                   !FancyZonesSettings::settings().cycleThroughAllZones;
+                   (!alt && !FancyZonesSettings::settings().cycleThroughAllZones);
         }
         else
         {
