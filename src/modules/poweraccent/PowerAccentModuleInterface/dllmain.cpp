@@ -50,10 +50,10 @@ private:
 
     bool is_process_running()
     {
-        return WaitForSingleObject(p_info.hProcess, 0) == WAIT_TIMEOUT;
+        return p_info.hProcess && WaitForSingleObject(p_info.hProcess, 0) == WAIT_TIMEOUT;
     }
 
-    void launch_process()
+    bool launch_process()
     {
         Logger::trace(L"Launching PowerToys QuickAccent process");
         unsigned long powertoys_pid = GetCurrentProcessId();
@@ -71,7 +71,12 @@ private:
             std::wstring message = L"PowerToys QuickAccent failed to start with error: ";
             message += std::to_wstring(error);
             Logger::error(message);
+            return false;
         }
+
+        CloseHandle(p_info.hThread);
+        p_info.hThread = nullptr;
+        return true;
     }
 
 public:
@@ -134,9 +139,8 @@ public:
 
     virtual void enable()
     {
-        launch_process();
-        m_enabled = true;
-        Trace::EnablePowerAccent(true);
+        m_enabled = launch_process();
+        Trace::EnablePowerAccent(m_enabled);
     };
 
     virtual void disable()
@@ -146,6 +150,7 @@ public:
             Logger::trace(L"Disabling QuickAccent... {}", m_enabled);
 
             auto exitEvent = CreateEvent(nullptr, false, false, CommonSharedConstants::POWERACCENT_EXIT_EVENT);
+            bool forceTerminate = !exitEvent;
             if (!exitEvent)
             {
                 Logger::warn(L"Failed to create exit event for PowerToys QuickAccent. {}", get_last_error_or_default(GetLastError()));
@@ -156,15 +161,34 @@ public:
                 if (!SetEvent(exitEvent))
                 {
                     Logger::warn(L"Failed to signal exit event for PowerToys QuickAccent. {}", get_last_error_or_default(GetLastError()));
-
-                    // For some reason, we couldn't process the signal correctly, so we still
-                    // need to terminate the PowerAccent process.
-                    TerminateProcess(p_info.hProcess, 1);
+                    forceTerminate = true;
+                }
+                else if (WaitForSingleObject(p_info.hProcess, 1500) != WAIT_OBJECT_0)
+                {
+                    Logger::warn(L"PowerToys QuickAccent did not exit after the exit event; terminating it.");
+                    forceTerminate = true;
                 }
 
-                ResetEvent(exitEvent);
+                // Auto-reset events clear when a waiter consumes the signal; resetting here can race the listener.
                 CloseHandle(exitEvent);
+            }
+
+            if (forceTerminate && p_info.hProcess)
+            {
+                if (!TerminateProcess(p_info.hProcess, 1))
+                {
+                    Logger::warn(L"Failed to terminate PowerToys QuickAccent. {}", get_last_error_or_default(GetLastError()));
+                }
+                else
+                {
+                    WaitForSingleObject(p_info.hProcess, 500);
+                }
+            }
+            
+            if (p_info.hProcess)
+            {
                 CloseHandle(p_info.hProcess);
+                p_info.hProcess = nullptr;
             }
         }
 
