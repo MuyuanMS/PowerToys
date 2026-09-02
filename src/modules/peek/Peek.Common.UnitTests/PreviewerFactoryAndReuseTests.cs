@@ -14,6 +14,7 @@ using Peek.Common.Models;
 using Peek.FilePreviewer.Models;
 using Peek.FilePreviewer.Previewers;
 using Peek.FilePreviewer.Previewers.Interfaces;
+using Peek.FilePreviewer.Previewers.MediaPreviewer;
 using Windows.Storage;
 
 namespace Peek.Common.UnitTests
@@ -56,6 +57,30 @@ namespace Peek.Common.UnitTests
 
             Assert.AreSame(nextItem, previewer.BoundItem);
             Assert.AreEqual(1.75, previewer.BoundScalingFactor, 0.0001);
+        }
+
+        [TestMethod]
+        public void PreviewerFactory_GetCompatiblePreviewerType_SelectsReusableImagePreviewer()
+        {
+            var item = new TestFileSystemItem("sample.png");
+            var factory = new PreviewerFactory(new TestPreviewSettings());
+
+            var compatibleType = factory.GetCompatiblePreviewerType(item);
+
+            Assert.AreEqual(typeof(ImagePreviewer), compatibleType);
+            Assert.IsTrue(typeof(IReusablePreviewer).IsAssignableFrom(compatibleType));
+        }
+
+        [TestMethod]
+        public void PreviewerFactory_GetCompatiblePreviewerType_SelectsReusableUnsupportedPreviewer()
+        {
+            var item = new TestFileSystemItem("sample.unsupported");
+            var factory = new PreviewerFactory(new TestPreviewSettings());
+
+            var compatibleType = factory.GetCompatiblePreviewerType(item);
+
+            Assert.AreEqual(typeof(UnsupportedFilePreviewer), compatibleType);
+            Assert.IsTrue(typeof(IReusablePreviewer).IsAssignableFrom(compatibleType));
         }
 
         private static PreviewerFactory CreateTestFactory()

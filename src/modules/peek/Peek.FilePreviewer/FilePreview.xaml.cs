@@ -357,7 +357,14 @@ namespace Peek.FilePreviewer
 
         private async Task OnScalingFactorPropertyChanged()
         {
-            await UpdatePreviewSizeAsync(_cancellationTokenSource.Token);
+            try
+            {
+                await UpdatePreviewSizeAsync(_cancellationTokenSource.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when navigation cancels a pending resize.
+            }
         }
 
         private async Task UpdatePreviewSizeAsync(CancellationToken cancellationToken)
