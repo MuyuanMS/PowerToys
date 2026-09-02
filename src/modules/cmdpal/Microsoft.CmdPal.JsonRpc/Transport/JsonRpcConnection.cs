@@ -371,24 +371,22 @@ public sealed partial class JsonRpcConnection : IDisposable
 
         if (_notificationHandlers.ContainsKey(method))
         {
-            EnqueueNotification(method, parameters);
+            await EnqueueNotificationAsync(method, parameters).ConfigureAwait(false);
         }
 
         return null;
     }
 
-    private void EnqueueNotification(string method, JsonElement parameters)
+    private async Task EnqueueNotificationAsync(string method, JsonElement parameters)
     {
         var envelope = new NotificationEnvelope(method, parameters.Clone());
-        while (!_notificationQueue.Writer.TryWrite(envelope))
+        try
         {
-            if (_notificationQueue.Reader.TryRead(out _))
-            {
-                Interlocked.Increment(ref _droppedNotifications);
-                continue;
-            }
-
-            return;
+            await _notificationQueue.Writer.WriteAsync(envelope, _disposalCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (_disposalCts.IsCancellationRequested)
+        {
+            Interlocked.Increment(ref _droppedNotifications);
         }
     }
 
