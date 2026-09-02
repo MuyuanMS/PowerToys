@@ -57,7 +57,7 @@ public enum PasteFormats
         SupportedClipboardFormats = ClipboardFormat.Text,
         IPCKey = AdvancedPasteAdditionalActions.PropertyNames.FixSpellingAndGrammar,
         KernelFunctionDescription = "Fixes all spelling and grammar errors in the clipboard text and returns the corrected version.")]
-    FixSpellingAndGrammar,
+    FixSpellingAndGrammar = 12,
 
     [PasteFormatMetadata(
         IsCoreAction = false,
