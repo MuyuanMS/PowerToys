@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation
+// Copyright (c) Microsoft Corporation
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 using System.Drawing.Drawing2D;
@@ -101,7 +101,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
         /// <param name="cx">The maximum thumbnail size, in pixels.</param>
         public Bitmap GetThumbnailImpl(uint cx)
         {
-            CleanupWebView2UserDataFolder();
+            EnsureWebView2UserDataFolder();
 
             if (cx == 0 || cx > MaxThumbnailSize)
             {
@@ -109,6 +109,8 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
             }
 
             Bitmap thumbnail = null;
+            string transientFilePath = string.Empty;
+            FileStream cacheLease = null;
 
             var thumbnailDone = new ManualResetEventSlim(false);
 
@@ -179,9 +181,6 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
                         }
                     };
 
-                    // WebView2.NavigateToString() limitation
-                    // See https://learn.microsoft.com/dotnet/api/microsoft.web.webview2.core.corewebview2.navigatetostring?view=webview2-dotnet-1.0.864.35#remarks
-                    // While testing the limit, it turned out it is ~1.5MB, so to be on a safe side we go for 1.5m bytes
                     SvgContentsReady.Wait();
                     if (string.IsNullOrEmpty(SvgContents) || !SvgContents.Contains("svg"))
                     {
@@ -189,16 +188,31 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
                         return;
                     }
 
-                    if (SvgContents.Length > 1_500_000)
+                    var cacheKey = SvgPreviewCacheHelper.BuildCacheKey("v2", VirtualHostName, SvgContents);
+                    var cacheFolder = SvgPreviewCacheHelper.GetCacheFolderPath(_webView2UserDataFolder);
+
+                    if (SvgPreviewCacheHelper.TryGetCacheFile(cacheFolder, cacheKey, out var cacheFilePath, out cacheLease))
                     {
-                        string filename = _webView2UserDataFolder + "\\" + Guid.NewGuid().ToString() + ".html";
-                        File.WriteAllText(filename, SvgContents);
-                        _localFileURI = new Uri(filename);
+                        _localFileURI = new Uri(cacheFilePath);
                         _browser.Source = _localFileURI;
                     }
                     else
                     {
-                        _browser.NavigateToString(SvgContents);
+                        var htmlContents = WrapSVGInHTML(SvgContents);
+                        if (SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, htmlContents, out cacheFilePath, out cacheLease))
+                        {
+                            _localFileURI = new Uri(cacheFilePath);
+                            _browser.Source = _localFileURI;
+                        }
+                        else if (SvgPreviewCacheHelper.TryWriteTransientFile(_webView2UserDataFolder, htmlContents, out transientFilePath))
+                        {
+                            _localFileURI = new Uri(transientFilePath);
+                            _browser.Source = _localFileURI;
+                        }
+                        else
+                        {
+                            _browser.NavigateToString(htmlContents);
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -214,6 +228,8 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
             }
 
             _browser.Dispose();
+            cacheLease?.Dispose();
+            SvgPreviewCacheHelper.DeleteTransientFile(transientFilePath);
 
             return thumbnail;
         }
@@ -313,7 +329,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
                             // MS Edge and Firefox also couldn't preview svg files with mentioned order of namespaces definitions.
                             svgData = SvgPreviewHandlerHelper.SwapNamespaces(svgData);
                             svgData = SvgPreviewHandlerHelper.AddStyleSVG(svgData);
-                            SvgContents = WrapSVGInHTML(svgData);
+                            SvgContents = svgData;
                             SvgContentsReady.Set();
                         }
                         catch (Exception)
@@ -345,23 +361,11 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
         }
 
         /// <summary>
-        /// Cleanup the previously created tmp html files from svg files bigger than 2MB.
+        /// Ensures the WebView2 user-data and SVG preview cache folders exist.
         /// </summary>
-        private void CleanupWebView2UserDataFolder()
+        private void EnsureWebView2UserDataFolder()
         {
-            try
-            {
-                // Cleanup temp dir
-                var dir = new DirectoryInfo(_webView2UserDataFolder);
-
-                foreach (var file in dir.EnumerateFiles("*.html"))
-                {
-                    file.Delete();
-                }
-            }
-            catch (Exception)
-            {
-            }
+            SvgPreviewCacheHelper.EnsureCacheFolder(_webView2UserDataFolder);
         }
     }
 }
