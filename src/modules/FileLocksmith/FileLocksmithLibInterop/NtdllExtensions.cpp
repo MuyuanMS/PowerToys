@@ -434,7 +434,7 @@ std::vector<NtdllExtensions::HandleInfo> NtdllExtensions::handles() noexcept
     }
 
     std::scoped_lock lock{ state->result_mutex };
-    return state->result;
+    return std::move(state->result);
 }
 
 // Returns the list of all processes.
