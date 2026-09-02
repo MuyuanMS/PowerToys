@@ -74,7 +74,7 @@ namespace PowerLauncher.Helper
         public static extern int SHQueryUserNotificationState(out UserNotificationState state);
 
         [DllImport("winmm.dll", CharSet = CharSet.Unicode)]
-        internal static extern bool PlaySound(byte[] pszSound, IntPtr hModule, uint dwFlags);
+        internal static extern bool PlaySound(IntPtr pszSound, IntPtr hModule, uint dwFlags);
 
         internal const uint SndAsync = 0x00000001;
         internal const uint SndNoDefault = 0x00000002;
