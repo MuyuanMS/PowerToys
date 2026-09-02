@@ -110,7 +110,10 @@ std::vector<GUID> LayoutHotkeys::GetLayoutIds() const noexcept
     ids.reserve(m_hotkeyMap.size());
     for (const auto& [key, id] : m_hotkeyMap)
     {
-        ids.push_back(id);
+        if (std::ranges::find(ids, id) == ids.end())
+        {
+            ids.push_back(id);
+        }
     }
 
     return ids;

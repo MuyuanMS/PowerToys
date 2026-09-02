@@ -94,6 +94,13 @@ namespace FancyZonesUnitTests
 
                 keysArray.Append(keyJson);
             }
+            {
+                json::JsonObject keyJson{};
+                keyJson.SetNamedValue(NonLocalizable::LayoutHotkeysIds::LayoutUuidID, json::value(L"{33A2B101-06E0-437B-A61E-CDBECF502908}"));
+                keyJson.SetNamedValue(NonLocalizable::LayoutHotkeysIds::KeyID, json::value(3));
+
+                keysArray.Append(keyJson);
+            }
 
             root.SetNamedValue(NonLocalizable::LayoutHotkeysIds::LayoutHotkeysArrayID, keysArray);
             json::to_file(LayoutHotkeys::LayoutHotkeysFileName(), root);
