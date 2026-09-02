@@ -260,6 +260,19 @@ namespace Common.Utilities
 
             var cacheRootFolder = GetCacheFolderPath(webView2UserDataFolder);
             PruneCache(cacheRootFolder, utcNow);
+            foreach (var temporaryFile in Directory.EnumerateFiles(cacheRootFolder, "*.tmp", SearchOption.TopDirectoryOnly))
+            {
+                try
+                {
+                    if (utcNow - File.GetLastWriteTimeUtc(temporaryFile) > MaxTransientFileAge)
+                    {
+                        TryDeleteFile(temporaryFile);
+                    }
+                }
+                catch (Exception)
+                {
+                }
+            }
 
             var transientFolder = Path.Combine(webView2UserDataFolder, "SvgPreviewTransient");
             if (Directory.Exists(transientFolder))

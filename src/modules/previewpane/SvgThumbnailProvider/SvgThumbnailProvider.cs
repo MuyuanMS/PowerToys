@@ -191,20 +191,28 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
                     var cacheKey = SvgPreviewCacheHelper.BuildCacheKey("v2", VirtualHostName, SvgContents);
                     var cacheFolder = SvgPreviewCacheHelper.GetCacheFolderPath(_webView2UserDataFolder);
 
-                    if (SvgPreviewCacheHelper.TryGetCacheFile(cacheFolder, cacheKey, out var cacheFilePath, out cacheLease) ||
-                        SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, SvgContents, out cacheFilePath, out cacheLease))
+                    if (SvgPreviewCacheHelper.TryGetCacheFile(cacheFolder, cacheKey, out var cacheFilePath, out cacheLease))
                     {
                         _localFileURI = new Uri(cacheFilePath);
                         _browser.Source = _localFileURI;
                     }
-                    else if (SvgPreviewCacheHelper.TryWriteTransientFile(_webView2UserDataFolder, SvgContents, out transientFilePath))
-                    {
-                        _localFileURI = new Uri(transientFilePath);
-                        _browser.Source = _localFileURI;
-                    }
                     else
                     {
-                        _browser.NavigateToString(SvgContents);
+                        var htmlContents = WrapSVGInHTML(SvgContents);
+                        if (SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, htmlContents, out cacheFilePath, out cacheLease))
+                        {
+                            _localFileURI = new Uri(cacheFilePath);
+                            _browser.Source = _localFileURI;
+                        }
+                        else if (SvgPreviewCacheHelper.TryWriteTransientFile(_webView2UserDataFolder, htmlContents, out transientFilePath))
+                        {
+                            _localFileURI = new Uri(transientFilePath);
+                            _browser.Source = _localFileURI;
+                        }
+                        else
+                        {
+                            _browser.NavigateToString(htmlContents);
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -321,7 +329,7 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
                             // MS Edge and Firefox also couldn't preview svg files with mentioned order of namespaces definitions.
                             svgData = SvgPreviewHandlerHelper.SwapNamespaces(svgData);
                             svgData = SvgPreviewHandlerHelper.AddStyleSVG(svgData);
-                            SvgContents = WrapSVGInHTML(svgData);
+                            SvgContents = svgData;
                             SvgContentsReady.Set();
                         }
                         catch (Exception)
