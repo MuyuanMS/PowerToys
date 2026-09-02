@@ -76,6 +76,16 @@ describe('initialization failure propagation', () => {
 
     expect(responseFor(sent, 2)?.error).toMatchObject({ message: 'creation boom' });
   });
+
+  it('ignores provider creation rejection after disposal', async () => {
+    const { runtime, fatal } = createHarness();
+    runtime.beginInitialization(Promise.reject(new Error('creation boom')));
+
+    await runtime.dispose();
+    await Promise.resolve();
+
+    expect(fatal).not.toHaveBeenCalled();
+  });
 });
 
 describe('handshake and version negotiation', () => {

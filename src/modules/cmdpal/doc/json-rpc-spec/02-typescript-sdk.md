@@ -33,7 +33,7 @@ The shipped package is ESM (`"type": "module"`) and exposes `./dist/index.js` wi
 
 ```typescript
 interface IconData {
-  icon?: string;          // Font glyph character or file/URI path
+  icon?: string;          // Font glyph character or URI
   data?: string | null;   // Base64-encoded image data or data URI
 }
 
@@ -45,7 +45,8 @@ interface IconInfo {
 
 Icons can be provided as:
 - **Font glyphs:** `{ icon: '\uE91B' }`, for Segoe Fluent Icons / MDL2 Assets
-- **File paths:** `{ icon: 'C:\\path\\to\\icon.png' }`
+- **Local files:** `await iconFromFile('./assets/icon.png')`, which sends encoded bytes rather than a machine-specific path
+- **URLs:** `await iconFromUrl('https://raw.githubusercontent.com/microsoft/PowerToys/main/doc/images/icons/PowerToys%20icon/Vintage/Logo-HiRes.png')`
 - **Base64 data:** `{ data: 'iVBORw0KGgo...' }`, with raw base64-encoded image bytes
 - **Data URIs:** `{ data: 'data:image/png;base64,iVBOR...' }`
 
@@ -289,7 +290,7 @@ interface Details {
   size?: DetailsSize;         // Defaults to 'small'
 }
 
-type DetailsSize = 'small' | 'medium' | 'large' | 0 | 1 | 2;
+type DetailsSize = 'small' | 'medium' | 'large';
 
 interface DetailsElement {
   key: string;                // Label shown to the left
@@ -303,10 +304,6 @@ type DetailsData =
   | DetailsCommands    // { type: 'commands', commands: ICommand[] }
   | DetailsSeparator;  // { type: 'separator' }
 ```
-
-Use the named sizes for new extensions. The numeric values map to the host's
-`ContentSize` values and remain available when you need to mirror an existing
-host payload.
 
 ---
 
@@ -601,11 +598,15 @@ const icon = iconFromGlyph('\uE91B');
 const icon = iconFromBase64('iVBORw0KGgoAAAANSUhEUg...');
 
 // Fetch image from URL (async, downloads and encodes as base64)
-const icon = await iconFromUrl('https://example.com/icon.png');
+const icon = await iconFromUrl('https://raw.githubusercontent.com/microsoft/PowerToys/main/doc/images/icons/PowerToys%20icon/Vintage/Logo-HiRes.png');
 
 // Read local file (async, reads and encodes as base64)
 const icon = await iconFromFile('./assets/icon.png');
 ```
+
+Base64 data is serialized into every item that uses it, and the protocol does
+not deduplicate repeated images. Use a relative path for the manifest icon, and
+keep inline payloads small when the same image appears across many items.
 
 ---
 
@@ -653,6 +654,19 @@ const provider = activate({ extensionId: 'my-extension', extensionDirectory: pro
 ```
 
 ### Notifications
+
+```typescript
+import { CommandProviderBase } from '@microsoft/cmdpal-sdk';
+
+class RefreshableProvider extends CommandProviderBase {
+  refreshCommands(): void {
+    // Sends provider/itemsChanged with { totalItems: -1 }.
+    this.notifyItemsChanged();
+  }
+}
+```
+
+For page and property notifications, the corresponding observable base classes expose protected helpers. The lower-level `sendNotification` API remains available for protocol work:
 
 ```typescript
 import { sendNotification } from '@microsoft/cmdpal-sdk';

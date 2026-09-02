@@ -2,9 +2,21 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-import { CopyTextCommand, ListItemBase, ListPageBase } from '@microsoft/cmdpal-sdk';
-import type { Details, IListItem, Tag } from '@microsoft/cmdpal-sdk';
-import { icon } from '../util.js';
+import {
+  CopyTextCommand,
+  iconFromBase64,
+  iconFromUrl,
+  ListItemBase,
+  ListPageBase,
+} from '@microsoft/cmdpal-sdk';
+import type { Details, IconInfo, IListItem, Tag } from '@microsoft/cmdpal-sdk';
+import { getHeroImage, glyphIcon, samplePngBase64 } from '../util.js';
+
+type IconLoader = () => Promise<IconInfo>;
+
+const firstPartyIconUrl =
+  'https://raw.githubusercontent.com/microsoft/PowerToys/main/doc/images/icons/PowerToys%20icon/Vintage/Logo-HiRes.png';
+const loadingFallback = glyphIcon('\uE774');
 
 /*
  * Quick intro to Unicode in source code:
@@ -64,7 +76,7 @@ function codePointTags(value: string): Tag[] {
 }
 
 function buildIconItem(glyph: string, title: string, description: string): IListItem {
-  const iconInfo = icon(glyph);
+  const iconInfo = glyphIcon(glyph);
   const details: Details = {
     heroImage: iconInfo,
     title,
@@ -87,20 +99,68 @@ function buildIconItem(glyph: string, title: string, description: string): IList
   });
 }
 
+class MutableIconItem extends ListItemBase {
+  updateIcon(icon: IconInfo): void {
+    if (this.icon === icon) {
+      return;
+    }
+
+    this.icon = icon;
+    this.notifyPropChanged('icon');
+  }
+}
+
 /** A demo of how many icon strings are interpreted. Mirrors `SampleIconPage`. */
 export class SampleIconPage extends ListPageBase {
   readonly id = 'sample-icon-page';
   readonly name = 'Sample Icon Page';
   readonly title = 'Sample Icon Page';
 
-  override icon = icon('\uE8BA');
+  override icon = glyphIcon('\uE8BA');
   override showDetails = true;
 
   private readonly items = iconSamples.map(([glyph, title, description]) =>
     buildIconItem(glyph, title, description),
   );
+  private readonly packagedFileItem = new MutableIconItem({
+    command: new CopyTextCommand('assets/hero.png', 'Copy packaged file path'),
+    title: 'Packaged file icon',
+    subtitle: 'Loads the bundled PNG after this list is requested and sends its bytes, not a machine path',
+    icon: loadingFallback,
+  });
+  private readonly urlItem = new MutableIconItem({
+    command: new CopyTextCommand(firstPartyIconUrl, 'Copy first-party URL'),
+    title: 'First-party URL icon',
+    subtitle: 'Loads after this list is requested and keeps this glyph fallback when offline',
+    icon: loadingFallback,
+  });
+  private readonly sourceItems = [
+    this.packagedFileItem,
+    this.urlItem,
+    new ListItemBase({
+      command: new CopyTextCommand(samplePngBase64, 'Copy inline base64'),
+      title: 'Inline base64 icon',
+      subtitle: 'iconFromBase64 sends image bytes without a file or network request',
+      icon: iconFromBase64(samplePngBase64),
+    }),
+  ];
+  private packagedFileIconLoad?: Promise<void>;
+  private urlIconLoad?: Promise<void>;
+
+  private loadIcon(loader: IconLoader, item: MutableIconItem): Promise<void> {
+    return Promise.resolve()
+      .then(loader)
+      .catch(() => loadingFallback)
+      .then((loadedIcon) => item.updateIcon(loadedIcon));
+  }
+
+  private startIconLoads(): void {
+    this.packagedFileIconLoad ??= this.loadIcon(getHeroImage, this.packagedFileItem);
+    this.urlIconLoad ??= this.loadIcon(() => iconFromUrl(firstPartyIconUrl), this.urlItem);
+  }
 
   override getItems(): IListItem[] {
-    return this.items;
+    this.startIconLoads();
+    return [...this.sourceItems, ...this.items];
   }
 }

@@ -9,9 +9,9 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    // The hand-written `.mjs` bin wrapper and build scripts run on Node without
-    // TypeScript's ambient lib, so declare the Node runtime globals they use.
-    files: ['**/*.mjs'],
+    // The hand-written `.mjs` bin wrapper runs on Node without TypeScript's
+    // ambient lib, so declare the Node runtime globals it uses.
+    files: ['bin/**/*.mjs'],
     languageOptions: {
       globals: {
         process: 'readonly',

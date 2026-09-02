@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
@@ -224,7 +225,7 @@ public class JSAdapterProxyTests
     }
 
     [TestMethod]
-    public void ListPage_MapsDetailsSizeFromStringAndNumber()
+    public void ListPage_MapsDetailsSizeNamesIgnoringCaseAndNumericLeniency()
     {
         using var fake = new JSFakeExtension();
         fake.OnResult("provider/getCommand", """{ "id": "list1", "pageType": "listPage", "name": "My List" }""");
@@ -233,10 +234,14 @@ public class JSAdapterProxyTests
             {
               "items": [
                 { "title": "Large by name", "details": { "title": "A", "size": "large" } },
-                { "title": "Medium by number", "details": { "title": "B", "size": 1 } },
-                { "title": "Default size", "details": { "title": "C" } },
-                { "title": "Unknown name", "details": { "title": "D", "size": "extra-large" } },
-                { "title": "Unknown number", "details": { "title": "E", "size": 99 } }
+                { "title": "Medium mixed case", "details": { "title": "B", "size": "MeDiUm" } },
+                { "title": "Small upper case", "details": { "title": "C", "size": "SMALL" } },
+                { "title": "Small by number", "details": { "title": "D", "size": 0 } },
+                { "title": "Medium by number", "details": { "title": "E", "size": 1 } },
+                { "title": "Large by number", "details": { "title": "F", "size": 2 } },
+                { "title": "Default size", "details": { "title": "G" } },
+                { "title": "Unknown name", "details": { "title": "H", "size": "extra-large" } },
+                { "title": "Unknown number", "details": { "title": "I", "size": 99 } }
               ]
             }
             """;
@@ -250,7 +255,27 @@ public class JSAdapterProxyTests
         Assert.AreEqual((int)ContentSize.Medium, GetDetailsSize(items[1].Details));
         Assert.AreEqual((int)ContentSize.Small, GetDetailsSize(items[2].Details));
         Assert.AreEqual((int)ContentSize.Small, GetDetailsSize(items[3].Details));
-        Assert.AreEqual((int)ContentSize.Small, GetDetailsSize(items[4].Details));
+        Assert.AreEqual((int)ContentSize.Medium, GetDetailsSize(items[4].Details));
+        Assert.AreEqual((int)ContentSize.Large, GetDetailsSize(items[5].Details));
+        Assert.AreEqual((int)ContentSize.Small, GetDetailsSize(items[6].Details));
+        Assert.AreEqual((int)ContentSize.Small, GetDetailsSize(items[7].Details));
+        Assert.AreEqual((int)ContentSize.Small, GetDetailsSize(items[8].Details));
+    }
+
+    [TestMethod]
+    public void ParseContentSize_BoundsMalformedValueDiagnosticPreview()
+    {
+        var oversizedValue = new string('x', JSModelMapper.JsonDiagnosticPreviewMaxLength * 4);
+        using var document = JsonDocument.Parse(JsonSerializer.Serialize(new { size = oversizedValue }));
+        var sizeElement = document.RootElement.GetProperty("size");
+
+        var preview = JSModelMapper.GetBoundedJsonPreview(sizeElement);
+        var size = JSModelMapper.ParseContentSize(document.RootElement, "size");
+
+        Assert.AreEqual(JSModelMapper.JsonDiagnosticPreviewMaxLength + 3, preview.Length);
+        Assert.IsTrue(preview.EndsWith("...", StringComparison.Ordinal));
+        Assert.AreEqual(ContentSize.Small, size);
+        Assert.AreEqual("<undefined>", JSModelMapper.GetBoundedJsonPreview(default));
     }
 
     [TestMethod]
@@ -537,7 +562,7 @@ public class JSAdapterProxyTests
               "id": "list-fg",
               "pageType": "listPage",
               "name": "Filtered",
-              "gridProperties": { "type": "medium", "showTitle": true },
+              "gridProperties": { "type": "MeDiUm", "showTitle": true },
               "filters": {
                 "currentFilterId": "all",
                 "filters": [

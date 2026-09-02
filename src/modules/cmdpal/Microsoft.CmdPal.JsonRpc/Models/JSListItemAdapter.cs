@@ -19,6 +19,9 @@ namespace Microsoft.CmdPal.JsonRpc.Models;
 /// </summary>
 internal sealed partial class JSListItemAdapter : JSObservableProxyBase, IListItem
 {
+    private readonly JSLazyCache<ICommand?> _command;
+    private readonly JSLazyCache<IContextItem[]> _moreCommands;
+    private readonly JSLazyCache<IDetails?> _details;
     private static readonly string[] RefreshableProperties =
     [
         "command",
@@ -32,17 +35,23 @@ internal sealed partial class JSListItemAdapter : JSObservableProxyBase, IListIt
         "textToSuggest",
     ];
 
-    private Lazy<ICommand?> _command;
-
     public JSListItemAdapter(JsonElement data, JsonRpcConnection connection)
         : base(GetNotificationId(data), connection, data)
     {
-        _command = CreateCommand();
+        _command = new JSLazyCache<ICommand?>(
+            CreateCommand,
+            JSLazyCache<ICommand?>.DisposeValue);
+        _moreCommands = new JSLazyCache<IContextItem[]>(
+            () => JSModelMapper.ParseMoreCommands(Data, Connection),
+            JSModelMapper.DisposeContextItems);
+        _details = new JSLazyCache<IDetails?>(
+            () => JSModelMapper.ParseDetails(Data, Connection),
+            JSModelMapper.DisposeDetails);
     }
 
-    public ICommand? Command => Volatile.Read(ref _command).Value;
+    public ICommand? Command => _command.Value;
 
-    public IContextItem[] MoreCommands => JSModelMapper.ParseMoreCommands(Data, Connection);
+    public IContextItem[] MoreCommands => _moreCommands.Value;
 
     public IIconInfo Icon => JSModelMapper.TryGetIcon(Data, "icon", out var icon)
         ? icon
@@ -54,7 +63,7 @@ internal sealed partial class JSListItemAdapter : JSObservableProxyBase, IListIt
 
     public ITag[] Tags => JSModelMapper.ParseTags(Data);
 
-    public IDetails? Details => JSModelMapper.ParseDetails(Data, Connection);
+    public IDetails? Details => _details.Value;
 
     public string Section => JSModelMapper.GetString(Data, "section") ?? string.Empty;
 
@@ -73,8 +82,15 @@ internal sealed partial class JSListItemAdapter : JSObservableProxyBase, IListIt
         {
             if (propertyName == "command")
             {
-                Volatile.Write(ref _command, CreateCommand());
-                break;
+                _command.Reset();
+            }
+            else if (propertyName == "moreCommands")
+            {
+                _moreCommands.Reset();
+            }
+            else if (propertyName == "details")
+            {
+                _details.Reset();
             }
         }
     }
@@ -101,17 +117,22 @@ internal sealed partial class JSListItemAdapter : JSObservableProxyBase, IListIt
 
     internal void UpdateData(JsonElement data)
     {
-        ReplaceData(data, RefreshableProperties);
+        ReplaceData(data, RefreshableProperties, GetNotificationId(data));
     }
 
-    private Lazy<ICommand?> CreateCommand()
+    public override void Dispose()
     {
-        return new Lazy<ICommand?>(() =>
-        {
-            return JSModelMapper.TryGetCommandData(Data, out var commandData)
-                ? JSCommandFactory.CreateCommandFromJson(commandData, Connection)
-                : null;
-        });
+        _moreCommands.Dispose();
+        _details.Dispose();
+        _command.Dispose();
+        base.Dispose();
+    }
+
+    private ICommand? CreateCommand()
+    {
+        return JSModelMapper.TryGetCommandData(Data, out var commandData)
+            ? JSCommandFactory.CreateCommandFromJson(commandData, Connection)
+            : null;
     }
 
     private static string GetNotificationId(JsonElement data)

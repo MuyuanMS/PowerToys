@@ -224,6 +224,10 @@ export class ExtensionRuntime {
         this.initState = 'ready';
       },
       (error: unknown) => {
+        if (this.disposed) {
+          return;
+        }
+
         this.initState = 'failed';
         this.initError = { code: JsonRpcErrorCode.InternalError, message: describeError(error) };
         this.reportFatal?.(1);
@@ -860,7 +864,8 @@ export class ExtensionRuntime {
         },
       );
 
-      serialized[propertyName] = serializer.observableProperty(commandId, propertyName, value);
+      const serializedValue = serializer.observableProperty(commandId, propertyName, value);
+      serialized[propertyName] = serializedValue === undefined ? null : serializedValue;
     }
 
     return { ...notification, properties: serialized };

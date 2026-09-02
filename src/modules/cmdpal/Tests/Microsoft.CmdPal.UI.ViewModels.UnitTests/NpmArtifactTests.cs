@@ -102,6 +102,14 @@ public class NpmArtifactTests
     [DataRow("1.2")]
     [DataRow("*")]
     [DataRow("1.2.3 || 2.0.0")]
+    [DataRow("01.2.3")]
+    [DataRow("1.02.3")]
+    [DataRow("1.2.03")]
+    [DataRow("1.2.3-")]
+    [DataRow("1.2.3-beta..1")]
+    [DataRow("1.2.3-01")]
+    [DataRow("1.2.3+")]
+    [DataRow("1.2.3+build..5")]
     public void TryCreate_RangeOrDistTagVersion_FailsClosed(string version)
     {
         var ok = NpmArtifact.TryCreate("left-pad", version, ValidIntegrity, null, out _, out var error);

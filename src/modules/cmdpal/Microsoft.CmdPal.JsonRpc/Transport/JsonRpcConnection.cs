@@ -22,6 +22,7 @@ namespace Microsoft.CmdPal.JsonRpc;
 public sealed partial class JsonRpcConnection : IDisposable
 {
     private const int NotificationQueueCapacity = 1024;
+    private const int MaxMessageContentLength = 16 * 1024 * 1024;
 
     private static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan DisposeDrainTimeout = TimeSpan.FromSeconds(2);
@@ -76,7 +77,7 @@ public sealed partial class JsonRpcConnection : IDisposable
         };
         _messageFactory = formatter;
 
-        _messageHandler = new HeaderDelimitedMessageHandler(output, input, formatter);
+        _messageHandler = new HeaderDelimitedMessageHandler(output, new BoundedContentLengthStream(input, MaxMessageContentLength), formatter);
         _rpc = new CmdPalJsonRpc(_messageHandler)
         {
             AllowModificationWhileListening = true,
@@ -98,6 +99,8 @@ public sealed partial class JsonRpcConnection : IDisposable
     public event EventHandler<JsonRpcErrorEventArgs>? Error;
 
     internal long DroppedNotificationCount => Interlocked.Read(ref _droppedNotifications);
+
+    internal Task NotificationConsumerCompletion => _notificationConsumerTask ?? Task.CompletedTask;
 
     /// <summary>
     /// Starts listening for messages from the extension.
@@ -145,6 +148,10 @@ public sealed partial class JsonRpcConnection : IDisposable
                 Result = result.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined ? null : result,
             };
         }
+        catch (ConnectionLostException ex)
+        {
+            throw new JsonRpcException("The JSON-RPC connection closed before a response was received.", ex);
+        }
         catch (RemoteRpcException ex)
         {
             return new JsonRpcResponse
@@ -172,7 +179,7 @@ public sealed partial class JsonRpcConnection : IDisposable
             requestCts.Cancel();
             throw;
         }
-        catch (Exception ex) when (ex is ConnectionLostException or ObjectDisposedException or IOException)
+        catch (Exception ex) when (ex is ObjectDisposedException or IOException)
         {
             throw new JsonRpcException("The JSON-RPC connection closed before a response was received.", ex);
         }
@@ -286,25 +293,31 @@ public sealed partial class JsonRpcConnection : IDisposable
         _connectionClosedCts.Cancel();
         DisposeRpc();
 
-        var tasks = new[] { _notificationConsumerTask, _errorPumpTask };
-        foreach (var task in tasks)
+        var tasks = new[]
         {
-            if (task is null)
-            {
-                continue;
-            }
-
-            try
-            {
-                task.Wait(DisposeDrainTimeout);
-            }
-            catch (AggregateException)
-            {
-            }
+            _notificationConsumerTask ?? Task.CompletedTask,
+            _errorPumpTask ?? Task.CompletedTask,
+            _rpc.Completion,
+        };
+        try
+        {
+            Task.WhenAll(tasks).Wait(DisposeDrainTimeout);
+        }
+        catch (AggregateException)
+        {
         }
 
-        _disposalCts.Dispose();
-        _connectionClosedCts.Dispose();
+        _ = DisposeTokenSourcesWhenTasksCompleteAsync(tasks, _disposalCts, _connectionClosedCts);
+    }
+
+    private static async Task DisposeTokenSourcesWhenTasksCompleteAsync(
+        Task[] tasks,
+        CancellationTokenSource disposalCts,
+        CancellationTokenSource connectionClosedCts)
+    {
+        await Task.WhenAll(tasks).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        disposalCts.Dispose();
+        connectionClosedCts.Dispose();
     }
 
     private void RegisterMethod(string method)
@@ -410,6 +423,11 @@ public sealed partial class JsonRpcConnection : IDisposable
         catch (ChannelClosedException)
         {
         }
+        catch (Exception ex)
+        {
+            Logger.LogError("The JSON-RPC notification pump ended unexpectedly.", ex);
+            RaiseError(ex);
+        }
     }
 
     private async Task PumpErrorStreamAsync()
@@ -456,7 +474,24 @@ public sealed partial class JsonRpcConnection : IDisposable
 
     private void RaiseError(Exception exception)
     {
-        Error?.Invoke(this, new JsonRpcErrorEventArgs(exception));
+        var handlers = Error;
+        if (handlers is null)
+        {
+            return;
+        }
+
+        var eventArgs = new JsonRpcErrorEventArgs(exception);
+        foreach (EventHandler<JsonRpcErrorEventArgs> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, eventArgs);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("A JSON-RPC error event handler failed.", ex);
+            }
+        }
     }
 
     private static int GetErrorCode(RemoteRpcException exception)

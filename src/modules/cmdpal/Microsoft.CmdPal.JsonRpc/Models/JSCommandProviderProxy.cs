@@ -43,6 +43,7 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
     // startup logs, statuses, and clipboard requests are not lost.
     private readonly Lock _hostLock = new();
     private readonly List<Action<IExtensionHost>> _pendingHostActions = [];
+    private readonly object _settingsLock = new();
 
     private JsonElement _providerMetadata;
 
@@ -55,8 +56,9 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
 
     private IExtensionHost? _host;
     private ICommandSettings? _settingsCache;
+    private bool _settingsLoading;
     private bool _settingsQueried;
-    private bool _isDisposed;
+    private volatile bool _isDisposed;
 
     public JSCommandProviderProxy(
         JsonRpcConnection connection,
@@ -143,39 +145,43 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
     {
         get
         {
-            if (_settingsQueried)
+            lock (_settingsLock)
             {
-                return _settingsCache;
-            }
+                while (_settingsLoading && !_isDisposed)
+                {
+                    Monitor.Wait(_settingsLock);
+                }
 
-            _settingsQueried = true;
+                if (_isDisposed)
+                {
+                    return null;
+                }
 
-            try
-            {
-                var response = _connection.SendRequestAsync(
-                    "provider/getSettings",
-                    null,
-                    CancellationToken.None).GetAwaiter().GetResult();
-
-                if (response.Error != null ||
-                    !response.Result.HasValue ||
-                    response.Result.Value.ValueKind != JsonValueKind.Object)
+                if (_settingsQueried)
                 {
                     return _settingsCache;
                 }
 
-                var pageId = JSModelMapper.GetString(response.Result.Value, "id") ?? string.Empty;
-                if (!string.IsNullOrEmpty(pageId))
-                {
-                    _settingsCache = new JSCommandSettingsProxy(pageId, _connection, response.Result.Value.Clone());
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.LogDebug($"Failed to get settings for {DisplayName}: {ex.Message}");
+                _settingsLoading = true;
             }
 
-            return _settingsCache;
+            var settings = LoadSettings();
+            lock (_settingsLock)
+            {
+                _settingsLoading = false;
+                _settingsQueried = true;
+                if (_isDisposed)
+                {
+                    (settings as IDisposable)?.Dispose();
+                }
+                else
+                {
+                    _settingsCache = settings;
+                }
+
+                Monitor.PulseAll(_settingsLock);
+                return _settingsCache;
+            }
         }
     }
 
@@ -198,7 +204,7 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Failed to get top-level commands: {ex.Message}");
+            Logger.LogError("Failed to get top-level commands.", ex);
             return [];
         }
     }
@@ -419,6 +425,12 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
         {
             _connection.UnregisterNotificationHandler(method);
         }
+
+        lock (_settingsLock)
+        {
+            (_settingsCache as IDisposable)?.Dispose();
+            Monitor.PulseAll(_settingsLock);
+        }
     }
 
     private void OnConnectionDisconnected(object? sender, EventArgs e)
@@ -488,6 +500,34 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
         _connection.RegisterNotificationHandler("host/showStatus", HandleShowStatusNotification);
         _connection.RegisterNotificationHandler("host/hideStatus", HandleHideStatusNotification);
         _connection.RegisterNotificationHandler("host/copyText", HandleCopyTextNotification);
+    }
+
+    private ICommandSettings? LoadSettings()
+    {
+        try
+        {
+            var response = _connection.SendRequestAsync(
+                "provider/getSettings",
+                null,
+                CancellationToken.None).GetAwaiter().GetResult();
+
+            if (response.Error != null ||
+                !response.Result.HasValue ||
+                response.Result.Value.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            var pageId = JSModelMapper.GetString(response.Result.Value, "id") ?? string.Empty;
+            return string.IsNullOrEmpty(pageId)
+                ? null
+                : new JSCommandSettingsProxy(pageId, _connection, response.Result.Value.Clone());
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug($"Failed to get settings for {DisplayName}: {ex.Message}");
+            return null;
+        }
     }
 
     private void HandleItemsChangedNotification(JsonElement paramsElement)

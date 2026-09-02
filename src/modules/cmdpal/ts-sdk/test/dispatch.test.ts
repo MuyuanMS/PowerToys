@@ -605,6 +605,21 @@ describe('ExtensionRuntime notification dispatch', () => {
       properties: { displayTitle: 'Search: abc' },
     });
   });
+
+  it('serializes undefined property changes as null so cleared values reach the host', () => {
+    const { runtime, sent } = createHarness();
+    runtime.sendSdkNotification('command/propChanged', {
+      commandId: 'page',
+      properties: { subtitle: undefined },
+    });
+
+    const changed = notificationsOf(sent, 'command/propChanged');
+    expect(changed).toHaveLength(1);
+    expect(changed[0]?.params).toEqual({
+      commandId: 'page',
+      properties: { subtitle: null },
+    });
+  });
 });
 
 describe('ExtensionRuntime settings integration', () => {

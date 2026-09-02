@@ -4,7 +4,7 @@
 
 import { ListItemBase, ListPageBase, NoOpCommand } from '@microsoft/cmdpal-sdk';
 import type { IListItem } from '@microsoft/cmdpal-sdk';
-import { icon } from '../util.js';
+import { glyphIcon } from '../util.js';
 
 /**
  * A page that adds one entry each time it opens. It mirrors the load side of the
@@ -18,13 +18,13 @@ export class OnLoadPage extends ListPageBase {
   readonly name = 'Open';
   readonly title = 'OnLoad sample';
 
-  override icon = icon('\uE8AB');
+  override icon = glyphIcon('\uE8AB');
   override placeholderText = 'This page changes each time you load it';
   override emptyContent = new ListItemBase({
     command: new NoOpCommand('on-load-empty'),
     title: 'This page starts empty',
     subtitle: 'but go back and open it again',
-    icon: icon('\uE8AB'),
+    icon: glyphIcon('\uE8AB'),
   });
 
   private readonly items: IListItem[] = [];
@@ -35,7 +35,7 @@ export class OnLoadPage extends ListPageBase {
       new ListItemBase({
         command: new NoOpCommand(`on-load-${this.items.length}`),
         title: `Loaded ${now}`,
-        icon: icon('\uECCB'),
+        icon: glyphIcon('\uECCB'),
       }),
     );
     return [...this.items];

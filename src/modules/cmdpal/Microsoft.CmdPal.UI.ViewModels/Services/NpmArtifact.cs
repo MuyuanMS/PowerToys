@@ -67,7 +67,7 @@ public sealed class NpmArtifact
     // operators (^, ~, >, <, =, *, x, ||, -) and dist tags such as "latest" do not match, so only one
     // concrete version is accepted.
     private static readonly Regex ExactVersionRegex = new(
-        @"^\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?(?:\+[0-9A-Za-z][0-9A-Za-z.-]*)?$",
+        @"^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:(?:0|[1-9]\d*|[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     // Subresource Integrity for a sha512 digest: the "sha512-" prefix followed by standard base64.
