@@ -182,6 +182,10 @@ internal sealed partial class AdaptiveFilePathInputControl : AdaptiveCustomInput
     {
         _element = element;
         _validationRegex = AdaptiveInputValidation.CreateRegex(element.ValidationPattern);
+        if (!string.IsNullOrEmpty(element.Id))
+        {
+            AutomationProperties.SetAutomationId(this, element.Id);
+        }
 
         var fieldName = string.IsNullOrEmpty(element.Header)
             ? RS_.GetString(element.SelectionMode == AdaptiveFilePathSelectionMode.File
@@ -222,6 +226,8 @@ internal sealed partial class AdaptiveFilePathInputControl : AdaptiveCustomInput
     }
 
     public override string CurrentValue => _pathTextBox.Text;
+
+    public override void RestoreValue(string value) => _pathTextBox.Text = value;
 
     public override void FocusInput() => _pathTextBox.Focus(FocusState.Programmatic);
 
