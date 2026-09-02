@@ -275,6 +275,9 @@ public sealed partial class ContentFormControl : UserControl
             {
                 switch (element)
                 {
+                    case IAdaptiveCustomInputControl customInput:
+                        values[key] = new InputValue(nameof(IAdaptiveCustomInputControl), customInput.CurrentValue);
+                        break;
                     case TextBox textBox:
                         values[key] = new InputValue(nameof(TextBox), textBox.Text);
                         break;
@@ -295,6 +298,12 @@ public sealed partial class ContentFormControl : UserControl
                         break;
                     case CalendarDatePicker datePicker:
                         values[key] = new InputValue(nameof(CalendarDatePicker), datePicker.Date);
+                        break;
+                    case TimePicker timePicker:
+                        values[key] = new InputValue(nameof(TimePicker), timePicker.Time);
+                        break;
+                    case RadioButton radioButton:
+                        values[key] = new InputValue(nameof(RadioButton), radioButton.IsChecked);
                         break;
                 }
             }
@@ -327,6 +336,9 @@ public sealed partial class ContentFormControl : UserControl
             {
                 switch (element)
                 {
+                    case IAdaptiveCustomInputControl customInput when inputValue.Kind == nameof(IAdaptiveCustomInputControl):
+                        customInput.RestoreValue((string)inputValue.Value!);
+                        break;
                     case TextBox textBox when inputValue.Kind == nameof(TextBox):
                         textBox.Text = (string)inputValue.Value!;
                         break;
@@ -348,6 +360,12 @@ public sealed partial class ContentFormControl : UserControl
                     case CalendarDatePicker datePicker when inputValue.Kind == nameof(CalendarDatePicker):
                         datePicker.Date = (DateTimeOffset?)inputValue.Value;
                         break;
+                    case TimePicker timePicker when inputValue.Kind == nameof(TimePicker):
+                        timePicker.Time = (TimeSpan)inputValue.Value!;
+                        break;
+                    case RadioButton radioButton when inputValue.Kind == nameof(RadioButton):
+                        radioButton.IsChecked = (bool?)inputValue.Value;
+                        break;
                 }
             }
         }
@@ -362,7 +380,12 @@ public sealed partial class ContentFormControl : UserControl
     private static string? GetInputKey(FrameworkElement element)
     {
         var automationId = AutomationProperties.GetAutomationId(element);
-        return !string.IsNullOrEmpty(automationId) ? automationId : element.Name;
+        if (!string.IsNullOrEmpty(automationId))
+        {
+            return automationId;
+        }
+
+        return string.IsNullOrEmpty(element.Name) ? null : element.Name;
     }
 
     private readonly record struct InputValue(string Kind, object? Value);

@@ -60,6 +60,20 @@ internal sealed partial class AdaptiveListInputControl : AdaptiveListInputContro
             ? _unreadableValue
             : AdaptiveListValueCodec.ToItemsValue(_items.Select(static item => item.Source));
 
+    public override void RestoreValue(string value)
+    {
+        if (!AdaptiveListValueCodec.TryParseItems(value, out var parsedItems))
+        {
+            return;
+        }
+
+        _items.Clear();
+        _items.AddRange(parsedItems.Select(static item => new AdaptiveListItem(item)));
+        _wasEdited = true;
+        RefreshItems();
+        UpdateValidationIfRequested();
+    }
+
     public override void FocusInput()
     {
         (_newItemTextBox as Control ?? _addButton)?.Focus(FocusState.Programmatic);

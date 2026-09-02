@@ -38,6 +38,8 @@ internal interface IAdaptiveCustomInputControl
 
     UIElement ValidationErrorElement { get; }
 
+    void RestoreValue(string value);
+
     bool ValidateInput();
 
     void FocusInput();

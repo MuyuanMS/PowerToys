@@ -189,6 +189,20 @@ internal sealed partial class AdaptiveKeyValueListInputControl : AdaptiveListInp
             ? _unreadableValue
             : AdaptiveListValueCodec.ToPairsValue(_items);
 
+    public override void RestoreValue(string value)
+    {
+        if (!AdaptiveListValueCodec.TryParsePairs(value, out var parsedPairs))
+        {
+            return;
+        }
+
+        _items.Clear();
+        _items.AddRange(parsedPairs);
+        _wasEdited = true;
+        RefreshItems();
+        UpdateValidationIfRequested();
+    }
+
     public override void FocusInput() => _keyTextBox.Focus(FocusState.Programmatic);
 
     private void AddTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
