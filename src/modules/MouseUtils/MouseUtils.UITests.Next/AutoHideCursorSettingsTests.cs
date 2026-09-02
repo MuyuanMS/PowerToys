@@ -182,7 +182,8 @@ public class AutoHideCursorSettingsTests : UITestBase
             actual => actual == expectedMilliseconds,
             timeoutMS: 10_000,
             requiredConsecutiveMatches: 2,
-            pollIntervalMS: 200);
+            pollIntervalMS: 200,
+            shouldRetryException: exception => exception is IOException or JsonException);
         Assert.IsTrue(
             result.Succeeded,
             $"Idle delay did not persist as {expectedMilliseconds} ms. Last observed value: {result.LastObservation}.");
