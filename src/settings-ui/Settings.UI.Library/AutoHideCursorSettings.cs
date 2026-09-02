@@ -52,6 +52,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                 Properties.IdleDelayMs?.Value ?? AutoHideCursorProperties.DefaultIdleDelayMs,
                 AutoHideCursorProperties.MinimumIdleDelayMs,
                 AutoHideCursorProperties.MaximumIdleDelayMs);
+            normalizedIdleDelay -= normalizedIdleDelay % 1000;
             if (Properties.IdleDelayMs == null || Properties.IdleDelayMs.Value != normalizedIdleDelay)
             {
                 Properties.IdleDelayMs = new IntProperty(normalizedIdleDelay);
