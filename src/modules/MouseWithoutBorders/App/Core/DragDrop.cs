@@ -283,15 +283,14 @@ internal static class DragDrop
                         isDragging = true;
                         publicationState = new DragPublicationState();
                         activeDragPublication = publicationState;
-                        BeginDragNetworkPublicationLocked(publicationState);
                         dropMachineId = MachineStuff.dropMachineID;
+                        PublishDragActivationLocked(publicationState, dropMachineId);
                         activated = true;
                     }
                 }
 
                 if (activated)
                 {
-                    PublishDragActivation(publicationState, dropMachineId);
                     Logger.LogDebug("DragDropStep05: File dragging: " + dragFileName);
                     _ = NativeMethods.PostMessage(Common.MainForm.Handle, NativeMethods.WM_HIDE_DD_HELPER, (IntPtr)1, (IntPtr)0);
                     Logger.LogDebug("DragDropStep05: WM_HIDE_DDHelper sent");
@@ -326,20 +325,18 @@ internal static class DragDrop
                 isDropping = false;
                 publicationState = activeDragPublication ?? new DragPublicationState();
                 activeDragPublication = publicationState;
-                BeginDragNetworkPublicationLocked(publicationState);
                 Common.MainFormVisible = true; // WM_HIDE_DRAG_DROP
                 dropMachineId = MachineStuff.dropMachineID; // Set in DragDropStep03
+                PublishDropBeginLocked(publicationState, dropMachineId);
             }
-
-            PublishDropBegin(publicationState, dropMachineId);
         }
 
         MouseDown = false;
     }
 
-    private static void PublishDragActivation(DragPublicationState publicationState, ID dropMachineId)
+    private static void PublishDragActivationLocked(DragPublicationState publicationState, ID dropMachineId)
     {
-        PublishDragNetwork(publicationState, () =>
+        QueueDragNetworkPublicationLocked(publicationState, () =>
         {
             Logger.LogDebug("DragDropStep06: SendClipboardBeatDragDrop");
             SendClipboardBeatDragDrop();
@@ -347,12 +344,12 @@ internal static class DragDrop
         });
     }
 
-    private static void PublishDropBegin(DragPublicationState publicationState, ID dropMachineId)
+    private static void PublishDropBeginLocked(DragPublicationState publicationState, ID dropMachineId)
     {
-        PublishDragNetwork(publicationState, () => SendDropBegin(dropMachineId));
+        QueueDragNetworkPublicationLocked(publicationState, () => SendDropBegin(dropMachineId));
     }
 
-    private static void BeginDragNetworkPublicationLocked(DragPublicationState publicationState)
+    private static void QueueDragNetworkPublicationLocked(DragPublicationState publicationState, Action publication)
     {
         if (publicationState.PendingCount == 0)
         {
@@ -361,10 +358,7 @@ internal static class DragDrop
         }
 
         publicationState.PendingCount++;
-    }
 
-    private static void PublishDragNetwork(DragPublicationState publicationState, Action publication)
-    {
         QueueDragNetworkAction(() =>
         {
             try
@@ -576,7 +570,18 @@ internal static class DragDrop
                 beginDestination = MachineStuff.dropMachineID;
                 publicationState = activeDragPublication ?? new DragPublicationState();
                 activeDragPublication = publicationState;
-                BeginDragNetworkPublicationLocked(publicationState);
+                QueueDragNetworkPublicationLocked(publicationState, () =>
+                {
+                    if (sendEnd)
+                    {
+                        SendClipboardBeatDragDropEnd(endDestination);
+                    }
+
+                    if (sendBegin)
+                    {
+                        SendDropBegin(beginDestination);
+                    }
+                });
             }
 
             // New drop machine is me
@@ -586,26 +591,15 @@ internal static class DragDrop
             }
         }
 
-        Action transition = () =>
+        if (!sendBegin)
         {
-            if (sendEnd)
+            QueueDragNetworkAction(() =>
             {
-                SendClipboardBeatDragDropEnd(endDestination);
-            }
-
-            if (sendBegin)
-            {
-                SendDropBegin(beginDestination);
-            }
-        };
-
-        if (sendBegin)
-        {
-            PublishDragNetwork(publicationState, transition);
-        }
-        else
-        {
-            QueueDragNetworkAction(transition);
+                if (sendEnd)
+                {
+                    SendClipboardBeatDragDropEnd(endDestination);
+                }
+            });
         }
     }
 
