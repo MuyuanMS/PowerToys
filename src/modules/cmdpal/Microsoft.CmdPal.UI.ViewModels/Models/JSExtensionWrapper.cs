@@ -635,6 +635,10 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
                     // Ask the extension to clean up, giving it a short grace period.
                     connection.SendNotificationAsync("dispose", null, CancellationToken.None)
                         .Wait(TimeSpan.FromSeconds(2));
+
+                    // Keep the transport alive while the extension processes the notification
+                    // and exits, so asynchronous cleanup is not cut off by an immediate kill.
+                    process!.WaitForExit(2000);
                 }
             }
             catch (Exception ex) when (ex is AggregateException or InvalidOperationException or JsonRpcException)
