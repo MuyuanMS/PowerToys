@@ -209,7 +209,7 @@ public class FileExplorerAddonsTests : UITestBase
     [TestMethod("FileExplorerAddons.Preview.Bgcode")]
     [TestCategory("File Explorer Add-ons")]
     [TestCategory("Preview Pane")]
-    public void BgcodePreviewShowsToolpathContent()
+    public void BgcodePreviewShowsToolPathContent()
     {
         TestPreview(
             ".bgcode",
@@ -223,7 +223,7 @@ public class FileExplorerAddonsTests : UITestBase
     [TestMethod("FileExplorerAddons.Preview.Gcode")]
     [TestCategory("File Explorer Add-ons")]
     [TestCategory("Preview Pane")]
-    public void GcodePreviewShowsToolpathContent()
+    public void GcodePreviewShowsToolPathContent()
     {
         TestPreview(
             ".gcode",
