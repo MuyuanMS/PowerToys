@@ -148,14 +148,21 @@
 	<!-- Removed hard-coded resource exclusion. -->
 
 	<ItemGroup>
-		<!-- Ensure the generated search index is present in the project; only if it exists to prevent CS1566 in clean CI -->
-		<Content Include="$(GeneratedJsonFile)" Condition="Exists('$(GeneratedJsonFile)')">
+		<!-- The index is generated before compilation, so declare it during project evaluation as well. -->
+		<Content Include="$(GeneratedJsonFile)">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</Content>
 		<!-- Embed the generated search index; logical name must match PrebuiltIndexResourceName -->
-		<EmbeddedResource Include="$(GeneratedJsonFile)" Condition="Exists('$(GeneratedJsonFile)')">
+		<EmbeddedResource Include="$(GeneratedJsonFile)">
 			<LogicalName>Microsoft.PowerToys.Settings.UI.Assets.search.index.json</LogicalName>
 		</EmbeddedResource>
+	</ItemGroup>
+	<ItemGroup>
+		<XamlIndexInputFiles Include="$(MSBuildProjectDirectory)\SettingsXAML\**\*.xaml" />
+		<XamlIndexInputDirectories Include="$(MSBuildProjectDirectory)\SettingsXAML\**\" />
+		<XamlIndexBuilderInputDirectories Include="..\Settings.UI.XamlIndexBuilder\**\" Exclude="..\Settings.UI.XamlIndexBuilder\bin\**;..\Settings.UI.XamlIndexBuilder\obj\**" />
+		<XamlIndexBuilderInputFiles Include="..\Settings.UI.XamlIndexBuilder\**\*.cs" Exclude="..\Settings.UI.XamlIndexBuilder\bin\**;..\Settings.UI.XamlIndexBuilder\obj\**" />
+		<XamlIndexBuilderInputFiles Include="..\Settings.UI.XamlIndexBuilder\Settings.UI.XamlIndexBuilder.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -212,7 +219,7 @@
 		</Page>
 	</ItemGroup>
 
-	<Target Name="BuildXamlIndexBeforeSettings" BeforeTargets="CoreCompile" Condition="'$(DesignTimeBuild)' != 'true'">
+	<Target Name="BuildXamlIndexBeforeSettings" BeforeTargets="CoreCompile" Condition="'$(DesignTimeBuild)' != 'true'" Inputs="@(XamlIndexInputFiles);@(XamlIndexInputDirectories);@(XamlIndexBuilderInputDirectories);@(XamlIndexBuilderInputFiles)" Outputs="$(GeneratedJsonFile)">
 		<Message Importance="high" Text="[Settings] Building XamlIndexBuilder prior to compile. Views='$(MSBuildProjectDirectory)\SettingsXAML\Views' Out='$(GeneratedJsonFile)'" />
 		<MSBuild Projects="..\Settings.UI.XamlIndexBuilder\Settings.UI.XamlIndexBuilder.csproj" Targets="Build" Properties="Configuration=$(Configuration);Platform=Any CPU;TargetFramework=$(CoreTargetFramework);XamlViewsDir=$(MSBuildProjectDirectory)\SettingsXAML\Views;GeneratedJsonFile=$(GeneratedJsonFile)" />
 	</Target>
