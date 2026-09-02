@@ -213,13 +213,13 @@ namespace ViewModelTests
         public void SoundSettingsShouldUpdateSettings()
         {
             viewModel.EnableAudibleFeedback = true;
-            viewModel.EnableOpeningSound = true;
+            viewModel.EnableOpeningSound = false;
             viewModel.EnableClosingSound = false;
 
-            Assert.AreEqual(2, sendCallbackMock.TimesSent);
+            Assert.AreEqual(3, sendCallbackMock.TimesSent);
 
             Assert.IsTrue(mockSettings.Properties.EnableAudibleFeedback);
-            Assert.IsTrue(mockSettings.Properties.EnableOpeningSound);
+            Assert.IsFalse(mockSettings.Properties.EnableOpeningSound);
             Assert.IsFalse(mockSettings.Properties.EnableClosingSound);
         }
     }
