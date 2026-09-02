@@ -11,6 +11,8 @@ internal static partial class SessionStateDetector
 {
     private const int WtsCurrentSession = -1;
     private const int WtsSessionInfoEx = 25;
+    private const int WtsInfoExLevel1 = 1;
+    private const int WtsSessionStateLock = 0;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct Wtsinfoex
@@ -60,11 +62,17 @@ internal static partial class SessionStateDetector
             return false;
         }
 
+        if (buffer == IntPtr.Zero)
+        {
+            // The session state is unknown. Do not assume the session is locked.
+            return false;
+        }
+
         try
         {
             var info = Marshal.PtrToStructure<Wtsinfoex>(buffer);
 
-            return info.Data.Level1.SessionFlags == 0;
+            return info.Level == WtsInfoExLevel1 && info.Data.Level1.SessionFlags == WtsSessionStateLock;
         }
         finally
         {
