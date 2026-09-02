@@ -7,6 +7,7 @@ using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 using Microsoft.PowerToys.Telemetry;
@@ -52,12 +53,38 @@ namespace MouseWithoutBorders.Core;
 
 internal static class DragDrop
 {
+    private static readonly object DragActivationLock = new();
+    private static readonly object DragNetworkQueueLock = new();
+    private static Task dragNetworkQueue = Task.CompletedTask;
     private static bool isDragging;
+    private static volatile bool mouseDown;
+    private static long transientDragValidationGeneration;
+    private static DragPublicationState activeDragPublication;
+
+    private sealed class DragPublicationState
+    {
+        internal int PendingCount;
+        internal bool ReleaseRequested;
+        internal ID ReleaseDestination;
+    }
 
     internal static bool IsDragging
     {
-        get => DragDrop.isDragging;
-        set => DragDrop.isDragging = value;
+        get
+        {
+            lock (DragActivationLock)
+            {
+                return isDragging;
+            }
+        }
+
+        set
+        {
+            lock (DragActivationLock)
+            {
+                isDragging = value;
+            }
+        }
     }
 
     internal static void DragDropStep01(int wParam)
@@ -69,14 +96,23 @@ internal static class DragDrop
 
         if (wParam == WM.WM_LBUTTONDOWN)
         {
-            MouseDown = true;
-            DragMachine = MachineStuff.desMachineID;
-            MachineStuff.dropMachineID = ID.NONE;
+            lock (DragActivationLock)
+            {
+                transientDragValidationGeneration = Clipboard.BeginTransientDragFileValidation();
+                MouseDown = true;
+                DragMachine = MachineStuff.desMachineID;
+                MachineStuff.dropMachineID = ID.NONE;
+            }
+
             Logger.LogDebug("DragDropStep01: MouseDown");
         }
         else if (wParam == WM.WM_LBUTTONUP)
         {
-            MouseDown = false;
+            lock (DragActivationLock)
+            {
+                MouseDown = false;
+            }
+
             Logger.LogDebug("DragDropStep01: MouseUp");
         }
 
@@ -136,6 +172,16 @@ internal static class DragDrop
             if (h.ToInt32() > 0)
             {
                 _ = Interlocked.Exchange(ref dragDropStep05ExCalledByIpc, 0);
+                long validationGeneration;
+                lock (DragActivationLock)
+                {
+                    validationGeneration = transientDragValidationGeneration;
+                }
+
+                _ = Helper.SendMessageToHelper(
+                    SharedConst.SET_DRAG_VALIDATION_GENERATION_CMD,
+                    checked((IntPtr)validationGeneration),
+                    IntPtr.Zero);
 
                 Common.MainForm.Hide();
                 Common.MainFormVisible = false;
@@ -176,62 +222,175 @@ internal static class DragDrop
         Logger.LogDebug("DragDropStep04: Got WM_CHECK_EXPLORER_DRAG_DROP, done with processing jump to DragDropStep05...");
     }
 
-    internal static void DragDropStep05Ex(string dragFileName)
+    internal static void DragDropStep05Ex(string dragFileName, long validationGeneration)
     {
         Logger.LogDebug("DragDropStep05 called.");
-
-        _ = Interlocked.Exchange(ref dragDropStep05ExCalledByIpc, 1);
 
         if (Common.RunOnLogonDesktop || Common.RunOnScrSaverDesktop)
         {
             return;
         }
 
+        bool isCurrentValidation;
+        lock (DragActivationLock)
+        {
+            isCurrentValidation = validationGeneration != 0
+                && transientDragValidationGeneration == validationGeneration;
+            if (isCurrentValidation)
+            {
+                transientDragValidationGeneration = 0;
+            }
+        }
+
+        if (!isCurrentValidation)
+        {
+            Clipboard.CancelTransientDragFileValidation(validationGeneration);
+            Logger.LogDebug("DragDropStep05: Ignoring a stale drag validation callback.");
+            return;
+        }
+
+        _ = Interlocked.Exchange(ref dragDropStep05ExCalledByIpc, 1);
+
         if (!IsDropping)
         {
-            _ = Launch.ImpersonateLoggedOnUserAndDoSomething(() =>
+            if (!MouseDown)
             {
-                if (!string.IsNullOrEmpty(dragFileName) && (File.Exists(dragFileName) || Directory.Exists(dragFileName)))
-                {
-                    Clipboard.LastDragDropFile = dragFileName;
-                    /*
-                     * possibleDropMachineID is used as desID sent in DragDropStep06();
-                     * */
-                    if (MachineStuff.dropMachineID == ID.NONE)
-                    {
-                        MachineStuff.dropMachineID = MachineStuff.newDesMachineID;
-                    }
+                Clipboard.CancelTransientDragFileValidation(validationGeneration);
+                Logger.LogDebug("DragDropStep05: Drag ended before path validation started.");
+                _ = NativeMethods.PostMessage(Common.MainForm.Handle, NativeMethods.WM_HIDE_DD_HELPER, (IntPtr)0, (IntPtr)0);
+                return;
+            }
 
-                    DragDropStep06();
+            if (LocalPathLease.TryCreate(dragFileName, out LocalPathLease lease))
+            {
+                bool activated = false;
+                ID dropMachineId = ID.NONE;
+                DragPublicationState publicationState = null;
+                lock (DragActivationLock)
+                {
+                    if (MouseDown
+                        && !isDropping
+                        && Clipboard.TrySetValidatedTransientDragFile(validationGeneration, dragFileName, lease))
+                    {
+                        /*
+                         * possibleDropMachineID is used as desID sent in DragDropStep06();
+                         * */
+                        if (MachineStuff.dropMachineID == ID.NONE)
+                        {
+                            MachineStuff.dropMachineID = MachineStuff.newDesMachineID;
+                        }
+
+                        isDragging = true;
+                        publicationState = new DragPublicationState();
+                        activeDragPublication = publicationState;
+                        dropMachineId = MachineStuff.dropMachineID;
+                        PublishDragActivationLocked(publicationState, dropMachineId);
+                        activated = true;
+                    }
+                }
+
+                if (activated)
+                {
                     Logger.LogDebug("DragDropStep05: File dragging: " + dragFileName);
                     _ = NativeMethods.PostMessage(Common.MainForm.Handle, NativeMethods.WM_HIDE_DD_HELPER, (IntPtr)1, (IntPtr)0);
+                    Logger.LogDebug("DragDropStep05: WM_HIDE_DDHelper sent");
                 }
                 else
                 {
-                    Logger.LogDebug("DragDropStep05: File not found: [" + dragFileName + "]");
+                    lease.Dispose();
+                    Logger.LogDebug("DragDropStep05: Drag ended before path validation completed.");
                     _ = NativeMethods.PostMessage(Common.MainForm.Handle, NativeMethods.WM_HIDE_DD_HELPER, (IntPtr)0, (IntPtr)0);
                 }
-
-                Logger.LogDebug("DragDropStep05: WM_HIDE_DDHelper sent");
-            });
+            }
+            else
+            {
+                Clipboard.CancelTransientDragFileValidation(validationGeneration);
+                Logger.Log("DragDropStep05: Rejected non-local or unstable path: [" + dragFileName + "]");
+                _ = NativeMethods.PostMessage(Common.MainForm.Handle, NativeMethods.WM_HIDE_DD_HELPER, (IntPtr)0, (IntPtr)0);
+            }
         }
         else
         {
-            Logger.LogDebug("DragDropStep05: IsDropping == true, change drop machine...");
-            IsDropping = false;
-            Common.MainFormVisible = true; // WM_HIDE_DRAG_DROP
-            SendDropBegin(); // To dropMachineID set in DragDropStep03
+            ID dropMachineId;
+            DragPublicationState publicationState;
+            lock (DragActivationLock)
+            {
+                if (!isDropping)
+                {
+                    Logger.LogDebug("DragDropStep05: Drop state changed before callback processing.");
+                    return;
+                }
+
+                Logger.LogDebug("DragDropStep05: IsDropping == true, change drop machine...");
+                isDropping = false;
+                publicationState = activeDragPublication ?? new DragPublicationState();
+                activeDragPublication = publicationState;
+                Common.MainFormVisible = true; // WM_HIDE_DRAG_DROP
+                dropMachineId = MachineStuff.dropMachineID; // Set in DragDropStep03
+                PublishDropBeginLocked(publicationState, dropMachineId);
+            }
         }
 
         MouseDown = false;
     }
 
-    private static void DragDropStep06()
+    private static void PublishDragActivationLocked(DragPublicationState publicationState, ID dropMachineId)
     {
-        IsDragging = true;
-        Logger.LogDebug("DragDropStep06: SendClipboardBeatDragDrop");
-        SendClipboardBeatDragDrop();
-        SendDropBegin();
+        QueueDragNetworkPublicationLocked(publicationState, () =>
+        {
+            Logger.LogDebug("DragDropStep06: SendClipboardBeatDragDrop");
+            SendClipboardBeatDragDrop();
+            SendDropBegin(dropMachineId);
+        });
+    }
+
+    private static void PublishDropBeginLocked(DragPublicationState publicationState, ID dropMachineId)
+    {
+        QueueDragNetworkPublicationLocked(publicationState, () => SendDropBegin(dropMachineId));
+    }
+
+    private static void QueueDragNetworkPublicationLocked(DragPublicationState publicationState, Action publication)
+    {
+        if (publicationState.PendingCount == 0)
+        {
+            publicationState.ReleaseRequested = false;
+            publicationState.ReleaseDestination = ID.NONE;
+        }
+
+        publicationState.PendingCount++;
+
+        QueueDragNetworkAction(() =>
+        {
+            try
+            {
+                publication();
+            }
+            finally
+            {
+                bool sendEnd;
+                ID releaseDestination;
+                lock (DragActivationLock)
+                {
+                    publicationState.PendingCount--;
+                    sendEnd = publicationState.PendingCount == 0 && publicationState.ReleaseRequested;
+                    releaseDestination = publicationState.ReleaseDestination;
+                    if (publicationState.PendingCount == 0)
+                    {
+                        publicationState.ReleaseRequested = false;
+                        publicationState.ReleaseDestination = ID.NONE;
+                        if (sendEnd && ReferenceEquals(activeDragPublication, publicationState))
+                        {
+                            activeDragPublication = null;
+                        }
+                    }
+                }
+
+                if (sendEnd)
+                {
+                    SendClipboardBeatDragDropEnd(releaseDestination);
+                }
+            }
+        });
     }
 
     internal static void DragDropStep08(DATA package)
@@ -260,28 +419,47 @@ internal static class DragDrop
                 _ = NativeMethods.PostMessage(Common.MainForm.Handle, NativeMethods.WM_SHOW_DRAG_DROP, (IntPtr)0, (IntPtr)0);
             });
         }
-        else if (wParam == WM.WM_LBUTTONUP && (IsDropping || IsDragging))
+        else if (wParam == WM.WM_LBUTTONUP)
         {
-            if (IsDropping)
+            bool completeDrop;
+            lock (DragActivationLock)
             {
-                // Hide form, get data
-                DragDropStep10();
+                DragPublicationState publicationState = activeDragPublication;
+                completeDrop = isDropping;
+                if (completeDrop)
+                {
+                    isDropping = false;
+                    isDragging = false;
+                    Clipboard.LastIDWithClipboardData = ID.NONE;
+                }
+                else if (isDragging || publicationState?.PendingCount > 0)
+                {
+                    isDragging = false;
+                    Clipboard.LastIDWithClipboardData = ID.NONE;
+                    if (publicationState?.PendingCount > 0)
+                    {
+                        publicationState.ReleaseRequested = true;
+                        publicationState.ReleaseDestination = MachineStuff.desMachineID;
+                    }
+                    else if (ReferenceEquals(activeDragPublication, publicationState))
+                    {
+                        activeDragPublication = null;
+                    }
+                }
+
+                Clipboard.RequestLastDragDropFileReleaseAfterSend();
             }
-            else
+
+            if (completeDrop)
             {
-                IsDragging = false;
-                Clipboard.LastIDWithClipboardData = ID.NONE;
+                FinishDragDropStep10();
             }
         }
     }
 
-    private static void DragDropStep10()
+    private static void FinishDragDropStep10()
     {
         Logger.LogDebug("DragDropStep10: Hide the form and get data...");
-        IsDropping = false;
-        IsDragging = false;
-        Clipboard.LastIDWithClipboardData = ID.NONE;
-
         Common.DoSomethingInUIThread(() =>
         {
             _ = NativeMethods.PostMessage(Common.MainForm.Handle, NativeMethods.WM_HIDE_DRAG_DROP, (IntPtr)0, (IntPtr)0);
@@ -294,13 +472,37 @@ internal static class DragDrop
     internal static void DragDropStep11()
     {
         Logger.LogDebug("DragDropStep11: Mouse drag coming back, canceling drag/drop");
-        SendClipboardBeatDragDropEnd();
-        IsDropping = false;
-        IsDragging = false;
-        DragMachine = (ID)1;
-        Clipboard.LastIDWithClipboardData = ID.NONE;
-        Clipboard.LastDragDropFile = null;
-        MouseDown = false;
+        bool sendEnd;
+        ID endDestination;
+        lock (DragActivationLock)
+        {
+            DragPublicationState publicationState = activeDragPublication;
+            long validationGeneration = transientDragValidationGeneration;
+            transientDragValidationGeneration = 0;
+            MouseDown = false;
+            IsDropping = false;
+            IsDragging = false;
+            DragMachine = (ID)1;
+            Clipboard.CancelTransientDragFileValidation(validationGeneration);
+            Clipboard.LastIDWithClipboardData = ID.NONE;
+            Clipboard.LastDragDropFile = null;
+            sendEnd = publicationState == null || publicationState.PendingCount == 0;
+            endDestination = MachineStuff.desMachineID;
+            if (!sendEnd)
+            {
+                publicationState.ReleaseRequested = true;
+                publicationState.ReleaseDestination = endDestination;
+            }
+            else if (ReferenceEquals(activeDragPublication, publicationState))
+            {
+                activeDragPublication = null;
+            }
+        }
+
+        if (sendEnd)
+        {
+            QueueDragNetworkAction(() => SendClipboardBeatDragDropEnd(endDestination));
+        }
     }
 
     internal static void DragDropStep12()
@@ -336,33 +538,68 @@ internal static class DragDrop
 
     internal static void ChangeDropMachine()
     {
-        // desMachineID = current drop machine
-        // newDesMachineID = new drop machine
+        bool sendEnd = false;
+        bool sendBegin = false;
+        ID endDestination = ID.NONE;
+        ID beginDestination = ID.NONE;
+        DragPublicationState publicationState = null;
+        lock (DragActivationLock)
+        {
+            // desMachineID = current drop machine
+            // newDesMachineID = new drop machine
 
-        // 1. Cancelling dropping in current drop machine
-        if (MachineStuff.dropMachineID == Common.MachineID)
-        {
-            // Drag/Drop coming through me
-            IsDropping = false;
-        }
-        else
-        {
-            // Drag/Drop coming back
-            SendClipboardBeatDragDropEnd();
+            // 1. Cancelling dropping in current drop machine
+            if (MachineStuff.dropMachineID == Common.MachineID)
+            {
+                // Drag/Drop coming through me
+                IsDropping = false;
+            }
+            else
+            {
+                // Drag/Drop coming back
+                sendEnd = true;
+                endDestination = MachineStuff.desMachineID;
+            }
+
+            // 2. SendClipboardBeatDragDrop to new drop machine
+            // new drop machine is not me
+            if (MachineStuff.newDesMachineID != Common.MachineID)
+            {
+                MachineStuff.dropMachineID = MachineStuff.newDesMachineID;
+                sendBegin = true;
+                beginDestination = MachineStuff.dropMachineID;
+                publicationState = activeDragPublication ?? new DragPublicationState();
+                activeDragPublication = publicationState;
+                QueueDragNetworkPublicationLocked(publicationState, () =>
+                {
+                    if (sendEnd)
+                    {
+                        SendClipboardBeatDragDropEnd(endDestination);
+                    }
+
+                    if (sendBegin)
+                    {
+                        SendDropBegin(beginDestination);
+                    }
+                });
+            }
+
+            // New drop machine is me
+            else
+            {
+                IsDropping = true;
+            }
         }
 
-        // 2. SendClipboardBeatDragDrop to new drop machine
-        // new drop machine is not me
-        if (MachineStuff.newDesMachineID != Common.MachineID)
+        if (!sendBegin)
         {
-            MachineStuff.dropMachineID = MachineStuff.newDesMachineID;
-            SendDropBegin();
-        }
-
-        // New drop machine is me
-        else
-        {
-            IsDropping = true;
+            QueueDragNetworkAction(() =>
+            {
+                if (sendEnd)
+                {
+                    SendClipboardBeatDragDropEnd(endDestination);
+                }
+            });
         }
     }
 
@@ -371,17 +608,39 @@ internal static class DragDrop
         Common.SendPackage(ID.ALL, PackageType.ClipboardDragDrop);
     }
 
-    private static void SendDropBegin()
+    private static void SendDropBegin(ID dropMachineId)
     {
         Logger.LogDebug("SendDropBegin...");
-        Common.SendPackage(MachineStuff.dropMachineID, PackageType.ClipboardDragDropOperation);
+        Common.SendPackage(dropMachineId, PackageType.ClipboardDragDropOperation);
     }
 
-    private static void SendClipboardBeatDragDropEnd()
+    private static void SendClipboardBeatDragDropEnd(ID destinationMachineId)
     {
-        if (MachineStuff.desMachineID != Common.MachineID)
+        if (destinationMachineId != Common.MachineID)
         {
-            Common.SendPackage(MachineStuff.desMachineID, PackageType.ClipboardDragDropEnd);
+            Common.SendPackage(destinationMachineId, PackageType.ClipboardDragDropEnd);
+        }
+    }
+
+    private static void QueueDragNetworkAction(Action action)
+    {
+        lock (DragNetworkQueueLock)
+        {
+            dragNetworkQueue = dragNetworkQueue.ContinueWith(
+                _ =>
+                {
+                    try
+                    {
+                        action();
+                    }
+                    catch (Exception exception)
+                    {
+                        Logger.Log(exception);
+                    }
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.Default);
         }
     }
 
@@ -396,9 +655,26 @@ internal static class DragDrop
 
     internal static bool IsDropping
     {
-        get => DragDrop.isDropping;
-        set => DragDrop.isDropping = value;
+        get
+        {
+            lock (DragActivationLock)
+            {
+                return isDropping;
+            }
+        }
+
+        set
+        {
+            lock (DragActivationLock)
+            {
+                isDropping = value;
+            }
+        }
     }
 
-    internal static bool MouseDown { get; set; }
+    internal static bool MouseDown
+    {
+        get => mouseDown;
+        set => mouseDown = value;
+    }
 }
