@@ -130,6 +130,23 @@ public class SettingsServiceTests
     }
 
     [TestMethod]
+    public void PersistedBeforePinnedValues_AreNormalizedToAfterPinned()
+    {
+        var persistedSettings = System.Text.Json.JsonSerializer.Deserialize(
+            "{ \"RecentCommandsOnQuickAccessShelf\": 1, \"RecentCommandsOnHome\": 1 }",
+            JsonSerializationContext.Default.SettingsModel);
+
+        Assert.IsNotNull(persistedSettings);
+        Assert.AreEqual(RecentCommandsPlacement.BeforePinned, persistedSettings.RecentCommandsOnQuickAccessShelf);
+        Assert.AreEqual(RecentCommandsPlacement.BeforePinned, persistedSettings.RecentCommandsOnHome);
+
+        var normalizedSettings = persistedSettings.NormalizeRecentCommandsPlacement();
+
+        Assert.AreEqual(RecentCommandsPlacement.AfterPinned, normalizedSettings.RecentCommandsOnQuickAccessShelf);
+        Assert.AreEqual(RecentCommandsPlacement.AfterPinned, normalizedSettings.RecentCommandsOnHome);
+    }
+
+    [TestMethod]
     public void ListItemAltNumberBehavior_DefaultsToRunAndRoundTripsSelect()
     {
         var defaults = System.Text.Json.JsonSerializer.Deserialize(
