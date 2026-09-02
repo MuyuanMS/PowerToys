@@ -521,6 +521,10 @@
     <value>Search remappings</value>
     <comment>Placeholder text for the search box that filters the remapping list</comment>
   </data>
+  <data name="FilterSearchBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Search remappings</value>
+    <comment>Accessible name for the search box that filters the remapping list</comment>
+  </data>
   <data name="FilterWinToggle.Content" xml:space="preserve">
     <value>Win</value>
     <comment>Toggle button that filters the list to remappings using the Windows modifier key</comment>
@@ -565,6 +569,10 @@
   <data name="FilterApp_GlobalOnly" xml:space="preserve">
     <value>Global only</value>
     <comment>App filter option that shows only remappings that are not tied to a specific app</comment>
+  </data>
+  <data name="AppFilterCombo.AutomationProperties.Name" xml:space="preserve">
+    <value>Filter by app</value>
+    <comment>Accessible name for the combo box that filters remappings by target app</comment>
   </data>
   <data name="BulkDelete_SelectedFormat" xml:space="preserve">
     <value>Delete selected ({0})</value>
