@@ -106,7 +106,7 @@ bool WindowKeyboardSnap::Snap(HWND window, RECT windowRect, HMONITOR monitor, DW
 
     if (result == SnapResult::NoTarget && !cycle && (vkCode == VK_UP || vkCode == VK_DOWN))
     {
-        return SetWindowState(window, vkCode == VK_UP ? SW_SHOWMAXIMIZED : SW_SHOWMINIMIZED);
+        return SetWindowState(window, vkCode == VK_UP ? SW_SHOWMAXIMIZED : SW_MINIMIZE);
     }
 
     return result == SnapResult::Success;
