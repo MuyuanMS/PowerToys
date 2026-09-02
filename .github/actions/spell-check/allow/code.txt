@@ -377,8 +377,9 @@ LWIN
 VCENTER
 VREDRAW
 
-# COM/winmm
-winrt interface prefixes and type fragments
+winmm
+
+# COM/WinRT interface prefixes and type fragments
 BAlt
 BShift
 Cmanifest
