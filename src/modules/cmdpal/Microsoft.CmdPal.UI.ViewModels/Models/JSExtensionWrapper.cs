@@ -812,17 +812,6 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
                 {
                     relative = named.GetString();
                 }
-                else
-                {
-                    foreach (var property in bin.EnumerateObject())
-                    {
-                        if (property.Value.ValueKind == JsonValueKind.String)
-                        {
-                            relative = property.Value.GetString();
-                            break;
-                        }
-                    }
-                }
             }
 
             if (string.IsNullOrEmpty(relative))
