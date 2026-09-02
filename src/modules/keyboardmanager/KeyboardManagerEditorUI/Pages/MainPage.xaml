@@ -138,7 +138,6 @@
                                 x:Name="SearchBox"
                                 x:Uid="FilterSearchBox"
                                 MinWidth="220"
-                                AutomationProperties.Name="Search remappings"
                                 VerticalAlignment="Center"
                                 QueryIcon="Find"
                                 TextChanged="SearchBox_TextChanged" />
@@ -166,7 +165,6 @@
                                 x:Name="AppFilterCombo"
                                 x:Uid="AppFilterCombo"
                                 MinWidth="150"
-                                AutomationProperties.Name="Filter by app"
                                 VerticalAlignment="Center"
                                 ItemsSource="{x:Bind AppFilterOptions}"
                                 SelectedIndex="0"
