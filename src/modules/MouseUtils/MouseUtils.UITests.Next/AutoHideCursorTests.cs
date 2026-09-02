@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Diagnostics;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.PowerToys.UITest.Next;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -15,6 +16,7 @@ public class AutoHideCursorTests : UITestBase
     private const string ModuleName = "AutoHideCursor";
     private const string WorkerProcessName = "PowerToys.AutoHideCursor";
     private const string ModuleToggleId = "MouseUtils_AutoHideCursorToggleId";
+    private const string SettingsExpanderId = "MouseUtilsAutoHideCursorSettingsExpander";
     private const string HideOnTypingToggleId = "MouseUtils_AutoHideCursorHideOnTypingToggleId";
     private const string HideOnIdleToggleId = "MouseUtils_AutoHideCursorHideOnIdleToggleId";
     private const string IdleDelayId = "MouseUtils_AutoHideCursorIdleDelayId";
@@ -73,6 +75,11 @@ public class AutoHideCursorTests : UITestBase
         MouseUtilsTestHelper.NavigateToMouseUtilities(this);
         MouseUtilsTestHelper.SetModuleEnabled(this, ModuleToggleId, true);
 
+        if (!Session.Has(By.AccessibilityId(HideOnTypingToggleId), 500))
+        {
+            Session.Find<Element>(By.AccessibilityId(SettingsExpanderId), 5_000).Invoke(msPostAction: 500);
+        }
+
         var hideOnTyping = Session.Find<ToggleSwitch>(By.AccessibilityId(HideOnTypingToggleId), 10_000);
         var hideOnIdle = Session.Find<ToggleSwitch>(By.AccessibilityId(HideOnIdleToggleId), 10_000);
         Assert.IsTrue(hideOnTyping.IsOn, "Hide-on-typing should reflect the seeded setting.");
@@ -129,7 +136,8 @@ public class AutoHideCursorTests : UITestBase
         var result = WaitHelper.WaitForStable(
             () => ReadTriggerSettings(settingsPath),
             settings => settings == (hideOnTyping, hideOnIdle),
-            5_000);
+            5_000,
+            shouldRetryException: exception => exception is IOException or JsonException);
         Assert.IsTrue(
             result.Succeeded,
             $"Trigger settings were not persisted as hide_on_typing={hideOnTyping}, hide_on_idle={hideOnIdle}.");
@@ -144,7 +152,7 @@ public class AutoHideCursorTests : UITestBase
                 root?["properties"]?["hide_on_typing"]?["value"]?.GetValue<bool>() ?? false,
                 root?["properties"]?["hide_on_idle"]?["value"]?.GetValue<bool>() ?? false);
         }
-        catch (IOException)
+        catch (Exception exception) when (exception is IOException or JsonException)
         {
             return null;
         }
