@@ -97,6 +97,7 @@ public sealed class SettingsService : ISettingsService
         }
 
         var normalizedSettings = _settings.NormalizePinnedCommands();
+        normalizedSettings = normalizedSettings.NormalizeRecentCommandsPlacement();
         if (!ReferenceEquals(normalizedSettings, _settings))
         {
             _settings = normalizedSettings;
