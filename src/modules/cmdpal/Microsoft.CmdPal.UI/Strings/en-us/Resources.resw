@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!--
     Microsoft ResX Schema
@@ -1481,5 +1481,215 @@ Right-click to remove the key combination, thereby deactivating the shortcut.</v
   <data name="AdaptiveFilePathInput_ValidationError" xml:space="preserve">
     <value>The path has an invalid format.</value>
     <comment>Validation error shown when a single path does not match its configured regular expression.</comment>
+  </data>
+  <data name="AboutSettingsHeader.Text" xml:space="preserve">
+    <value>About</value>
+    <comment>A section header for information about the app</comment>
+  </data>
+  <data name="Run_PositionHeader.Description" xml:space="preserve">
+    <value>If multiple monitors are in use, Command Palette can be launched on the desired monitor</value>
+    <comment>as in Show Command Palette on primary monitor</comment>
+  </data>
+  <data name="Settings_GeneralPage_ToastPosition_Description.Text" xml:space="preserve">
+    <value>Confirmation messages and other indicators will appear in this location</value>
+    <comment>Mirrors the Windows Settings card "Volume, brightness and other controls will appear in this location"</comment>
+  </data>
+  <data name="Settings_GeneralPage_ActivationKey_SettingsExpander.Description" xml:space="preserve">
+    <value>This key will open the Command Palette.</value>
+  </data>
+  <data name="Settings_GeneralPage_AllowBreakthroughShortcut_SettingsCard.Description" xml:space="preserve">
+    <value>Press the activation shortcut 3 times within 2 seconds to bypass the fullscreen or busy state guard</value>
+  </data>
+  <data name="Settings_GeneralPage_HighlightSearch_SettingsCard.Description" xml:space="preserve">
+    <value>Selects the previous search text at launch</value>
+  </data>
+  <data name="Settings_GeneralPage_CompactMode_SettingsCard.Description" xml:space="preserve">
+    <value>Shrinks the palette to just the search box until you start typing</value>
+  </data>
+  <data name="Settings_GeneralPage_KeepPreviousQuery_SettingsCard.Description" xml:space="preserve">
+    <value>Preserves the last search text when Command Palette is reopened</value>
+  </data>
+  <data name="Settings_GeneralPage_ShowAppDetails_SettingsCard.Description" xml:space="preserve">
+    <value>Controls if app details are automatically expanded or not.</value>
+  </data>
+  <data name="Settings_GeneralPage_BackspaceGoesBack_SettingsCard.Description" xml:space="preserve">
+    <value>If the search field is empty, backspace returns to the previous page</value>
+  </data>
+  <data name="Settings_GeneralPage_SingleClickActivation_SettingsCard.Description" xml:space="preserve">
+    <value>Choose how to interact with list items: single-click to activate, or single-click to select and double-click to activate</value>
+  </data>
+  <data name="ActivationSettingsHeader.Text" xml:space="preserve">
+    <value>Activation</value>
+  </data>
+  <data name="Settings_GeneralPage_ShowSystemTrayIcon_SettingsCard.Description" xml:space="preserve">
+    <value>Choose if Command Palette is visible in the system tray</value>
+  </data>
+  <data name="Settings_GeneralPage_AllowAltF4_SettingsCard.Description" xml:space="preserve">
+    <value>If this setting is on, pressing Alt+F4 will quit Command Palette</value>
+  </data>
+  <data name="Settings_GeneralPage_DisableAnimations_SettingsCard.Description" xml:space="preserve">
+    <value>Disable animations when switching between pages</value>
+  </data>
+  <data name="Settings_GeneralPage_ExternalCommandLinks_SettingsExpander.Header" xml:space="preserve">
+    <value>Enable external command links</value>
+  </data>
+  <data name="Settings_GeneralPage_ExternalCommandLinks_SettingsExpander.Description" xml:space="preserve">
+    <value>Allow x-cmdpal links to request commands and extension reloads. New requests require your confirmation.</value>
+  </data>
+  <data name="Settings_GeneralPage_ExternalCommandPermissions_SettingsCard.Header" xml:space="preserve">
+    <value>Always allowed command links</value>
+  </data>
+  <data name="Settings_GeneralPage_ExternalCommandPermissions_SettingsCard.Description" xml:space="preserve">
+    <value>Review or revoke requests you previously allowed without confirmation.</value>
+  </data>
+  <data name="Settings_GeneralPage_ExternalCommandPermissions_Warning.Text" xml:space="preserve">
+    <value>Command Palette cannot identify which app or website opened a link. Always allowed requests remain global until you revoke them.</value>
+  </data>
+  <data name="Settings_GeneralPage_ExternalCommandPermissions_Empty.Text" xml:space="preserve">
+    <value>No command links are always allowed.</value>
+  </data>
+  <data name="Settings_GeneralPage_ExternalCommandPermission_DetailsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Show command link details</value>
+  </data>
+  <data name="Settings_GeneralPage_ExternalCommandPermission_DetailsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Show command link details</value>
+  </data>
+  <data name="Settings_GeneralPage_ExternalCommandPermission_DetailsFlyout_Title.Text" xml:space="preserve">
+    <value>Command link details</value>
+  </data>
+  <data name="Settings_GeneralPage_ExternalCommandPermission_ProviderIdLabel.Text" xml:space="preserve">
+    <value>Provider ID</value>
+  </data>
+  <data name="Settings_GeneralPage_ExternalCommandPermission_CommandIdLabel.Text" xml:space="preserve">
+    <value>Command ID</value>
+  </data>
+  <data name="Settings_GeneralPage_ExternalCommandPermission_RevokeButton.Content" xml:space="preserve">
+    <value>Revoke</value>
+  </data>
+  <data name="Settings_GeneralPage_ExternalCommandPermission_RevokeButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Revoke permission</value>
+  </data>
+  <data name="Settings_GeneralPage_ExternalCommandPermissions_ClearButton.Content" xml:space="preserve">
+    <value>Remove all</value>
+  </data>
+  <data name="Settings_GeneralPage_ExternalCommandPermissions_ClearButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Remove all remembered command link permissions</value>
+  </data>
+  <data name="Settings_GeneralPage_ExternalCommandPermissions_ClearConfirmation_Title" xml:space="preserve">
+    <value>Remove all command link permissions?</value>
+  </data>
+  <data name="Settings_GeneralPage_ExternalCommandPermissions_ClearConfirmation_Description" xml:space="preserve">
+    <value>Command Palette will ask for confirmation the next time each external command link is opened.</value>
+  </data>
+  <data name="Settings_GeneralPage_ExternalCommandPermissions_ClearConfirmation_RemoveButton" xml:space="preserve">
+    <value>Remove all</value>
+  </data>
+  <data name="CommandLink_CopyCommand_Name" xml:space="preserve">
+    <value>Copy command link</value>
+  </data>
+  <data name="CommandLink_Toast_Copied" xml:space="preserve">
+    <value>Command link copied to clipboard</value>
+  </data>
+  <data name="ExternalCommandLink_Consent_Title" xml:space="preserve">
+    <value>Allow this command link?</value>
+  </data>
+  <data name="ExternalCommandLink_Loading_Title" xml:space="preserve">
+    <value>Opening command link</value>
+  </data>
+  <data name="ExternalCommandLink_Loading_Description" xml:space="preserve">
+    <value>Loading command information...</value>
+  </data>
+  <data name="ExternalCommandLink_CommandConsent_Description" xml:space="preserve">
+    <value>An external link is requesting this command.</value>
+  </data>
+  <data name="ExternalCommandLink_PageConsent_Description" xml:space="preserve">
+    <value>An external link is requesting this page.</value>
+  </data>
+  <data name="ExternalCommandLink_PageState_Label" xml:space="preserve">
+    <value>Page state:</value>
+  </data>
+  <data name="ExternalCommandLink_PageFilter_Description" xml:space="preserve">
+    <value>Filter: {0}</value>
+  </data>
+  <data name="ExternalCommandLink_PageQuery_Description" xml:space="preserve">
+    <value>Search: {0}</value>
+  </data>
+  <data name="ExternalCommandLink_FilterOneTime_Description" xml:space="preserve">
+    <value>Permission for links that select a filter is granted for this request only and cannot be remembered.</value>
+  </data>
+  <data name="ExternalCommandLink_ReloadConsent_Description" xml:space="preserve">
+    <value>An external link is requesting that Command Palette reload all extensions.</value>
+  </data>
+  <data name="ExternalCommandLink_OriginWarning_Description" xml:space="preserve">
+    <value>Command Palette cannot identify which app or website opened the link. Continue only if you expected this request.</value>
+  </data>
+  <data name="ExternalCommandLink_Link_Description" xml:space="preserve">
+    <value>Link: {0}</value>
+  </data>
+  <data name="ExternalCommandLink_ShowMore_Button" xml:space="preserve">
+    <value>Show more...</value>
+  </data>
+  <data name="ExternalCommandLink_ShowLess_Button" xml:space="preserve">
+    <value>Show less</value>
+  </data>
+  <data name="ExternalCommandLink_RunOnce_Button" xml:space="preserve">
+    <value>Run once</value>
+  </data>
+  <data name="ExternalCommandLink_OpenOnce_Button" xml:space="preserve">
+    <value>Open once</value>
+  </data>
+  <data name="ExternalCommandLink_ReloadOnce_Button" xml:space="preserve">
+    <value>Reload once</value>
+  </data>
+  <data name="ExternalCommandLink_AlwaysAllow_Button" xml:space="preserve">
+    <value>Always allow</value>
+  </data>
+  <data name="ExternalCommandLink_Cancel_Button" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="ExternalCommandLink_Close_Button" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="ExternalCommandLink_Unavailable_Title" xml:space="preserve">
+    <value>Command unavailable</value>
+  </data>
+  <data name="ExternalCommandLink_Unavailable_Description" xml:space="preserve">
+    <value>The linked command is not installed, enabled, or available.</value>
+  </data>
+  <data name="ExternalCommandLink_Reload_Name" xml:space="preserve">
+    <value>Reload extensions</value>
+  </data>
+  <data name="ExternalCommandLink_CommandPalette_Name" xml:space="preserve">
+    <value>Command Palette</value>
+  </data>
+  <data name="ExternalLinksSettingsHeader.Text" xml:space="preserve">
+    <value>External links</value>
+  </data>
+  <data name="Settings_ExtensionsPage_Banner_Header.Text" xml:space="preserve">
+    <value>Discover more extensions</value>
+  </data>
+  <data name="Settings_ExtensionsPage_Banner_Description.Text" xml:space="preserve">
+    <value>Find more extensions on the Microsoft Store or WinGet.</value>
+  </data>
+  <data name="Settings_ExtensionsPage_Banner_Hyperlink.Content" xml:space="preserve">
+    <value>Learn how to create your own extensions</value>
+  </data>
+  <data name="Settings_ExtensionsPage_FindExtensions_MicrosoftStore.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Find extensions on the Microsoft Store</value>
+  </data>
+  <data name="Settings_ExtensionsPage_FindExtensions_MicrosoftStore.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Microsoft Store</value>
+  </data>
+  <data name="Settings_ExtensionsPage_FindExtensions_MicrosoftStore_Text.Text" xml:space="preserve">
+    <value>Microsoft Store</value>
+  </data>
+  <data name="Settings_GeneralPage_AutoGoHome_SettingsCard.Description" xml:space="preserve">
+    <value>Automatically returns to home page after a period of inactivity when Command Palette is closed</value>
+  </data>
+  <data name="AppearanceSettingsHeader.Text" xml:space="preserve">
+    <value>Appearance</value>
+  </data>
+  <data name="Settings_GeneralPage_EscapeKeyBehavior_SettingsCard.Description" xml:space="preserve">
+    <value>Choose how Escape key behaves</value>
   </data>
 </root>

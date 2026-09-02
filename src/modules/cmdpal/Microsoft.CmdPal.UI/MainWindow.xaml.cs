@@ -137,7 +137,6 @@ public sealed partial class MainWindow : WindowEx,
     {
         _protocolActivation = App.Current.Services.GetRequiredService<ICmdPalProtocolActivation>();
         _monitorService = App.Current.Services.GetRequiredService<ViewModels.Models.IMonitorService>();
-
         InitializeComponent();
 
         ViewModel = App.Current.Services.GetService<MainWindowViewModel>()!;
@@ -1426,14 +1425,33 @@ public sealed partial class MainWindow : WindowEx,
         }
     }
 
-    public void HandleLaunchNonUI(AppActivationArguments? activatedEventArgs)
+    internal static ActivationSnapshot? CaptureActivation(AppActivationArguments? activatedEventArgs)
+    {
+        if (activatedEventArgs is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return activatedEventArgs.Kind == ExtendedActivationKind.Protocol &&
+                activatedEventArgs.Data is IProtocolActivatedEventArgs protocolArgs
+                ? new ActivationSnapshot(activatedEventArgs.Kind, protocolArgs.Uri)
+                : new ActivationSnapshot(activatedEventArgs.Kind, null);
+        }
+        catch (COMException ex)
+        {
+            Logger.LogWarning($"Failed to read activation arguments: {ex.Message}");
+            return null;
+        }
+    }
+
+    internal void HandleLaunchNonUI(ActivationSnapshot? activation)
     {
         // LOAD BEARING
-        // Any reading and processing of the activation arguments must be done
-        // synchronously in this method, before it returns. The sending instance
-        // remains blocked until this returns; afterward it may quit, causing
-        // the activation arguments to be lost.
-        if (activatedEventArgs is null)
+        // Activation arguments are captured before this method is called so their COM-backed
+        // data remains valid even when startup replay happens after the sender exits.
+        if (activation is null)
         {
             Summon(string.Empty);
             return;
@@ -1441,38 +1459,42 @@ public sealed partial class MainWindow : WindowEx,
 
         try
         {
-            if (activatedEventArgs.Kind == ExtendedActivationKind.StartupTask)
+            if (activation.Kind == ExtendedActivationKind.StartupTask)
             {
                 return;
             }
 
-            if (activatedEventArgs.Kind == ExtendedActivationKind.Protocol)
+            if (activation.Kind == ExtendedActivationKind.Protocol)
             {
-                if (activatedEventArgs.Data is IProtocolActivatedEventArgs protocolArgs &&
-                    _protocolActivation.TryParse(protocolArgs.Uri, out var route))
+                if (activation.ProtocolUri is not null &&
+                    _protocolActivation.TryParse(activation.ProtocolUri, out var route))
                 {
-                    switch (route)
+                    switch (CmdPalProtocolPolicy.Evaluate(route))
                     {
-                        case CmdPalProtocolRoute.Background:
-                            // we're running, we don't want to activate our window. bail
+                        case CmdPalProtocolAction.RunInBackground:
+                            // We're running, but this route intentionally does not activate a window.
                             return;
 
-                        case CmdPalProtocolRoute.OpenSettings openSettings:
+                        case CmdPalProtocolAction.OpenSettings openSettings:
                             WeakReferenceMessenger.Default.Send(openSettings.Message);
                             return;
 
-                        case CmdPalProtocolRoute.Reload:
+                        case CmdPalProtocolAction.RequestConsent requestConsent:
                             var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
-                            if (settings?.AllowExternalReload == true)
+                            if (settings.EnableExternalCommandLinks)
                             {
-                                Logger.LogInfo("External Reload triggered");
-                                WeakReferenceMessenger.Default.Send<ReloadCommandsMessage>(new());
+                                WeakReferenceMessenger.Default.Send(new ExternalCommandLinkRequestedMessage(requestConsent.Route));
                             }
                             else
                             {
-                                Logger.LogInfo("External Reload is disabled");
+                                Logger.LogInfo("External command links are disabled");
                             }
 
+                            return;
+
+                        case CmdPalProtocolAction.Reject:
+                        default:
+                            Logger.LogWarning("Ignoring an unsupported CmdPal protocol route.");
                             return;
                     }
                 }
@@ -1697,6 +1719,10 @@ public sealed partial class MainWindow : WindowEx,
     {
         switch (uMsg)
         {
+            case PInvoke.WM_DISPLAYCHANGE:
+                _monitorService.NotifyMonitorsChanged();
+                break;
+
             // Prevent the window from maximizing when double-clicking the title bar area
             case PInvoke.WM_NCLBUTTONDBLCLK:
                 return (LRESULT)IntPtr.Zero;
@@ -1769,14 +1795,6 @@ public sealed partial class MainWindow : WindowEx,
 
                     return (LRESULT)IntPtr.Zero;
                 }
-
-            // Unlike DockWindow instances, MainWindow always exists, so it's the one
-            // reliable place to catch topology changes. Without this, the Settings page's
-            // monitor list goes stale whenever no dock window is around to see WM_DISPLAYCHANGE.
-            case PInvoke.WM_DISPLAYCHANGE:
-                Logger.LogDebug("MainWindow WM_DISPLAYCHANGE");
-                _monitorService.NotifyMonitorsChanged();
-                break;
 
             default:
                 if (uMsg == WM_TASKBAR_RESTART)
