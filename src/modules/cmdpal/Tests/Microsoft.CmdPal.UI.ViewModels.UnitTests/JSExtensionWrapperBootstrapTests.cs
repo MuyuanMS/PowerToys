@@ -84,6 +84,34 @@ public class JSExtensionWrapperBootstrapTests
     }
 
     [TestMethod]
+    public void ResolveBootstrapScript_IgnoresUnrelatedObjectBinEntries()
+    {
+        var manifestDir = NewTempDir();
+        try
+        {
+            var sdkRoot = CreateSdkRoot(manifestDir);
+            var unrelated = Path.Combine(sdkRoot, "bin", "sdk-cli.mjs");
+            var fallback = Path.Combine(sdkRoot, "dist", "runtime", "bootstrap.js");
+            Directory.CreateDirectory(Path.GetDirectoryName(unrelated)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(fallback)!);
+            File.WriteAllText(unrelated, "// not a bootstrap");
+            File.WriteAllText(fallback, "// bootstrap");
+            File.WriteAllText(
+                Path.Combine(sdkRoot, "package.json"),
+                "{ \"name\": \"@microsoft/cmdpal-sdk\", \"bin\": { \"sdk-cli\": \"./bin/sdk-cli.mjs\" } }");
+
+            var resolved = JSExtensionWrapper.ResolveBootstrapScript(manifestDir);
+
+            Assert.IsNotNull(resolved);
+            Assert.AreEqual(Path.GetFullPath(fallback), Path.GetFullPath(resolved!));
+        }
+        finally
+        {
+            Directory.Delete(manifestDir, recursive: true);
+        }
+    }
+
+    [TestMethod]
     public void ResolveBootstrapScript_ReturnsNull_WhenSdkMissing()
     {
         var manifestDir = NewTempDir();
