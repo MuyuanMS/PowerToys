@@ -40,6 +40,7 @@ namespace CommonLibTest
         [TestMethod]
         [DataRow(0, AutoHideCursorProperties.MinimumIdleDelayMs)]
         [DataRow(1000, 1000)]
+        [DataRow(1500, 1000)]
         [DataRow(60000, 60000)]
         [DataRow(90000, AutoHideCursorProperties.MaximumIdleDelayMs)]
         public void UpgradeClampsIdleDelay(int configuredValue, int expectedValue)
