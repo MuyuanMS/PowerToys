@@ -67,6 +67,7 @@ namespace Awake.Core
 
         private static CancellationTokenSource _monitorTokenSource;
         private static IDisposable? _timerSubscription;
+        private static ulong _timerGeneration;
 
         static Manager()
         {
@@ -183,6 +184,7 @@ namespace Awake.Core
         internal static void CancelExistingThread()
         {
             Logger.LogInfo("Canceling existing timer and resetting state...");
+            _timerGeneration++;
 
             // Reset the thread state. Kept under _stateLock so the ES_CONTINUOUS reset cannot
             // interleave between a concurrent OnSessionSwitch / Set* compute-and-enqueue.
@@ -345,9 +347,10 @@ namespace Awake.Core
                 SetModeShellIcon();
 
                 TimeSpan remainingTime = expireAt - DateTimeOffset.Now;
+                ulong timerGeneration = _timerGeneration;
 
                 _timerSubscription = Observable.Timer(remainingTime).Subscribe(
-                    _ => HandleTimerCompletion("expirable"));
+                    _ => HandleTimerCompletion("expirable", timerGeneration));
             }
         }
 
@@ -408,6 +411,7 @@ namespace Awake.Core
                 SetModeShellIcon();
 
                 var targetExpiryTime = DateTimeOffset.Now.AddSeconds(seconds);
+                ulong timerGeneration = _timerGeneration;
 
                 _timerSubscription = Observable.Interval(TimeSpan.FromSeconds(1))
                     .Select(_ => targetExpiryTime - DateTimeOffset.Now)
@@ -423,7 +427,7 @@ namespace Awake.Core
                                 TrayHelper.TimedIcon,
                                 TrayIconAction.Update);
                         },
-                        () => HandleTimerCompletion("timed"));
+                        () => HandleTimerCompletion("timed", timerGeneration));
             }
         }
 
@@ -431,21 +435,30 @@ namespace Awake.Core
         /// Handles the common logic that should execute when a keep-awake timer completes. Resets
         /// the application state to Passive if configured; otherwise it exits.
         /// </summary>
-        private static void HandleTimerCompletion(string timerType)
+        private static void HandleTimerCompletion(string timerType, ulong timerGeneration)
         {
-            Logger.LogInfo($"Completed {timerType} keep-awake.");
-            CancelExistingThread();
+            lock (TransitionLock)
+            {
+                if (timerGeneration != _timerGeneration)
+                {
+                    Logger.LogInfo($"Ignoring stale {timerType} keep-awake timer completion.");
+                    return;
+                }
 
-            if (IsUsingPowerToysConfig)
-            {
-                // If running under PowerToys settings, just revert to the default Passive state.
-                SetPassiveKeepAwake();
-            }
-            else
-            {
-                // If running as a standalone process, exit cleanly.
-                Logger.LogInfo($"Exiting after {timerType} keep-awake.");
-                CompleteExit(Environment.ExitCode);
+                Logger.LogInfo($"Completed {timerType} keep-awake.");
+                CancelExistingThread();
+
+                if (IsUsingPowerToysConfig)
+                {
+                    // If running under PowerToys settings, just revert to the default Passive state.
+                    SetPassiveKeepAwake();
+                }
+                else
+                {
+                    // If running as a standalone process, exit cleanly.
+                    Logger.LogInfo($"Exiting after {timerType} keep-awake.");
+                    CompleteExit(Environment.ExitCode);
+                }
             }
         }
 

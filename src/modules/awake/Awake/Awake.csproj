@@ -40,6 +40,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Win32.SystemEvents" />
     <PackageReference Include="System.CommandLine" />
     <PackageReference Include="System.Reactive" />
     <PackageReference Include="System.Runtime.Caching" />
