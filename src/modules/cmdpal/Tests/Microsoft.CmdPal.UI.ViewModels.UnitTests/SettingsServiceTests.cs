@@ -147,6 +147,37 @@ public class SettingsServiceTests
     }
 
     [TestMethod]
+    public void Constructor_NormalizesPersistedBeforePinnedValuesAndSaves()
+    {
+        // Arrange
+        var persistedSettings = System.Text.Json.JsonSerializer.Deserialize(
+            "{ \"RecentCommandsOnQuickAccessShelf\": 1, \"RecentCommandsOnHome\": 1 }",
+            JsonSerializationContext.Default.SettingsModel);
+        Assert.IsNotNull(persistedSettings);
+
+        _mockPersistence
+            .Setup(p => p.Load(
+                It.IsAny<string>(),
+                It.IsAny<System.Text.Json.Serialization.Metadata.JsonTypeInfo<SettingsModel>>()))
+            .Returns(persistedSettings);
+
+        // Act
+        var service = new SettingsService(_mockPersistence.Object, _mockAppInfo.Object);
+
+        // Assert
+        Assert.AreEqual(RecentCommandsPlacement.AfterPinned, service.Settings.RecentCommandsOnQuickAccessShelf);
+        Assert.AreEqual(RecentCommandsPlacement.AfterPinned, service.Settings.RecentCommandsOnHome);
+        _mockPersistence.Verify(
+            p => p.Save(
+                It.Is<SettingsModel>(settings =>
+                    settings.RecentCommandsOnQuickAccessShelf == RecentCommandsPlacement.AfterPinned &&
+                    settings.RecentCommandsOnHome == RecentCommandsPlacement.AfterPinned),
+                It.IsAny<string>(),
+                It.IsAny<System.Text.Json.Serialization.Metadata.JsonTypeInfo<SettingsModel>>()),
+            Times.Once);
+    }
+
+    [TestMethod]
     public void ListItemAltNumberBehavior_DefaultsToRunAndRoundTripsSelect()
     {
         var defaults = System.Text.Json.JsonSerializer.Deserialize(
