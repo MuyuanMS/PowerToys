@@ -32,6 +32,7 @@ export abstract class FallbackCommandItemBase
   extends ObservableBase
   implements IFallbackCommandItem, IFallbackHandler
 {
+  protected override readonly notificationTargetKind = 'commandItem';
   /** The command run when the item is activated. */
   abstract readonly command: ICommand;
   protected get notificationId(): string {

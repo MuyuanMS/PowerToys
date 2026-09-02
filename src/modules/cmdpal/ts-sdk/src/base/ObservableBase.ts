@@ -2,12 +2,13 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-import type { ObservablePropertyName } from '../types.js';
+import type { ObservablePropertyName, ObservableTargetKind } from '../types.js';
 import { sendNotification } from '../runtime/notifications.js';
 
 /** Shared property-change notification support for observable SDK models. */
 export abstract class ObservableBase {
   protected abstract readonly notificationId: string;
+  protected readonly notificationTargetKind: ObservableTargetKind = 'command';
 
   /**
    * Tells the host that one of this object's ABI properties changed.
@@ -16,6 +17,7 @@ export abstract class ObservableBase {
   protected notifyPropChanged(propertyName: ObservablePropertyName): void {
     sendNotification('command/propChanged', {
       commandId: this.notificationId,
+      targetKind: this.notificationTargetKind,
       properties: { [propertyName]: Reflect.get(this, propertyName) },
     });
   }
