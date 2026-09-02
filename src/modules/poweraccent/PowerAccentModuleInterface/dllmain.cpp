@@ -74,6 +74,8 @@ private:
             return false;
         }
 
+        CloseHandle(p_info.hThread);
+        p_info.hThread = nullptr;
         return true;
     }
 
@@ -148,6 +150,7 @@ public:
             Logger::trace(L"Disabling QuickAccent... {}", m_enabled);
 
             auto exitEvent = CreateEvent(nullptr, false, false, CommonSharedConstants::POWERACCENT_EXIT_EVENT);
+            bool forceTerminate = !exitEvent;
             if (!exitEvent)
             {
                 Logger::warn(L"Failed to create exit event for PowerToys QuickAccent. {}", get_last_error_or_default(GetLastError()));
@@ -155,7 +158,6 @@ public:
             else
             {
                 Logger::trace(L"Signaled exit event for PowerToys QuickAccent.");
-                bool forceTerminate = false;
                 if (!SetEvent(exitEvent))
                 {
                     Logger::warn(L"Failed to signal exit event for PowerToys QuickAccent. {}", get_last_error_or_default(GetLastError()));
@@ -167,20 +169,24 @@ public:
                     forceTerminate = true;
                 }
 
-                if (forceTerminate && p_info.hProcess)
-                {
-                    if (!TerminateProcess(p_info.hProcess, 1))
-                    {
-                        Logger::warn(L"Failed to terminate PowerToys QuickAccent. {}", get_last_error_or_default(GetLastError()));
-                    }
-                    else
-                    {
-                        WaitForSingleObject(p_info.hProcess, 500);
-                    }
-                }
-
                 // Auto-reset events clear when a waiter consumes the signal; resetting here can race the listener.
                 CloseHandle(exitEvent);
+            }
+
+            if (forceTerminate && p_info.hProcess)
+            {
+                if (!TerminateProcess(p_info.hProcess, 1))
+                {
+                    Logger::warn(L"Failed to terminate PowerToys QuickAccent. {}", get_last_error_or_default(GetLastError()));
+                }
+                else
+                {
+                    WaitForSingleObject(p_info.hProcess, 500);
+                }
+            }
+            
+            if (p_info.hProcess)
+            {
                 CloseHandle(p_info.hProcess);
                 p_info.hProcess = nullptr;
             }

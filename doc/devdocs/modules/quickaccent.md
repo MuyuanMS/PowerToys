@@ -15,12 +15,14 @@ Quick Accent (formerly known as Power Accent) is a PowerToys module that allows 
 
 ## Architecture
 
-The Quick Accent module consists of six projects:
+The Quick Accent module consists of eight projects:
 
 ```
 poweraccent/
 ├── PowerAccent.Common/             # Language data, character mappings, LetterKey enum
+├── PowerAccent.Common.UnitTests/   # Unit tests for shared language data and mappings
 ├── PowerAccent.Core/               # Accent logic, settings, positioning, usage statistics
+├── PowerAccent.Core.UnitTests/     # Unit tests for accent logic and positioning
 ├── PowerAccent.UI/                 # WinUI 3 character selector app (PowerToys.PowerAccent.exe)
 ├── PowerAccentKeyboardService/     # WinRT keyboard-hook component
 ├── PowerAccentModuleInterface/     # Native runner module DLL

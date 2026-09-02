@@ -939,6 +939,13 @@ internal static class PowerAccentTestHelper
 
             try
             {
+                var settingsHandle = new IntPtr(testBase.Session.WindowHandle);
+                if (settingsHandle != IntPtr.Zero)
+                {
+                    Step(testBase, $"Minimizing Settings HWND {settingsHandle} before launching Notepad");
+                    WindowHelper.MinimizeWindow(settingsHandle);
+                }
+
                 Session? window = null;
                 for (var attempt = 1; attempt <= 2 && window is null; attempt++)
                 {
@@ -980,6 +987,7 @@ internal static class PowerAccentTestHelper
                     TryTerminateProcess(processId);
                 }
 
+                RestoreSettingsWindow(testBase);
                 File.Delete(filePath);
                 throw;
             }
@@ -1073,6 +1081,8 @@ internal static class PowerAccentTestHelper
                 catch (UnauthorizedAccessException)
                 {
                 }
+
+                RestoreSettingsWindow(testBase);
             }
         }
 
@@ -1105,6 +1115,15 @@ internal static class PowerAccentTestHelper
             }
             catch (InvalidOperationException)
             {
+            }
+        }
+
+        private static void RestoreSettingsWindow(UITestBase testBase)
+        {
+            var settingsHandle = new IntPtr(testBase.Session.WindowHandle);
+            if (settingsHandle != IntPtr.Zero)
+            {
+                WindowHelper.MaximizeWindow(settingsHandle);
             }
         }
     }
