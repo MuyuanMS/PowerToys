@@ -31,10 +31,8 @@ namespace Awake.Core
     /// Helper class that allows talking to Win32 APIs without having to rely on PInvoke in other parts
     /// of the codebase.
     /// </summary>
-    public class Manager : IDisposable
+    public class Manager
     {
-        private bool _disposed;
-
         internal static bool IsUsingPowerToysConfig { get; set; }
 
         internal static SettingsUtils? ModuleSettings { get; set; }
@@ -64,6 +62,8 @@ namespace Awake.Core
         // Set* / CancelExistingThread compute-and-enqueue sequences. Reentrant (Monitor), so a
         // caller that already holds it may call into another guarded method.
         private static readonly Lock StateLock = new();
+
+        private static readonly Lock TransitionLock = new();
 
         private static CancellationTokenSource _monitorTokenSource;
         private static IDisposable? _timerSubscription;
@@ -165,7 +165,7 @@ namespace Awake.Core
         /// Re-applies the current awake state after a power event.
         /// Called when WM_POWERBROADCAST indicates system wake or power source change.
         /// </summary>
-        internal static void ReapplyAwakeState()
+        internal static void ReapplyAwakeState(string trigger = "Power event")
         {
             lock (StateLock)
             {
@@ -175,7 +175,7 @@ namespace Awake.Core
                     return;
                 }
 
-                Logger.LogInfo($"Power event received. Reapplying awake state for mode: {CurrentOperatingMode}");
+                Logger.LogInfo($"{trigger} received. Reapplying awake state for mode: {CurrentOperatingMode}");
                 _stateQueue.Add(ComputeAwakeState(IsDisplayOn));
             }
         }
@@ -241,46 +241,49 @@ namespace Awake.Core
         {
             PowerToysTelemetry.Log.WriteEvent(new Telemetry.AwakeIndefinitelyKeepAwakeEvent());
 
-            CancelExistingThread();
-
-            if (IsUsingPowerToysConfig)
+            lock (TransitionLock)
             {
-                try
+                CancelExistingThread();
+
+                if (IsUsingPowerToysConfig)
                 {
-                    AwakeSettings currentSettings = ModuleSettings!.GetSettings<AwakeSettings>(Constants.AppName) ?? new AwakeSettings();
-                    bool settingsChanged = currentSettings.Properties.Mode != AwakeMode.INDEFINITE ||
-                                          currentSettings.Properties.KeepDisplayOn != keepDisplayOn;
-
-                    if (settingsChanged)
+                    try
                     {
-                        currentSettings.Properties.Mode = AwakeMode.INDEFINITE;
-                        currentSettings.Properties.KeepDisplayOn = keepDisplayOn;
-                        ModuleSettings!.SaveSettings(JsonSerializer.Serialize(currentSettings), Constants.AppName);
+                        AwakeSettings currentSettings = ModuleSettings!.GetSettings<AwakeSettings>(Constants.AppName) ?? new AwakeSettings();
+                        bool settingsChanged = currentSettings.Properties.Mode != AwakeMode.INDEFINITE ||
+                                              currentSettings.Properties.KeepDisplayOn != keepDisplayOn;
 
-                        // We return here because when the settings are saved, they will be automatically
-                        // processed. That means that when they are processed, the indefinite keep-awake will kick-in properly
-                        // and we avoid double execution.
-                        return;
+                        if (settingsChanged)
+                        {
+                            currentSettings.Properties.Mode = AwakeMode.INDEFINITE;
+                            currentSettings.Properties.KeepDisplayOn = keepDisplayOn;
+                            ModuleSettings!.SaveSettings(JsonSerializer.Serialize(currentSettings), Constants.AppName);
+
+                            // We return here because when the settings are saved, they will be automatically
+                            // processed. That means that when they are processed, the indefinite keep-awake will kick-in properly
+                            // and we avoid double execution.
+                            return;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($"Failed to handle indefinite keep awake command invoked by {callerName}: {ex.Message}");
                     }
                 }
-                catch (Exception ex)
+
+                Logger.LogInfo($"Indefinite keep-awake starting, invoked by {callerName}...");
+
+                lock (StateLock)
                 {
-                    Logger.LogError($"Failed to handle indefinite keep awake command invoked by {callerName}: {ex.Message}");
+                    _stateQueue.Add(ComputeAwakeState(keepDisplayOn));
+
+                    IsDisplayOn = keepDisplayOn;
+                    CurrentOperatingMode = AwakeMode.INDEFINITE;
+                    ProcessId = processId;
                 }
+
+                SetModeShellIcon();
             }
-
-            Logger.LogInfo($"Indefinite keep-awake starting, invoked by {callerName}...");
-
-            lock (StateLock)
-            {
-                _stateQueue.Add(ComputeAwakeState(keepDisplayOn));
-
-                IsDisplayOn = keepDisplayOn;
-                CurrentOperatingMode = AwakeMode.INDEFINITE;
-                ProcessId = processId;
-            }
-
-            SetModeShellIcon();
         }
 
         internal static void SetExpirableKeepAwake(DateTimeOffset expireAt, bool keepDisplayOn = true, [CallerMemberName] string callerName = "")
@@ -288,61 +291,64 @@ namespace Awake.Core
             Logger.LogInfo($"Expirable keep-awake invoked by {callerName}. Expected expiration date/time: {expireAt} with display on setting set to {keepDisplayOn}.");
             PowerToysTelemetry.Log.WriteEvent(new Telemetry.AwakeExpirableKeepAwakeEvent());
 
-            CancelExistingThread();
-
-            if (IsUsingPowerToysConfig)
+            lock (TransitionLock)
             {
-                try
+                CancelExistingThread();
+
+                if (IsUsingPowerToysConfig)
                 {
-                    AwakeSettings currentSettings = ModuleSettings!.GetSettings<AwakeSettings>(Constants.AppName) ?? new AwakeSettings();
-                    bool settingsChanged = currentSettings.Properties.Mode != AwakeMode.EXPIRABLE ||
-                                          currentSettings.Properties.ExpirationDateTime != expireAt ||
-                                          currentSettings.Properties.KeepDisplayOn != keepDisplayOn;
-
-                    if (settingsChanged)
+                    try
                     {
-                        currentSettings.Properties.Mode = AwakeMode.EXPIRABLE;
-                        currentSettings.Properties.KeepDisplayOn = keepDisplayOn;
-                        currentSettings.Properties.ExpirationDateTime = expireAt;
-                        ModuleSettings!.SaveSettings(JsonSerializer.Serialize(currentSettings), Constants.AppName);
+                        AwakeSettings currentSettings = ModuleSettings!.GetSettings<AwakeSettings>(Constants.AppName) ?? new AwakeSettings();
+                        bool settingsChanged = currentSettings.Properties.Mode != AwakeMode.EXPIRABLE ||
+                                              currentSettings.Properties.ExpirationDateTime != expireAt ||
+                                              currentSettings.Properties.KeepDisplayOn != keepDisplayOn;
 
-                        // We return here because when the settings are saved, they will be automatically
-                        // processed. That means that when they are processed, the expirable keep-awake will kick-in properly
-                        // and we avoid double execution.
-                        return;
+                        if (settingsChanged)
+                        {
+                            currentSettings.Properties.Mode = AwakeMode.EXPIRABLE;
+                            currentSettings.Properties.KeepDisplayOn = keepDisplayOn;
+                            currentSettings.Properties.ExpirationDateTime = expireAt;
+                            ModuleSettings!.SaveSettings(JsonSerializer.Serialize(currentSettings), Constants.AppName);
+
+                            // We return here because when the settings are saved, they will be automatically
+                            // processed. That means that when they are processed, the expirable keep-awake will kick-in properly
+                            // and we avoid double execution.
+                            return;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($"Failed to handle indefinite keep awake command: {ex.Message}");
                     }
                 }
-                catch (Exception ex)
+
+                Logger.LogInfo("Expirable keep-awake starting...");
+
+                if (expireAt <= DateTimeOffset.Now)
                 {
-                    Logger.LogError($"Failed to handle indefinite keep awake command: {ex.Message}");
+                    Logger.LogError($"The specified target date and time is not in the future. Current time: {DateTimeOffset.Now}, Target time: {expireAt}");
+                    return;
                 }
+
+                Logger.LogInfo($"Starting expirable log for {expireAt}");
+
+                lock (StateLock)
+                {
+                    _stateQueue.Add(ComputeAwakeState(keepDisplayOn));
+
+                    IsDisplayOn = keepDisplayOn;
+                    CurrentOperatingMode = AwakeMode.EXPIRABLE;
+                    ExpireAt = expireAt;
+                }
+
+                SetModeShellIcon();
+
+                TimeSpan remainingTime = expireAt - DateTimeOffset.Now;
+
+                _timerSubscription = Observable.Timer(remainingTime).Subscribe(
+                    _ => HandleTimerCompletion("expirable"));
             }
-
-            Logger.LogInfo($"Expirable keep-awake starting...");
-
-            if (expireAt <= DateTimeOffset.Now)
-            {
-                Logger.LogError($"The specified target date and time is not in the future. Current time: {DateTimeOffset.Now}, Target time: {expireAt}");
-                return;
-            }
-
-            Logger.LogInfo($"Starting expirable log for {expireAt}");
-
-            lock (StateLock)
-            {
-                _stateQueue.Add(ComputeAwakeState(keepDisplayOn));
-
-                IsDisplayOn = keepDisplayOn;
-                CurrentOperatingMode = AwakeMode.EXPIRABLE;
-                ExpireAt = expireAt;
-            }
-
-            SetModeShellIcon();
-
-            TimeSpan remainingTime = expireAt - DateTimeOffset.Now;
-
-            _timerSubscription = Observable.Timer(remainingTime).Subscribe(
-                _ => HandleTimerCompletion("expirable"));
         }
 
         internal static void SetTimedKeepAwake(uint seconds, bool keepDisplayOn = true, [CallerMemberName] string callerName = "")
@@ -350,72 +356,75 @@ namespace Awake.Core
             Logger.LogInfo($"Timed keep-awake invoked by {callerName}. Expected runtime: {seconds} seconds with display on setting set to {keepDisplayOn}.");
             PowerToysTelemetry.Log.WriteEvent(new Telemetry.AwakeTimedKeepAwakeEvent());
 
-            CancelExistingThread();
-
-            if (IsUsingPowerToysConfig)
+            lock (TransitionLock)
             {
-                try
+                CancelExistingThread();
+
+                if (IsUsingPowerToysConfig)
                 {
-                    AwakeSettings currentSettings = ModuleSettings!.GetSettings<AwakeSettings>(Constants.AppName) ?? new AwakeSettings();
-                    TimeSpan timeSpan = TimeSpan.FromSeconds(seconds);
-
-                    uint totalHours = (uint)timeSpan.TotalHours;
-
-                    // Round up partial minutes to prevent timer from expiring before intended duration
-                    uint remainingMinutes = (uint)Math.Ceiling(timeSpan.TotalMinutes % 60);
-
-                    bool settingsChanged = currentSettings.Properties.Mode != AwakeMode.TIMED ||
-                                          currentSettings.Properties.IntervalHours != totalHours ||
-                                          currentSettings.Properties.IntervalMinutes != remainingMinutes;
-
-                    if (settingsChanged)
+                    try
                     {
-                        currentSettings.Properties.Mode = AwakeMode.TIMED;
-                        currentSettings.Properties.IntervalHours = totalHours;
-                        currentSettings.Properties.IntervalMinutes = remainingMinutes;
-                        ModuleSettings!.SaveSettings(JsonSerializer.Serialize(currentSettings), Constants.AppName);
+                        AwakeSettings currentSettings = ModuleSettings!.GetSettings<AwakeSettings>(Constants.AppName) ?? new AwakeSettings();
+                        TimeSpan timeSpan = TimeSpan.FromSeconds(seconds);
 
-                        // We return here because when the settings are saved, they will be automatically
-                        // processed. That means that when they are processed, the timed keep-awake will kick-in properly
-                        // and we avoid double execution.
-                        return;
+                        uint totalHours = (uint)timeSpan.TotalHours;
+
+                        // Round up partial minutes to prevent timer from expiring before intended duration
+                        uint remainingMinutes = (uint)Math.Ceiling(timeSpan.TotalMinutes % 60);
+
+                        bool settingsChanged = currentSettings.Properties.Mode != AwakeMode.TIMED ||
+                                              currentSettings.Properties.IntervalHours != totalHours ||
+                                              currentSettings.Properties.IntervalMinutes != remainingMinutes;
+
+                        if (settingsChanged)
+                        {
+                            currentSettings.Properties.Mode = AwakeMode.TIMED;
+                            currentSettings.Properties.IntervalHours = totalHours;
+                            currentSettings.Properties.IntervalMinutes = remainingMinutes;
+                            ModuleSettings!.SaveSettings(JsonSerializer.Serialize(currentSettings), Constants.AppName);
+
+                            // We return here because when the settings are saved, they will be automatically
+                            // processed. That means that when they are processed, the timed keep-awake will kick-in properly
+                            // and we avoid double execution.
+                            return;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($"Failed to handle timed keep awake command: {ex.Message}");
                     }
                 }
-                catch (Exception ex)
+
+                Logger.LogInfo("Timed keep-awake starting...");
+
+                lock (StateLock)
                 {
-                    Logger.LogError($"Failed to handle timed keep awake command: {ex.Message}");
+                    _stateQueue.Add(ComputeAwakeState(keepDisplayOn));
+
+                    IsDisplayOn = keepDisplayOn;
+                    CurrentOperatingMode = AwakeMode.TIMED;
                 }
+
+                SetModeShellIcon();
+
+                var targetExpiryTime = DateTimeOffset.Now.AddSeconds(seconds);
+
+                _timerSubscription = Observable.Interval(TimeSpan.FromSeconds(1))
+                    .Select(_ => targetExpiryTime - DateTimeOffset.Now)
+                    .TakeWhile(remaining => remaining.TotalSeconds > 0)
+                    .Subscribe(
+                        remainingTimeSpan =>
+                        {
+                            TimeRemaining = (uint)remainingTimeSpan.TotalSeconds;
+
+                            TrayHelper.SetShellIcon(
+                                TrayHelper.WindowHandle,
+                                $"{Constants.FullAppName}\n{remainingTimeSpan.ToHumanReadableString()} {Resources.AWAKE_TRAY_REMAINING}\n{Resources.AWAKE_TRAY_DISPLAY}: {ScreenStateString}",
+                                TrayHelper.TimedIcon,
+                                TrayIconAction.Update);
+                        },
+                        () => HandleTimerCompletion("timed"));
             }
-
-            Logger.LogInfo($"Timed keep-awake starting...");
-
-            lock (StateLock)
-            {
-                _stateQueue.Add(ComputeAwakeState(keepDisplayOn));
-
-                IsDisplayOn = keepDisplayOn;
-                CurrentOperatingMode = AwakeMode.TIMED;
-            }
-
-            SetModeShellIcon();
-
-            var targetExpiryTime = DateTimeOffset.Now.AddSeconds(seconds);
-
-            _timerSubscription = Observable.Interval(TimeSpan.FromSeconds(1))
-                .Select(_ => targetExpiryTime - DateTimeOffset.Now)
-                .TakeWhile(remaining => remaining.TotalSeconds > 0)
-                .Subscribe(
-                    remainingTimeSpan =>
-                    {
-                        TimeRemaining = (uint)remainingTimeSpan.TotalSeconds;
-
-                        TrayHelper.SetShellIcon(
-                            TrayHelper.WindowHandle,
-                            $"{Constants.FullAppName}\n{remainingTimeSpan.ToHumanReadableString()} {Resources.AWAKE_TRAY_REMAINING}\n{Resources.AWAKE_TRAY_DISPLAY}: {ScreenStateString}",
-                            TrayHelper.TimedIcon,
-                            TrayIconAction.Update);
-                    },
-                    () => HandleTimerCompletion("timed"));
         }
 
         /// <summary>
@@ -447,6 +456,7 @@ namespace Awake.Core
         internal static void CompleteExit(int exitCode)
         {
             SetPassiveKeepAwake(updateSettings: false);
+            SystemEvents.SessionSwitch -= OnSessionSwitch;
 
             // Stop the monitor thread gracefully
             StopMonitor();
@@ -525,40 +535,43 @@ namespace Awake.Core
             Logger.LogInfo($"Operating in passive mode (computer's standard power plan). Invoked by {callerName}. No custom keep awake settings enabled.");
             PowerToysTelemetry.Log.WriteEvent(new Telemetry.AwakeNoKeepAwakeEvent());
 
-            CancelExistingThread();
-
-            if (IsUsingPowerToysConfig && updateSettings)
+            lock (TransitionLock)
             {
-                try
+                CancelExistingThread();
+
+                if (IsUsingPowerToysConfig && updateSettings)
                 {
-                    AwakeSettings currentSettings = ModuleSettings!.GetSettings<AwakeSettings>(Constants.AppName) ?? new AwakeSettings();
-
-                    if (currentSettings.Properties.Mode != AwakeMode.PASSIVE)
+                    try
                     {
-                        currentSettings.Properties.Mode = AwakeMode.PASSIVE;
-                        ModuleSettings!.SaveSettings(JsonSerializer.Serialize(currentSettings), Constants.AppName);
+                        AwakeSettings currentSettings = ModuleSettings!.GetSettings<AwakeSettings>(Constants.AppName) ?? new AwakeSettings();
 
-                        // We return here because when the settings are saved, they will be automatically
-                        // processed. That means that when they are processed, the passive keep-awake will kick-in properly
-                        // and we avoid double execution.
-                        return;
+                        if (currentSettings.Properties.Mode != AwakeMode.PASSIVE)
+                        {
+                            currentSettings.Properties.Mode = AwakeMode.PASSIVE;
+                            ModuleSettings!.SaveSettings(JsonSerializer.Serialize(currentSettings), Constants.AppName);
+
+                            // We return here because when the settings are saved, they will be automatically
+                            // processed. That means that when they are processed, the passive keep-awake will kick-in properly
+                            // and we avoid double execution.
+                            return;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($"Failed to reset Awake mode: {ex.Message}");
                     }
                 }
-                catch (Exception ex)
+
+                Logger.LogInfo("Passive keep-awake starting...");
+
+                lock (StateLock)
                 {
-                    Logger.LogError($"Failed to reset Awake mode: {ex.Message}");
+                    CurrentOperatingMode = AwakeMode.PASSIVE;
+                    _stateQueue.Add(ExecutionState.ES_CONTINUOUS);
                 }
+
+                SetModeShellIcon();
             }
-
-            Logger.LogInfo("Passive keep-awake starting...");
-
-            lock (StateLock)
-            {
-                CurrentOperatingMode = AwakeMode.PASSIVE;
-                _stateQueue.Add(ExecutionState.ES_CONTINUOUS);
-            }
-
-            SetModeShellIcon();
         }
 
         /// <summary>
@@ -567,38 +580,41 @@ namespace Awake.Core
         internal static void SetDisplay([CallerMemberName] string callerName = "")
         {
             Logger.LogInfo($"Setting display configuration from settings. Invoked by {callerName}.");
-            if (IsUsingPowerToysConfig)
+            lock (TransitionLock)
             {
-                try
+                if (IsUsingPowerToysConfig)
                 {
-                    AwakeSettings currentSettings = ModuleSettings!.GetSettings<AwakeSettings>(Constants.AppName) ?? new AwakeSettings();
-                    currentSettings.Properties.KeepDisplayOn = !currentSettings.Properties.KeepDisplayOn;
-
-                    // For TIMED mode: update state directly without restarting timer
-                    // This preserves the existing timer Observable subscription and targetExpiryTime
-                    if (CurrentOperatingMode == AwakeMode.TIMED && TimeRemaining > 0)
+                    try
                     {
-                        lock (StateLock)
-                        {
-                            // Update internal state
-                            IsDisplayOn = currentSettings.Properties.KeepDisplayOn;
+                        AwakeSettings currentSettings = ModuleSettings!.GetSettings<AwakeSettings>(Constants.AppName) ?? new AwakeSettings();
+                        currentSettings.Properties.KeepDisplayOn = !currentSettings.Properties.KeepDisplayOn;
 
-                            // Update execution state without canceling timer
-                            _stateQueue.Add(ComputeAwakeState(IsDisplayOn));
+                        // For TIMED mode: update state directly without restarting timer
+                        // This preserves the existing timer Observable subscription and targetExpiryTime
+                        if (CurrentOperatingMode == AwakeMode.TIMED && TimeRemaining > 0)
+                        {
+                            lock (StateLock)
+                            {
+                                // Update internal state
+                                IsDisplayOn = currentSettings.Properties.KeepDisplayOn;
+
+                                // Update execution state without canceling timer
+                                _stateQueue.Add(ComputeAwakeState(IsDisplayOn));
+                            }
+
+                            // Save settings - ProcessSettings will skip reinitialization
+                            // since we're already in TIMED mode
+                            ModuleSettings!.SaveSettings(JsonSerializer.Serialize(currentSettings), Constants.AppName);
+
+                            return;
                         }
 
-                        // Save settings - ProcessSettings will skip reinitialization
-                        // since we're already in TIMED mode
                         ModuleSettings!.SaveSettings(JsonSerializer.Serialize(currentSettings), Constants.AppName);
-
-                        return;
                     }
-
-                    ModuleSettings!.SaveSettings(JsonSerializer.Serialize(currentSettings), Constants.AppName);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError($"Failed to handle display setting command: {ex.Message}");
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($"Failed to handle display setting command: {ex.Message}");
+                    }
                 }
             }
         }
@@ -608,7 +624,7 @@ namespace Awake.Core
             lock (StateLock)
             {
                 IsScreenLocked = SessionStateController.ApplySessionSwitch(e.Reason, IsScreenLocked);
-                ReapplyAwakeState();
+                ReapplyAwakeState("Session switch event");
             }
         }
 
@@ -621,34 +637,7 @@ namespace Awake.Core
         {
             ProcessBasicInformation pbi = default;
             int status = Bridge.NtQueryInformationProcess(handle, 0, ref pbi, Marshal.SizeOf<ProcessBasicInformation>(), out _);
-
             return status != 0 ? null : Process.GetProcessById(pbi.InheritedFromUniqueProcessId.ToInt32());
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            if (disposing)
-            {
-                SystemEvents.SessionSwitch -= OnSessionSwitch;
-            }
-
-            _disposed = true;
-        }
-
-        ~Manager()
-        {
-            Dispose(false);
         }
     }
 }

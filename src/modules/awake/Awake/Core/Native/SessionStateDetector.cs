@@ -56,13 +56,7 @@ internal static partial class SessionStateDetector
                 WtsCurrentSession,
                 WtsSessionInfoEx,
                 out var buffer,
-                out _))
-        {
-            // The session state is unknown. Do not assume the session is locked.
-            return false;
-        }
-
-        if (buffer == IntPtr.Zero)
+                out var bytesReturned))
         {
             // The session state is unknown. Do not assume the session is locked.
             return false;
@@ -70,13 +64,33 @@ internal static partial class SessionStateDetector
 
         try
         {
-            var info = Marshal.PtrToStructure<Wtsinfoex>(buffer);
-
-            return info.Level == WtsInfoExLevel1 && info.Data.Level1.SessionFlags == WtsSessionStateLock;
+            return TryReadLockState(buffer, bytesReturned, out var isLocked) && isLocked;
         }
         finally
         {
-            WTSFreeMemory(buffer);
+            if (buffer != IntPtr.Zero)
+            {
+                WTSFreeMemory(buffer);
+            }
         }
+    }
+
+    internal static bool TryReadLockState(IntPtr buffer, int bytesReturned, out bool isLocked)
+    {
+        isLocked = false;
+
+        if (buffer == IntPtr.Zero || bytesReturned < Marshal.SizeOf<Wtsinfoex>())
+        {
+            return false;
+        }
+
+        var info = Marshal.PtrToStructure<Wtsinfoex>(buffer);
+        if (info.Level != WtsInfoExLevel1)
+        {
+            return false;
+        }
+
+        isLocked = info.Data.Level1.SessionFlags == WtsSessionStateLock;
+        return true;
     }
 }
