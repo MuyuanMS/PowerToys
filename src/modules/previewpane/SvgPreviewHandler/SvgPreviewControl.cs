@@ -43,6 +43,10 @@ namespace Microsoft.PowerToys.PreviewHandler.Svg
         /// </summary>
         private CoreWebView2Environment _webView2Environment;
 
+        private FileStream _cacheLease;
+
+        private string _transientFilePath = string.Empty;
+
         /// <summary>
         /// Name of the virtual host
         /// </summary>
@@ -270,7 +274,7 @@ namespace Microsoft.PowerToys.PreviewHandler.Svg
                     var cacheFolder = SvgPreviewCacheHelper.GetCacheFolderPath(_webView2UserDataFolder);
                     if (SvgPreviewCacheHelper.TryGetCacheFile(cacheFolder, cacheKey, out var cacheFilePath, out var cacheLease))
                     {
-                        _browser.NavigationCompleted += (sender, args) => cacheLease?.Dispose();
+                        TrackCacheResources(cacheLease, string.Empty);
                         _localFileURI = new Uri(cacheFilePath);
                         _browser.Source = _localFileURI;
                     }
@@ -279,13 +283,13 @@ namespace Microsoft.PowerToys.PreviewHandler.Svg
                         string generatedPreview = _previewGenerator.GeneratePreview(svgData, settings);
                         if (SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, generatedPreview, out cacheFilePath, out cacheLease))
                         {
-                            _browser.NavigationCompleted += (sender, args) => cacheLease?.Dispose();
+                            TrackCacheResources(cacheLease, string.Empty);
                             _localFileURI = new Uri(cacheFilePath);
                             _browser.Source = _localFileURI;
                         }
                         else if (SvgPreviewCacheHelper.TryWriteTransientFile(_webView2UserDataFolder, generatedPreview, out var transientFilePath))
                         {
-                            _browser.NavigationCompleted += (sender, args) => SvgPreviewCacheHelper.DeleteTransientFile(transientFilePath);
+                            TrackCacheResources(null, transientFilePath);
                             _localFileURI = new Uri(transientFilePath);
                             _browser.Source = _localFileURI;
                         }
@@ -348,6 +352,38 @@ namespace Microsoft.PowerToys.PreviewHandler.Svg
         private void EnsureWebView2UserDataFolder()
         {
             SvgPreviewCacheHelper.EnsureCacheFolder(_webView2UserDataFolder);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                ReleaseCacheResources();
+            }
+
+            base.Dispose(disposing);
+        }
+
+        private void TrackCacheResources(FileStream cacheLease, string transientFilePath)
+        {
+            ReleaseCacheResources();
+            _cacheLease = cacheLease;
+            _transientFilePath = transientFilePath;
+            _browser.NavigationCompleted += Browser_NavigationCompleted;
+        }
+
+        private void Browser_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs args)
+        {
+            _browser.NavigationCompleted -= Browser_NavigationCompleted;
+            ReleaseCacheResources();
+        }
+
+        private void ReleaseCacheResources()
+        {
+            _cacheLease?.Dispose();
+            _cacheLease = null;
+            SvgPreviewCacheHelper.DeleteTransientFile(_transientFilePath);
+            _transientFilePath = string.Empty;
         }
     }
 }

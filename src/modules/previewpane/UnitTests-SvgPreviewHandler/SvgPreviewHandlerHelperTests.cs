@@ -253,6 +253,29 @@ namespace SvgPreviewHandlerUnitTests
         }
 
         [TestMethod]
+        public void TryGetCacheFileShouldRefreshLastWriteTime()
+        {
+            var cacheFolder = CreateTestCacheFolder();
+
+            try
+            {
+                var cacheKey = SvgPreviewCacheHelper.BuildCacheKey("recency");
+                Assert.IsTrue(SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, "contents", out var cacheFilePath, out var writtenLease));
+                writtenLease!.Dispose();
+                var oldTimestamp = DateTime.UtcNow.AddDays(-1);
+                File.SetLastWriteTimeUtc(cacheFilePath, oldTimestamp);
+
+                Assert.IsTrue(SvgPreviewCacheHelper.TryGetCacheFile(cacheFolder, cacheKey, out _, out var readLease));
+                Assert.IsTrue(File.GetLastWriteTimeUtc(cacheFilePath) > oldTimestamp);
+                readLease!.Dispose();
+            }
+            finally
+            {
+                Directory.Delete(cacheFolder, recursive: true);
+            }
+        }
+
+        [TestMethod]
         public void TryWriteTransientFileShouldPersistOversizedFallback()
         {
             var userDataFolder = CreateTestCacheFolder();

@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 
 namespace Common.Utilities
 {
@@ -22,7 +23,6 @@ namespace Common.Utilities
         private static readonly UTF8Encoding Utf8NoBom = new(false);
         private static readonly object MaintenanceLock = new();
         private static readonly Dictionary<string, DateTime> LastMaintenanceByFolder = new(StringComparer.OrdinalIgnoreCase);
-        private static readonly Dictionary<string, long> CacheSizeByFolder = new(StringComparer.OrdinalIgnoreCase);
 
         internal static string GetCacheFolderPath(string webView2UserDataFolder)
         {
@@ -70,7 +70,7 @@ namespace Common.Utilities
 
             try
             {
-                cacheLease = new FileStream(cacheFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                cacheLease = new FileStream(cacheFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                 if (cacheLease.Length == 0)
                 {
                     cacheLease.Dispose();
@@ -107,6 +107,8 @@ namespace Common.Utilities
             cacheFilePath = GetCacheFilePath(cacheRootFolder, cacheKey);
             cacheLease = null;
             string? temporaryFilePath = null;
+            Mutex? cacheMutex = null;
+            bool mutexAcquired = false;
 
             try
             {
@@ -116,13 +118,26 @@ namespace Common.Utilities
                 }
 
                 Directory.CreateDirectory(cacheRootFolder);
-                long previousLength = TryGetFileLength(cacheFilePath);
+                cacheMutex = new Mutex(false, GetCacheMutexName(cacheRootFolder));
+                try
+                {
+                    mutexAcquired = cacheMutex.WaitOne(TimeSpan.FromSeconds(5));
+                }
+                catch (AbandonedMutexException)
+                {
+                    mutexAcquired = true;
+                }
+
+                if (!mutexAcquired)
+                {
+                    return false;
+                }
+
                 temporaryFilePath = Path.Combine(cacheRootFolder, $"{cacheKey}.{Guid.NewGuid():N}.tmp");
                 File.WriteAllText(temporaryFilePath, contents, Utf8NoBom);
                 File.Move(temporaryFilePath, cacheFilePath, overwrite: true);
-                long currentLength = TryGetFileLength(cacheFilePath);
 
-                if (!EnsureCacheSizeLimit(cacheRootFolder, cacheFilePath, currentLength - previousLength, maxCacheSizeBytes))
+                if (!EnsureCacheSizeLimit(cacheRootFolder, cacheFilePath, maxCacheSizeBytes))
                 {
                     return false;
                 }
@@ -139,6 +154,13 @@ namespace Common.Utilities
                 {
                     TryDeleteFile(temporaryFilePath);
                 }
+
+                if (mutexAcquired)
+                {
+                    cacheMutex!.ReleaseMutex();
+                }
+
+                cacheMutex?.Dispose();
             }
         }
 
@@ -237,11 +259,7 @@ namespace Common.Utilities
             }
 
             var cacheRootFolder = GetCacheFolderPath(webView2UserDataFolder);
-            var retainedBytes = PruneCache(cacheRootFolder, utcNow);
-            lock (MaintenanceLock)
-            {
-                CacheSizeByFolder[cacheRootFolder] = retainedBytes;
-            }
+            PruneCache(cacheRootFolder, utcNow);
 
             var transientFolder = Path.Combine(webView2UserDataFolder, "SvgPreviewTransient");
             if (Directory.Exists(transientFolder))
@@ -286,28 +304,8 @@ namespace Common.Utilities
             }
         }
 
-        private static bool EnsureCacheSizeLimit(string cacheRootFolder, string newFilePath, long sizeDelta, long maxCacheSizeBytes)
+        private static bool EnsureCacheSizeLimit(string cacheRootFolder, string newFilePath, long maxCacheSizeBytes)
         {
-            bool shouldPrune;
-            lock (MaintenanceLock)
-            {
-                if (CacheSizeByFolder.TryGetValue(cacheRootFolder, out var cachedSize))
-                {
-                    cachedSize = Math.Max(0, cachedSize + sizeDelta);
-                    CacheSizeByFolder[cacheRootFolder] = cachedSize;
-                    shouldPrune = cachedSize > maxCacheSizeBytes;
-                }
-                else
-                {
-                    shouldPrune = true;
-                }
-            }
-
-            if (!shouldPrune)
-            {
-                return true;
-            }
-
             long retainedBytes = PruneCache(cacheRootFolder, DateTime.UtcNow, maxCacheSizeBytes);
             if (retainedBytes > maxCacheSizeBytes)
             {
@@ -315,24 +313,14 @@ namespace Common.Utilities
                 retainedBytes = PruneCache(cacheRootFolder, DateTime.UtcNow, maxCacheSizeBytes);
             }
 
-            lock (MaintenanceLock)
-            {
-                CacheSizeByFolder[cacheRootFolder] = retainedBytes;
-            }
-
             return retainedBytes <= maxCacheSizeBytes && File.Exists(newFilePath);
         }
 
-        private static long TryGetFileLength(string filePath)
+        private static string GetCacheMutexName(string cacheRootFolder)
         {
-            try
-            {
-                return new FileInfo(filePath).Length;
-            }
-            catch (Exception)
-            {
-                return 0;
-            }
+            var normalizedPath = Path.GetFullPath(cacheRootFolder).ToUpperInvariant();
+            var pathHash = Convert.ToHexString(SHA256.HashData(Utf8NoBom.GetBytes(normalizedPath)));
+            return $"Local\\PowerToysSvgPreviewCache_{pathHash}";
         }
 
         private static bool TryDeleteFile(string filePath)
