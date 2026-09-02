@@ -1176,7 +1176,6 @@ public sealed partial class ListItemsView : UserControl,
             return;
         }
 
-        ClearNumberedShortcutAccelerators();
         foreach (var cue in _numberedShortcutCues)
         {
             cue.Visibility = Visibility.Collapsed;
