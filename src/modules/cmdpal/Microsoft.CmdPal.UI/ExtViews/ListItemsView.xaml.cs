@@ -118,6 +118,8 @@ public sealed partial class ListItemsView : UserControl,
         RegisterMessenger();
         _accessKeyMode.IsActiveChanged += AccessKeyMode_IsActiveChanged;
         SetNumberedShortcutCuesVisibility(_accessKeyMode.IsActive);
+        EnsureNumberedShortcutCueTracking();
+        QueueNumberedShortcutCueUpdate();
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -130,6 +132,8 @@ public sealed partial class ListItemsView : UserControl,
         SetItemsScrollViewer(null);
         _accessKeyMode.IsActiveChanged -= AccessKeyMode_IsActiveChanged;
         SetNumberedShortcutCuesVisibility(false);
+        StopNumberedShortcutCueTracking();
+        ClearNumberedShortcutAccelerators();
         UnregisterMessenger();
         CancelPendingContextMenuOpen();
     }
@@ -813,7 +817,7 @@ public sealed partial class ListItemsView : UserControl,
                 Logger.LogDebug("cleared view model");
             }
 
-            if (@this._areNumberedShortcutCuesVisible)
+            if (@this._isLoaded)
             {
                 @this.EnsureNumberedShortcutCueTracking();
                 @this.QueueNumberedShortcutCueUpdate();
@@ -900,7 +904,6 @@ public sealed partial class ListItemsView : UserControl,
         }
         else
         {
-            StopNumberedShortcutCueTracking();
             HideNumberedShortcutCues();
         }
     }
@@ -912,7 +915,7 @@ public sealed partial class ListItemsView : UserControl,
 
     private void QueueNumberedShortcutCueUpdate()
     {
-        if (!_areNumberedShortcutCuesVisible || _numberedShortcutCueUpdatePending)
+        if (!_isLoaded || !ShowNumberedShortcutCues || ViewModel is null || _numberedShortcutCueUpdatePending)
         {
             return;
         }
@@ -923,10 +926,7 @@ public sealed partial class ListItemsView : UserControl,
                 () =>
                 {
                     _numberedShortcutCueUpdatePending = false;
-                    if (_areNumberedShortcutCuesVisible)
-                    {
-                        UpdateNumberedShortcutCues();
-                    }
+                    UpdateNumberedShortcutCues();
                 }))
         {
             _numberedShortcutCueUpdatePending = false;
@@ -967,7 +967,7 @@ public sealed partial class ListItemsView : UserControl,
 
     private void EnsureNumberedShortcutCueTracking()
     {
-        var itemView = _areNumberedShortcutCuesVisible && ShowNumberedShortcutCues && ViewModel is not null
+        var itemView = _isLoaded && ShowNumberedShortcutCues && ViewModel is not null
             ? ItemView
             : null;
         if (ReferenceEquals(_numberedShortcutCueTrackedView, itemView))
@@ -1042,8 +1042,9 @@ public sealed partial class ListItemsView : UserControl,
 
     private void UpdateNumberedShortcutCues()
     {
-        if (!_areNumberedShortcutCuesVisible || !ShowNumberedShortcutCues || ViewModel is null)
+        if (!_isLoaded || !ShowNumberedShortcutCues || ViewModel is null)
         {
+            ClearNumberedShortcutAccelerators();
             HideNumberedShortcutCues();
             return;
         }
@@ -1052,10 +1053,10 @@ public sealed partial class ListItemsView : UserControl,
         EnsureNumberedShortcutCueTracking();
 
         var itemView = ItemView;
-        if (!TryUpdateNumberedShortcutCueClip(itemView))
+        var showCues = _areNumberedShortcutCuesVisible && TryUpdateNumberedShortcutCueClip(itemView);
+        if (!showCues)
         {
             HideNumberedShortcutCues();
-            return;
         }
 
         ClearNumberedShortcutAccelerators();
@@ -1068,11 +1069,17 @@ public sealed partial class ListItemsView : UserControl,
             }
 
             var cue = _numberedShortcutCues![cueIndex];
-            if (itemView.ContainerFromItem(item) is SelectorItem container &&
-                container.ContentTemplateRoot is FrameworkElement anchor)
+            if (itemView.ContainerFromItem(item) is SelectorItem container)
             {
                 SetNumberedShortcutAccelerator(container, cueIndex);
-                PositionNumberedShortcutCue(cue, anchor, itemView);
+                if (showCues && container.ContentTemplateRoot is FrameworkElement anchor)
+                {
+                    PositionNumberedShortcutCue(cue, anchor, itemView);
+                }
+                else
+                {
+                    cue.Visibility = Visibility.Collapsed;
+                }
             }
             else
             {
