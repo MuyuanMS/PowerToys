@@ -96,7 +96,7 @@ namespace KeyboardManagerEditorUI.Pages
         private static readonly int[] _ctrlVkCodes = { 0x11, 0xA2, 0xA3 };
         private static readonly int[] _altVkCodes = { 0x12, 0xA4, 0xA5 };
         private static readonly int[] _shiftVkCodes = { 0x10, 0xA0, 0xA1 };
-        private static readonly int[] _winVkCodes = { 0x5B, 0x5C };
+        private static readonly int[] _winVkCodes = { 0x5B, 0x5C, 0x104 };
 
         // Sentinel stored in _appFilter for the "Global only" option (item index 1 in the combo).
         // Uses a control character so it can never collide with a real app name.
@@ -830,6 +830,14 @@ namespace KeyboardManagerEditorUI.Pages
                 return;
             }
 
+            if (IsSelectionMode)
+            {
+                ClearAllSelections();
+                IsSelectionMode = false;
+                SelectionModeToggle.IsChecked = false;
+                UpdateSelectedCount();
+            }
+
             try
             {
                 switch (menuFlyoutItem.Tag)
@@ -883,6 +891,12 @@ namespace KeyboardManagerEditorUI.Pages
                 toggleSwitch.DataContext is not IToggleableShortcut shortcut ||
                 _mappingService == null)
             {
+                return;
+            }
+
+            if (IsSelectionMode)
+            {
+                RestoreToggleState(toggleSwitch, shortcut.IsActive);
                 return;
             }
 
