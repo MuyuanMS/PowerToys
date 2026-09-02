@@ -364,35 +364,38 @@ namespace Peek.FilePreviewer
         {
             if (Previewer != null)
             {
-                var previewSize = await Previewer.GetPreviewSizeAsync(cancellationToken);
-                PreviewSizeChanged?.Invoke(this, new PreviewSizeChangedArgs(previewSize));
+                await UpdatePreviewSizeAsync(Previewer, cancellationToken);
             }
         }
 
-        private async Task UpdateImagePreviewAsync(CancellationToken cancellationToken)
+        private async Task UpdatePreviewSizeAsync(IPreviewer previewer, CancellationToken cancellationToken)
         {
-            if (Previewer is IImagePreviewer imagePreviewer)
+            var previewSize = await previewer.GetPreviewSizeAsync(cancellationToken);
+            PreviewSizeChanged?.Invoke(this, new PreviewSizeChangedArgs(previewSize));
+        }
+
+        private async Task UpdateImagePreviewAsync(IImagePreviewer imagePreviewer, CancellationToken cancellationToken)
+        {
+            var previewSize = await imagePreviewer.GetPreviewSizeAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            await imagePreviewer.LoadPreviewAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (imagePreviewer.State == PreviewState.Loaded)
             {
-                var previewSize = await imagePreviewer.GetPreviewSizeAsync(cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
-
-                await imagePreviewer.LoadPreviewAsync(cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (imagePreviewer.State == PreviewState.Loaded)
-                {
-                    imagePreviewer.ImageSize = previewSize.MonitorSize;
-                }
-
-                // Apply resize and image swap atomically on the UI thread once the image is ready.
-                PreviewSizeChanged?.Invoke(this, new PreviewSizeChangedArgs(previewSize));
-                ImagePreview.InstantSwap();
+                imagePreviewer.ImageSize = previewSize.MonitorSize;
             }
+
+            // Apply resize and image swap atomically on the UI thread once the image is ready.
+            PreviewSizeChanged?.Invoke(this, new PreviewSizeChangedArgs(previewSize));
+            ImagePreview.InstantSwap();
         }
 
         private async Task UpdatePreviewAsync(CancellationToken cancellationToken)
         {
-            if (Previewer is null)
+            var previewer = Previewer;
+            if (previewer is null)
             {
                 return;
             }
@@ -401,15 +404,15 @@ namespace Peek.FilePreviewer
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (Previewer is IImagePreviewer)
+                if (previewer is IImagePreviewer imagePreviewer)
                 {
-                    await UpdateImagePreviewAsync(cancellationToken);
+                    await UpdateImagePreviewAsync(imagePreviewer, cancellationToken);
                 }
                 else
                 {
-                    await UpdatePreviewSizeAsync(cancellationToken);
+                    await UpdatePreviewSizeAsync(previewer, cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
-                    await Previewer.LoadPreviewAsync(cancellationToken);
+                    await previewer.LoadPreviewAsync(cancellationToken);
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -421,10 +424,15 @@ namespace Peek.FilePreviewer
             }
             catch (Exception ex)
             {
+                if (cancellationToken.IsCancellationRequested || !ReferenceEquals(Previewer, previewer))
+                {
+                    return;
+                }
+
                 // Fall back to Default previewer.
                 PowerToysTelemetry.Log.WriteEvent(new ErrorEvent() { HResult = (Common.Models.HResult)ex.HResult, Message = ex.Message, Failure = ErrorEvent.FailureType.PreviewFail });
                 Logger.LogError("Error in UpdatePreviewAsync, falling back to default previewer: " + ex.Message);
-                Previewer.State = PreviewState.Error;
+                previewer.State = PreviewState.Error;
             }
         }
 
