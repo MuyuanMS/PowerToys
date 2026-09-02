@@ -164,7 +164,9 @@ namespace Peek.FilePreviewer.Previewers
             {
                 await Dispatcher.RunOnUiThread(async () =>
                 {
-                    Preview = await ThumbnailHelper.GetCachedThumbnailAsync(item.Path, IsPng(item), cancellationToken);
+                    var thumbnail = await ThumbnailHelper.GetCachedThumbnailAsync(item.Path, IsPng(item), cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    Preview = thumbnail;
                 });
             });
         }

@@ -119,8 +119,13 @@ namespace Peek.FilePreviewer.Previewers
             }
             catch (Exception ex)
             {
+                if (bindingGeneration != BindingGeneration || cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
                 Logger.LogError("UnsupportedFilePreviewer error.", ex);
-                State = PreviewState.Error;
+                EnqueueIfCurrent(bindingGeneration, () => State = PreviewState.Error);
             }
         }
 
