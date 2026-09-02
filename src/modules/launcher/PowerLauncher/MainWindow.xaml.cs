@@ -51,8 +51,8 @@ namespace PowerLauncher
 
         private static readonly string OpenSoundPath = Path.Combine(AppContext.BaseDirectory, "Sounds", "open.wav");
         private static readonly string CloseSoundPath = Path.Combine(AppContext.BaseDirectory, "Sounds", "close.wav");
-        private static readonly Lazy<byte[]> OpenSoundBytes = new Lazy<byte[]>(() => LoadSoundBytes(OpenSoundPath));
-        private static readonly Lazy<byte[]> CloseSoundBytes = new Lazy<byte[]>(() => LoadSoundBytes(CloseSoundPath));
+        private static readonly Lazy<GCHandle?> OpenSoundHandle = new Lazy<GCHandle?>(() => LoadSound(OpenSoundPath));
+        private static readonly Lazy<GCHandle?> CloseSoundHandle = new Lazy<GCHandle?>(() => LoadSound(CloseSoundPath));
 
         private IDisposable _reactiveSubscription;
         private Point _mouseDownPosition;
@@ -846,18 +846,19 @@ namespace PowerLauncher
                 return;
             }
 
-            string soundPath = isOpening ? OpenSoundPath : CloseSoundPath;
-            byte[] soundBytes = isOpening ? OpenSoundBytes.Value : CloseSoundBytes.Value;
+            GCHandle? soundHandle = isOpening ? OpenSoundHandle.Value : CloseSoundHandle.Value;
 
-            if (soundBytes == null)
+            if (!soundHandle.HasValue)
             {
-                Log.Info($"Sound file not found: {soundPath}", GetType());
                 return;
             }
 
             try
             {
-                NativeMethods.PlaySound(soundBytes, IntPtr.Zero, NativeMethods.SndMemory | NativeMethods.SndAsync | NativeMethods.SndNoDefault);
+                if (!NativeMethods.PlaySound(soundHandle.Value.AddrOfPinnedObject(), IntPtr.Zero, NativeMethods.SndMemory | NativeMethods.SndAsync | NativeMethods.SndNoDefault))
+                {
+                    Log.Warn("Failed to play audible feedback", GetType());
+                }
             }
             catch (Exception ex)
             {
@@ -865,11 +866,17 @@ namespace PowerLauncher
             }
         }
 
-        private static byte[] LoadSoundBytes(string path)
+        private static GCHandle? LoadSound(string path)
         {
             try
             {
-                return File.Exists(path) ? File.ReadAllBytes(path) : null;
+                if (!File.Exists(path))
+                {
+                    Log.Warn($"Sound file not found: {path}", typeof(MainWindow));
+                    return null;
+                }
+
+                return GCHandle.Alloc(File.ReadAllBytes(path), GCHandleType.Pinned);
             }
             catch (Exception ex)
             {

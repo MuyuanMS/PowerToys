@@ -111,12 +111,12 @@
     <Resource Include="Assets\PowerLauncher\RunResource.ico" />
   </ItemGroup>
   <ItemGroup>
-	<None Include="Sounds\open.wav">
-	 <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	</None>
-	<None Include="Sounds\close.wav">
-	 <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	</None>
+    <None Include="Sounds\open.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Sounds\close.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Compile Update="Properties\Resources.Designer.cs">

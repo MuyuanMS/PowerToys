@@ -49,7 +49,7 @@ public class SetSettingCommandTests
     [DataRow(typeof(AwakeSettings), nameof(AwakeProperties.ExpirationDateTime), "March 31, 2020 15:00 +00:00")]
     [DataRow(typeof(PowerLauncherSettings), nameof(PowerLauncherProperties.MaximumNumberOfResults), "322")]
     [DataRow(typeof(PowerLauncherSettings), nameof(PowerLauncherProperties.EnableAudibleFeedback), "true")]
-    [DataRow(typeof(PowerLauncherSettings), nameof(PowerLauncherProperties.EnableOpeningSound), "true")]
+    [DataRow(typeof(PowerLauncherSettings), nameof(PowerLauncherProperties.EnableOpeningSound), "false")]
     [DataRow(typeof(PowerLauncherSettings), nameof(PowerLauncherProperties.EnableClosingSound), "false")]
 
     [DataRow(typeof(ColorPickerSettings), nameof(ColorPickerProperties.CopiedColorRepresentation), "RGB")]
