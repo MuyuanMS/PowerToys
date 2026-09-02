@@ -109,19 +109,19 @@ internal sealed class Program
 
     internal static void ReplayPendingActivations(MainWindow mainWindow)
     {
-        List<ActivationSnapshot?> pendingActivations = [];
-
-        lock (ActivationLock)
+        while (true)
         {
-            currentMainWindow = mainWindow;
-            while (PendingActivations.TryDequeue(out var args))
+            ActivationSnapshot? args;
+
+            lock (ActivationLock)
             {
-                pendingActivations.Add(args);
+                if (!PendingActivations.TryDequeue(out args))
+                {
+                    currentMainWindow = mainWindow;
+                    return;
+                }
             }
-        }
 
-        foreach (var args in pendingActivations)
-        {
             mainWindow.HandleLaunchNonUI(args);
         }
     }
