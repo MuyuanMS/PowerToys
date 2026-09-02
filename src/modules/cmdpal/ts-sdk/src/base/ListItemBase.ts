@@ -30,6 +30,7 @@ export interface ListItemOptions {
 /** A concrete, ready-to-use {@link IListItem} built from a plain options bag. */
 export class ListItemBase extends ObservableBase implements IListItem {
   private readonly stableNotificationId: string;
+  protected override readonly notificationTargetKind = 'listItem';
   /** The command run when the item is activated. */
   command: ICommand;
   protected get notificationId(): string {

@@ -22,7 +22,7 @@ internal sealed partial class JSCommandItemAdapter : JSObservableProxyBase, ICom
     private readonly JSLazyCache<IContextItem[]> _moreCommands;
 
     public JSCommandItemAdapter(JsonElement data, JsonRpcConnection connection)
-        : base(GetNotificationId(data), connection, data)
+        : base(GetNotificationId(data), connection, data, JSPropertyChangeTargetKinds.CommandItem)
     {
         _command = new JSLazyCache<ICommand?>(
             CreateCommand,

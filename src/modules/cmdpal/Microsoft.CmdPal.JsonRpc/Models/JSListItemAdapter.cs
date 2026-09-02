@@ -24,7 +24,7 @@ internal sealed partial class JSListItemAdapter : JSObservableProxyBase, IListIt
     private readonly JSLazyCache<IDetails?> _details;
 
     public JSListItemAdapter(JsonElement data, JsonRpcConnection connection)
-        : base(GetNotificationId(data), connection, data)
+        : base(GetNotificationId(data), connection, data, JSPropertyChangeTargetKinds.ListItem)
     {
         _command = new JSLazyCache<ICommand?>(
             CreateCommand,

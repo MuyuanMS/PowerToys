@@ -47,8 +47,19 @@ internal static class JSPropertyChangeRegistry
             return;
         }
 
+        var targetKind = paramsElement.TryGetProperty("targetKind", out var targetKindProperty) &&
+            targetKindProperty.ValueKind == JsonValueKind.String
+                ? targetKindProperty.GetString()
+                : null;
+
         foreach (var target in registry.Targets.GetLiveTargets(commandId))
         {
+            if (targetKind is not null &&
+                !string.Equals(target.TargetKind, targetKind, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             target.ApplyPropertyChanges(properties);
         }
     }

@@ -37,6 +37,9 @@ export type FontFamily = 'userInterface' | 'monospace';
 /** Identifies the kind of page a command navigates to, if any. */
 export type PageType = 'listPage' | 'dynamicListPage' | 'contentPage';
 
+/** Which observable object raised a property-change notification. */
+export type ObservableTargetKind = 'command' | 'commandItem' | 'listItem';
+
 // === Icons ===
 
 /**

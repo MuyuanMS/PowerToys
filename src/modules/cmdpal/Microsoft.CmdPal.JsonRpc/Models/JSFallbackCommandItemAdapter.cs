@@ -26,7 +26,7 @@ internal sealed partial class JSFallbackCommandItemAdapter : JSObservableProxyBa
     private IFallbackHandler? _fallbackHandler;
 
     public JSFallbackCommandItemAdapter(JsonElement data, JsonRpcConnection connection)
-        : base(GetNotificationId(data), connection, data)
+        : base(GetNotificationId(data), connection, data, JSPropertyChangeTargetKinds.CommandItem)
     {
         _command = new JSLazyCache<ICommand?>(
             CreateCommand,

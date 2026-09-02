@@ -22,6 +22,7 @@ export interface CommandItemOptions {
 /** A concrete, ready-to-use {@link ICommandItem} built from a plain options bag. */
 export class CommandItemBase extends ObservableBase implements ICommandItem {
   private readonly stableNotificationId: string;
+  protected override readonly notificationTargetKind = 'commandItem';
   /** The command run when the item is activated. */
   command: ICommand;
   protected get notificationId(): string {

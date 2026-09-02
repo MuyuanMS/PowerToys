@@ -104,6 +104,88 @@ public class JSAdapterProxyTests
     }
 
     [TestMethod]
+    public async Task CommandPropChanged_TargetKindKeepsItemAndCommandIconsSeparate()
+    {
+        using var fake = new JSFakeExtension();
+        var commandsJson =
+            """
+            [
+              {
+                "id": "shared-item",
+                "title": "Shared item",
+                "icon": { "light": { "icon": "ITEM_OLD" }, "dark": { "icon": "ITEM_OLD" } },
+                "command": {
+                  "id": "shared",
+                  "name": "Shared command",
+                  "icon": { "light": { "icon": "COMMAND_OLD" }, "dark": { "icon": "COMMAND_OLD" } }
+                }
+              }
+            ]
+            """;
+        fake.OnResult("provider/getTopLevelCommands", commandsJson);
+
+        var provider = CreateProvider(fake);
+        var item = provider.TopLevelCommands()[0];
+        var command = item.Command!;
+        var commandChanged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var itemChanged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        command.PropChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(ICommand.Icon))
+            {
+                commandChanged.TrySetResult();
+            }
+        };
+        item.PropChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(ICommandItem.Icon))
+            {
+                itemChanged.TrySetResult();
+            }
+        };
+
+        await fake.PushNotificationAsync(
+            "command/propChanged",
+            new JsonObject
+            {
+                ["commandId"] = "shared",
+                ["targetKind"] = "command",
+                ["properties"] = new JsonObject
+                {
+                    ["icon"] = new JsonObject
+                    {
+                        ["light"] = new JsonObject { ["icon"] = "COMMAND_NEW" },
+                        ["dark"] = new JsonObject { ["icon"] = "COMMAND_NEW" },
+                    },
+                },
+            });
+
+        await commandChanged.Task.WaitAsync(Timeout);
+        Assert.AreEqual("ITEM_OLD", item.Icon.Light.Icon);
+        Assert.AreEqual("COMMAND_NEW", command.Icon.Light.Icon);
+
+        await fake.PushNotificationAsync(
+            "command/propChanged",
+            new JsonObject
+            {
+                ["commandId"] = "shared",
+                ["targetKind"] = "commandItem",
+                ["properties"] = new JsonObject
+                {
+                    ["icon"] = new JsonObject
+                    {
+                        ["light"] = new JsonObject { ["icon"] = "ITEM_NEW" },
+                        ["dark"] = new JsonObject { ["icon"] = "ITEM_NEW" },
+                    },
+                },
+            });
+
+        await itemChanged.Task.WaitAsync(Timeout);
+        Assert.AreEqual("ITEM_NEW", item.Icon.Light.Icon);
+        Assert.AreEqual("COMMAND_NEW", command.Icon.Light.Icon);
+    }
+
+    [TestMethod]
     public void IconPipeline_HandlesGlyphPathBase64AndDataUri()
     {
         using var fake = new JSFakeExtension();

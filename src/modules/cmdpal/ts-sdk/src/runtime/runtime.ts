@@ -653,6 +653,7 @@ export class ExtensionRuntime {
     await item.fallbackHandler.updateQuery(query);
     this.sendNotification('command/propChanged', {
       commandId,
+      targetKind: 'commandItem',
       properties: { displayTitle: item.displayTitle ?? item.title },
     });
   }
@@ -856,7 +857,8 @@ export class ExtensionRuntime {
         },
       );
 
-      serialized[propertyName] = serializer.observableProperty(commandId, propertyName, value);
+      serialized[propertyName] =
+        value === undefined ? null : serializer.observableProperty(commandId, propertyName, value);
     }
 
     return { ...notification, properties: serialized };

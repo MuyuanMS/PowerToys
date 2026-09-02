@@ -301,7 +301,7 @@ describe('ExtensionRuntime notification dispatch', () => {
     expect(notifications).toEqual([
       {
         method: 'command/propChanged',
-        params: { commandId: 'loading', properties: { isLoading: true } },
+        params: { commandId: 'loading', targetKind: 'command', properties: { isLoading: true } },
       },
     ]);
     setNotificationSink(null);
@@ -329,6 +329,7 @@ describe('ExtensionRuntime notification dispatch', () => {
         method: 'command/propChanged',
         params: {
           commandId: 'initial-command',
+          targetKind: 'commandItem',
           properties: {
             command: { id: 'replacement-command', name: 'Replacement' },
           },
@@ -343,12 +344,13 @@ describe('ExtensionRuntime notification dispatch', () => {
       readonly id = 'mutable-page';
       readonly name = 'Mutable';
       readonly title = 'Mutable';
+      override emptyContent?: ICommandItem | null = null;
 
       getItems() {
         return [];
       }
 
-      setEmptyContent(item: ICommandItem): void {
+      setEmptyContent(item: ICommandItem | undefined): void {
         this.emptyContent = item;
         this.notifyPropChanged('emptyContent');
       }
@@ -389,6 +391,7 @@ describe('ExtensionRuntime notification dispatch', () => {
     const changed = notificationsOf(sent, 'command/propChanged');
     expect(changed.at(-1)?.params).toEqual({
       commandId: 'mutable-page',
+      targetKind: 'command',
       properties: {
         emptyContent: {
           id: 'updated-child',
@@ -420,6 +423,53 @@ describe('ExtensionRuntime notification dispatch', () => {
       params: { commandId: 'initial-child' },
     });
     expect(responseFor(sent, 3)?.result).toBeNull();
+    setNotificationSink(null);
+  });
+
+  it('serializes undefined property changes as null so the host clears old state', async () => {
+    class MutablePage extends ListPageBase {
+      readonly id = 'clear-page';
+      readonly name = 'Clear';
+      readonly title = 'Clear';
+      override emptyContent?: ICommandItem | null = {
+        command: { id: 'stale-child', name: 'Stale child' },
+        title: 'Stale child',
+      };
+
+      getItems() {
+        return [];
+      }
+
+      clearEmptyContent(): void {
+        this.emptyContent = undefined;
+        this.notifyPropChanged('emptyContent');
+      }
+    }
+
+    const page = new MutablePage();
+    const { runtime, sent } = createHarness();
+    runtime.setProvider({
+      id: 'ext',
+      displayName: 'Ext',
+      topLevelCommands: () => [{ command: page, title: 'Clear' }],
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'provider/getTopLevelCommands',
+    });
+    setNotificationSink((method, params) => runtime.sendSdkNotification(method, params));
+
+    page.clearEmptyContent();
+
+    const changed = notificationsOf(sent, 'command/propChanged');
+    expect(changed.at(-1)?.params).toEqual({
+      commandId: 'clear-page',
+      targetKind: 'command',
+      properties: {
+        emptyContent: null,
+      },
+    });
     setNotificationSink(null);
   });
 
@@ -602,6 +652,7 @@ describe('ExtensionRuntime notification dispatch', () => {
     expect(changed).toHaveLength(1);
     expect(changed[0]?.params).toEqual({
       commandId: 'fb',
+      targetKind: 'commandItem',
       properties: { displayTitle: 'Search: abc' },
     });
   });

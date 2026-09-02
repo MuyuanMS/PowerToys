@@ -174,9 +174,8 @@ public partial class JSAdapterTests
         Assert.AreEqual("Test Extension", provider.DisplayName);
     }
 
-    // A pending show holds the status lock, so a hide from Dispose
-    // cannot run until the show has been dispatched. The order is always show
-    // then hide.
+    // Dispose queues hides after pending asynchronous shows so it cannot leave
+    // a late status visible.
     [TestMethod]
     public async Task Provider_DisposeHidesStrictlyAfterPendingShow()
     {
@@ -197,8 +196,8 @@ public partial class JSAdapterTests
 
         var dispose = Task.Run(() => provider.Dispose());
 
-        // The pending show still holds the status lock, so Dispose cannot hide the
-        // status yet. Give it time to prove the hide waits.
+        // The pending show has not completed, so Dispose cannot hide the status
+        // yet. Give it time to prove the hide waits.
         await Task.Delay(200);
         Assert.AreEqual(0, host.HiddenCount);
 
@@ -253,8 +252,8 @@ public partial class JSAdapterTests
     }
 
     /// <summary>
-    /// A host whose ShowStatus blocks until released and records show and hide
-    /// order. This makes the show versus dispose ordering deterministic.
+    /// A host whose ShowStatus action completes only after release and records
+    /// show and hide order. This makes the show versus dispose ordering deterministic.
     /// </summary>
     private sealed partial class OrderedGatingHost : IExtensionHost, IDisposable
     {
@@ -280,14 +279,17 @@ public partial class JSAdapterTests
 
         public IAsyncAction ShowStatus(IStatusMessage message, StatusContext context)
         {
-            ShowEntered.Set();
-            _releaseShow.Wait();
-            lock (_lock)
-            {
-                Operations.Add("show");
-            }
+            return ShowStatusAsync().AsAsyncAction();
 
-            return Task.CompletedTask.AsAsyncAction();
+            async Task ShowStatusAsync()
+            {
+                ShowEntered.Set();
+                await Task.Run(_releaseShow.Wait);
+                lock (_lock)
+                {
+                    Operations.Add("show");
+                }
+            }
         }
 
         public IAsyncAction HideStatus(IStatusMessage message)

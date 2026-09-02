@@ -45,6 +45,7 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
     private List<BufferedHostNotification>? _preInitNotifications = new();
     private IExtensionHost? _host;
     private ICommandSettings? _settingsCache;
+    private Task _statusOperations = Task.CompletedTask;
     private bool _settingsLoading;
     private bool _settingsQueried;
     private volatile bool _isDisposed;
@@ -240,25 +241,34 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
     {
         ArgumentNullException.ThrowIfNull(host);
 
-        List<BufferedHostNotification> buffered;
         lock (_preInitLock)
         {
             _host = host;
+        }
 
-            // Swap the buffer to null under the same lock used by notification handlers.
-            // _host is written first so any handler that now runs inline sees the host,
-            // not a stale null.
-            buffered = _preInitNotifications ?? new List<BufferedHostNotification>();
-            _preInitNotifications = null;
+        while (true)
+        {
+            List<BufferedHostNotification> buffered;
+            lock (_preInitLock)
+            {
+                if (_preInitNotifications is not { Count: > 0 })
+                {
+                    _preInitNotifications = null;
+                    break;
+                }
+
+                buffered = _preInitNotifications;
+                _preInitNotifications = new List<BufferedHostNotification>();
+            }
+
+            // Replay startup notifications in arrival order now that the host can receive them.
+            foreach (var notification in buffered)
+            {
+                DispatchBufferedHostNotification(notification.Method, notification.Parameters);
+            }
         }
 
         Logger.LogDebug($"JSCommandProviderProxy initialized with host for {DisplayName}");
-
-        // Replay startup notifications in arrival order now that the host can receive them.
-        foreach (var notification in buffered)
-        {
-            DispatchBufferedHostNotification(notification.Method, notification.Parameters);
-        }
     }
 
     public void Dispose()
@@ -288,20 +298,23 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
             _shownStatusMessages.Clear();
         }
 
+        Task statusDrain = Task.CompletedTask;
         if (host != null)
         {
-            foreach (var status in pendingStatuses)
+            lock (_statusLock)
             {
-                try
+                foreach (var status in pendingStatuses)
                 {
-                    _ = host.HideStatus(status);
+                    EnqueueStatusOperationLocked(
+                        () => host.HideStatus(status).AsTask(),
+                        $"Error hiding status during dispose for {DisplayName}");
                 }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning($"Error hiding status during dispose for {DisplayName}: {ex.Message}");
-                }
+
+                statusDrain = _statusOperations;
             }
         }
+
+        statusDrain.GetAwaiter().GetResult();
 
         lock (_settingsLock)
         {
@@ -326,9 +339,9 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
     {
         _connection.RegisterNotificationHandler("provider/itemsChanged", HandleItemsChangedNotification);
         _connection.RegisterNotificationHandler("command/propChanged", HandleCommandPropChangedNotification);
-        _connection.RegisterNotificationHandler("host/logMessage", HandleLogMessageNotification);
-        _connection.RegisterNotificationHandler("host/showStatus", HandleShowStatusNotification);
-        _connection.RegisterNotificationHandler("host/hideStatus", HandleHideStatusNotification);
+        _connection.RegisterNotificationHandler("host/logMessage", parameters => HandleLogMessageNotification(parameters));
+        _connection.RegisterNotificationHandler("host/showStatus", parameters => HandleShowStatusNotification(parameters));
+        _connection.RegisterNotificationHandler("host/hideStatus", parameters => HandleHideStatusNotification(parameters));
         _connection.RegisterNotificationHandler("host/copyText", HandleCopyTextNotification);
     }
 
@@ -383,13 +396,13 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
         switch (method)
         {
             case "host/showStatus":
-                HandleShowStatusNotification(paramsElement);
+                HandleShowStatusNotification(paramsElement, allowBuffer: false);
                 break;
             case "host/hideStatus":
-                HandleHideStatusNotification(paramsElement);
+                HandleHideStatusNotification(paramsElement, allowBuffer: false);
                 break;
             case "host/logMessage":
-                HandleLogMessageNotification(paramsElement);
+                HandleLogMessageNotification(paramsElement, allowBuffer: false);
                 break;
         }
     }
@@ -436,14 +449,14 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
         }
     }
 
-    private void HandleLogMessageNotification(JsonElement paramsElement)
+    private void HandleLogMessageNotification(JsonElement paramsElement, bool allowBuffer = true)
     {
         if (_isDisposed)
         {
             return;
         }
 
-        if (TryBufferUntilHostAttached("host/logMessage", paramsElement))
+        if (allowBuffer && TryBufferUntilHostAttached("host/logMessage", paramsElement))
         {
             return;
         }
@@ -488,14 +501,14 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
         }
     }
 
-    private void HandleShowStatusNotification(JsonElement paramsElement)
+    private void HandleShowStatusNotification(JsonElement paramsElement, bool allowBuffer = true)
     {
         if (_isDisposed)
         {
             return;
         }
 
-        if (TryBufferUntilHostAttached("host/showStatus", paramsElement))
+        if (allowBuffer && TryBufferUntilHostAttached("host/showStatus", paramsElement))
         {
             return;
         }
@@ -547,12 +560,10 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
                     _shownStatusMessages[statusId] = statusMessage;
                 }
 
-                // Keep the map update and ShowStatus under one lock. Dispose uses
-                // this same lock to hide tracked statuses, so it either runs before
-                // this show starts or after the shown status is tracked. Releasing
-                // the lock between those steps would let Dispose hide a status that
-                // was not shown yet.
-                _ = host.ShowStatus(statusMessage, ReadStatusContext(paramsElement));
+                var statusContext = ReadStatusContext(paramsElement);
+                EnqueueStatusOperationLocked(
+                    () => host.ShowStatus(statusMessage, statusContext).AsTask(),
+                    $"Error showing status for {DisplayName}");
             }
         }
         catch (Exception ex)
@@ -561,14 +572,14 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
         }
     }
 
-    private void HandleHideStatusNotification(JsonElement paramsElement)
+    private void HandleHideStatusNotification(JsonElement paramsElement, bool allowBuffer = true)
     {
         if (_isDisposed)
         {
             return;
         }
 
-        if (TryBufferUntilHostAttached("host/hideStatus", paramsElement))
+        if (allowBuffer && TryBufferUntilHostAttached("host/hideStatus", paramsElement))
         {
             return;
         }
@@ -594,12 +605,36 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
                 _shownStatusMessages.Remove(statusId);
             }
 
-            _ = host.HideStatus(statusMessage);
+            lock (_statusLock)
+            {
+                EnqueueStatusOperationLocked(
+                    () => host.HideStatus(statusMessage).AsTask(),
+                    $"Error hiding status for {DisplayName}");
+            }
         }
         catch (Exception ex)
         {
             Logger.LogWarning($"Error handling host/hideStatus notification: {ex.Message}");
         }
+    }
+
+    private void EnqueueStatusOperationLocked(Func<Task> operation, string failureMessage)
+    {
+        _statusOperations = _statusOperations.ContinueWith(
+            async _ =>
+            {
+                try
+                {
+                    await operation().ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"{failureMessage}: {ex.Message}");
+                }
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.None,
+            TaskScheduler.Default).Unwrap();
     }
 
     private void HandleCopyTextNotification(JsonElement paramsElement)

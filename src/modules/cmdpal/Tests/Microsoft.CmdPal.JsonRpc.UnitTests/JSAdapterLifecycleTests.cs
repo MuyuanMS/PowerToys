@@ -536,6 +536,8 @@ public partial class JSAdapterTests
 
     private sealed class RecordingPropertyChangeTarget : IJSPropertyChangeTarget
     {
+        public string TargetKind => JSPropertyChangeTargetKinds.Command;
+
         public int ApplyCount { get; private set; }
 
         public void ApplyPropertyChanges(JsonElement properties)

@@ -20,13 +20,20 @@ internal abstract class JSObservableProxyBase : BaseObservable, IJSPropertyChang
     private DataBox _data;
     private bool _disposed;
 
-    protected JSObservableProxyBase(string commandId, JsonRpcConnection connection, JsonElement data)
+    protected JSObservableProxyBase(
+        string commandId,
+        JsonRpcConnection connection,
+        JsonElement data,
+        string targetKind = JSPropertyChangeTargetKinds.Command)
     {
         _commandId = commandId ?? throw new ArgumentNullException(nameof(commandId));
         _connection = connection ?? throw new ArgumentNullException(nameof(connection));
+        TargetKind = targetKind ?? throw new ArgumentNullException(nameof(targetKind));
         _data = new DataBox(data);
         JSPropertyChangeRegistry.Register(connection, commandId, this);
     }
+
+    public string TargetKind { get; }
 
     protected JsonRpcConnection Connection => _connection;
 
