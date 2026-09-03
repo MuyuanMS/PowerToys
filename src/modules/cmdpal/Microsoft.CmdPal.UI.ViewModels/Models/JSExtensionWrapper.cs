@@ -823,11 +823,25 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
                 return null;
             }
 
-            return Path.GetFullPath(Path.Combine(sdkRoot, relative));
+            var candidate = Path.GetFullPath(Path.Combine(sdkRoot, relative));
+            if (!IsPathUnderRoot(candidate, sdkRoot))
+            {
+                return null;
+            }
+
+            return candidate;
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {
             return null;
         }
+    }
+
+    private static bool IsPathUnderRoot(string path, string root)
+    {
+        var normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var normalizedPath = Path.GetFullPath(path);
+
+        return normalizedPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase);
     }
 }
