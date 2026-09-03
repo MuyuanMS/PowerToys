@@ -1386,16 +1386,17 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
             return;
         }
 
-        _notifications.Enqueue(() =>
+        var token = _reload.Token;
+        _notifications.Enqueue(async () =>
         {
             if (shouldRemove)
             {
-                HandleDirectoryEntryRemoved(e.OldFullPath);
+                await HandleDirectoryEntryRemovedOrderedAsync(e.OldFullPath).ConfigureAwait(false);
             }
 
             if (shouldUpsert)
             {
-                HandleDirectoryEntryUpsert(e.FullPath);
+                await HandleDirectoryEntryUpsertOrderedAsync(e.FullPath, token).ConfigureAwait(false);
             }
         });
     }
@@ -1440,20 +1441,22 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
 
     private void HandleDirectoryEntryUpsert(string changedPath)
     {
-        var extensionDirectory = GetExtensionDirectoryForPath(ExtensionsPath, changedPath);
-        if (extensionDirectory is null)
-        {
-            return;
-        }
-
         var token = _reload.Token;
         StartObservedBackgroundTask(
-            () => HandleDirectoryEntryUpsertAsync(extensionDirectory, token),
-            $"install JS extension at {extensionDirectory}",
+            () => HandleDirectoryEntryUpsertOrderedAsync(changedPath, token),
+            $"install JS extension at {changedPath}",
             token);
     }
 
     private void HandleDirectoryEntryRemoved(string changedPath)
+    {
+        StartObservedBackgroundTask(
+            () => HandleDirectoryEntryRemovedOrderedAsync(changedPath),
+            $"uninstall JS extension at {changedPath}",
+            _reload.Token);
+    }
+
+    private async Task HandleDirectoryEntryUpsertOrderedAsync(string changedPath, CancellationToken token)
     {
         var extensionDirectory = GetExtensionDirectoryForPath(ExtensionsPath, changedPath);
         if (extensionDirectory is null)
@@ -1461,11 +1464,18 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
             return;
         }
 
-        var token = _reload.Token;
-        StartObservedBackgroundTask(
-            () => HandleDirectoryEntryRemovedAsync(extensionDirectory),
-            $"uninstall JS extension at {extensionDirectory}",
-            token);
+        await HandleDirectoryEntryUpsertAsync(extensionDirectory, token).ConfigureAwait(false);
+    }
+
+    private async Task HandleDirectoryEntryRemovedOrderedAsync(string changedPath)
+    {
+        var extensionDirectory = GetExtensionDirectoryForPath(ExtensionsPath, changedPath);
+        if (extensionDirectory is null)
+        {
+            return;
+        }
+
+        await HandleDirectoryEntryRemovedAsync(extensionDirectory).ConfigureAwait(false);
     }
 
     private async Task HandleDirectoryEntryUpsertAsync(string extensionDirectory, CancellationToken token)

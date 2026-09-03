@@ -27,7 +27,7 @@ namespace Microsoft.CmdPal.UI.ViewModels.Services;
 /// </remarks>
 internal sealed partial class SerialNotificationDispatcher : IDisposable
 {
-    private readonly Channel<Action> _queue = Channel.CreateUnbounded<Action>(
+    private readonly Channel<Func<Task>> _queue = Channel.CreateUnbounded<Func<Task>>(
         new UnboundedChannelOptions
         {
             SingleReader = true,
@@ -48,6 +48,22 @@ internal sealed partial class SerialNotificationDispatcher : IDisposable
     /// </summary>
     /// <param name="notification">The action to run, in order, on the background worker.</param>
     public void Enqueue(Action notification)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+
+        Enqueue(() =>
+        {
+            notification();
+            return Task.CompletedTask;
+        });
+    }
+
+    /// <summary>
+    /// Queues an asynchronous notification to run on the worker after everything already queued.
+    /// Silently dropped once the dispatcher has been disposed.
+    /// </summary>
+    /// <param name="notification">The asynchronous work to run, in order, on the background worker.</param>
+    public void Enqueue(Func<Task> notification)
     {
         ArgumentNullException.ThrowIfNull(notification);
 
@@ -85,7 +101,7 @@ internal sealed partial class SerialNotificationDispatcher : IDisposable
                 {
                     try
                     {
-                        notification();
+                        await notification().ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
