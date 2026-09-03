@@ -193,6 +193,19 @@ std::wstring NtdllExtensions::path_to_canonical_name(LPCWSTR path)
     return canonical_name;
 }
 
+std::wstring NtdllExtensions::path_to_kernel_name(LPCWSTR path)
+{
+    HANDLE file_handle = CreateFileW(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    if (file_handle == INVALID_HANDLE_VALUE)
+    {
+        return {};
+    }
+
+    auto kernel_name = file_handle_to_kernel_name(file_handle);
+    CloseHandle(file_handle);
+    return kernel_name;
+}
+
 std::vector<NtdllExtensions::HandleInfo> NtdllExtensions::handles() noexcept
 {
     auto get_info_result = NtQuerySystemInformationMemoryLoop(SystemExtendedHandleInformation);

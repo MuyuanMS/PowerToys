@@ -34,6 +34,12 @@ std::vector<ProcessResult> find_processes_recursive(const std::vector<std::wstri
         {
             (is_directory(path) ? kernel_names_dirs : kernel_names_files)[kernel_path] = path;
         }
+
+        auto fallback_kernel_path = nt_ext.path_to_kernel_name(path.c_str());
+        if (!fallback_kernel_path.empty())
+        {
+            (is_directory(path) ? kernel_names_dirs : kernel_names_files)[fallback_kernel_path] = path;
+        }
     }
 
     std::map<ULONG_PTR, std::set<std::wstring>> pid_files;
@@ -68,7 +74,7 @@ std::vector<ProcessResult> find_processes_recursive(const std::vector<std::wstri
     {
         if (handle_info.type_name == L"File")
         {
-            auto path = kernel_paths_contain(handle_info.file_path);
+            auto path = kernel_paths_contain(handle_info.kernel_file_name);
             if (!path.empty())
             {
                 pid_files[handle_info.pid].insert(std::move(path));
@@ -86,6 +92,13 @@ std::vector<ProcessResult> find_processes_recursive(const std::vector<std::wstri
             auto kernel_name = nt_ext.path_to_canonical_name(path.c_str());
 
             auto found_path = kernel_paths_contain(kernel_name);
+            if (!found_path.empty())
+            {
+                pid_files[process.pid].insert(std::move(found_path));
+            }
+
+            auto fallback_kernel_name = nt_ext.path_to_kernel_name(path.c_str());
+            found_path = kernel_paths_contain(fallback_kernel_name);
             if (!found_path.empty())
             {
                 pid_files[process.pid].insert(std::move(found_path));

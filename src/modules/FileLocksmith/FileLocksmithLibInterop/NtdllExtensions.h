@@ -41,10 +41,12 @@ public:
         ULONG_PTR pid;
         ULONG_PTR handle;
         std::wstring type_name;
-        std::wstring file_path;
+        std::wstring kernel_file_name;
     };
 
     std::wstring file_handle_to_kernel_name(HANDLE file_handle);
+
+    std::wstring path_to_kernel_name(LPCWSTR path);
 
     std::wstring path_to_canonical_name(LPCWSTR path);
 
