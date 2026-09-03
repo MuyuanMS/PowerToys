@@ -31,22 +31,35 @@ namespace ManagedCommon
             var currentUser = WindowsIdentity.GetCurrent();
             var keyPath = $"{currentUser.User.Value}\\\\{ThemeHelpers.HkeyWindowsPersonalizeTheme.Replace("\\", "\\\\")}";
 
-            var appThemeQuery = new WqlEventQuery(
-                $"SELECT * FROM RegistryValueChangeEvent WHERE Hive='HKEY_USERS' AND " +
-                $"KeyPath='{keyPath}' AND ValueName='{ThemeHelpers.HValueAppTheme}'");
-            appThemeWatcher = new ManagementEventWatcher(appThemeQuery);
-            appThemeWatcher.EventArrived += OnAppThemeRegistryChanged;
-            appThemeWatcher.Start();
+            ManagementEventWatcher createdAppThemeWatcher = null;
+            ManagementEventWatcher createdSystemThemeWatcher = null;
+            try
+            {
+                var appThemeQuery = new WqlEventQuery(
+                    $"SELECT * FROM RegistryValueChangeEvent WHERE Hive='HKEY_USERS' AND " +
+                    $"KeyPath='{keyPath}' AND ValueName='{ThemeHelpers.HValueAppTheme}'");
+                createdAppThemeWatcher = new ManagementEventWatcher(appThemeQuery);
+                createdAppThemeWatcher.EventArrived += OnAppThemeRegistryChanged;
+                createdAppThemeWatcher.Start();
 
-            var systemThemeQuery = new WqlEventQuery(
-                $"SELECT * FROM RegistryValueChangeEvent WHERE Hive='HKEY_USERS' AND " +
-                $"KeyPath='{keyPath}' AND ValueName='{ThemeHelpers.HValueSystemTheme}'");
-            systemThemeWatcher = new ManagementEventWatcher(systemThemeQuery);
-            systemThemeWatcher.EventArrived += OnSystemThemeRegistryChanged;
-            systemThemeWatcher.Start();
+                var systemThemeQuery = new WqlEventQuery(
+                    $"SELECT * FROM RegistryValueChangeEvent WHERE Hive='HKEY_USERS' AND " +
+                    $"KeyPath='{keyPath}' AND ValueName='{ThemeHelpers.HValueSystemTheme}'");
+                createdSystemThemeWatcher = new ManagementEventWatcher(systemThemeQuery);
+                createdSystemThemeWatcher.EventArrived += OnSystemThemeRegistryChanged;
+                createdSystemThemeWatcher.Start();
 
-            AppTheme = ThemeHelpers.GetAppTheme();
-            SystemTheme = ThemeHelpers.GetSystemTheme();
+                AppTheme = ThemeHelpers.GetAppTheme();
+                SystemTheme = ThemeHelpers.GetSystemTheme();
+                appThemeWatcher = createdAppThemeWatcher;
+                systemThemeWatcher = createdSystemThemeWatcher;
+            }
+            catch
+            {
+                createdSystemThemeWatcher?.Dispose();
+                createdAppThemeWatcher?.Dispose();
+                throw;
+            }
         }
 
         private void OnAppThemeRegistryChanged(object sender, EventArrivedEventArgs e)
