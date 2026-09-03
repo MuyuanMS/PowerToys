@@ -1112,7 +1112,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
                 _providerWrappers.Add(wrapper);
                 if (resetCrashCount)
                 {
-                    _crashCounts.Remove(CanonicalKey(directory));
+                    ResetCrashCountAfterSourceEditCore(CanonicalKey(directory));
                 }
             }
         }
@@ -1300,6 +1300,36 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
     /// <returns><see cref="CrashAction.Restart"/> while at or below the limit; otherwise <see cref="CrashAction.Disable"/>.</returns>
     internal static CrashAction DecideCrashAction(int crashCount, int maxRestartAttempts) =>
         crashCount > maxRestartAttempts ? CrashAction.Disable : CrashAction.Restart;
+
+    internal void SetCrashCountForTest(string directory, int crashCount)
+    {
+        lock (_extensionsLock)
+        {
+            _crashCounts[CanonicalKey(directory)] = crashCount;
+        }
+    }
+
+    internal int GetCrashCountForTest(string directory)
+    {
+        lock (_extensionsLock)
+        {
+            _crashCounts.TryGetValue(CanonicalKey(directory), out var crashCount);
+            return crashCount;
+        }
+    }
+
+    internal void ResetCrashCountAfterSourceEdit(string directory)
+    {
+        lock (_extensionsLock)
+        {
+            ResetCrashCountAfterSourceEditCore(CanonicalKey(directory));
+        }
+    }
+
+    private void ResetCrashCountAfterSourceEditCore(string key)
+    {
+        _crashCounts.Remove(key);
+    }
 
     /// <summary>
     /// Returns true when the salient fields of <paramref name="current"/> differ from
@@ -2064,7 +2094,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
                     {
                         _extensions.Add(newExtension);
                         _providerWrappers.Add(newWrapper);
-                        _crashCounts.Remove(key);
+                        ResetCrashCountAfterSourceEditCore(key);
                         swapped = true;
                     }
                     else if (incumbentExtension is not null)
