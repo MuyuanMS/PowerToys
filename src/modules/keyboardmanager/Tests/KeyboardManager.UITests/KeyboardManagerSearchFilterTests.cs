@@ -170,9 +170,9 @@ public sealed class KeyboardManagerSearchFilterTests : KeyboardManagerTestBase
             editor.WaitFor(
                 () => SingleKeyMappings().Count == 0 &&
                     GlobalShortcutMappings().Count == 1 &&
-                    ProfileContainsShortcut(GlobalShortcutMappings(), $"{LeftAlt};{F16}") &&
+                    ProfileContainsShortcut(GlobalShortcutMappings(), $"{LeftAlt};{F16}", W.ToString(System.Globalization.CultureInfo.InvariantCulture)) &&
                     AppSpecificShortcutMappings().Count == 1 &&
-                    ProfileContainsShortcut(AppSpecificShortcutMappings(), $"{LeftShift};{F17}"),
+                    ProfileContainsShortcut(AppSpecificShortcutMappings(), $"{LeftShift};{F17}", Q.ToString(System.Globalization.CultureInfo.InvariantCulture), TargetApp),
                 timeoutMS: 10_000,
                 pollIntervalMS: 250),
             $"The bulk delete did not remove exactly the two selected mappings. Profile: {KeyboardManagerSettings.ReadProfile().ToJsonString()}");
@@ -192,10 +192,16 @@ public sealed class KeyboardManagerSearchFilterTests : KeyboardManagerTestBase
         editorProcess = Session.FromProcess(KeyboardManagerTestConstants.EditorProcessName);
         AssertRowCount(editor, editorProcess, 2, "The reopened editor did not persist the bulk delete.");
         Assert.IsNull(FindExact<Element>(editorProcess, "F13", timeoutMS: 1_000), "The reopened editor restored a bulk-deleted mapping.");
+        Assert.IsNull(FindExact<Element>(editorProcess, "F15", timeoutMS: 1_000), "The reopened editor restored a bulk-deleted mapping.");
+        Assert.IsNotNull(FindExact<Element>(editorProcess, "F16", timeoutMS: 5_000), "The reopened editor did not retain the Alt+F16 mapping.");
+        Assert.IsNotNull(FindExact<Element>(editorProcess, "F17", timeoutMS: 5_000), "The reopened editor did not retain the Shift+F17 mapping.");
     }
 
-    private static bool ProfileContainsShortcut(JsonArray mappings, string originalKeys) =>
-        mappings.Any(mapping => mapping?["originalKeys"]?.GetValue<string>() == originalKeys);
+    private static bool ProfileContainsShortcut(JsonArray mappings, string originalKeys, string newRemapKeys, string? targetApp = null) =>
+        mappings.Any(mapping =>
+            mapping?["originalKeys"]?.GetValue<string>() == originalKeys &&
+            mapping?["newRemapKeys"]?.GetValue<string>() == newRemapKeys &&
+            mapping?["targetApp"]?.GetValue<string>() == targetApp);
 
     private static bool ProfileContainsSeededMappings() =>
         SingleKeyMappings().Count == 1 &&
@@ -203,7 +209,10 @@ public sealed class KeyboardManagerSearchFilterTests : KeyboardManagerTestBase
             mapping?["originalKeys"]?.GetValue<string>() == F13.ToString(System.Globalization.CultureInfo.InvariantCulture) &&
             mapping?["newRemapKeys"]?.GetValue<string>() == F14.ToString(System.Globalization.CultureInfo.InvariantCulture)) &&
         GlobalShortcutMappings().Count == 2 &&
-        AppSpecificShortcutMappings().Count == 1;
+        ProfileContainsShortcut(GlobalShortcutMappings(), $"{LeftControl};{F15}", $"{LeftControl};{V}") &&
+        ProfileContainsShortcut(GlobalShortcutMappings(), $"{LeftAlt};{F16}", W.ToString(System.Globalization.CultureInfo.InvariantCulture)) &&
+        AppSpecificShortcutMappings().Count == 1 &&
+        ProfileContainsShortcut(AppSpecificShortcutMappings(), $"{LeftShift};{F17}", Q.ToString(System.Globalization.CultureInfo.InvariantCulture), TargetApp);
 
     private static JsonArray SingleKeyMappings() =>
         KeyboardManagerSettings.ReadProfile()["remapKeys"]?["inProcess"] as JsonArray ?? new JsonArray();
