@@ -61,6 +61,17 @@ public partial class TabbedPageViewModelTests
         public override IContent[] GetContent() => [];
     }
 
+    private sealed partial class TestContentPageWithoutId : ContentPage
+    {
+        public TestContentPageWithoutId(string title)
+        {
+            Title = title;
+            Name = title;
+        }
+
+        public override IContent[] GetContent() => [];
+    }
+
     private static CommandPalettePageViewModelFactory CreateFactory() =>
         new(TaskScheduler.Default, DefaultContextMenuFactory.Instance);
 
@@ -278,6 +289,31 @@ public partial class TabbedPageViewModelTests
 
         await WaitFor(() => viewModel.Tabs.Count == 3, "Tabs did not update");
         await WaitFor(() => viewModel.SelectedTab?.TabId == "docs", "Active tab was not preserved");
+
+        viewModel.SafeCleanup();
+    }
+
+    [TestMethod]
+    public async Task DuplicateTitlesWithoutPageIds_GetDistinctFallbackIdentities()
+    {
+        var page = new TestTabbedPage(
+        [
+            new Tab("Duplicate", new TestContentPageWithoutId("First")),
+            new Tab("Duplicate", new TestContentPageWithoutId("Second")),
+        ]);
+
+        var viewModel = CreateViewModel(page);
+        viewModel.InitializeProperties();
+
+        await WaitFor(() => viewModel.Tabs.Count == 2, "Tabs did not populate");
+
+        Assert.AreNotEqual(viewModel.Tabs[0].TabId, viewModel.Tabs[1].TabId);
+
+        viewModel.SelectedTab = viewModel.Tabs[1];
+        await WaitFor(() => viewModel.ActiveChild?.Title == "Second", "Second tab child was not activated");
+
+        viewModel.SelectedTab = viewModel.Tabs[0];
+        await WaitFor(() => viewModel.ActiveChild?.Title == "First", "First tab child was not activated");
 
         viewModel.SafeCleanup();
     }

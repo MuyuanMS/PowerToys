@@ -18,6 +18,7 @@ namespace Microsoft.CmdPal.UI.ViewModels;
 public partial class TabViewModel : ExtensionObjectViewModel
 {
     private readonly ExtensionObject<ITab> _model;
+    private readonly string _fallbackTabId;
 
     /// <summary>
     /// Gets the stable identity for this tab, used to preserve the active tab
@@ -43,10 +44,11 @@ public partial class TabViewModel : ExtensionObjectViewModel
     /// </summary>
     public IPage? Page { get; private set; }
 
-    public TabViewModel(ITab tab, WeakReference<IPageContext> context)
+    public TabViewModel(ITab tab, WeakReference<IPageContext> context, string fallbackTabId)
         : base(context)
     {
         _model = new(tab);
+        _fallbackTabId = fallbackTabId;
     }
 
     public override void InitializeProperties()
@@ -75,7 +77,7 @@ public partial class TabViewModel : ExtensionObjectViewModel
         Badge = tab.Badge ?? string.Empty;
 
         var pageId = Page?.Id;
-        TabId = string.IsNullOrEmpty(pageId) ? Title : pageId;
+        TabId = string.IsNullOrEmpty(pageId) ? _fallbackTabId : pageId;
 
         Icon = new(tab.Icon);
         Icon.InitializeProperties();
