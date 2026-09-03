@@ -434,6 +434,7 @@ void start_tray_icon(bool isProcessElevated, bool theme_adaptive)
         wc.style = CS_HREDRAW | CS_VREDRAW;
         wc.lpfnWndProc = tray_icon_window_proc;
         wc.hIcon = icon;
+        DarkMode::Initialize();
         RegisterClass(&wc);
         auto hwnd = CreateWindowW(wc.lpszClassName,
                                   pt_tray_icon_window_class,
@@ -467,10 +468,9 @@ void start_tray_icon(bool isProcessElevated, bool theme_adaptive)
         wcscpy_s(tray_icon_data.szTip, sizeof(tray_icon_data.szTip) / sizeof(WCHAR), pt_version_tooltip.c_str());
         tray_icon_data.uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE;
         ChangeWindowMessageFilterEx(hwnd, WM_COMMAND, MSGFLT_ALLOW, nullptr);
-
         tray_icon_created = Shell_NotifyIcon(NIM_ADD, &tray_icon_data) == TRUE;
         theme_listener.AddSystemThemeChangedHandler(&handle_theme_change);
-        DarkMode::Initialize();
+        theme_listener.AddSystemThemeChangedHandler(&handle_theme_change);
 
         // Register callback to update bug report menu item status
         BugReportManager::instance().register_callback([](bool isRunning) {

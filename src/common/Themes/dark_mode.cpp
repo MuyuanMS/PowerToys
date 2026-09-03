@@ -20,11 +20,9 @@ namespace
     };
 
     using fnSetPreferredAppMode = PreferredAppMode(WINAPI*)(PreferredAppMode appMode);
-    using fnShouldAppsUseDarkMode = bool(WINAPI*)();
     using fnFlushMenuThemes = void(WINAPI*)();
 
     fnSetPreferredAppMode pSetPreferredAppMode = nullptr;
-    fnShouldAppsUseDarkMode pShouldAppsUseDarkMode = nullptr;
     fnFlushMenuThemes pFlushMenuThemes = nullptr;
 
     std::once_flag init_flag;
@@ -48,8 +46,6 @@ namespace
 
         pSetPreferredAppMode = reinterpret_cast<fnSetPreferredAppMode>(
             GetProcAddress(hUxTheme, MAKEINTRESOURCEA(135)));
-        pShouldAppsUseDarkMode = reinterpret_cast<fnShouldAppsUseDarkMode>(
-            GetProcAddress(hUxTheme, MAKEINTRESOURCEA(132)));
         pFlushMenuThemes = reinterpret_cast<fnFlushMenuThemes>(
             GetProcAddress(hUxTheme, MAKEINTRESOURCEA(136)));
     }
@@ -69,6 +65,13 @@ namespace
             pFlushMenuThemes();
         }
     }
+
+    bool IsHighContrastEnabled()
+    {
+        HIGHCONTRASTW highContrast{ .cbSize = sizeof(highContrast) };
+        return SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(highContrast), &highContrast, 0) &&
+               (highContrast.dwFlags & HCF_HIGHCONTRASTON);
+    }
 }
 
 void DarkMode::Initialize()
@@ -84,11 +87,6 @@ void DarkMode::Refresh()
 
 bool DarkMode::IsDarkModeEnabled()
 {
-    if (pShouldAppsUseDarkMode)
-    {
-        return pShouldAppsUseDarkMode();
-    }
-
     return ThemeHelpers::GetSystemTheme() == Theme::Dark;
 }
 
@@ -108,7 +106,7 @@ void DarkMode::ApplyToMenu(HMENU menu)
     MENUINFO mi = { sizeof(mi) };
     mi.fMask = MIM_BACKGROUND | MIM_APPLYTOSUBMENUS;
 
-    if (IsDarkModeEnabled())
+    if (IsDarkModeEnabled() && !IsHighContrastEnabled())
     {
         if (!dark_menu_brush)
         {
