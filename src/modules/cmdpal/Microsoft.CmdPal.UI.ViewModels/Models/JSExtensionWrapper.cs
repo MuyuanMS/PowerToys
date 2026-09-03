@@ -831,7 +831,7 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
 
             return candidate;
         }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is ArgumentException or IOException or JsonException or NotSupportedException or PathTooLongException or UnauthorizedAccessException)
         {
             return null;
         }

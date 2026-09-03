@@ -202,6 +202,31 @@ public class JSExtensionWrapperBootstrapTests
     }
 
     [TestMethod]
+    public void ResolveBootstrapScript_IgnoresMalformedPackageJsonBinEntry()
+    {
+        var manifestDir = NewTempDir();
+        try
+        {
+            var sdkRoot = CreateSdkRoot(manifestDir);
+            var fallback = Path.Combine(sdkRoot, "dist", "runtime", "bootstrap.js");
+            Directory.CreateDirectory(Path.GetDirectoryName(fallback)!);
+            File.WriteAllText(fallback, "// bootstrap");
+            File.WriteAllText(
+                Path.Combine(sdkRoot, "package.json"),
+                $"{{ \"name\": \"{SdkPackageName}\", \"bin\": {{ \"cmdpal-bootstrap\": \"bad\\u0000path.js\" }} }}");
+
+            var resolved = JSExtensionWrapper.ResolveBootstrapScript(manifestDir);
+
+            Assert.IsNotNull(resolved);
+            Assert.AreEqual(Path.GetFullPath(fallback), Path.GetFullPath(resolved!));
+        }
+        finally
+        {
+            Directory.Delete(manifestDir, recursive: true);
+        }
+    }
+
+    [TestMethod]
     public void ResolveBootstrapScript_ReturnsNull_ForEmptyManifestDirectory()
     {
         Assert.IsNull(JSExtensionWrapper.ResolveBootstrapScript(string.Empty));

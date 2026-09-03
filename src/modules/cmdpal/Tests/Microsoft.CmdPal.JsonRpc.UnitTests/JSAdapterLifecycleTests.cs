@@ -340,6 +340,54 @@ public partial class JSAdapterTests
     }
 
     [TestMethod]
+    public async Task ListPage_ItemsChangedDuringInFlightGetItemsForcesFollowUpRefresh()
+    {
+        using var fake = new JSFakeExtension();
+        var requestCount = 0;
+        var firstRequestStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstRequest = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var itemsChanged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        fake.OnRequestAsync("listPage/getItems", async _ =>
+        {
+            var request = Interlocked.Increment(ref requestCount);
+            if (request == 1)
+            {
+                firstRequestStarted.SetResult();
+                await releaseFirstRequest.Task;
+            }
+
+            return new JsonObject
+            {
+                ["items"] = new JsonArray
+                {
+                    new JsonObject { ["id"] = "row", ["title"] = request == 1 ? "Before change" : "After change" },
+                },
+            };
+        });
+
+        using var page = new JSListPageProxy("page", fake.Connection);
+        page.ItemsChanged += (_, _) => itemsChanged.SetResult();
+
+        var firstGetItems = Task.Run(page.GetItems);
+        await firstRequestStarted.Task.WaitAsync(Timeout);
+        await fake.PushNotificationAsync(
+            "listPage/itemsChanged",
+            new JsonObject { ["pageId"] = "page", ["totalItems"] = 1 });
+        await itemsChanged.Task.WaitAsync(Timeout);
+
+        var secondGetItems = Task.Run(page.GetItems);
+        releaseFirstRequest.SetResult();
+
+        var firstItems = await firstGetItems.WaitAsync(Timeout);
+        var secondItems = await secondGetItems.WaitAsync(Timeout);
+
+        Assert.IsTrue(requestCount >= 2, "An in-flight invalidation should force a follow-up request.");
+        Assert.AreEqual("After change", firstItems[0].Title);
+        Assert.AreEqual("After change", secondItems[0].Title);
+    }
+
+    [TestMethod]
     public async Task ListPage_ConcurrentFailureIsSharedAndNextCallRetries()
     {
         using var fake = new JSFakeExtension();
