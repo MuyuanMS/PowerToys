@@ -1112,7 +1112,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
                 _providerWrappers.Add(wrapper);
                 if (resetCrashCount)
                 {
-                    ResetCrashCountAfterSourceEditCore(CanonicalKey(directory));
+                    ResetCrashCountAfterSourceEditCore(_crashCounts, CanonicalKey(directory));
                 }
             }
         }
@@ -1322,13 +1322,13 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
     {
         lock (_extensionsLock)
         {
-            ResetCrashCountAfterSourceEditCore(CanonicalKey(directory));
+            ResetCrashCountAfterSourceEditCore(_crashCounts, CanonicalKey(directory));
         }
     }
 
-    private void ResetCrashCountAfterSourceEditCore(string key)
+    private static void ResetCrashCountAfterSourceEditCore(IDictionary<string, int> crashCounts, string key)
     {
-        _crashCounts.Remove(key);
+        crashCounts.Remove(key);
     }
 
     /// <summary>
@@ -2094,7 +2094,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
                     {
                         _extensions.Add(newExtension);
                         _providerWrappers.Add(newWrapper);
-                        ResetCrashCountAfterSourceEditCore(key);
+                        ResetCrashCountAfterSourceEditCore(_crashCounts, key);
                         swapped = true;
                     }
                     else if (incumbentExtension is not null)
