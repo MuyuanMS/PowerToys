@@ -152,6 +152,8 @@ namespace FileLocksmithCLIUnitTests
             DeleteFileW(temp_file);
 
             Assert::IsFalse(canonical_name.empty());
+            Assert::IsTrue(canonical_name.find(L":\\") == 1 || canonical_name.rfind(L"\\\\", 0) == 0);
+            Assert::IsTrue(canonical_name.rfind(L"\\Device\\", 0) != 0);
             Assert::IsTrue(canonical_name.find(L"flt") != std::wstring::npos);
             Assert::IsFalse(kernel_name.empty());
             Assert::IsTrue(kernel_name.rfind(L"\\Device\\", 0) == 0);
