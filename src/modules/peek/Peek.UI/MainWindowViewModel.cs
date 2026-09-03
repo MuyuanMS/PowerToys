@@ -77,6 +77,10 @@ namespace Peek.UI
         [NotifyPropertyChangedFor(nameof(HasMultipleItems))]
         private IReadOnlyList<IFileSystemItem>? _items;
 
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasMultipleItems))]
+        private bool _isMultipleItemsActivation;
+
         /// <summary>
         /// The number of items selected and available to preview. Decreases as the user deletes
         /// items. Displayed on the title bar.
@@ -97,11 +101,11 @@ namespace Peek.UI
         }
 
         /// <summary>
-        /// Gets a value indicating whether more than one item is available for
-        /// navigation, from either Explorer or CLI.
+        /// Gets a value indicating whether the activation selected more than one item,
+        /// from either Explorer or CLI.
         /// Controls the visibility of the index/total counter in the title bar.
         /// </summary>
-        public bool HasMultipleItems => (Items?.Count ?? 0) > 1;
+        public bool HasMultipleItems => IsMultipleItemsActivation;
 
         [ObservableProperty]
         private double _scalingFactor = 1.0;
@@ -172,6 +176,7 @@ namespace Peek.UI
             _currentIndex = DisplayIndex = 0;
 
             CurrentItem = (Items != null && Items.Count > 0) ? Items[0] : null;
+            IsMultipleItemsActivation = NeighboringItemsQuery.IsMultipleFilesActivation;
         }
 
         private void InitializeFromCli(string path)
@@ -182,6 +187,7 @@ namespace Peek.UI
         private void InitializeFromCliPaths(IReadOnlyList<string> paths)
         {
             _currentIndex = DisplayIndex = 0;
+            IsMultipleItemsActivation = paths.Count > 1;
 
             var items = new List<IFileSystemItem>(paths.Count);
             foreach (var path in paths)
@@ -210,6 +216,7 @@ namespace Peek.UI
             CurrentItem = null;
             _deletedItemIndexes.Clear();
             Items = null;
+            IsMultipleItemsActivation = false;
             _navigationDirection = NavigationDirection.Forwards;
             IsErrorVisible = false;
         }
