@@ -146,6 +146,38 @@ describe('form identity and routing', () => {
     expect(responseFor(sent, 1)?.result).toEqual({ Kind: 1 });
   });
 
+  it('falls back to the first nested form when the host omits a formId', async () => {
+    const nested = vi.fn((): CommandResult => ({ kind: 'hide' }));
+    const page: IContentPage = {
+      id: 'page',
+      name: 'Page',
+      title: 'Page',
+      getContent(): Content[] {
+        return [
+          {
+            type: 'tree',
+            rootContent: { type: 'markdown', body: 'root' },
+            getChildren(): Content[] {
+              return [formContent('nested', nested)];
+            },
+          },
+        ];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(providerWith(page));
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'form/submit',
+      params: { pageId: 'page', inputs: '{}', data: '{}' },
+    });
+
+    expect(nested).toHaveBeenCalledTimes(1);
+    expect(responseFor(sent, 1)?.result).toEqual({ Kind: 3 });
+  });
+
   it('assigns a deterministic formId when the author omits one', async () => {
     const page: IContentPage = {
       id: 'page',

@@ -590,20 +590,18 @@ export class ExtensionRuntime {
     }
 
     // Fallback for a host that does not yet send a formId: preserve today's
-    // behavior by submitting the first form on the page.
-    const command = await this.resolveCommand(pageId);
-    const page = command ? asContentPage(command) : null;
-    if (!page) {
+    // behavior by submitting the first form discovered in the page content.
+    const serialized = await this.serializePageContent(pageId);
+    if (!serialized) {
       this.respondError(id, JsonRpcErrorCode.MethodNotFound, `Form page not found: ${pageId}`);
       return;
     }
-    const content = await page.getContent();
-    const form = content.find((item) => item.type === 'form');
-    if (!form) {
+    const handler = this.pageScopes.get(pageId)?.forms.values().next().value;
+    if (!handler) {
       this.respondError(id, JsonRpcErrorCode.MethodNotFound, `Form content not found: ${pageId}`);
       return;
     }
-    const result = await form.submitForm(inputs, data);
+    const result = await handler(inputs, data);
     this.respond(id, await this.serializeOwnedResult(pageId, result));
   }
 
