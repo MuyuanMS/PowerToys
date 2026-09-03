@@ -95,21 +95,28 @@ public sealed class CommandProviderWrapper : ICommandProviderContext, IDisposabl
 
         // Hook the extension back into us
         ExtensionHost = new CommandPaletteHost(provider);
-        _commandProvider.Unsafe!.InitializeWithHost(ExtensionHost);
+        try
+        {
+            _commandProvider.Unsafe!.InitializeWithHost(ExtensionHost);
+            _commandProvider.Unsafe!.ItemsChanged += CommandProvider_ItemsChanged;
 
-        _commandProvider.Unsafe!.ItemsChanged += CommandProvider_ItemsChanged;
+            isValid = true;
+            Id = provider.Id;
+            DisplayName = provider.DisplayName;
+            Icon = new(provider.Icon);
+            Icon.InitializeProperties();
 
-        isValid = true;
-        Id = provider.Id;
-        DisplayName = provider.DisplayName;
-        Icon = new(provider.Icon);
-        Icon.InitializeProperties();
+            // Note: explicitly not InitializeProperties()ing the settings here. If
+            // we do that, then we'd regress GH #38321
+            Settings = new(provider.Settings, this, _taskScheduler);
 
-        // Note: explicitly not InitializeProperties()ing the settings here. If
-        // we do that, then we'd regress GH #38321
-        Settings = new(provider.Settings, this, _taskScheduler);
-
-        Logger.LogDebug($"Initialized command provider {ProviderId}");
+            Logger.LogDebug($"Initialized command provider {ProviderId}");
+        }
+        catch
+        {
+            Dispose();
+            throw;
+        }
     }
 
     private CommandProviderWrapper(IExtensionWrapper extension, TaskScheduler mainThread, ICommandProviderCache commandProviderCache)
@@ -120,22 +127,22 @@ public sealed class CommandProviderWrapper : ICommandProviderContext, IDisposabl
 
         Extension = extension;
         ExtensionHost = new CommandPaletteHost(extension);
-        if (!Extension.IsRunning())
-        {
-            throw new ArgumentException("You forgot to start the extension. This is a CmdPal error - we need to make sure to call StartExtensionAsync");
-        }
-
-        var extensionImpl = extension.GetExtensionObject();
-        var providerObject = extensionImpl?.GetProvider(ProviderType.Commands);
-        if (providerObject is not ICommandProvider provider)
-        {
-            throw new ArgumentException("extension didn't actually implement ICommandProvider");
-        }
-
-        _commandProvider = new(provider);
 
         try
         {
+            if (!Extension.IsRunning())
+            {
+                throw new ArgumentException("You forgot to start the extension. This is a CmdPal error - we need to make sure to call StartExtensionAsync");
+            }
+
+            var extensionImpl = extension.GetExtensionObject();
+            var providerObject = extensionImpl?.GetProvider(ProviderType.Commands);
+            if (providerObject is not ICommandProvider provider)
+            {
+                throw new ArgumentException("extension didn't actually implement ICommandProvider");
+            }
+
+            _commandProvider = new(provider);
             var model = _commandProvider.Unsafe!;
 
             // Hook the extension back into us
@@ -151,9 +158,9 @@ public sealed class CommandProviderWrapper : ICommandProviderContext, IDisposabl
             Logger.LogError("Failed to initialize CommandProvider for extension.");
             Logger.LogError($"Extension was {Extension!.PackageFamilyName}");
             Logger.LogError(e.ToString());
+            Dispose();
+            throw;
         }
-
-        isValid = true;
     }
 
     private CommandProviderWrapper(IExtensionWrapper extension, ICommandProvider provider, TaskScheduler mainThread)
@@ -191,6 +198,7 @@ public sealed class CommandProviderWrapper : ICommandProviderContext, IDisposabl
             Logger.LogError("Failed to initialize CommandProvider for JS extension.");
             Logger.LogError($"Extension was {Extension!.PackageFamilyName}");
             Logger.LogError(e.ToString());
+            Dispose();
             throw;
         }
     }
