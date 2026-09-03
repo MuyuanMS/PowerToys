@@ -737,9 +737,9 @@ public sealed class CommandProviderWrapper : ICommandProviderContext, IDisposabl
 
     public ICommandProviderContext GetProviderContext() => this;
 
-    public override bool Equals(object? obj) => obj is CommandProviderWrapper wrapper && isValid == wrapper.isValid;
+    public override bool Equals(object? obj) => ReferenceEquals(this, obj);
 
-    public override int GetHashCode() => _commandProvider.GetHashCode();
+    public override int GetHashCode() => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this);
 
     private void CommandProvider_ItemsChanged(object sender, IItemsChangedEventArgs args)
     {
