@@ -15,6 +15,7 @@ namespace Microsoft.CmdPal.UI.ViewModels;
 public abstract partial class AppExtensionHost : IExtensionHost, IDisposable
 {
     private static readonly GlobalLogPageContext _globalLogPageContext = new();
+    private readonly Lock _statusNotificationsLock = new();
     private readonly SerialNotificationDispatcher _statusNotifications = new();
     private bool _disposed;
 
@@ -44,7 +45,16 @@ public abstract partial class AppExtensionHost : IExtensionHost, IDisposable
             return Task.CompletedTask.AsAsyncAction();
         }
 
-        _statusNotifications.Enqueue(() => ProcessHideStatusMessage(message));
+        lock (_statusNotificationsLock)
+        {
+            if (_disposed)
+            {
+                return Task.CompletedTask.AsAsyncAction();
+            }
+
+            _statusNotifications.Enqueue(() => ProcessHideStatusMessage(message));
+        }
+
         return Task.CompletedTask.AsAsyncAction();
     }
 
@@ -167,21 +177,33 @@ public abstract partial class AppExtensionHost : IExtensionHost, IDisposable
             return Task.CompletedTask.AsAsyncAction();
         }
 
-        _statusNotifications.Enqueue(() => ProcessStatusMessage(message, context));
+        lock (_statusNotificationsLock)
+        {
+            if (_disposed)
+            {
+                return Task.CompletedTask.AsAsyncAction();
+            }
+
+            _statusNotifications.Enqueue(() => ProcessStatusMessage(message, context));
+        }
 
         return Task.CompletedTask.AsAsyncAction();
     }
 
     public void Dispose()
     {
-        if (_disposed)
+        lock (_statusNotificationsLock)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _statusNotifications.Enqueue(ClearStatusMessagesAsync);
+            _statusNotifications.CompleteWithoutWaiting();
         }
 
-        _disposed = true;
-        _statusNotifications.Enqueue(ClearStatusMessagesAsync);
-        _statusNotifications.CompleteWithoutWaiting();
         GC.SuppressFinalize(this);
     }
 
