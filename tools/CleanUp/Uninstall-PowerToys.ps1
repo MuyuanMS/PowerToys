@@ -355,6 +355,41 @@ function Get-BundleExecutable {
     return $null
 }
 
+function New-ProtectedDirectory {
+    param(
+        [string]$Path
+    )
+
+    New-Item -ItemType Directory -Path $Path -Force | Out-Null
+
+    $administrators = [Security.Principal.SecurityIdentifier]::new([Security.Principal.WellKnownSidType]::BuiltinAdministratorsSid, $null)
+    $system = [Security.Principal.SecurityIdentifier]::new([Security.Principal.WellKnownSidType]::LocalSystemSid, $null)
+    $acl = [Security.AccessControl.DirectorySecurity]::new()
+    $inheritance = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+    $propagation = [Security.AccessControl.PropagationFlags]::None
+    $rights = [Security.AccessControl.FileSystemRights]::FullControl
+
+    $acl.SetAccessRuleProtection($true, $false)
+    $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($administrators, $rights, $inheritance, $propagation, [Security.AccessControl.AccessControlType]::Allow))
+    $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($system, $rights, $inheritance, $propagation, [Security.AccessControl.AccessControlType]::Allow))
+    Set-Acl -LiteralPath $Path -AclObject $acl
+}
+
+function Copy-BundleExecutableForExecution {
+    param(
+        [string]$Path,
+        [string]$DestinationDirectory
+    )
+
+    $destination = Join-Path $DestinationDirectory ([IO.Path]::GetFileName($Path))
+    Copy-Item -LiteralPath $Path -Destination $destination -Force -ErrorAction Stop
+    if (-not (Test-MicrosoftSignedFile -Path $destination)) {
+        throw "The staged bundle at $destination is not an authentic Microsoft-signed file."
+    }
+
+    return $destination
+}
+
 function Stop-PowerToysProcesses {
     $processes = @(Get-Process -ErrorAction SilentlyContinue | Where-Object {
         $_.ProcessName -eq 'PowerToys' -or $_.ProcessName.StartsWith('PowerToys.')
@@ -364,13 +399,14 @@ function Stop-PowerToysProcesses {
         try {
             Write-Host "Stopping $($process.ProcessName) (PID $($process.Id))..."
             Stop-Process -Id $process.Id -Force -ErrorAction Stop
+            if (-not $process.WaitForExit(5000)) {
+                $script:failures.Add("Could not stop $($process.ProcessName) (PID $($process.Id)) within 5 seconds.")
+            }
         } catch {
             $script:failures.Add("Could not stop $($process.ProcessName) (PID $($process.Id)): $($_.Exception.Message)")
+        } finally {
+            $process.Dispose()
         }
-    }
-
-    if ($processes.Count -gt 0) {
-        Start-Sleep -Seconds 1
     }
 }
 
@@ -477,6 +513,8 @@ if (-not (Test-IsAdministrator)) {
 $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $logDirectory = Join-Path $env:TEMP "PowerToys-Cleanup-$timestamp"
 New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+$stagingDirectory = Join-Path $env:ProgramData "Microsoft\PowerToys\Cleanup\$timestamp"
+New-ProtectedDirectory -Path $stagingDirectory
 
 Stop-PowerToysProcesses
 
@@ -514,6 +552,15 @@ foreach ($bundle in $bundles) {
         $script:failures.Add(
             "A trusted cached bootstrapper for $($bundle.Scope) $($bundle.DisplayVersion) was not found. " +
             "Its registry entry remains at $($bundle.RegistryPath).")
+        continue
+    }
+
+    try {
+        $bundleExecutable = Copy-BundleExecutableForExecution -Path $bundleExecutable -DestinationDirectory $stagingDirectory
+    } catch {
+        $script:failures.Add(
+            "Could not stage the cached bootstrapper for $($bundle.Scope) $($bundle.DisplayVersion) " +
+            "in a protected location: $($_.Exception.Message)")
         continue
     }
 
