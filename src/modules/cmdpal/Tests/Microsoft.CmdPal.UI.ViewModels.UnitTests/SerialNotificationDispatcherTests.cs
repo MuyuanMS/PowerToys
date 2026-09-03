@@ -21,6 +21,9 @@ namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
 [TestClass]
 public class SerialNotificationDispatcherTests
 {
+    private static readonly string[] ExpectedAsyncOrderBeforeRelease = ["first-start"];
+    private static readonly string[] ExpectedAsyncOrderAfterRelease = ["first-start", "first-end", "second"];
+
     [TestMethod]
     public void Enqueue_RunsNotificationsInFifoOrder()
     {
@@ -144,6 +147,35 @@ public class SerialNotificationDispatcherTests
         release.Set();
         Assert.IsTrue(dispose.Wait(TimeSpan.FromSeconds(5)));
         Assert.AreEqual(2, Volatile.Read(ref count));
+    }
+
+    [TestMethod]
+    public void Enqueue_AwaitsAsyncNotificationBeforeNextNotification()
+    {
+        using var dispatcher = new SerialNotificationDispatcher();
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var order = new ConcurrentQueue<string>();
+        var secondRan = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        dispatcher.Enqueue(async () =>
+        {
+            order.Enqueue("first-start");
+            await release.Task.ConfigureAwait(false);
+            order.Enqueue("first-end");
+        });
+        dispatcher.Enqueue(() =>
+        {
+            order.Enqueue("second");
+            secondRan.SetResult();
+        });
+
+        Thread.Sleep(100);
+        CollectionAssert.AreEqual(ExpectedAsyncOrderBeforeRelease, order.ToArray());
+
+        release.SetResult();
+
+        Assert.IsTrue(secondRan.Task.Wait(TimeSpan.FromSeconds(5)), "The next notification should run after the async work completes.");
+        CollectionAssert.AreEqual(ExpectedAsyncOrderAfterRelease, order.ToArray());
     }
 
     [TestMethod]
