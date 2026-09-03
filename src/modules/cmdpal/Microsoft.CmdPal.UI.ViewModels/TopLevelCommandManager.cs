@@ -512,6 +512,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             }
 
             DisposeWrappers(wrapperList);
+            CleanupLoadedResults(loadResults);
             return default;
         }
 
@@ -852,6 +853,18 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         foreach (var viewModel in viewModels)
         {
             viewModel.Cleanup();
+        }
+    }
+
+    private static void CleanupLoadedResults(IEnumerable<CommandLoadResult> loadResults)
+    {
+        foreach (var result in loadResults)
+        {
+            if (result.IsLoaded)
+            {
+                CleanupViewModels(result.TopLevelObjectSets.Commands ?? []);
+                CleanupViewModels(result.TopLevelObjectSets.DockBands ?? []);
+            }
         }
     }
 
