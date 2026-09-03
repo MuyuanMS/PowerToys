@@ -83,9 +83,9 @@ public abstract partial class AppExtensionHost : IExtensionHost, IDisposable
         return Task.CompletedTask.AsAsyncAction();
     }
 
-    public void ProcessHideStatusMessage(IStatusMessage message)
+    public Task ProcessHideStatusMessage(IStatusMessage message)
     {
-        Task.Factory.StartNew(
+        return Task.Factory.StartNew(
             () =>
             {
                 try
@@ -120,13 +120,13 @@ public abstract partial class AppExtensionHost : IExtensionHost, IDisposable
             _globalLogPageContext.Scheduler);
     }
 
-    public void ProcessStatusMessage(IStatusMessage message, StatusContext context)
+    public Task ProcessStatusMessage(IStatusMessage message, StatusContext context)
     {
         // If this message is already in the list of messages, just bring it to the top
         var oldVm = StatusMessages.Where(messageVM => messageVM.Model.Unsafe == message).FirstOrDefault();
         if (oldVm is not null)
         {
-            Task.Factory.StartNew(
+            return Task.Factory.StartNew(
                 () =>
                 {
                     StatusMessages.Remove(oldVm);
@@ -135,13 +135,12 @@ public abstract partial class AppExtensionHost : IExtensionHost, IDisposable
                 CancellationToken.None,
                 TaskCreationOptions.None,
                 _globalLogPageContext.Scheduler);
-            return;
         }
 
         var vm = new StatusMessageViewModel(message, new(_globalLogPageContext));
         vm.SafeInitializePropertiesSynchronous();
 
-        Task.Factory.StartNew(
+        return Task.Factory.StartNew(
             () =>
             {
                 StatusMessages.Add(vm);

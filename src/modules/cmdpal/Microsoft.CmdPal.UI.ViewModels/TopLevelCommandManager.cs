@@ -44,6 +44,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     private readonly SerialNotificationDispatcher _providerChanges = new();
     private CancellationTokenSource _extensionLoadCts = new();
     private CancellationToken _currentExtensionLoadCancellationToken;
+    private int _providerChangeGeneration;
 
     private HashSet<(string ProviderId, string CommandId)> _pinnedCommandSet = [];
 
@@ -310,6 +311,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             _extensionLoadCts.Dispose();
             _extensionLoadCts = new();
             _currentExtensionLoadCancellationToken = _extensionLoadCts.Token;
+            Interlocked.Increment(ref _providerChangeGeneration);
 
             // Signal all services to stop their running providers
             foreach (var service in _extensionServices)
@@ -331,9 +333,16 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
                 DockBands.Clear();
             }
 
+            List<CommandProviderWrapper> removedWrappers;
             lock (_commandProvidersLock)
             {
+                removedWrappers = [.. _commandProviders];
                 _commandProviders.Clear();
+            }
+
+            foreach (var wrapper in removedWrappers)
+            {
+                wrapper.Dispose();
             }
 
             foreach (var item in removedTopLevel)
@@ -470,14 +479,16 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
 
     private async Task<RegisterAndLoadSummary> RegisterAndLoadCommandsAsync(IEnumerable<CommandProviderWrapper> wrappers, CancellationToken ct)
     {
-        if (ct.IsCancellationRequested)
-        {
-            return default;
-        }
-
         var wrapperList = wrappers.ToList();
         if (ct.IsCancellationRequested)
         {
+            DisposeWrappers(wrapperList);
+            return default;
+        }
+
+        if (ct.IsCancellationRequested)
+        {
+            DisposeWrappers(wrapperList);
             return default;
         }
 
@@ -485,6 +496,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         {
             if (ct.IsCancellationRequested)
             {
+                DisposeWrappers(wrapperList);
                 return default;
             }
 
@@ -493,6 +505,17 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
 
         // Load the commands from the providers in parallel
         var loadResults = await Task.WhenAll(wrapperList.Select(w => TryLoadCommandsAsync(w, ct))).ConfigureAwait(false);
+
+        if (ct.IsCancellationRequested)
+        {
+            lock (_commandProvidersLock)
+            {
+                _commandProviders.RemoveAll(wrapperList.Contains);
+            }
+
+            DisposeWrappers(wrapperList);
+            return default;
+        }
 
         var totalCommands = 0;
         var totalDockBands = 0;
@@ -636,15 +659,35 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     private void ExtensionService_OnProviderAdded(IExtensionService sender, IEnumerable<CommandProviderWrapper> wrappers)
     {
         var ct = _currentExtensionLoadCancellationToken;
+        var generation = _providerChangeGeneration;
+        var wrapperList = wrappers.ToList();
 
-        _providerChanges.Enqueue(() => RegisterAndLoadCommandsAsync(wrappers, ct));
+        _providerChanges.Enqueue(() =>
+        {
+            if (ct.IsCancellationRequested || generation != _providerChangeGeneration)
+            {
+                DisposeWrappers(wrapperList);
+                return Task.CompletedTask;
+            }
+
+            return RegisterAndLoadCommandsAsync(wrapperList, ct);
+        });
     }
 
     private void ExtensionService_OnProviderRemoved(IExtensionService sender, IEnumerable<CommandProviderWrapper> removedWrappers)
     {
+        var ct = _currentExtensionLoadCancellationToken;
+        var generation = _providerChangeGeneration;
+        var removedWrapperList = removedWrappers.ToList();
+
         _providerChanges.Enqueue(async () =>
         {
-            var removedWrapperList = removedWrappers.ToList();
+            if (ct.IsCancellationRequested || generation != _providerChangeGeneration)
+            {
+                DisposeWrappers(removedWrapperList);
+                return;
+            }
+
             var removedProviderIds = new HashSet<string>(removedWrapperList.Select(w => w.ProviderId));
 
             List<TopLevelViewModel> commandsToRemove = [];
@@ -712,15 +755,20 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
                     deleted.Cleanup();
                 }
 
-                foreach (var wrapper in removedWrapperList)
-                {
-                    wrapper.Dispose();
-                }
+                DisposeWrappers(removedWrapperList);
             },
             CancellationToken.None,
             TaskCreationOptions.None,
             _taskScheduler);
         });
+    }
+
+    private static void DisposeWrappers(IEnumerable<CommandProviderWrapper> wrappers)
+    {
+        foreach (var wrapper in wrappers)
+        {
+            wrapper.Dispose();
+        }
     }
 
     public TopLevelViewModel? LookupCommand(string id)
