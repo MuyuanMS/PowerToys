@@ -194,14 +194,6 @@ Shortcuts:
             Alt: false
             Keys:
               - "<F9>"
-      - Name: Capture MIDI
-        Shortcut:
-          - Win: false
-            Ctrl: true
-            Shift: true
-            Alt: false
-            Keys:
-              - C
 
   - SectionName: Editing and Tracks
     Properties:
