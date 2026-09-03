@@ -398,10 +398,14 @@ function Stop-PowerToysProcesses {
     foreach ($process in $processes) {
         try {
             Write-Host "Stopping $($process.ProcessName) (PID $($process.Id))..."
-            Stop-Process -Id $process.Id -Force -ErrorAction Stop
-            if (-not $process.WaitForExit(5000)) {
+            if (-not $process.HasExited) {
+                $process.Kill()
+            }
+            if (-not $process.HasExited -and -not $process.WaitForExit(5000)) {
                 $script:failures.Add("Could not stop $($process.ProcessName) (PID $($process.Id)) within 5 seconds.")
             }
+        } catch [System.InvalidOperationException] {
+            # The process exited between enumeration and shutdown.
         } catch {
             $script:failures.Add("Could not stop $($process.ProcessName) (PID $($process.Id)): $($_.Exception.Message)")
         } finally {
@@ -511,10 +515,10 @@ if (-not (Test-IsAdministrator)) {
 }
 
 $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$logDirectory = Join-Path $env:TEMP "PowerToys-Cleanup-$timestamp"
-New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
 $stagingDirectory = Join-Path $env:ProgramData "Microsoft\PowerToys\Cleanup\$timestamp"
+$logDirectory = Join-Path $env:ProgramData "Microsoft\PowerToys\CleanupLogs\$timestamp"
 New-ProtectedDirectory -Path $stagingDirectory
+New-ProtectedDirectory -Path $logDirectory
 
 try {
     Stop-PowerToysProcesses

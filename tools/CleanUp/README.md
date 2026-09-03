@@ -45,8 +45,8 @@ Per-user MSI products can only be removed from the Windows profile that owns
 them. If other profiles have per-user PowerToys installations, sign in to each
 affected profile and run the script again.
 
-MSI logs are written to a timestamped `PowerToys-Cleanup-*` directory under
-`%TEMP%`. A failed run preserves those logs and reports any bootstrapper whose
-cache is missing or invalid. For safety, the script only executes cached MSI
-packages and bootstrappers with a valid Microsoft signature and PowerToys
-identity.
+MSI logs are written to a timestamped, administrator-protected
+`%ProgramData%\Microsoft\PowerToys\CleanupLogs` directory. A failed run
+preserves those logs and reports any bootstrapper whose cache is missing or
+invalid. For safety, the script only executes cached MSI packages and
+bootstrappers with a valid Microsoft signature and PowerToys identity.
