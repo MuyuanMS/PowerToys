@@ -16,6 +16,7 @@
 #include "../../../common/utils/process_path.h"
 #include "../../../interface/powertoy_module_interface.h"
 
+#include <algorithm>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -32,6 +33,8 @@ namespace
     constexpr wchar_t jsonHideOnTyping[] = L"hide_on_typing";
     constexpr wchar_t jsonHideOnIdle[] = L"hide_on_idle";
     constexpr wchar_t jsonIdleDelayMs[] = L"idle_delay_ms";
+    constexpr DWORD initialWorkerFailureDelayMs = 1000;
+    constexpr DWORD maximumWorkerFailureDelayMs = 60000;
 
     class AutoHideCursorModule : public PowertoyModuleIface
     {
@@ -225,11 +228,21 @@ namespace
         void SupervisorLoop()
         {
             unsigned int workerGeneration = 0;
+            unsigned int consecutiveWorkerFailures = 0;
+            const auto waitBeforeWorkerRetry = [this, &consecutiveWorkerFailures]() {
+                const auto delay = std::min(
+                    initialWorkerFailureDelayMs << std::min(consecutiveWorkerFailures, 5u),
+                    maximumWorkerFailureDelayMs);
+                ++consecutiveWorkerFailures;
+                return WaitForSingleObject(m_terminateEvent, delay) == WAIT_OBJECT_0;
+            };
+
             while (m_enabled)
             {
                 const auto settingsSnapshot = GetSettingsSnapshot();
                 if (!settingsSnapshot.hideOnTyping && !settingsSnapshot.hideOnIdle)
                 {
+                    consecutiveWorkerFailures = 0;
                     const HANDLE events[] = { m_terminateEvent, m_restartEvent };
                     const auto waitResult = WaitForMultipleObjects(
                         static_cast<DWORD>(std::size(events)),
@@ -252,7 +265,7 @@ namespace
                 if (!stopEvent)
                 {
                     Logger::error(L"Failed to create the Auto Hide Cursor worker stop event. Error: {}", GetLastError());
-                    if (WaitForSingleObject(m_terminateEvent, 1000) == WAIT_OBJECT_0)
+                    if (waitBeforeWorkerRetry())
                     {
                         break;
                     }
@@ -263,7 +276,7 @@ namespace
                 if (!LaunchWorker(settingsSnapshot, stopEventName, processInfo))
                 {
                     CloseHandle(stopEvent);
-                    if (WaitForSingleObject(m_terminateEvent, 1000) == WAIT_OBJECT_0)
+                    if (waitBeforeWorkerRetry())
                     {
                         break;
                     }
@@ -279,8 +292,10 @@ namespace
 
                 const bool stopping = waitResult == WAIT_OBJECT_0;
                 const bool restarting = waitResult == WAIT_OBJECT_0 + 1;
+                bool workerFailed = false;
                 if (stopping || restarting)
                 {
+                    consecutiveWorkerFailures = 0;
                     SetEvent(stopEvent);
                     if (WaitForSingleObject(processInfo.hProcess, 3000) == WAIT_TIMEOUT)
                     {
@@ -294,11 +309,13 @@ namespace
                     DWORD exitCode = ERROR_GEN_FAILURE;
                     GetExitCodeProcess(processInfo.hProcess, &exitCode);
                     Logger::warn(L"Auto Hide Cursor worker exited unexpectedly with code {}.", exitCode);
+                    workerFailed = true;
                 }
                 else
                 {
                     Logger::error(L"Failed while waiting for the Auto Hide Cursor worker. Error: {}", GetLastError());
                     SetEvent(stopEvent);
+                    workerFailed = true;
                     if (WaitForSingleObject(processInfo.hProcess, 1000) == WAIT_TIMEOUT)
                     {
                         TerminateProcess(processInfo.hProcess, ERROR_CANCELLED);
@@ -318,7 +335,12 @@ namespace
                     break;
                 }
 
-                if (!restarting && WaitForSingleObject(m_terminateEvent, 1000) == WAIT_OBJECT_0)
+                if (!restarting && workerFailed && waitBeforeWorkerRetry())
+                {
+                    break;
+                }
+
+                if (!restarting && !workerFailed && WaitForSingleObject(m_terminateEvent, initialWorkerFailureDelayMs) == WAIT_OBJECT_0)
                 {
                     break;
                 }
