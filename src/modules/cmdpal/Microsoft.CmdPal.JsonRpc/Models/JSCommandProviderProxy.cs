@@ -438,7 +438,7 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
         // The extension disconnected or its process exited. Clear any active statuses so
         // they do not linger in the host UI even though no explicit hide arrived. The
         // notification handlers stay registered; the connection is gone so they cannot
-        // fire again, and Dispose still unregisters them during full teardown.
+        // fire again, and Dispose still removes those registrations during full teardown.
         lock (_hostLock)
         {
             if (_isDisposed)

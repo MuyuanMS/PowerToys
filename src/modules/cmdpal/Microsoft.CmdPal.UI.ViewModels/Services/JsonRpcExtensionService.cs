@@ -628,8 +628,8 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
 
     /// <summary>
     /// Returns true only when a watcher change under <paramref name="root"/> is a top-level
-    /// extension change: the extension directory itself (<c>&lt;root&gt;/&lt;extdir&gt;</c>) or its
-    /// own manifest (<c>&lt;root&gt;/&lt;extdir&gt;/package.json</c>). Anything deeper (a nested
+    /// extension change: the extension directory itself (<c>&lt;root&gt;/&lt;extension&gt;</c>) or its
+    /// own manifest (<c>&lt;root&gt;/&lt;extension&gt;/package.json</c>). Anything deeper (a nested
     /// package.json or a nested directory, for example under <c>node_modules</c> or a nested
     /// package) returns false so the recursive root watcher does not treat it as an extension
     /// upsert. Extracted as a pure helper so the depth filter can be tested without a live
@@ -663,10 +663,10 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
 
             return segments.Length switch
             {
-                // <root>/<extdir> (the extension directory created, renamed, or removed).
+                // <root>/<extension> (the extension directory created, renamed, or removed).
                 1 => true,
 
-                // <root>/<extdir>/package.json (the extension's own manifest).
+                // <root>/<extension>/package.json (the extension's own manifest).
                 2 => string.Equals(segments[1], "package.json", StringComparison.OrdinalIgnoreCase),
 
                 // Anything deeper is a nested file or directory and is not an extension entry.
@@ -714,7 +714,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
     /// Resolves the directory the per-extension source watcher should observe for
     /// <paramref name="directory"/>'s manifest. The manifest's declared
     /// <see cref="JSExtensionManifest.WatchDirectory"/> (cmdpal.watchPath) wins when
-    /// present. Otherwise the directory containing the resolved entry point is used, so an
+    /// present. Otherwise, the directory containing the resolved entry point is used, so an
     /// extension that keeps its runtime output in a subfolder (for example a bundler's
     /// <c>dist/</c>) is not watched more broadly than that just because the host guessed at
     /// the whole package. Falls back to the extension directory itself only if neither can
@@ -1354,7 +1354,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         }
 
         // The root watcher is recursive, so it also reports nested files and directories.
-        // Only a top-level <root>/<extdir> directory or its own <root>/<extdir>/package.json
+        // Only a top-level <root>/<extension> directory or its own <root>/<extension>/package.json
         // is an extension change; a nested package.json or directory (a nested package or
         // dependency) must not be treated as an extension upsert.
         if (!IsTopLevelExtensionChange(ExtensionsPath, e.FullPath))
@@ -1659,7 +1659,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
     /// (per <see cref="ResolveWatchRoot"/>) it is currently rooted at. Tracking the watch
     /// root alongside the watcher instance is what lets <see cref="EnsureSourceFileWatcher"/>
     /// tell an already-correct watcher (no-op) apart from a stale one whose manifest-declared
-    /// root has since moved (repair path), without re-deriving and diffing paths from the
+    /// root has since moved (repair path), without re-deriving and comparing paths from the
     /// manifest on every ensure call.
     /// </summary>
     private sealed record ExtensionSourceWatcher(FileSystemWatcher Watcher, string WatchRoot);
@@ -1692,7 +1692,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
     private void EnsureSourceFileWatcher(string directory, JSExtensionManifest manifest)
     {
         // The watch root is manifest-driven (see ResolveWatchRoot): an explicit
-        // cmdpal.watchPath wins, otherwise the entry point's own directory is used instead
+        // cmdpal.watchPath wins; otherwise, the entry point's own directory is used instead
         // of the whole extension directory, so the host does not have to guess which
         // unrelated subfolders (VCS metadata, docs, and so on) to stay out of.
         var watchRoot = ResolveWatchRoot(directory, manifest);

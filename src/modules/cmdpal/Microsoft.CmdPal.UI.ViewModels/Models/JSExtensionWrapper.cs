@@ -749,7 +749,7 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
     /// claims and guards stdout before it dynamically imports the extension entry, so a
     /// static top-level stdout write cannot corrupt the JSON-RPC framing. Resolution is
     /// relative to the extension's installed SDK
-    /// (<c>&lt;manifestDirectory&gt;/node_modules/@microsoft/cmdpal-sdk</c>), preferring the
+    /// (<c>&lt;manifestDirectory&gt;/node_modules/.../cmdpal-sdk</c>), preferring the
     /// package's declared <c>bin</c> entry and falling back to the known published
     /// artifacts. Returns <see langword="null"/> when the SDK or its bootstrap is not present.
     /// </summary>
