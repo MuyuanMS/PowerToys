@@ -196,6 +196,11 @@ public sealed class CommandProviderWrapper : ICommandProviderContext, IDisposabl
 
     public void Dispose()
     {
+        if (_commandProvider.Unsafe is not null)
+        {
+            _commandProvider.Unsafe.ItemsChanged -= CommandProvider_ItemsChanged;
+        }
+
         ExtensionHost.Dispose();
     }
 
