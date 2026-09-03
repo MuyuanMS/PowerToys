@@ -54,7 +54,7 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
         }
 
         reloadRequested.Value = true;
-        LoadClipboardHistoryInSTA();
+        LoadClipboardHistoryInSTA(waitForCompletion: false);
     }
 
     private async Task LoadClipboardHistoryAsync()
@@ -157,7 +157,7 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
 
             if (!disposed.Value && reloadRequested.Clear())
             {
-                LoadClipboardHistoryInSTA();
+                LoadClipboardHistoryInSTA(waitForCompletion: false);
             }
         }
     }
@@ -263,7 +263,7 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
         }
     }
 
-    private void LoadClipboardHistoryInSTA()
+    private void LoadClipboardHistoryInSTA(bool waitForCompletion)
     {
         if (!loadInFlight.Set())
         {
@@ -271,10 +271,10 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
         }
 
         reloadRequested.Clear();
-        StartClipboardHistoryLoad();
+        StartClipboardHistoryLoad(waitForCompletion);
     }
 
-    private void StartClipboardHistoryLoad()
+    private void StartClipboardHistoryLoad(bool waitForCompletion)
     {
         // https://github.com/microsoft/windows-rs/issues/317
         // The synchronous prefix must run in STA or the clipboard API hangs.
@@ -313,6 +313,10 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
             }
 
             thread.Start();
+            if (waitForCompletion)
+            {
+                thread.Join();
+            }
         }
         catch (Exception ex)
         {
@@ -351,7 +355,7 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
     {
         if (!disposed.Value && hasLoadedOnce.Set())
         {
-            LoadClipboardHistoryInSTA();
+            LoadClipboardHistoryInSTA(waitForCompletion: true);
         }
 
         return GetClipboardHistoryListItems();
