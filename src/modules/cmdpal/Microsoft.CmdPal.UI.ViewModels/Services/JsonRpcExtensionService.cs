@@ -116,6 +116,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
     // can only be canceled once, so stop-then-load-again would otherwise hand out a
     // permanently canceled token; this wrapper swaps in a fresh source per cycle.
     private readonly ReloadCancellation _reload = new();
+    private readonly SemaphoreSlim _loadStopLock = new(1, 1);
 
     private readonly DirectoryLifecycleGate _directoryGate = new();
 
@@ -191,85 +192,109 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
             return [];
         }
 
-        // Begin a fresh load cycle. This replaces a token that a previous stop left
-        // canceled, so a load after a stop actually runs.
-        _reload.BeginCycle();
-
-        // Re-open crash recovery, which a previous stop closed, so a crash in this cycle is
-        // recovered instead of being dropped as post-shutdown work.
-        _recovery.BeginCycle();
-
-        // A new load cycle clears the shutting-down guard so registrations are accepted
-        // again after a previous SignalStopAsync.
-        lock (_extensionsLock)
+        try
         {
-            _shuttingDown = false;
+            await _loadStopLock.WaitAsync(ct).ConfigureAwait(false);
         }
-
-        var sw = Stopwatch.StartNew();
-
-        if (!EnsureExtensionsDirectory())
+        catch (OperationCanceledException)
         {
             return [];
         }
 
-        // Start the watcher before scanning so a package installed while the scan runs
-        // is still observed (the per-directory gate and the already-loaded check make a
-        // watcher-driven load and a scan-driven load for the same directory idempotent).
-        StartDirectoryWatcher();
+        try
+        {
+            // Begin a fresh load cycle. This replaces a token that a previous stop left
+            // canceled, so a load after a stop actually runs.
+            _reload.BeginCycle();
 
-        var accepted = DiscoverAcceptedManifests(ExtensionsPath);
-        var wrappers = (await ExtensionTaskCoordinator.RunConcurrentlyAsync<(string Directory, JSExtensionManifest Manifest), CommandProviderWrapper>(
-            accepted,
-            item => AddExtensionGatedAsync(item.Directory, item.Manifest, ct),
-            (item, ex) => Logger.LogError($"Failed to load JS extension from {item.Directory}", ex),
-            MaxConcurrentExtensionStarts,
-            ct)
-            .ConfigureAwait(false)).ToList();
+            // Re-open crash recovery, which a previous stop closed, so a crash in this cycle is
+            // recovered instead of being dropped as post-shutdown work.
+            _recovery.BeginCycle();
 
-        // Reconcile once more to pick up anything installed during the scan/watch gap.
-        var stragglers = await AddDiscoveredNotLoadedAsync(ct).ConfigureAwait(false);
-        wrappers.AddRange(stragglers);
+            // A new load cycle clears the shutting-down guard so registrations are accepted
+            // again after a previous SignalStopAsync.
+            lock (_extensionsLock)
+            {
+                _shuttingDown = false;
+            }
 
-        sw.Stop();
-        Logger.LogInfo($"JsonRpcExtensionService: Loaded {wrappers.Count} extension(s) in {sw.ElapsedMilliseconds} ms");
+            var sw = Stopwatch.StartNew();
 
-        return wrappers;
+            if (!EnsureExtensionsDirectory())
+            {
+                return [];
+            }
+
+            // Start the watcher before scanning so a package installed while the scan runs
+            // is still observed (the per-directory gate and the already-loaded check make a
+            // watcher-driven load and a scan-driven load for the same directory idempotent).
+            StartDirectoryWatcher();
+
+            var accepted = DiscoverAcceptedManifests(ExtensionsPath);
+            var wrappers = (await ExtensionTaskCoordinator.RunConcurrentlyAsync<(string Directory, JSExtensionManifest Manifest), CommandProviderWrapper>(
+                accepted,
+                item => AddExtensionGatedAsync(item.Directory, item.Manifest, ct),
+                (item, ex) => Logger.LogError($"Failed to load JS extension from {item.Directory}", ex),
+                MaxConcurrentExtensionStarts,
+                ct)
+                .ConfigureAwait(false)).ToList();
+
+            // Reconcile once more to pick up anything installed during the scan/watch gap.
+            var stragglers = await AddDiscoveredNotLoadedAsync(ct).ConfigureAwait(false);
+            wrappers.AddRange(stragglers);
+
+            sw.Stop();
+            Logger.LogInfo($"JsonRpcExtensionService: Loaded {wrappers.Count} extension(s) in {sw.ElapsedMilliseconds} ms");
+
+            return wrappers;
+        }
+        finally
+        {
+            _loadStopLock.Release();
+        }
     }
 
     public async Task SignalStopAsync()
     {
         await Task.Yield();
 
-        // Request cancellation first so any in-flight, delayed watcher handlers bail out
-        // before they start an extension after we have already begun shutting down.
-        _reload.Stop();
-
-        // Close crash recovery in the same breath: cancel what is running and refuse new
-        // recovery, so the process exits we are about to cause below cannot queue restart
-        // work behind the shutdown.
-        _recovery.CancelAll();
-
-        StopDirectoryWatcher();
-        StopAllSourceFileWatchers();
-
-        List<JSExtensionWrapper> toStop;
-        lock (_extensionsLock)
+        await _loadStopLock.WaitAsync().ConfigureAwait(false);
+        try
         {
-            _shuttingDown = true;
-            toStop = [.. _extensions];
-            _extensions.Clear();
-            _providerWrappers.Clear();
-            _crashCounts.Clear();
-            _providerIds.Clear();
+            // Request cancellation first so any in-flight, delayed watcher handlers bail out
+            // before they start an extension after we have already begun shutting down.
+            _reload.Stop();
+
+            // Close crash recovery in the same breath: cancel what is running and refuse new
+            // recovery, so the process exits we are about to cause below cannot queue restart
+            // work behind the shutdown.
+            _recovery.CancelAll();
+
+            StopDirectoryWatcher();
+            StopAllSourceFileWatchers();
+
+            List<JSExtensionWrapper> toStop;
+            lock (_extensionsLock)
+            {
+                _shuttingDown = true;
+                toStop = [.. _extensions];
+                _extensions.Clear();
+                _providerWrappers.Clear();
+                _crashCounts.Clear();
+                _providerIds.Clear();
+            }
+
+            await StopExtensionsConcurrentlyAsync(toStop, "stop").ConfigureAwait(false);
+
+            // Everything was canceled above, so this only waits for already-running recovery to
+            // unwind. It cannot deadlock on the directory gate: no gate is held here, and the
+            // recovery tasks' tokens are already canceled.
+            await _recovery.DrainAllAsync().ConfigureAwait(false);
         }
-
-        await StopExtensionsConcurrentlyAsync(toStop, "stop").ConfigureAwait(false);
-
-        // Everything was canceled above, so this only waits for already-running recovery to
-        // unwind. It cannot deadlock on the directory gate: no gate is held here, and the
-        // recovery tasks' tokens are already canceled.
-        await _recovery.DrainAllAsync().ConfigureAwait(false);
+        finally
+        {
+            _loadStopLock.Release();
+        }
     }
 
     public Task<IEnumerable<IExtensionWrapper>> GetInstalledExtensionsAsync(bool includeDisabledExtensions = false)
@@ -420,6 +445,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         _notifications.Dispose();
         _directoryGate.Dispose();
         _reload.Dispose();
+        _loadStopLock.Dispose();
     }
 
     /// <summary>
