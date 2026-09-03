@@ -39,6 +39,7 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
     private readonly object _getItemsLock = new();
     private readonly object _itemCacheLock = new();
     private Task<IListItem[]>? _getItemsTask;
+    private int _getItemsTaskGeneration;
     private int _itemsChangedGeneration;
     private bool? _hasMoreItemsState;
     private bool _disposed;
@@ -127,12 +128,17 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
                     return [];
                 }
 
-                generation = _itemsChangedGeneration;
-                getItemsTask = _getItemsTask ??= GetItemsCoreAsync();
+                if (_getItemsTask is null)
+                {
+                    _getItemsTaskGeneration = _itemsChangedGeneration;
+                    _getItemsTask = GetItemsCoreAsync();
+                }
+
+                generation = _getItemsTaskGeneration;
+                getItemsTask = _getItemsTask;
             }
 
             var items = getItemsTask.GetAwaiter().GetResult();
-            var retry = false;
 
             if (getItemsTask.IsCompleted)
             {
@@ -140,15 +146,17 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
                 {
                     if (ReferenceEquals(_getItemsTask, getItemsTask))
                     {
+                        if (!IsDisposed() && _itemsChangedGeneration != generation)
+                        {
+                            _getItemsTaskGeneration = _itemsChangedGeneration;
+                            _getItemsTask = GetItemsCoreAsync();
+                            continue;
+                        }
+
                         _getItemsTask = null;
-                        retry = !IsDisposed() && _itemsChangedGeneration != generation;
+                        return items;
                     }
                 }
-            }
-
-            if (!retry)
-            {
-                return items;
             }
         }
     }
