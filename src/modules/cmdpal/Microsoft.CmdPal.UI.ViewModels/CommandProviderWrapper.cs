@@ -14,7 +14,7 @@ using Windows.Foundation;
 
 namespace Microsoft.CmdPal.UI.ViewModels;
 
-public sealed class CommandProviderWrapper : ICommandProviderContext
+public sealed class CommandProviderWrapper : ICommandProviderContext, IDisposable
 {
     public bool IsExtension => Extension is not null;
 
@@ -192,6 +192,11 @@ public sealed class CommandProviderWrapper : ICommandProviderContext
             Logger.LogError(e.ToString());
             throw;
         }
+    }
+
+    public void Dispose()
+    {
+        ExtensionHost.Dispose();
     }
 
     private ProviderSettings GetProviderSettings(SettingsModel settings)
