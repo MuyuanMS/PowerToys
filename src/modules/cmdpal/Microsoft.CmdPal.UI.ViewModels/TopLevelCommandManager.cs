@@ -642,39 +642,47 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
 
             var commands = topLevelObjectSets.Commands;
             var dockBands = topLevelObjectSets.DockBands;
-            lock (_providerPublicationLock)
+
+            if (!_providerChanges.Enqueue(() =>
             {
-                if (ct.IsCancellationRequested)
+                lock (_providerPublicationLock)
                 {
-                    CleanupViewModels(commands ?? []);
-                    CleanupViewModels(dockBands ?? []);
-                    return;
-                }
-
-                if (commands is not null)
-                {
-                    lock (TopLevelCommands)
+                    if (ct.IsCancellationRequested || !IsWrapperRegistered(wrapper))
                     {
-                        foreach (var c in commands)
+                        CleanupViewModels(commands ?? []);
+                        CleanupViewModels(dockBands ?? []);
+                        return;
+                    }
+
+                    if (commands is not null)
+                    {
+                        lock (TopLevelCommands)
                         {
-                            TopLevelCommands.Add(c);
+                            foreach (var c in commands)
+                            {
+                                TopLevelCommands.Add(c);
+                            }
+                        }
+                    }
+
+                    if (dockBands is not null)
+                    {
+                        lock (_dockBandsLock)
+                        {
+                            foreach (var band in dockBands)
+                            {
+                                DockBands.Add(band);
+                            }
                         }
                     }
                 }
 
-                if (dockBands is not null)
-                {
-                    lock (_dockBandsLock)
-                    {
-                        foreach (var band in dockBands)
-                        {
-                            DockBands.Add(band);
-                        }
-                    }
-                }
+                Logger.LogInfo($"Late-loaded {commands?.Count ?? 0} command(s) and {dockBands?.Count ?? 0} band(s) from {wrapper.ExtensionHost?.Extension?.PackageFullName ?? wrapper.DisplayName} in {sw.ElapsedMilliseconds} ms");
+            }))
+            {
+                CleanupViewModels(commands ?? []);
+                CleanupViewModels(dockBands ?? []);
             }
-
-            Logger.LogInfo($"Late-loaded {commands?.Count ?? 0} command(s) and {dockBands?.Count ?? 0} band(s) from {wrapper.ExtensionHost?.Extension?.PackageFullName ?? wrapper.DisplayName} in {sw.ElapsedMilliseconds} ms");
         }
         catch (OperationCanceledException)
         {
@@ -697,7 +705,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         var wrapperList = wrappers.ToList();
         var completion = new TaskCompletionSource<RegisterAndLoadSummary>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        _providerChanges.Enqueue(() =>
+        if (!_providerChanges.Enqueue(() =>
         {
             if (ct.IsCancellationRequested || generation != _providerChangeGeneration)
             {
@@ -707,7 +715,11 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             }
 
             return CompleteRegisterAndLoadCommandsAsync(wrapperList, completion, ct);
-        });
+        }))
+        {
+            DisposeWrappers(wrapperList);
+            completion.SetResult(default);
+        }
 
         return completion.Task;
     }
@@ -734,7 +746,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         var generation = _providerChangeGeneration;
         var removedWrapperList = removedWrappers.ToList();
 
-        _providerChanges.Enqueue(async () =>
+        if (!_providerChanges.Enqueue(async () =>
         {
             if (ct.IsCancellationRequested || generation != _providerChangeGeneration)
             {
@@ -819,7 +831,10 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             CancellationToken.None,
             TaskCreationOptions.None,
             _taskScheduler);
-        });
+        }))
+        {
+            DisposeWrappers(removedWrapperList);
+        }
     }
 
     private static void DisposeWrappers(IEnumerable<CommandProviderWrapper> wrappers)
@@ -827,6 +842,14 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         foreach (var wrapper in wrappers)
         {
             wrapper.Dispose();
+        }
+    }
+
+    private bool IsWrapperRegistered(CommandProviderWrapper wrapper)
+    {
+        lock (_commandProvidersLock)
+        {
+            return _commandProviders.Contains(wrapper);
         }
     }
 

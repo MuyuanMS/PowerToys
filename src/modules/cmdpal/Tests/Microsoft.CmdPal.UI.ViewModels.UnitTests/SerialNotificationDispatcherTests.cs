@@ -155,11 +155,13 @@ public class SerialNotificationDispatcherTests
         using var dispatcher = new SerialNotificationDispatcher();
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var order = new ConcurrentQueue<string>();
+        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var secondRan = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         dispatcher.Enqueue(async () =>
         {
             order.Enqueue("first-start");
+            firstStarted.SetResult();
             await release.Task.ConfigureAwait(false);
             order.Enqueue("first-end");
         });
@@ -169,7 +171,7 @@ public class SerialNotificationDispatcherTests
             secondRan.SetResult();
         });
 
-        Thread.Sleep(100);
+        Assert.IsTrue(firstStarted.Task.Wait(TimeSpan.FromSeconds(5)), "The first async notification should start.");
         CollectionAssert.AreEqual(ExpectedAsyncOrderBeforeRelease, order.ToArray());
 
         release.SetResult();
