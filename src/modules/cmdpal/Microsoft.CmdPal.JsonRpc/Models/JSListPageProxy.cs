@@ -133,7 +133,7 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
                 if (_getItemsTask is null)
                 {
                     _getItemsTaskGeneration = _itemsChangedGeneration;
-                    _getItemsTask = GetItemsCoreAsync();
+                    _getItemsTask = GetItemsCoreAsync(_getItemsTaskGeneration);
                 }
 
                 generation = _getItemsTaskGeneration;
@@ -151,7 +151,7 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
                         if (!IsDisposed() && _itemsChangedGeneration != generation)
                         {
                             _getItemsTaskGeneration = _itemsChangedGeneration;
-                            _getItemsTask = GetItemsCoreAsync();
+                            _getItemsTask = GetItemsCoreAsync(_getItemsTaskGeneration);
                             continue;
                         }
 
@@ -182,7 +182,7 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
         }
     }
 
-    private async Task<IListItem[]> GetItemsCoreAsync()
+    private async Task<IListItem[]> GetItemsCoreAsync(int generation)
     {
         try
         {
@@ -200,6 +200,14 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
             if (IsDisposed())
             {
                 return [];
+            }
+
+            lock (_getItemsLock)
+            {
+                if (IsDisposed() || _itemsChangedGeneration != generation)
+                {
+                    return [];
+                }
             }
 
             UpdatePageState(response.Result);

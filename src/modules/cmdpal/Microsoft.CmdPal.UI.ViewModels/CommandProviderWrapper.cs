@@ -212,7 +212,7 @@ public sealed class CommandProviderWrapper : ICommandProviderContext, IDisposabl
 
         _disposed = true;
 
-        if (_commandProvider.Unsafe is not null)
+        if (_commandProvider?.Unsafe is not null)
         {
             _commandProvider.Unsafe.ItemsChanged -= CommandProvider_ItemsChanged;
         }
