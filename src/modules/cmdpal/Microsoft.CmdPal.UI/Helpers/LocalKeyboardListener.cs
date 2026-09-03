@@ -16,6 +16,8 @@ namespace Microsoft.CmdPal.UI.Helpers;
 /// </summary>
 internal sealed partial class LocalKeyboardListener : IDisposable
 {
+    private const int HcAction = 0;
+
     /// <summary>
     /// Event that is raised when a key is pressed down.
     /// </summary>
@@ -146,7 +148,7 @@ internal sealed partial class LocalKeyboardListener : IDisposable
     {
         try
         {
-            if (nCode >= 0)
+            if (nCode == HcAction)
             {
                 var virtualKey = (VirtualKey)wParam.Value;
                 if (IsKeyDownHook(lParam))
