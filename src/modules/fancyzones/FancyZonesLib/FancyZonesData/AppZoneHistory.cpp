@@ -444,7 +444,26 @@ bool AppZoneHistory::RemoveAppLastZone(HWND window, const FancyZonesDataTypes::W
     auto history = m_history.find(processPath);
     if (history == std::end(m_history))
     {
-        history = m_history.find(GetProcessPathWithoutAUMID(processPath));
+        const auto legacyProcessPath = GetProcessPathWithoutAUMID(processPath);
+        if (legacyProcessPath != processPath)
+        {
+            auto legacyHistory = m_history.find(legacyProcessPath);
+            if (legacyHistory != m_history.end())
+            {
+                auto qualifiedHistory = legacyHistory->second;
+                for (auto& data : qualifiedHistory)
+                {
+                    data.processIdToHandleMap.clear();
+                }
+
+                history = m_history.emplace(processPath, std::move(qualifiedHistory)).first;
+            }
+        }
+        else
+        {
+            history = m_history.find(legacyProcessPath);
+        }
+
         if (history == std::end(m_history))
         {
             return false;
