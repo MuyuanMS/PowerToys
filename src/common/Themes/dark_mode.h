@@ -3,7 +3,8 @@
 
 // Lightweight helpers for opting native Win32 popup menus into the
 // app dark / light theme. Built on top of undocumented uxtheme.dll
-// ordinals (ShouldAppsUseDarkMode / SetPreferredAppMode / FlushMenuThemes)
+// ordinals (RefreshImmersiveColorPolicyState / ShouldAppsUseDarkMode /
+// SetPreferredAppMode / FlushMenuThemes)
 // that ship with Windows 10 1903+ and Windows 11.
 struct DarkMode
 {
