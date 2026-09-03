@@ -91,6 +91,17 @@ internal sealed partial class SerialNotificationDispatcher : IDisposable
         _worker.GetAwaiter().GetResult();
     }
 
+    public void CompleteWithoutWaiting()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _queue.Writer.TryComplete();
+    }
+
     private async Task RunAsync()
     {
         try
