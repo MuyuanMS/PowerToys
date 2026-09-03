@@ -142,6 +142,22 @@ public class AutoHideCursorSettingsTests : UITestBase
         AssertIdleDelaySetting(60000);
     }
 
+    [TestMethod]
+    [TestCategory("MouseUtils")]
+    [TestCategory("AutoHideCursor")]
+    public void OutOfRangeIdleDelayIsClampedInSettings()
+    {
+        MouseUtilsTestHelper.ReplaceModuleSettings(
+            ModuleName,
+            CreateSettings(hideOnTyping: true, hideOnIdle: true, idleDelayMs: 120000));
+
+        OpenSettings();
+
+        var idleDelay = Session.Find<NumberBox>(By.AccessibilityId(IdleDelayId), 5_000);
+        Assert.AreEqual("60", idleDelay.GetValue(), "The out-of-range seeded delay should be clamped to sixty seconds.");
+        AssertIdleDelaySetting(60000);
+    }
+
     private void OpenSettings()
     {
         MouseUtilsTestHelper.NavigateToMouseUtilities(this);

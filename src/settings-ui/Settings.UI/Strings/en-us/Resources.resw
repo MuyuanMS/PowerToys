@@ -2794,7 +2794,7 @@ From there, simply click on one of the supported files in the File Explorer and 
     <value>Activation</value>
   </data>
   <data name="MouseUtils_AutoHideCursor_Behavior.Description" xml:space="preserve">
-    <value>Choose one or both ways to hide the pointer</value>
+    <value>Choose how the pointer is hidden, or turn both triggers off</value>
   </data>
   <data name="MouseUtils_AutoHideCursor_HideOnTyping.Header" xml:space="preserve">
     <value>Hide after keyboard input</value>
