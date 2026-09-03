@@ -2,8 +2,10 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.Linq;
 using System.Text.Json.Nodes;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CmdPal.JsonRpc.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -64,18 +66,22 @@ public class JSCommandProviderProxyStatusDisposeRaceTests
         {
             using var fake = new JSFakeExtension();
             var provider = CreateInitialized(fake, out var host);
+            host.ShowStatusEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var releaseShow = new ManualResetEventSlim();
+            host.ReleaseShowStatus = releaseShow;
 
-            // Push a status and tear the proxy down without waiting for the show to be
-            // delivered, so the show handler races Dispose. Whichever wins the lock, the
-            // show is either delivered-then-hidden or its late delivery is dropped: it must
-            // never be recorded as shown without a matching hide.
             var pushTask = fake.PushNotificationAsync("host/showStatus", ShowStatus($"s{i}", "Racing"));
-            provider.Dispose();
-            await pushTask;
+            await host.ShowStatusEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-            // Give the connection's delivery thread a chance to run the (now no-op) handler
-            // so the assertion sees the settled state rather than an in-flight one.
-            await Task.Delay(5);
+            // The show handler is now in the host callback while still holding the proxy's
+            // host lock. Dispose must wait for that path and then hide the delivered status.
+            var disposeTask = Task.Run(provider.Dispose);
+            await Task.Delay(10);
+            Assert.IsFalse(disposeTask.IsCompleted, "Dispose should wait for the in-flight show handler to leave the host lock.");
+
+            releaseShow.Set();
+            await disposeTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await pushTask;
 
             var shown = host.Shown;
             var hidden = host.Hidden;
@@ -89,8 +95,6 @@ public class JSCommandProviderProxyStatusDisposeRaceTests
                     hidden.Any(h => ReferenceEquals(h, message)),
                     "A status shown to the host must always be hidden; disposal must not strand it.");
             }
-
-            provider.Dispose();
         }
     }
 }

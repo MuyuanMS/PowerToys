@@ -61,6 +61,17 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
     private bool _settingsQueried;
     private volatile bool _isDisposed;
 
+    internal int PendingHostActionCount
+    {
+        get
+        {
+            lock (_hostLock)
+            {
+                return _pendingHostActions.Count;
+            }
+        }
+    }
+
     public JSCommandProviderProxy(
         JsonRpcConnection connection,
         string fallbackId,
