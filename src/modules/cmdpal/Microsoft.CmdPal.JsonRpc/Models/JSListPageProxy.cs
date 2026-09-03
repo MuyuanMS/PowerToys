@@ -39,6 +39,7 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
     private readonly object _getItemsLock = new();
     private readonly object _itemCacheLock = new();
     private Task<IListItem[]>? _getItemsTask;
+    private int _itemsChangedGeneration;
     private bool? _hasMoreItemsState;
     private bool _disposed;
 
@@ -115,23 +116,24 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
             return [];
         }
 
-        Task<IListItem[]> getItemsTask;
-        lock (_getItemsLock)
+        while (true)
         {
-            if (IsDisposed())
+            Task<IListItem[]> getItemsTask;
+            int generation;
+            lock (_getItemsLock)
             {
-                return [];
+                if (IsDisposed())
+                {
+                    return [];
+                }
+
+                generation = _itemsChangedGeneration;
+                getItemsTask = _getItemsTask ??= GetItemsCoreAsync();
             }
 
-            getItemsTask = _getItemsTask ??= GetItemsCoreAsync();
-        }
+            var items = getItemsTask.GetAwaiter().GetResult();
+            var retry = false;
 
-        try
-        {
-            return getItemsTask.GetAwaiter().GetResult();
-        }
-        finally
-        {
             if (getItemsTask.IsCompleted)
             {
                 lock (_getItemsLock)
@@ -139,8 +141,14 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
                     if (ReferenceEquals(_getItemsTask, getItemsTask))
                     {
                         _getItemsTask = null;
+                        retry = !IsDisposed() && _itemsChangedGeneration != generation;
                     }
                 }
+            }
+
+            if (!retry)
+            {
+                return items;
             }
         }
     }
@@ -329,6 +337,14 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
         ItemsChanged?.Invoke(this, new ItemsChangedEventArgs(totalItems));
     }
 
+    private void MarkItemsChanged()
+    {
+        lock (_getItemsLock)
+        {
+            _itemsChangedGeneration++;
+        }
+    }
+
     public override void Dispose()
     {
         lock (_stateLock)
@@ -379,6 +395,7 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
 
             foreach (var proxy in registry.Pages.GetLiveTargets(pageId))
             {
+                proxy.MarkItemsChanged();
                 proxy.UpdatePageState(paramsElement);
 
                 var args = new ItemsChangedEventArgs(totalItems);
