@@ -181,7 +181,7 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
                         return items;
                     }
 
-                    if (_getItemsTaskGeneration == generation)
+                    if (_getItemsTaskGeneration == generation && _itemsChangedGeneration == generation)
                     {
                         return items;
                     }
