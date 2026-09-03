@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.IO;
+using System.Text.Json;
 using Microsoft.CmdPal.UI.ViewModels.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -139,6 +140,58 @@ public class JSExtensionWrapperBootstrapTests
                 "{ \"name\": \"@microsoft/cmdpal-sdk\", \"bin\": { \"cmdpal-bootstrap\": \"./dist/runtime/bootstrap.js\" } }");
 
             Assert.IsNull(JSExtensionWrapper.ResolveBootstrapScript(manifestDir));
+        }
+        finally
+        {
+            Directory.Delete(manifestDir, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public void ResolveBootstrapScript_IgnoresPackageJsonBinEntryOutsideSdkRoot()
+    {
+        var manifestDir = NewTempDir();
+        try
+        {
+            var sdkRoot = CreateSdkRoot(manifestDir);
+            var outsideBootstrap = Path.Combine(manifestDir, "outside-bootstrap.js");
+            File.WriteAllText(outsideBootstrap, "// outside bootstrap");
+            File.WriteAllText(
+                Path.Combine(sdkRoot, "package.json"),
+                "{ \"name\": \"@microsoft/cmdpal-sdk\", \"bin\": { \"cmdpal-bootstrap\": \"../../../outside-bootstrap.js\" } }");
+
+            Assert.IsNull(JSExtensionWrapper.ResolveBootstrapScript(manifestDir));
+        }
+        finally
+        {
+            Directory.Delete(manifestDir, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public void ResolveBootstrapScript_IgnoresRootedPackageJsonBinEntry()
+    {
+        var manifestDir = NewTempDir();
+        try
+        {
+            var sdkRoot = CreateSdkRoot(manifestDir);
+            var rootedBootstrap = Path.Combine(Path.GetTempPath(), "cmdpal-rooted-bootstrap-" + Path.GetRandomFileName() + ".js");
+            try
+            {
+                File.WriteAllText(rootedBootstrap, "// rooted bootstrap");
+                File.WriteAllText(
+                    Path.Combine(sdkRoot, "package.json"),
+                    $"{{ \"name\": \"@microsoft/cmdpal-sdk\", \"bin\": {{ \"cmdpal-bootstrap\": {JsonSerializer.Serialize(rootedBootstrap)} }} }}");
+
+                Assert.IsNull(JSExtensionWrapper.ResolveBootstrapScript(manifestDir));
+            }
+            finally
+            {
+                if (File.Exists(rootedBootstrap))
+                {
+                    File.Delete(rootedBootstrap);
+                }
+            }
         }
         finally
         {
