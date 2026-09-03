@@ -644,7 +644,8 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     {
         _providerChanges.Enqueue(async () =>
         {
-            var removedProviderIds = new HashSet<string>(removedWrappers.Select(w => w.ProviderId));
+            var removedWrapperList = removedWrappers.ToList();
+            var removedProviderIds = new HashSet<string>(removedWrapperList.Select(w => w.ProviderId));
 
             List<TopLevelViewModel> commandsToRemove = [];
             List<TopLevelViewModel> bandsToRemove = [];
@@ -709,6 +710,11 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
                 foreach (var deleted in bandsToRemove)
                 {
                     deleted.Cleanup();
+                }
+
+                foreach (var wrapper in removedWrapperList)
+                {
+                    wrapper.Dispose();
                 }
             },
             CancellationToken.None,
