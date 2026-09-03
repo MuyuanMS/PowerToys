@@ -6,6 +6,10 @@
 #include <thread>
 #include <atomic>
 #include <optional>
+#include <future>
+#include <memory>
+#include <algorithm>
+#include <chrono>
 
 #pragma comment(lib, "wbemuuid.lib")
 #ifdef _DEBUG
@@ -22,9 +26,9 @@ class BrightnessObserver
 public:
     // callback receives the new brightness level (0-100)
     explicit BrightnessObserver(std::function<void(int)> callback, int pollIntervalSeconds = 5)
-        : _callback(std::move(callback)), _pollInterval(pollIntervalSeconds), _stop(false)
+        : _state(std::make_shared<State>(std::move(callback), pollIntervalSeconds))
     {
-        _thread = std::thread([this]() { Run(); });
+        _thread = std::thread([state = _state]() { Run(state); });
     }
 
     ~BrightnessObserver()
@@ -34,26 +38,48 @@ public:
 
     void Stop()
     {
-        _stop = true;
+        _state->stop = true;
         if (_thread.joinable())
-            _thread.join();
+        {
+            auto done = _state->done.get_future();
+            if (done.wait_for(std::chrono::seconds(2)) == std::future_status::ready)
+            {
+                _thread.join();
+            }
+            else
+            {
+                _thread.detach();
+            }
+        }
     }
 
 private:
-    std::function<void(int)> _callback;
-    int _pollInterval;
-    std::atomic<bool> _stop;
+    struct State
+    {
+        State(std::function<void(int)> callback, int pollIntervalSeconds) :
+            callback(std::move(callback)),
+            pollInterval(pollIntervalSeconds)
+        {
+        }
+
+        std::function<void(int)> callback;
+        int pollInterval;
+        std::atomic<bool> stop = false;
+        std::promise<void> done;
+    };
+
+    std::shared_ptr<State> _state;
     std::thread _thread;
 
-    void WaitForNextPoll()
+    static void WaitForNextPoll(const std::shared_ptr<State>& state)
     {
-        for (int i = 0; i < _pollInterval && !_stop; ++i)
+        for (int i = 0; i < state->pollInterval && !state->stop; ++i)
         {
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
     }
 
-    void Run()
+    static void Run(const std::shared_ptr<State>& state)
     {
         HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
         bool coInitializeCalledHere = SUCCEEDED(hr);
@@ -64,18 +90,18 @@ private:
         // this keeps Stop()/join() responsive to _stop between polls.
         constexpr long kNextTimeoutMs = 1000;
 
-        while (!_stop)
+        while (!state->stop)
         {
             IWbemLocator* pLoc = nullptr;
             IWbemServices* pSvc = nullptr;
 
-            while (!_stop && !pSvc)
+            while (!state->stop && !pSvc)
             {
                 hr = CoCreateInstance(CLSID_WbemLocator, nullptr, CLSCTX_INPROC_SERVER,
                                       IID_IWbemLocator, reinterpret_cast<LPVOID*>(&pLoc));
                 if (FAILED(hr))
                 {
-                    WaitForNextPoll();
+                    WaitForNextPoll(state);
                     continue;
                 }
 
@@ -85,7 +111,7 @@ private:
                 {
                     pLoc->Release();
                     pLoc = nullptr;
-                    WaitForNextPoll();
+                    WaitForNextPoll(state);
                     continue;
                 }
 
@@ -98,11 +124,11 @@ private:
                     pSvc = nullptr;
                     pLoc->Release();
                     pLoc = nullptr;
-                    WaitForNextPoll();
+                    WaitForNextPoll(state);
                 }
             }
 
-            while (!_stop && pSvc)
+            while (!state->stop && pSvc)
             {
                 IEnumWbemClassObject* pEnum = nullptr;
                 hr = pSvc->ExecQuery(
@@ -120,37 +146,45 @@ private:
                 {
                     IWbemClassObject* pObj = nullptr;
                     ULONG returned = 0;
-                    if (pEnum->Next(kNextTimeoutMs, 1, &pObj, &returned) == WBEM_S_NO_ERROR && returned)
+                    std::optional<int> maxBrightness;
+                    while (!state->stop &&
+                           pEnum->Next(kNextTimeoutMs, 1, &pObj, &returned) == WBEM_S_NO_ERROR &&
+                           returned)
                     {
                         VARIANT vt;
                         VariantInit(&vt);
                         if (SUCCEEDED(pObj->Get(L"CurrentBrightness", 0, &vt, nullptr, nullptr)))
                         {
                             int brightness = static_cast<int>(vt.bVal);
-                            if (brightness != lastBrightness)
-                            {
-                                lastBrightness = brightness;
-                                try
-                                {
-                                    _callback(lastBrightness);
-                                }
-                                catch (...) {}
-                            }
+                            maxBrightness = maxBrightness && *maxBrightness > brightness ? *maxBrightness : brightness;
                         }
                         VariantClear(&vt);
                         pObj->Release();
+                        pObj = nullptr;
                     }
+
+                    if (!state->stop && maxBrightness && *maxBrightness != lastBrightness)
+                    {
+                        lastBrightness = *maxBrightness;
+                        try
+                        {
+                            state->callback(lastBrightness);
+                        }
+                        catch (...) {}
+                    }
+
                     pEnum->Release();
                 }
 
-                WaitForNextPoll();
+                WaitForNextPoll(state);
             }
 
             if (pSvc) pSvc->Release();
             if (pLoc) pLoc->Release();
-            if (!_stop) WaitForNextPoll();
+            if (!state->stop) WaitForNextPoll(state);
         }
 
         if (coInitializeCalledHere) CoUninitialize();
+        state->done.set_value();
     }
 };
