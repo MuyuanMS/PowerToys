@@ -16,6 +16,9 @@ struct LightSwitchState
     // Derived, runtime-resolved times
     int effectiveLightMinutes = 0; // the boundary we actually act on
     int effectiveDarkMinutes = 0; // includes offsets if needed
+
+    // Last known display brightness (0-100), -1 = unknown
+    int lastBrightness = -1;
 };
 
 // The controller that reacts to settings changes, time ticks, and manual overrides.
@@ -33,14 +36,22 @@ public:
     // Called when manual override is toggled (via shortcut or system change).
     void OnManualOverride();
 
+    // Called when the service detects that Windows Settings changed the theme.
+    // If expectedTheme is empty, derive it from the current brightness sample.
+    void OnExternalThemeChange(std::optional<bool> expectedTheme);
+
     // Called when night light changes in windows settings
     void OnNightLightChange();
 
+    // Called when display brightness changes (via BrightnessObserver)
+    void OnBrightnessChange(int brightness);
+
+    // Invalidate the cached brightness sample (e.g. when the BrightnessObserver is stopped),
+    // so a later mode switch back to Follow Brightness does not act on a stale value.
+    void InvalidateBrightness();
+
     // Initial sync at startup to align internal state with system theme
     void SyncInitialThemeState();
-
-    // Accessor for current state (optional, for debugging or telemetry)
-    const LightSwitchState& GetState() const { return _state; }
 
 private:
     LightSwitchState _state;
