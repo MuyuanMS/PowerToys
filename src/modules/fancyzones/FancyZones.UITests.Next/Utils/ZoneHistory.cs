@@ -34,8 +34,14 @@ public static class ZoneHistory
         foreach (var item in historyArray.EnumerateArray())
         {
             if (!item.TryGetProperty("app-path", out var appPath) ||
-                appPath.GetString() is not string path ||
-                !path.EndsWith(exeName, StringComparison.OrdinalIgnoreCase))
+                appPath.GetString() is not string path)
+            {
+                continue;
+            }
+
+            int aumidSeparator = path.IndexOf('?');
+            string executablePath = aumidSeparator >= 0 ? path[..aumidSeparator] : path;
+            if (!executablePath.EndsWith(exeName, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
