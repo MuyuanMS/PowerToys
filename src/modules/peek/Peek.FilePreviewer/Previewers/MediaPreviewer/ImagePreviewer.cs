@@ -166,6 +166,11 @@ namespace Peek.FilePreviewer.Previewers
                 {
                     var thumbnail = await ThumbnailHelper.GetCachedThumbnailAsync(item.Path, IsPng(item), cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
+                    if (thumbnail is null)
+                    {
+                        throw new InvalidOperationException("No cached thumbnail was available.");
+                    }
+
                     Preview = thumbnail;
                 });
             });
