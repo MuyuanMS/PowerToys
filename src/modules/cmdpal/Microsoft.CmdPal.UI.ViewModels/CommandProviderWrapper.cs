@@ -190,6 +190,7 @@ public sealed class CommandProviderWrapper : ICommandProviderContext
             Logger.LogError("Failed to initialize CommandProvider for JS extension.");
             Logger.LogError($"Extension was {Extension!.PackageFamilyName}");
             Logger.LogError(e.ToString());
+            throw;
         }
     }
 
