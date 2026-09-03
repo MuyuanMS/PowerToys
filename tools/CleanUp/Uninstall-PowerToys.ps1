@@ -516,58 +516,62 @@ New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
 $stagingDirectory = Join-Path $env:ProgramData "Microsoft\PowerToys\Cleanup\$timestamp"
 New-ProtectedDirectory -Path $stagingDirectory
 
-Stop-PowerToysProcesses
+try {
+    Stop-PowerToysProcesses
 
-foreach ($product in $products) {
-    if ($product.State -eq -1 -or $product.State -eq 2) {
-        Write-Host "Skipping inactive $($product.Scope) MSI $($product.ProductCode) [$($product.StateName)]."
-        continue
+    foreach ($product in $products) {
+        if ($product.State -eq -1 -or $product.State -eq 2) {
+            Write-Host "Skipping inactive $($product.Scope) MSI $($product.ProductCode) [$($product.StateName)]."
+            continue
+        }
+
+        if (-not (Test-PowerToysMsiProduct -Product $product)) {
+            $script:failures.Add(
+                "Refusing to run the uninstaller for $($product.Scope) MSI $($product.ProductCode) " +
+                'because its cached package is not an authentic Microsoft-signed PowerToys MSI.')
+            continue
+        }
+
+        $logPath = Join-Path $logDirectory "$($product.Scope)-$($product.ProductCode.Trim('{}')).log"
+        $arguments = @(
+            '/x',
+            $product.ProductCode,
+            '/quiet',
+            '/norestart',
+            '/L*v',
+            "`"$logPath`""
+        )
+        Invoke-Uninstaller `
+            -FilePath (Join-Path $env:SystemRoot 'System32\msiexec.exe') `
+            -Arguments $arguments `
+            -Description "Uninstalling $($product.Scope) MSI $($product.ProductCode)"
     }
 
-    if (-not (Test-PowerToysMsiProduct -Product $product)) {
-        $script:failures.Add(
-            "Refusing to run the uninstaller for $($product.Scope) MSI $($product.ProductCode) " +
-            'because its cached package is not an authentic Microsoft-signed PowerToys MSI.')
-        continue
+    foreach ($bundle in $bundles) {
+        $bundleExecutable = Get-BundleExecutable -Bundle $bundle
+        if ($null -eq $bundleExecutable) {
+            $script:failures.Add(
+                "A trusted cached bootstrapper for $($bundle.Scope) $($bundle.DisplayVersion) was not found. " +
+                "Its registry entry remains at $($bundle.RegistryPath).")
+            continue
+        }
+
+        try {
+            $bundleExecutable = Copy-BundleExecutableForExecution -Path $bundleExecutable -DestinationDirectory $stagingDirectory
+        } catch {
+            $script:failures.Add(
+                "Could not stage the cached bootstrapper for $($bundle.Scope) $($bundle.DisplayVersion) " +
+                "in a protected location: $($_.Exception.Message)")
+            continue
+        }
+
+        Invoke-Uninstaller `
+            -FilePath $bundleExecutable `
+            -Arguments @('/uninstall', '/quiet', '/norestart') `
+            -Description "Removing $($bundle.Scope) bundle $($bundle.DisplayVersion)"
     }
-
-    $logPath = Join-Path $logDirectory "$($product.Scope)-$($product.ProductCode.Trim('{}')).log"
-    $arguments = @(
-        '/x',
-        $product.ProductCode,
-        '/quiet',
-        '/norestart',
-        '/L*v',
-        "`"$logPath`""
-    )
-    Invoke-Uninstaller `
-        -FilePath (Join-Path $env:SystemRoot 'System32\msiexec.exe') `
-        -Arguments $arguments `
-        -Description "Uninstalling $($product.Scope) MSI $($product.ProductCode)"
-}
-
-foreach ($bundle in $bundles) {
-    $bundleExecutable = Get-BundleExecutable -Bundle $bundle
-    if ($null -eq $bundleExecutable) {
-        $script:failures.Add(
-            "A trusted cached bootstrapper for $($bundle.Scope) $($bundle.DisplayVersion) was not found. " +
-            "Its registry entry remains at $($bundle.RegistryPath).")
-        continue
-    }
-
-    try {
-        $bundleExecutable = Copy-BundleExecutableForExecution -Path $bundleExecutable -DestinationDirectory $stagingDirectory
-    } catch {
-        $script:failures.Add(
-            "Could not stage the cached bootstrapper for $($bundle.Scope) $($bundle.DisplayVersion) " +
-            "in a protected location: $($_.Exception.Message)")
-        continue
-    }
-
-    Invoke-Uninstaller `
-        -FilePath $bundleExecutable `
-        -Arguments @('/uninstall', '/quiet', '/norestart') `
-        -Description "Removing $($bundle.Scope) bundle $($bundle.DisplayVersion)"
+} finally {
+    Remove-KnownArtifact -Path $stagingDirectory -Description 'protected cleanup staging directory'
 }
 
 $remainingProducts = @(Get-PowerToysMsiProducts | Where-Object {
