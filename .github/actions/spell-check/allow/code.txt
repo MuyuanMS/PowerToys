@@ -17,8 +17,8 @@ LIGHTTURQUOISE
 NCol
 OLIVEGREEN
 PALEBLUE
-PArgb
-Pbgra
+pargb
+pbgra
 SRGBTo
 WHITEONBLACK
 
@@ -51,6 +51,7 @@ resw
 resx
 srt
 Stereolithography
+taskmgr
 terabyte
 UYVY
 xbf
@@ -170,6 +171,7 @@ thmutil
 uriutil
 VKTAB
 wcautil
+wcsnlen
 winkey
 wininet
 WMKEYDOWN
@@ -185,6 +187,12 @@ xmlutil
 
 # Prefix
 pcs
+
+# EXPRTK / C++ MATH
+
+ifunction
+isinf
+isnan
 
 # User32.SYSTEM_METRICS_INDEX.cs
 
@@ -302,6 +310,11 @@ pwa
 AOT
 Aot
 ify
+LAF
+Laf
+languagemodel
+philm
+phisilica
 TFM
 
 # YML
@@ -310,6 +323,7 @@ onefuzz
 # NameInCode
 leilzh
 mengyuanchen
+contoso
 
 # DllName
 testhost
@@ -322,12 +336,17 @@ xes
 PACKAGEVERSIONNUMBER
 APPXMANIFESTVERSION
 PROGMAN
+ROOTOWNER
 
 # MRU lists
 CACHEWRITE
 MRUCMPPROC
 MRUINFO
 REGSTR
+
+#Xaml
+NVI
+Storyboards
 
 # Misc Win32 APIs and PInvokes
 DEFAULTTONEAREST
@@ -346,6 +365,17 @@ WINDOWPOS
 WINEVENTPROC
 WORKERW
 FULLSCREENAPP
+ACLO
+CACLI
+DOENVSUBST
+FILESYSONLY
+URLIS
+WAITTIMEOUT
+DEFAULTTONEAREST
+DWRITE
+LWIN
+VCENTER
+VREDRAW
 
 # COM/WinRT interface prefixes and type fragments
 BAlt
@@ -377,8 +407,25 @@ HHH
 riday
 YYY
 
+# Release versioning identifiers and format fragments
+DAILYVERSIONSEQUENCE
+DDNNN
+Mdd
+SOURCEBRANCH
+SOURCEVERSION
+VERSIONDATE
+YDDD
+YDDDB
+YYMM
+
 # Unicode
 precomposed
+
+# names of characters
+zwsp
+
+# mermaid
+autonumber
 
 # GitHub issue/PR commands
 azp
@@ -403,3 +450,10 @@ SHELLEXPERIENCEHOST
 SHELLHOST
 STARTMENUEXPERIENCEHOST
 WIDGETBOARD
+
+# URIs
+actioncenter
+
+# New+ shell PIDL type names
+PCUITEMID
+PITEMID

@@ -49,6 +49,7 @@ namespace CommonSharedConstants
     const wchar_t TERMINATE_COLOR_PICKER_SHARED_EVENT[] = L"Local\\TerminateColorPickerEvent-3d676258-c4d5-424e-a87a-4be22020e813";
 
     const wchar_t SHORTCUT_GUIDE_TRIGGER_EVENT[] = L"Local\\ShortcutGuide-TriggerEvent-d4275ad3-2531-4d19-9252-c0becbd9b496";
+    const wchar_t SHORTCUT_GUIDE_WIN_KEY_HOLD_EVENT[] = L"Local\\ShortcutGuide-WinKeyHoldEvent-b5eb7614-d1c4-49d7-9813-ab277aabdd80";
 
     const wchar_t SHORTCUT_GUIDE_EXIT_EVENT[] = L"Local\\ShortcutGuide-ExitEvent-35697cdd-a3d2-47d6-a246-34efcc73eac0";
 
@@ -165,6 +166,8 @@ namespace CommonSharedConstants
     const wchar_t SETTINGS_UPDATED_POWER_DISPLAY_EVENT[] = L"Local\\PowerToysPowerDisplay-SettingsUpdatedEvent-2e4d6f8a-1c3b-5e7f-9a1d-4c6e8f0b2d3e";
     const wchar_t POWER_DISPLAY_SEND_SETTINGS_TELEMETRY_EVENT[] = L"Local\\PowerToysPowerDisplay-SettingsTelemetryEvent-8c4f2a1d-5e3b-7f9c-1a6d-3b8e5f2c9a7d";
     const wchar_t HOTKEY_UPDATED_POWER_DISPLAY_EVENT[] = L"Local\\PowerToysPowerDisplay-HotkeyUpdatedEvent-9d5f3a2b-7e1c-4b8a-6f3d-2a9e5c7b1d4f";
+    const wchar_t POWER_DISPLAY_AUTO_DISABLE_EVENT[] = L"Local\\PowerToysPowerDisplay-AutoDisableEvent-1a7bd9af-d2e0-4e57-8879-0e1c353994d0";
+    const wchar_t RESCAN_POWER_DISPLAY_MONITORS_EVENT[] = L"Local\\PowerToysPowerDisplay-RescanMonitorsEvent-7f3e8c5a-1d4b-4a9e-bc6f-5d8a2b9e3c4f";
 
     // IPC Messages used in PowerDisplay (Named Pipe communication)
     const wchar_t POWER_DISPLAY_TOGGLE_MESSAGE[] = L"Toggle";

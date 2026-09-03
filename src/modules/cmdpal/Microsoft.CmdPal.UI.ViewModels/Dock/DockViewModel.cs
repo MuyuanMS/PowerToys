@@ -66,29 +66,28 @@ public sealed partial class DockViewModel : IDisposable
     {
         if (_isEditing)
         {
-            Logger.LogDebug("Skipping DockBands_CollectionChanged during edit mode");
             return;
         }
-
-        Logger.LogDebug("Starting DockBands_CollectionChanged");
 
         // Refresh settings so newly pinned/unpinned bands are visible.
         // Pin/unpin operations save with hotReload:false (to avoid
         // double-updates), so _settings can be stale here.
         _settings = _settingsService.Settings.DockSettings;
         SetupBands();
-        Logger.LogDebug("Ended DockBands_CollectionChanged");
     }
 
     public void UpdateSettings(DockSettings settings)
     {
         if (_isEditing)
         {
-            Logger.LogDebug("DockViewModel.UpdateSettings skipped (edit in progress)");
             return;
         }
 
-        Logger.LogDebug($"DockViewModel.UpdateSettings");
+        if (_settings == settings)
+        {
+            return;
+        }
+
         _settings = settings;
         SetupBands();
     }
@@ -239,7 +238,6 @@ public sealed partial class DockViewModel : IDisposable
 
     private void SetupBands()
     {
-        Logger.LogDebug($"Setting up dock bands");
         var (start, center, end) = GetActiveBands();
         SetupBands(start, StartItems);
         SetupBands(center, CenterItems);
@@ -258,7 +256,7 @@ public sealed partial class DockViewModel : IDisposable
 
             if (topLevelCommand is null)
             {
-                Logger.LogWarning($"Failed to find band {commandId}");
+                Logger.LogWarning($"[DockDrop] DockViewModel.SetupBands: failed to find band command '{commandId}' (provider='{band.ProviderId}')");
             }
 
             if (topLevelCommand is not null)
@@ -845,6 +843,112 @@ public sealed partial class DockViewModel : IDisposable
         Logger.LogDebug($"Unpinned band {bandId} (not saved yet)");
     }
 
+    /// <summary>
+    /// Removes a band from this dock by its ID. Used when a band is dragged to
+    /// another monitor's dock. Does not save — save happens when exiting edit mode.
+    /// </summary>
+    public void RemoveBandById(string bandId)
+    {
+        if (FindBandById(bandId) == null)
+        {
+            return;
+        }
+
+        EnsureMonitorForked();
+
+        var (activeStart, activeCenter, activeEnd) = GetActiveBands();
+
+        _settings = WithActiveBands(
+            activeStart.RemoveAll(b => b.CommandId == bandId),
+            activeCenter.RemoveAll(b => b.CommandId == bandId),
+            activeEnd.RemoveAll(b => b.CommandId == bandId));
+
+        RemoveBandFromCollection(StartItems, bandId);
+        RemoveBandFromCollection(CenterItems, bandId);
+        RemoveBandFromCollection(EndItems, bandId);
+
+        Logger.LogDebug($"Removed band {bandId} from monitor {_monitorDeviceId} (cross-monitor drag)");
+    }
+
+    /// <summary>
+    /// Accepts a dock band from another monitor during a cross-monitor drag.
+    /// Creates the band ViewModel and inserts it at the specified position.
+    /// Does not save — save happens when exiting edit mode.
+    /// </summary>
+    public void AcceptBandFromMonitor(string bandId, DockPinSide targetSide, int targetIndex)
+    {
+        if (FindBandById(bandId) != null)
+        {
+            Logger.LogWarning($"AcceptBandFromMonitor: band {bandId} already in this dock");
+            return;
+        }
+
+        EnsureMonitorForked();
+
+        var topLevel = _topLevelCommandManager.LookupDockBand(bandId);
+        if (topLevel is null)
+        {
+            Logger.LogWarning($"AcceptBandFromMonitor: band {bandId} not found in DockBandsSnapshot");
+            return;
+        }
+
+        var bandSettings = new DockBandSettings { ProviderId = topLevel.CommandProviderId, CommandId = bandId };
+        var bandVm = CreateBandItem(bandSettings, topLevel.ItemViewModel);
+
+        var (activeStart, activeCenter, activeEnd) = GetActiveBands();
+
+        switch (targetSide)
+        {
+            case DockPinSide.Start:
+            {
+                var idx = Math.Min(targetIndex, activeStart.Count);
+                activeStart = activeStart.Insert(idx, bandSettings);
+                var uiIdx = Math.Min(targetIndex, StartItems.Count);
+                StartItems.Insert(uiIdx, bandVm);
+                break;
+            }
+
+            case DockPinSide.Center:
+            {
+                var idx = Math.Min(targetIndex, activeCenter.Count);
+                activeCenter = activeCenter.Insert(idx, bandSettings);
+                var uiIdx = Math.Min(targetIndex, CenterItems.Count);
+                CenterItems.Insert(uiIdx, bandVm);
+                break;
+            }
+
+            case DockPinSide.End:
+            {
+                var idx = Math.Min(targetIndex, activeEnd.Count);
+                activeEnd = activeEnd.Insert(idx, bandSettings);
+                var uiIdx = Math.Min(targetIndex, EndItems.Count);
+                EndItems.Insert(uiIdx, bandVm);
+                break;
+            }
+        }
+
+        _settings = WithActiveBands(activeStart, activeCenter, activeEnd);
+
+        bandVm.SnapshotShowLabels();
+        Task.Run(() =>
+        {
+            bandVm.SafeInitializePropertiesSynchronous();
+        });
+
+        Logger.LogDebug($"Accepted band {bandId} at {targetSide}[{targetIndex}] on monitor {_monitorDeviceId}");
+    }
+
+    private static void RemoveBandFromCollection(ObservableCollection<DockBandViewModel> collection, string bandId)
+    {
+        for (var i = collection.Count - 1; i >= 0; i--)
+        {
+            if (collection[i].Id == bandId)
+            {
+                collection.RemoveAt(i);
+            }
+        }
+    }
+
     private void DoOnUiThread(Action action)
     {
         Task.Factory.StartNew(
@@ -898,6 +1002,9 @@ public sealed partial class DockViewModel : IDisposable
     {
         var isDockEnabled = _settingsService.Settings.EnableDock;
         var dockSide = isDockEnabled ? GetEffectiveSide().ToString().ToLowerInvariant() : "none";
+        /*
+        // TODO: re-enable the collection of active bands at some point, if
+        // we ever get data flowing again.
 
         var (activeStart, activeCenter, activeEnd) = GetActiveBands();
 
@@ -907,7 +1014,10 @@ public sealed partial class DockViewModel : IDisposable
         var startBands = isDockEnabled ? FormatBands(activeStart) : string.Empty;
         var centerBands = isDockEnabled ? FormatBands(activeCenter) : string.Empty;
         var endBands = isDockEnabled ? FormatBands(activeEnd) : string.Empty;
-
+        */
+        var startBands = string.Empty;
+        var centerBands = string.Empty;
+        var endBands = string.Empty;
         WeakReferenceMessenger.Default.Send(new TelemetryDockConfigurationMessage(
             isDockEnabled, dockSide, startBands, centerBands, endBands));
     }
