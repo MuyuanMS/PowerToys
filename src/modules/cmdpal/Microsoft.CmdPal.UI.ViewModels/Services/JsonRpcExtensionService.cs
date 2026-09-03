@@ -242,6 +242,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
             // Reconcile once more to pick up anything installed during the scan/watch gap.
             var stragglers = await AddDiscoveredNotLoadedAsync(ct).ConfigureAwait(false);
             wrappers.AddRange(stragglers);
+            wrappers.RemoveAll(wrapper => !IsProviderWrapperRegistered(wrapper));
 
             sw.Stop();
             Logger.LogInfo($"JsonRpcExtensionService: Loaded {wrappers.Count} extension(s) in {sw.ElapsedMilliseconds} ms");
@@ -1584,6 +1585,14 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
                 ex),
             () => Logger.LogWarning(
                 $"Timed out waiting for {extensions.Count} JS extension(s) to {operation} after {ExtensionTeardownTimeout.TotalSeconds} seconds."));
+    }
+
+    private bool IsProviderWrapperRegistered(CommandProviderWrapper wrapper)
+    {
+        lock (_extensionsLock)
+        {
+            return _providerWrappers.Contains(wrapper);
+        }
     }
 
     private async Task<JSExtensionManifest?> WaitForStableManifestInstanceAsync(string directory, CancellationToken ct)
