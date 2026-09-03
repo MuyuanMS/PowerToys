@@ -23,7 +23,7 @@ public partial class TabViewModel : ExtensionObjectViewModel
     /// <summary>
     /// Gets the stable identity for this tab, used to preserve the active tab
     /// across dynamic tab-set updates. This is the hosted page's <c>Id</c> when
-    /// available; otherwise it falls back to the tab title.
+    /// available; otherwise it uses the fallback identity assigned by the host.
     /// </summary>
     public string TabId { get; private set; } = string.Empty;
 

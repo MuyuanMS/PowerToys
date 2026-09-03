@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Collections.ObjectModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.CmdPal.UI.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
@@ -119,7 +120,7 @@ public partial class TabbedPageViewModel : PageViewModel
                 continue;
             }
 
-            var vm = new TabViewModel(tab, PageContext, i.ToString());
+            var vm = new TabViewModel(tab, PageContext, i.ToString(CultureInfo.InvariantCulture));
             vm.InitializeProperties();
             result.Add(vm);
         }
