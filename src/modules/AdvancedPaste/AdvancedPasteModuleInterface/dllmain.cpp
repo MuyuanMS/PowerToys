@@ -272,6 +272,7 @@ private:
                     m_additional_actions.push_back(coachingAction);
                 }
             }
+
         }
         else
         {
@@ -279,6 +280,27 @@ private:
             {
                 process_additional_action(subActionName, subAction, actionIsShown);
             }
+        }
+    }
+
+    void reserve_text_case_actions()
+    {
+        static constexpr std::array textCaseActionIds{
+            L"lower-case",
+            L"upper-case",
+            L"title-case",
+            L"sentence-case",
+            L"toggle-case",
+            L"camel-case",
+            L"pascal-case",
+            L"snake-case",
+            L"screaming-snake-case",
+            L"kebab-case",
+        };
+
+        for (const auto actionId : textCaseActionIds)
+        {
+            m_additional_actions.push_back({ actionId, Hotkey{} });
         }
     }
 
@@ -426,7 +448,8 @@ private:
                             L"image-to-text",
                             L"fix-spelling-and-grammar",
                             L"paste-as-file",
-                            L"transcode"
+                            L"transcode",
+                            L"text-case"
                         };
 
                         // Process actions in the predefined order
@@ -436,6 +459,10 @@ private:
                             {
                                 const auto actionValue = additionalActions.GetNamedValue(actionKey);
                                 process_additional_action(actionKey, actionValue);
+                            }
+                            else if (actionKey == L"text-case")
+                            {
+                                reserve_text_case_actions();
                             }
                         }
                     }

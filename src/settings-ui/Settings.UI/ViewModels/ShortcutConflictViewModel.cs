@@ -333,7 +333,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         {
             // Handle AdvancedPaste custom actions
             if (string.Equals(moduleName, AdvancedPasteSettings.ModuleName, StringComparison.OrdinalIgnoreCase)
-                && hotkeyID > 9)
+                && hotkeyID >= GetAdvancedPasteCustomActionHotkeyStart())
             {
                 return headerKey;
             }
@@ -347,6 +347,26 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 System.Diagnostics.Debug.WriteLine($"Error getting hotkey header for {moduleName}.{hotkeyID}: {ex.Message}");
                 return headerKey; // Return the key itself as fallback
             }
+        }
+
+        private int GetAdvancedPasteCustomActionHotkeyStart()
+        {
+            var settings = _settingsFactory.GetSettings(AdvancedPasteSettings.ModuleName) as AdvancedPasteSettings;
+            if (settings is null)
+            {
+                return int.MaxValue;
+            }
+
+            var fixedHotkeyCount = 4;
+            var additionalActionCount = settings.Properties.AdditionalActions.GetAllActions()
+                .OfType<AdvancedPasteAdditionalAction>()
+                .Count();
+            var coachingHotkeyCount = settings.Properties.AdditionalActions.FixSpellingAndGrammar.CoachingEnabled
+                && settings.Properties.AdditionalActions.FixSpellingAndGrammar.CoachingShortcut is { Code: not 0 }
+                    ? 1
+                    : 0;
+
+            return fixedHotkeyCount + additionalActionCount + coachingHotkeyCount;
         }
 
         protected override void Dispose(bool disposing)
