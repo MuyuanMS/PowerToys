@@ -146,6 +146,14 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
             {
                 lock (_getItemsLock)
                 {
+                    if (IsDisposed())
+                    {
+                        _getItemsTask = null;
+                        _lastCompletedItems = null;
+                        _lastCompletedItemsGeneration = 0;
+                        return [];
+                    }
+
                     if (ReferenceEquals(_getItemsTask, getItemsTask))
                     {
                         if (!IsDisposed() && _itemsChangedGeneration != generation)
@@ -208,10 +216,10 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
                 {
                     return [];
                 }
-            }
 
-            UpdatePageState(response.Result);
-            return ParseListItems(response.Result);
+                UpdatePageState(response.Result);
+                return ParseListItems(response.Result);
+            }
         }
         catch (Exception ex)
         {
