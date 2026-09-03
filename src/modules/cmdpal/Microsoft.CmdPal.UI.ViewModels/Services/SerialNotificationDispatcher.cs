@@ -72,14 +72,7 @@ internal sealed partial class SerialNotificationDispatcher : IDisposable
         // so nothing queued before disposal is stranded.
         _queue.Writer.TryComplete();
 
-        try
-        {
-            _worker.Wait(TimeSpan.FromSeconds(2));
-        }
-        catch (AggregateException)
-        {
-            // RunAsync already catches and logs handler exceptions; nothing to do here.
-        }
+        _worker.GetAwaiter().GetResult();
     }
 
     private async Task RunAsync()

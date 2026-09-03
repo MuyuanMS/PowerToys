@@ -1377,17 +1377,27 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         // a possible removal, ignoring either side that sits under an ignored segment.
         // The new name must also be a top-level extension entry (directory or its own
         // manifest); a nested rename is not an extension change.
-        if (!HasIgnoredDirectorySegment(e.FullPath)
+        var shouldUpsert = !HasIgnoredDirectorySegment(e.FullPath)
             && IsTopLevelExtensionChange(ExtensionsPath, e.FullPath)
-            && (IsManifestPath(e.FullPath) || Directory.Exists(e.FullPath)))
+            && (IsManifestPath(e.FullPath) || Directory.Exists(e.FullPath));
+        var shouldRemove = ShouldRouteDirectoryRemoval(ExtensionsPath, e.OldFullPath);
+        if (!shouldUpsert && !shouldRemove)
         {
-            HandleDirectoryEntryUpsert(e.FullPath);
+            return;
         }
 
-        if (ShouldRouteDirectoryRemoval(ExtensionsPath, e.OldFullPath))
+        _notifications.Enqueue(() =>
         {
-            HandleDirectoryEntryRemoved(e.OldFullPath);
-        }
+            if (shouldRemove)
+            {
+                HandleDirectoryEntryRemoved(e.OldFullPath);
+            }
+
+            if (shouldUpsert)
+            {
+                HandleDirectoryEntryUpsert(e.FullPath);
+            }
+        });
     }
 
     private void OnDirectoryWatcherDeleted(object sender, FileSystemEventArgs e)

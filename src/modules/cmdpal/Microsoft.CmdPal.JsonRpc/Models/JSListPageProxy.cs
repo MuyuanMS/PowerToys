@@ -110,9 +110,19 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
 
     public IListItem[] GetItems()
     {
+        if (IsDisposed())
+        {
+            return [];
+        }
+
         Task<IListItem[]> getItemsTask;
         lock (_getItemsLock)
         {
+            if (IsDisposed())
+            {
+                return [];
+            }
+
             getItemsTask = _getItemsTask ??= GetItemsCoreAsync();
         }
 
@@ -147,6 +157,11 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
             if (response.Error != null)
             {
                 Logger.LogError($"GetItems error for page {_pageId}: {response.Error.Message}");
+                return [];
+            }
+
+            if (IsDisposed())
+            {
                 return [];
             }
 
@@ -316,12 +331,20 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
 
     public override void Dispose()
     {
-        if (_disposed)
+        lock (_stateLock)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
         }
 
-        _disposed = true;
+        lock (_getItemsLock)
+        {
+            _getItemsTask = null;
+        }
 
         _filters.Dispose();
         _emptyContent.Dispose();
@@ -422,6 +445,11 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
 
     private IListItem[] ParseListItems(JsonElement? result)
     {
+        if (IsDisposed())
+        {
+            return [];
+        }
+
         if (!result.HasValue)
         {
             ResetAdapterCache();
@@ -445,6 +473,11 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
 
         lock (_itemCacheLock)
         {
+            if (IsDisposed())
+            {
+                return [];
+            }
+
             var previousCache = _adapterCache;
             var nextCache = new Dictionary<string, Queue<JSListItemAdapter>>(StringComparer.Ordinal);
 
@@ -493,6 +526,14 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
             // GetItems hands these adapters to the host, so the cache only owns its
             // references. Host-held adapters remain live until their owners release them.
             _adapterCache = new Dictionary<string, Queue<JSListItemAdapter>>(StringComparer.Ordinal);
+        }
+    }
+
+    private bool IsDisposed()
+    {
+        lock (_stateLock)
+        {
+            return _disposed;
         }
     }
 

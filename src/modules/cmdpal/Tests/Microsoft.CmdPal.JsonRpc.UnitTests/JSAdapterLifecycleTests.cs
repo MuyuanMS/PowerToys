@@ -385,6 +385,36 @@ public partial class JSAdapterTests
     }
 
     [TestMethod]
+    public async Task ListPage_DisposeBeforeGetItemsCompletes_DropsResponse()
+    {
+        using var fake = new JSFakeExtension();
+        var requestStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseResponse = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        fake.OnRequestAsync("listPage/getItems", async _ =>
+        {
+            requestStarted.SetResult();
+            await releaseResponse.Task;
+            return new JsonObject
+            {
+                ["items"] = new JsonArray
+                {
+                    new JsonObject { ["id"] = "late", ["title"] = "Late item" },
+                },
+            };
+        });
+
+        var page = new JSListPageProxy("page", fake.Connection);
+        var getItems = Task.Run(page.GetItems);
+        await requestStarted.Task.WaitAsync(Timeout);
+
+        page.Dispose();
+        releaseResponse.SetResult();
+
+        Assert.AreEqual(0, (await getItems.WaitAsync(Timeout)).Length);
+        Assert.AreEqual(0, page.GetItems().Length);
+    }
+
+    [TestMethod]
     public void ListItem_UpdateDataRebindsEffectiveNotificationId()
     {
         using var fake = new JSFakeExtension();

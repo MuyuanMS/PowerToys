@@ -35,6 +35,7 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
     // Host status messages use the statusId minted by the client. That lets an
     // update refresh the same message and lets hide target the right one.
     private readonly Dictionary<string, StatusMessage> _shownStatusMessages = new();
+    private readonly List<StatusMessage> _activeStatusMessages = [];
 
     // Guards the host reference, the shown-status bookkeeping, and the buffer of host
     // actions emitted before the host is attached. Notifications an extension raises
@@ -404,8 +405,7 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
             var host = _host;
             _host = null;
             _pendingHostActions.Clear();
-            var activeStatuses = new List<StatusMessage>(_shownStatusMessages.Values);
-            _shownStatusMessages.Clear();
+            var activeStatuses = TakeActiveStatusesLocked();
 
             // Hide any status still visible while holding the lock so the hide is ordered
             // after every show already dispatched and cannot be overtaken by a late show.
@@ -447,14 +447,13 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
             }
 
             _pendingHostActions.Clear();
-            if (_shownStatusMessages.Count == 0)
+            if (_activeStatusMessages.Count == 0)
             {
                 return;
             }
 
             var host = _host;
-            var activeStatuses = new List<StatusMessage>(_shownStatusMessages.Values);
-            _shownStatusMessages.Clear();
+            var activeStatuses = TakeActiveStatusesLocked();
 
             // Hide under the lock so this teardown hide is ordered against any concurrent
             // show or dispose and cannot strand or resurrect status.
@@ -480,6 +479,14 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
                 Logger.LogWarning($"Error hiding status for {DisplayName}: {ex.Message}");
             }
         }
+    }
+
+    private List<StatusMessage> TakeActiveStatusesLocked()
+    {
+        var activeStatuses = new List<StatusMessage>(_activeStatusMessages);
+        _activeStatusMessages.Clear();
+        _shownStatusMessages.Clear();
+        return activeStatuses;
     }
 
     private static readonly string[] RegisteredNotificationMethods =
@@ -667,6 +674,8 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
                     _shownStatusMessages[statusId] = statusMessage;
                 }
 
+                _activeStatusMessages.Add(statusMessage);
+
                 // Dispatch inside the same lock acquisition that recorded the status so the
                 // show cannot be reordered behind a hide that arrives immediately after.
                 RunWithHostLocked(host => _ = host.ShowStatus(statusMessage, context));
@@ -706,6 +715,7 @@ public sealed partial class JSCommandProviderProxy : ICommandProvider4, IDisposa
                 }
 
                 _shownStatusMessages.Remove(statusId);
+                _activeStatusMessages.Remove(existing);
 
                 // Dispatch inside the same lock acquisition that removed the status so the
                 // hide observes the same ordering as the show that preceded it.
