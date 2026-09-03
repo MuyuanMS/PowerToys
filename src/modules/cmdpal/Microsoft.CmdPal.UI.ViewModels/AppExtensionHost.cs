@@ -41,10 +41,7 @@ public abstract partial class AppExtensionHost : IExtensionHost
             return Task.CompletedTask.AsAsyncAction();
         }
 
-        _ = Task.Run(() =>
-        {
-            ProcessHideStatusMessage(message);
-        });
+        ProcessHideStatusMessage(message);
         return Task.CompletedTask.AsAsyncAction();
     }
 
@@ -161,10 +158,7 @@ public abstract partial class AppExtensionHost : IExtensionHost
 
         Debug.WriteLine(message.Message);
 
-        _ = Task.Run(() =>
-        {
-            ProcessStatusMessage(message, context);
-        });
+        ProcessStatusMessage(message, context);
 
         return Task.CompletedTask.AsAsyncAction();
     }

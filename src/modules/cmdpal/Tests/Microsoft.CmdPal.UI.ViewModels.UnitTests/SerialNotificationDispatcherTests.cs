@@ -120,6 +120,33 @@ public class SerialNotificationDispatcherTests
     }
 
     [TestMethod]
+    public void Dispose_WaitsUntilAlreadyEnqueuedNotificationCompletes()
+    {
+        var dispatcher = new SerialNotificationDispatcher();
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var count = 0;
+
+        dispatcher.Enqueue(() =>
+        {
+            entered.Set();
+            release.Wait();
+            Interlocked.Increment(ref count);
+        });
+        dispatcher.Enqueue(() => Interlocked.Increment(ref count));
+
+        Assert.IsTrue(entered.Wait(TimeSpan.FromSeconds(5)), "The first notification should start.");
+
+        var dispose = Task.Run(dispatcher.Dispose);
+        Thread.Sleep(100);
+        Assert.IsFalse(dispose.IsCompleted, "Dispose must wait for the queue to drain rather than timing out.");
+
+        release.Set();
+        Assert.IsTrue(dispose.Wait(TimeSpan.FromSeconds(5)));
+        Assert.AreEqual(2, Volatile.Read(ref count));
+    }
+
+    [TestMethod]
     public void Enqueue_HandlerException_DoesNotStopLaterNotifications()
     {
         using var dispatcher = new SerialNotificationDispatcher();
