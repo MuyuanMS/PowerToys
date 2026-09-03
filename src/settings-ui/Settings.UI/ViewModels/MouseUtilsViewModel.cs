@@ -261,7 +261,8 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 [LaserPointerSettings.ModuleName] = [
                     LaserPointerActivationShortcut,
                     LaserPointerPenActivationShortcut,
-                    LaserPointerPresenterActivationShortcut],
+                    LaserPointerPresenterActivationShortcut,
+                    LaserPointerPresenterStopShortcut],
             };
 
             return hotkeysDict;
@@ -1519,6 +1520,23 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 if (LaserPointerSettingsConfig.Properties.PresenterActivationShortcut != value)
                 {
                     LaserPointerSettingsConfig.Properties.PresenterActivationShortcut = value ?? LaserPointerSettingsConfig.Properties.DefaultPresenterActivationShortcut;
+                    NotifyLaserPointerPropertyChanged();
+                }
+            }
+        }
+
+        public HotkeySettings LaserPointerPresenterStopShortcut
+        {
+            get
+            {
+                return LaserPointerSettingsConfig.Properties.PresenterStopShortcut;
+            }
+
+            set
+            {
+                if (LaserPointerSettingsConfig.Properties.PresenterStopShortcut != value)
+                {
+                    LaserPointerSettingsConfig.Properties.PresenterStopShortcut = value ?? LaserPointerSettingsConfig.Properties.DefaultPresenterStopShortcut;
                     NotifyLaserPointerPropertyChanged();
                 }
             }
