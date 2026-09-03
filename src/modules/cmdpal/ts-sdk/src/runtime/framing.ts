@@ -22,6 +22,8 @@
 
 const HEADER_TERMINATOR = Buffer.from('\r\n\r\n', 'ascii');
 const CONTENT_LENGTH_PREFIX = 'content-length:';
+const MAX_HEADER_BYTES = 8 * 1024;
+const MAX_MESSAGE_BYTES = 16 * 1024 * 1024;
 
 /** Serializes a value into a single framed message buffer. */
 export function encodeMessage(message: unknown): Buffer {
@@ -72,12 +74,19 @@ export class MessageFramer {
       if (this.expectedLength === null) {
         const headerEnd = this.buffer.indexOf(HEADER_TERMINATOR);
         if (headerEnd === -1) {
+          if (this.buffer.length > MAX_HEADER_BYTES) {
+            this.buffer = Buffer.alloc(0);
+          }
           break;
+        }
+        if (headerEnd > MAX_HEADER_BYTES) {
+          this.buffer = this.buffer.subarray(headerEnd + HEADER_TERMINATOR.length);
+          continue;
         }
         const headerBlock = this.buffer.subarray(0, headerEnd).toString('ascii');
         const length = parseContentLength(headerBlock);
         this.buffer = this.buffer.subarray(headerEnd + HEADER_TERMINATOR.length);
-        if (length === null) {
+        if (length === null || length > MAX_MESSAGE_BYTES) {
           // Malformed or unsupported header block; drop it and resynchronize.
           continue;
         }
@@ -85,6 +94,10 @@ export class MessageFramer {
       }
 
       if (this.buffer.length < this.expectedLength) {
+        if (this.buffer.length > MAX_MESSAGE_BYTES) {
+          this.buffer = Buffer.alloc(0);
+          this.expectedLength = null;
+        }
         break;
       }
 

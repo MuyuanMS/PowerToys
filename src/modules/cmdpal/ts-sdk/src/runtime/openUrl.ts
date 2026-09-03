@@ -41,11 +41,7 @@ export const openUrlInDefaultBrowser: UrlOpener = (url) => {
   }
 
   if (process.platform === 'win32') {
-    // The empty `""` title keeps `start` from treating the quoted URL as a
-    // window title, and verbatim arguments preserve the quotes we add so that
-    // characters such as `&` inside the query string are not reinterpreted.
-    const child = spawn('cmd.exe', ['/s', '/c', 'start', '""', `"${url}"`], {
-      windowsVerbatimArguments: true,
+    const child = spawn('rundll32.exe', ['url.dll,FileProtocolHandler', url], {
       detached: true,
       stdio: 'ignore',
       windowsHide: true,

@@ -138,6 +138,7 @@ describe('WireSerializer.commandItem fallback ids', () => {
       const serializer = new WireSerializer();
       let nextId = 0;
       const collector = {
+        reserve: vi.fn(),
         nextId: vi.fn(() => {
           const id = `form-${String(nextId)}`;
           nextId += 1;

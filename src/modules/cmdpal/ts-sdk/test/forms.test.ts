@@ -169,4 +169,38 @@ describe('form identity and routing', () => {
     expect(typeof content[0]?.formId).toBe('string');
     expect((content[0]?.formId as string).length).toBeGreaterThan(0);
   });
+
+  it('reserves nested explicit form IDs before assigning generated IDs', async () => {
+    const page: IContentPage = {
+      id: 'page',
+      name: 'Page',
+      title: 'Page',
+      getContent(): Content[] {
+        return [
+          formContent(undefined, () => ({ kind: 'goHome' })),
+          {
+            type: 'tree',
+            rootContent: { type: 'plainText', text: 'root' },
+            getChildren(): Content[] {
+              return [formContent('form-0', () => ({ kind: 'goBack' }))];
+            },
+          },
+        ];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(providerWith(page));
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'contentPage/getContent',
+      params: { pageId: 'page' },
+    });
+
+    const content = responseFor(sent, 1)?.result as Array<Record<string, unknown>>;
+    expect(content[0]?.formId).toBe('form-1');
+    const tree = content[1] as { children: Array<{ formId: string }> };
+    expect(tree.children[0]?.formId).toBe('form-0');
+  });
 });

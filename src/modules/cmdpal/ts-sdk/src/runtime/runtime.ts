@@ -10,6 +10,7 @@
 
 import type {
   CommandResult,
+  Content,
   ICommand,
   ICommandProvider,
   IContentPage,
@@ -620,10 +621,12 @@ export class ExtensionRuntime {
     const content = await page.getContent();
     const scope = this.beginPageScope(pageId);
     const collector = createFormCollector(scope);
+    const treeChildren = new Map<Content, Content[]>();
+    await reserveExplicitFormIds(content, collector, treeChildren);
     const serialized = await this.withScopeSink(scope, async () => {
       const result: Record<string, unknown>[] = [];
       for (const item of content) {
-        result.push(await this.serializer.content(item, collector));
+        result.push(await this.serializer.content(item, collector, treeChildren));
       }
       return result;
     });
@@ -868,6 +871,12 @@ function createFormCollector(scope: PageScope): FormCollector {
   const allocatedIds = new Set<string>();
   const registeredIds = new Set<string>();
   return {
+    reserve(formId: string): void {
+      if (registeredIds.has(formId)) {
+        throw new Error(`Duplicate form id: ${formId}`);
+      }
+      registeredIds.add(formId);
+    },
     nextId(): string {
       while (
         allocatedIds.has(`form-${String(counter)}`) ||
@@ -881,7 +890,7 @@ function createFormCollector(scope: PageScope): FormCollector {
       return id;
     },
     register(formId: string, handler: FormSubmitHandler): void {
-      if (registeredIds.has(formId)) {
+      if (scope.forms.has(formId)) {
         throw new Error(`Duplicate form id: ${formId}`);
       }
       if (allocatedIds.has(formId)) {
@@ -891,6 +900,22 @@ function createFormCollector(scope: PageScope): FormCollector {
       scope.forms.set(formId, handler);
     },
   };
+}
+
+async function reserveExplicitFormIds(
+  content: Content[],
+  forms: FormCollector,
+  treeChildren: Map<Content, Content[]>,
+): Promise<void> {
+  for (const item of content) {
+    if (item.type === 'form' && item.formId) {
+      forms.reserve(item.formId);
+    } else if (item.type === 'tree') {
+      const children = await item.getChildren();
+      treeChildren.set(item, children);
+      await reserveExplicitFormIds([item.rootContent, ...children], forms, treeChildren);
+    }
+  }
 }
 
 function withTimeout(work: Promise<void>, timeoutMs: number): Promise<void> {

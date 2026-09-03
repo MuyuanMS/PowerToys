@@ -33,6 +33,8 @@ export type FormSubmitHandler = FormContent['submitForm'];
  * exact handler captured here, rather than re-fetching content and guessing.
  */
 export interface FormCollector {
+  /** Reserves an author-supplied id before generated ids are allocated. */
+  reserve(formId: string): void;
   /** Mints the next generated form id for a form without an explicit id. */
   nextId(): string;
   /** Registers a form's submit handler under its resolved id. */
@@ -196,7 +198,11 @@ export class WireSerializer {
     return result;
   }
 
-  async content(content: Content, forms?: FormCollector): Promise<Record<string, unknown>> {
+  async content(
+    content: Content,
+    forms?: FormCollector,
+    treeChildren?: Map<Content, Content[]>,
+  ): Promise<Record<string, unknown>> {
     switch (content.type) {
       case 'markdown':
         return { type: 'markdown', body: content.body };
@@ -225,14 +231,14 @@ export class WireSerializer {
         return result;
       }
       case 'tree': {
-        const children = await content.getChildren();
+        const children = treeChildren?.get(content) ?? (await content.getChildren());
         const serializedChildren: Record<string, unknown>[] = [];
         for (const child of children) {
-          serializedChildren.push(await this.content(child, forms));
+          serializedChildren.push(await this.content(child, forms, treeChildren));
         }
         return {
           type: 'tree',
-          rootContent: await this.content(content.rootContent, forms),
+          rootContent: await this.content(content.rootContent, forms, treeChildren),
           children: serializedChildren,
         };
       }

@@ -96,4 +96,20 @@ describe('MessageFramer round-trip', () => {
       expect(decodeAll(framer, Buffer.concat([malformed, good]))).toEqual([{ ok: true }]);
     },
   );
+
+  it('drops an unterminated oversized header and accepts the next frame', () => {
+    const framer = new MessageFramer();
+    framer.push(Buffer.alloc(8 * 1024 + 1, 0x61));
+
+    expect(decodeAll(framer, encodeMessage({ ok: true }))).toEqual([{ ok: true }]);
+  });
+
+  it('drops an oversized advertised message and accepts the next frame', () => {
+    const framer = new MessageFramer();
+    const oversized = Buffer.from(`Content-Length: ${String(16 * 1024 * 1024 + 1)}\r\n\r\n`, 'ascii');
+
+    expect(decodeAll(framer, Buffer.concat([oversized, encodeMessage({ ok: true })]))).toEqual([
+      { ok: true },
+    ]);
+  });
 });
