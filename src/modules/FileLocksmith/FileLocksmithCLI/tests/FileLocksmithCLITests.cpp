@@ -1,6 +1,10 @@
 #include "pch.h"
 #include "CppUnitTest.h"
 #include "../CLILogic.h"
+#ifndef FILELOCKSMITH_LIB_STATIC
+#define FILELOCKSMITH_LIB_STATIC
+#endif
+#include "../../FileLocksmithLibInterop/NtdllExtensions.h"
 #include <map>
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
@@ -131,6 +135,26 @@ namespace FileLocksmithCLIUnitTests
             
             Assert::AreEqual(1, result.exit_code);
             Assert::AreEqual(std::wstring(L"query-wait"), result.command_name);
+        }
+
+        TEST_METHOD(TestCanonicalAndKernelPathHelpers)
+        {
+            wchar_t temp_path[MAX_PATH]{};
+            Assert::IsTrue(GetTempPathW(ARRAYSIZE(temp_path), temp_path) > 0);
+
+            wchar_t temp_file[MAX_PATH]{};
+            Assert::IsTrue(GetTempFileNameW(temp_path, L"flt", 0, temp_file) != 0);
+
+            NtdllExtensions extensions;
+            const auto canonical_name = extensions.path_to_canonical_name(temp_file);
+            const auto kernel_name = extensions.path_to_kernel_name(temp_file);
+
+            DeleteFileW(temp_file);
+
+            Assert::IsFalse(canonical_name.empty());
+            Assert::IsTrue(canonical_name.find(L"flt") != std::wstring::npos);
+            Assert::IsFalse(kernel_name.empty());
+            Assert::IsTrue(kernel_name.rfind(L"\\Device\\", 0) == 0);
         }
     };
 }
