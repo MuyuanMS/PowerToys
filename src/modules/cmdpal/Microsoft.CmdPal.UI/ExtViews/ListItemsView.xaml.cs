@@ -119,7 +119,11 @@ public sealed partial class ListItemsView : UserControl,
         _accessKeyMode.IsActiveChanged += AccessKeyMode_IsActiveChanged;
         SetNumberedShortcutCuesVisibility(_accessKeyMode.IsActive);
         EnsureNumberedShortcutCueTracking();
-        RefreshNumberedShortcutItemTracking();
+        if (ShowNumberedShortcutCues)
+        {
+            RefreshNumberedShortcutItemTracking();
+        }
+
         QueueNumberedShortcutCueUpdate();
     }
 
@@ -730,8 +734,11 @@ public sealed partial class ListItemsView : UserControl,
             {
                 page.ItemsUpdated += @this.Page_ItemsUpdated;
                 page.PropertyChanged += @this.ViewModel_PropertyChanged;
-                page.FilteredItems.CollectionChanged += @this.FilteredItems_CollectionChanged;
-                @this.RefreshNumberedShortcutItemTracking();
+                if (@this.ShowNumberedShortcutCues)
+                {
+                    page.FilteredItems.CollectionChanged += @this.FilteredItems_CollectionChanged;
+                    @this.RefreshNumberedShortcutItemTracking();
+                }
 
                 // When the hosted ViewModel is swapped while we're already on
                 // screen (e.g. ParametersPage activating a list parameter), the
