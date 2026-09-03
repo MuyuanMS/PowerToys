@@ -17,6 +17,7 @@
 #include <common/utils/elevation.h>
 #include <common/Themes/theme_listener.h>
 #include <common/Themes/theme_helpers.h>
+#include <common/Themes/dark_mode.h>
 #include "bug_report.h"
 #include <common/updating/updateState.h>
 
@@ -307,6 +308,8 @@ LRESULT __stdcall tray_icon_window_proc(HWND window, UINT message, WPARAM wparam
                     InsertMenuW(h_sub_menu, 1, MF_BYPOSITION | MF_SEPARATOR, 0, nullptr);
                 }
 
+                DarkMode::ApplyToMenu(h_menu);
+
                 POINT mouse_pointer;
                 GetCursorPos(&mouse_pointer);
                 SetForegroundWindow(window); // Needed for the context menu to disappear.
@@ -396,6 +399,8 @@ static void handle_theme_change()
         tray_icon_data.hIcon = get_icon(ThemeHelpers::GetSystemTheme());
         Shell_NotifyIcon(NIM_MODIFY, &tray_icon_data);
     }
+
+    DarkMode::Refresh();
 }
 
 void update_bug_report_menu_status(bool isRunning)
@@ -429,6 +434,7 @@ void start_tray_icon(bool isProcessElevated, bool theme_adaptive)
         wc.style = CS_HREDRAW | CS_VREDRAW;
         wc.lpfnWndProc = tray_icon_window_proc;
         wc.hIcon = icon;
+        DarkMode::Initialize();
         RegisterClass(&wc);
         auto hwnd = CreateWindowW(wc.lpszClassName,
                                   pt_tray_icon_window_class,
@@ -462,9 +468,9 @@ void start_tray_icon(bool isProcessElevated, bool theme_adaptive)
         wcscpy_s(tray_icon_data.szTip, sizeof(tray_icon_data.szTip) / sizeof(WCHAR), pt_version_tooltip.c_str());
         tray_icon_data.uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE;
         ChangeWindowMessageFilterEx(hwnd, WM_COMMAND, MSGFLT_ALLOW, nullptr);
-
         tray_icon_created = Shell_NotifyIcon(NIM_ADD, &tray_icon_data) == TRUE;
         theme_listener.AddSystemThemeChangedHandler(&handle_theme_change);
+        theme_listener.AddAppThemeChangedHandler(&handle_theme_change);
 
         // Register callback to update bug report menu item status
         BugReportManager::instance().register_callback([](bool isRunning) {

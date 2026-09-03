@@ -1,0 +1,26 @@
+#pragma once
+#include <windows.h>
+
+// Lightweight helpers for opting native Win32 popup menus into the
+// app dark / light theme. Built on top of undocumented uxtheme.dll
+// ordinals (RefreshImmersiveColorPolicyState / ShouldAppsUseDarkMode /
+// SetPreferredAppMode / FlushMenuThemes)
+// that ship with Windows 10 1903+ and Windows 11.
+struct DarkMode
+{
+    // Loads the uxtheme.dll ordinals (idempotent) and applies the current
+    // app theme as the preferred app mode. Safe to call multiple times.
+    static void Initialize();
+
+    // Re-evaluates the current app theme and re-applies the preferred
+    // app mode. Call this from a theme-change handler.
+    static void Refresh();
+
+    // Returns true if the app theme is currently in dark mode.
+    static bool IsDarkModeEnabled();
+
+    // Applies a dark or light background brush to the given menu and all of
+    // its submenus, based on the current app theme. No-op when the
+    // uxtheme.dll ordinals are unavailable.
+    static void ApplyToMenu(HMENU menu);
+};
