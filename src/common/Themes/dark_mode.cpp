@@ -20,9 +20,11 @@ namespace
     };
 
     using fnSetPreferredAppMode = PreferredAppMode(WINAPI*)(PreferredAppMode appMode);
+    using fnShouldAppsUseDarkMode = bool(WINAPI*)();
     using fnFlushMenuThemes = void(WINAPI*)();
 
     fnSetPreferredAppMode pSetPreferredAppMode = nullptr;
+    fnShouldAppsUseDarkMode pShouldAppsUseDarkMode = nullptr;
     fnFlushMenuThemes pFlushMenuThemes = nullptr;
 
     std::once_flag init_flag;
@@ -46,6 +48,8 @@ namespace
 
         pSetPreferredAppMode = reinterpret_cast<fnSetPreferredAppMode>(
             GetProcAddress(hUxTheme, MAKEINTRESOURCEA(135)));
+        pShouldAppsUseDarkMode = reinterpret_cast<fnShouldAppsUseDarkMode>(
+            GetProcAddress(hUxTheme, MAKEINTRESOURCEA(132)));
         pFlushMenuThemes = reinterpret_cast<fnFlushMenuThemes>(
             GetProcAddress(hUxTheme, MAKEINTRESOURCEA(136)));
     }
@@ -87,7 +91,12 @@ void DarkMode::Refresh()
 
 bool DarkMode::IsDarkModeEnabled()
 {
-    return ThemeHelpers::GetSystemTheme() == Theme::Dark;
+    if (pShouldAppsUseDarkMode)
+    {
+        return pShouldAppsUseDarkMode();
+    }
+
+    return ThemeHelpers::GetAppTheme() == Theme::Dark;
 }
 
 void DarkMode::ApplyToMenu(HMENU menu)
