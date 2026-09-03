@@ -490,12 +490,6 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             return default;
         }
 
-        if (ct.IsCancellationRequested)
-        {
-            DisposeWrappers(wrapperList);
-            return default;
-        }
-
         lock (_commandProvidersLock)
         {
             if (ct.IsCancellationRequested)
