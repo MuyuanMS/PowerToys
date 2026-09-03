@@ -27,6 +27,14 @@ public class DetailsMarkdownHelperTests
     }
 
     [TestMethod]
+    public void BuildTextBody_UsesSinglePassFence_WhenTextContainsLongBacktickRun()
+    {
+        var body = DetailsMarkdownHelper.BuildTextBody("before `````` after");
+
+        Assert.AreEqual("```````text\nbefore `````` after\n```````", body);
+    }
+
+    [TestMethod]
     public void BuildImageBody_ReturnsMarkdownImage_WithFitHint()
     {
         var path = @"C:\Temp\clipboard.png";

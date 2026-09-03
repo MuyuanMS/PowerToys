@@ -15,11 +15,7 @@ internal static class DetailsMarkdownHelper
             return string.Empty;
         }
 
-        var fence = "```";
-        while (text.Contains(fence, StringComparison.Ordinal))
-        {
-            fence += "`";
-        }
+        var fence = new string('`', Math.Max(3, GetLongestBacktickRun(text) + 1));
 
         return $"{fence}text\n{text}\n{fence}";
     }
@@ -28,4 +24,25 @@ internal static class DetailsMarkdownHelper
         => string.IsNullOrEmpty(imagePath)
             ? string.Empty
             : $"![{altText}]({new Uri(imagePath).AbsoluteUri}?--x-cmdpal-fit=fit)";
+
+    private static int GetLongestBacktickRun(string text)
+    {
+        var longestRun = 0;
+        var currentRun = 0;
+
+        foreach (var character in text)
+        {
+            if (character == '`')
+            {
+                currentRun++;
+                longestRun = Math.Max(longestRun, currentRun);
+            }
+            else
+            {
+                currentRun = 0;
+            }
+        }
+
+        return longestRun;
+    }
 }

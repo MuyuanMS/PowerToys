@@ -24,11 +24,13 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
 {
     private readonly SettingsManager _settingsManager;
     private readonly string _defaultIconPath;
+    private readonly object loadThreadLock = new();
     private volatile ClipboardItem[] clipboardHistory = [];
     private InterlockedBoolean hasLoadedOnce;
     private InterlockedBoolean loadInFlight;
     private InterlockedBoolean reloadRequested;
     private InterlockedBoolean disposed;
+    private Thread? loadThread;
 
     public ClipboardHistoryListPage(SettingsManager settingsManager)
     {
@@ -96,10 +98,19 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
                     if (imageReceived is not null)
                     {
                         item.ImageData = imageReceived;
-                        item.ImagePath = GetImagePath(item.Item.Id);
-                        await CacheImageAsync(imageReceived, item.ImagePath).ConfigureAwait(false);
+                        var imagePath = GetImagePath(item.Item.Id);
+                        if (await CacheImageAsync(imageReceived, imagePath).ConfigureAwait(false))
+                        {
+                            item.ImagePath = imagePath;
+                        }
                     }
                 }
+            }
+
+            if (disposed.Value)
+            {
+                CleanupCachedImages([]);
+                return;
             }
 
             clipboardHistory = [.. items];
@@ -114,7 +125,9 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
         }
         finally
         {
-            CleanupCachedImages(clipboardHistory.Where(static item => item.ImagePath is not null).Select(static item => item.ImagePath!));
+            CleanupCachedImages(disposed.Value
+                ? []
+                : clipboardHistory.Where(static item => item.ImagePath is not null).Select(static item => item.ImagePath!));
             loadInFlight.Value = false;
             if (!loadSucceeded)
             {
@@ -196,20 +209,36 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
         }
     }
 
-    private static async Task CacheImageAsync(RandomAccessStreamReference imageData, string path)
+    private static async Task<bool> CacheImageAsync(RandomAccessStreamReference imageData, string path)
     {
+        var tempPath = $"{path}.{Guid.NewGuid():N}.tmp";
         try
         {
             using var stream = await imageData.OpenReadAsync().AsTask().ConfigureAwait(false);
             using var input = stream.AsStreamForRead();
             var directory = Path.GetDirectoryName(path)!;
             Directory.CreateDirectory(directory);
-            using var output = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read, 64 * 1024, useAsync: true);
+            using var output = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 64 * 1024, useAsync: true);
             await input.CopyToAsync(output).ConfigureAwait(false);
+            output.Close();
+            File.Move(tempPath, path, true);
+            return true;
         }
         catch (Exception ex)
         {
             TryLogMessage($"Failed to cache clipboard image data: {ex}");
+            try
+            {
+                File.Delete(tempPath);
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+
+            return false;
         }
     }
 
@@ -240,14 +269,14 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
 
     private void StartClipboardHistoryLoad()
     {
-        IsLoading = true;
-
         // https://github.com/microsoft/windows-rs/issues/317
         // The synchronous prefix must run in STA or the clipboard API hangs.
         // Continuations use the thread pool because this raw thread has no
         // synchronization context.
         try
         {
+            IsLoading = true;
+
             var thread = new Thread(() =>
             {
                 try
@@ -258,15 +287,44 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
                 {
                     TryLogMessage($"Clipboard history load thread failed: {ex}");
                 }
+                finally
+                {
+                    lock (loadThreadLock)
+                    {
+                        if (ReferenceEquals(loadThread, Thread.CurrentThread))
+                        {
+                            loadThread = null;
+                        }
+                    }
+                }
             });
+            thread.IsBackground = true;
             thread.SetApartmentState(ApartmentState.STA);
+            lock (loadThreadLock)
+            {
+                loadThread = thread;
+            }
+
             thread.Start();
         }
         catch (Exception ex)
         {
+            lock (loadThreadLock)
+            {
+                loadThread = null;
+            }
+
             loadInFlight.Value = false;
             hasLoadedOnce.Value = false;
-            IsLoading = false;
+            try
+            {
+                IsLoading = false;
+            }
+            catch (Exception clearException)
+            {
+                TryLogMessage($"Failed to clear clipboard history loading state: {clearException}");
+            }
+
             TryLogMessage($"Failed to start clipboard history load thread: {ex}");
         }
     }
@@ -300,6 +358,17 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
         }
 
         Clipboard.HistoryChanged -= TrackClipboardHistoryChanged_EventHandler;
+        Thread? thread;
+        lock (loadThreadLock)
+        {
+            thread = loadThread;
+        }
+
+        if (thread is not null && !ReferenceEquals(thread, Thread.CurrentThread) && thread.IsAlive)
+        {
+            thread.Join(TimeSpan.FromSeconds(2));
+        }
+
         CleanupCachedImages([]);
         GC.SuppressFinalize(this);
     }
