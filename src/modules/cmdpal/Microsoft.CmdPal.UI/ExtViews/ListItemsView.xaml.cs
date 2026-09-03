@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
 using System.Text;
@@ -49,6 +50,7 @@ public sealed partial class ListItemsView : UserControl,
         CompositeFormat.Parse(RS_.GetString("ListItemNumberedShortcutAcceleratorFormat"));
 
     private readonly AccessKeyModeController _accessKeyMode;
+    private readonly HashSet<ListItemViewModel> _numberedShortcutCueTrackedItems = [];
 
     private InputSource _lastInputSource;
 
@@ -117,6 +119,7 @@ public sealed partial class ListItemsView : UserControl,
         _accessKeyMode.IsActiveChanged += AccessKeyMode_IsActiveChanged;
         SetNumberedShortcutCuesVisibility(_accessKeyMode.IsActive);
         EnsureNumberedShortcutCueTracking();
+        RefreshNumberedShortcutItemTracking();
         QueueNumberedShortcutCueUpdate();
     }
 
@@ -126,6 +129,7 @@ public sealed partial class ListItemsView : UserControl,
         _accessKeyMode.IsActiveChanged -= AccessKeyMode_IsActiveChanged;
         SetNumberedShortcutCuesVisibility(false);
         StopNumberedShortcutCueTracking();
+        StopNumberedShortcutItemTracking();
         ClearNumberedShortcutAccelerators();
         UnregisterMessenger();
         CancelPendingContextMenuOpen();
@@ -712,6 +716,8 @@ public sealed partial class ListItemsView : UserControl,
             {
                 old.ItemsUpdated -= @this.Page_ItemsUpdated;
                 old.PropertyChanged -= @this.ViewModel_PropertyChanged;
+                old.FilteredItems.CollectionChanged -= @this.FilteredItems_CollectionChanged;
+                @this.StopNumberedShortcutItemTracking();
             }
 
             // Reset latched state — selection sticky/last-pushed only make sense
@@ -724,6 +730,8 @@ public sealed partial class ListItemsView : UserControl,
             {
                 page.ItemsUpdated += @this.Page_ItemsUpdated;
                 page.PropertyChanged += @this.ViewModel_PropertyChanged;
+                page.FilteredItems.CollectionChanged += @this.FilteredItems_CollectionChanged;
+                @this.RefreshNumberedShortcutItemTracking();
 
                 // When the hosted ViewModel is swapped while we're already on
                 // screen (e.g. ParametersPage activating a list parameter), the
@@ -756,6 +764,90 @@ public sealed partial class ListItemsView : UserControl,
 
         EnsureNumberedShortcutCueTracking();
         QueueNumberedShortcutCueUpdate();
+    }
+
+    private void FilteredItems_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.Action == NotifyCollectionChangedAction.Reset)
+        {
+            StopNumberedShortcutItemTracking();
+            RefreshNumberedShortcutItemTracking();
+            QueueNumberedShortcutCueUpdate();
+            return;
+        }
+
+        if (e.OldItems is not null)
+        {
+            foreach (var oldItem in e.OldItems)
+            {
+                if (oldItem is ListItemViewModel item)
+                {
+                    StopTrackingNumberedShortcutItem(item);
+                }
+            }
+        }
+
+        if (e.NewItems is not null)
+        {
+            foreach (var newItem in e.NewItems)
+            {
+                if (newItem is ListItemViewModel item)
+                {
+                    TrackNumberedShortcutItem(item);
+                }
+            }
+        }
+
+        QueueNumberedShortcutCueUpdate();
+    }
+
+    private void RefreshNumberedShortcutItemTracking()
+    {
+        var viewModel = ViewModel;
+        if (viewModel is null)
+        {
+            StopNumberedShortcutItemTracking();
+            return;
+        }
+
+        foreach (var item in viewModel.FilteredItems)
+        {
+            TrackNumberedShortcutItem(item);
+        }
+    }
+
+    private void TrackNumberedShortcutItem(ListItemViewModel item)
+    {
+        if (_numberedShortcutCueTrackedItems.Add(item))
+        {
+            item.PropertyChanged += NumberedShortcutItem_PropertyChanged;
+        }
+    }
+
+    private void StopTrackingNumberedShortcutItem(ListItemViewModel item)
+    {
+        if (_numberedShortcutCueTrackedItems.Remove(item))
+        {
+            item.PropertyChanged -= NumberedShortcutItem_PropertyChanged;
+        }
+    }
+
+    private void StopNumberedShortcutItemTracking()
+    {
+        foreach (var item in _numberedShortcutCueTrackedItems)
+        {
+            item.PropertyChanged -= NumberedShortcutItem_PropertyChanged;
+        }
+
+        _numberedShortcutCueTrackedItems.Clear();
+    }
+
+    private void NumberedShortcutItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ListItemViewModel.IsInteractive))
+        {
+            QueueNumberedShortcutCueUpdate();
+        }
     }
 
     // Called after we've finished updating the whole list for either a

@@ -48,8 +48,11 @@ public class BasicTests : CommandPaletteTestBase
     public void NumberedShortcutInvokesFirstResult()
     {
         SetSearchBox("calculator");
+        Assert.IsNotNull(this.Find<NavigationViewItem>("Calculator"));
 
         this.SendKeys(Key.Alt, Key.Num1);
+        Assert.IsNotNull(this.Find<Button>("Back"));
+
         SetCalculatorExtensionSearchBox("1+2");
 
         Assert.IsNotNull(this.Find<NavigationViewItem>("3"));
@@ -59,10 +62,13 @@ public class BasicTests : CommandPaletteTestBase
     public void LatchedNumberedShortcutInvokesFirstResult()
     {
         SetSearchBox("calculator");
+        Assert.IsNotNull(this.Find<NavigationViewItem>("Calculator"));
 
         this.Session.PressKey(Key.Alt);
         this.Session.ReleaseKey(Key.Alt);
         this.Session.SendKey(Key.Num1);
+        Assert.IsNotNull(this.Find<Button>("Back"));
+
         SetCalculatorExtensionSearchBox("1+2");
 
         Assert.IsNotNull(this.Find<NavigationViewItem>("3"));
@@ -71,12 +77,16 @@ public class BasicTests : CommandPaletteTestBase
     [TestMethod]
     public void ShiftNumberedShortcutSelectsWithoutInvoking()
     {
-        SetSearchBox("calculator");
+        SetSearchBox("power");
+        Assert.IsNotNull(this.Find<NavigationViewItem>("Windows PowerShell"));
+
+        this.SendKeys(Key.Down);
+        Assert.IsFalse(this.Find<NavigationViewItem>("Windows PowerShell").Selected);
 
         this.SendKeys(Key.Alt, Key.Shift, Key.Num1);
 
-        var searchFileItem = this.Find<NavigationViewItem>("Calculator");
-        Assert.AreEqual("Calculator", searchFileItem.Name);
+        var searchFileItem = this.Find<NavigationViewItem>("Windows PowerShell");
+        Assert.AreEqual("Windows PowerShell", searchFileItem.Name);
         Assert.IsTrue(searchFileItem.Selected);
     }
 
