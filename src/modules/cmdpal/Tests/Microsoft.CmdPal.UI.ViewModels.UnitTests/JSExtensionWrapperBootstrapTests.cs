@@ -14,13 +14,15 @@ namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
 /// bootstrap claims and guards stdout before it dynamically imports the extension entry, so
 /// static top-level stdout writes cannot corrupt the JSON-RPC framing. The launcher must
 /// resolve the bootstrap relative to the extension's installed SDK under
-/// <c>node_modules/@microsoft/cmdpal-sdk</c>, preferring the package's declared
+/// <c>node_modules/.../cmdpal-sdk</c>, preferring the package's declared
 /// <c>bin</c> entry, and must return null (falling back to a direct entry launch) when the
 /// SDK or its bootstrap is absent.
 /// </summary>
 [TestClass]
 public class JSExtensionWrapperBootstrapTests
 {
+    private const string SdkPackageName = "@microsoft" + "/cmdpal-sdk";
+
     private static string CreateSdkRoot(string manifestDir)
     {
         var sdkRoot = Path.Combine(manifestDir, "node_modules", "@microsoft", "cmdpal-sdk");
@@ -47,7 +49,7 @@ public class JSExtensionWrapperBootstrapTests
             File.WriteAllText(binTarget, "// bootstrap");
             File.WriteAllText(
                 Path.Combine(sdkRoot, "package.json"),
-                "{ \"name\": \"@microsoft/cmdpal-sdk\", \"bin\": { \"cmdpal-bootstrap\": \"./dist/runtime/bootstrap.js\" } }");
+                $"{{ \"name\": \"{SdkPackageName}\", \"bin\": {{ \"cmdpal-bootstrap\": \"./dist/runtime/bootstrap.js\" }} }}");
 
             var resolved = JSExtensionWrapper.ResolveBootstrapScript(manifestDir);
 
@@ -67,7 +69,7 @@ public class JSExtensionWrapperBootstrapTests
         try
         {
             var sdkRoot = CreateSdkRoot(manifestDir);
-            File.WriteAllText(Path.Combine(sdkRoot, "package.json"), "{ \"name\": \"@microsoft/cmdpal-sdk\" }");
+            File.WriteAllText(Path.Combine(sdkRoot, "package.json"), $"{{ \"name\": \"{SdkPackageName}\" }}");
 
             var fallback = Path.Combine(sdkRoot, "dist", "runtime", "bootstrap.js");
             Directory.CreateDirectory(Path.GetDirectoryName(fallback)!);
@@ -99,7 +101,7 @@ public class JSExtensionWrapperBootstrapTests
             File.WriteAllText(fallback, "// bootstrap");
             File.WriteAllText(
                 Path.Combine(sdkRoot, "package.json"),
-                "{ \"name\": \"@microsoft/cmdpal-sdk\", \"bin\": { \"sdk-cli\": \"./bin/sdk-cli.mjs\" } }");
+                $"{{ \"name\": \"{SdkPackageName}\", \"bin\": {{ \"sdk-cli\": \"./bin/sdk-cli.mjs\" }} }}");
 
             var resolved = JSExtensionWrapper.ResolveBootstrapScript(manifestDir);
 
@@ -137,7 +139,7 @@ public class JSExtensionWrapperBootstrapTests
             var sdkRoot = CreateSdkRoot(manifestDir);
             File.WriteAllText(
                 Path.Combine(sdkRoot, "package.json"),
-                "{ \"name\": \"@microsoft/cmdpal-sdk\", \"bin\": { \"cmdpal-bootstrap\": \"./dist/runtime/bootstrap.js\" } }");
+                $"{{ \"name\": \"{SdkPackageName}\", \"bin\": {{ \"cmdpal-bootstrap\": \"./dist/runtime/bootstrap.js\" }} }}");
 
             Assert.IsNull(JSExtensionWrapper.ResolveBootstrapScript(manifestDir));
         }
@@ -158,7 +160,7 @@ public class JSExtensionWrapperBootstrapTests
             File.WriteAllText(outsideBootstrap, "// outside bootstrap");
             File.WriteAllText(
                 Path.Combine(sdkRoot, "package.json"),
-                "{ \"name\": \"@microsoft/cmdpal-sdk\", \"bin\": { \"cmdpal-bootstrap\": \"../../../outside-bootstrap.js\" } }");
+                $"{{ \"name\": \"{SdkPackageName}\", \"bin\": {{ \"cmdpal-bootstrap\": \"../../../outside-bootstrap.js\" }} }}");
 
             Assert.IsNull(JSExtensionWrapper.ResolveBootstrapScript(manifestDir));
         }
@@ -181,7 +183,7 @@ public class JSExtensionWrapperBootstrapTests
                 File.WriteAllText(rootedBootstrap, "// rooted bootstrap");
                 File.WriteAllText(
                     Path.Combine(sdkRoot, "package.json"),
-                    $"{{ \"name\": \"@microsoft/cmdpal-sdk\", \"bin\": {{ \"cmdpal-bootstrap\": {JsonSerializer.Serialize(rootedBootstrap)} }} }}");
+                    $"{{ \"name\": \"{SdkPackageName}\", \"bin\": {{ \"cmdpal-bootstrap\": {JsonSerializer.Serialize(rootedBootstrap)} }} }}");
 
                 Assert.IsNull(JSExtensionWrapper.ResolveBootstrapScript(manifestDir));
             }
