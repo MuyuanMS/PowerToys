@@ -139,7 +139,7 @@ namespace JsonUtils
                 if (json.HasKey(NonLocalizable::AppZoneHistoryIds::HistoryID))
                 {
                     auto appHistoryArray = json.GetNamedArray(NonLocalizable::AppZoneHistoryIds::HistoryID);
-                    hasExplicitEmptyHistory = appHistoryArray.Size() == 0;
+                    hasExplicitEmptyHistory = appHistoryArray.Size() == 0 && result.appPath.find(L'?') != std::wstring::npos;
                     for (uint32_t i = 0; i < appHistoryArray.Size(); ++i)
                     {
                         json::JsonObject json_hist = appHistoryArray.GetObjectAt(i);
