@@ -230,8 +230,8 @@ namespace
             unsigned int workerGeneration = 0;
             unsigned int consecutiveWorkerFailures = 0;
             const auto waitBeforeWorkerRetry = [this, &consecutiveWorkerFailures]() {
-                const auto delay = std::min(
-                    initialWorkerFailureDelayMs << std::min(consecutiveWorkerFailures, 5u),
+                const auto delay = (std::min)(
+                    initialWorkerFailureDelayMs << (std::min)(consecutiveWorkerFailures, 5u),
                     maximumWorkerFailureDelayMs);
                 ++consecutiveWorkerFailures;
                 return WaitForSingleObject(m_terminateEvent, delay) == WAIT_OBJECT_0;
