@@ -155,7 +155,17 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     // be sure we don't block the caller, hop off this thread
     private void CommandProvider_CommandsChanged(CommandProviderWrapper sender, IItemsChangedEventArgs args)
     {
-        _ = Task.Run(async () => await UpdateCommandsForProvider(sender, args));
+        var ct = _currentExtensionLoadCancellationToken;
+        var generation = _providerChangeGeneration;
+        _providerChanges.Enqueue(() =>
+        {
+            if (ct.IsCancellationRequested || generation != _providerChangeGeneration || !IsWrapperRegistered(sender))
+            {
+                return Task.CompletedTask;
+            }
+
+            return UpdateCommandsForProvider(sender, args, generation, ct);
+        });
     }
 
     /// <summary>
@@ -166,7 +176,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     /// <param name="sender">The provider who's commands changed</param>
     /// <param name="args">the ItemsChangedEvent the provider raised</param>
     /// <returns>an awaitable task</returns>
-    private async Task UpdateCommandsForProvider(CommandProviderWrapper sender, IItemsChangedEventArgs args)
+    private async Task UpdateCommandsForProvider(CommandProviderWrapper sender, IItemsChangedEventArgs args, int generation, CancellationToken ct)
     {
         await sender.LoadTopLevelCommands(_serviceProvider);
 
@@ -185,38 +195,48 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         // TopLevelCommands to get modified while we're working on it. Otherwise, we might
         // out clone would be stale at the end of this method.
         List<TopLevelViewModel> removedTopLevel;
-        lock (TopLevelCommands)
-        {
-            // Work on a clone of the list, so that we can just do one atomic
-            // update to the actual observable list at the end
-            // TODO: just added a lock around all of this anyway, but keeping the clone
-            // while looking on some other ways to improve this; can be removed later.
-            List<TopLevelViewModel> clone = [.. TopLevelCommands];
-
-            var startIndex = FindIndexForFirstProviderItem(clone, sender.ProviderId);
-            clone.RemoveAll(item => item.CommandProviderId == sender.ProviderId);
-            clone.InsertRange(startIndex, newItems);
-
-            ListHelpers.InPlaceUpdateList(TopLevelCommands, clone, out removedTopLevel);
-        }
-
         List<TopLevelViewModel> removedDockBands;
-        lock (_dockBandsLock)
+        lock (_providerPublicationLock)
         {
-            // Same idea as TopLevelCommands above, but we deliberately use
-            // ReplaceWith so the dock only sees one CollectionChanged event
-            // for the whole rewrite instead of one per item.
-            List<TopLevelViewModel> dockClone = [.. DockBands];
-            var dockStartIndex = FindIndexForFirstProviderItem(dockClone, sender.ProviderId);
-            dockClone.RemoveAll(item => item.CommandProviderId == sender.ProviderId);
-            dockClone.InsertRange(dockStartIndex, newBands);
+            if (ct.IsCancellationRequested || generation != _providerChangeGeneration || !IsWrapperRegistered(sender))
+            {
+                CleanupViewModels(newItems);
+                CleanupViewModels(newBands);
+                return;
+            }
 
-            // ReplaceWith doesn't report what it dropped, so diff the current
-            // contents against the new ones before we overwrite them. Bands
-            // that get re-inserted from newBands are correctly not reported.
-            removedDockBands = [.. DockBands.Except(dockClone)];
+            lock (TopLevelCommands)
+            {
+                // Work on a clone of the list, so that we can just do one atomic
+                // update to the actual observable list at the end
+                // TODO: just added a lock around all of this anyway, but keeping the clone
+                // while looking on some other ways to improve this; can be removed later.
+                List<TopLevelViewModel> clone = [.. TopLevelCommands];
 
-            DockBands.ReplaceWith(dockClone);
+                var startIndex = FindIndexForFirstProviderItem(clone, sender.ProviderId);
+                clone.RemoveAll(item => item.CommandProviderId == sender.ProviderId);
+                clone.InsertRange(startIndex, newItems);
+
+                ListHelpers.InPlaceUpdateList(TopLevelCommands, clone, out removedTopLevel);
+            }
+
+            lock (_dockBandsLock)
+            {
+                // Same idea as TopLevelCommands above, but we deliberately use
+                // ReplaceWith so the dock only sees one CollectionChanged event
+                // for the whole rewrite instead of one per item.
+                List<TopLevelViewModel> dockClone = [.. DockBands];
+                var dockStartIndex = FindIndexForFirstProviderItem(dockClone, sender.ProviderId);
+                dockClone.RemoveAll(item => item.CommandProviderId == sender.ProviderId);
+                dockClone.InsertRange(dockStartIndex, newBands);
+
+                // ReplaceWith doesn't report what it dropped, so diff the current
+                // contents against the new ones before we overwrite them. Bands
+                // that get re-inserted from newBands are correctly not reported.
+                removedDockBands = [.. DockBands.Except(dockClone)];
+
+                DockBands.ReplaceWith(dockClone);
+            }
         }
 
         foreach (var item in removedTopLevel)
@@ -378,6 +398,8 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     private async Task UpdateProviderEnabledStateAsyncCore(string providerId, bool isEnabled)
     {
         IsLoading = true;
+        var ct = _currentExtensionLoadCancellationToken;
+        var generation = _providerChangeGeneration;
 
         try
         {
@@ -438,32 +460,43 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
                 {
                     await provider.LoadTopLevelCommands(_serviceProvider);
 
-                    lock (TopLevelCommands)
+                    lock (_providerPublicationLock)
                     {
-                        foreach (var command in provider.TopLevelItems)
+                        if (ct.IsCancellationRequested || generation != _providerChangeGeneration || !IsWrapperRegistered(provider))
                         {
-                            if (!TopLevelCommands.Any(a => a.Id == command.Id))
+                            CleanupViewModels(provider.TopLevelItems);
+                            CleanupViewModels(provider.FallbackItems);
+                            CleanupViewModels(provider.DockBandItems);
+                            return;
+                        }
+
+                        lock (TopLevelCommands)
+                        {
+                            foreach (var command in provider.TopLevelItems)
                             {
-                                TopLevelCommands.Add(command);
+                                if (!TopLevelCommands.Any(a => a.Id == command.Id))
+                                {
+                                    TopLevelCommands.Add(command);
+                                }
+                            }
+
+                            foreach (var item in provider.FallbackItems)
+                            {
+                                if (!TopLevelCommands.Any(a => a.Id == item.Id) && item.IsEnabled)
+                                {
+                                    TopLevelCommands.Add(item);
+                                }
                             }
                         }
 
-                        foreach (var item in provider.FallbackItems)
+                        lock (_dockBandsLock)
                         {
-                            if (!TopLevelCommands.Any(a => a.Id == item.Id) && item.IsEnabled)
+                            foreach (var band in provider.DockBandItems)
                             {
-                                TopLevelCommands.Add(item);
-                            }
-                        }
-                    }
-
-                    lock (_dockBandsLock)
-                    {
-                        foreach (var band in provider.DockBandItems)
-                        {
-                            if (!DockBands.Any(a => a.Id == band.Id))
-                            {
-                                DockBands.Add(band);
+                                if (!DockBands.Any(a => a.Id == band.Id))
+                                {
+                                    DockBands.Add(band);
+                                }
                             }
                         }
                     }
