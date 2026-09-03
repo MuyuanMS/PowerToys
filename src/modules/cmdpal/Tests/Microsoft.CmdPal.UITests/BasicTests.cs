@@ -45,6 +45,42 @@ public class BasicTests : CommandPaletteTestBase
     }
 
     [TestMethod]
+    public void NumberedShortcutInvokesFirstResult()
+    {
+        SetSearchBox("calculator");
+
+        this.SendKeys(Key.Alt, Key.Num1);
+        SetCalculatorExtensionSearchBox("1+2");
+
+        Assert.IsNotNull(this.Find<NavigationViewItem>("3"));
+    }
+
+    [TestMethod]
+    public void LatchedNumberedShortcutInvokesFirstResult()
+    {
+        SetSearchBox("calculator");
+
+        this.Session.PressKey(Key.Alt);
+        this.Session.ReleaseKey(Key.Alt);
+        this.Session.SendKey(Key.Num1);
+        SetCalculatorExtensionSearchBox("1+2");
+
+        Assert.IsNotNull(this.Find<NavigationViewItem>("3"));
+    }
+
+    [TestMethod]
+    public void ShiftNumberedShortcutSelectsWithoutInvoking()
+    {
+        SetSearchBox("calculator");
+
+        this.SendKeys(Key.Alt, Key.Shift, Key.Num1);
+
+        var searchFileItem = this.Find<NavigationViewItem>("Calculator");
+        Assert.AreEqual("Calculator", searchFileItem.Name);
+        Assert.IsTrue(searchFileItem.Selected);
+    }
+
+    [TestMethod]
     public void BasicTimeAndDateTest()
     {
         SetSearchBox("time and date");

@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.ComponentModel;
 using System.Globalization;
 using System.Text;
 using CommunityToolkit.Mvvm.Messaging;
@@ -710,6 +711,7 @@ public sealed partial class ListItemsView : UserControl,
             if (e.OldValue is ListViewModel old)
             {
                 old.ItemsUpdated -= @this.Page_ItemsUpdated;
+                old.PropertyChanged -= @this.ViewModel_PropertyChanged;
             }
 
             // Reset latched state — selection sticky/last-pushed only make sense
@@ -721,6 +723,7 @@ public sealed partial class ListItemsView : UserControl,
             if (e.NewValue is ListViewModel page)
             {
                 page.ItemsUpdated += @this.Page_ItemsUpdated;
+                page.PropertyChanged += @this.ViewModel_PropertyChanged;
 
                 // When the hosted ViewModel is swapped while we're already on
                 // screen (e.g. ParametersPage activating a list parameter), the
@@ -742,6 +745,17 @@ public sealed partial class ListItemsView : UserControl,
                 @this.QueueNumberedShortcutCueUpdate();
             }
         }
+    }
+
+    private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ListViewModel.IsGridView))
+        {
+            return;
+        }
+
+        EnsureNumberedShortcutCueTracking();
+        QueueNumberedShortcutCueUpdate();
     }
 
     // Called after we've finished updating the whole list for either a
