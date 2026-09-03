@@ -145,7 +145,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         _taskScheduler = taskScheduler;
         _hotReloadDebouncer = new HotReloadDebouncer(directory =>
             StartObservedBackgroundTask(
-                () => HotReloadExtensionAsync(directory),
+                _ => HotReloadExtensionAsync(directory),
                 $"hot-reload JS extension at {directory}",
                 _reload.Token));
     }
@@ -1417,7 +1417,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         {
             if (shouldRemove)
             {
-                await HandleDirectoryEntryRemovedOrderedAsync(e.OldFullPath).ConfigureAwait(false);
+                await HandleDirectoryEntryRemovedOrderedAsync(e.OldFullPath, token).ConfigureAwait(false);
             }
 
             if (shouldUpsert)
@@ -1456,8 +1456,9 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         if (error is InternalBufferOverflowException && !_disposed)
         {
             StartObservedBackgroundTask(
-                async () =>
+                async token =>
                 {
+                    token.ThrowIfCancellationRequested();
                     await RefreshInstalledExtensionsAsync().ConfigureAwait(false);
                 },
                 "reconcile after directory watcher overflow",
@@ -1469,17 +1470,18 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
     {
         var token = _reload.Token;
         StartObservedBackgroundTask(
-            () => HandleDirectoryEntryUpsertOrderedAsync(changedPath, token),
+            cancellationToken => HandleDirectoryEntryUpsertOrderedAsync(changedPath, cancellationToken),
             $"install JS extension at {changedPath}",
             token);
     }
 
     private void HandleDirectoryEntryRemoved(string changedPath)
     {
+        var token = _reload.Token;
         StartObservedBackgroundTask(
-            () => HandleDirectoryEntryRemovedOrderedAsync(changedPath),
+            cancellationToken => HandleDirectoryEntryRemovedOrderedAsync(changedPath, cancellationToken),
             $"uninstall JS extension at {changedPath}",
-            _reload.Token);
+            token);
     }
 
     private async Task HandleDirectoryEntryUpsertOrderedAsync(string changedPath, CancellationToken token)
@@ -1493,14 +1495,17 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         await HandleDirectoryEntryUpsertAsync(extensionDirectory, token).ConfigureAwait(false);
     }
 
-    private async Task HandleDirectoryEntryRemovedOrderedAsync(string changedPath)
+    private async Task HandleDirectoryEntryRemovedOrderedAsync(string changedPath, CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
+
         var extensionDirectory = GetExtensionDirectoryForPath(ExtensionsPath, changedPath);
         if (extensionDirectory is null)
         {
             return;
         }
 
+        token.ThrowIfCancellationRequested();
         await HandleDirectoryEntryRemovedAsync(extensionDirectory).ConfigureAwait(false);
     }
 
@@ -1555,7 +1560,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         }
     }
 
-    private void StartObservedBackgroundTask(Func<Task> operation, string description, CancellationToken cancellationToken)
+    private void StartObservedBackgroundTask(Func<CancellationToken, Task> operation, string description, CancellationToken cancellationToken)
     {
         _ = ExtensionTaskCoordinator.RunInBackgroundAsync(
             operation,

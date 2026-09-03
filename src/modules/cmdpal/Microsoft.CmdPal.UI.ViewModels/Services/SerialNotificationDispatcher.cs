@@ -43,15 +43,15 @@ internal sealed partial class SerialNotificationDispatcher : IDisposable
     }
 
     /// <summary>
-    /// Queues a notification to run on the worker after everything already queued. Silently
-    /// dropped once the dispatcher has been disposed.
+    /// Queues a notification to run on the worker after everything already queued.
     /// </summary>
     /// <param name="notification">The action to run, in order, on the background worker.</param>
-    public void Enqueue(Action notification)
+    /// <returns><see langword="true"/> if the notification was accepted; otherwise <see langword="false"/>.</returns>
+    public bool Enqueue(Action notification)
     {
         ArgumentNullException.ThrowIfNull(notification);
 
-        Enqueue(() =>
+        return Enqueue(() =>
         {
             notification();
             return Task.CompletedTask;
@@ -60,19 +60,19 @@ internal sealed partial class SerialNotificationDispatcher : IDisposable
 
     /// <summary>
     /// Queues an asynchronous notification to run on the worker after everything already queued.
-    /// Silently dropped once the dispatcher has been disposed.
     /// </summary>
     /// <param name="notification">The asynchronous work to run, in order, on the background worker.</param>
-    public void Enqueue(Func<Task> notification)
+    /// <returns><see langword="true"/> if the notification was accepted; otherwise <see langword="false"/>.</returns>
+    public bool Enqueue(Func<Task> notification)
     {
         ArgumentNullException.ThrowIfNull(notification);
 
         if (_disposed)
         {
-            return;
+            return false;
         }
 
-        _queue.Writer.TryWrite(notification);
+        return _queue.Writer.TryWrite(notification);
     }
 
     public void Dispose()
