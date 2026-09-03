@@ -16,6 +16,7 @@ public abstract partial class AppExtensionHost : IExtensionHost, IDisposable
 {
     private static readonly GlobalLogPageContext _globalLogPageContext = new();
     private readonly SerialNotificationDispatcher _statusNotifications = new();
+    private bool _disposed;
 
     private static ulong _hostingHwnd;
 
@@ -150,6 +151,15 @@ public abstract partial class AppExtensionHost : IExtensionHost, IDisposable
             _globalLogPageContext.Scheduler);
     }
 
+    private Task ClearStatusMessagesAsync()
+    {
+        return Task.Factory.StartNew(
+            StatusMessages.Clear,
+            CancellationToken.None,
+            TaskCreationOptions.None,
+            _globalLogPageContext.Scheduler);
+    }
+
     public IAsyncAction ShowStatus(IStatusMessage? message, StatusContext context)
     {
         if (message is null)
@@ -164,6 +174,13 @@ public abstract partial class AppExtensionHost : IExtensionHost, IDisposable
 
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _statusNotifications.Enqueue(ClearStatusMessagesAsync);
         _statusNotifications.CompleteWithoutWaiting();
         GC.SuppressFinalize(this);
     }
