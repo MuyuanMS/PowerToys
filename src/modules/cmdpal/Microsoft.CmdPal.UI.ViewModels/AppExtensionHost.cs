@@ -5,15 +5,17 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Microsoft.CmdPal.Common;
+using Microsoft.CmdPal.UI.ViewModels.Services;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Windows.Foundation;
 
 namespace Microsoft.CmdPal.UI.ViewModels;
 
-public abstract partial class AppExtensionHost : IExtensionHost
+public abstract partial class AppExtensionHost : IExtensionHost, IDisposable
 {
     private static readonly GlobalLogPageContext _globalLogPageContext = new();
+    private readonly SerialNotificationDispatcher _statusNotifications = new();
 
     private static ulong _hostingHwnd;
 
@@ -41,7 +43,7 @@ public abstract partial class AppExtensionHost : IExtensionHost
             return Task.CompletedTask.AsAsyncAction();
         }
 
-        ProcessHideStatusMessage(message);
+        _statusNotifications.Enqueue(() => ProcessHideStatusMessage(message));
         return Task.CompletedTask.AsAsyncAction();
     }
 
@@ -156,11 +158,15 @@ public abstract partial class AppExtensionHost : IExtensionHost
             return Task.CompletedTask.AsAsyncAction();
         }
 
-        Debug.WriteLine(message.Message);
-
-        ProcessStatusMessage(message, context);
+        _statusNotifications.Enqueue(() => ProcessStatusMessage(message, context));
 
         return Task.CompletedTask.AsAsyncAction();
+    }
+
+    public void Dispose()
+    {
+        _statusNotifications.CompleteWithoutWaiting();
+        GC.SuppressFinalize(this);
     }
 
     public abstract string? GetExtensionDisplayName();

@@ -470,9 +470,24 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
 
     private async Task<RegisterAndLoadSummary> RegisterAndLoadCommandsAsync(IEnumerable<CommandProviderWrapper> wrappers, CancellationToken ct)
     {
+        if (ct.IsCancellationRequested)
+        {
+            return default;
+        }
+
         var wrapperList = wrappers.ToList();
+        if (ct.IsCancellationRequested)
+        {
+            return default;
+        }
+
         lock (_commandProvidersLock)
         {
+            if (ct.IsCancellationRequested)
+            {
+                return default;
+            }
+
             _commandProviders.AddRange(wrapperList);
         }
 
