@@ -111,14 +111,15 @@ public partial class TabbedPageViewModel : PageViewModel
             return result;
         }
 
-        foreach (var tab in tabs)
+        for (var i = 0; i < tabs.Length; i++)
         {
+            var tab = tabs[i];
             if (tab is null)
             {
                 continue;
             }
 
-            var vm = new TabViewModel(tab, PageContext);
+            var vm = new TabViewModel(tab, PageContext, i.ToString());
             vm.InitializeProperties();
             result.Add(vm);
         }
