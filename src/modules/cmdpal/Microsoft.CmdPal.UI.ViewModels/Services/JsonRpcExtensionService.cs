@@ -1689,7 +1689,13 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         IDisposable? gate = null;
         try
         {
-            gate = await _directoryGate.AcquireAsync(directory, CancellationToken.None).ConfigureAwait(false);
+            using var gateWait = new CancellationTokenSource(ExtensionTeardownTimeout);
+            gate = await _directoryGate.AcquireAsync(directory, gateWait.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.LogWarning(
+                $"Timed out waiting for lifecycle work on JS extension directory {directory}; continuing removal best-effort.");
         }
         catch (ObjectDisposedException)
         {
