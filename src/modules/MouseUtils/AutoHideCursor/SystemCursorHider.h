@@ -91,6 +91,7 @@ namespace auto_hide_cursor
             }
 
             m_hidden = true;
+            RefreshCurrentCursor();
             return true;
         }
 
