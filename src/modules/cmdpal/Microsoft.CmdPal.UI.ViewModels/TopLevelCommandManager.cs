@@ -715,8 +715,10 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
                 }
             }
 
+            List<CommandProviderWrapper> registeredWrappersToDispose;
             lock (_commandProvidersLock)
             {
+                registeredWrappersToDispose = [.. _commandProviders.Where(w => removedProviderIds.Contains(w.ProviderId))];
                 _commandProviders.RemoveAll(w => removedProviderIds.Contains(w.ProviderId));
             }
 
@@ -755,7 +757,10 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
                     deleted.Cleanup();
                 }
 
-                DisposeWrappers(removedWrapperList);
+                DisposeWrappers(registeredWrappersToDispose);
+
+                var registeredWrappers = new HashSet<CommandProviderWrapper>(registeredWrappersToDispose);
+                DisposeWrappers(removedWrapperList.Where(w => !registeredWrappers.Contains(w)));
             },
             CancellationToken.None,
             TaskCreationOptions.None,

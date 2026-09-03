@@ -41,6 +41,8 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
     private Task<IListItem[]>? _getItemsTask;
     private int _getItemsTaskGeneration;
     private int _itemsChangedGeneration;
+    private int _lastCompletedItemsGeneration;
+    private IListItem[]? _lastCompletedItems;
     private bool? _hasMoreItemsState;
     private bool _disposed;
 
@@ -153,11 +155,25 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
                             continue;
                         }
 
+                        _lastCompletedItemsGeneration = generation;
+                        _lastCompletedItems = items;
                         _getItemsTask = null;
                         return items;
                     }
 
-                    if (_getItemsTask is null || _getItemsTaskGeneration == generation)
+                    if (_lastCompletedItemsGeneration > generation && _lastCompletedItems is not null)
+                    {
+                        return _lastCompletedItems;
+                    }
+
+                    if (_getItemsTask is null && _itemsChangedGeneration == generation)
+                    {
+                        _lastCompletedItemsGeneration = generation;
+                        _lastCompletedItems = items;
+                        return items;
+                    }
+
+                    if (_getItemsTaskGeneration == generation)
                     {
                         return items;
                     }

@@ -25,6 +25,7 @@ public sealed class CommandProviderWrapper : ICommandProviderContext, IDisposabl
     private readonly TaskScheduler _taskScheduler;
 
     private readonly ICommandProviderCache? _commandProviderCache;
+    private bool _disposed;
 
     public TopLevelViewModel[] TopLevelItems { get; private set; } = [];
 
@@ -196,6 +197,13 @@ public sealed class CommandProviderWrapper : ICommandProviderContext, IDisposabl
 
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
         if (_commandProvider.Unsafe is not null)
         {
             _commandProvider.Unsafe.ItemsChanged -= CommandProvider_ItemsChanged;
