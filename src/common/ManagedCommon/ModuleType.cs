@@ -7,6 +7,7 @@ namespace ManagedCommon
     public enum ModuleType
     {
         AdvancedPaste,
+        AltWindowCycle,
         AlwaysOnTop,
         Awake,
         ColorPicker,
@@ -30,11 +31,13 @@ namespace ManagedCommon
         PowerRename,
         PowerLauncher,
         PowerAccent,
+        PowerDisplay,
         RegistryPreview,
         MeasureTool,
         ShortcutGuide,
         PowerOCR,
         Workspaces,
+        GrabAndMove,
         ZoomIt,
         GeneralSettings,
     }

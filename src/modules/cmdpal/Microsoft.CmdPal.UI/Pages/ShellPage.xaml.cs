@@ -8,13 +8,15 @@ using System.Text;
 using CommunityToolkit.Mvvm.Messaging;
 using CommunityToolkit.WinUI;
 using ManagedCommon;
-using Microsoft.CmdPal.Core.ViewModels;
-using Microsoft.CmdPal.Core.ViewModels.Messages;
+using Microsoft.CmdPal.UI.Dock;
 using Microsoft.CmdPal.UI.Events;
 using Microsoft.CmdPal.UI.Helpers;
 using Microsoft.CmdPal.UI.Messages;
+using Microsoft.CmdPal.UI.Services;
 using Microsoft.CmdPal.UI.Settings;
 using Microsoft.CmdPal.UI.ViewModels;
+using Microsoft.CmdPal.UI.ViewModels.Messages;
+using Microsoft.CmdPal.UI.ViewModels.Services;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.PowerToys.Telemetry;
@@ -24,7 +26,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Animation;
-using Windows.UI.Core;
 using DispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue;
 using VirtualKey = Windows.System.VirtualKey;
 
@@ -37,6 +38,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
     IRecipient<NavigateBackMessage>,
     IRecipient<OpenSettingsMessage>,
     IRecipient<HotkeySummonMessage>,
+    IRecipient<FocusSearchBoxMessage>,
     IRecipient<ShowDetailsMessage>,
     IRecipient<HideDetailsMessage>,
     IRecipient<ClearSearchMessage>,
@@ -47,6 +49,9 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
     IRecipient<ShowConfirmationMessage>,
     IRecipient<ShowToastMessage>,
     IRecipient<NavigateToPageMessage>,
+    IRecipient<ShowHideDockMessage>,
+    IRecipient<ShowPinToDockDialogMessage>,
+    IRecipient<ExpandCompactModeMessage>,
     INotifyPropertyChanged,
     IDisposable
 {
@@ -63,23 +68,75 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
     private readonly CompositeFormat _pageNavigatedAnnouncement;
 
+    private readonly ISettingsService _settingsService;
+
+    // The last compact-mode setting we reacted to. Lets us ignore hot-reloads of unrelated
+    // settings and only re-evaluate the layout when compact mode itself changes.
+    private bool _compactMode;
+
     private SettingsWindow? _settingsWindow;
+    private DockWindowManager? _dockWindowManager;
 
     private CancellationTokenSource? _focusAfterLoadedCts;
     private WeakReference<Page>? _lastNavigatedPageRef;
+
+    // When the shell goes from compact (collapsed) to expanded, the content frame's page
+    // — which was collapsed and therefore never laid out — finally fires its Loaded event.
+    // That late Loaded would otherwise run the post-navigation focus/select logic and
+    // select-all the character the user just typed (which triggered the expand). This
+    // one-shot flag suppresses that select for the expand-driven load.
+    private bool _suppressSelectOnNextLoad;
+    private bool _pendingTopBarFocusRestore;
+    private bool _isDisposed;
 
     public ShellViewModel ViewModel { get; private set; } = App.Current.Services.GetService<ShellViewModel>()!;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    private IHostWindow? _hostWindow;
+
+    public IHostWindow? HostWindow
+    {
+        get => _hostWindow;
+        set
+        {
+            if (ReferenceEquals(_hostWindow, value))
+            {
+                return;
+            }
+
+            if (_hostWindow is not null)
+            {
+                _hostWindow.IsVisibleToUserChanged -= HostWindow_IsVisibleToUserChanged;
+            }
+
+            _hostWindow = value;
+
+            if (_hostWindow is not null)
+            {
+                _hostWindow.IsVisibleToUserChanged += HostWindow_IsVisibleToUserChanged;
+            }
+        }
+    }
+
+    public bool ExpandedMode { get; set; }
+
+    // Item keybindings act on the selected item, which is hidden while collapsed — only honor them when expanded.
+    private bool ItemActionsAllowed => !_compactMode || ExpandedMode;
+
     public ShellPage()
     {
+        _settingsService = App.Current.Services.GetRequiredService<ISettingsService>();
+        _compactMode = _settingsService.Settings.CompactMode;
+        this.ExpandedMode = !_compactMode;
+
         this.InitializeComponent();
 
         // how we are doing navigation around
         WeakReferenceMessenger.Default.Register<NavigateBackMessage>(this);
         WeakReferenceMessenger.Default.Register<OpenSettingsMessage>(this);
         WeakReferenceMessenger.Default.Register<HotkeySummonMessage>(this);
+        WeakReferenceMessenger.Default.Register<FocusSearchBoxMessage>(this);
         WeakReferenceMessenger.Default.Register<SettingsWindowClosedMessage>(this);
 
         WeakReferenceMessenger.Default.Register<ShowDetailsMessage>(this);
@@ -94,6 +151,16 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         WeakReferenceMessenger.Default.Register<ShowToastMessage>(this);
         WeakReferenceMessenger.Default.Register<NavigateToPageMessage>(this);
 
+        WeakReferenceMessenger.Default.Register<ShowHideDockMessage>(this);
+        WeakReferenceMessenger.Default.Register<ShowPinToDockDialogMessage>(this);
+
+        WeakReferenceMessenger.Default.Register<ExpandCompactModeMessage>(this);
+
+        // The compact-mode setting can be toggled while the palette is open. React to the
+        // hot-reload so the expanded/collapsed layout updates immediately instead of waiting
+        // for the next navigation or search-text change.
+        _settingsService.SettingsChanged += OnSettingsChanged;
+
         AddHandler(PreviewKeyDownEvent, new KeyEventHandler(ShellPage_OnPreviewKeyDown), true);
         AddHandler(KeyDownEvent, new KeyEventHandler(ShellPage_OnKeyDown), false);
         AddHandler(PointerPressedEvent, new PointerEventHandler(ShellPage_OnPointerPressed), true);
@@ -102,6 +169,12 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
         var pageAnnouncementFormat = ResourceLoaderInstance.GetString("ScreenReader_Announcement_NavigatedToPage0");
         _pageNavigatedAnnouncement = CompositeFormat.Parse(pageAnnouncementFormat);
+
+        if (App.Current.Services.GetRequiredService<ISettingsService>().Settings.EnableDock)
+        {
+            _dockWindowManager = App.Current.Services.GetService<DockWindowManager>();
+            _dockWindowManager?.ShowDocks();
+        }
     }
 
     /// <summary>
@@ -111,14 +184,14 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
     {
         get
         {
-            var settings = App.Current.Services.GetService<SettingsModel>()!;
+            var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
             return settings.DisableAnimations ? _noAnimation : _slideRightTransition;
         }
     }
 
     public void Receive(NavigateBackMessage message)
     {
-        var settings = App.Current.Services.GetService<SettingsModel>()!;
+        var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
 
         if (RootFrame.CanGoBack)
         {
@@ -143,7 +216,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
     public void Receive(NavigateToPageMessage message)
     {
         // TODO GH #526 This needs more better locking too
-        _ = _queue.TryEnqueue(() =>
+        _ = _queue.TryEnqueue(DispatcherQueuePriority.High, () =>
         {
             // Also hide our details pane about here, if we had one
             HideDetails();
@@ -154,6 +227,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
                 {
                     ListViewModel => typeof(ListPage),
                     ContentPageViewModel => typeof(ContentPage),
+                    ParametersPageViewModel => typeof(ParametersPage),
                     _ => throw new NotSupportedException(),
                 },
                 new AsyncNavigationRequest(message.Page, message.CancellationToken),
@@ -191,8 +265,59 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
     {
         DispatcherQueue.TryEnqueue(() =>
         {
-            _toast.ShowToast(message.Message);
+            _toast.ShowToast(message);
         });
+    }
+
+    public void Receive(ShowPinToDockDialogMessage message)
+    {
+        DispatcherQueue.TryEnqueue(async () =>
+        {
+            try
+            {
+                await HandlePinToDockDialogOnUiThread(message);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex.ToString());
+            }
+        });
+    }
+
+    private async Task HandlePinToDockDialogOnUiThread(ShowPinToDockDialogMessage message)
+    {
+        // Ask each dock window to display a teaching tip identifying its monitor,
+        // so the user can correlate the dialog's monitor list with the physical docks.
+        WeakReferenceMessenger.Default.Send(new ShowDockMonitorLabelsMessage(true));
+
+        try
+        {
+            var (result, content) = await PinToDockDialogContent.ShowAsync(
+                this.XamlRoot,
+                message.Title,
+                message.Subtitle,
+                message.Icon,
+                message.DockSide,
+                message.AvailableMonitors);
+
+            if (result == ContentDialogResult.Primary)
+            {
+                var pinMessage = new PinToDockMessage(
+                    message.ProviderId,
+                    message.CommandId,
+                    Pin: true,
+                    Side: content.SelectedSide,
+                    ShowTitles: content.ShowTitles,
+                    ShowSubtitles: content.ShowSubtitles,
+                    MonitorDeviceId: content.SelectedMonitorDeviceId);
+                WeakReferenceMessenger.Default.Send(pinMessage);
+            }
+        }
+        finally
+        {
+            // Hide the teaching tips once the dialog is saved or dismissed.
+            WeakReferenceMessenger.Default.Send(new ShowDockMonitorLabelsMessage(false));
+        }
     }
 
     // This gets called from the UI thread
@@ -236,7 +361,26 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
             // };
         }
 
-        var result = await dialog.ShowAsync();
+        // In compact mode the palette may be collapsed to just the search box. The confirmation
+        // dialog renders in the host window's popup layer, which is clipped to the card's HWND
+        // region, so merely expanding our own content isn't enough - the card must fill the whole
+        // window or the dialog is clipped. Ask the host window to maximize the card while the
+        // dialog is up (and expand our own content to match), then restore the normal compact
+        // behavior once it closes.
+        WeakReferenceMessenger.Default.Send(new MaximizeForDialogMessage(true));
+        HandleExpandCompactOnUiThread(true);
+
+        ContentDialogResult result;
+        try
+        {
+            result = await dialog.ShowAsync();
+        }
+        finally
+        {
+            WeakReferenceMessenger.Default.Send(new MaximizeForDialogMessage(false));
+            UpdateCompactModeForCurrentPage();
+        }
+
         if (result == ContentDialogResult.Primary)
         {
             var performMessage = new PerformCommandMessage(vm);
@@ -248,20 +392,22 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         }
     }
 
-    private void InitializeConfirmationDialog(ConfirmResultViewModel vm)
-    {
-        vm.SafeInitializePropertiesSynchronous();
-    }
+    private void InitializeConfirmationDialog(ConfirmResultViewModel vm) => vm.SafeInitializePropertiesSynchronous();
 
     public void Receive(OpenSettingsMessage message)
     {
         _ = DispatcherQueue.TryEnqueue(() =>
         {
-            OpenSettings();
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            OpenSettings(message.SettingsPageTag, message.ExtensionGalleryId);
         });
     }
 
-    public void OpenSettings()
+    public void OpenSettings(string pageTag, string? extensionGalleryId = null)
     {
         if (_settingsWindow is null)
         {
@@ -270,53 +416,70 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
         _settingsWindow.Activate();
         _settingsWindow.BringToFront();
+        _settingsWindow.Navigate(pageTag, extensionGalleryId);
     }
 
     public void Receive(ShowDetailsMessage message)
     {
-        if (ViewModel is not null &&
-            ViewModel.CurrentPage is not null)
+        if (ViewModel is null || ViewModel.CurrentPage is null)
         {
-            if (ViewModel.CurrentPage.PageContext.TryGetTarget(out var pageContext))
+            return;
+        }
+
+        var details = message.Details;
+        var wasVisible = ViewModel.IsDetailsVisible;
+
+        // GH #322:
+        // For inexplicable reasons, if you try to change the details too fast,
+        // we'll explode. This seemingly only happens if you change the details
+        // while we're also scrolling a new list view item into view.
+        //
+        // Always debounce through the DispatcherQueue
+        // timer so the UI settles between updates. Use immediate=true for
+        // the first show so the panel appears without delay; subsequent
+        // updates during rapid navigation are coalesced.
+        _debounceTimer.Debounce(ShowDetails, interval: TimeSpan.FromMilliseconds(100), immediate: !wasVisible);
+
+        void ShowDetails()
+        {
+            // Since immediate=true means we're called synchronously from this method, we need to check
+            // if we're on the UI thread and re-queue if not.
+            if (!_queue.HasThreadAccess)
             {
-                Task.Factory.StartNew(
-                    () =>
-                    {
-                        // TERRIBLE HACK TODO GH #245
-                        // There's weird wacky bugs with debounce currently.
-                        if (!ViewModel.IsDetailsVisible)
-                        {
-                            ViewModel.Details = message.Details;
-                            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasHeroImage)));
-                            ViewModel.IsDetailsVisible = true;
-                            return;
-                        }
+                var enqueued = _queue.TryEnqueue(ShowDetails);
+                if (!enqueued)
+                {
+                    Logger.LogError("Failed to enqueue show details action on UI thread");
+                }
 
-                        // GH #322:
-                        // For inexplicable reasons, if you try to change the details too fast,
-                        // we'll explode. This seemingly only happens if you change the details
-                        // while we're also scrolling a new list view item into view.
-                        _debounceTimer.Debounce(
-                            () =>
-                            {
-                                ViewModel.Details = message.Details;
+                return;
+            }
 
-                                // Trigger a re-evaluation of whether we have a hero image based on
-                                // the current theme
-                                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasHeroImage)));
-                            },
-                            interval: TimeSpan.FromMilliseconds(50),
-                            immediate: ViewModel.IsDetailsVisible == false);
-                        ViewModel.IsDetailsVisible = true;
-                    },
-                    CancellationToken.None,
-                    TaskCreationOptions.None,
-                    pageContext.Scheduler);
+            try
+            {
+                DetailsContent.ChangeView(null, 0, null, true);
+                ViewModel.Details = details;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasHeroImage)));
+                ViewModel.IsDetailsVisible = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Failed to show detail", ex);
             }
         }
     }
 
-    public void Receive(HideDetailsMessage message) => HideDetails();
+    public void Receive(HideDetailsMessage message)
+    {
+        // Debounce the hide through the same timer used for show. If a
+        // ShowDetailsMessage arrives before this fires, it cancels the
+        // pending hide - preventing the panel from flickering closed and
+        // reopened during rapid item navigation.
+        _debounceTimer.Debounce(
+            () => HideDetails(),
+            interval: TimeSpan.FromMilliseconds(150),
+            immediate: false);
+    }
 
     public void Receive(LaunchUriMessage message) => _ = global::Windows.System.Launcher.LaunchUriAsync(message.Uri);
 
@@ -328,16 +491,15 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
     public void Receive(ClearSearchMessage message) => SearchBox.ClearSearch();
 
-    public void Receive(HotkeySummonMessage message)
-    {
-        _ = DispatcherQueue.TryEnqueue(() => SummonOnUiThread(message));
-    }
+    public void Receive(FocusSearchBoxMessage message) => RequestTopBarFocusRestore();
+
+    public void Receive(HotkeySummonMessage message) => _ = DispatcherQueue.TryEnqueue(() => SummonOnUiThread(message));
 
     public void Receive(SettingsWindowClosedMessage message) => _settingsWindow = null;
 
     private void SummonOnUiThread(HotkeySummonMessage message)
     {
-        var settings = App.Current.Services.GetService<SettingsModel>()!;
+        var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
         var commandId = message.CommandId;
         var isRoot = string.IsNullOrEmpty(commandId);
         if (isRoot)
@@ -376,8 +538,9 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
                     if (isPage)
                     {
                         // If we're here, then the bound command was a page
-                        // of some kind. Let's pop the stack, show the window, and navigate to it.
-                        GoHome(false);
+                        // of some kind. Reset to root (clearing any transient dock state),
+                        // show the window, and navigate to it.
+                        ViewModel.ResetToHome();
 
                         WeakReferenceMessenger.Default.Send<ShowWindowMessage>(new(message.Hwnd));
                     }
@@ -397,13 +560,16 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
             }
         }
 
+        // When re-showing the palette, the previous session's query may still be present
+        // (e.g. after a light dismiss with HighlightSearchOnActivate). Recompute the
+        // compact/expanded state so a retained query restores the expanded results instead
+        // of being stuck in the collapsed search-only layout.
+        UpdateCompactModeForCurrentPage();
+
         WeakReferenceMessenger.Default.Send<FocusSearchBoxMessage>();
     }
 
-    public void Receive(GoBackMessage message)
-    {
-        _ = DispatcherQueue.TryEnqueue(() => GoBack(message.WithAnimation, message.FocusSearch));
-    }
+    public void Receive(GoBackMessage message) => _ = DispatcherQueue.TryEnqueue(() => GoBack(message.WithAnimation, message.FocusSearch));
 
     private void GoBack(bool withAnimation = true, bool focusSearch = true)
     {
@@ -417,37 +583,40 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         // However, then we have more fine-grained control on the back stack, managing the VM cache, and not
         // having that all be a black box, though then we wouldn't cache the XAML page itself, but sometimes that is a drawback.
         // However, we do a good job here, see ForwardStack.Clear below, and BackStack.Clear above about managing that.
-        if (withAnimation)
+        if (RootFrame.CanGoBack)
         {
-            RootFrame.GoBack();
-        }
-        else
-        {
-            RootFrame.GoBack(_noAnimation);
-        }
+            if (withAnimation)
+            {
+                RootFrame.GoBack();
+            }
+            else
+            {
+                RootFrame.GoBack(_noAnimation);
+            }
 
-        // Don't store pages we're navigating away from in the Frame cache
-        // TODO: In the future we probably want a short cache (3-5?) of recent VMs in case the user re-navigates
-        // back to a recent page they visited (like the Pokedex) so we don't have to reload it from  scratch.
-        // That'd be retrieved as we re-navigate in the PerformCommandMessage logic above
-        RootFrame.ForwardStack.Clear();
+            // Don't store pages we're navigating away from in the Frame cache
+            // TODO: In the future we probably want a short cache (3-5?) of recent VMs in case the user re-navigates
+            // back to a recent page they visited (like the Pokedex) so we don't have to reload it from  scratch.
+            // That'd be retrieved as we re-navigate in the PerformCommandMessage logic above
+            RootFrame.ForwardStack.Clear();
+        }
 
         if (!RootFrame.CanGoBack)
         {
-            ViewModel.GoHome();
+            ViewModel.GoHome(withAnimation, focusSearch);
         }
 
-        if (focusSearch)
+        // Only move focus when the palette is actually on screen. FocusActiveControl uses keyboard
+        // focus so the screen reader announces the box; doing that while the window is hidden
+        // would announce it prematurely.
+        if (focusSearch && HostWindow?.IsVisibleToUser == true)
         {
-            SearchBox.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
+            SearchBox.FocusActiveControl();
             SearchBox.SelectSearch();
         }
     }
 
-    public void Receive(GoHomeMessage message)
-    {
-        _ = DispatcherQueue.TryEnqueue(() => GoHome(withAnimation: message.WithAnimation, focusSearch: message.FocusSearch));
-    }
+    public void Receive(GoHomeMessage message) => _ = DispatcherQueue.TryEnqueue(() => GoHome(withAnimation: message.WithAnimation, focusSearch: message.FocusSearch));
 
     private void GoHome(bool withAnimation = true, bool focusSearch = true)
     {
@@ -457,18 +626,101 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
             GoBack(withAnimation, focusSearch: false);
         }
 
-        // focus search box, even if we were already home
-        if (focusSearch)
+        // focus search box, even if we were already home (but only when the palette is on
+        // screen - see GoBack; keyboard focus while hidden announces prematurely).
+        if (focusSearch && HostWindow?.IsVisibleToUser == true)
         {
-            SearchBox.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
+            SearchBox.FocusActiveControl();
             SearchBox.SelectSearch();
         }
+    }
+
+    public void Receive(ShowHideDockMessage message)
+    {
+        _ = DispatcherQueue.TryEnqueue(() =>
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            if (message.ShowDock)
+            {
+                if (_dockWindowManager is null)
+                {
+                    _dockWindowManager = App.Current.Services.GetService<DockWindowManager>();
+                }
+
+                _dockWindowManager?.ShowDocks();
+            }
+            else
+            {
+                _dockWindowManager?.HideDocks();
+            }
+        });
+    }
+
+    private void ToggleFilterFocus()
+    {
+        if (!FiltersDropDown.IsFilterVisible)
+        {
+            return;
+        }
+
+        if (FiltersDropDown.IsActive)
+        {
+            FiltersDropDown.CloseDropDownAndFocusSearch();
+        }
+        else
+        {
+            FiltersDropDown.OpenDropDown();
+        }
+    }
+
+    private void SearchBox_ActiveFocusTargetChanged(object? sender, EventArgs e)
+    {
+        RequestTopBarFocusRestore();
+    }
+
+    private void HostWindow_IsVisibleToUserChanged(object? sender, EventArgs e)
+    {
+        if (HostWindow?.IsVisibleToUser == true &&
+            _pendingTopBarFocusRestore &&
+            ViewModel.CurrentPage?.HasSearchBox == true)
+        {
+            _pendingTopBarFocusRestore = false;
+            SearchBox.FocusActiveControl();
+        }
+    }
+
+    private void RequestTopBarFocusRestore()
+    {
+        if (ViewModel.CurrentPage?.HasSearchBox != true)
+        {
+            _pendingTopBarFocusRestore = false;
+            return;
+        }
+
+        if (HostWindow?.IsVisibleToUser == true)
+        {
+            _pendingTopBarFocusRestore = false;
+            SearchBox.FocusActiveControl();
+            return;
+        }
+
+        _pendingTopBarFocusRestore = true;
     }
 
     private void BackButton_Clicked(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) => WeakReferenceMessenger.Default.Send<NavigateBackMessage>(new());
 
     private void RootFrame_Navigated(object sender, Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
     {
+        // A real navigation always loads a fresh page that we do want to focus/select, so
+        // clear any stale suppression left over from a prior compact expand. (If this
+        // navigation itself expands compact mode, UpdateCompactModeForCurrentPage below
+        // will re-arm the flag for the page that's about to load.)
+        _suppressSelectOnNextLoad = false;
+
         // This listens to the root frame to ensure that we also track the content's page VM as well that we passed as a parameter.
         // This is currently used for both forward and backward navigation.
         // As when we go back that we restore ourselves to the proper state within our VM
@@ -505,6 +757,47 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
             _lastNavigatedPageRef = new WeakReference<Page>(element);
             element.Loaded += FocusAfterLoaded;
         }
+
+        UpdateCompactModeForCurrentPage();
+    }
+
+    /// <summary>
+    /// Updates the compact/expanded state after a navigation. On any nested (sub) page we
+    /// always show the full expanded UI; on the root page the search box drives the state,
+    /// so we collapse to the compact search box only when the query is empty. Driving this
+    /// from navigation (rather than only from search-text changes) makes alias-based
+    /// navigation expand correctly — an alias clears the search box before navigating, so
+    /// the search-text transition alone would otherwise leave the palette collapsed.
+    /// Transient pages always show the expanded UI, ignoring the compact setting entirely.
+    /// </summary>
+    private void UpdateCompactModeForCurrentPage()
+    {
+        var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
+        if (!settings.CompactMode)
+        {
+            // Compact mode is off: the shell always shows the full expanded UI. Set it
+            // explicitly (rather than trusting the constructor's initial value) so toggling
+            // the setting off at runtime restores the list and command bar when the palette
+            // was collapsed.
+            HandleExpandCompactOnUiThread(true);
+            return;
+        }
+
+        // Transient pages ignore compact mode and always present as expanded.
+        if (ViewModel.IsTransient)
+        {
+            HandleExpandCompactOnUiThread(true);
+            return;
+        }
+
+        // The ShellViewModel's IsNested flag is only updated on forward navigation and is
+        // never cleared when navigating back to the root page. Gate it on the current
+        // page's own root-ness so a stale IsNested can't keep the home page expanded after
+        // returning to it (e.g. after following a 1-character alias and going back).
+        var isRootPage = ViewModel.CurrentPage?.IsRootPage ?? false;
+        var nested = ViewModel.IsNested && !isRootPage;
+        var hasQuery = !string.IsNullOrEmpty(ViewModel.CurrentPage?.SearchTextBox);
+        HandleExpandCompactOnUiThread(nested || hasQuery);
     }
 
     private void FocusAfterLoaded(object sender, RoutedEventArgs e)
@@ -531,7 +824,22 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         if (shouldSearchBoxBeVisible || page is not ContentPage)
         {
             ViewModel.IsSearchBoxVisible = shouldSearchBoxBeVisible;
-            SearchBox.Focus(FocusState.Programmatic);
+
+            if (HostWindow?.IsVisibleToUser != true)
+            {
+                return;
+            }
+
+            // This Loaded can fire late when expanding out of compact mode (the page was
+            // collapsed and never laid out). In that case the user is mid-typing in the
+            // already-focused search box, so don't steal focus / select-all their input.
+            if (_suppressSelectOnNextLoad)
+            {
+                _suppressSelectOnNextLoad = false;
+                return;
+            }
+
+            SearchBox.FocusActiveControl();
             SearchBox.SelectSearch();
         }
         else
@@ -546,6 +854,11 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
                     try
                     {
+                        if (HostWindow?.IsVisibleToUser != true)
+                        {
+                            return;
+                        }
+
                         await page.DispatcherQueue.EnqueueAsync(
                             async () =>
                             {
@@ -554,6 +867,11 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
                                 for (var i = 0; i < 10; i++)
                                 {
                                     token.ThrowIfCancellationRequested();
+
+                                    if (HostWindow?.IsVisibleToUser != true)
+                                    {
+                                        break;
+                                    }
 
                                     if (FocusManager.FindFirstFocusableElement(page) is FrameworkElement frameworkElement)
                                     {
@@ -634,66 +952,91 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
     private static void ShellPage_OnPreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        var ctrlPressed = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
-        var altPressed = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu).HasFlag(CoreVirtualKeyStates.Down);
-        var shiftPressed = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down);
-        var winPressed = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.LeftWindows).HasFlag(CoreVirtualKeyStates.Down) ||
-                         InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.RightWindows).HasFlag(CoreVirtualKeyStates.Down);
+        var modifiers = KeyModifiers.GetCurrent();
 
-        var onlyAlt = altPressed && !ctrlPressed && !shiftPressed && !winPressed;
-        var onlyCtrl = !altPressed && ctrlPressed && !shiftPressed && !winPressed;
         switch (e.Key)
         {
-            case VirtualKey.Left when onlyAlt: // Alt+Left arrow
+            case VirtualKey.Left when modifiers.OnlyAlt: // Alt+Left arrow
                 WeakReferenceMessenger.Default.Send<NavigateBackMessage>(new());
                 e.Handled = true;
                 break;
-            case VirtualKey.Home when onlyAlt: // Alt+Home
+            case VirtualKey.Home when modifiers.OnlyAlt: // Alt+Home
                 WeakReferenceMessenger.Default.Send<GoHomeMessage>(new(WithAnimation: false));
                 e.Handled = true;
                 break;
-            case (VirtualKey)188 when onlyCtrl: // Ctrl+,
+            case (VirtualKey)188 when modifiers.OnlyCtrl: // Ctrl+,
                 WeakReferenceMessenger.Default.Send<OpenSettingsMessage>(new());
                 e.Handled = true;
                 break;
+            case VirtualKey.F when modifiers.OnlyAlt: // Alt+F: toggle filter focus
+                ((ShellPage)sender).ToggleFilterFocus();
+                e.Handled = true;
+                break;
+            case VirtualKey.Down when modifiers.None:
+            case VirtualKey.Tab when modifiers.None:
+                // In a collapsed compact palette, Down/Tab reveals the top-level items so the
+                // user can browse and discover them. Only swallow the key when we actually
+                // expand; otherwise let it fall through to normal list navigation / focus move.
+                if (((ShellPage)sender).TryExpandCollapsedCompact())
+                {
+                    e.Handled = true;
+                }
+
+                break;
             default:
                 {
-                    // The CommandBar is responsible for handling all the item keybindings,
-                    // since the bound context item may need to then show another
-                    // context menu
-                    TryCommandKeybindingMessage msg = new(ctrlPressed, altPressed, shiftPressed, winPressed, e.Key);
-                    WeakReferenceMessenger.Default.Send(msg);
-                    e.Handled = msg.Handled;
+                    // The CommandBar handles item keybindings; skip them while collapsed so a chord can't hit the hidden selection.
+                    if (((ShellPage)sender).ItemActionsAllowed)
+                    {
+                        TryCommandKeybindingMessage msg = new(modifiers.Ctrl, modifiers.Alt, modifiers.Shift, modifiers.Win, e.Key);
+                        WeakReferenceMessenger.Default.Send(msg);
+                        e.Handled = msg.Handled;
+                    }
+
                     break;
                 }
         }
     }
 
-    private static void ShellPage_OnKeyDown(object sender, KeyRoutedEventArgs e)
+    private void ShellPage_OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        var ctrlPressed = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
-        if (ctrlPressed && e.Key == VirtualKey.Enter)
+        if (ItemActionsAllowed && TryHandleItemAction(e))
         {
-            // ctrl+enter
-            WeakReferenceMessenger.Default.Send<ActivateSecondaryCommandMessage>();
-            e.Handled = true;
+            return;
         }
-        else if (e.Key == VirtualKey.Enter)
-        {
-            WeakReferenceMessenger.Default.Send<ActivateSelectedListItemMessage>();
-            e.Handled = true;
-        }
-        else if (ctrlPressed && e.Key == VirtualKey.K)
-        {
-            // ctrl+k
-            WeakReferenceMessenger.Default.Send<OpenContextMenuMessage>(new OpenContextMenuMessage(null, null, null, ContextMenuFilterLocation.Bottom));
-            e.Handled = true;
-        }
-        else if (e.Key == VirtualKey.Escape)
+
+        if (e.Key == VirtualKey.Escape)
         {
             WeakReferenceMessenger.Default.Send<NavigateBackMessage>(new());
             e.Handled = true;
         }
+    }
+
+    private static bool TryHandleItemAction(KeyRoutedEventArgs e)
+    {
+        var mods = KeyModifiers.GetCurrent();
+        switch (e.Key)
+        {
+            // Ctrl+Enter
+            case VirtualKey.Enter when mods.OnlyCtrl:
+                WeakReferenceMessenger.Default.Send<ActivateSecondaryCommandMessage>();
+                break;
+
+            // Enter
+            case VirtualKey.Enter when mods.None:
+                WeakReferenceMessenger.Default.Send<ActivateSelectedListItemMessage>();
+                break;
+
+            // Ctrl+K
+            case VirtualKey.K when mods.OnlyCtrl:
+                WeakReferenceMessenger.Default.Send<OpenContextMenuMessage>(new(null, null, null, ContextMenuFilterLocation.Bottom));
+                break;
+            default:
+                return false;
+        }
+
+        e.Handled = true;
+        return true;
     }
 
     private void ShellPage_OnPointerPressed(object sender, PointerRoutedEventArgs e)
@@ -716,10 +1059,119 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         }
     }
 
+    public void Receive(ExpandCompactModeMessage message)
+    {
+        // Down/Tab expands the shell synchronously before broadcasting this message so the
+        // host can resize the card. In that case the requested state is already applied;
+        // re-evaluating from the empty query would immediately collapse it again.
+        if (ExpandedMode == message.Expanded)
+        {
+            return;
+        }
+
+        // Re-evaluate from the current authoritative page state rather than applying the
+        // message's snapshot directly. The message can race with navigation: following a
+        // 1-character alias clears the home search (sending a "collapse") right as we
+        // navigate to a nested page that must stay expanded. Recomputing here keeps the
+        // final state consistent regardless of message/navigation ordering.
+        this.DispatcherQueue.TryEnqueue(UpdateCompactModeForCurrentPage);
+    }
+
+    private void OnSettingsChanged(ISettingsService sender, SettingsModel args)
+    {
+        // Only the compact-mode setting affects the expanded/collapsed layout, so ignore
+        // hot-reloads that leave it unchanged. Comparing and updating _compactMode on the UI
+        // thread keeps it single-threaded regardless of which thread raises the event.
+        var compactMode = args.CompactMode;
+        this.DispatcherQueue.TryEnqueue(() =>
+        {
+            if (compactMode == _compactMode)
+            {
+                return;
+            }
+
+            _compactMode = compactMode;
+            UpdateCompactModeForCurrentPage();
+        });
+    }
+
+    private void HandleExpandCompactOnUiThread(bool expanded)
+    {
+        var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
+        var newExpanded = settings.CompactMode ? expanded : true;
+
+        // Going from collapsed to expanded realizes the (previously collapsed) content
+        // page for the first time, which fires its deferred Loaded event. Suppress the
+        // resulting focus/select so we don't select-all the character the user just typed.
+        if (!this.ExpandedMode && newExpanded)
+        {
+            _suppressSelectOnNextLoad = true;
+        }
+
+        this.ExpandedMode = newExpanded;
+        PropertyChanged?.Invoke(this, new(nameof(ExpandedMode)));
+    }
+
+    /// <summary>
+    /// Expands a collapsed compact palette on demand (via Down/Tab) so the user can browse the
+    /// top-level items. Returns <see langword="false"/> and does nothing unless compact mode is
+    /// on and the palette is currently collapsed, letting the caller keep the key's normal
+    /// meaning (list navigation / focus traversal) in every other case.
+    /// </summary>
+    private bool TryExpandCollapsedCompact()
+    {
+        if (!_compactMode || ExpandedMode)
+        {
+            return false;
+        }
+
+        HandleExpandCompactOnUiThread(true);
+        WeakReferenceMessenger.Default.Send<ExpandCompactModeMessage>(new(true));
+        return true;
+    }
+
+    /// <summary>
+    /// Forces the shell into its compact (collapsed) layout and flushes layout so the host can
+    /// read the resulting card height. Only has an effect when compact mode is enabled.
+    /// </summary>
+    public void EnsureCompactLayout()
+    {
+        var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
+        if (!settings.CompactMode)
+        {
+            return;
+        }
+
+        this.ExpandedMode = false;
+        PropertyChanged?.Invoke(this, new(nameof(ExpandedMode)));
+        this.UpdateLayout();
+    }
+
     public void Dispose()
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        _isDisposed = true;
+        WeakReferenceMessenger.Default.UnregisterAll(this);
+        _settingsService.SettingsChanged -= OnSettingsChanged;
+
+        if (_hostWindow is not null)
+        {
+            _hostWindow.IsVisibleToUserChanged -= HostWindow_IsVisibleToUserChanged;
+            _hostWindow = null;
+        }
+
         _focusAfterLoadedCts?.Cancel();
         _focusAfterLoadedCts?.Dispose();
         _focusAfterLoadedCts = null;
+
+        var dockWindowManager = _dockWindowManager;
+        _dockWindowManager = null;
+        dockWindowManager?.Dispose();
+
+        GC.SuppressFinalize(this);
     }
 }

@@ -9,8 +9,6 @@ using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
-
-using Microsoft.CmdPal.Core.ViewModels.Messages;
 using Microsoft.CmdPal.UI.ViewModels.Messages;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 
@@ -126,13 +124,6 @@ public partial class SettingsExtensionsViewModel : ObservableObject
     private static bool Contains(string? haystack, string needle)
     {
         return !string.IsNullOrEmpty(haystack) && haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [RelayCommand]
-    private void OpenStoreWithExtension(string? query)
-    {
-        const string extensionsAssocUri = "ms-windows-store://assoc/?Tags=AppExtension-com.microsoft.commandpalette";
-        ShellHelpers.OpenInShell(extensionsAssocUri);
     }
 
     private void ReloadExtensions()

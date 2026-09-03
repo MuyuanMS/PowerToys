@@ -1,13 +1,9 @@
 ﻿// Copyright (c) Microsoft Corporation
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
-using System;
-using System.Collections.Generic;
-using System.Linq;
+
 using Microsoft.CmdPal.Ext.WindowWalker.Commands;
-using Microsoft.CmdPal.Ext.WindowWalker.Helpers;
-using Microsoft.CmdPal.Ext.WindowWalker.Properties;
-using Microsoft.CommandPalette.Extensions.Toolkit;
+using Microsoft.CmdPal.Ext.WindowWalker.Pages;
 
 namespace Microsoft.CmdPal.Ext.WindowWalker.Components;
 
@@ -17,53 +13,25 @@ namespace Microsoft.CmdPal.Ext.WindowWalker.Components;
 internal static class ResultHelper
 {
     /// <summary>
-    /// Returns a list of all results for the query.
+    /// Creates a list item for a window.
     /// </summary>
-    /// <param name="searchControllerResults">List with all search controller matches</param>
-    /// <returns>List of results</returns>
-    internal static List<WindowWalkerListItem> GetResultList(List<SearchResult> searchControllerResults, bool isKeywordSearch)
+    internal static WindowWalkerListItem CreateResult(Window window)
     {
-        if (searchControllerResults is null || searchControllerResults.Count == 0)
-        {
-            return [];
-        }
-
-        var resultsList = new List<WindowWalkerListItem>(searchControllerResults.Count);
-        var addExplorerInfo = searchControllerResults.Any(x =>
-            string.Equals(x.Result.Process.Name, "explorer.exe", StringComparison.OrdinalIgnoreCase) &&
-            x.Result.Process.IsShellProcess);
-
-        // Process each SearchResult to convert it into a Result.
-        // Using parallel processing if the operation is CPU-bound and the list is large.
-        resultsList = searchControllerResults
-            .AsParallel()
-            .Select(x => CreateResultFromSearchResult(x))
-            .ToList();
-
-        if (addExplorerInfo && !SettingsManager.Instance.HideExplorerSettingInfo)
-        {
-            resultsList.Insert(0, GetExplorerInfoResult());
-        }
-
-        return resultsList;
+        var item = new WindowWalkerListItem(window);
+        UpdateResult(item, window);
+        return item;
     }
 
     /// <summary>
-    /// Creates a Result object from a given SearchResult.
+    /// Updates a cached list item with the latest window data.
     /// </summary>
-    /// <param name="searchResult">The SearchResult object to convert.</param>
-    /// <returns>A Result object populated with data from the SearchResult.</returns>
-    private static WindowWalkerListItem CreateResultFromSearchResult(SearchResult searchResult)
+    internal static void UpdateResult(WindowWalkerListItem item, Window window)
     {
-        var item = new WindowWalkerListItem(searchResult.Result)
-        {
-            Title = searchResult.Result.Title,
-            Subtitle = GetSubtitle(searchResult.Result),
-            Tags = GetTags(searchResult.Result),
-        };
-        item.MoreCommands = ContextMenuHelper.GetContextMenuResults(item).ToArray();
-
-        return item;
+        item.UpdateWindow(window);
+        item.Title = window.Title;
+        item.Subtitle = GetSubtitle(window);
+        item.Tags = GetTags(window);
+        item.MoreCommands = [.. ContextMenuHelper.GetContextMenuResults(item)];
     }
 
     /// <summary>
@@ -73,11 +41,6 @@ internal static class ResultHelper
     /// <returns>String with the subtitle</returns>
     private static string GetSubtitle(Window window)
     {
-        if (window is null or null)
-        {
-            return string.Empty;
-        }
-
         var subtitleText = Resources.windowwalker_Running + ": " + window.Process.Name;
 
         return subtitleText;
@@ -91,7 +54,6 @@ internal static class ResultHelper
             tags.Add(new Tag
             {
                 Text = Resources.windowwalker_NotResponding,
-                Foreground = ColorHelpers.FromRgb(220, 20, 60),
             });
         }
 
@@ -111,10 +73,10 @@ internal static class ResultHelper
             });
         }
 
-        return tags.ToArray();
+        return [.. tags];
     }
 
-    private static WindowWalkerListItem GetExplorerInfoResult()
+    internal static WindowWalkerListItem GetExplorerInfoResult()
     {
         return new WindowWalkerListItem(null)
         {

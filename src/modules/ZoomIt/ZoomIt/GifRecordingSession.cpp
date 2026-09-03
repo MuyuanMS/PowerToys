@@ -12,6 +12,12 @@
 #include <shcore.h>
 
 extern DWORD g_RecordScaling;
+extern HWND g_hWndMain;
+
+// Must match the definition in ZoomIt.h.
+#ifndef WM_USER_RECORDING_NO_FRAMES
+#define WM_USER_RECORDING_NO_FRAMES (WM_USER + 112)
+#endif
 
 namespace winrt
 {
@@ -242,6 +248,13 @@ std::shared_ptr<GifRecordingSession> GifRecordingSession::Create(
 //----------------------------------------------------------------------------
 HRESULT GifRecordingSession::EncodeFrame(ID3D11Texture2D* frameTexture)
 {
+    std::lock_guard<std::mutex> lock(m_encoderMutex);
+    if (m_encoderReleased)
+    {
+        OutputDebugStringW(L"EncodeFrame called after encoder released.\n");
+        return E_FAIL;
+    }
+
     try
     {
         // Create a staging texture for CPU access
@@ -367,6 +380,7 @@ HRESULT GifRecordingSession::EncodeFrame(ID3D11Texture2D* frameTexture)
 
         // Increment and log frame count
         m_frameCount++;
+        m_hasAnyFrame.store(true);
         OutputDebugStringW((L"GIF Frame #" + std::to_wstring(m_frameCount) + L" fully encoded and committed\n").c_str());
 
         return S_OK;
@@ -401,10 +415,34 @@ winrt::IAsyncAction GifRecordingSession::StartAsync()
             // Keep track of the last frame to duplicate when needed
             winrt::com_ptr<ID3D11Texture2D> lastCroppedTexture;
 
+            bool firstFrame = true;
             while (m_isRecording && !m_closed)
             {
                 captureAttempts++;
-                auto frame = m_frameWait->TryGetNextFrame();
+                // Bound the very first frame so a display that never delivers
+                // frames to Windows.Graphics.Capture (headless / GPU-less VM
+                // or some remote sessions) is detected and reported instead
+                // of blocking forever on an INFINITE wait.
+                constexpr DWORD c_firstFrameTimeoutMs = 3000;
+                auto frame = firstFrame
+                    ? m_frameWait->TryGetNextFrame( c_firstFrameTimeoutMs )
+                    : m_frameWait->TryGetNextFrame();
+                if (firstFrame && !frame && m_isRecording && !m_closed)
+                {
+                    // First frame never arrived — capture is not delivering
+                    // frames.  Notify the UI so it can tell the user instead
+                    // of silently producing an empty GIF.
+                    OutputDebugStringW(L"[GIF] first-frame timeout — capture delivered no frames; signaling capture-unavailable\n");
+                    PostMessage(g_hWndMain, WM_USER_RECORDING_NO_FRAMES, 0, 0);
+                    break;
+                }
+                firstFrame = false;
+                if (!frame && !m_isRecording)
+                {
+                    // Recording was stopped while waiting for frame
+                    OutputDebugStringW(L"[GIF] Recording stopped during frame wait\n");
+                    break;
+                }
 
                 winrt::com_ptr<ID3D11Texture2D> croppedTexture;
 
@@ -472,7 +510,16 @@ winrt::IAsyncAction GifRecordingSession::StartAsync()
 
                 // Wait for the next frame interval
                 co_await winrt::resume_after(std::chrono::milliseconds(1000 / m_frameRate));
+                
+                // Check again after resuming from sleep
+                if (!m_isRecording || m_closed)
+                {
+                    OutputDebugStringW(L"[GIF] Loop exiting after resume_after\n");
+                    break;
+                }
             }
+
+            OutputDebugStringW(L"[GIF] Capture loop exited\n");
 
             // Commit the GIF encoder
             if (m_gifEncoder)
@@ -511,6 +558,10 @@ winrt::IAsyncAction GifRecordingSession::StartAsync()
             CloseInternal();
         }
     }
+
+    // Ensure encoder resources are released in case caller forgets to Close explicitly.
+    ReleaseEncoderResources();
+    OutputDebugStringW(L"[GIF] StartAsync completing, about to co_return\n");
     co_return;
 }
 
@@ -521,18 +572,18 @@ winrt::IAsyncAction GifRecordingSession::StartAsync()
 //----------------------------------------------------------------------------
 void GifRecordingSession::Close()
 {
+    OutputDebugStringW(L"[GIF] Close() called\n");
     auto expected = false;
     if (m_closed.compare_exchange_strong(expected, true))
     {
-        expected = true;
-        if (!m_isRecording.compare_exchange_strong(expected, false))
-        {
-            CloseInternal();
-        }
-        else
-        {
-            m_frameWait->StopCapture();
-        }
+        OutputDebugStringW(L"[GIF] Setting m_closed = true\n");
+        // Signal the capture loop to stop
+        m_isRecording = false;
+        OutputDebugStringW(L"[GIF] Setting m_isRecording = false\n");
+        
+        // Stop the frame wait to unblock any pending frame acquisition
+        m_frameWait->StopCapture();
+        OutputDebugStringW(L"[GIF] StopCapture called\n");
     }
 }
 
@@ -543,6 +594,42 @@ void GifRecordingSession::Close()
 //----------------------------------------------------------------------------
 void GifRecordingSession::CloseInternal()
 {
+    ReleaseEncoderResources();
+
     m_frameWait->StopCapture();
     m_itemClosed.revoke();
+}
+
+//----------------------------------------------------------------------------
+//
+// GifRecordingSession::ReleaseEncoderResources
+// Ensures encoder/stream COM objects release the temp file handle so trim can reopen it.
+//
+//----------------------------------------------------------------------------
+void GifRecordingSession::ReleaseEncoderResources()
+{
+    std::lock_guard<std::mutex> lock(m_encoderMutex);
+    if (m_encoderReleased)
+    {
+        return;
+    }
+
+    // Commit only if we still own the encoder and it has not been committed; swallow failures.
+    if (m_gifEncoder)
+    {
+        try
+        {
+            m_gifEncoder->Commit();
+        }
+        catch (...)
+        {
+        }
+    }
+
+    m_encoderMetadataWriter = nullptr;
+    m_gifEncoder = nullptr;
+    m_wicStream = nullptr;
+    m_wicFactory = nullptr;
+    m_stream = nullptr;
+    m_encoderReleased = true;
 }

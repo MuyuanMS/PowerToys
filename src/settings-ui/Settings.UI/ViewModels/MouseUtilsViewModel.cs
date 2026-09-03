@@ -69,14 +69,20 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
             MouseHighlighterSettingsConfig = mouseHighlighterSettingsRepository.SettingsConfig;
             string leftClickColor = MouseHighlighterSettingsConfig.Properties.LeftButtonClickColor.Value;
-            _highlighterLeftButtonClickColor = !string.IsNullOrEmpty(leftClickColor) ? leftClickColor : "#a6FFFF00";
+            _highlighterLeftButtonClickColor = !string.IsNullOrEmpty(leftClickColor) ? leftClickColor : MouseHighlighterProperties.DefaultLeftButtonClickColor;
 
             string rightClickColor = MouseHighlighterSettingsConfig.Properties.RightButtonClickColor.Value;
-            _highlighterRightButtonClickColor = !string.IsNullOrEmpty(rightClickColor) ? rightClickColor : "#a60000FF";
+            _highlighterRightButtonClickColor = !string.IsNullOrEmpty(rightClickColor) ? rightClickColor : MouseHighlighterProperties.DefaultRightButtonClickColor;
 
             string alwaysColor = MouseHighlighterSettingsConfig.Properties.AlwaysColor.Value;
             _highlighterAlwaysColor = !string.IsNullOrEmpty(alwaysColor) ? alwaysColor : "#00FF0000";
             _isSpotlightModeEnabled = MouseHighlighterSettingsConfig.Properties.SpotlightMode.Value;
+            _isRippleModeEnabled = MouseHighlighterSettingsConfig.Properties.RippleMode.Value;
+            _rippleSize = MouseHighlighterSettingsConfig.Properties.RippleSize.Value;
+            _rippleIntensity = MouseHighlighterSettingsConfig.Properties.RippleIntensity.Value;
+            _rippleDurationMs = MouseHighlighterSettingsConfig.Properties.RippleDurationMs.Value;
+            _rippleShowDragTrail = MouseHighlighterSettingsConfig.Properties.RippleShowDragTrail.Value;
+            _rippleShowReleasePulse = MouseHighlighterSettingsConfig.Properties.RippleShowReleasePulse.Value;
 
             _highlighterRadius = MouseHighlighterSettingsConfig.Properties.HighlightRadius.Value;
             _highlightFadeDelayMs = MouseHighlighterSettingsConfig.Properties.HighlightFadeDelayMs.Value;
@@ -112,6 +118,15 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
             // Null-safe access in case property wasn't upgraded yet - default to TRUE
             _cursorWrapDisableWrapDuringDrag = CursorWrapSettingsConfig.Properties.DisableWrapDuringDrag?.Value ?? true;
+
+            // Null-safe access in case property wasn't upgraded yet - default to 0 (Both)
+            _cursorWrapWrapMode = CursorWrapSettingsConfig.Properties.WrapMode?.Value ?? 0;
+
+            // Null-safe access in case property wasn't upgraded yet - default to 0 (Always)
+            _cursorWrapActivationMode = CursorWrapSettingsConfig.Properties.ActivationMode?.Value ?? 0;
+
+            // Null-safe access in case property wasn't upgraded yet - default to false
+            _cursorWrapDisableOnSingleMonitor = CursorWrapSettingsConfig.Properties.DisableCursorWrapOnSingleMonitor?.Value ?? false;
 
             int isEnabled = 0;
 
@@ -599,6 +614,64 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
         }
 
+        public bool IsRippleModeEnabled
+        {
+            get => _isRippleModeEnabled;
+            set
+            {
+                if (_isRippleModeEnabled != value)
+                {
+                    _isRippleModeEnabled = value;
+                    MouseHighlighterSettingsConfig.Properties.RippleMode.Value = value;
+                    NotifyMouseHighlighterPropertyChanged();
+                }
+            }
+        }
+
+        // ComboBox index for the highlight mode selector.
+        // 0 = Spotlight, 1 = Circle, 2 = Ripple
+        public int HighlightModeIndex
+        {
+            get
+            {
+                if (_isSpotlightModeEnabled)
+                {
+                    return 0;
+                }
+
+                return _isRippleModeEnabled ? 2 : 1;
+            }
+
+            set
+            {
+                bool spotlight = value == 0;
+                bool ripple = value == 2;
+                bool changed = false;
+
+                if (_isSpotlightModeEnabled != spotlight)
+                {
+                    _isSpotlightModeEnabled = spotlight;
+                    MouseHighlighterSettingsConfig.Properties.SpotlightMode.Value = spotlight;
+                    OnPropertyChanged(nameof(IsSpotlightModeEnabled));
+                    changed = true;
+                }
+
+                if (_isRippleModeEnabled != ripple)
+                {
+                    _isRippleModeEnabled = ripple;
+                    MouseHighlighterSettingsConfig.Properties.RippleMode.Value = ripple;
+                    OnPropertyChanged(nameof(IsRippleModeEnabled));
+                    changed = true;
+                }
+
+                if (changed)
+                {
+                    OnPropertyChanged(nameof(HighlightModeIndex));
+                    NotifyMouseHighlighterPropertyChanged();
+                }
+            }
+        }
+
         public int MouseHighlighterRadius
         {
             get
@@ -666,6 +739,76 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 {
                     _highlighterAutoActivate = value;
                     MouseHighlighterSettingsConfig.Properties.AutoActivate.Value = value;
+                    NotifyMouseHighlighterPropertyChanged();
+                }
+            }
+        }
+
+        public int RippleSize
+        {
+            get => _rippleSize;
+            set
+            {
+                if (value != _rippleSize)
+                {
+                    _rippleSize = value;
+                    MouseHighlighterSettingsConfig.Properties.RippleSize.Value = value;
+                    NotifyMouseHighlighterPropertyChanged();
+                }
+            }
+        }
+
+        public double RippleIntensity
+        {
+            get => _rippleIntensity;
+            set
+            {
+                if (value != _rippleIntensity)
+                {
+                    _rippleIntensity = value;
+                    MouseHighlighterSettingsConfig.Properties.RippleIntensity.Value = value;
+                    NotifyMouseHighlighterPropertyChanged();
+                }
+            }
+        }
+
+        public int RippleDurationMs
+        {
+            get => _rippleDurationMs;
+            set
+            {
+                if (value != _rippleDurationMs)
+                {
+                    _rippleDurationMs = value;
+                    MouseHighlighterSettingsConfig.Properties.RippleDurationMs.Value = value;
+                    NotifyMouseHighlighterPropertyChanged();
+                }
+            }
+        }
+
+        public bool RippleShowDragTrail
+        {
+            get => _rippleShowDragTrail;
+            set
+            {
+                if (value != _rippleShowDragTrail)
+                {
+                    _rippleShowDragTrail = value;
+                    MouseHighlighterSettingsConfig.Properties.RippleShowDragTrail.Value = value;
+                    NotifyMouseHighlighterPropertyChanged();
+                }
+            }
+        }
+
+        public bool RippleShowReleasePulse
+        {
+            get => _rippleShowReleasePulse;
+            set
+            {
+                if (value != _rippleShowReleasePulse)
+                {
+                    _rippleShowReleasePulse = value;
+                    MouseHighlighterSettingsConfig.Properties.RippleShowReleasePulse.Value = value;
                     NotifyMouseHighlighterPropertyChanged();
                 }
             }
@@ -1000,13 +1143,6 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                     GeneralSettingsConfig.Enabled.CursorWrap = value;
                     OnPropertyChanged(nameof(IsCursorWrapEnabled));
 
-                    // Auto-enable the AutoActivate setting when CursorWrap is enabled
-                    // This ensures cursor wrapping is active immediately after enabling
-                    if (value && !_cursorWrapAutoActivate)
-                    {
-                        CursorWrapAutoActivate = true;
-                    }
-
                     OutGoingGeneralSettings outgoing = new OutGoingGeneralSettings(GeneralSettingsConfig);
                     SendConfigMSG(outgoing.ToString());
 
@@ -1083,6 +1219,90 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
         }
 
+        public int CursorWrapWrapMode
+        {
+            get
+            {
+                return _cursorWrapWrapMode;
+            }
+
+            set
+            {
+                if (value != _cursorWrapWrapMode)
+                {
+                    _cursorWrapWrapMode = value;
+
+                    // Ensure the property exists before setting value
+                    if (CursorWrapSettingsConfig.Properties.WrapMode == null)
+                    {
+                        CursorWrapSettingsConfig.Properties.WrapMode = new IntProperty(value);
+                    }
+                    else
+                    {
+                        CursorWrapSettingsConfig.Properties.WrapMode.Value = value;
+                    }
+
+                    NotifyCursorWrapPropertyChanged();
+                }
+            }
+        }
+
+        public int CursorWrapActivationMode
+        {
+            get
+            {
+                return _cursorWrapActivationMode;
+            }
+
+            set
+            {
+                if (value != _cursorWrapActivationMode)
+                {
+                    _cursorWrapActivationMode = value;
+
+                    // Ensure the property exists before setting value
+                    if (CursorWrapSettingsConfig.Properties.ActivationMode == null)
+                    {
+                        CursorWrapSettingsConfig.Properties.ActivationMode = new IntProperty(value);
+                    }
+                    else
+                    {
+                        CursorWrapSettingsConfig.Properties.ActivationMode.Value = value;
+                    }
+
+                    NotifyCursorWrapPropertyChanged();
+                }
+            }
+        }
+
+        public bool CursorWrapDisableOnSingleMonitor
+        {
+            get
+            {
+                return _cursorWrapDisableOnSingleMonitor;
+            }
+
+            set
+            {
+                if (value != _cursorWrapDisableOnSingleMonitor)
+                {
+                    _cursorWrapDisableOnSingleMonitor = value;
+
+                    // Ensure the property exists before setting value
+                    if (CursorWrapSettingsConfig.Properties.DisableCursorWrapOnSingleMonitor == null)
+                    {
+                        CursorWrapSettingsConfig.Properties.DisableCursorWrapOnSingleMonitor = new BoolProperty(value);
+                    }
+                    else
+                    {
+                        CursorWrapSettingsConfig.Properties.DisableCursorWrapOnSingleMonitor.Value = value;
+                    }
+
+                    NotifyCursorWrapPropertyChanged();
+                }
+            }
+        }
+
         public void NotifyCursorWrapPropertyChanged([CallerMemberName] string propertyName = null)
         {
             OnPropertyChanged(propertyName);
@@ -1128,6 +1348,12 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         private string _highlighterRightButtonClickColor;
         private string _highlighterAlwaysColor;
         private bool _isSpotlightModeEnabled;
+        private bool _isRippleModeEnabled;
+        private int _rippleSize;
+        private double _rippleIntensity;
+        private int _rippleDurationMs;
+        private bool _rippleShowDragTrail;
+        private bool _rippleShowReleasePulse;
         private int _highlighterRadius;
         private int _highlightFadeDelayMs;
         private int _highlightFadeDurationMs;
@@ -1154,5 +1380,8 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         private bool _isCursorWrapEnabled;
         private bool _cursorWrapAutoActivate;
         private bool _cursorWrapDisableWrapDuringDrag; // Will be initialized in constructor from settings
+        private int _cursorWrapWrapMode; // 0=Both, 1=VerticalOnly, 2=HorizontalOnly
+        private int _cursorWrapActivationMode; // 0=Always, 1=HoldingCtrl (wraps only while held), 2=HoldingShift (wraps only while held)
+        private bool _cursorWrapDisableOnSingleMonitor; // Disable cursor wrap when only one monitor is connected
     }
 }

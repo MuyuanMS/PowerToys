@@ -13,6 +13,7 @@ using ManagedCommon;
 using Microsoft.PowerToys.Settings.UI.Controls;
 using Microsoft.PowerToys.Settings.UI.Helpers;
 using Microsoft.PowerToys.Settings.UI.Library;
+using Microsoft.PowerToys.Settings.UI.Library.Utilities;
 using Microsoft.PowerToys.Settings.UI.Services;
 using Microsoft.PowerToys.Settings.UI.ViewModels;
 using Microsoft.UI.Windowing;
@@ -49,16 +50,6 @@ namespace Microsoft.PowerToys.Settings.UI.Views
         public delegate bool UpdatingGeneralSettingsCallback(ModuleType moduleType, bool isEnabled);
 
         /// <summary>
-        /// Declaration for opening oobe window callback function.
-        /// </summary>
-        public delegate void OobeOpeningCallback();
-
-        /// <summary>
-        /// Declaration for opening whats new window callback function.
-        /// </summary>
-        public delegate void WhatIsNewOpeningCallback();
-
-        /// <summary>
         /// Gets or sets a shell handler to be used to update contents of the shell dynamically from page within the frame.
         /// </summary>
         public static ShellPage ShellHandler { get; set; }
@@ -89,19 +80,11 @@ namespace Microsoft.PowerToys.Settings.UI.Views
         public static UpdatingGeneralSettingsCallback UpdateGeneralSettingsCallback { get; set; }
 
         /// <summary>
-        /// Gets or sets callback function for opening oobe window
-        /// </summary>
-        public static OobeOpeningCallback OpenOobeWindowCallback { get; set; }
-
-        /// <summary>
-        /// Gets or sets callback function for opening oobe window
-        /// </summary>
-        public static WhatIsNewOpeningCallback OpenWhatIsNewWindowCallback { get; set; }
-
-        /// <summary>
         /// Gets view model.
         /// </summary>
         public ShellViewModel ViewModel { get; }
+
+        public UpdateViewModel UpdateViewModel { get; }
 
         /// <summary>
         /// Gets a collection of functions that handle IPC responses.
@@ -132,7 +115,9 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             InitializeComponent();
             SetWindowTitle();
             var settingsUtils = SettingsUtils.Default;
-            ViewModel = new ShellViewModel(SettingsRepository<GeneralSettings>.GetInstance(settingsUtils));
+            var generalSettingsRepository = SettingsRepository<GeneralSettings>.GetInstance(settingsUtils);
+            ViewModel = new ShellViewModel(generalSettingsRepository);
+            UpdateViewModel = new UpdateViewModel(generalSettingsRepository, SendCheckForUpdatesIPCMessage);
             DataContext = ViewModel;
             ShellHandler = this;
             ViewModel.Initialize(shellFrame, navigationView, KeyboardAccelerators);
@@ -167,8 +152,12 @@ namespace Microsoft.PowerToys.Settings.UI.Views
 
         public static int SendCheckForUpdatesIPCMessage(string msg)
         {
-            CheckForUpdatesMsgCallback?.Invoke(msg);
+            if (CheckForUpdatesMsgCallback is null)
+            {
+                return 1;
+            }
 
+            CheckForUpdatesMsgCallback(msg);
             return 0;
         }
 
@@ -223,24 +212,6 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             UpdateGeneralSettingsCallback = implementation;
         }
 
-        /// <summary>
-        /// Set oobe opening callback function
-        /// </summary>
-        /// <param name="implementation">delegate function implementation.</param>
-        public static void SetOpenOobeCallback(OobeOpeningCallback implementation)
-        {
-            OpenOobeWindowCallback = implementation;
-        }
-
-        /// <summary>
-        /// Set whats new opening callback function
-        /// </summary>
-        /// <param name="implementation">delegate function implementation.</param>
-        public static void SetOpenWhatIsNewCallback(WhatIsNewOpeningCallback implementation)
-        {
-            OpenWhatIsNewWindowCallback = implementation;
-        }
-
         public static void SetElevationStatus(bool isElevated)
         {
             IsElevated = isElevated;
@@ -259,6 +230,16 @@ namespace Microsoft.PowerToys.Settings.UI.Views
         public void Refresh()
         {
             shellFrame.Navigate(typeof(DashboardPage));
+        }
+
+        public void OpenUpdateActivity()
+        {
+            UpdateActivity.Open();
+        }
+
+        public void BeginWindowSession()
+        {
+            UpdateViewModel.BeginWindowSession();
         }
 
         // Tell the current page view model to update
@@ -325,7 +306,12 @@ namespace Microsoft.PowerToys.Settings.UI.Views
 
         private void OOBEItem_Tapped(object sender, TappedRoutedEventArgs e)
         {
-            OpenOobeWindowCallback();
+            ((App)App.Current)!.OpenOobe();
+        }
+
+        private void WhatIsNewItem_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            ((App)App.Current)!.OpenScoobe();
         }
 
         private async void FeedbackItem_Tapped(object sender, TappedRoutedEventArgs e)
@@ -333,15 +319,9 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             await Launcher.LaunchUriAsync(new Uri("https://aka.ms/powerToysGiveFeedback"));
         }
 
-        private void WhatIsNewItem_Tapped(object sender, TappedRoutedEventArgs e)
-        {
-            OpenWhatIsNewWindowCallback();
-        }
-
         private void NavigationView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
         {
-            NavigationViewItem selectedItem = args.SelectedItem as NavigationViewItem;
-            if (selectedItem != null)
+            if (args.SelectedItem is NavigationViewItem selectedItem)
             {
                 Type pageType = selectedItem.GetValue(NavHelper.NavigateToProperty) as Type;
 
@@ -409,7 +389,7 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             navigationView.IsPaneOpen = !navigationView.IsPaneOpen;
         }
 
-        private async void Close_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
+        private async void Close_Tapped(object sender, TappedRoutedEventArgs e)
         {
             await CloseDialog.ShowAsync();
         }
@@ -638,27 +618,34 @@ namespace Microsoft.PowerToys.Settings.UI.Views
 
         private async void SearchBox_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
         {
-            // If a suggestion is selected, navigate directly
-            if (args.ChosenSuggestion is SuggestionItem chosen)
+            try
             {
-                NavigateFromSuggestion(chosen);
-                return;
-            }
+                // If a suggestion is selected, navigate directly
+                if (args.ChosenSuggestion is SuggestionItem chosen)
+                {
+                    NavigateFromSuggestion(chosen);
+                    return;
+                }
 
-            var queryText = (args.QueryText ?? _lastQueryText)?.Trim();
-            if (string.IsNullOrWhiteSpace(queryText))
+                var queryText = (args.QueryText ?? _lastQueryText)?.Trim();
+                if (string.IsNullOrWhiteSpace(queryText))
+                {
+                    NavigationService.Navigate<DashboardPage>();
+                    return;
+                }
+
+                // Prefer cached results (from live search); if empty, perform a fresh search
+                var matched = _lastSearchResults?.Count > 0 && string.Equals(_lastQueryText, queryText, StringComparison.Ordinal)
+                    ? _lastSearchResults
+                    : await Task.Run(() => SearchIndexService.Search(queryText));
+
+                var searchParams = new SearchResultsNavigationParams(queryText, matched);
+                NavigationService.Navigate<SearchResultsPage>(searchParams);
+            }
+            catch (Exception ex)
             {
-                NavigationService.Navigate<DashboardPage>();
-                return;
+                Logger.LogError("Search query submission failed", ex);
             }
-
-            // Prefer cached results (from live search); if empty, perform a fresh search
-            var matched = _lastSearchResults?.Count > 0 && string.Equals(_lastQueryText, queryText, StringComparison.Ordinal)
-                ? _lastSearchResults
-                : await Task.Run(() => SearchIndexService.Search(queryText));
-
-            var searchParams = new SearchResultsNavigationParams(queryText, matched);
-            NavigationService.Navigate<SearchResultsPage>(searchParams);
         }
 
         public void Dispose()
@@ -668,6 +655,7 @@ namespace Microsoft.PowerToys.Settings.UI.Views
                 return;
             }
 
+            UpdateViewModel.Dispose();
             _searchDebounceCts?.Cancel();
             _searchDebounceCts?.Dispose();
             _searchDebounceCts = null;

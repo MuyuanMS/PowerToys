@@ -17,6 +17,12 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         public const string DefaultLatitude = "0.0";
         public const string DefaultLongitude = "0.0";
         public const string DefaultScheduleMode = "Off";
+        public const bool DefaultEnableDarkModeProfile = false;
+        public const bool DefaultEnableLightModeProfile = false;
+        public const string DefaultDarkModeProfile = "";
+        public const string DefaultLightModeProfile = "";
+        public const int DefaultDarkModeProfileId = 0;
+        public const int DefaultLightModeProfileId = 0;
         public static readonly HotkeySettings DefaultToggleThemeHotkey = new HotkeySettings(true, true, false, true, 0x44); // Ctrl+Win+Shift+D
 
         public LightSwitchProperties()
@@ -31,6 +37,12 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             SunsetOffset = new IntProperty(DefaultSunsetOffset);
             ScheduleMode = new StringProperty(DefaultScheduleMode);
             ToggleThemeHotkey = new KeyboardKeysProperty(DefaultToggleThemeHotkey);
+            EnableDarkModeProfile = new BoolProperty(DefaultEnableDarkModeProfile);
+            EnableLightModeProfile = new BoolProperty(DefaultEnableLightModeProfile);
+            DarkModeProfile = new StringProperty(DefaultDarkModeProfile);
+            LightModeProfile = new StringProperty(DefaultLightModeProfile);
+            DarkModeProfileId = new IntProperty(DefaultDarkModeProfileId);
+            LightModeProfileId = new IntProperty(DefaultLightModeProfileId);
         }
 
         [JsonPropertyName("changeSystem")]
@@ -62,5 +74,31 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
         [JsonPropertyName("toggle-theme-hotkey")]
         public KeyboardKeysProperty ToggleThemeHotkey { get; set; }
+
+        [JsonPropertyName("enableDarkModeProfile")]
+        public BoolProperty EnableDarkModeProfile { get; set; }
+
+        [JsonPropertyName("enableLightModeProfile")]
+        public BoolProperty EnableLightModeProfile { get; set; }
+
+        /// <summary>
+        /// Legacy profile name retained only to migrate settings written before profile IDs.
+        /// New code must persist <see cref="DarkModeProfileId"/> instead.
+        /// </summary>
+        [JsonPropertyName("darkModeProfile")]
+        public StringProperty DarkModeProfile { get; set; }
+
+        /// <summary>
+        /// Legacy profile name retained only to migrate settings written before profile IDs.
+        /// New code must persist <see cref="LightModeProfileId"/> instead.
+        /// </summary>
+        [JsonPropertyName("lightModeProfile")]
+        public StringProperty LightModeProfile { get; set; }
+
+        [JsonPropertyName("darkModeProfileId")]
+        public IntProperty DarkModeProfileId { get; set; }
+
+        [JsonPropertyName("lightModeProfileId")]
+        public IntProperty LightModeProfileId { get; set; }
     }
 }

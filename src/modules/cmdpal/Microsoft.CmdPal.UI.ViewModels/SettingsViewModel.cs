@@ -4,13 +4,18 @@
 
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using CommunityToolkit.Mvvm.Messaging;
+using Microsoft.CmdPal.UI.ViewModels.Dock;
+using Microsoft.CmdPal.UI.ViewModels.Messages;
+using Microsoft.CmdPal.UI.ViewModels.Models;
 using Microsoft.CmdPal.UI.ViewModels.Services;
 using Microsoft.CmdPal.UI.ViewModels.Settings;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 
 namespace Microsoft.CmdPal.UI.ViewModels;
 
-public partial class SettingsViewModel : INotifyPropertyChanged
+public partial class SettingsViewModel : INotifyPropertyChanged,
+    IRecipient<DockAutoHideConflictMessage>
 {
     private static readonly List<TimeSpan> AutoGoHomeIntervals =
     [
@@ -25,122 +30,181 @@ public partial class SettingsViewModel : INotifyPropertyChanged
         TimeSpan.FromSeconds(180),
     ];
 
-    private readonly SettingsModel _settings;
+    private readonly ISettingsService _settingsService;
     private readonly TopLevelCommandManager _topLevelCommandManager;
+    private readonly IMonitorService? _monitorService;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public AppearanceSettingsViewModel Appearance { get; }
 
+    public DockAppearanceSettingsViewModel DockAppearance { get; }
+
     public HotkeySettings? Hotkey
     {
-        get => _settings.Hotkey;
+        get => _settingsService.Settings.Hotkey;
         set
         {
-            _settings.Hotkey = value ?? SettingsModel.DefaultActivationShortcut;
+            _settingsService.UpdateSettings(s => s with { Hotkey = value ?? SettingsModel.DefaultActivationShortcut });
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Hotkey)));
-            Save();
         }
     }
 
     public bool UseLowLevelGlobalHotkey
     {
-        get => _settings.UseLowLevelGlobalHotkey;
+        get => _settingsService.Settings.UseLowLevelGlobalHotkey;
         set
         {
-            _settings.UseLowLevelGlobalHotkey = value;
+            _settingsService.UpdateSettings(s => s with { UseLowLevelGlobalHotkey = value });
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Hotkey)));
-            Save();
         }
     }
 
     public bool AllowExternalReload
     {
-        get => _settings.AllowExternalReload;
+        get => _settingsService.Settings.AllowExternalReload;
         set
         {
-            _settings.AllowExternalReload = value;
-            Save();
+            _settingsService.UpdateSettings(s => s with { AllowExternalReload = value });
+        }
+    }
+
+    public bool AllowAltF4
+    {
+        get => _settingsService.Settings.AllowAltF4;
+        set
+        {
+            _settingsService.UpdateSettings(s => s with { AllowAltF4 = value });
         }
     }
 
     public bool ShowAppDetails
     {
-        get => _settings.ShowAppDetails;
+        get => _settingsService.Settings.ShowAppDetails;
         set
         {
-            _settings.ShowAppDetails = value;
-            Save();
+            _settingsService.UpdateSettings(s => s with { ShowAppDetails = value });
         }
     }
 
     public bool BackspaceGoesBack
     {
-        get => _settings.BackspaceGoesBack;
+        get => _settingsService.Settings.BackspaceGoesBack;
         set
         {
-            _settings.BackspaceGoesBack = value;
-            Save();
+            _settingsService.UpdateSettings(s => s with { BackspaceGoesBack = value });
         }
     }
 
     public bool SingleClickActivates
     {
-        get => _settings.SingleClickActivates;
+        get => _settingsService.Settings.SingleClickActivates;
         set
         {
-            _settings.SingleClickActivates = value;
-            Save();
+            _settingsService.UpdateSettings(s => s with { SingleClickActivates = value });
         }
     }
 
     public bool HighlightSearchOnActivate
     {
-        get => _settings.HighlightSearchOnActivate;
+        get => _settingsService.Settings.HighlightSearchOnActivate;
         set
         {
-            _settings.HighlightSearchOnActivate = value;
-            Save();
+            _settingsService.UpdateSettings(s => s with { HighlightSearchOnActivate = value });
+        }
+    }
+
+    public bool KeepPreviousQuery
+    {
+        get => _settingsService.Settings.KeepPreviousQuery;
+        set
+        {
+            _settingsService.UpdateSettings(s => s with { KeepPreviousQuery = value });
         }
     }
 
     public int MonitorPositionIndex
     {
-        get => (int)_settings.SummonOn;
+        get => (int)_settingsService.Settings.SummonOn;
         set
         {
-            _settings.SummonOn = (MonitorBehavior)value;
-            Save();
+            _settingsService.UpdateSettings(s => s with { SummonOn = (MonitorBehavior)value });
         }
     }
 
-    public bool ShowSystemTrayIcon
+    public int ToastPositionIndex
     {
-        get => _settings.ShowSystemTrayIcon;
+        get => (int)_settingsService.Settings.ToastPosition;
         set
         {
-            _settings.ShowSystemTrayIcon = value;
-            Save();
+            _settingsService.UpdateSettings(s => s with { ToastPosition = (ToastPosition)value });
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsToastPositionFromSystemSettings)));
+        }
+    }
+
+    public bool IsToastPositionFromSystemSettings => _settingsService.Settings.ToastPosition == ToastPosition.UseSystemSettings;
+
+    public bool ShowSystemTrayIcon
+    {
+        get => _settingsService.Settings.ShowSystemTrayIcon;
+        set
+        {
+            _settingsService.UpdateSettings(s => s with { ShowSystemTrayIcon = value });
+        }
+    }
+
+    public bool CompactMode
+    {
+        get => _settingsService.Settings.CompactMode;
+        set
+        {
+            _settingsService.UpdateSettings(s => s with { CompactMode = value });
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CompactMode)));
+        }
+    }
+
+    public double CompactCenterHeightPercentage
+    {
+        get => _settingsService.Settings.CompactCenterHeightPercentage;
+        set
+        {
+            _settingsService.UpdateSettings(s => s with { CompactCenterHeightPercentage = (int)value });
         }
     }
 
     public bool IgnoreShortcutWhenFullscreen
     {
-        get => _settings.IgnoreShortcutWhenFullscreen;
+        get => _settingsService.Settings.IgnoreShortcutWhenFullscreen;
         set
         {
-            _settings.IgnoreShortcutWhenFullscreen = value;
-            Save();
+            _settingsService.UpdateSettings(s => s with { IgnoreShortcutWhenFullscreen = value });
+        }
+    }
+
+    public bool IgnoreShortcutWhenBusy
+    {
+        get => _settingsService.Settings.IgnoreShortcutWhenBusy;
+        set
+        {
+            _settingsService.UpdateSettings(s => s with { IgnoreShortcutWhenBusy = value });
+        }
+    }
+
+    public bool AllowBreakthroughShortcut
+    {
+        get => _settingsService.Settings.AllowBreakthroughShortcut;
+        set
+        {
+            _settingsService.UpdateSettings(s => s with { AllowBreakthroughShortcut = value });
         }
     }
 
     public bool DisableAnimations
     {
-        get => _settings.DisableAnimations;
+        get => _settingsService.Settings.DisableAnimations;
         set
         {
-            _settings.DisableAnimations = value;
-            Save();
+            _settingsService.UpdateSettings(s => s with { DisableAnimations = value });
         }
     }
 
@@ -148,7 +212,7 @@ public partial class SettingsViewModel : INotifyPropertyChanged
     {
         get
         {
-            var index = AutoGoHomeIntervals.IndexOf(_settings.AutoGoHomeInterval);
+            var index = AutoGoHomeIntervals.IndexOf(_settingsService.Settings.AutoGoHomeInterval);
             return index >= 0 ? index : 0;
         }
 
@@ -156,20 +220,97 @@ public partial class SettingsViewModel : INotifyPropertyChanged
         {
             if (value >= 0 && value < AutoGoHomeIntervals.Count)
             {
-                _settings.AutoGoHomeInterval = AutoGoHomeIntervals[value];
+                _settingsService.UpdateSettings(s => s with { AutoGoHomeInterval = AutoGoHomeIntervals[value] });
             }
-
-            Save();
         }
     }
 
     public int EscapeKeyBehaviorIndex
     {
-        get => (int)_settings.EscapeKeyBehaviorSetting;
+        get => (int)_settingsService.Settings.EscapeKeyBehaviorSetting;
         set
         {
-            _settings.EscapeKeyBehaviorSetting = (EscapeKeyBehavior)value;
-            Save();
+            _settingsService.UpdateSettings(s => s with { EscapeKeyBehaviorSetting = (EscapeKeyBehavior)value });
+        }
+    }
+
+    public DockSide Dock_Side
+    {
+        get => _settingsService.Settings.DockSettings.Side;
+        set
+        {
+            _settingsService.UpdateSettings(s => s with { DockSettings = s.DockSettings with { Side = value } });
+        }
+    }
+
+    public DockSize Dock_DockSize
+    {
+        get => _settingsService.Settings.DockSettings.DockSize;
+        set
+        {
+            _settingsService.UpdateSettings(s => s with { DockSettings = s.DockSettings with { DockSize = value } });
+        }
+    }
+
+    public DockBackdrop Dock_Backdrop
+    {
+        get => _settingsService.Settings.DockSettings.Backdrop;
+        set
+        {
+            _settingsService.UpdateSettings(s => s with { DockSettings = s.DockSettings with { Backdrop = value } });
+        }
+    }
+
+    public bool Dock_ShowLabels
+    {
+        get => _settingsService.Settings.DockSettings.ShowLabels;
+        set
+        {
+            _settingsService.UpdateSettings(s => s with { DockSettings = s.DockSettings with { ShowLabels = value } });
+        }
+    }
+
+    public bool Dock_AlwaysOnTop
+    {
+        get => _settingsService.Settings.DockSettings.AlwaysOnTop;
+        set
+        {
+            _settingsService.UpdateSettings(s => s with { DockSettings = s.DockSettings with { AlwaysOnTop = value } });
+        }
+    }
+
+    public bool Dock_AutoHide
+    {
+        get => _settingsService.Settings.DockSettings.AutoHide;
+        set
+        {
+            _settingsService.UpdateSettings(s => s with { DockSettings = s.DockSettings with { AutoHide = value } });
+        }
+    }
+
+    private bool _dockAutoHideConflict;
+
+    public bool Dock_AutoHideConflict
+    {
+        get => _dockAutoHideConflict;
+        private set
+        {
+            if (_dockAutoHideConflict != value)
+            {
+                _dockAutoHideConflict = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Dock_AutoHideConflict)));
+            }
+        }
+    }
+
+    public bool EnableDock
+    {
+        get => _settingsService.Settings.EnableDock;
+        set
+        {
+            _settingsService.UpdateSettings(s => s with { EnableDock = value });
+            WeakReferenceMessenger.Default.Send(new ShowHideDockMessage(value));
+            WeakReferenceMessenger.Default.Send(new ReloadCommandsMessage()); // TODO! we need to update the MoreCommands of all top level items, but we don't _really_ want to reload
         }
     }
 
@@ -177,30 +318,53 @@ public partial class SettingsViewModel : INotifyPropertyChanged
 
     public ObservableCollection<FallbackSettingsViewModel> FallbackRankings { get; set; } = new();
 
+    public ObservableCollection<DockMonitorConfigViewModel> MonitorConfigs { get; } = new();
+
     public SettingsExtensionsViewModel Extensions { get; }
 
-    public SettingsViewModel(SettingsModel settings, TopLevelCommandManager topLevelCommandManager, TaskScheduler scheduler, IThemeService themeService)
+    public SettingsViewModel(
+        TopLevelCommandManager topLevelCommandManager,
+        TaskScheduler scheduler,
+        IThemeService themeService,
+        ISettingsService settingsService,
+        IMonitorService? monitorService = null)
     {
-        _settings = settings;
+        _settingsService = settingsService;
         _topLevelCommandManager = topLevelCommandManager;
+        _monitorService = monitorService;
 
-        Appearance = new AppearanceSettingsViewModel(themeService, _settings);
+        Appearance = new AppearanceSettingsViewModel(themeService, settingsService);
+        DockAppearance = new DockAppearanceSettingsViewModel(themeService, settingsService);
+
+        PopulateMonitorConfigs();
 
         var activeProviders = GetCommandProviders();
-        var allProviderSettings = _settings.ProviderSettings;
+        var allProviderSettings = _settingsService.Settings.ProviderSettings;
 
         var fallbacks = new List<FallbackSettingsViewModel>();
-        var currentRankings = _settings.FallbackRanks;
+        var currentRankings = _settingsService.Settings.FallbackRanks;
         var needsSave = false;
+        var currentSettingsModel = _settingsService.Settings;
 
         foreach (var item in activeProviders)
         {
-            var providerSettings = settings.GetProviderSettings(item);
+            var (newModel, providerSettings) = currentSettingsModel.GetProviderSettings(item);
+            currentSettingsModel = newModel;
 
-            var settingsModel = new ProviderSettingsViewModel(item, providerSettings, _settings);
-            CommandProviders.Add(settingsModel);
+            var providerSettingsModel = new ProviderSettingsViewModel(item, providerSettings, settingsService);
+            CommandProviders.Add(providerSettingsModel);
 
-            fallbacks.AddRange(settingsModel.FallbackCommands);
+            fallbacks.AddRange(providerSettingsModel.FallbackCommands);
+        }
+
+        // Only persist if provider enumeration actually changed the model
+        // Smelly? Yes, but it avoids an unnecessary write to disk.
+        // I don't love it, but it seems better than the alternatives.
+        // Open to suggestions.
+        if (!ReferenceEquals(currentSettingsModel, _settingsService.Settings))
+        {
+            var finalModel = currentSettingsModel;
+            _settingsService.UpdateSettings(_ => finalModel, hotReload: false);
         }
 
         var fallbackRankings = new List<Scored<FallbackSettingsViewModel>>(fallbacks.Count);
@@ -229,6 +393,13 @@ public partial class SettingsViewModel : INotifyPropertyChanged
         {
             ApplyFallbackSort();
         }
+
+        WeakReferenceMessenger.Default.Register<DockAutoHideConflictMessage>(this);
+    }
+
+    public void Receive(DockAutoHideConflictMessage message)
+    {
+        Dock_AutoHideConflict = message.IsConflict;
     }
 
     private IEnumerable<CommandProviderWrapper> GetCommandProviders()
@@ -239,10 +410,47 @@ public partial class SettingsViewModel : INotifyPropertyChanged
 
     public void ApplyFallbackSort()
     {
-        _settings.FallbackRanks = FallbackRankings.Select(s => s.Id).ToArray();
-        Save();
+        _settingsService.UpdateSettings(s => s with { FallbackRanks = FallbackRankings.Select(s2 => s2.Id).ToArray() });
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FallbackRankings)));
     }
 
-    private void Save() => SettingsModel.SaveSettings(_settings);
+    /// <summary>
+    /// Builds or refreshes the <see cref="MonitorConfigs"/> collection by reconciling
+    /// connected monitors with persisted per-monitor settings.
+    /// </summary>
+    public void PopulateMonitorConfigs()
+    {
+        if (_monitorService is null)
+        {
+            return;
+        }
+
+        var monitors = _monitorService.GetMonitors();
+        var currentSettings = _settingsService.Settings.DockSettings;
+
+        var reconciled = MonitorConfigReconciler.Reconcile(currentSettings.MonitorConfigs, monitors);
+        var currentMonitorConfigs = currentSettings.MonitorConfigs ?? System.Collections.Immutable.ImmutableList<DockMonitorConfig>.Empty;
+
+        if (!reconciled.SequenceEqual(currentMonitorConfigs))
+        {
+            _settingsService.UpdateSettings(s => s with
+            {
+                DockSettings = s.DockSettings with { MonitorConfigs = reconciled },
+            });
+        }
+
+        MonitorConfigs.Clear();
+        foreach (var monitor in monitors)
+        {
+            var config = reconciled.FirstOrDefault(c =>
+                string.Equals(c.MonitorDeviceId, monitor.StableId, StringComparison.OrdinalIgnoreCase));
+
+            if (config is not null)
+            {
+                MonitorConfigs.Add(new DockMonitorConfigViewModel(config, monitor, _settingsService));
+            }
+        }
+
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MonitorConfigs)));
+    }
 }

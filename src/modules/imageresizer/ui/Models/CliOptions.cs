@@ -7,7 +7,9 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.CommandLine.Parsing;
 using System.Globalization;
+using System.Linq;
 using ImageResizer.Cli.Commands;
+using ImageResizer.Helpers;
 
 #pragma warning disable SA1649 // File name should match first type name
 #pragma warning disable SA1402 // File may only contain a single type
@@ -19,230 +21,374 @@ namespace ImageResizer.Models
     /// </summary>
     public class CliOptions
     {
-        /// <summary>
-        /// Gets or sets a value indicating whether to show help information.
-        /// </summary>
         public bool ShowHelp { get; set; }
 
-        /// <summary>
-        /// Gets or sets a value indicating whether to show current configuration.
-        /// </summary>
         public bool ShowConfig { get; set; }
 
-        /// <summary>
-        /// Gets or sets the destination directory for resized images.
-        /// </summary>
         public string DestinationDirectory { get; set; }
 
-        /// <summary>
-        /// Gets or sets the width of the resized image.
-        /// </summary>
         public double? Width { get; set; }
 
-        /// <summary>
-        /// Gets or sets the height of the resized image.
-        /// </summary>
         public double? Height { get; set; }
 
-        /// <summary>
-        /// Gets or sets the resize unit (Pixel, Percent, Inch, Centimeter).
-        /// </summary>
         public ResizeUnit? Unit { get; set; }
 
-        /// <summary>
-        /// Gets or sets the resize fit mode (Fill, Fit, Stretch).
-        /// </summary>
         public ResizeFit? Fit { get; set; }
 
-        /// <summary>
-        /// Gets or sets the index of the preset size to use.
-        /// </summary>
         public int? SizeIndex { get; set; }
 
-        /// <summary>
-        /// Gets or sets a value indicating whether to only shrink images (not enlarge).
-        /// </summary>
         public bool? ShrinkOnly { get; set; }
 
-        /// <summary>
-        /// Gets or sets a value indicating whether to replace the original file.
-        /// </summary>
         public bool? Replace { get; set; }
 
-        /// <summary>
-        /// Gets or sets a value indicating whether to ignore orientation when resizing.
-        /// </summary>
         public bool? IgnoreOrientation { get; set; }
 
-        /// <summary>
-        /// Gets or sets a value indicating whether to remove metadata from the resized image.
-        /// </summary>
         public bool? RemoveMetadata { get; set; }
 
-        /// <summary>
-        /// Gets or sets the JPEG quality level (1-100).
-        /// </summary>
         public int? JpegQualityLevel { get; set; }
 
-        /// <summary>
-        /// Gets or sets a value indicating whether to keep the date modified.
-        /// </summary>
         public bool? KeepDateModified { get; set; }
 
-        /// <summary>
-        /// Gets or sets the output filename format.
-        /// </summary>
         public string FileName { get; set; }
 
-        /// <summary>
-        /// Gets or sets a value indicating whether to use line-based progress output for screen reader accessibility.
-        /// </summary>
         public bool? ProgressLines { get; set; }
 
-        /// <summary>
-        /// Gets the list of files to process.
-        /// </summary>
         public ICollection<string> Files { get; } = new List<string>();
 
-        /// <summary>
-        /// Gets or sets the pipe name for receiving file list.
-        /// </summary>
         public string PipeName { get; set; }
 
-        /// <summary>
-        /// Gets parse/validation errors produced by System.CommandLine.
-        /// </summary>
-        public IReadOnlyList<string> ParseErrors { get; private set; } = Array.Empty<string>();
+        public IReadOnlyList<string> ParseErrors { get; private set; } = [];
 
-        /// <summary>
-        /// Converts a boolean value to nullable bool (true -> true, false -> null).
-        /// </summary>
         private static bool? ToBoolOrNull(bool value) => value ? true : null;
 
-        /// <summary>
-        /// Parses command-line arguments into CliOptions using System.CommandLine.
-        /// </summary>
-        /// <param name="args">The command-line arguments.</param>
-        /// <returns>A CliOptions instance with parsed values.</returns>
         public static CliOptions Parse(string[] args)
+            => ParseCore(args, rejectOptionLikeFiles: false);
+
+        internal static CliOptions ParseForCli(string[] args)
+            => ParseCore(args, rejectOptionLikeFiles: true);
+
+        private static CliOptions ParseCore(string[] args, bool rejectOptionLikeFiles)
         {
             var options = new CliOptions();
             var cmd = new ImageResizerRootCommand();
 
-            // Parse using System.CommandLine
             var parseResult = new Parser(cmd).Parse(args);
+            var errors = new List<string>(parseResult.Errors.Count + 1);
 
-            if (parseResult.Errors.Count > 0)
+            foreach (var error in parseResult.Errors)
             {
-                var errors = new List<string>(parseResult.Errors.Count);
-                foreach (var error in parseResult.Errors)
-                {
-                    errors.Add(error.Message);
-                }
+                errors.Add(error.Message);
+            }
 
+            var files = parseResult.GetValueForArgument(cmd.FilesArgument);
+            PopulateInputs(options, files);
+            PopulateOptionValues(options, cmd, parseResult);
+
+            if (errors.Count > 0)
+            {
+                options.ParseErrors = new ReadOnlyCollection<string>(errors);
+                return options;
+            }
+
+            if ((options.Width.HasValue || options.Height.HasValue) &&
+                (options.Width ?? 0) == 0 &&
+                (options.Height ?? 0) == 0)
+            {
+                errors.Add(Properties.Resources.CLI_ErrorZeroDimensions);
                 options.ParseErrors = new ReadOnlyCollection<string>(errors);
             }
 
-            // Extract values from parse result using strongly typed options
-            options.ShowHelp = parseResult.GetValueForOption(cmd.HelpOption);
-            options.ShowConfig = parseResult.GetValueForOption(cmd.ShowConfigOption);
-            options.DestinationDirectory = parseResult.GetValueForOption(cmd.DestinationOption);
-            options.Width = parseResult.GetValueForOption(cmd.WidthOption);
-            options.Height = parseResult.GetValueForOption(cmd.HeightOption);
-            options.Unit = parseResult.GetValueForOption(cmd.UnitOption);
-            options.Fit = parseResult.GetValueForOption(cmd.FitOption);
-            options.SizeIndex = parseResult.GetValueForOption(cmd.SizeOption);
-
-            // Convert bool to nullable bool (true -> true, false -> null)
-            options.ShrinkOnly = ToBoolOrNull(parseResult.GetValueForOption(cmd.ShrinkOnlyOption));
-            options.Replace = ToBoolOrNull(parseResult.GetValueForOption(cmd.ReplaceOption));
-            options.IgnoreOrientation = ToBoolOrNull(parseResult.GetValueForOption(cmd.IgnoreOrientationOption));
-            options.RemoveMetadata = ToBoolOrNull(parseResult.GetValueForOption(cmd.RemoveMetadataOption));
-            options.KeepDateModified = ToBoolOrNull(parseResult.GetValueForOption(cmd.KeepDateModifiedOption));
-            options.ProgressLines = ToBoolOrNull(parseResult.GetValueForOption(cmd.ProgressLinesOption));
-
-            options.JpegQualityLevel = parseResult.GetValueForOption(cmd.QualityOption);
-
-            options.FileName = parseResult.GetValueForOption(cmd.FileNameOption);
-
-            // Get files from arguments
-            var files = parseResult.GetValueForArgument(cmd.FilesArgument);
-            if (files != null)
+            if (rejectOptionLikeFiles)
             {
-                const string pipeNamePrefix = "\\\\.\\pipe\\";
-                foreach (var file in files)
+                var validationArgs = ExpandTokensForValidation(args);
+                AddOptionLikeFileErrors(validationArgs, parseResult, cmd.Options, options.Files, errors);
+                if (errors.Count > 0)
                 {
-                    // Check for pipe name (must be at the start of the path)
-                    if (file.StartsWith(pipeNamePrefix, StringComparison.OrdinalIgnoreCase))
-                    {
-                        options.PipeName = file.Substring(pipeNamePrefix.Length);
-                    }
-                    else
-                    {
-                        options.Files.Add(file);
-                    }
+                    options.ParseErrors = new ReadOnlyCollection<string>(errors);
                 }
             }
 
             return options;
         }
 
-        /// <summary>
-        /// Prints current configuration to the console.
-        /// </summary>
-        /// <param name="settings">The settings to display.</param>
+        private static void PopulateOptionValues(CliOptions options, ImageResizerRootCommand command, ParseResult parseResult)
+        {
+            options.ShowHelp = GetValidOptionValue(parseResult, command.HelpOption);
+            options.ShowConfig = GetValidOptionValue(parseResult, command.ShowConfigOption);
+            options.DestinationDirectory = GetValidOptionValue(parseResult, command.DestinationOption);
+            options.Width = GetValidOptionValue(parseResult, command.WidthOption);
+            options.Height = GetValidOptionValue(parseResult, command.HeightOption);
+            options.Unit = GetValidOptionValue(parseResult, command.UnitOption);
+            options.Fit = GetValidOptionValue(parseResult, command.FitOption);
+            options.SizeIndex = GetValidOptionValue(parseResult, command.SizeOption);
+
+            options.ShrinkOnly = ToBoolOrNull(GetValidOptionValue(parseResult, command.ShrinkOnlyOption));
+            options.Replace = ToBoolOrNull(GetValidOptionValue(parseResult, command.ReplaceOption));
+            options.IgnoreOrientation = ToBoolOrNull(GetValidOptionValue(parseResult, command.IgnoreOrientationOption));
+            options.RemoveMetadata = ToBoolOrNull(GetValidOptionValue(parseResult, command.RemoveMetadataOption));
+            options.KeepDateModified = ToBoolOrNull(GetValidOptionValue(parseResult, command.KeepDateModifiedOption));
+            options.ProgressLines = ToBoolOrNull(GetValidOptionValue(parseResult, command.ProgressLinesOption));
+
+            options.JpegQualityLevel = GetValidOptionValue(parseResult, command.QualityOption);
+            options.FileName = GetValidOptionValue(parseResult, command.FileNameOption);
+        }
+
+        private static T GetValidOptionValue<T>(ParseResult parseResult, System.CommandLine.Option<T> option)
+        {
+            var optionResult = parseResult.FindResultFor(option);
+            if (optionResult != null && !string.IsNullOrEmpty(optionResult.ErrorMessage))
+            {
+                return default;
+            }
+
+            try
+            {
+                return parseResult.GetValueForOption(option);
+            }
+            catch (InvalidOperationException)
+            {
+                return default;
+            }
+        }
+
+        private static void AddOptionLikeFileErrors(
+            IReadOnlyList<string> args,
+            ParseResult parseResult,
+            IReadOnlyList<System.CommandLine.Option> options,
+            ICollection<string> files,
+            ICollection<string> errors)
+        {
+            var escapedCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+            var afterEndOfOptions = false;
+            foreach (var token in parseResult.Tokens)
+            {
+                if (!afterEndOfOptions && token.Type == TokenType.DoubleDash)
+                {
+                    afterEndOfOptions = true;
+                    continue;
+                }
+
+                if (afterEndOfOptions && LooksLikeOption(token.Value))
+                {
+                    escapedCounts.TryGetValue(token.Value, out var count);
+                    escapedCounts[token.Value] = count + 1;
+                }
+            }
+
+            var optionLikeErrors = new List<string>();
+            foreach (var file in files.Reverse())
+            {
+                if (!LooksLikeOption(file))
+                {
+                    continue;
+                }
+
+                if (escapedCounts.TryGetValue(file, out var count) && count > 0)
+                {
+                    escapedCounts[file] = count - 1;
+                    continue;
+                }
+
+                optionLikeErrors.Add(string.Format(CultureInfo.InvariantCulture, Properties.Resources.CLI_ErrorUnknownOption, file));
+            }
+
+            optionLikeErrors.Reverse();
+            foreach (var error in optionLikeErrors)
+            {
+                errors.Add(error);
+            }
+
+            AddInvalidBundleErrors(args, options, errors);
+        }
+
+        private static bool LooksLikeOption(string value)
+            => value?.Length > 1 && value[0] == '-';
+
+        private static void AddInvalidBundleErrors(
+            IReadOnlyList<string> args,
+            IReadOnlyList<System.CommandLine.Option> options,
+            ICollection<string> errors)
+        {
+            var aliasMap = options
+                .SelectMany(option => option.Aliases.Select(alias => (Alias: alias, Option: option)))
+                .ToDictionary(item => item.Alias, item => item.Option, StringComparer.Ordinal);
+            var shortOptions = aliasMap
+                .Where(item => item.Key.Length == 2 && item.Key[0] == '-' && item.Key[1] != '-')
+                .ToDictionary(item => item.Key[1], item => item.Value);
+
+            for (var argumentIndex = 0; argumentIndex < args.Count; argumentIndex++)
+            {
+                var arg = args[argumentIndex];
+                if (arg == "--")
+                {
+                    break;
+                }
+
+                if (aliasMap.TryGetValue(arg, out var exactOption))
+                {
+                    if (exactOption.ValueType != typeof(bool) && argumentIndex + 1 < args.Count)
+                    {
+                        argumentIndex++;
+                    }
+
+                    continue;
+                }
+
+                var handledSeparatedOption = false;
+                foreach (var (alias, option) in aliasMap)
+                {
+                    if (arg.Length > alias.Length &&
+                        arg.StartsWith(alias, StringComparison.Ordinal) &&
+                        (arg[alias.Length] == '=' || arg[alias.Length] == ':'))
+                    {
+                        var hasAttachedValue = arg.Length > alias.Length + 1;
+                        if (option.ValueType != typeof(bool) && !hasAttachedValue && argumentIndex + 1 < args.Count)
+                        {
+                            argumentIndex++;
+                        }
+
+                        handledSeparatedOption = true;
+                        break;
+                    }
+                }
+
+                if (handledSeparatedOption)
+                {
+                    continue;
+                }
+
+                if (arg.StartsWith("--", StringComparison.Ordinal) || arg.StartsWith('/'))
+                {
+                    continue;
+                }
+
+                if (arg.Length <= 2 || arg[0] != '-' || arg[1] == '-')
+                {
+                    continue;
+                }
+
+                var consumedFlag = false;
+                for (var index = 1; index < arg.Length; index++)
+                {
+                    if (!shortOptions.TryGetValue(arg[index], out var option))
+                    {
+                        if (consumedFlag)
+                        {
+                            errors.Add(string.Format(CultureInfo.InvariantCulture, Properties.Resources.CLI_ErrorUnknownOption, arg));
+                        }
+
+                        break;
+                    }
+
+                    if (option.ValueType != typeof(bool))
+                    {
+                        var attachedValue = arg.Substring(index + 1);
+                        if (attachedValue.Length == 0 && argumentIndex + 1 < args.Count)
+                        {
+                            argumentIndex++;
+                        }
+
+                        // The remainder, when present, is the attached value for this option.
+                        break;
+                    }
+
+                    consumedFlag = true;
+                    if (bool.TryParse(arg.AsSpan(index + 1), out _))
+                    {
+                        // System.CommandLine accepts an explicit boolean value attached to a
+                        // short option (for example, -rtrue). The value consumes the remainder.
+                        break;
+                    }
+                }
+            }
+        }
+
+        private static IReadOnlyList<string> ExpandTokensForValidation(string[] args)
+        {
+            var tokenizerCommand = new System.CommandLine.RootCommand();
+            var tokenizerArgument = new System.CommandLine.Argument<string[]>("tokens")
+            {
+                Arity = System.CommandLine.ArgumentArity.ZeroOrMore,
+            };
+            tokenizerCommand.AddArgument(tokenizerArgument);
+
+            return new Parser(tokenizerCommand)
+                .Parse(args)
+                .Tokens
+                .Select(token => token.Type == TokenType.DoubleDash ? "--" : token.Value)
+                .ToList();
+        }
+
+        private static void PopulateInputs(CliOptions options, string[] files)
+        {
+            if (files == null)
+            {
+                return;
+            }
+
+            const string pipeNamePrefix = "\\\\.\\pipe\\";
+            foreach (var file in files)
+            {
+                if (file.StartsWith(pipeNamePrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    options.PipeName = file.Substring(pipeNamePrefix.Length);
+                }
+                else
+                {
+                    options.Files.Add(file);
+                }
+            }
+        }
+
         public static void PrintConfig(ImageResizer.Properties.Settings settings)
         {
+            var getString = ResourceLoaderInstance.GetString;
             Console.OutputEncoding = System.Text.Encoding.UTF8;
-            Console.WriteLine(Properties.Resources.CLI_ConfigTitle);
+            Console.WriteLine(getString("CLI_ConfigTitle"));
             Console.WriteLine();
-            Console.WriteLine(Properties.Resources.CLI_ConfigGeneralSettings);
-            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, Properties.Resources.CLI_ConfigShrinkOnly, settings.ShrinkOnly));
-            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, Properties.Resources.CLI_ConfigReplaceOriginal, settings.Replace));
-            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, Properties.Resources.CLI_ConfigIgnoreOrientation, settings.IgnoreOrientation));
-            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, Properties.Resources.CLI_ConfigRemoveMetadata, settings.RemoveMetadata));
-            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, Properties.Resources.CLI_ConfigKeepDateModified, settings.KeepDateModified));
-            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, Properties.Resources.CLI_ConfigJpegQuality, settings.JpegQualityLevel));
-            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, Properties.Resources.CLI_ConfigPngInterlace, settings.PngInterlaceOption));
-            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, Properties.Resources.CLI_ConfigTiffCompress, settings.TiffCompressOption));
-            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, Properties.Resources.CLI_ConfigFilenameFormat, settings.FileName));
+            Console.WriteLine(getString("CLI_ConfigGeneralSettings"));
+            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, getString("CLI_ConfigShrinkOnly"), settings.ShrinkOnly));
+            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, getString("CLI_ConfigReplaceOriginal"), settings.Replace));
+            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, getString("CLI_ConfigIgnoreOrientation"), settings.IgnoreOrientation));
+            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, getString("CLI_ConfigRemoveMetadata"), settings.RemoveMetadata));
+            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, getString("CLI_ConfigKeepDateModified"), settings.KeepDateModified));
+            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, getString("CLI_ConfigJpegQuality"), settings.JpegQualityLevel));
+            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, getString("CLI_ConfigPngInterlace"), settings.PngInterlaceOption));
+            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, getString("CLI_ConfigTiffCompress"), settings.TiffCompressOption));
+            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, getString("CLI_ConfigFilenameFormat"), settings.FileName));
             Console.WriteLine();
-            Console.WriteLine(Properties.Resources.CLI_ConfigCustomSize);
-            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, Properties.Resources.CLI_ConfigWidth, settings.CustomSize.Width, settings.CustomSize.Unit));
-            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, Properties.Resources.CLI_ConfigHeight, settings.CustomSize.Height, settings.CustomSize.Unit));
-            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, Properties.Resources.CLI_ConfigFitMode, settings.CustomSize.Fit));
+            Console.WriteLine(getString("CLI_ConfigCustomSize"));
+            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, getString("CLI_ConfigWidth"), settings.CustomSize.Width, settings.CustomSize.Unit));
+            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, getString("CLI_ConfigHeight"), settings.CustomSize.Height, settings.CustomSize.Unit));
+            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, getString("CLI_ConfigFitMode"), settings.CustomSize.Fit));
             Console.WriteLine();
-            Console.WriteLine(Properties.Resources.CLI_ConfigPresetSizes);
+            Console.WriteLine(getString("CLI_ConfigPresetSizes"));
             for (int i = 0; i < settings.Sizes.Count; i++)
             {
                 var size = settings.Sizes[i];
                 var selected = i == settings.SelectedSizeIndex ? "*" : " ";
-                Console.WriteLine(string.Format(CultureInfo.InvariantCulture, Properties.Resources.CLI_ConfigPresetSizeFormat, i, selected, size.Name, size.Width, size.Height, size.Unit, size.Fit));
+                Console.WriteLine(string.Format(CultureInfo.InvariantCulture, getString("CLI_ConfigPresetSizeFormat"), i, selected, size.Name, size.Width, size.Height, size.Unit, size.Fit));
             }
 
             if (settings.SelectedSizeIndex >= settings.Sizes.Count)
             {
-                Console.WriteLine(string.Format(CultureInfo.InvariantCulture, Properties.Resources.CLI_ConfigCustomSelected, settings.CustomSize.Width, settings.CustomSize.Height, settings.CustomSize.Unit, settings.CustomSize.Fit));
+                Console.WriteLine(string.Format(CultureInfo.InvariantCulture, getString("CLI_ConfigCustomSelected"), settings.CustomSize.Width, settings.CustomSize.Height, settings.CustomSize.Unit, settings.CustomSize.Fit));
             }
         }
 
-        /// <summary>
-        /// Prints usage information to the console.
-        /// </summary>
         public static void PrintUsage()
         {
+            var getString = ResourceLoaderInstance.GetString;
             Console.OutputEncoding = System.Text.Encoding.UTF8;
-            Console.WriteLine(Properties.Resources.CLI_UsageTitle);
+            Console.WriteLine(getString("CLI_UsageTitle"));
             Console.WriteLine();
 
             var cmd = new ImageResizerRootCommand();
 
-            // Print usage line
-            Console.WriteLine(Properties.Resources.CLI_UsageLine);
+            Console.WriteLine(getString("CLI_UsageLine"));
             Console.WriteLine();
 
-            // Print options from the command definition
-            Console.WriteLine(Properties.Resources.CLI_UsageOptions);
+            Console.WriteLine(getString("CLI_UsageOptions"));
             foreach (var option in cmd.Options)
             {
                 var aliases = string.Join(", ", option.Aliases);
@@ -251,11 +397,11 @@ namespace ImageResizer.Models
             }
 
             Console.WriteLine();
-            Console.WriteLine(Properties.Resources.CLI_UsageExamples);
-            Console.WriteLine(Properties.Resources.CLI_UsageExampleHelp);
-            Console.WriteLine(Properties.Resources.CLI_UsageExampleDimensions);
-            Console.WriteLine(Properties.Resources.CLI_UsageExamplePercent);
-            Console.WriteLine(Properties.Resources.CLI_UsageExamplePreset);
+            Console.WriteLine(getString("CLI_UsageExamples"));
+            Console.WriteLine(getString("CLI_UsageExampleHelp"));
+            Console.WriteLine(getString("CLI_UsageExampleDimensions"));
+            Console.WriteLine(getString("CLI_UsageExamplePercent"));
+            Console.WriteLine(getString("CLI_UsageExamplePreset"));
         }
     }
 }

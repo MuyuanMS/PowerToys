@@ -30,6 +30,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Helpers
             return moduleType switch
             {
                 ModuleType.AdvancedPaste => "ms-appx:///Assets/Settings/Icons/AdvancedPaste.png",
+                ModuleType.AltWindowCycle => "ms-appx:///Assets/Settings/Icons/WindowHopper.png",
                 ModuleType.Workspaces => "ms-appx:///Assets/Settings/Icons/Workspaces.png",
                 ModuleType.PowerOCR => "ms-appx:///Assets/Settings/Icons/TextExtractor.png",
                 ModuleType.PowerAccent => "ms-appx:///Assets/Settings/Icons/QuickAccent.png",
@@ -56,6 +57,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Helpers
                 ModuleType.FancyZones => generalSettingsConfig.Enabled.FancyZones,
                 ModuleType.FileLocksmith => generalSettingsConfig.Enabled.FileLocksmith,
                 ModuleType.FindMyMouse => generalSettingsConfig.Enabled.FindMyMouse,
+                ModuleType.AltWindowCycle => generalSettingsConfig.Enabled.AltWindowCycle,
                 ModuleType.Hosts => generalSettingsConfig.Enabled.Hosts,
                 ModuleType.ImageResizer => generalSettingsConfig.Enabled.ImageResizer,
                 ModuleType.KeyboardManager => generalSettingsConfig.Enabled.KeyboardManager,
@@ -73,7 +75,9 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Helpers
                 ModuleType.MeasureTool => generalSettingsConfig.Enabled.MeasureTool,
                 ModuleType.ShortcutGuide => generalSettingsConfig.Enabled.ShortcutGuide,
                 ModuleType.PowerOCR => generalSettingsConfig.Enabled.PowerOcr,
+                ModuleType.PowerDisplay => generalSettingsConfig.Enabled.PowerDisplay,
                 ModuleType.Workspaces => generalSettingsConfig.Enabled.Workspaces,
+                ModuleType.GrabAndMove => generalSettingsConfig.Enabled.GrabAndMove,
                 ModuleType.ZoomIt => generalSettingsConfig.Enabled.ZoomIt,
                 ModuleType.GeneralSettings => generalSettingsConfig.EnableQuickAccess,
                 _ => false,
@@ -95,6 +99,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Helpers
                 case ModuleType.FancyZones: generalSettingsConfig.Enabled.FancyZones = isEnabled; break;
                 case ModuleType.FileLocksmith: generalSettingsConfig.Enabled.FileLocksmith = isEnabled; break;
                 case ModuleType.FindMyMouse: generalSettingsConfig.Enabled.FindMyMouse = isEnabled; break;
+                case ModuleType.AltWindowCycle: generalSettingsConfig.Enabled.AltWindowCycle = isEnabled; break;
                 case ModuleType.Hosts: generalSettingsConfig.Enabled.Hosts = isEnabled; break;
                 case ModuleType.ImageResizer: generalSettingsConfig.Enabled.ImageResizer = isEnabled; break;
                 case ModuleType.KeyboardManager: generalSettingsConfig.Enabled.KeyboardManager = isEnabled; break;
@@ -112,10 +117,57 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Helpers
                 case ModuleType.MeasureTool: generalSettingsConfig.Enabled.MeasureTool = isEnabled; break;
                 case ModuleType.ShortcutGuide: generalSettingsConfig.Enabled.ShortcutGuide = isEnabled; break;
                 case ModuleType.PowerOCR: generalSettingsConfig.Enabled.PowerOcr = isEnabled; break;
+                case ModuleType.PowerDisplay: generalSettingsConfig.Enabled.PowerDisplay = isEnabled; break;
                 case ModuleType.Workspaces: generalSettingsConfig.Enabled.Workspaces = isEnabled; break;
+                case ModuleType.GrabAndMove: generalSettingsConfig.Enabled.GrabAndMove = isEnabled; break;
                 case ModuleType.ZoomIt: generalSettingsConfig.Enabled.ZoomIt = isEnabled; break;
                 case ModuleType.GeneralSettings: generalSettingsConfig.EnableQuickAccess = isEnabled; break;
             }
+        }
+
+        /// <summary>
+        /// Gets the module key name used in IPC messages and settings JSON.
+        /// These names match the JsonPropertyName attributes in EnabledModules class.
+        /// </summary>
+        public static string GetModuleKey(ModuleType moduleType)
+        {
+            return moduleType switch
+            {
+                ModuleType.AdvancedPaste => AdvancedPasteSettings.ModuleName,
+                ModuleType.AlwaysOnTop => AlwaysOnTopSettings.ModuleName,
+                ModuleType.Awake => AwakeSettings.ModuleName,
+                ModuleType.CmdPal => "CmdPal", // No dedicated settings class
+                ModuleType.ColorPicker => ColorPickerSettings.ModuleName,
+                ModuleType.CropAndLock => CropAndLockSettings.ModuleName,
+                ModuleType.CursorWrap => CursorWrapSettings.ModuleName,
+                ModuleType.EnvironmentVariables => EnvironmentVariablesSettings.ModuleName,
+                ModuleType.FancyZones => FancyZonesSettings.ModuleName,
+                ModuleType.FileLocksmith => FileLocksmithSettings.ModuleName,
+                ModuleType.FindMyMouse => FindMyMouseSettings.ModuleName,
+                ModuleType.AltWindowCycle => AltWindowCycleSettings.ModuleName,
+                ModuleType.Hosts => HostsSettings.ModuleName,
+                ModuleType.ImageResizer => ImageResizerSettings.ModuleName,
+                ModuleType.KeyboardManager => KeyboardManagerSettings.ModuleName,
+                ModuleType.LightSwitch => LightSwitchSettings.ModuleName,
+                ModuleType.MouseHighlighter => MouseHighlighterSettings.ModuleName,
+                ModuleType.MouseJump => MouseJumpSettings.ModuleName,
+                ModuleType.MousePointerCrosshairs => MousePointerCrosshairsSettings.ModuleName,
+                ModuleType.MouseWithoutBorders => MouseWithoutBordersSettings.ModuleName,
+                ModuleType.NewPlus => NewPlusSettings.ModuleName,
+                ModuleType.Peek => PeekSettings.ModuleName,
+                ModuleType.PowerRename => PowerRenameSettings.ModuleName,
+                ModuleType.PowerLauncher => PowerLauncherSettings.ModuleName,
+                ModuleType.PowerAccent => PowerAccentSettings.ModuleName,
+                ModuleType.PowerDisplay => PowerDisplaySettings.ModuleName,
+                ModuleType.RegistryPreview => RegistryPreviewSettings.ModuleName,
+                ModuleType.MeasureTool => MeasureToolSettings.ModuleName,
+                ModuleType.ShortcutGuide => ShortcutGuideSettings.ModuleName,
+                ModuleType.PowerOCR => PowerOcrSettings.ModuleName,
+                ModuleType.Workspaces => WorkspacesSettings.ModuleName,
+                ModuleType.GrabAndMove => GrabAndMoveSettings.ModuleName,
+                ModuleType.ZoomIt => ZoomItSettings.ModuleName,
+                _ => moduleType.ToString(),
+            };
         }
     }
 }

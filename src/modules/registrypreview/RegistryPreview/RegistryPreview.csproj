@@ -1,7 +1,7 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <!-- Look at Directory.Build.props in root for common stuff as well -->
-  <Import Project="..\..\..\Common.Dotnet.CsWinRT.props" />
-  <Import Project="..\..\..\Common.SelfContained.props" />
+  <Import Project="$(RepoRoot)src\Common.Dotnet.CsWinRT.props" />
+  <Import Project="$(RepoRoot)src\Common.SelfContained.props" />
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -15,7 +15,7 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-    <OutputPath>..\..\..\..\$(Platform)\$(Configuration)\WinUI3Apps</OutputPath>
+    <OutputPath>$(RepoRoot)$(Platform)\$(Configuration)\WinUI3Apps</OutputPath>
     <AssemblyName>PowerToys.RegistryPreview</AssemblyName>
     <ApplicationIcon>Assets\RegistryPreview\RegistryPreview.ico</ApplicationIcon>
     <!-- MRT from windows app sdk will search for a pri file with the same name of the module before defaulting to resources.pri -->
@@ -57,6 +57,7 @@
   <ItemGroup>
     <!-- HACK: Common.UI is referenced, even if it is not used, to force dll versions to be the same as in other projects that use it. It's still unclear why this is the case, but this is need for flattening the install directory. -->
     <ProjectReference Include="..\..\..\common\Common.UI\Common.UI.csproj" />
+    <ProjectReference Include="..\..\..\common\Common.UI.Controls\Common.UI.Controls.csproj" />
     <ProjectReference Include="..\..\..\common\ManagedCommon\ManagedCommon.csproj" />
     <ProjectReference Include="..\RegistryPreviewUILib\RegistryPreviewUILib.csproj" />
   </ItemGroup>

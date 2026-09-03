@@ -181,7 +181,10 @@ void dispatch_json_config_to_modules(const json::JsonObject& powertoys_configs)
             const auto properties = settings.GetNamedObject(L"properties");
 
             // Currently, only PowerToys Run settings use the 'hotkey_changed' property.
-            json::get(properties, L"hotkey_changed", hotkeyUpdated, true);
+            if (properties.HasKey(L"hotkey_changed"))
+            {
+                json::get(properties, L"hotkey_changed", hotkeyUpdated, true);
+            }
         }
         
         send_json_config_to_module(powertoy_element.Key().c_str(), element.c_str(), hotkeyUpdated);
@@ -214,6 +217,12 @@ void dispatch_received_json(const std::wstring& json_to_parse)
             //     if (current_settings_ipc)
             //         current_settings_ipc->send(settings_string);
             // }
+        }
+        else if (name == L"module_status")
+        {
+            // Handle single module enable/disable update
+            // Expected format: {"module_status": {"ModuleName": true/false}}
+            apply_module_status_update(value.GetObjectW());
         }
         else if (name == L"powertoys")
         {
@@ -573,7 +582,24 @@ void run_settings_window(bool show_oobe_window, bool show_scoobe_window, std::op
     {
         std::unique_lock lock{ ipc_mutex };
         current_settings_ipc = new TwoWayPipeMessageIPC(powertoys_pipe_name, settings_pipe_name, receive_json_send_to_main_thread);
-        current_settings_ipc->start(hToken);
+
+        // Authenticate the connecting client (Settings) before dispatching any privileged command.
+        // The expected image directory is derived from the Runner's own module folder so it adapts to
+        // both installed and dev-build layouts; only Microsoft-signed PowerToys.Settings.exe at the
+        // Runner's own version is accepted (signature check is compiled out in Debug).
+        interop_auth::CallerPolicy settings_caller_policy;
+        settings_caller_policy.enabled = true;
+        settings_caller_policy.expectedDirectory = get_module_folderpath() + L"\\WinUI3Apps";
+        settings_caller_policy.allowedBasenames = { L"PowerToys.Settings.exe" };
+        settings_caller_policy.expectedVersion = interop_auth::GetOwnModuleVersion();
+        settings_caller_policy.requireMicrosoftSignature = true;
+        settings_caller_policy.logReject = [](const interop_auth::AuthResult& r) {
+            Logger::warn(L"Rejected unauthenticated Settings pipe client: pid={} image='{}' reason={}",
+                         r.pid,
+                         r.imagePath,
+                         r.reasonCode);
+        };
+        current_settings_ipc->start(hToken, settings_caller_policy);
 
         // Register callback for bug report status changes
         BugReportManager::instance().register_callback([](bool isRunning) {
@@ -796,6 +822,10 @@ std::string ESettingsWindowNames_to_string(ESettingsWindowNames value)
         return "CmdPal";
     case ESettingsWindowNames::ZoomIt:
         return "ZoomIt";
+    case ESettingsWindowNames::PowerDisplay:
+        return "PowerDisplay";
+    case ESettingsWindowNames::GrabAndMove:
+        return "GrabAndMove";
     default:
     {
         Logger::error(L"Can't convert ESettingsWindowNames value={} to string", static_cast<int>(value));
@@ -934,6 +964,14 @@ ESettingsWindowNames ESettingsWindowNames_from_string(std::string value)
     else if (value == "ZoomIt")
     {
         return ESettingsWindowNames::ZoomIt;
+    }
+    else if (value == "PowerDisplay")
+    {
+        return ESettingsWindowNames::PowerDisplay;
+    }
+    else if (value == "GrabAndMove")
+    {
+        return ESettingsWindowNames::GrabAndMove;
     }
     else
     {

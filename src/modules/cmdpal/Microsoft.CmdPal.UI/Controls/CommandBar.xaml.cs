@@ -3,9 +3,9 @@
 // See the LICENSE file in the project root for more information.
 
 using CommunityToolkit.Mvvm.Messaging;
-using Microsoft.CmdPal.Core.ViewModels;
-using Microsoft.CmdPal.Core.ViewModels.Messages;
 using Microsoft.CmdPal.UI.Messages;
+using Microsoft.CmdPal.UI.ViewModels;
+using Microsoft.CmdPal.UI.ViewModels.Messages;
 using Microsoft.CmdPal.UI.Views;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -44,13 +44,16 @@ public sealed partial class CommandBar : UserControl,
 
     public void Receive(OpenContextMenuMessage message)
     {
-        if (!ViewModel.ShouldShowContextMenu)
-        {
-            return;
-        }
-
         if (message.Element is null)
         {
+            // This is invoked from the "More" button on the command bar
+            if (!ViewModel.ShouldShowContextMenu)
+            {
+                return;
+            }
+
+            ContextControl.PrepareForOpen(message.ContextMenuFilterLocation);
+
             _ = DispatcherQueue.TryEnqueue(
                 () =>
                 {
@@ -65,6 +68,14 @@ public sealed partial class CommandBar : UserControl,
         }
         else
         {
+            // This is invoked from a specific element
+            if (!(ContextControl.ViewModel.SelectedItem?.CanOpenContextMenu ?? false))
+            {
+                return;
+            }
+
+            ContextControl.PrepareForOpen(message.ContextMenuFilterLocation);
+
             _ = DispatcherQueue.TryEnqueue(
             () =>
             {
@@ -126,7 +137,7 @@ public sealed partial class CommandBar : UserControl,
 
     private void SettingsIcon_Clicked(object sender, RoutedEventArgs e)
     {
-        WeakReferenceMessenger.Default.Send<OpenSettingsMessage>();
+        WeakReferenceMessenger.Default.Send(new OpenSettingsMessage());
     }
 
     private void MoreCommandsButton_Clicked(object sender, RoutedEventArgs e)
@@ -145,8 +156,9 @@ public sealed partial class CommandBar : UserControl,
 
     private void ContextMenuFlyout_Opened(object sender, object e)
     {
-        // We need to wait until our flyout is opened to try and toss focus
-        // at its search box. The control isn't in the UI tree before that
+        // Focus the filter box so the flyout captures keyboard input,
+        // then fire a single consolidated Narrator announcement.
         ContextControl.FocusSearchBox();
+        ContextControl.AnnounceOpened();
     }
 }

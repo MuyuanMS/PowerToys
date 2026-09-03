@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation
+// Copyright (c) Microsoft Corporation
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -8,9 +8,9 @@ using AdaptiveCards.ObjectModel.WinUI3;
 using AdaptiveCards.Templating;
 using CommunityToolkit.Mvvm.Messaging;
 using ManagedCommon;
-using Microsoft.CmdPal.Core.ViewModels;
-using Microsoft.CmdPal.Core.ViewModels.Messages;
-using Microsoft.CmdPal.Core.ViewModels.Models;
+using Microsoft.CmdPal.UI.ViewModels;
+using Microsoft.CmdPal.UI.ViewModels.Messages;
+using Microsoft.CmdPal.UI.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
 using Windows.Data.Json;
 
@@ -47,7 +47,16 @@ public partial class ContentFormViewModel(IFormContent _form, WeakReference<IPag
         {
             var template = new AdaptiveCardTemplate(templateJson);
             var cardJson = template.Expand(dataJson);
-            card = AdaptiveCard.FromJsonString(cardJson);
+            card = AdaptiveCard.FromJsonString(
+                cardJson,
+                AdaptiveCardParserRegistrations.ElementParsers,
+                AdaptiveCardParserRegistrations.ActionParsers);
+
+            foreach (var warning in card.Warnings)
+            {
+                Logger.LogWarning($"Adaptive Card parse warning ({warning.StatusCode}): {warning.Message}");
+            }
+
             return true;
         }
         catch (Exception ex)
@@ -70,6 +79,15 @@ public partial class ContentFormViewModel(IFormContent _form, WeakReference<IPag
         StateJson = model.StateJson;
         DataJson = model.DataJson;
 
+        RenderCard();
+
+        UpdateProperty(nameof(Card));
+
+        model.PropChanged += Model_PropChanged;
+    }
+
+    private void RenderCard()
+    {
         if (TryBuildCard(TemplateJson, DataJson, out var builtCard, out var renderingError))
         {
             Card = builtCard;
@@ -93,8 +111,41 @@ public partial class ContentFormViewModel(IFormContent _form, WeakReference<IPag
             UpdateProperty(nameof(Card));
             return;
         }
+    }
 
-        UpdateProperty(nameof(Card));
+    private void Model_PropChanged(object sender, IPropChangedEventArgs args)
+    {
+        try
+        {
+            FetchProperty(args.PropertyName);
+        }
+        catch (Exception ex)
+        {
+            ShowException(ex);
+        }
+    }
+
+    protected virtual void FetchProperty(string propertyName)
+    {
+        var model = this._formModel.Unsafe;
+        if (model is null)
+        {
+            return; // throw?
+        }
+
+        switch (propertyName)
+        {
+            case nameof(DataJson):
+                DataJson = model.DataJson;
+                RenderCard();
+                break;
+            case nameof(TemplateJson):
+                TemplateJson = model.TemplateJson;
+                RenderCard();
+                break;
+        }
+
+        UpdateProperty(propertyName);
     }
 
     [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(AdaptiveOpenUrlAction))]
@@ -121,7 +172,9 @@ public partial class ContentFormViewModel(IFormContent _form, WeakReference<IPag
                     var model = _formModel.Unsafe!;
                     if (model != null)
                     {
-                        var result = model.SubmitForm(inputString, dataString);
+                        var result = model is IFormContent2 form2
+                            ? form2.SubmitAction(action.Id, inputString, dataString)
+                            : model.SubmitForm(inputString, dataString);
                         WeakReferenceMessenger.Default.Send<HandleCommandResultMessage>(new(new(result)));
                     }
                 }

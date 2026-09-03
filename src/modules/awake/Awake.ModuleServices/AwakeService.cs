@@ -5,6 +5,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Common.UI;
+using ManagedCommon;
 using Microsoft.PowerToys.Settings.UI.Library;
 using PowerToys.ModuleContracts;
 
@@ -32,6 +33,11 @@ public sealed class AwakeService : ModuleServiceBase, IAwakeService
         var isRunning = IsAwakeProcessRunning();
         var settings = ReadSettings();
 
+        return CreateState(isRunning, settings);
+    }
+
+    internal static AwakeState CreateState(bool isRunning, AwakeSettings? settings)
+    {
         if (settings is null)
         {
             return new AwakeState(isRunning, AwakeStateMode.Passive, false, null, null);
@@ -82,10 +88,9 @@ public sealed class AwakeService : ModuleServiceBase, IAwakeService
         return UpdateSettingsAsync(
             settings =>
             {
-                var totalMinutes = Math.Min(minutes, int.MaxValue);
                 settings.Properties.Mode = AwakeMode.TIMED;
-                settings.Properties.IntervalHours = (uint)(totalMinutes / 60);
-                settings.Properties.IntervalMinutes = (uint)(totalMinutes % 60);
+                settings.Properties.IntervalHours = (uint)(minutes / 60);
+                settings.Properties.IntervalMinutes = (uint)(minutes % 60);
             },
             cancellationToken);
     }
@@ -130,8 +135,9 @@ public sealed class AwakeService : ModuleServiceBase, IAwakeService
         {
             return Process.GetProcessesByName("PowerToys.Awake").Length > 0;
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.LogError($"Failed to check Awake process status: {ex.Message}");
             return false;
         }
     }
@@ -143,8 +149,9 @@ public sealed class AwakeService : ModuleServiceBase, IAwakeService
             var settingsUtils = SettingsUtils.Default;
             return settingsUtils.GetSettingsOrDefault<AwakeSettings>(AwakeSettings.ModuleName);
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.LogError($"Failed to read Awake settings: {ex.Message}");
             return null;
         }
     }

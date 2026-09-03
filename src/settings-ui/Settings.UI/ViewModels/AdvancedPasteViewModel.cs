@@ -76,16 +76,24 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
             GeneralSettingsConfig = settingsRepository.SettingsConfig;
 
-            // To obtain the settings configurations of Fancy zones.
-            ArgumentNullException.ThrowIfNull(settingsRepository);
+            // To obtain the settings configurations of Advanced Paste.
+            ArgumentNullException.ThrowIfNull(advancedPasteSettingsRepository);
 
             _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
 
             _settingsUtils = settingsUtils ?? throw new ArgumentNullException(nameof(settingsUtils));
 
-            ArgumentNullException.ThrowIfNull(advancedPasteSettingsRepository);
+            _advancedPasteSettings = advancedPasteSettingsRepository.SettingsConfig ?? throw new ArgumentException("SettingsConfig cannot be null", nameof(advancedPasteSettingsRepository));
 
-            _advancedPasteSettings = advancedPasteSettingsRepository.SettingsConfig;
+            if (_advancedPasteSettings.Properties is null)
+            {
+                throw new ArgumentException("AdvancedPasteSettings.Properties cannot be null", nameof(advancedPasteSettingsRepository));
+            }
+
+            // Ensure AdditionalActions and CustomActions are initialized to prevent null reference exceptions
+            // This handles legacy settings files that may be missing these properties
+            _advancedPasteSettings.Properties.AdditionalActions ??= new AdvancedPasteAdditionalActions();
+            _advancedPasteSettings.Properties.CustomActions ??= new AdvancedPasteCustomActions();
 
             AttachConfigurationHandlers();
 
@@ -93,7 +101,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             SendConfigMSG = ipcMSGCallBackFunc;
 
             _additionalActions = _advancedPasteSettings.Properties.AdditionalActions;
-            _customActions = _advancedPasteSettings.Properties.CustomActions.Value;
+            _customActions = _advancedPasteSettings.Properties.CustomActions.Value ?? new ObservableCollection<AdvancedPasteCustomAction>();
 
             SetupSettingsFileWatcher();
 
@@ -131,6 +139,15 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 if (action is AdvancedPasteAdditionalAction additionalAction)
                 {
                     hotkeySettings.Add(additionalAction.Shortcut);
+
+                    // Mirror the runner's hotkey order: the coaching shortcut is registered as a
+                    // separate hotkey immediately after Fix Spelling and Grammar when it's active.
+                    if (ReferenceEquals(additionalAction, _additionalActions.FixSpellingAndGrammar)
+                        && additionalAction.CoachingEnabled
+                        && additionalAction.CoachingShortcut is { Code: not 0 })
+                    {
+                        hotkeySettings.Add(additionalAction.CoachingShortcut);
+                    }
                 }
             }
 
@@ -469,7 +486,13 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         public PasteAIConfiguration PasteAIConfiguration
         {
-            get => _advancedPasteSettings.Properties.PasteAIConfiguration;
+            get
+            {
+                // Ensure PasteAIConfiguration is never null for XAML binding
+                _advancedPasteSettings.Properties.PasteAIConfiguration ??= new PasteAIConfiguration();
+                return _advancedPasteSettings.Properties.PasteAIConfiguration;
+            }
+
             set
             {
                 if (!ReferenceEquals(value, _advancedPasteSettings.Properties.PasteAIConfiguration))
@@ -478,6 +501,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
                     var newValue = value ?? new PasteAIConfiguration();
                     _advancedPasteSettings.Properties.PasteAIConfiguration = newValue;
+                    SyncProviderActiveFlags(newValue);
                     SubscribeToPasteAIConfiguration(newValue);
 
                     OnPropertyChanged(nameof(PasteAIConfiguration));
@@ -529,6 +553,19 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
         }
 
+        public bool ShowAIPaste
+        {
+            get => _advancedPasteSettings.Properties.ShowAIPaste;
+            set
+            {
+                if (value != _advancedPasteSettings.Properties.ShowAIPaste)
+                {
+                    _advancedPasteSettings.Properties.ShowAIPaste = value;
+                    NotifySettingsChanged();
+                }
+            }
+        }
+
         public bool CloseAfterLosingFocus
         {
             get => _advancedPasteSettings.Properties.CloseAfterLosingFocus;
@@ -555,16 +592,43 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
         }
 
+        public bool AutoCopySelectionForCustomActionHotkey
+        {
+            get => _advancedPasteSettings.Properties.AutoCopySelectionForCustomActionHotkey;
+            set
+            {
+                if (value != _advancedPasteSettings.Properties.AutoCopySelectionForCustomActionHotkey)
+                {
+                    _advancedPasteSettings.Properties.AutoCopySelectionForCustomActionHotkey = value;
+                    NotifySettingsChanged();
+                }
+            }
+        }
+
         public bool IsConflictingCopyShortcut =>
             _customActions.Select(customAction => customAction.Shortcut)
                           .Concat([PasteAsPlainTextShortcut, AdvancedPasteUIShortcut, PasteAsMarkdownShortcut, PasteAsJsonShortcut])
                           .Any(hotkey => WarnHotkeys.Contains(hotkey.ToString()));
 
-        public bool IsAdditionalActionConflictingCopyShortcut =>
-            _additionalActions.GetAllActions()
-                              .OfType<AdvancedPasteAdditionalAction>()
-                              .Select(additionalAction => additionalAction.Shortcut)
-                              .Any(hotkey => WarnHotkeys.Contains(hotkey.ToString()));
+        public bool IsAdditionalActionConflictingCopyShortcut
+        {
+            get
+            {
+                var shortcuts = _additionalActions.GetAllActions()
+                                                  .OfType<AdvancedPasteAdditionalAction>()
+                                                  .Select(additionalAction => additionalAction.Shortcut)
+                                                  .ToList();
+
+                // The coaching shortcut is a separately-registered hotkey; include it when active.
+                var fixSpelling = _additionalActions.FixSpellingAndGrammar;
+                if (fixSpelling.CoachingEnabled && fixSpelling.CoachingShortcut is { Code: not 0 })
+                {
+                    shortcuts.Add(fixSpelling.CoachingShortcut);
+                }
+
+                return shortcuts.Any(hotkey => WarnHotkeys.Contains(hotkey.ToString()));
+            }
+        }
 
         private void NotifySettingsChanged()
         {
@@ -752,6 +816,25 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 SaveAndNotifySettings();
                 OnPropertyChanged(nameof(PasteAIConfiguration));
             }
+        }
+
+        public void SetAsDefaultProvider(PasteAIProviderDefinition provider)
+        {
+            if (provider is null || string.IsNullOrEmpty(provider.Id))
+            {
+                return;
+            }
+
+            var config = PasteAIConfiguration;
+            if (config is null)
+            {
+                return;
+            }
+
+            config.ActiveProviderId = provider.Id;
+            SyncProviderActiveFlags(config);
+            SaveAndNotifySettings();
+            OnPropertyChanged(nameof(PasteAIConfiguration));
         }
 
         protected override void Dispose(bool disposing)
@@ -1056,7 +1139,9 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         {
             SaveAndNotifySettings();
 
-            if (e.PropertyName == nameof(AdvancedPasteAdditionalAction.Shortcut))
+            if (e.PropertyName is nameof(AdvancedPasteAdditionalAction.Shortcut)
+                or nameof(AdvancedPasteAdditionalAction.CoachingShortcut)
+                or nameof(AdvancedPasteAdditionalAction.CoachingEnabled))
             {
                 OnPropertyChanged(nameof(IsAdditionalActionConflictingCopyShortcut));
             }
@@ -1207,6 +1292,12 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 OnPropertyChanged(nameof(ShowCustomPreview));
             }
 
+            if (target.ShowAIPaste != source.ShowAIPaste)
+            {
+                target.ShowAIPaste = source.ShowAIPaste;
+                OnPropertyChanged(nameof(ShowAIPaste));
+            }
+
             if (target.CloseAfterLosingFocus != source.CloseAfterLosingFocus)
             {
                 target.CloseAfterLosingFocus = source.CloseAfterLosingFocus;
@@ -1217,6 +1308,12 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             {
                 target.EnableClipboardPreview = source.EnableClipboardPreview;
                 OnPropertyChanged(nameof(EnableClipboardPreview));
+            }
+
+            if (target.AutoCopySelectionForCustomActionHotkey != source.AutoCopySelectionForCustomActionHotkey)
+            {
+                target.AutoCopySelectionForCustomActionHotkey = source.AutoCopySelectionForCustomActionHotkey;
+                OnPropertyChanged(nameof(AutoCopySelectionForCustomActionHotkey));
             }
 
             var incomingConfig = source.PasteAIConfiguration ?? new PasteAIConfiguration();
@@ -1291,7 +1388,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                     return true;
                 }
 
-                if (existing?.ModerationEnabled != updated?.ModerationEnabled || existing?.EnableAdvancedAI != updated?.EnableAdvancedAI || existing?.IsActive != updated?.IsActive)
+                if (existing?.ModerationEnabled != updated?.ModerationEnabled || existing?.EnableAdvancedAI != updated?.EnableAdvancedAI)
                 {
                     return true;
                 }
@@ -1378,6 +1475,12 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         {
             if (sender is PasteAIProviderDefinition provider)
             {
+                // IsActive is a UI-only (JsonIgnore) flag; don't save when it changes.
+                if (string.Equals(e.PropertyName, nameof(PasteAIProviderDefinition.IsActive), StringComparison.Ordinal))
+                {
+                    return;
+                }
+
                 // When service type changes we may need to update credentials entry names.
                 if (string.Equals(e.PropertyName, nameof(PasteAIProviderDefinition.ServiceType), StringComparison.Ordinal))
                 {
@@ -1394,12 +1497,14 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             if (string.Equals(e.PropertyName, nameof(PasteAIConfiguration.Providers), StringComparison.Ordinal))
             {
                 SubscribeToPasteAIProviders(PasteAIConfiguration);
+                SyncProviderActiveFlags(PasteAIConfiguration);
                 SaveAndNotifySettings();
                 return;
             }
 
             if (string.Equals(e.PropertyName, nameof(PasteAIConfiguration.ActiveProviderId), StringComparison.Ordinal))
             {
+                SyncProviderActiveFlags(PasteAIConfiguration);
                 SaveAndNotifySettings();
             }
         }
@@ -1415,7 +1520,30 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
             pasteConfig.Providers ??= new ObservableCollection<PasteAIProviderDefinition>();
 
+            SyncProviderActiveFlags(pasteConfig);
             SubscribeToPasteAIProviders(pasteConfig);
+        }
+
+        private static void SyncProviderActiveFlags(PasteAIConfiguration config)
+        {
+            if (config?.Providers is null)
+            {
+                return;
+            }
+
+            var activeId = config.ActiveProviderId;
+
+            // If no explicit active ID, default to the first provider
+            if (string.IsNullOrEmpty(activeId) && config.Providers.Count > 0)
+            {
+                activeId = config.Providers[0].Id;
+                config.ActiveProviderId = activeId;
+            }
+
+            foreach (var provider in config.Providers)
+            {
+                provider.IsActive = !string.IsNullOrEmpty(activeId) && string.Equals(provider.Id, activeId, StringComparison.OrdinalIgnoreCase);
+            }
         }
 
         private static string RetrieveCredentialValue(string credentialResource, string credentialUserName)

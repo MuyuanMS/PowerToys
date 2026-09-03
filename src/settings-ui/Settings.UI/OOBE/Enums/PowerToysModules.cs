@@ -32,9 +32,11 @@ namespace Microsoft.PowerToys.Settings.UI.OOBE.Enums
         MeasureTool,
         Hosts,
         Workspaces,
-        WhatsNew,
         RegistryPreview,
+        PowerDisplay,
+        GrabAndMove,
         NewPlus,
         ZoomIt,
+        AltWindowCycle,
     }
 }

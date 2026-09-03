@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation
+// Copyright (c) Microsoft Corporation
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -30,53 +30,119 @@ internal static class Commands
     private static DateTime timeOfLastNetworkQuery;
 
     /// <summary>
+    /// Runs the "update and restart"/"update and shut down" action and turns the outcome
+    /// into a <see cref="CommandResult"/>. When the shutdown can't be started we keep the
+    /// palette open and show a localized error instead of silently dismissing.
+    /// </summary>
+    private static CommandResult UpdateShutdownResult(bool restart)
+        => WindowsUpdateHelper.InitiateUpdateShutdown(restart)
+            ? CommandResult.Dismiss()
+            : CommandResult.ShowToast(new ToastArgs
+            {
+                Message = Resources.Microsoft_plugin_sys_update_failed,
+                Result = CommandResult.KeepOpen(),
+            });
+
+    /// <summary>
     /// Returns a list with all system command results
     /// </summary>
     /// <param name="isUefi">Value indicating if the system is booted in uefi mode</param>
+    /// <param name="isUpdatePending">Value indicating if Windows Update is waiting for a restart to install updates.</param>
     /// <param name="hideEmptyRecycleBin">Value indicating if we should hide the Empty Recycle Bin command.</param>
     /// <param name="confirmCommands">A value indicating if the user should confirm the system commands</param>
     /// <param name="emptyRBSuccessMessage">Show a success message after empty Recycle Bin.</param>
     /// <returns>A list of all results</returns>
-    public static List<IListItem> GetSystemCommands(bool isUefi, bool hideEmptyRecycleBin, bool confirmCommands, bool emptyRBSuccessMessage)
+    public static List<IListItem> GetSystemCommands(bool isUefi, bool isUpdatePending, bool hideEmptyRecycleBin, bool confirmCommands, bool emptyRBSuccessMessage)
     {
         var results = new List<IListItem>();
         results.AddRange(new[]
         {
-            new ListItem(new ExecuteCommandConfirmation(Resources.Microsoft_plugin_command_name_shutdown, confirmCommands, Resources.Microsoft_plugin_sys_shutdown_computer_confirmation, () => OpenInShellHelper.OpenInShell("shutdown", "/s /hybrid /t 0")))
+            new ListItem(
+                new ExecuteCommandConfirmation(Resources.Microsoft_plugin_command_name_shutdown, confirmCommands, Resources.Microsoft_plugin_sys_shutdown_computer_confirmation, () => OpenInShellHelper.OpenInShell("shutdown", "/s /hybrid /t 0", runWithHiddenWindow: true))
+                {
+                    Id = "com.microsoft.cmdpal.builtin.system.shutdown",
+                })
             {
                 Title = Resources.Microsoft_plugin_sys_shutdown_computer,
-                Subtitle = Resources.Microsoft_plugin_sys_shutdown_computer_description,
                 Icon = Icons.ShutdownIcon,
             },
-            new ListItem(new ExecuteCommandConfirmation(Resources.Microsoft_plugin_command_name_restart, confirmCommands, Resources.Microsoft_plugin_sys_restart_computer_confirmation, () => OpenInShellHelper.OpenInShell("shutdown", "/g /t 0")))
+            new ListItem(
+                new ExecuteCommandConfirmation(Resources.Microsoft_plugin_command_name_restart, confirmCommands, Resources.Microsoft_plugin_sys_restart_computer_confirmation, () => OpenInShellHelper.OpenInShell("shutdown", "/g /t 0", runWithHiddenWindow: true))
+                {
+                    Id = "com.microsoft.cmdpal.builtin.system.restart",
+                })
             {
                 Title = Resources.Microsoft_plugin_sys_restart_computer,
-                Subtitle = Resources.Microsoft_plugin_sys_restart_computer_description,
                 Icon = Icons.RestartIcon,
             },
-            new ListItem(new ExecuteCommandConfirmation(Resources.Microsoft_plugin_command_name_signout, confirmCommands, Resources.Microsoft_plugin_sys_sign_out_confirmation, () => NativeMethods.ExitWindowsEx(EWXLOGOFF, 0)))
+        });
+
+        // Update and restart/shut down commands. Only available while Windows Update
+        // is waiting for a restart to finish installing updates (mirrors the Start menu).
+        if (isUpdatePending)
+        {
+            results.AddRange(new[]
+            {
+                new ListItem(
+                    new ExecuteCommandConfirmation(Resources.Microsoft_plugin_command_name_shutdown, confirmCommands, Resources.Microsoft_plugin_sys_update_and_shutdown_confirmation, () => UpdateShutdownResult(restart: false))
+                    {
+                        Id = "com.microsoft.cmdpal.builtin.system.update_shutdown",
+                    })
+                {
+                    Title = Resources.Microsoft_plugin_sys_update_and_shutdown,
+                    Subtitle = Resources.Microsoft_plugin_sys_update_and_shutdown_description,
+                    Icon = Icons.ShutdownIcon,
+                },
+                new ListItem(
+                    new ExecuteCommandConfirmation(Resources.Microsoft_plugin_command_name_restart, confirmCommands, Resources.Microsoft_plugin_sys_update_and_restart_confirmation, () => UpdateShutdownResult(restart: true))
+                    {
+                        Id = "com.microsoft.cmdpal.builtin.system.update_restart",
+                    })
+                {
+                    Title = Resources.Microsoft_plugin_sys_update_and_restart,
+                    Subtitle = Resources.Microsoft_plugin_sys_update_and_restart_description,
+                    Icon = Icons.RestartIcon,
+                },
+            });
+        }
+
+        results.AddRange(new[]
+        {
+            new ListItem(
+                new ExecuteCommandConfirmation(Resources.Microsoft_plugin_command_name_signout, confirmCommands, Resources.Microsoft_plugin_sys_sign_out_confirmation, () => NativeMethods.ExitWindowsEx(EWXLOGOFF, 0))
+                {
+                    Id = "com.microsoft.cmdpal.builtin.system.signout",
+                })
             {
                 Title = Resources.Microsoft_plugin_sys_sign_out,
-                Subtitle = Resources.Microsoft_plugin_sys_sign_out_description,
                 Icon = Icons.LogoffIcon,
             },
-            new ListItem(new ExecuteCommandConfirmation(Resources.Microsoft_plugin_command_name_lock, confirmCommands, Resources.Microsoft_plugin_sys_lock_confirmation, () => NativeMethods.LockWorkStation()))
+            new ListItem(
+                new ExecuteCommandConfirmation(Resources.Microsoft_plugin_command_name_lock, confirmCommands, Resources.Microsoft_plugin_sys_lock_confirmation, () => NativeMethods.LockWorkStation())
+                {
+                    Id = "com.microsoft.cmdpal.builtin.system.lock",
+                })
             {
                 Title = Resources.Microsoft_plugin_sys_lock,
-                Subtitle = Resources.Microsoft_plugin_sys_lock_description,
                 Icon = Icons.LockIcon,
             },
-            new ListItem(new ExecuteCommandConfirmation(Resources.Microsoft_plugin_command_name_sleep, confirmCommands, Resources.Microsoft_plugin_sys_sleep_confirmation, () => NativeMethods.SetSuspendState(false, true, true)))
+            new ListItem(
+                new ExecuteCommandConfirmation(Resources.Microsoft_plugin_command_name_sleep, confirmCommands, Resources.Microsoft_plugin_sys_sleep_confirmation, () => NativeMethods.SetSuspendState(false, true, true))
+                {
+                    Id = "com.microsoft.cmdpal.builtin.system.sleep",
+                })
             {
                 Title = Resources.Microsoft_plugin_sys_sleep,
-                Subtitle = Resources.Microsoft_plugin_sys_sleep_description,
                 Icon = Icons.SleepIcon,
             },
-            new ListItem(new ExecuteCommandConfirmation(Resources.Microsoft_plugin_command_name_hibernate, confirmCommands, Resources.Microsoft_plugin_sys_hibernate_confirmation, () => NativeMethods.SetSuspendState(true, true, true)))
+            new ListItem(
+                new ExecuteCommandConfirmation(Resources.Microsoft_plugin_command_name_hibernate, confirmCommands, Resources.Microsoft_plugin_sys_hibernate_confirmation, () => NativeMethods.SetSuspendState(true, true, true))
+                {
+                    Id = "com.microsoft.cmdpal.builtin.system.hibernate",
+                })
             {
                 Title = Resources.Microsoft_plugin_sys_hibernate,
-                Subtitle = Resources.Microsoft_plugin_sys_hibernate_description,
-                Icon = Icons.SleepIcon, // Icon change needed
+                Icon = Icons.HibernateIcon,
             },
         });
 
@@ -85,16 +151,20 @@ internal static class Commands
         {
             results.AddRange(new[]
             {
-                new ListItem(new OpenInShellCommand(Resources.Microsoft_plugin_command_name_open, "explorer.exe", "shell:RecycleBinFolder"))
+                new ListItem(new OpenInShellCommand(Resources.Microsoft_plugin_command_name_open, "explorer.exe", "shell:RecycleBinFolder")
+                {
+                    Id = "com.microsoft.cmdpal.builtin.system.recycle_bin",
+                })
                 {
                     Title = Resources.Microsoft_plugin_sys_RecycleBinOpen,
-                    Subtitle = Resources.Microsoft_plugin_sys_RecycleBin_description,
                     Icon = Icons.RecycleBinIcon,
                 },
-                new ListItem(new EmptyRecycleBinConfirmation(emptyRBSuccessMessage))
+                new ListItem(new EmptyRecycleBinConfirmation(emptyRBSuccessMessage)
+                {
+                    Id = "com.microsoft.cmdpal.builtin.system.empty_recycle_bin",
+                })
                 {
                     Title = Resources.Microsoft_plugin_sys_RecycleBinEmptyResult,
-                    Subtitle = Resources.Microsoft_plugin_sys_RecycleBinEmpty_description,
                     Icon = Icons.RecycleBinIcon,
                 },
             });
@@ -102,15 +172,25 @@ internal static class Commands
         else
         {
             results.Add(
-                new ListItem(new OpenInShellCommand(Resources.Microsoft_plugin_command_name_open, "explorer.exe", "shell:RecycleBinFolder"))
+                new ListItem(new OpenInShellCommand(Resources.Microsoft_plugin_command_name_open, "explorer.exe", "shell:RecycleBinFolder")
+                {
+                    Id = "com.microsoft.cmdpal.builtin.system.recycle_bin",
+                })
                 {
                     Title = Resources.Microsoft_plugin_sys_RecycleBin,
-                    Subtitle = Resources.Microsoft_plugin_sys_RecycleBin_description,
                     Icon = Icons.RecycleBinIcon,
                 });
         }
 
-        results.Add(new ListItem(new ExecuteCommandConfirmation(Resources.Microsoft_plugin_sys_RestartShell_name!, confirmCommands, Resources.Microsoft_plugin_sys_RestartShell_confirmation!, static () => OpenInShellHelper.OpenInShell("cmd", "/C tskill explorer && start explorer", runWithHiddenWindow: true)))
+        results.Add(new ListItem(
+            new ExecuteCommandConfirmation(
+                    Resources.Microsoft_plugin_sys_RestartShell_name!,
+                    confirmCommands,
+                    Resources.Microsoft_plugin_sys_RestartShell_confirmation!,
+                    static () => OpenInShellHelper.OpenInShell("cmd", "/C tskill explorer && start explorer", runWithHiddenWindow: true))
+            {
+                Id = "com.microsoft.cmdpal.builtin.system.restart_shell",
+            })
         {
             Title = Resources.Microsoft_plugin_sys_RestartShell!,
             Subtitle = Resources.Microsoft_plugin_sys_RestartShell_description!,
@@ -141,19 +221,19 @@ internal static class Commands
         var results = new List<IListItem>();
 
         // We update the cache only if the last query is older than 'updateCacheIntervalSeconds' seconds
-        DateTime timeOfLastNetworkQueryBefore = timeOfLastNetworkQuery;
+        var timeOfLastNetworkQueryBefore = timeOfLastNetworkQuery;
         timeOfLastNetworkQuery = DateTime.Now;             // Set time of last query to this query
         if ((timeOfLastNetworkQuery - timeOfLastNetworkQueryBefore).TotalSeconds >= UpdateCacheIntervalSeconds)
         {
             networkPropertiesCache = NetworkConnectionProperties.GetList();
         }
 
-        CompositeFormat sysIpv4DescriptionCompositeFormate = CompositeFormat.Parse(Resources.Microsoft_plugin_sys_ip4_description);
-        CompositeFormat sysIpv6DescriptionCompositeFormate = CompositeFormat.Parse(Resources.Microsoft_plugin_sys_ip6_description);
-        CompositeFormat sysMacDescriptionCompositeFormate = CompositeFormat.Parse(Resources.Microsoft_plugin_sys_mac_description);
+        var sysIpv4DescriptionCompositeFormate = CompositeFormat.Parse(Resources.Microsoft_plugin_sys_ip4_description);
+        var sysIpv6DescriptionCompositeFormate = CompositeFormat.Parse(Resources.Microsoft_plugin_sys_ip6_description);
+        var sysMacDescriptionCompositeFormate = CompositeFormat.Parse(Resources.Microsoft_plugin_sys_mac_description);
         var hideDisconnectedNetworkInfo = manager.HideDisconnectedNetworkInfo();
 
-        foreach (NetworkConnectionProperties intInfo in networkPropertiesCache)
+        foreach (var intInfo in networkPropertiesCache)
         {
             if (hideDisconnectedNetworkInfo)
             {
@@ -210,13 +290,14 @@ internal static class Commands
         var networkConnectionResults = Commands.GetNetworkConnectionResults(manager);
 
         var isBootedInUefiMode = manager.GetSystemFirmwareType() == FirmwareType.Uefi;
+        var isUpdatePending = manager.IsUpdatePending();
 
         var hideEmptyRB = manager.HideEmptyRecycleBin();
         var confirmSystemCommands = manager.ShowDialogToConfirmCommand();
         var showSuccessOnEmptyRB = manager.ShowSuccessMessageAfterEmptyingRecycleBin();
 
         // normal system commands are fast and can be returned immediately
-        var systemCommands = Commands.GetSystemCommands(isBootedInUefiMode, hideEmptyRB, confirmSystemCommands, showSuccessOnEmptyRB);
+        var systemCommands = Commands.GetSystemCommands(isBootedInUefiMode, isUpdatePending, hideEmptyRB, confirmSystemCommands, showSuccessOnEmptyRB);
         list.AddRange(systemCommands);
         list.AddRange(networkConnectionResults);
 

@@ -6,9 +6,9 @@
     xmlns:animations="using:CommunityToolkit.WinUI.Animations"
     xmlns:cmdpalUI="using:Microsoft.CmdPal.UI"
     xmlns:converters="using:CommunityToolkit.WinUI.Converters"
-    xmlns:coreViewModels="using:Microsoft.CmdPal.Core.ViewModels"
     xmlns:cpcontrols="using:Microsoft.CmdPal.UI.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:extViews="using:Microsoft.CmdPal.UI.ExtViews.Controls"
     xmlns:h="using:Microsoft.CmdPal.UI.Helpers"
     xmlns:help="using:Microsoft.CmdPal.UI.Helpers"
     xmlns:markdownImageProviders="using:Microsoft.CmdPal.UI.Helpers.MarkdownImageProviders"
@@ -16,6 +16,7 @@
     xmlns:tkcontrols="using:CommunityToolkit.WinUI.Controls"
     xmlns:toolkit="using:CommunityToolkit.WinUI.Controls"
     xmlns:ui="using:CommunityToolkit.WinUI"
+    xmlns:viewModels="using:Microsoft.CmdPal.UI.ViewModels"
     Background="Transparent"
     mc:Ignorable="d">
 
@@ -28,6 +29,7 @@
 
             <cmdpalUI:DetailsSizeToGridLengthConverter x:Key="SizeToWidthConverter" />
             <cmdpalUI:MessageStateToSeverityConverter x:Key="MessageStateToSeverityConverter" />
+            <cmdpalUI:BoolToStarOrAutoGridLengthConverter x:Key="ExpandedModeToRowHeightConverter" />
 
             <cmdpalUI:DetailsDataTemplateSelector
                 x:Key="DetailsDataTemplateSelector"
@@ -66,7 +68,7 @@
                 <Setter Property="TextWrapping" Value="WrapWholeWords" />
             </Style>
 
-            <DataTemplate x:Key="TagTemplate" x:DataType="coreViewModels:TagViewModel">
+            <DataTemplate x:Key="TagTemplate" x:DataType="viewModels:TagViewModel">
                 <cpcontrols:Tag
                     HorizontalAlignment="Left"
                     AutomationProperties.Name="{x:Bind Text, Mode=OneWay}"
@@ -78,28 +80,30 @@
                     ToolTipService.ToolTip="{x:Bind ToolTip, Mode=OneWay}" />
             </DataTemplate>
 
-            <DataTemplate x:Key="CommandTemplate" x:DataType="coreViewModels:CommandViewModel">
+            <DataTemplate x:Key="CommandTemplate" x:DataType="viewModels:CommandViewModel">
                 <StackPanel Orientation="Vertical">
                     <Button
                         Name="Command"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Left"
+                        AutomationProperties.AutomationId="{x:Bind Id, Mode=OneWay}"
                         Click="Command_Click"
-                        Style="{StaticResource SubtleButtonStyle}">
+                        Style="{StaticResource SubtleButtonStyle}"
+                        UseSystemFocusVisuals="{StaticResource UseSystemFocusVisuals}">
                         <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
                             <cpcontrols:IconBox
                                 Width="16"
                                 Height="16"
                                 Margin="0,3,8,0"
                                 SourceKey="{x:Bind Icon, Mode=OneWay}"
-                                SourceRequested="{x:Bind help:IconCacheProvider.SourceRequested}" />
+                                SourceRequested="{x:Bind help:IconProvider.SourceRequested20}" />
                             <TextBlock Style="{StaticResource BodyTextBlockStyle}" Text="{x:Bind Name}" />
                         </StackPanel>
                     </Button>
                 </StackPanel>
             </DataTemplate>
 
-            <DataTemplate x:Key="DetailsLinkTemplate" x:DataType="coreViewModels:DetailsLinkViewModel">
+            <DataTemplate x:Key="DetailsLinkTemplate" x:DataType="viewModels:DetailsLinkViewModel">
                 <StackPanel Orientation="Vertical">
                     <TextBlock Style="{StaticResource DetailKeyTextBlockStyle}" Text="{x:Bind Key, Mode=OneWay}" />
                     <TextBlock
@@ -110,21 +114,23 @@
                         Padding="0"
                         Command="{x:Bind NavigateCommand, Mode=OneWay}"
                         NavigateUri="{x:Bind Link, Mode=OneWay}"
+                        UseSystemFocusVisuals="{StaticResource UseSystemFocusVisuals}"
                         Visibility="{x:Bind IsLink, Mode=OneWay}">
                         <TextBlock Text="{x:Bind Text, Mode=OneWay}" TextWrapping="Wrap" />
                     </HyperlinkButton>
                 </StackPanel>
             </DataTemplate>
-            <DataTemplate x:Key="DetailsCommandsTemplate" x:DataType="coreViewModels:DetailsCommandsViewModel">
+            <DataTemplate x:Key="DetailsCommandsTemplate" x:DataType="viewModels:DetailsCommandsViewModel">
                 <StackPanel Orientation="Vertical" Spacing="4">
                     <TextBlock Style="{StaticResource DetailKeyTextBlockStyle}" Text="{x:Bind Key, Mode=OneWay}" />
                     <ItemsControl
+                        IsTabStop="False"
                         ItemTemplate="{StaticResource CommandTemplate}"
                         ItemsSource="{x:Bind Commands, Mode=OneWay}"
                         Visibility="{x:Bind HasCommands, Mode=OneWay}" />
                 </StackPanel>
             </DataTemplate>
-            <DataTemplate x:Key="DetailsSeparatorTemplate" x:DataType="coreViewModels:DetailsSeparatorViewModel">
+            <DataTemplate x:Key="DetailsSeparatorTemplate" x:DataType="viewModels:DetailsSeparatorViewModel">
                 <StackPanel Margin="0,8,8,0" Orientation="Vertical">
                     <TextBlock
                         Margin="0,8,0,0"
@@ -138,10 +144,11 @@
                         Visibility="{x:Bind help:BindTransformers.EmptyOrWhitespaceToVisible(Key), Mode=OneWay, FallbackValue=Collapsed}" />
                 </StackPanel>
             </DataTemplate>
-            <DataTemplate x:Key="DetailsTagsTemplate" x:DataType="coreViewModels:DetailsTagsViewModel">
+            <DataTemplate x:Key="DetailsTagsTemplate" x:DataType="viewModels:DetailsTagsViewModel">
                 <StackPanel Orientation="Vertical" Spacing="4">
                     <TextBlock Style="{StaticResource DetailKeyTextBlockStyle}" Text="{x:Bind Key, Mode=OneWay}" />
                     <ItemsControl
+                        IsTabStop="False"
                         ItemTemplate="{StaticResource TagTemplate}"
                         ItemsSource="{x:Bind Tags, Mode=OneWay}"
                         Visibility="{x:Bind HasTags, Mode=OneWay}">
@@ -162,25 +169,66 @@
             <tkcontrols:MarkdownThemes
                 x:Key="DefaultMarkdownThemeConfig"
                 H3FontSize="12"
-                H3FontWeight="Normal" />
+                H3FontWeight="Normal"
+                InlineCodeBackground="{StaticResource ControlFillColorDefaultBrush}"
+                InlineCodeBorderBrush="{StaticResource ControlElevationBorderBrush}"
+                InlineCodeCornerRadius="2"
+                InlineCodeForeground="{StaticResource TextFillColorSecondaryBrush}"
+                InlineCodePadding="2,0,2,1" />
             <markdownImageProviders:ImageProvider x:Key="ImageProvider" />
             <tkcontrols:MarkdownConfig
                 x:Key="DefaultMarkdownConfig"
                 ImageProvider="{StaticResource ImageProvider}"
                 Themes="{StaticResource DefaultMarkdownThemeConfig}" />
+
+            <StackLayout x:Key="DetailsContentLayout" Orientation="Vertical" Spacing="8" />
+
+            <cmdpalUI:ContentTemplateSelector
+                x:Key="DetailsContentTemplateSelector"
+                FormTemplate="{StaticResource DetailsFormContentTemplate}"
+                ImageTemplate="{StaticResource DetailsImageContentTemplate}"
+                MarkdownTemplate="{StaticResource DetailsMarkdownContentTemplate}"
+                PlainTextTemplate="{StaticResource DetailsPlainTextContentTemplate}" />
+
+            <DataTemplate x:Key="DetailsFormContentTemplate" x:DataType="viewModels:ContentFormViewModel">
+                <cpcontrols:ContentFormControl ViewModel="{x:Bind}" />
+            </DataTemplate>
+
+            <DataTemplate x:Key="DetailsMarkdownContentTemplate" x:DataType="viewModels:ContentMarkdownViewModel">
+                <tkcontrols:MarkdownTextBlock
+                    Config="{StaticResource DefaultMarkdownConfig}"
+                    Text="{x:Bind Body, Mode=OneWay}"
+                    UseEmphasisExtras="True"
+                    UsePipeTables="True" />
+            </DataTemplate>
+
+            <DataTemplate x:Key="DetailsPlainTextContentTemplate" x:DataType="viewModels:ContentPlainTextViewModel">
+                <extViews:PlainTextContentViewer
+                    Text="{x:Bind Text, Mode=OneWay}"
+                    UseMonospace="{x:Bind UseMonospace, Mode=OneWay}"
+                    WordWrapEnabled="{x:Bind WordWrapEnabled, Mode=OneWay}" />
+            </DataTemplate>
+
+            <DataTemplate x:Key="DetailsImageContentTemplate" x:DataType="viewModels:ContentImageViewModel">
+                <extViews:ImageContentViewer DataContext="{x:Bind}" />
+            </DataTemplate>
         </ResourceDictionary>
     </Page.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <!--
+                In compact mode this row collapses to Auto so the card can shrink to just the
+                search box. A star row would otherwise reserve space during measure even when
+                its only child (the collapsed content) is hidden.
+            -->
+            <RowDefinition Height="{x:Bind ExpandedMode, Mode=OneWay, Converter={StaticResource ExpandedModeToRowHeightConverter}}" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <Grid Grid.Row="0" Background="{ThemeResource LayerOnAcrylicPrimaryBackgroundBrush}">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
@@ -191,7 +239,7 @@
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"
                 BorderBrush="{ThemeResource CmdPal.TopBarBorderBrush}"
-                BorderThickness="0,0,0,1">
+                BorderThickness="{x:Bind h:BindTransformers.BottomBorderThicknessWhenAll(ViewModel.IsSearchBoxVisible, ExpandedMode), Mode=OneWay}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -200,14 +248,19 @@
 
                 <!--  Back button  -->
                 <StackPanel Orientation="Horizontal">
+                    <!--
+                        This border is to hold a bit of padding we need when
+                        the back button is hidden
+                    -->
+                    <Border Margin="20,0,0,0" Visibility="{x:Bind ViewModel.CurrentPage.HasBackButton, Mode=OneWay, Converter={StaticResource BoolToInvertedVisibilityConverter}}" />
                     <Image
                         Width="20"
-                        Margin="20,0,6,0"
+                        Margin="0,0,6,0"
                         HorizontalAlignment="Center"
                         ui:VisualExtensions.NormalizedCenterPoint="0.5,0.5"
                         AutomationProperties.AccessibilityView="Raw"
                         Source="ms-appx:///Assets/icon.svg"
-                        Visibility="{x:Bind ViewModel.CurrentPage.IsNested, Mode=OneWay, Converter={StaticResource BoolToInvertedVisibilityConverter}}">
+                        Visibility="{x:Bind ViewModel.CurrentPage.IsRootPage, Mode=OneWay}">
                         <animations:Implicit.ShowAnimations>
                             <animations:OpacityAnimation
                                 EasingMode="EaseIn"
@@ -250,7 +303,7 @@
                                               FontSize=14}"
                         FontSize="16"
                         Style="{StaticResource SubtleButtonStyle}"
-                        Visibility="{x:Bind ViewModel.CurrentPage.IsNested, Mode=OneWay}">
+                        Visibility="{x:Bind ViewModel.CurrentPage.HasBackButton, Mode=OneWay}">
                         <animations:Implicit.ShowAnimations>
                             <animations:OpacityAnimation
                                 EasingMode="EaseIn"
@@ -296,8 +349,8 @@
                         ui:VisualExtensions.NormalizedCenterPoint="0.5,0.5"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         SourceKey="{x:Bind ViewModel.CurrentPage.Icon, Mode=OneWay}"
-                        SourceRequested="{x:Bind help:IconCacheProvider.SourceRequested}"
-                        Visibility="{x:Bind ViewModel.CurrentPage.IsNested, Mode=OneWay}">
+                        SourceRequested="{x:Bind help:IconProvider.SourceRequested20}"
+                        Visibility="{x:Bind ViewModel.CurrentPage.IsRootPage, Mode=OneWay, Converter={StaticResource BoolToInvertedVisibilityConverter}}">
                         <animations:Implicit.ShowAnimations>
                             <animations:OpacityAnimation
                                 From="0"
@@ -333,6 +386,7 @@
                     <cpcontrols:SearchBar
                         x:Name="SearchBox"
                         HorizontalAlignment="Stretch"
+                        ActiveFocusTargetChanged="SearchBox_ActiveFocusTargetChanged"
                         CurrentPageViewModel="{x:Bind ViewModel.CurrentPage, Mode=OneWay}" />
                     <Grid.Transitions>
                         <TransitionCollection>
@@ -368,6 +422,18 @@
                 </animations:Implicit.HideAnimations>
             </ProgressBar>
 
+        </Grid>
+
+        <Grid
+            Grid.Row="1"
+            Background="{ThemeResource LayerOnAcrylicPrimaryBackgroundBrush}"
+            Visibility="{x:Bind ExpandedMode, Mode=OneWay}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
             <Grid x:Name="ContentGrid" Grid.Row="1">
 
                 <Grid.ColumnDefinitions>
@@ -389,10 +455,17 @@
                     Margin="4"
                     HorizontalAlignment="Stretch"
                     ui:VisualExtensions.NormalizedCenterPoint="0.5,0.5"
+                    AutomationProperties.AccessibilityView="Content"
+                    AutomationProperties.HelpText="{x:Bind ViewModel.Details.Body, Mode=OneWay}"
+                    AutomationProperties.LandmarkType="Custom"
+                    AutomationProperties.LocalizedLandmarkType="Details"
+                    AutomationProperties.Name="{x:Bind ViewModel.Details.Title, Mode=OneWay}"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CmdPal.DividerStrokeColorDefaultBrush}"
                     BorderThickness="1"
                     CornerRadius="{StaticResource ControlCornerRadius}"
+                    IsTabStop="True"
+                    UseSystemFocusVisuals="{StaticResource UseSystemFocusVisuals}"
                     Visibility="Collapsed">
                     <animations:Implicit.ShowAnimations>
                         <animations:OpacityAnimation
@@ -419,6 +492,7 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
@@ -429,7 +503,7 @@
                             HorizontalAlignment="Left"
                             AutomationProperties.AccessibilityView="Raw"
                             SourceKey="{x:Bind ViewModel.Details.HeroImage, Mode=OneWay}"
-                            SourceRequested="{x:Bind help:IconCacheProvider.SourceRequested}"
+                            SourceRequested="{x:Bind help:IconProvider.SourceRequested64}"
                             Visibility="{x:Bind HasHeroImage, Mode=OneWay}" />
 
                         <TextBlock
@@ -445,12 +519,22 @@
                             Margin="0,4,0,24"
                             Background="Transparent"
                             Config="{StaticResource DefaultMarkdownConfig}"
+                            IsTabStop="False"
                             Text="{x:Bind ViewModel.Details.Body, Mode=OneWay}"
                             UseEmphasisExtras="True"
                             UsePipeTables="True" />
 
                         <ItemsRepeater
                             Grid.Row="3"
+                            Margin="0,4,0,16"
+                            IsTabStop="False"
+                            ItemTemplate="{StaticResource DetailsContentTemplateSelector}"
+                            ItemsSource="{x:Bind ViewModel.Details.Content, Mode=OneWay}"
+                            Layout="{StaticResource DetailsContentLayout}" />
+
+                        <ItemsRepeater
+                            Grid.Row="4"
+                            IsTabStop="False"
                             ItemTemplate="{StaticResource DetailsDataTemplateSelector}"
                             ItemsSource="{x:Bind ViewModel.Details.Metadata, Mode=OneWay}">
                             <ItemsRepeater.Layout>
@@ -492,12 +576,13 @@
             See https://github.com/microsoft/microsoft-ui-xaml/issues/5741
         -->
         <StackPanel
-            Grid.Row="0"
+            Grid.Row="1"
             Margin="16,8,16,8"
             HorizontalAlignment="Stretch"
             VerticalAlignment="Bottom"
             Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
-            CornerRadius="{ThemeResource ControlCornerRadius}">
+            CornerRadius="{ThemeResource ControlCornerRadius}"
+            Visibility="Collapsed">
             <InfoBar
                 CornerRadius="{ThemeResource ControlCornerRadius}"
                 IsOpen="{x:Bind ViewModel.CurrentPage.HasStatusMessage, Mode=OneWay}"
@@ -516,10 +601,11 @@
         </StackPanel>
 
         <Grid
-            Grid.Row="1"
+            Grid.Row="2"
             Background="{ThemeResource LayerOnAcrylicSecondaryBackgroundBrush}"
             BorderBrush="{ThemeResource CmdPal.DividerStrokeColorDefaultBrush}"
-            BorderThickness="0,1,0,0">
+            BorderThickness="0,1,0,0"
+            Visibility="{x:Bind ExpandedMode, Mode=OneWay}">
             <cpcontrols:CommandBar CurrentPageViewModel="{x:Bind ViewModel.CurrentPage, Mode=OneWay}" />
         </Grid>
 
@@ -552,7 +638,6 @@
                     <VisualState.Setters>
                         <Setter Target="SearchBox.IsEnabled" Value="False" />
                         <Setter Target="SearchBox.Opacity" Value="0" />
-                        <Setter Target="TopBarGrid.BorderBrush" Value="Transparent" />
                     </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>

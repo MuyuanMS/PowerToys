@@ -71,6 +71,7 @@ static bool show_theme_adaptive_tray_icon = false;
 static bool run_as_elevated = false;
 static bool show_new_updates_toast_notification = true;
 static bool download_updates_automatically = true;
+static bool include_prerelease_updates = false;
 static bool show_whats_new_after_updates = true;
 static bool enable_experimentation = true;
 static bool enable_warnings_elevated_apps = true;
@@ -105,6 +106,7 @@ json::JsonObject GeneralSettings::to_json()
     result.SetNamedValue(L"run_elevated", json::value(isRunElevated));
     result.SetNamedValue(L"show_new_updates_toast_notification", json::value(showNewUpdatesToastNotification));
     result.SetNamedValue(L"download_updates_automatically", json::value(downloadUpdatesAutomatically));
+    result.SetNamedValue(L"include_prerelease_updates", json::value(includePrereleaseUpdates));
     result.SetNamedValue(L"show_whats_new_after_updates", json::value(showWhatsNewAfterUpdates));
     result.SetNamedValue(L"enable_experimentation", json::value(enableExperimentation));
     result.SetNamedValue(L"dashboard_sort_order", json::value(static_cast<int>(dashboardSortOrder)));
@@ -133,6 +135,7 @@ json::JsonObject load_general_settings()
     run_as_elevated = loaded.GetNamedBoolean(L"run_elevated", false);
     show_new_updates_toast_notification = loaded.GetNamedBoolean(L"show_new_updates_toast_notification", true);
     download_updates_automatically = loaded.GetNamedBoolean(L"download_updates_automatically", true) && check_user_is_admin();
+    include_prerelease_updates = loaded.GetNamedBoolean(L"include_prerelease_updates", false);
     show_whats_new_after_updates = loaded.GetNamedBoolean(L"show_whats_new_after_updates", true);
     enable_experimentation = loaded.GetNamedBoolean(L"enable_experimentation", true);
     enable_warnings_elevated_apps = loaded.GetNamedBoolean(L"enable_warnings_elevated_apps", true);
@@ -172,6 +175,7 @@ GeneralSettings get_general_settings()
         .quickAccessShortcut = quick_access_shortcut,
         .showNewUpdatesToastNotification = show_new_updates_toast_notification,
         .downloadUpdatesAutomatically = download_updates_automatically && is_user_admin,
+        .includePrereleaseUpdates = include_prerelease_updates,
         .showWhatsNewAfterUpdates = show_whats_new_after_updates,
         .enableExperimentation = enable_experimentation,
     .dashboardSortOrder = dashboard_sort_order,
@@ -191,6 +195,102 @@ GeneralSettings get_general_settings()
     }
 
     return settings;
+}
+
+void apply_module_status_update(const json::JsonObject& module_config, bool save)
+{
+    Logger::info(L"apply_module_status_update: {}", std::wstring{ module_config.ToString() });
+
+    // Expected format: {"ModuleName": true/false} - only one module per update
+    auto iter = module_config.First();
+    if (!iter.HasCurrent())
+    {
+        Logger::warn(L"apply_module_status_update: Empty module config");
+        return;
+    }
+
+    const auto& element = iter.Current();
+    const auto value = element.Value();
+    if (value.ValueType() != json::JsonValueType::Boolean)
+    {
+        Logger::warn(L"apply_module_status_update: Invalid value type for module status");
+        return;
+    }
+
+    const std::wstring name{ element.Key().c_str() };
+    if (modules().find(name) == modules().end())
+    {
+        Logger::warn(L"apply_module_status_update: Module {} not found", name);
+        return;
+    }
+
+    PowertoyModule& powertoy = modules().at(name);
+    const bool module_inst_enabled = powertoy->is_enabled();
+    bool target_enabled = value.GetBoolean();
+
+    auto gpo_rule = powertoy->gpo_policy_enabled_configuration();
+    if (gpo_rule == powertoys_gpo::gpo_rule_configured_enabled || gpo_rule == powertoys_gpo::gpo_rule_configured_disabled)
+    {
+        // Apply the GPO Rule.
+        target_enabled = gpo_rule == powertoys_gpo::gpo_rule_configured_enabled;
+    }
+
+    if (module_inst_enabled == target_enabled)
+    {
+        Logger::info(L"apply_module_status_update: Module {} already in target state {}", name, target_enabled);
+        return;
+    }
+
+    if (target_enabled)
+    {
+        Logger::info(L"apply_module_status_update: Enabling powertoy {}", name);
+        powertoy->enable();
+        auto& hkmng = HotkeyConflictDetector::HotkeyConflictManager::GetInstance();
+        hkmng.EnableHotkeyByModule(name);
+
+        // Trigger AI capability detection when ImageResizer is enabled
+        if (name == L"Image Resizer")
+        {
+            Logger::info(L"ImageResizer enabled, triggering AI capability detection");
+            DetectAiCapabilitiesAsync(true);  // Skip settings check since we know it's being enabled
+        }
+    }
+    else
+    {
+        Logger::info(L"apply_module_status_update: Disabling powertoy {}", name);
+        powertoy->disable();
+        auto& hkmng = HotkeyConflictDetector::HotkeyConflictManager::GetInstance();
+        hkmng.DisableHotkeyByModule(name);
+    }
+    // Sync the hotkey state with the module state, so it can be removed for disabled modules.
+    powertoy.UpdateHotkeyEx();
+
+    if (save)
+    {
+        // Load existing settings and only update the specific module's enabled state
+        json::JsonObject current_settings = PTSettingsHelper::load_general_settings();
+        
+        json::JsonObject enabled;
+        if (current_settings.HasKey(L"enabled"))
+        {
+            enabled = current_settings.GetNamedObject(L"enabled");
+        }
+        
+        // Check if the saved state is different from the requested state
+        bool current_saved = enabled.HasKey(name) ? enabled.GetNamedBoolean(name, true) : true;
+        
+        if (current_saved != target_enabled)
+        {
+            // Update only this module's enabled state
+            enabled.SetNamedValue(name, json::value(target_enabled));
+            current_settings.SetNamedValue(L"enabled", enabled);
+            
+            PTSettingsHelper::save_general_settings(current_settings);
+            
+            GeneralSettings settings_for_trace = get_general_settings();
+            Trace::SettingsChanged(settings_for_trace);
+        }
+    }
 }
 
 void apply_general_settings(const json::JsonObject& general_configs, bool save)
@@ -239,6 +339,7 @@ void apply_general_settings(const json::JsonObject& general_configs, bool save)
     show_new_updates_toast_notification = general_configs.GetNamedBoolean(L"show_new_updates_toast_notification", true);
 
     download_updates_automatically = general_configs.GetNamedBoolean(L"download_updates_automatically", true);
+    include_prerelease_updates = general_configs.GetNamedBoolean(L"include_prerelease_updates", false);
     show_whats_new_after_updates = general_configs.GetNamedBoolean(L"show_whats_new_after_updates", true);
 
     enable_experimentation = general_configs.GetNamedBoolean(L"enable_experimentation", true);
@@ -367,11 +468,21 @@ void apply_general_settings(const json::JsonObject& general_configs, bool save)
     if (json::has(general_configs, L"show_theme_adaptive_tray_icon", json::JsonValueType::Boolean))
     {
         bool new_theme_adaptive = general_configs.GetNamedBoolean(L"show_theme_adaptive_tray_icon");
+        Logger::info(L"apply_general_settings: show_theme_adaptive_tray_icon current={}, new={}",
+                     show_theme_adaptive_tray_icon, new_theme_adaptive);
         if (show_theme_adaptive_tray_icon != new_theme_adaptive)
         {
             show_theme_adaptive_tray_icon = new_theme_adaptive;
             set_tray_icon_theme_adaptive(show_theme_adaptive_tray_icon);
         }
+        else
+        {
+            Logger::info(L"apply_general_settings: show_theme_adaptive_tray_icon unchanged, skipping update");
+        }
+    }
+    else
+    {
+        Logger::warn(L"apply_general_settings: show_theme_adaptive_tray_icon not found in config");
     }
 
     if (json::has(general_configs, L"ignored_conflict_properties", json::JsonValueType::Object))
@@ -478,5 +589,4 @@ void start_enabled_powertoys()
         }
     }
 }
-
 

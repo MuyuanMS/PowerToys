@@ -2,16 +2,14 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System;
 using CommunityToolkit.WinUI.Controls;
+using Microsoft.PowerToys.Common.UI.Controls.Window;
 using Microsoft.PowerToys.Settings.UI.Helpers;
 using Microsoft.PowerToys.Settings.UI.Library;
-using Microsoft.PowerToys.Settings.UI.Library.Helpers;
 using Microsoft.PowerToys.Settings.UI.Library.HotkeyConflicts;
 using Microsoft.PowerToys.Settings.UI.Services;
 using Microsoft.PowerToys.Settings.UI.ViewModels;
 using Microsoft.PowerToys.Settings.UI.Views;
-using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -26,7 +24,11 @@ namespace Microsoft.PowerToys.Settings.UI.SettingsXAML.Controls.Dashboard
 
         public ShortcutConflictWindow()
         {
+            App.ThemeService.ThemeChanged += OnThemeChanged;
+            App.ThemeService.ApplyTheme();
+
             var settingsUtils = SettingsUtils.Default;
+
             ViewModel = new ShortcutConflictViewModel(
                 settingsUtils,
                 SettingsRepository<GeneralSettings>.GetInstance(settingsUtils),
@@ -43,11 +45,27 @@ namespace Microsoft.PowerToys.Settings.UI.SettingsXAML.Controls.Dashboard
             var resourceLoader = ResourceLoaderInstance.ResourceLoader;
             ExtendsContentIntoTitleBar = true;
             SetTitleBar(titleBar);
+            TitleBarHelper.SetPreferredTheme(this);
 
-            this.Title = resourceLoader.GetString("ShortcutConflictWindow_Title");
+            var windowTitle = resourceLoader.GetString("ShortcutConflictWindow_Title");
+
+            // Guard against an empty title: ResourceLoader.GetString returns "" when the resource
+            // map can't be resolved, and an empty native window title can fault the WinUI TitleBar
+            // control while it reads AppWindow.Title during a deferred layout pass.
+            if (string.IsNullOrEmpty(windowTitle))
+            {
+                windowTitle = "PowerToys shortcut conflicts";
+            }
+
+            this.Title = windowTitle;
             this.CenterOnScreen();
 
             ViewModel.OnPageLoaded();
+        }
+
+        private void OnThemeChanged(object sender, ElementTheme theme)
+        {
+            WindowHelper.SetTheme(this, theme);
         }
 
         private void CenterOnScreen()
@@ -127,6 +145,14 @@ namespace Microsoft.PowerToys.Settings.UI.SettingsXAML.Controls.Dashboard
         private void WindowEx_Closed(object sender, WindowEventArgs args)
         {
             ViewModel?.Dispose();
+
+            var mainWindow = App.GetSettingsWindow();
+            if (mainWindow != null)
+            {
+                mainWindow.CloseHiddenWindow();
+            }
+
+            App.ThemeService.ThemeChanged -= OnThemeChanged;
         }
 
         private void Window_Activated_SetIcon(object sender, WindowActivatedEventArgs args)

@@ -2,28 +2,28 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using CmdPalKeyboardService;
 using CommunityToolkit.Mvvm.Messaging;
 using ManagedCommon;
-using Microsoft.CmdPal.Core.Common.Helpers;
-using Microsoft.CmdPal.Core.Common.Services;
-using Microsoft.CmdPal.Core.ViewModels.Messages;
-using Microsoft.CmdPal.Ext.ClipboardHistory.Messages;
+using Microsoft.CmdPal.Common.Helpers;
+using Microsoft.CmdPal.Common.Messages;
 using Microsoft.CmdPal.UI.Controls;
+using Microsoft.CmdPal.UI.Dock;
 using Microsoft.CmdPal.UI.Events;
 using Microsoft.CmdPal.UI.Helpers;
 using Microsoft.CmdPal.UI.Messages;
+using Microsoft.CmdPal.UI.Pages;
 using Microsoft.CmdPal.UI.Services;
 using Microsoft.CmdPal.UI.ViewModels;
 using Microsoft.CmdPal.UI.ViewModels.Messages;
 using Microsoft.CmdPal.UI.ViewModels.Services;
+using Microsoft.CmdPal.ViewModels.Messages;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.PowerToys.Telemetry;
 using Microsoft.UI;
-using Microsoft.UI.Composition;
-using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -32,16 +32,11 @@ using Windows.ApplicationModel.Activation;
 using Windows.Foundation;
 using Windows.Graphics;
 using Windows.System;
-using Windows.UI;
-using Windows.UI.WindowManagement;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Graphics.Dwm;
-using Windows.Win32.Graphics.Gdi;
-using Windows.Win32.UI.HiDpi;
 using Windows.Win32.UI.Input.KeyboardAndMouse;
 using Windows.Win32.UI.WindowsAndMessaging;
-using WinRT;
 using WinUIEx;
 using RS_ = Microsoft.CmdPal.UI.Helpers.ResourceLoaderInstance;
 
@@ -50,6 +45,7 @@ namespace Microsoft.CmdPal.UI;
 public sealed partial class MainWindow : WindowEx,
     IRecipient<DismissMessage>,
     IRecipient<ShowWindowMessage>,
+    IRecipient<ShowPaletteAtMessage>,
     IRecipient<HideWindowMessage>,
     IRecipient<QuitMessage>,
     IRecipient<NavigateToPageMessage>,
@@ -58,11 +54,13 @@ public sealed partial class MainWindow : WindowEx,
     IRecipient<ErrorOccurredMessage>,
     IRecipient<DragStartedMessage>,
     IRecipient<DragCompletedMessage>,
-    IDisposable
+    IRecipient<ToggleDevRibbonMessage>,
+    IRecipient<GetHwndMessage>,
+    IRecipient<ExpandCompactModeMessage>,
+    IRecipient<MaximizeForDialogMessage>,
+    IDisposable,
+    IHostWindow
 {
-    private const int DefaultWidth = 800;
-    private const int DefaultHeight = 480;
-
     [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.NamingRules", "SA1310:Field names should not contain underscore", Justification = "Stylistically, window messages are WM_")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.NamingRules", "SA1306:Field names should begin with lower-case letter", Justification = "Stylistically, window messages are WM_")]
     private readonly uint WM_TASKBAR_RESTART;
@@ -74,10 +72,22 @@ public sealed partial class MainWindow : WindowEx,
     private readonly KeyboardListener _keyboardListener;
     private readonly LocalKeyboardListener _localKeyboardListener;
     private readonly HiddenOwnerWindowBehavior _hiddenOwnerBehavior = new();
+    private readonly ICmdPalProtocolActivation _protocolActivation;
+    private readonly ViewModels.Models.IMonitorService _monitorService;
     private readonly IThemeService _themeService;
     private readonly WindowThemeSynchronizer _windowThemeSynchronizer;
+    private readonly List<long> _breakthroughTimestamps = [];
+
     private bool _ignoreHotKeyWhenFullScreen = true;
+    private bool _ignoreHotKeyWhenBusy;
+    private bool _allowBreakthroughShortcut;
+    private bool _suppressDpiChange;
     private bool _themeServiceInitialized;
+
+    // The snapshot of settings last consumed by HotReloadSettings. Used to skip redundant
+    // hot-reloads when a SettingsChanged notification touches settings this window doesn't
+    // care about (theme, provider config, aliases, and so on).
+    private SettingsModel? _lastAppliedSettings;
 
     // Session tracking for telemetry
     private Stopwatch? _sessionStopwatch;
@@ -87,18 +97,47 @@ public sealed partial class MainWindow : WindowEx,
     private int _sessionMaxNavigationDepth;
     private int _sessionErrorCount;
 
-    private DesktopAcrylicController? _acrylicController;
-    private SystemBackdropConfiguration? _configurationSource;
+    private bool _isUpdatingBackdrop;
+    private bool _isBackdropUpdatePending;
     private TimeSpan _autoGoHomeInterval = Timeout.InfiniteTimeSpan;
+
+    // Tracks the chrome mode currently applied to the HWND. Nullable so the first
+    // call to ApplyHwndFrameMode always runs, regardless of which mode we land in.
+    private bool? _hwndFrameVisible;
+
+    // Thickness (in DIPs) of the resize grip around the visible card's border. Shared
+    // by the InputNonClientPointerSource region registration (so WM_NCHITTEST actually
+    // fires over the border) and the WM_NCHITTEST handler (so it returns resize codes
+    // over the same band). These MUST match or the two disagree about where resizing is.
+    private const int ResizeBorderThicknessDip = 8;
 
     private WindowPosition _currentWindowPosition = new();
 
     private bool _preventHideWhenDeactivated;
+    private bool _isLoadedFromDock;
+
+    // While a modal dialog (e.g. a confirmation) is showing, the card is forced to fill the
+    // whole window so the dialog — which renders in the window's popup layer and is clipped to
+    // the card's HWND region — isn't cut off. Cleared when the dialog closes.
+    private bool _dialogFullExpandActive;
+
+    // The most recent expand/collapse request, remembered so the correct compact layout can be
+    // restored once a dialog-driven full expansion ends.
+    private bool _lastExpandRequested;
+
+    private DevRibbon? _devRibbon;
 
     private MainWindowViewModel ViewModel { get; }
 
+    public bool IsVisibleToUser { get; private set; } = true;
+
+    public event EventHandler? IsVisibleToUserChanged;
+
     public MainWindow()
     {
+        _protocolActivation = App.Current.Services.GetRequiredService<ICmdPalProtocolActivation>();
+        _monitorService = App.Current.Services.GetRequiredService<ViewModels.Models.IMonitorService>();
+
         InitializeComponent();
 
         ViewModel = App.Current.Services.GetService<MainWindowViewModel>()!;
@@ -117,7 +156,13 @@ public sealed partial class MainWindow : WindowEx,
             CommandPaletteHost.SetHostHwnd((ulong)_hwnd.Value);
         }
 
-        SetAcrylic();
+        // The HWND itself is borderless / transparent — the visible card lives inside
+        // RootElement (CmdPalMainControl) and draws its own corners, border, shadow, and
+        // backdrop via the SystemBackdropElement. The frame can be re-enabled via an
+        // internal-only setting (hot-reloaded through HotReloadSettings) to make the
+        // HWND bounds visible while debugging.
+        var initialSettings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
+        ApplyHwndFrameMode(ShouldShowHwndFrame(initialSettings));
 
         _hiddenOwnerBehavior.ShowInTaskbar(this, Debugger.IsAttached);
 
@@ -125,31 +170,6 @@ public sealed partial class MainWindow : WindowEx,
         _keyboardListener.Start();
 
         _keyboardListener.SetProcessCommand(new CmdPalKeyboardService.ProcessCommand(HandleSummon));
-
-        this.SetIcon();
-        AppWindow.Title = RS_.GetString("AppName");
-        RestoreWindowPosition();
-        UpdateWindowPositionInMemory();
-
-        WeakReferenceMessenger.Default.Register<DismissMessage>(this);
-        WeakReferenceMessenger.Default.Register<QuitMessage>(this);
-        WeakReferenceMessenger.Default.Register<ShowWindowMessage>(this);
-        WeakReferenceMessenger.Default.Register<HideWindowMessage>(this);
-        WeakReferenceMessenger.Default.Register<NavigateToPageMessage>(this);
-        WeakReferenceMessenger.Default.Register<NavigationDepthMessage>(this);
-        WeakReferenceMessenger.Default.Register<SearchQueryMessage>(this);
-        WeakReferenceMessenger.Default.Register<ErrorOccurredMessage>(this);
-        WeakReferenceMessenger.Default.Register<DragStartedMessage>(this);
-        WeakReferenceMessenger.Default.Register<DragCompletedMessage>(this);
-
-        // Hide our titlebar.
-        // We need to both ExtendsContentIntoTitleBar, then set the height to Collapsed
-        // to hide the old caption buttons. Then, in UpdateRegionsForCustomTitleBar,
-        // we'll make the top drag-able again. (after our content loads)
-        ExtendsContentIntoTitleBar = true;
-        AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Collapsed;
-        SizeChanged += WindowSizeChanged;
-        RootElement.Loaded += RootElementLoaded;
 
         WM_TASKBAR_RESTART = PInvoke.RegisterWindowMessage("TaskbarCreated");
 
@@ -161,12 +181,42 @@ public sealed partial class MainWindow : WindowEx,
         var hotKeyPrcPointer = Marshal.GetFunctionPointerForDelegate(_hotkeyWndProc);
         _originalWndProc = Marshal.GetDelegateForFunctionPointer<WNDPROC>(PInvoke.SetWindowLongPtr(_hwnd, WINDOW_LONG_PTR_INDEX.GWL_WNDPROC, hotKeyPrcPointer));
 
+        this.SetIcon();
+        AppWindow.Title = RS_.GetString("AppName");
+        RestoreWindowPositionFromSavedSettings();
+        UpdateWindowPositionInMemory();
+
+        WeakReferenceMessenger.Default.Register<DismissMessage>(this);
+        WeakReferenceMessenger.Default.Register<QuitMessage>(this);
+        WeakReferenceMessenger.Default.Register<ShowWindowMessage>(this);
+        WeakReferenceMessenger.Default.Register<ShowPaletteAtMessage>(this);
+        WeakReferenceMessenger.Default.Register<HideWindowMessage>(this);
+        WeakReferenceMessenger.Default.Register<NavigateToPageMessage>(this);
+        WeakReferenceMessenger.Default.Register<NavigationDepthMessage>(this);
+        WeakReferenceMessenger.Default.Register<SearchQueryMessage>(this);
+        WeakReferenceMessenger.Default.Register<ErrorOccurredMessage>(this);
+        WeakReferenceMessenger.Default.Register<DragStartedMessage>(this);
+        WeakReferenceMessenger.Default.Register<DragCompletedMessage>(this);
+        WeakReferenceMessenger.Default.Register<ToggleDevRibbonMessage>(this);
+        WeakReferenceMessenger.Default.Register<GetHwndMessage>(this);
+        WeakReferenceMessenger.Default.Register<ExpandCompactModeMessage>(this);
+        WeakReferenceMessenger.Default.Register<MaximizeForDialogMessage>(this);
+
+        // Hide our titlebar.
+        // We need to both ExtendsContentIntoTitleBar, then set the height to Collapsed
+        // to hide the old caption buttons. Then, in UpdateRegionsForCustomTitleBar,
+        // we'll make the top drag-able again. (after our content loads)
+        ExtendsContentIntoTitleBar = true;
+        AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Collapsed;
+        SizeChanged += WindowSizeChanged;
+        RootElement.Loaded += RootElementLoaded;
+
         // Load our settings, and then also wire up a settings changed handler
         HotReloadSettings();
-        App.Current.Services.GetService<SettingsModel>()!.SettingsChanged += SettingsChangedHandler;
+        App.Current.Services.GetRequiredService<ISettingsService>().SettingsChanged += SettingsChangedHandler;
 
         // Make sure that we update the acrylic theme when the OS theme changes
-        RootElement.ActualThemeChanged += (s, e) => DispatcherQueue.TryEnqueue(UpdateAcrylic);
+        RootElement.ActualThemeChanged += RootElement_ActualThemeChanged;
 
         // Hardcoding event name to avoid bringing in the PowerToys.interop dependency. Event name must match CMDPAL_SHOW_EVENT from shared_constants.h
         NativeEventWaiter.WaitForEventLoop("Local\\PowerToysCmdPal-ShowEvent-62336fcd-8611-4023-9b30-091a6af4cc5a", () =>
@@ -193,7 +243,39 @@ public sealed partial class MainWindow : WindowEx,
 
     private void ThemeServiceOnThemeChanged(object? sender, ThemeChangedEventArgs e)
     {
-        UpdateAcrylic();
+        ScheduleBackdropUpdate();
+    }
+
+    private void RootElement_ActualThemeChanged(FrameworkElement sender, object args)
+    {
+        ScheduleBackdropUpdate();
+    }
+
+    private void ScheduleBackdropUpdate()
+    {
+        // A theme reload changes RequestedTheme several times to force WinUI to refresh
+        // its resources. Coalesce the resulting ThemeChanged / ActualThemeChanged events
+        // so the SystemBackdropElement is only updated once with the final theme.
+        if (_isBackdropUpdatePending)
+        {
+            return;
+        }
+
+        _isBackdropUpdatePending = true;
+        if (!DispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                UpdateBackdrop();
+            }
+            finally
+            {
+                _isBackdropUpdatePending = false;
+            }
+        }))
+        {
+            _isBackdropUpdatePending = false;
+        }
     }
 
     private static void LocalKeyboardListener_OnKeyPressed(object? sender, LocalKeyboardListenerKeyPressedEventArgs e)
@@ -204,19 +286,46 @@ public sealed partial class MainWindow : WindowEx,
         }
     }
 
-    private void SettingsChangedHandler(SettingsModel sender, object? args) => HotReloadSettings();
+    private void SettingsChangedHandler(ISettingsService sender, SettingsModel args)
+    {
+        // Only rebuild window state when a setting HotReloadSettings actually consumes has
+        // changed. Most SettingsChanged notifications (theme, provider config, aliases, ...)
+        // don't affect the host window, so hot-reloading on every one is wasteful.
+        if (MainWindowSettingsComparer.Instance.Equals(_lastAppliedSettings, args))
+        {
+            return;
+        }
+
+        DispatcherQueue.TryEnqueue(HotReloadSettings);
+    }
 
     private void RootElementLoaded(object sender, RoutedEventArgs e)
     {
         // Now that our content has loaded, we can update our draggable regions
         UpdateRegionsForCustomTitleBar();
 
-        // Add dev ribbon if enabled
+        // Also update regions when DPI changes. SizeChanged only fires when the logical
+        // (DIP) size changes — a DPI change that scales the physical size while preserving
+        // the DIP size won't trigger it, leaving drag regions at the old physical coordinates.
+        RootElement.XamlRoot.Changed += XamlRoot_Changed;
+
+        // The visible card resizes inside the fixed-size HWND (e.g. compact <-> expanded),
+        // which does not raise WindowSizeChanged. Recompute the drag regions and the HWND
+        // clip region whenever the card's own size changes so they keep tracking it.
+        RootElement.CardElement.SizeChanged += CardElement_SizeChanged;
+
+        // Add dev ribbon if enabled. The ribbon lives inside the visible card so it
+        // doesn't draw into the transparent shadow area outside the rounded border.
         if (!BuildInfo.IsCiBuild)
         {
-            RootElement.Children.Add(new DevRibbon { Margin = new Thickness(-1, -1, 120, -1) });
+            _devRibbon = new DevRibbon { Margin = new Thickness(-1, -1, 120, -1) };
+            RootElement.CardContentPanel.Children.Add(_devRibbon);
         }
     }
+
+    private void XamlRoot_Changed(XamlRoot sender, XamlRootChangedEventArgs args) => UpdateRegionsForCustomTitleBar();
+
+    private void CardElement_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateRegionsForCustomTitleBar();
 
     private void WindowSizeChanged(object sender, WindowSizeChangedEventArgs args) => UpdateRegionsForCustomTitleBar();
 
@@ -226,112 +335,492 @@ public sealed partial class MainWindow : WindowEx,
         PositionCentered(displayArea);
     }
 
-    private void RestoreWindowPosition()
-    {
-        var settings = App.Current.Services.GetService<SettingsModel>();
-        if (settings?.LastWindowPosition is not WindowPosition savedPosition)
-        {
-            PositionCentered();
-            return;
-        }
-
-        if (savedPosition.Width <= 0 || savedPosition.Height <= 0)
-        {
-            PositionCentered();
-            return;
-        }
-
-        var newRect = EnsureWindowIsVisible(savedPosition.ToPhysicalWindowRectangle(), new SizeInt32(savedPosition.ScreenWidth, savedPosition.ScreenHeight), savedPosition.Dpi);
-        AppWindow.MoveAndResize(newRect);
-    }
-
     private void PositionCentered(DisplayArea displayArea)
     {
-        if (displayArea is not null)
-        {
-            var centeredPosition = AppWindow.Position;
-            centeredPosition.X = (displayArea.WorkArea.Width - AppWindow.Size.Width) / 2;
-            centeredPosition.Y = (displayArea.WorkArea.Height - AppWindow.Size.Height) / 2;
+        // Use the saved window size when available so that a dock-resized HWND
+        // (hidden but not destroyed) doesn't dictate the size on normal reopen.
+        SizeInt32 windowSize;
+        int windowDpi;
 
-            centeredPosition.X += displayArea.WorkArea.X;
-            centeredPosition.Y += displayArea.WorkArea.Y;
-            AppWindow.Move(centeredPosition);
+        if (_currentWindowPosition.IsSizeValid)
+        {
+            windowSize = new SizeInt32(_currentWindowPosition.Width, _currentWindowPosition.Height);
+            windowDpi = _currentWindowPosition.Dpi;
+        }
+        else
+        {
+            windowSize = AppWindow.Size;
+            windowDpi = (int)this.GetDpiForWindow();
+        }
+
+        var rect = WindowPositionHelper.CenterOnDisplay(
+           displayArea,
+           windowSize,
+           windowDpi);
+
+        if (rect is not null)
+        {
+            var finalRect = rect.Value;
+
+            // In compact mode, center the *visible collapsed card* (the search box) on the
+            // display, not the much larger transparent HWND. The card is anchored to the top
+            // of the HWND, so we offset the HWND upward by the card's center so that growing
+            // the card downward (when results appear) keeps the search box where it was.
+            if (TryGetCompactCardCenterOffsetPhysical(windowDpi, out var cardCenterFromHwndTop))
+            {
+                var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
+                var workArea = displayArea.WorkArea;
+
+                // The setting is the relative height measured from the *bottom* of the screen,
+                // so a larger percentage places the search box higher up the display.
+                var fractionFromTop = GetCompactCenterFractionFromTop(settings);
+                var desiredCardCenterY = workArea.Y + (int)Math.Round(workArea.Height * fractionFromTop);
+                finalRect.Y = desiredCardCenterY - cardCenterFromHwndTop;
+
+                if (finalRect.Y < workArea.Y)
+                {
+                    finalRect.Y = workArea.Y;
+                }
+            }
+
+            MoveAndResizeDpiAware(finalRect);
+        }
+    }
+
+    /// <summary>
+    /// When the palette is in compact mode and is being centered on launch, computes the
+    /// distance (in physical pixels) from the top of the HWND to the vertical center of the
+    /// collapsed card, so the caller can position the HWND such that the card is centered.
+    /// Returns false when the card should not be re-centered (compact mode off, or a summon
+    /// behavior that restores the last position).
+    /// </summary>
+    private bool TryGetCompactCardCenterOffsetPhysical(int windowDpi, out int cardCenterFromHwndTop)
+    {
+        cardCenterFromHwndTop = 0;
+
+        var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
+        if (!settings.CompactMode || !IsCenteringSummon(settings))
+        {
+            return false;
+        }
+
+        // Make sure the card is actually collapsed before we measure it.
+        (RootElement.MainContent as ShellPage)?.EnsureCompactLayout();
+
+        var cardHeightDip = RootElement.GetCardHeight();
+        if (cardHeightDip <= 0)
+        {
+            return false;
+        }
+
+        var scale = windowDpi / 96.0;
+        var cardTopDip = RootElement.ShadowPadding.Top;
+        cardCenterFromHwndTop = (int)Math.Round((cardTopDip + (cardHeightDip / 2.0)) * scale);
+        return true;
+    }
+
+    // Every summon behavior except ToLast centers the window on its target display.
+    private static bool IsCenteringSummon(SettingsModel settings) => settings.SummonOn != MonitorBehavior.ToLast;
+
+    // Converts the "center height" setting (a percentage measured up from the bottom of the
+    // screen) into the fraction of the work area, measured from the top, at which the
+    // collapsed search box should be centered.
+    private static double GetCompactCenterFractionFromTop(SettingsModel settings)
+    {
+        var pct = Math.Clamp(settings.CompactCenterHeightPercentage, 0, 100);
+        return 1.0 - (pct / 100.0);
+    }
+
+    private void RestoreWindowPosition(WindowPosition? savedPosition)
+    {
+        if (savedPosition?.IsSizeValid != true)
+        {
+            // don't try to restore if the saved position is invalid, just recenter
+            PositionCentered();
+            return;
+        }
+
+        var newRect = WindowPositionHelper.AdjustRectForVisibility(
+            savedPosition.ToPhysicalWindowRectangle(),
+            new SizeInt32(savedPosition.ScreenWidth, savedPosition.ScreenHeight),
+            savedPosition.Dpi);
+
+        MoveAndResizeDpiAware(newRect);
+    }
+
+    private void RestoreWindowPositionFromSavedSettings()
+    {
+        var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
+        RestoreWindowPosition(settings?.LastWindowPosition);
+    }
+
+    private void RestoreWindowPositionFromMemory()
+    {
+        RestoreWindowPosition(_currentWindowPosition);
+    }
+
+    /// <summary>
+    /// Moves and resizes the window while suppressing WM_DPICHANGED.
+    /// The caller is expected to provide a rect already scaled for the target display's DPI.
+    /// Without suppression, the framework would apply its own DPI scaling on top, double-scaling the window.
+    /// </summary>
+    private void MoveAndResizeDpiAware(RectInt32 rect)
+    {
+        var originalMinHeight = MinHeight;
+        var originalMinWidth = MinWidth;
+
+        _suppressDpiChange = true;
+
+        try
+        {
+            // WindowEx is uses current DPI to calculate the minimum window size
+            MinHeight = 0;
+            MinWidth = 0;
+            AppWindow.MoveAndResize(rect);
+        }
+        finally
+        {
+            MinHeight = originalMinHeight;
+            MinWidth = originalMinWidth;
+            _suppressDpiChange = false;
         }
     }
 
     private void UpdateWindowPositionInMemory()
     {
+        var placement = new WINDOWPLACEMENT { length = (uint)Marshal.SizeOf<WINDOWPLACEMENT>() };
+        if (!PInvoke.GetWindowPlacement(_hwnd, ref placement))
+        {
+            return;
+        }
+
+        var rect = placement.rcNormalPosition;
         var displayArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest) ?? DisplayArea.Primary;
+
+        // GetWindowPlacement returns rcNormalPosition in workspace coordinates for
+        // normal windows, but in screen coordinates for tool windows (WS_EX_TOOLWINDOW).
+        // HiddenOwnerWindowBehavior applies WS_EX_TOOLWINDOW to hide from taskbar/Alt+Tab,
+        // so we must check the current style before converting coordinates.
+        //
+        // To be on the safe side, we should consider the possibility that setting
+        // WS_EX_TOOLWINDOW failed or isn't applied while debugging.
+        var workArea = displayArea.WorkArea;
+        var isToolWindow = this.HasExtendedStyle(WINDOW_EX_STYLE.WS_EX_TOOLWINDOW);
+
         _currentWindowPosition = new WindowPosition
         {
-            X = AppWindow.Position.X,
-            Y = AppWindow.Position.Y,
-            Width = AppWindow.Size.Width,
-            Height = AppWindow.Size.Height,
+            X = rect.X + (isToolWindow ? 0 : workArea.X),
+            Y = rect.Y + (isToolWindow ? 0 : workArea.Y),
+            Width = rect.Width,
+            Height = rect.Height,
             Dpi = (int)this.GetDpiForWindow(),
-            ScreenWidth = displayArea.WorkArea.Width,
-            ScreenHeight = displayArea.WorkArea.Height,
+            ScreenWidth = workArea.Width,
+            ScreenHeight = workArea.Height,
         };
     }
 
     private void HotReloadSettings()
     {
-        var settings = App.Current.Services.GetService<SettingsModel>()!;
+        // NOTE: SettingsChangedHandler skips this method when nothing relevant changed, using
+        // MainWindowSettingsComparer. When you start consuming a new setting below, add it to
+        // that comparer too — otherwise changes to it won't trigger a hot-reload.
+        var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
+        _lastAppliedSettings = settings;
 
         SetupHotkey(settings);
         App.Current.Services.GetService<TrayIconService>()!.SetupTrayIcon(settings.ShowSystemTrayIcon);
 
         _ignoreHotKeyWhenFullScreen = settings.IgnoreShortcutWhenFullscreen;
+        _ignoreHotKeyWhenBusy = settings.IgnoreShortcutWhenBusy;
+        _allowBreakthroughShortcut = settings.AllowBreakthroughShortcut;
 
         _autoGoHomeInterval = settings.AutoGoHomeInterval;
         _autoGoHomeTimer.Interval = _autoGoHomeInterval;
+
+        ApplyHwndFrameMode(ShouldShowHwndFrame(settings));
+
+        // Start collapsed: the card shrinks to just the search box until there is a query.
+        HandleExpandCompactOnUiThread(false);
     }
 
-    private void SetAcrylic()
+    /// <summary>
+    /// Returns true if the user has opted in to seeing the OS-drawn HWND chrome (an internal
+    /// debugging setting). Always false in CI / release builds.
+    /// </summary>
+    private static bool ShouldShowHwndFrame(SettingsModel settings) =>
+        !BuildInfo.IsCiBuild && settings.ShowHwndFrame;
+
+    /// <summary>
+    /// Compares two <see cref="SettingsModel"/> instances by only the settings that
+    /// <see cref="HotReloadSettings"/> (and the methods it calls) actually consume. Any change
+    /// to a setting outside this set is invisible to the host window, so treating such models
+    /// as equal lets <see cref="SettingsChangedHandler"/> skip a redundant hot-reload.
+    /// </summary>
+    /// <remarks>
+    /// Keep this in sync with the settings read by <see cref="HotReloadSettings"/>,
+    /// <see cref="SetupHotkey"/>, <see cref="ShouldShowHwndFrame"/>, and
+    /// <see cref="HandleExpandCompactOnUiThread"/>.
+    /// </remarks>
+    private sealed class MainWindowSettingsComparer : IEqualityComparer<SettingsModel>
     {
-        if (DesktopAcrylicController.IsSupported())
+        public static MainWindowSettingsComparer Instance { get; } = new();
+
+        public bool Equals(SettingsModel? x, SettingsModel? y)
         {
-            // Hooking up the policy object.
-            _configurationSource = new SystemBackdropConfiguration
+            if (ReferenceEquals(x, y))
             {
-                // Initial configuration state.
-                IsInputActive = true,
-            };
-            UpdateAcrylic();
+                return true;
+            }
+
+            if (x is null || y is null)
+            {
+                return false;
+            }
+
+            return x.UseLowLevelGlobalHotkey == y.UseLowLevelGlobalHotkey
+                && x.ShowSystemTrayIcon == y.ShowSystemTrayIcon
+                && x.IgnoreShortcutWhenFullscreen == y.IgnoreShortcutWhenFullscreen
+                && x.IgnoreShortcutWhenBusy == y.IgnoreShortcutWhenBusy
+                && x.AllowBreakthroughShortcut == y.AllowBreakthroughShortcut
+                && x.AutoGoHomeInterval == y.AutoGoHomeInterval
+                && x.ShowHwndFrame == y.ShowHwndFrame
+                && x.CompactMode == y.CompactMode
+                && x.Hotkey == y.Hotkey // HotkeySettings is a record (value equality)
+                && CommandHotkeysEqual(x.CommandHotkeys, y.CommandHotkeys);
+        }
+
+        // TopLevelHotkey is a record (value equality); compare element-wise. ImmutableList
+        // itself only implements reference equality, so we can't rely on ==.
+        private static bool CommandHotkeysEqual(ImmutableList<TopLevelHotkey> x, ImmutableList<TopLevelHotkey> y)
+        {
+            if (ReferenceEquals(x, y))
+            {
+                return true;
+            }
+
+            if (x.Count != y.Count)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < x.Count; i++)
+            {
+                if (x[i] != y[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public int GetHashCode(SettingsModel obj)
+        {
+            var hash = default(HashCode);
+            hash.Add(obj.UseLowLevelGlobalHotkey);
+            hash.Add(obj.ShowSystemTrayIcon);
+            hash.Add(obj.IgnoreShortcutWhenFullscreen);
+            hash.Add(obj.IgnoreShortcutWhenBusy);
+            hash.Add(obj.AllowBreakthroughShortcut);
+            hash.Add(obj.AutoGoHomeInterval);
+            hash.Add(obj.ShowHwndFrame);
+            hash.Add(obj.CompactMode);
+            hash.Add(obj.Hotkey);
+            hash.Add(obj.CommandHotkeys.Count);
+            return hash.ToHashCode();
         }
     }
 
-    private void UpdateAcrylic()
+    /// <summary>
+    /// Configures the HWND for the borderless / transparent main-window mode and (when
+    /// the internal debug toggle is enabled) overlays the OS-drawn chrome so the HWND's
+    /// real bounds are easy to spot. Hit testing is always handled by
+    /// <see cref="HitTestForCardResize"/> — the frame flag is purely visual.
+    /// </summary>
+    private void ApplyHwndFrameMode(bool showFrame)
     {
+        if (_hwndFrameVisible == showFrame)
+        {
+            return;
+        }
+
+        _hwndFrameVisible = showFrame;
+
+        // The HWND itself never paints — the card draws the backdrop. Re-applying this
+        // each toggle is safe (it just reassigns SystemBackdrop) and guards against the
+        // OS replacing it when chrome changes.
+        InitializeBackdropSupport();
+
+        if (AppWindow.Presenter is OverlappedPresenter overlappedPresenter)
+        {
+            // When the debug flag is off we hide the OS chrome (no title bar, no border).
+            // When on we let the OS draw both so the HWND outline is obvious.
+            // This must actually be applied (not just relied on via WM_NCCALCSIZE): now
+            // that the HWND is clipped to the card region, the OS-drawn title bar / frame
+            // is no longer covered by our full-window transparent content, so DWM would
+            // otherwise repaint it (most visibly the inactive caption) behind the card
+            // when the window loses focus.
+            overlappedPresenter.SetBorderAndTitleBar(showFrame, showFrame);
+
+            // IsResizable must stay true so WS_THICKFRAME is present. The OS only honors
+            // resize-style WM_NCHITTEST results (HTLEFT, HTRIGHT, HT{TOP,BOTTOM}{,LEFT,RIGHT})
+            // when the window has a sizing frame, even though we drive the resize from a
+            // custom NCHITTEST handler. Setting it after SetBorderAndTitleBar makes sure a
+            // borderless window still keeps its sizing frame.
+            overlappedPresenter.IsResizable = true;
+        }
+
+        ApplyHwndBorderAttributes(showFrame);
+
+        // Drag regions are computed relative to the visible card; the chrome change can
+        // shift its on-screen position, so refresh.
+        UpdateRegionsForCustomTitleBar();
+    }
+
+    /// <summary>
+    /// Applies the DWM corner and border attributes for the current frame mode. This is
+    /// split out from <see cref="ApplyHwndFrameMode"/> because the DWM border color does
+    /// not reliably "take" when first set during window construction (before the HWND has
+    /// been shown on a cold process start) — leaving the faint OS outline visible until
+    /// the chrome is toggled. Re-applying it each time the window is shown guarantees the
+    /// borderless look on a cold start.
+    /// </summary>
+    private void ApplyHwndBorderAttributes(bool showFrame)
+    {
+        unsafe
+        {
+            // Rounded corners: let the OS pick when the debug frame is on, suppress
+            // otherwise so the card's CornerRadius isn't doubled by an OS rounding.
+            var corner = (uint)(showFrame
+                ? DWM_WINDOW_CORNER_PREFERENCE.DWMWCP_DEFAULT
+                : DWM_WINDOW_CORNER_PREFERENCE.DWMWCP_DONOTROUND);
+            PInvoke.DwmSetWindowAttribute(_hwnd, DWMWINDOWATTRIBUTE.DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(uint));
+
+            // DWMWA_BORDER_COLOR: 0xFFFFFFFE = DWMWA_COLOR_NONE (no border drawn);
+            // 0xFFFFFFFF = DWMWA_COLOR_DEFAULT (system default). With WS_THICKFRAME still
+            // on, DWM otherwise draws a faint 1px outline around the HWND — which the
+            // user sees as the "frame still appears around the sides" even when our
+            // ShowHwndFrame setting is off. Setting COLOR_NONE removes it.
+            const uint DWMWA_COLOR_NONE = 0xFFFFFFFEu;
+            const uint DWMWA_COLOR_DEFAULT = 0xFFFFFFFFu;
+            var borderColor = showFrame ? DWMWA_COLOR_DEFAULT : DWMWA_COLOR_NONE;
+            PInvoke.DwmSetWindowAttribute(_hwnd, DWMWINDOWATTRIBUTE.DWMWA_BORDER_COLOR, &borderColor, sizeof(uint));
+        }
+
+        RedrawWindow(_hwnd);
+    }
+
+    private void InitializeBackdropSupport()
+    {
+        // The window itself paints nothing (it's transparent). All actual backdrop
+        // rendering lives on the SystemBackdropElement inside CmdPalMainControl, so the
+        // mica/acrylic only fills the rounded card instead of the whole HWND. The empty
+        // tint here keeps the HWND fully transparent.
+        SystemBackdrop = new TransparentTintBackdrop { TintColor = Colors.Transparent };
+    }
+
+    private void UpdateBackdrop()
+    {
+        // Prevent re-entrance when backdrop changes trigger ActualThemeChanged
+        if (_isUpdatingBackdrop)
+        {
+            return;
+        }
+
+        _isUpdatingBackdrop = true;
+
         try
         {
-            if (_acrylicController != null)
-            {
-                _acrylicController.RemoveAllSystemBackdropTargets();
-                _acrylicController.Dispose();
-            }
-
             var backdrop = _themeService.Current.BackdropParameters;
-            _acrylicController = new DesktopAcrylicController
-            {
-                TintColor = backdrop.TintColor,
-                TintOpacity = backdrop.TintOpacity,
-                FallbackColor = backdrop.FallbackColor,
-                LuminosityOpacity = backdrop.LuminosityOpacity,
-            };
+            var isImageMode = ViewModel.ShowBackgroundImage;
+            var config = BackdropStyles.Get(backdrop.Style);
+            var hasColorization = _themeService.Current.HasColorization;
 
-            // Enable the system backdrop.
-            // Note: Be sure to have "using WinRT;" to support the Window.As<...>() call.
-            _acrylicController.AddSystemBackdropTarget(this.As<ICompositionSupportsSystemBackdrop>());
-            _acrylicController.SetSystemBackdropConfiguration(_configurationSource);
+            RootElement.ApplyBackdrop(backdrop, config.ControllerKind, isImageMode, hasColorization);
         }
         catch (Exception ex)
         {
             Logger.LogError("Failed to update backdrop", ex);
         }
+        finally
+        {
+            _isUpdatingBackdrop = false;
+        }
     }
 
     private void ShowHwnd(IntPtr hwndValue, MonitorBehavior target)
+    {
+        var positionWindowForTargetMonitor = (HWND hwnd) =>
+        {
+            if (target == MonitorBehavior.ToLast)
+            {
+                var originalScreen = new SizeInt32(_currentWindowPosition.ScreenWidth, _currentWindowPosition.ScreenHeight);
+                var newRect = WindowPositionHelper.AdjustRectForVisibility(_currentWindowPosition.ToPhysicalWindowRectangle(), originalScreen, _currentWindowPosition.Dpi);
+                MoveAndResizeDpiAware(newRect);
+            }
+            else
+            {
+                var display = GetScreen(hwnd, target);
+                PositionCentered(display);
+            }
+        };
+        ShowHwnd(hwndValue, positionWindowForTargetMonitor);
+    }
+
+    private void ShowHwnd(IntPtr hwndValue, Point anchorInPixels, AnchorPoint anchorCorner)
+    {
+        var positionWindowForAnchor = (HWND hwnd) =>
+        {
+            PInvoke.GetWindowRect(hwnd, out var bounds);
+            var swpFlags = SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE | SET_WINDOW_POS_FLAGS.SWP_NOZORDER | SET_WINDOW_POS_FLAGS.SWP_FRAMECHANGED;
+            switch (anchorCorner)
+            {
+                case AnchorPoint.TopLeft:
+                    PInvoke.SetWindowPos(
+                        hwnd,
+                        HWND.HWND_TOP,
+                        (int)anchorInPixels.X,
+                        (int)anchorInPixels.Y,
+                        0,
+                        0,
+                        swpFlags);
+                    break;
+                case AnchorPoint.TopRight:
+                    PInvoke.SetWindowPos(
+                        hwnd,
+                        HWND.HWND_TOP,
+                        (int)(anchorInPixels.X - bounds.Width),
+                        (int)anchorInPixels.Y,
+                        0,
+                        0,
+                        swpFlags);
+                    break;
+                case AnchorPoint.BottomLeft:
+                    PInvoke.SetWindowPos(
+                        hwnd,
+                        HWND.HWND_TOP,
+                        (int)anchorInPixels.X,
+                        (int)(anchorInPixels.Y - bounds.Height),
+                        0,
+                        0,
+                        swpFlags);
+                    break;
+                case AnchorPoint.BottomRight:
+                    PInvoke.SetWindowPos(
+                        hwnd,
+                        HWND.HWND_TOP,
+                        (int)(anchorInPixels.X - bounds.Width),
+                        (int)(anchorInPixels.Y - bounds.Height),
+                        0,
+                        0,
+                        swpFlags);
+                    break;
+            }
+        };
+        ShowHwnd(hwndValue, positionWindowForAnchor);
+    }
+
+    private void ShowHwnd(IntPtr hwndValue, Action<HWND>? positionWindow)
     {
         StopAutoGoHome();
 
@@ -350,15 +839,9 @@ public sealed partial class MainWindow : WindowEx,
             PInvoke.ShowWindow(hwnd, SHOW_WINDOW_CMD.SW_RESTORE);
         }
 
-        if (target == MonitorBehavior.ToLast)
+        if (positionWindow is not null)
         {
-            var newRect = EnsureWindowIsVisible(_currentWindowPosition.ToPhysicalWindowRectangle(), new SizeInt32(_currentWindowPosition.ScreenWidth, _currentWindowPosition.ScreenHeight), _currentWindowPosition.Dpi);
-            AppWindow.MoveAndResize(newRect);
-        }
-        else
-        {
-            var display = GetScreen(hwnd, target);
-            PositionCentered(display);
+            positionWindow(hwnd);
         }
 
         // Check if the debugger is attached. If it is, we don't want to apply the tool window style,
@@ -371,126 +854,52 @@ public sealed partial class MainWindow : WindowEx,
         // Just to be sure, SHOW our hwnd.
         PInvoke.ShowWindow(hwnd, SHOW_WINDOW_CMD.SW_SHOW);
 
+        // Re-apply the borderless DWM attributes now that the window is
+        // actually shown. On a cold launch these are first set during
+        // construction before the HWND has ever been displayed, and DWM doesn't
+        // reliably honor the border color until the window exists on-screen —
+        // which left the faint OS outline visible until the chrome was toggled.
+        ApplyHwndBorderAttributes(_hwndFrameVisible ?? false);
+
         // Once we're done, uncloak to avoid all animations
         Uncloak();
 
         PInvoke.SetForegroundWindow(hwnd);
         PInvoke.SetActiveWindow(hwnd);
 
-        // Push our window to the top of the Z-order and make it the topmost, so that it appears above all other windows.
-        // We want to remove the topmost status when we hide the window (because we cloak it instead of hiding it).
-        PInvoke.SetWindowPos(hwnd, HWND.HWND_TOPMOST, 0, 0, 0, 0, SET_WINDOW_POS_FLAGS.SWP_NOMOVE | SET_WINDOW_POS_FLAGS.SWP_NOSIZE);
+        // Push our window to the top of the Z-order and make it the topmost, so
+        // that it appears above all other windows. We want to remove the
+        // topmost status when we hide the window (because we cloak it instead
+        // of hiding it).
+        //
+        // SWP_FRAMECHANGED re-sends WM_NCCALCSIZE so the OS recomputes the
+        // (zero-width) frame. But on this cloak->show path it doesn't reliably
+        // *repaint* the non-client area, so the WS_THICKFRAME border that was
+        // painted earlier survives on the top/left/right edges (the bottom is
+        // clipped away by the card region). A real resize fixes it because it
+        // forces that NC repaint - so we do the same explicitly below.
+        PInvoke.SetWindowPos(hwnd, HWND.HWND_TOPMOST, 0, 0, 0, 0, SET_WINDOW_POS_FLAGS.SWP_NOMOVE | SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_FRAMECHANGED);
+
+        // Force the non-client frame to actually redraw (RDW_FRAME) and the
+        // client to repaint over wherever it used to be. Without this the stale
+        // border lingers until the user resizes the window.
+        RedrawWindow(hwnd);
+
+        // Treat the overall show/hide lifecycle as the authoritative
+        // visibility transition, not the lower-level cloak/uncloak helpers.
+        SetIsVisibleToUser(true);
     }
 
-    /// <summary>
-    /// Ensures that the window rectangle is visible on-screen.
-    /// </summary>
-    /// <param name="windowRect">The window rectangle in physical pixels.</param>
-    /// <param name="originalScreen">The desktop area the window was positioned on.</param>
-    /// <param name="originalDpi">The window's original DPI.</param>
-    /// <returns>
-    /// A window rectangle in physical pixels, moved to the nearest display and resized
-    /// if the DPI has changed.
-    /// </returns>
-    private static RectInt32 EnsureWindowIsVisible(RectInt32 windowRect, SizeInt32 originalScreen, int originalDpi)
+    private static void RedrawWindow(HWND hwnd)
     {
-        var displayArea = DisplayArea.GetFromRect(windowRect, DisplayAreaFallback.Nearest);
-        if (displayArea is null)
-        {
-            return windowRect;
-        }
-
-        var workArea = displayArea.WorkArea;
-        if (workArea.Width <= 0 || workArea.Height <= 0)
-        {
-            // Fallback, nothing reasonable to do
-            return windowRect;
-        }
-
-        var effectiveDpi = GetEffectiveDpiFromDisplayId(displayArea);
-        if (originalDpi <= 0)
-        {
-            originalDpi = effectiveDpi; // use current DPI as baseline (no scaling adjustment needed)
-        }
-
-        var hasInvalidSize = windowRect.Width <= 0 || windowRect.Height <= 0;
-        if (hasInvalidSize)
-        {
-            windowRect = new RectInt32(windowRect.X, windowRect.Y, DefaultWidth, DefaultHeight);
-        }
-
-        // If we have a DPI change, scale the window rectangle accordingly
-        if (effectiveDpi != originalDpi)
-        {
-            var scalingFactor = effectiveDpi / (double)originalDpi;
-            windowRect = new RectInt32(
-                (int)Math.Round(windowRect.X * scalingFactor),
-                (int)Math.Round(windowRect.Y * scalingFactor),
-                (int)Math.Round(windowRect.Width * scalingFactor),
-                (int)Math.Round(windowRect.Height * scalingFactor));
-        }
-
-        var targetWidth = Math.Min(windowRect.Width, workArea.Width);
-        var targetHeight = Math.Min(windowRect.Height, workArea.Height);
-
-        // Ensure at least some minimum visible area (e.g., 100 pixels)
-        // This helps prevent the window from being entirely offscreen, regardless of display scaling.
-        const int minimumVisibleSize = 100;
-        var isOffscreen =
-            windowRect.X + minimumVisibleSize > workArea.X + workArea.Width ||
-            windowRect.X + windowRect.Width - minimumVisibleSize < workArea.X ||
-            windowRect.Y + minimumVisibleSize > workArea.Y + workArea.Height ||
-            windowRect.Y + windowRect.Height - minimumVisibleSize < workArea.Y;
-
-        // if the work area size has changed, re-center the window
-        var workAreaSizeChanged =
-            originalScreen.Width != workArea.Width ||
-            originalScreen.Height != workArea.Height;
-
-        int targetX;
-        int targetY;
-        var recenter = isOffscreen || workAreaSizeChanged || hasInvalidSize;
-        if (recenter)
-        {
-            targetX = workArea.X + ((workArea.Width - targetWidth) / 2);
-            targetY = workArea.Y + ((workArea.Height - targetHeight) / 2);
-        }
-        else
-        {
-            targetX = windowRect.X;
-            targetY = windowRect.Y;
-        }
-
-        return new RectInt32(targetX, targetY, targetWidth, targetHeight);
+        const uint RDW_INVALIDATE = 0x0001;
+        const uint RDW_UPDATENOW = 0x0100;
+        const uint RDW_ALLCHILDREN = 0x0080;
+        const uint RDW_FRAME = 0x0400;
+        _ = RedrawWindow(hwnd, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN | RDW_FRAME);
     }
 
-    private static int GetEffectiveDpiFromDisplayId(DisplayArea displayArea)
-    {
-        var effectiveDpi = 96;
-
-        var hMonitor = (HMONITOR)Win32Interop.GetMonitorFromDisplayId(displayArea.DisplayId);
-        if (!hMonitor.IsNull)
-        {
-            var hr = PInvoke.GetDpiForMonitor(hMonitor, MONITOR_DPI_TYPE.MDT_EFFECTIVE_DPI, out var dpiX, out _);
-            if (hr == 0)
-            {
-                effectiveDpi = (int)dpiX;
-            }
-            else
-            {
-                Logger.LogWarning($"GetDpiForMonitor failed with HRESULT: 0x{hr.Value:X8} on display {displayArea.DisplayId}");
-            }
-        }
-
-        if (effectiveDpi <= 0)
-        {
-            effectiveDpi = 96;
-        }
-
-        return effectiveDpi;
-    }
-
-    private DisplayArea GetScreen(HWND currentHwnd, MonitorBehavior target)
+    private static DisplayArea GetScreen(HWND currentHwnd, MonitorBehavior target)
     {
         // Leaving a note here, in case we ever need it:
         // https://github.com/microsoft/microsoft-ui-xaml/issues/6454
@@ -538,7 +947,9 @@ public sealed partial class MainWindow : WindowEx,
 
     public void Receive(ShowWindowMessage message)
     {
-        var settings = App.Current.Services.GetService<SettingsModel>()!;
+        _isLoadedFromDock = false;
+
+        var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
 
         // Start session tracking
         _sessionStopwatch = Stopwatch.StartNew();
@@ -546,6 +957,18 @@ public sealed partial class MainWindow : WindowEx,
         _sessionPagesVisited = 0;
 
         ShowHwnd(message.Hwnd, settings.SummonOn);
+    }
+
+    internal void Receive(ShowPaletteAtMessage message)
+    {
+        _isLoadedFromDock = true;
+
+        // Reset the size in case users have resized a dock window.
+        // Ideally in the future, we'll have defined sizes that opening
+        // a dock window will adhere to, but alas, that's the future.
+        RestoreWindowPositionFromMemory();
+
+        ShowHwnd(HWND.Null, message.PosPixels, message.Anchor);
     }
 
     public void Receive(HideWindowMessage message)
@@ -658,6 +1081,12 @@ public sealed partial class MainWindow : WindowEx,
             // Sure, it's not ideal, but at least it's not visible.
         }
 
+        // Treat the overall show/hide lifecycle as the authoritative
+        // visibility transition, not the lower-level cloak/uncloak helpers.
+        SetIsVisibleToUser(false);
+
+        WeakReferenceMessenger.Default.Send(new WindowHiddenMessage());
+
         // Start auto-go-home timer
         RestartAutoGoHome();
     }
@@ -693,13 +1122,6 @@ public sealed partial class MainWindow : WindowEx,
             wasCloaked = hr.Succeeded;
         }
 
-        if (wasCloaked)
-        {
-            // Because we're only cloaking the window, bury it at the bottom in case something can
-            // see it - e.g. some accessibility helper (note: this also removes the top-most status).
-            PInvoke.SetWindowPos(_hwnd, HWND.HWND_BOTTOM, 0, 0, 0, 0, SET_WINDOW_POS_FLAGS.SWP_NOMOVE | SET_WINDOW_POS_FLAGS.SWP_NOSIZE);
-        }
-
         return wasCloaked;
     }
 
@@ -712,30 +1134,43 @@ public sealed partial class MainWindow : WindowEx,
         }
     }
 
+    private void SetIsVisibleToUser(bool isVisibleToUser)
+    {
+        if (IsVisibleToUser == isVisibleToUser)
+        {
+            return;
+        }
+
+        IsVisibleToUser = isVisibleToUser;
+        IsVisibleToUserChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     internal void MainWindow_Closed(object sender, WindowEventArgs args)
     {
         var serviceProvider = App.Current.Services;
-        UpdateWindowPositionInMemory();
 
-        var settings = serviceProvider.GetService<SettingsModel>();
-        if (settings is not null)
+        if (!_isLoadedFromDock)
         {
-            settings.LastWindowPosition = new WindowPosition
-            {
-                X = _currentWindowPosition.X,
-                Y = _currentWindowPosition.Y,
-                Width = _currentWindowPosition.Width,
-                Height = _currentWindowPosition.Height,
-                Dpi = _currentWindowPosition.Dpi,
-                ScreenWidth = _currentWindowPosition.ScreenWidth,
-                ScreenHeight = _currentWindowPosition.ScreenHeight,
-            };
-
-            SettingsModel.SaveSettings(settings);
+            UpdateWindowPositionInMemory();
         }
 
-        var extensionService = serviceProvider.GetService<IExtensionService>()!;
-        extensionService.SignalStopExtensionsAsync();
+        var settingsService = serviceProvider.GetRequiredService<ISettingsService>();
+        var settings = settingsService.Settings;
+        if (settings is not null)
+        {
+            // If we were last shown from the dock, _currentWindowPosition still holds
+            // the last non-dock placement because dock sessions intentionally skip updates.
+            if (_currentWindowPosition.IsSizeValid)
+            {
+                settingsService.UpdateSettings(s => s with { LastWindowPosition = _currentWindowPosition });
+            }
+        }
+
+        var extensionServices = serviceProvider.GetServices<IExtensionService>();
+        foreach (var extensionService in extensionServices)
+        {
+            extensionService.SignalStopAsync();
+        }
 
         App.Current.Services.GetService<TrayIconService>()!.Destroy();
 
@@ -751,45 +1186,160 @@ public sealed partial class MainWindow : WindowEx,
 
     private void DisposeAcrylic()
     {
-        if (_acrylicController is not null)
+        // Backdrop resources are thread-affine. ClearBackdrop closes the active controller or
+        // brush on the XAML thread, but leaves SystemBackdrop assigned so its target stays rooted.
+        // Clearing it can let C#/WinRT finalize ContentExternalBackdropLink off-thread, which
+        // fail-fasts with RPC_E_WRONG_THREAD (0x8001010E).
+        try
         {
-            _acrylicController.Dispose();
-            _acrylicController = null!;
-            _configurationSource = null!;
+            RootElement?.ClearBackdrop();
+        }
+        catch
+        {
+            // Best-effort cleanup; ignore errors during shutdown.
         }
     }
 
     // Updates our window s.t. the top of the window is draggable.
     private void UpdateRegionsForCustomTitleBar()
     {
-        // Specify the interactive regions of the title bar.
-        var scaleAdjustment = RootElement.XamlRoot.RasterizationScale;
-
-        // Get the rectangle around our XAML content. We're going to mark this
-        // rectangle as "Passthrough", so that the normal window operations
-        // (resizing, dragging) don't apply in this space.
-        var transform = RootElement.TransformToVisual(null);
-
-        // Reserve 16px of space at the top for dragging.
-        var topHeight = 16;
-        var bounds = transform.TransformBounds(new Rect(
-            0,
-            topHeight,
-            RootElement.ActualWidth,
-            RootElement.ActualHeight));
-        var contentRect = GetRect(bounds, scaleAdjustment);
-        var rectArray = new RectInt32[] { contentRect };
-        var nonClientInputSrc = InputNonClientPointerSource.GetForWindowId(this.AppWindow.Id);
-        nonClientInputSrc.SetRegionRects(NonClientRegionKind.Passthrough, rectArray);
-
-        // Add a drag-able region on top
-        var w = RootElement.ActualWidth;
-        _ = RootElement.ActualHeight;
-        var dragSides = new RectInt32[]
+        var xamlRoot = RootElement.XamlRoot;
+        if (xamlRoot is null)
         {
-            GetRect(new Rect(0, 0, w, topHeight), scaleAdjustment), // the top, {topHeight=16} tall
+            return;
+        }
+
+        // Specify the interactive regions of the title bar.
+        var scaleAdjustment = xamlRoot.RasterizationScale;
+
+        // Drag/passthrough regions are computed against the visible card (the rounded
+        // border inside CmdPalMainControl), not the whole HWND. The HWND extends beyond
+        // the card to make room for the drop shadow, and we don't want that transparent
+        // shadow area to be draggable.
+        var card = RootElement.CardElement;
+        if (card.ActualWidth <= 0 || card.ActualHeight <= 0)
+        {
+            return;
+        }
+
+        // All coordinates below are in the card's own (DIP) space: (0,0) is the
+        // top-left of the visible card, (w,h) is the bottom-right. GetRect transforms
+        // them into the physical-pixel client coordinates that
+        // InputNonClientPointerSource expects.
+        var transform = card.TransformToVisual(null);
+        var w = card.ActualWidth;
+        var h = card.ActualHeight;
+
+        RectInt32 CardRect(double x, double y, double rw, double rh) =>
+            GetRect(transform.TransformBounds(new Rect(x, y, rw, rh)), scaleAdjustment);
+
+        // Reserve some space at the top for dragging the window (caption).
+        const double dragHeight = 16;
+
+        // The resize grip straddles each card edge by `grip` DIPs on either side so the
+        // affordance reaches a little into the drop-shadow padding too.
+        const double grip = ResizeBorderThicknessDip;
+
+        var nonClientInputSrc = InputNonClientPointerSource.GetForWindowId(this.AppWindow.Id);
+
+        // Mark the card's border ring + top drag bar as Caption. Only regions
+        // registered here generate WM_NCHITTEST on our wndproc - without the
+        // side/bottom strips the XAML island swallows the pointer and we never
+        // get a resize. HotKeyPrc's WM_NCHITTEST then picks drag vs. resize
+        // per-pixel.
+        var caption = new RectInt32[]
+        {
+            CardRect(0, 0, w, dragHeight),                       // top drag bar
+            CardRect(-grip, -grip, 2 * grip, h + (2 * grip)),   // left edge
+            CardRect(w - grip, -grip, 2 * grip, h + (2 * grip)), // right edge
+            CardRect(-grip, -grip, w + (2 * grip), 2 * grip),   // top edge
+            CardRect(-grip, h - grip, w + (2 * grip), 2 * grip), // bottom edge
         };
-        nonClientInputSrc.SetRegionRects(NonClientRegionKind.Caption, dragSides);
+        nonClientInputSrc.SetRegionRects(NonClientRegionKind.Caption, caption);
+
+        // Everything inside the border ring (and below the drag bar) is
+        // interactive content. Marking it Passthrough keeps the search box,
+        // list, etc. clickable and explicitly carves it out of the caption
+        // regions above.
+        var interiorWidth = Math.Max(0, w - (2 * grip));
+        var interiorHeight = Math.Max(0, h - dragHeight - grip);
+        var passthrough = new RectInt32[]
+        {
+            CardRect(grip, dragHeight, interiorWidth, interiorHeight),
+        };
+        nonClientInputSrc.SetRegionRects(NonClientRegionKind.Passthrough, passthrough);
+
+        // Clip the HWND to the card + its shadow. Card is inset by
+        // ShadowPadding on each side, so card + full padding lands flush with
+        // the HWND edge - and a region flush with the edge makes WS_THICKFRAME
+        // draw its border there. So inset 1px on every side to hide that.
+        // Bottom is clamped to 1px inside the HWND so the border doesn't
+        // reappear as the card grows tall.
+        var shadowPadding = RootElement.ShadowPadding;
+        var cardPhysical = CardRect(0, 0, w, h);
+
+        const int EdgeInsetPx = 1;
+        var windowWidthPx = AppWindow.Size.Width;
+        var windowHeightPx = AppWindow.Size.Height;
+
+        var clipLeft = EdgeInsetPx;
+        var clipTop = EdgeInsetPx;
+        var clipRight = windowWidthPx - EdgeInsetPx;
+
+        var bottomShadowPx = (int)Math.Round(shadowPadding.Bottom * scaleAdjustment);
+        var clipBottom = Math.Min(
+            cardPhysical.Y + cardPhysical.Height + bottomShadowPx,
+            windowHeightPx - EdgeInsetPx);
+
+        ApplyCardWindowRegion(new RectInt32(
+            clipLeft,
+            clipTop,
+            Math.Max(0, clipRight - clipLeft),
+            Math.Max(0, clipBottom - clipTop)));
+    }
+
+    /// <summary>
+    /// Restricts the HWND's visible / hit-testable area to the supplied
+    /// rectangle (in physical client pixels), which covers the visible card and
+    /// its drop-shadow margin. Everything outside — the empty transparent area
+    /// of the (larger) HWND — becomes click-through and is excluded from the
+    /// window region. When the debug HWND frame is enabled the clip is removed
+    /// so the full window stays visible.
+    /// </summary>
+    private void ApplyCardWindowRegion(RectInt32 regionPhysical)
+    {
+        nint hwnd;
+        unsafe
+        {
+            hwnd = (nint)_hwnd.Value;
+        }
+
+        // Debug frame mode: keep the whole window visible / interactive, no clip.
+        if (_hwndFrameVisible == true)
+        {
+            _ = SetWindowRgn(hwnd, IntPtr.Zero, true);
+            return;
+        }
+
+        // CreateRectRgn coordinates are relative to the window's top-left. For this
+        // borderless popup the client origin coincides with the window origin, so the
+        // region's client-space physical rect maps directly into window space.
+        var region = CreateRectRgn(
+            regionPhysical.X,
+            regionPhysical.Y,
+            regionPhysical.X + regionPhysical.Width,
+            regionPhysical.Y + regionPhysical.Height);
+        if (region == IntPtr.Zero)
+        {
+            return;
+        }
+
+        // On success SetWindowRgn takes ownership of the region (the OS frees it), so we
+        // only delete it ourselves if the call failed.
+        if (SetWindowRgn(hwnd, region, true) == 0)
+        {
+            _ = DeleteObject(region);
+        }
     }
 
     private static RectInt32 GetRect(Rect bounds, double scale)
@@ -800,6 +1350,23 @@ public sealed partial class MainWindow : WindowEx,
             _Width: (int)Math.Round(bounds.Width * scale),
             _Height: (int)Math.Round(bounds.Height * scale));
     }
+
+    // Raw interop for the window-region clip. Declared here (rather than via CsWin32)
+    // because SetWindowRgn transfers ownership of the HRGN to the OS on success, which is
+    // awkward to express through CsWin32's SafeHandle-returning region creator.
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, [MarshalAs(UnmanagedType.Bool)] bool bRedraw);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateRectRgn(int nLeftRect, int nTopRect, int nRightRect, int nBottomRect);
+
+    [DllImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DeleteObject(IntPtr hObject);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool RedrawWindow(IntPtr hWnd, IntPtr lprcUpdate, IntPtr hrgnUpdate, uint flags);
 
     internal void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
     {
@@ -819,7 +1386,11 @@ public sealed partial class MainWindow : WindowEx,
         if (args.WindowActivationState == WindowActivationState.Deactivated)
         {
             // Save the current window position before hiding the window
-            UpdateWindowPositionInMemory();
+            // but not when opened from dock — preserve the pre-dock size.
+            if (!_isLoadedFromDock)
+            {
+                UpdateWindowPositionInMemory();
+            }
 
             // If there's a debugger attached...
             if (System.Diagnostics.Debugger.IsAttached)
@@ -849,9 +1420,9 @@ public sealed partial class MainWindow : WindowEx,
             PowerToysTelemetry.Log.WriteEvent(new CmdPalDismissedOnLostFocus());
         }
 
-        if (_configurationSource is not null)
+        if (RootElement is not null)
         {
-            _configurationSource.IsInputActive = args.WindowActivationState != WindowActivationState.Deactivated;
+            RootElement.SetIsInputActive(args.WindowActivationState != WindowActivationState.Deactivated);
         }
     }
 
@@ -877,24 +1448,21 @@ public sealed partial class MainWindow : WindowEx,
 
             if (activatedEventArgs.Kind == ExtendedActivationKind.Protocol)
             {
-                if (activatedEventArgs.Data is IProtocolActivatedEventArgs protocolArgs)
+                if (activatedEventArgs.Data is IProtocolActivatedEventArgs protocolArgs &&
+                    _protocolActivation.TryParse(protocolArgs.Uri, out var route))
                 {
-                    if (protocolArgs.Uri.ToString() is string uri)
+                    switch (route)
                     {
-                        // was the URI "x-cmdpal://background" ?
-                        if (uri.StartsWith("x-cmdpal://background", StringComparison.OrdinalIgnoreCase))
-                        {
+                        case CmdPalProtocolRoute.Background:
                             // we're running, we don't want to activate our window. bail
                             return;
-                        }
-                        else if (uri.StartsWith("x-cmdpal://settings", StringComparison.OrdinalIgnoreCase))
-                        {
-                            WeakReferenceMessenger.Default.Send<OpenSettingsMessage>(new());
+
+                        case CmdPalProtocolRoute.OpenSettings openSettings:
+                            WeakReferenceMessenger.Default.Send(openSettings.Message);
                             return;
-                        }
-                        else if (uri.StartsWith("x-cmdpal://reload", StringComparison.OrdinalIgnoreCase))
-                        {
-                            var settings = App.Current.Services.GetService<SettingsModel>();
+
+                        case CmdPalProtocolRoute.Reload:
+                            var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
                             if (settings?.AllowExternalReload == true)
                             {
                                 Logger.LogInfo("External Reload triggered");
@@ -906,7 +1474,6 @@ public sealed partial class MainWindow : WindowEx,
                             }
 
                             return;
-                        }
                     }
                 }
             }
@@ -1022,10 +1589,25 @@ public sealed partial class MainWindow : WindowEx,
 
     private void HandleSummon(string commandId)
     {
-        if (_ignoreHotKeyWhenFullScreen)
+        var isRootHotkey = string.IsNullOrEmpty(commandId);
+        if (isRootHotkey && IsPaletteVisibleToUser())
         {
-            // If we're in full screen mode, ignore the hotkey
-            if (WindowHelper.IsWindowFullscreen())
+            HandleSummonCore(commandId);
+            return;
+        }
+
+        var notificationFlags = WindowHelper.GetUserNotificationFlags();
+        var shouldSuppress =
+            (_ignoreHotKeyWhenFullScreen && notificationFlags.IsFullscreenState) ||
+            (_ignoreHotKeyWhenBusy && notificationFlags.IsBusy);
+
+        if (shouldSuppress)
+        {
+            if (_allowBreakthroughShortcut && IsBreakthroughTriggered())
+            {
+                // Rapid-press breakthrough: let it through
+            }
+            else
             {
                 return;
             }
@@ -1034,12 +1616,9 @@ public sealed partial class MainWindow : WindowEx,
         HandleSummonCore(commandId);
     }
 
-    private void HandleSummonCore(string commandId)
+    private bool IsPaletteVisibleToUser()
     {
-        var isRootHotkey = string.IsNullOrEmpty(commandId);
-        PowerToysTelemetry.Log.WriteEvent(new CmdPalHotkeySummoned(isRootHotkey));
-
-        var isVisible = this.Visible;
+        var isVisible = Visible;
 
         unsafe
         {
@@ -1053,6 +1632,36 @@ public sealed partial class MainWindow : WindowEx,
                 isVisible = false;
             }
         }
+
+        return isVisible;
+    }
+
+    private bool IsBreakthroughTriggered()
+    {
+        const int requiredPresses = 3;
+        var windowTicks = 2 * Stopwatch.Frequency; // 2 seconds
+        var now = Stopwatch.GetTimestamp();
+
+        _breakthroughTimestamps.Add(now);
+
+        // Prune timestamps outside the window
+        _breakthroughTimestamps.RemoveAll(t => now - t > windowTicks);
+
+        if (_breakthroughTimestamps.Count >= requiredPresses)
+        {
+            _breakthroughTimestamps.Clear();
+            return true;
+        }
+
+        return false;
+    }
+
+    private void HandleSummonCore(string commandId)
+    {
+        var isRootHotkey = string.IsNullOrEmpty(commandId);
+        PowerToysTelemetry.Log.WriteEvent(new CmdPalHotkeySummoned(isRootHotkey));
+
+        var isVisible = IsPaletteVisibleToUser();
 
         // Note to future us: the wParam will have the index of the hotkey we registered.
         // We can use that in the future to differentiate the hotkeys we've pressed
@@ -1070,6 +1679,8 @@ public sealed partial class MainWindow : WindowEx,
                 // but that's the price to pay for having the HWND not light-dismiss while we're debugging.
                 Cloak();
                 this.Hide();
+                SetIsVisibleToUser(false);
+                WeakReferenceMessenger.Default.Send(new WindowHiddenMessage());
 
                 return;
             }
@@ -1089,6 +1700,64 @@ public sealed partial class MainWindow : WindowEx,
             // Prevent the window from maximizing when double-clicking the title bar area
             case PInvoke.WM_NCLBUTTONDBLCLK:
                 return (LRESULT)IntPtr.Zero;
+
+            // When restoring a saved position across monitors with different DPIs,
+            // MoveAndResize already sets the correctly-scaled size. Suppress the
+            // framework's automatic DPI resize to avoid double-scaling.
+            case PInvoke.WM_DPICHANGED when _suppressDpiChange:
+                return (LRESULT)IntPtr.Zero;
+
+            case PInvoke.WM_NCHITTEST:
+                {
+                    var ht = HitTestForCardResize(lParam);
+                    if (ht != 0)
+                    {
+                        return (LRESULT)(nint)ht;
+                    }
+
+                    break;
+                }
+
+            // Borderless mode: claim the entire window rectangle as client area.
+            // A resizable window has WS_THICKFRAME, which makes the OS reserve a
+            // non-client sizing frame *and* gives the window a DWM drop shadow / a thin
+            // frame line along the top. We keep WS_THICKFRAME (so our custom WM_NCHITTEST
+            // can still drive resizing) but tell the OS the whole window is client by
+            // returning 0 from WM_NCCALCSIZE — which removes that frame and its shadow.
+            // The visible card draws its own border + shadow inside the transparent HWND.
+            // When the debug frame is on we fall through to the default handling so the
+            // real OS chrome appears.
+            case PInvoke.WM_NCCALCSIZE when wParam.Value != 0 && _hwndFrameVisible != true:
+                return (LRESULT)0;
+
+            // On every activation change the OS repaints the non-client frame to
+            // flip between the active / inactive caption. With WS_THICKFRAME still
+            // present that paints the OS border back over our borderless window each
+            // time we lose (or gain) focus - which is the frame that reappears when
+            // another window steals focus, and the one that shows up shortly after
+            // startup (the first activation flip). Passing -1 as the update-region
+            // (lParam) to DefWindowProc keeps the correct activation result while
+            // telling it to skip the non-client repaint entirely.
+            case PInvoke.WM_NCACTIVATE when _hwndFrameVisible != true:
+                return PInvoke.CallWindowProc(_originalWndProc, hwnd, uMsg, wParam, new LPARAM(-1));
+
+            case PInvoke.WM_SYSCOMMAND:
+                {
+                    var command = (int)(wParam.Value & 0xFFF0);
+                    if (command == PInvoke.SC_CLOSE)
+                    {
+                        var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
+                        if (settings.AllowAltF4)
+                        {
+                            WeakReferenceMessenger.Default.Send<QuitMessage>();
+                        }
+
+                        return (LRESULT)IntPtr.Zero;
+                    }
+
+                    break;
+                }
+
             case PInvoke.WM_HOTKEY:
                 {
                     var hotkeyIndex = (int)wParam.Value;
@@ -1100,6 +1769,14 @@ public sealed partial class MainWindow : WindowEx,
 
                     return (LRESULT)IntPtr.Zero;
                 }
+
+            // Unlike DockWindow instances, MainWindow always exists, so it's the one
+            // reliable place to catch topology changes. Without this, the Settings page's
+            // monitor list goes stale whenever no dock window is around to see WM_DISPLAYCHANGE.
+            case PInvoke.WM_DISPLAYCHANGE:
+                Logger.LogDebug("MainWindow WM_DISPLAYCHANGE");
+                _monitorService.NotifyMonitorsChanged();
+                break;
 
             default:
                 if (uMsg == WM_TASKBAR_RESTART)
@@ -1113,11 +1790,131 @@ public sealed partial class MainWindow : WindowEx,
         return PInvoke.CallWindowProc(_originalWndProc, hwnd, uMsg, wParam, lParam);
     }
 
+    /// <summary>
+    /// Custom WM_NCHITTEST handler that turns the visible card's border (the rounded
+    /// stroke drawn by <see cref="CmdPalMainControl"/>) into the window's resize handles.
+    /// Without this the borderless / transparent HWND has no visible resize affordance,
+    /// even though the OS still allows resizing along the (invisible) HWND edges.
+    /// </summary>
+    /// <returns>
+    /// A non-zero HT* value to override the system hit test, or 0 to fall through to
+    /// the default WndProc (which lets the InputNonClientPointerSource Caption /
+    /// Passthrough regions decide caption vs. client behavior inside the card).
+    /// </returns>
+    private uint HitTestForCardResize(LPARAM lParam)
+    {
+        // NB: We intentionally do *not* short-circuit when the debug frame is showing.
+        // The HWND frame toggle is purely a visual diagnostic; resize hit-testing
+        // remains ours in both modes so the card's border is always the grab area.
+        if (RootElement is null || RootElement.XamlRoot is null)
+        {
+            return 0;
+        }
+
+        // LPARAM packs the screen-space pointer position: low word = x, high word = y,
+        // both as signed 16-bit ints.
+        var ptX = (short)(lParam.Value & 0xFFFF);
+        var ptY = (short)((lParam.Value >> 16) & 0xFFFF);
+
+        if (!PInvoke.GetWindowRect(_hwnd, out var windowRect))
+        {
+            return 0;
+        }
+
+        // Convert the card's ShadowPadding (DIPs) into screen pixels so we can locate
+        // the visible card rect within the (larger, transparent) HWND.
+        var dpi = PInvoke.GetDpiForWindow(_hwnd);
+        var scale = dpi / 96.0;
+        var padding = RootElement.ShadowPadding;
+
+        var cardLeft = windowRect.left + (int)Math.Round(padding.Left * scale);
+        var cardTop = windowRect.top + (int)Math.Round(padding.Top * scale);
+        var cardRight = windowRect.right - (int)Math.Round(padding.Right * scale);
+        var cardBottom = windowRect.bottom - (int)Math.Round(padding.Bottom * scale);
+
+        // Width of the resize grip around the card's visible border, in screen pixels.
+        // Shared with the InputNonClientPointerSource region registration in
+        // UpdateRegionsForCustomTitleBar so the band where WM_NCHITTEST fires lines up
+        // exactly with the band where we return resize codes.
+        var grip = (int)Math.Round(ResizeBorderThicknessDip * scale);
+
+        var onLeftEdge = ptX >= cardLeft - grip && ptX < cardLeft + grip;
+        var onRightEdge = ptX > cardRight - grip && ptX <= cardRight + grip;
+        var onTopEdge = ptY >= cardTop - grip && ptY < cardTop + grip;
+        var onBottomEdge = ptY > cardBottom - grip && ptY <= cardBottom + grip;
+
+        // Corners get priority over edges.
+        if (onTopEdge && onLeftEdge)
+        {
+            return PInvoke.HTTOPLEFT;
+        }
+
+        if (onTopEdge && onRightEdge)
+        {
+            return PInvoke.HTTOPRIGHT;
+        }
+
+        if (onBottomEdge && onLeftEdge)
+        {
+            return PInvoke.HTBOTTOMLEFT;
+        }
+
+        if (onBottomEdge && onRightEdge)
+        {
+            return PInvoke.HTBOTTOMRIGHT;
+        }
+
+        var withinHorizontalSpan = ptX >= cardLeft - grip && ptX <= cardRight + grip;
+        var withinVerticalSpan = ptY >= cardTop - grip && ptY <= cardBottom + grip;
+
+        if (onTopEdge && withinHorizontalSpan)
+        {
+            return PInvoke.HTTOP;
+        }
+
+        if (onBottomEdge && withinHorizontalSpan)
+        {
+            return PInvoke.HTBOTTOM;
+        }
+
+        if (onLeftEdge && withinVerticalSpan)
+        {
+            return PInvoke.HTLEFT;
+        }
+
+        if (onRightEdge && withinVerticalSpan)
+        {
+            return PInvoke.HTRIGHT;
+        }
+
+        // Pointer is inside the card but away from the border: defer to the default
+        // hit test so the InputNonClientPointerSource Caption/Passthrough regions take
+        // effect for dragging vs. normal input.
+        if (ptX >= cardLeft && ptX <= cardRight && ptY >= cardTop && ptY <= cardBottom)
+        {
+            return 0;
+        }
+
+        // Pointer is in the transparent shadow padding around the card. Make that area
+        // click-through so the window behind us receives the mouse input.
+        return unchecked((uint)PInvoke.HTTRANSPARENT);
+    }
+
     public void Dispose()
     {
+        _themeService.ThemeChanged -= ThemeServiceOnThemeChanged;
+        App.Current.Services.GetRequiredService<ISettingsService>().SettingsChanged -= SettingsChangedHandler;
+
         _localKeyboardListener.Dispose();
         _windowThemeSynchronizer.Dispose();
         DisposeAcrylic();
+    }
+
+    void IRecipient<ShowPaletteAtMessage>.Receive(ShowPaletteAtMessage message) => Receive(message);
+
+    public void Receive(ToggleDevRibbonMessage message)
+    {
+        _devRibbon?.Visibility = _devRibbon.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
     }
 
     public void Receive(DragStartedMessage message)
@@ -1158,5 +1955,82 @@ public sealed partial class MainWindow : WindowEx,
         {
             PInvoke.SetForegroundWindow(_hwnd);
         }
+    }
+
+    public void Receive(GetHwndMessage message)
+    {
+        message.Hwnd = this.GetWindowHandle();
+    }
+
+    public void Receive(ExpandCompactModeMessage message)
+    {
+        this.DispatcherQueue.TryEnqueue(() => HandleExpandCompactOnUiThread(message.Expanded));
+    }
+
+    public void Receive(MaximizeForDialogMessage message)
+    {
+        this.DispatcherQueue.TryEnqueue(() =>
+        {
+            _dialogFullExpandActive = message.Maximize;
+
+            // Re-run with the last requested state: when maximizing this fills the window; when
+            // the dialog closes it restores the normal compact/expanded layout.
+            HandleExpandCompactOnUiThread(_lastExpandRequested);
+        });
+    }
+
+    // The HWND is already as large as it will ever need to be (and it's transparent), so
+    // instead of resizing the window we simply shrink or grow the visible card inside it.
+    private void HandleExpandCompactOnUiThread(bool expanded)
+    {
+        _lastExpandRequested = expanded;
+
+        var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
+
+        var preventCompactMode = _dialogFullExpandActive || !settings.CompactMode;
+        if (preventCompactMode)
+        {
+            // When compact mode is off, or a dialog is active, the card is
+            // always static and fills the entire window, regardless of how much
+            // content is currently displayed.
+            RootElement.SetCardStretch(true);
+            RootElement.SetCardMaxHeight(double.PositiveInfinity);
+        }
+        else
+        {
+            // In compact mode the card sizes itself to its content and anchors to the top.
+            RootElement.SetCardStretch(false);
+
+            // The HWND can extend below the current display after moving from a taller monitor.
+            // Always clamp an expanded compact card to the visible work area; the transparent
+            // portion of the HWND may remain off-screen, but the card and its content must not.
+            var cardMaxHeight = expanded
+                ? ComputeExpandedCardMaxHeightDip()
+                : double.PositiveInfinity;
+            RootElement.SetCardMaxHeight(cardMaxHeight);
+        }
+    }
+
+    // Computes how tall (in DIPs) the visible card may grow before it would extend past the
+    // bottom of the work area, given the card's current top on screen.
+    private double ComputeExpandedCardMaxHeightDip()
+    {
+        var dpi = (int)this.GetDpiForWindow();
+        var scale = dpi / 96.0;
+
+        var padding = RootElement.ShadowPadding;
+        var cardTopPhysical = AppWindow.Position.Y + (padding.Top * scale);
+
+        // Select the display from the visible card rather than from the HWND. An oversized HWND
+        // can overlap another display (or have its center below the intended display), causing
+        // GetFromWindowId to choose a work area unrelated to the card the user is looking at.
+        var cardCenterXPhysical = AppWindow.Position.X + (AppWindow.Size.Width / 2);
+        var displayArea = DisplayArea.GetFromPoint(
+            new PointInt32(cardCenterXPhysical, (int)Math.Round(cardTopPhysical)),
+            DisplayAreaFallback.Nearest);
+        var workArea = displayArea.WorkArea;
+        var availablePhysical = (workArea.Y + workArea.Height) - cardTopPhysical - (padding.Bottom * scale);
+
+        return Math.Max(0, availablePhysical / scale);
     }
 }

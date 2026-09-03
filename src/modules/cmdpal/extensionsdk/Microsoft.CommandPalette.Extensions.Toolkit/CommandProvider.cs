@@ -6,7 +6,11 @@ using Windows.Foundation;
 
 namespace Microsoft.CommandPalette.Extensions.Toolkit;
 
-public abstract partial class CommandProvider : ICommandProvider, ICommandProvider2
+public abstract partial class CommandProvider :
+    ICommandProvider,
+    ICommandProvider2,
+    ICommandProvider3,
+    ICommandProvider4
 {
     public virtual string Id { get; protected set; } = string.Empty;
 
@@ -21,6 +25,8 @@ public abstract partial class CommandProvider : ICommandProvider, ICommandProvid
     public virtual IFallbackCommandItem[]? FallbackCommands() => null;
 
     public virtual ICommand? GetCommand(string id) => null;
+
+    public virtual ICommandItem? GetCommandItem(string id) => null;
 
     public virtual ICommandSettings? Settings { get; protected set; }
 
@@ -49,6 +55,21 @@ public abstract partial class CommandProvider : ICommandProvider, ICommandProvid
     }
 
     /// <summary>
+    /// Get the dock bands provided by this command provider. Dock bands are
+    /// strips of items that appear on various UI surfaces in CmdPal, such as a
+    /// toolbar. Each ICommandItem returned from this method will be treated as
+    /// one atomic band by cmdpal.
+    ///
+    /// If the command on an item here is a
+    /// IListPage, then cmdpal will render all of the items on that page as one
+    /// band. You can use this to create complex bands with multiple buttons.
+    /// </summary>
+    public virtual ICommandItem[]? GetDockBands()
+    {
+        return null;
+    }
+
+    /// <summary>
     /// This is used to manually populate the WinRT type cache in CmdPal with
     /// any interfaces that might not follow a straight linear path of requires.
     ///
@@ -57,7 +78,7 @@ public abstract partial class CommandProvider : ICommandProvider, ICommandProvid
     /// <returns>an array of objects that implement all the leaf interfaces we support</returns>
     public object[] GetApiExtensionStubs()
     {
-        return [new SupportCommandsWithProperties()];
+        return [new SupportCommandsWithProperties(), new SupportFormActions(), new SupportDetailsContent()];
     }
 
     /// <summary>
@@ -68,5 +89,35 @@ public abstract partial class CommandProvider : ICommandProvider, ICommandProvid
     private sealed partial class SupportCommandsWithProperties : IExtendedAttributesProvider
     {
         public IDictionary<string, object>? GetProperties() => null;
+    }
+
+    private sealed partial class SupportDetailsContent : IDetails2
+    {
+        public IIconInfo? HeroImage => null;
+
+        public string Title => string.Empty;
+
+        public string Body => string.Empty;
+
+        public IDetailsElement[] Metadata => [];
+
+        public IContent[] GetContent() => [];
+    }
+
+    private sealed partial class SupportFormActions : IFormContent2
+    {
+        public string TemplateJson => string.Empty;
+
+        public string DataJson => string.Empty;
+
+        public string StateJson => string.Empty;
+
+        public ICommandResult SubmitForm(string inputs, string data) => CommandResult.KeepOpen();
+
+        public ICommandResult SubmitAction(string actionId, string inputs, string data) => CommandResult.KeepOpen();
+
+#pragma warning disable CS0067
+        public event Windows.Foundation.TypedEventHandler<object, IPropChangedEventArgs>? PropChanged;
+#pragma warning restore CS0067
     }
 }

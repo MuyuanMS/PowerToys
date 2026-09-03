@@ -17,9 +17,9 @@ body:
 - id: version
   type: input
   attributes:
-    label: Microsoft PowerToys version
-    placeholder: X.XX.X
-    description: Hover over the system tray icon or look at Settings
+    label: Microsoft PowerToys version and release channel
+    placeholder: 0.100.2 - Stable or 0.101.2211.0 - Preview (Insider)
+    description: Find the version and update channel in PowerToys Settings > General.
   validations:
     required: true
 
@@ -40,7 +40,6 @@ body:
       - Other (please specify in "Steps to Reproduce")
   validations:
     required: true
-
 - type: dropdown
   attributes:
     label: Area(s) with issue?
@@ -58,6 +57,7 @@ body:
       - Environment Variables
       - FancyZones
       - FancyZones Editor 
+      - Grab And Move
       - File Locksmith 
       - "File Explorer: Preview Pane"
       - "File Explorer: Thumbnail preview"
@@ -70,6 +70,7 @@ body:
       - Mouse Without Borders
       - New+
       - Peek
+      - Power Display
       - PowerRename
       - PowerToys Run
       - Quick Accent
@@ -79,6 +80,7 @@ body:
       - Shortcut Guide
       - System tray interaction
       - TextExtractor
+      - Window Hopper
       - Workspaces
       - Welcome / PowerToys Tour window
       - ZoomIt
@@ -106,7 +108,13 @@ body:
     placeholder: What happened instead?
   validations:
     required: false
-
+- type: upload
+  id: bugreportfile 
+  attributes:
+    label: Upload Bug Report ZIP-file
+    description: Right-clicking the PowerToys tray icon in the taskbar and selecting “Report bug” generates a ZIP file containing diagnostic information about your setup and PowerToys logs, helping us better understand and troubleshoot the issue.
+  validations:
+    required: false
 - id: additionalInfo
   type: textarea
   attributes:

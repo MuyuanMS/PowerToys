@@ -49,6 +49,7 @@ void Trace::SettingsChanged(const GeneralSettings& settings)
         TraceLoggingWideString(enabledModules.c_str(), "ModulesEnabled"),
         TraceLoggingBoolean(settings.isRunElevated, "AlwaysRunElevated"),
         TraceLoggingBoolean(settings.downloadUpdatesAutomatically, "DownloadUpdatesAutomatically"),
+        TraceLoggingBoolean(settings.includePrereleaseUpdates, "IncludePrereleaseUpdates"),
         TraceLoggingBoolean(settings.enableExperimentation, "EnableExperimentation"),
         TraceLoggingWideString(settings.theme.c_str(), "Theme"),
         ProjectTelemetryPrivacyDataTag(ProjectTelemetryTag_ProductAndServicePerformance),
@@ -77,6 +78,39 @@ void Trace::UpdateDownloadCompleted(bool success, const std::wstring& version)
         "UpdateDownload_Completed",
         TraceLoggingBoolean(success, "Success"),
         TraceLoggingWideString(version.c_str(), "Version"),
+        ProjectTelemetryPrivacyDataTag(ProjectTelemetryTag_ProductAndServicePerformance),
+        TraceLoggingBoolean(TRUE, "UTCReplace_AppSessionGuid"),
+        TraceLoggingKeyword(PROJECT_KEYWORD_MEASURE));
+}
+
+void Trace::TrayIconLeftClick(bool quickAccessEnabled)
+{
+    TraceLoggingWriteWrapper(
+        g_hProvider,
+        "TrayIcon_LeftClick",
+        TraceLoggingBoolean(quickAccessEnabled, "QuickAccessEnabled"),
+        ProjectTelemetryPrivacyDataTag(ProjectTelemetryTag_ProductAndServicePerformance),
+        TraceLoggingBoolean(TRUE, "UTCReplace_AppSessionGuid"),
+        TraceLoggingKeyword(PROJECT_KEYWORD_MEASURE));
+}
+
+void Trace::TrayIconDoubleClick(bool quickAccessEnabled)
+{
+    TraceLoggingWriteWrapper(
+        g_hProvider,
+        "TrayIcon_DoubleClick",
+        TraceLoggingBoolean(quickAccessEnabled, "QuickAccessEnabled"),
+        ProjectTelemetryPrivacyDataTag(ProjectTelemetryTag_ProductAndServicePerformance),
+        TraceLoggingBoolean(TRUE, "UTCReplace_AppSessionGuid"),
+        TraceLoggingKeyword(PROJECT_KEYWORD_MEASURE));
+}
+
+void Trace::TrayIconRightClick(bool quickAccessEnabled)
+{
+    TraceLoggingWriteWrapper(
+        g_hProvider,
+        "TrayIcon_RightClick",
+        TraceLoggingBoolean(quickAccessEnabled, "QuickAccessEnabled"),
         ProjectTelemetryPrivacyDataTag(ProjectTelemetryTag_ProductAndServicePerformance),
         TraceLoggingBoolean(TRUE, "UTCReplace_AppSessionGuid"),
         TraceLoggingKeyword(PROJECT_KEYWORD_MEASURE));

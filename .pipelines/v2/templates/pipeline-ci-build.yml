@@ -19,6 +19,9 @@ parameters:
   - name: runTests
     type: boolean
     default: true
+  - name: runAffectedUiTests
+    type: boolean
+    default: false
   - name: useVSPreview
     type: boolean
     default: false
@@ -30,10 +33,29 @@ parameters:
     default: false
   - name: winAppSDKVersionNumber
     type: string
-    default: 1.6
+    default: '2.0'
   - name: useExperimentalVersion
     type: boolean
     default: false
+  # Artifact mode parameters
+  - name: useArtifactSource
+    type: boolean
+    default: false
+  - name: azureDevOpsOrg
+    type: string
+    default: 'https://dev.azure.com/microsoft'
+  - name: azureDevOpsProject
+    type: string
+    default: 'ProjectReunion'
+  - name: buildId
+    type: string
+    default: ''
+  - name: artifactName
+    type: string
+    default: 'WindowsAppSDK_Nuget_And_MSIX'
+  - name: metaPackageName
+    type: string
+    default: 'Microsoft.WindowsAppSDK'
 
 stages:
   - ${{ each platform in parameters.buildPlatforms }}:
@@ -49,7 +71,9 @@ stages:
               ${{ else }}:
                 name: SHINE-OSS-L
               ${{ if eq(parameters.useVSPreview, true) }}:
-                demands: ImageOverride -equals SHINE-VS17-Preview
+                demands: ImageOverride -equals SHINE-VS18-Preview
+              ${{ else }}:
+                demands: ImageOverride -equals SHINE-VS18-Latest
             buildPlatforms:
               - ${{ platform }}
             buildConfigurations: [Release]
@@ -57,12 +81,60 @@ stages:
             enableMsBuildCaching: ${{ parameters.enableMsBuildCaching }}
             msBuildCacheIsReadOnly: ${{ parameters.msBuildCacheIsReadOnly }}
             runTests: ${{ parameters.runTests }}
+            buildTests: true
             useVSPreview: ${{ parameters.useVSPreview }}
             useLatestWinAppSDK: ${{ parameters.useLatestWinAppSDK }}
             ${{ if eq(parameters.useLatestWinAppSDK, true) }}:
               winAppSDKVersionNumber: ${{ parameters.winAppSDKVersionNumber }}
               useExperimentalVersion: ${{ parameters.useExperimentalVersion }}
+              useArtifactSource: ${{ parameters.useArtifactSource }}
+              azureDevOpsOrg: ${{ parameters.azureDevOpsOrg }}
+              azureDevOpsProject: ${{ parameters.azureDevOpsProject }}
+              buildId: ${{ parameters.buildId }}
+              artifactName: ${{ parameters.artifactName }}
+              metaPackageName: ${{ parameters.metaPackageName }}
             timeoutInMinutes: 90
+
+        - ${{ if eq(parameters.runAffectedUiTests, true) }}:
+          - template: job-resolve-ui-tests.yml
+
+          - ${{ if eq(platform, 'x64') }}:
+            - template: job-test-project.yml
+              parameters:
+                platform: x64Win10
+                configuration: Release
+                buildSource: buildNowSlim
+                useLatestWebView2: ${{ parameters.useLatestWebView2 }}
+                autoSelectUiTests: true
+                dependsOn:
+                  - Build
+                  - Resolve
+                condition: and(succeeded(), eq(dependencies.Resolve.outputs['resolve.hasUiTests'], 'true'))
+
+            - template: job-test-project.yml
+              parameters:
+                platform: x64Win11
+                configuration: Release
+                buildSource: buildNowSlim
+                useLatestWebView2: ${{ parameters.useLatestWebView2 }}
+                autoSelectUiTests: true
+                dependsOn:
+                  - Build
+                  - Resolve
+                condition: and(succeeded(), eq(dependencies.Resolve.outputs['resolve.hasUiTests'], 'true'))
+
+          - ${{ if ne(platform, 'x64') }}:
+            - template: job-test-project.yml
+              parameters:
+                platform: ${{ platform }}
+                configuration: Release
+                buildSource: buildNowSlim
+                useLatestWebView2: ${{ parameters.useLatestWebView2 }}
+                autoSelectUiTests: true
+                dependsOn:
+                  - Build
+                  - Resolve
+                condition: and(succeeded(), eq(dependencies.Resolve.outputs['resolve.hasUiTests'], 'true'))
 
   - stage: Build_SDK
     displayName: Build Command Palette Toolkit SDK
@@ -76,7 +148,9 @@ stages:
             ${{ else }}:
               name: SHINE-OSS-L
             ${{ if eq(parameters.useVSPreview, true) }}:
-              demands: ImageOverride -equals SHINE-VS17-Preview
+              demands: ImageOverride -equals SHINE-VS18-Preview
+            ${{ else }}:
+              demands: ImageOverride -equals SHINE-VS18-Latest
           buildConfigurations: [Release]
           official: false
           codeSign: false
