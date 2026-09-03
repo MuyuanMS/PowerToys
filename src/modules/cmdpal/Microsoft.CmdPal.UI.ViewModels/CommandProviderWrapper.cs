@@ -14,7 +14,7 @@ using Windows.Foundation;
 
 namespace Microsoft.CmdPal.UI.ViewModels;
 
-public sealed class CommandProviderWrapper : ICommandProviderContext
+public sealed class CommandProviderWrapper : ICommandProviderContext, IDisposable
 {
     public bool IsExtension => Extension is not null;
 
@@ -25,6 +25,7 @@ public sealed class CommandProviderWrapper : ICommandProviderContext
     private readonly TaskScheduler _taskScheduler;
 
     private readonly ICommandProviderCache? _commandProviderCache;
+    private bool _disposed;
 
     public TopLevelViewModel[] TopLevelItems { get; private set; } = [];
 
@@ -54,7 +55,37 @@ public sealed class CommandProviderWrapper : ICommandProviderContext
 
     public TopLevelItemPageContext TopLevelPageContext { get; }
 
-    public CommandProviderWrapper(ICommandProvider provider, TaskScheduler mainThread)
+    /// <summary>
+    /// Creates a wrapper for an in-proc built-in command provider registered directly in the
+    /// DI container (no extension host process involved).
+    /// </summary>
+    /// <param name="provider">The in-proc command provider instance.</param>
+    /// <param name="mainThread">The UI thread scheduler.</param>
+    public static CommandProviderWrapper CreateForBuiltIn(ICommandProvider provider, TaskScheduler mainThread)
+        => new(provider, mainThread);
+
+    /// <summary>
+    /// Creates a wrapper for a WinRT/COM extension whose <see cref="ICommandProvider"/> is
+    /// obtained through <see cref="IExtensionWrapper.GetExtensionObject"/>. The extension must
+    /// already be started (via <see cref="IExtensionWrapper.StartExtensionAsync"/>).
+    /// </summary>
+    /// <param name="extension">The started WinRT extension wrapper.</param>
+    /// <param name="mainThread">The UI thread scheduler.</param>
+    /// <param name="commandProviderCache">Cache used to recall display info if initialization fails.</param>
+    public static CommandProviderWrapper CreateForWinRtExtension(IExtensionWrapper extension, TaskScheduler mainThread, ICommandProviderCache commandProviderCache)
+        => new(extension, mainThread, commandProviderCache);
+
+    /// <summary>
+    /// Creates a wrapper for a JavaScript extension where the <see cref="ICommandProvider"/>
+    /// is obtained directly over JSON-RPC (not through <see cref="IExtensionWrapper.GetExtensionObject"/>).
+    /// </summary>
+    /// <param name="extension">The JS extension wrapper managing the Node.js process.</param>
+    /// <param name="provider">The command provider proxy backed by the JSON-RPC connection.</param>
+    /// <param name="mainThread">The UI thread scheduler.</param>
+    public static CommandProviderWrapper CreateForJsonRpcExtension(IExtensionWrapper extension, ICommandProvider provider, TaskScheduler mainThread)
+        => new(extension, provider, mainThread);
+
+    private CommandProviderWrapper(ICommandProvider provider, TaskScheduler mainThread)
     {
         // This ctor is only used for in-proc builtin commands. So the Unsafe!
         // calls are pretty dang safe actually.
@@ -64,24 +95,31 @@ public sealed class CommandProviderWrapper : ICommandProviderContext
 
         // Hook the extension back into us
         ExtensionHost = new CommandPaletteHost(provider);
-        _commandProvider.Unsafe!.InitializeWithHost(ExtensionHost);
+        try
+        {
+            _commandProvider.Unsafe!.InitializeWithHost(ExtensionHost);
+            _commandProvider.Unsafe!.ItemsChanged += CommandProvider_ItemsChanged;
 
-        _commandProvider.Unsafe!.ItemsChanged += CommandProvider_ItemsChanged;
+            isValid = true;
+            Id = provider.Id;
+            DisplayName = provider.DisplayName;
+            Icon = new(provider.Icon);
+            Icon.InitializeProperties();
 
-        isValid = true;
-        Id = provider.Id;
-        DisplayName = provider.DisplayName;
-        Icon = new(provider.Icon);
-        Icon.InitializeProperties();
+            // Note: explicitly not InitializeProperties()ing the settings here. If
+            // we do that, then we'd regress GH #38321
+            Settings = new(provider.Settings, this, _taskScheduler);
 
-        // Note: explicitly not InitializeProperties()ing the settings here. If
-        // we do that, then we'd regress GH #38321
-        Settings = new(provider.Settings, this, _taskScheduler);
-
-        Logger.LogDebug($"Initialized command provider {ProviderId}");
+            Logger.LogDebug($"Initialized command provider {ProviderId}");
+        }
+        catch
+        {
+            Dispose();
+            throw;
+        }
     }
 
-    public CommandProviderWrapper(IExtensionWrapper extension, TaskScheduler mainThread, ICommandProviderCache commandProviderCache)
+    private CommandProviderWrapper(IExtensionWrapper extension, TaskScheduler mainThread, ICommandProviderCache commandProviderCache)
     {
         _taskScheduler = mainThread;
         _commandProviderCache = commandProviderCache;
@@ -89,22 +127,22 @@ public sealed class CommandProviderWrapper : ICommandProviderContext
 
         Extension = extension;
         ExtensionHost = new CommandPaletteHost(extension);
-        if (!Extension.IsRunning())
-        {
-            throw new ArgumentException("You forgot to start the extension. This is a CmdPal error - we need to make sure to call StartExtensionAsync");
-        }
-
-        var extensionImpl = extension.GetExtensionObject();
-        var providerObject = extensionImpl?.GetProvider(ProviderType.Commands);
-        if (providerObject is not ICommandProvider provider)
-        {
-            throw new ArgumentException("extension didn't actually implement ICommandProvider");
-        }
-
-        _commandProvider = new(provider);
 
         try
         {
+            if (!Extension.IsRunning())
+            {
+                throw new ArgumentException("You forgot to start the extension. This is a CmdPal error - we need to make sure to call StartExtensionAsync");
+            }
+
+            var extensionImpl = extension.GetExtensionObject();
+            var providerObject = extensionImpl?.GetProvider(ProviderType.Commands);
+            if (providerObject is not ICommandProvider provider)
+            {
+                throw new ArgumentException("extension didn't actually implement ICommandProvider");
+            }
+
+            _commandProvider = new(provider);
             var model = _commandProvider.Unsafe!;
 
             // Hook the extension back into us
@@ -120,9 +158,66 @@ public sealed class CommandProviderWrapper : ICommandProviderContext
             Logger.LogError("Failed to initialize CommandProvider for extension.");
             Logger.LogError($"Extension was {Extension!.PackageFamilyName}");
             Logger.LogError(e.ToString());
+            Dispose();
+            throw;
+        }
+    }
+
+    private CommandProviderWrapper(IExtensionWrapper extension, ICommandProvider provider, TaskScheduler mainThread)
+    {
+        _taskScheduler = mainThread;
+        TopLevelPageContext = new(this, _taskScheduler);
+
+        Extension = extension;
+        ExtensionHost = new CommandPaletteHost(extension);
+        _commandProvider = new(provider);
+
+        try
+        {
+            var model = _commandProvider.Unsafe!;
+
+            // Hook the extension back into us
+            model.InitializeWithHost(ExtensionHost);
+            model.ItemsChanged += CommandProvider_ItemsChanged;
+
+            Id = provider.Id;
+            DisplayName = provider.DisplayName;
+            Icon = new(provider.Icon);
+            Icon.InitializeProperties();
+
+            // Note: explicitly not InitializeProperties()ing the settings here. If
+            // we do that, then we'd regress GH #38321
+            Settings = new(provider.Settings, this, _taskScheduler);
+
+            isValid = true;
+
+            Logger.LogDebug($"Initialized JS extension command provider {Extension.PackageFamilyName}:{Extension.ExtensionUniqueId}");
+        }
+        catch (Exception e)
+        {
+            Logger.LogError("Failed to initialize CommandProvider for JS extension.");
+            Logger.LogError($"Extension was {Extension!.PackageFamilyName}");
+            Logger.LogError(e.ToString());
+            Dispose();
+            throw;
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
         }
 
-        isValid = true;
+        _disposed = true;
+
+        if (_commandProvider?.Unsafe is not null)
+        {
+            _commandProvider.Unsafe.ItemsChanged -= CommandProvider_ItemsChanged;
+        }
+
+        ExtensionHost.Dispose();
     }
 
     private ProviderSettings GetProviderSettings(SettingsModel settings)
@@ -642,9 +737,9 @@ public sealed class CommandProviderWrapper : ICommandProviderContext
 
     public ICommandProviderContext GetProviderContext() => this;
 
-    public override bool Equals(object? obj) => obj is CommandProviderWrapper wrapper && isValid == wrapper.isValid;
+    public override bool Equals(object? obj) => ReferenceEquals(this, obj);
 
-    public override int GetHashCode() => _commandProvider.GetHashCode();
+    public override int GetHashCode() => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this);
 
     private void CommandProvider_ItemsChanged(object sender, IItemsChangedEventArgs args)
     {

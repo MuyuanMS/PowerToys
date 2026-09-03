@@ -5,15 +5,19 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Microsoft.CmdPal.Common;
+using Microsoft.CmdPal.UI.ViewModels.Services;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Windows.Foundation;
 
 namespace Microsoft.CmdPal.UI.ViewModels;
 
-public abstract partial class AppExtensionHost : IExtensionHost
+public abstract partial class AppExtensionHost : IExtensionHost, IDisposable
 {
     private static readonly GlobalLogPageContext _globalLogPageContext = new();
+    private readonly Lock _statusNotificationsLock = new();
+    private readonly SerialNotificationDispatcher _statusNotifications = new();
+    private bool _disposed;
 
     private static ulong _hostingHwnd;
 
@@ -41,10 +45,16 @@ public abstract partial class AppExtensionHost : IExtensionHost
             return Task.CompletedTask.AsAsyncAction();
         }
 
-        _ = Task.Run(() =>
+        lock (_statusNotificationsLock)
         {
-            ProcessHideStatusMessage(message);
-        });
+            if (_disposed)
+            {
+                return Task.CompletedTask.AsAsyncAction();
+            }
+
+            _statusNotifications.Enqueue(() => ProcessHideStatusMessage(message));
+        }
+
         return Task.CompletedTask.AsAsyncAction();
     }
 
@@ -84,9 +94,9 @@ public abstract partial class AppExtensionHost : IExtensionHost
         return Task.CompletedTask.AsAsyncAction();
     }
 
-    public void ProcessHideStatusMessage(IStatusMessage message)
+    public Task ProcessHideStatusMessage(IStatusMessage message)
     {
-        Task.Factory.StartNew(
+        return Task.Factory.StartNew(
             () =>
             {
                 try
@@ -121,13 +131,13 @@ public abstract partial class AppExtensionHost : IExtensionHost
             _globalLogPageContext.Scheduler);
     }
 
-    public void ProcessStatusMessage(IStatusMessage message, StatusContext context)
+    public Task ProcessStatusMessage(IStatusMessage message, StatusContext context)
     {
         // If this message is already in the list of messages, just bring it to the top
         var oldVm = StatusMessages.Where(messageVM => messageVM.Model.Unsafe == message).FirstOrDefault();
         if (oldVm is not null)
         {
-            Task.Factory.StartNew(
+            return Task.Factory.StartNew(
                 () =>
                 {
                     StatusMessages.Remove(oldVm);
@@ -136,17 +146,25 @@ public abstract partial class AppExtensionHost : IExtensionHost
                 CancellationToken.None,
                 TaskCreationOptions.None,
                 _globalLogPageContext.Scheduler);
-            return;
         }
 
         var vm = new StatusMessageViewModel(message, new(_globalLogPageContext));
         vm.SafeInitializePropertiesSynchronous();
 
-        Task.Factory.StartNew(
+        return Task.Factory.StartNew(
             () =>
             {
                 StatusMessages.Add(vm);
             },
+            CancellationToken.None,
+            TaskCreationOptions.None,
+            _globalLogPageContext.Scheduler);
+    }
+
+    private Task ClearStatusMessagesAsync()
+    {
+        return Task.Factory.StartNew(
+            StatusMessages.Clear,
             CancellationToken.None,
             TaskCreationOptions.None,
             _globalLogPageContext.Scheduler);
@@ -159,14 +177,34 @@ public abstract partial class AppExtensionHost : IExtensionHost
             return Task.CompletedTask.AsAsyncAction();
         }
 
-        Debug.WriteLine(message.Message);
-
-        _ = Task.Run(() =>
+        lock (_statusNotificationsLock)
         {
-            ProcessStatusMessage(message, context);
-        });
+            if (_disposed)
+            {
+                return Task.CompletedTask.AsAsyncAction();
+            }
+
+            _statusNotifications.Enqueue(() => ProcessStatusMessage(message, context));
+        }
 
         return Task.CompletedTask.AsAsyncAction();
+    }
+
+    public void Dispose()
+    {
+        lock (_statusNotificationsLock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _statusNotifications.Enqueue(ClearStatusMessagesAsync);
+            _statusNotifications.CompleteWithoutWaiting();
+        }
+
+        GC.SuppressFinalize(this);
     }
 
     public abstract string? GetExtensionDisplayName();
