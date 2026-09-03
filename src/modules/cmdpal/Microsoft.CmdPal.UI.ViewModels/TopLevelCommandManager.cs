@@ -855,7 +855,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         _extensionLoadCts.Cancel();
         _extensionLoadCts.Dispose();
         _reloadCommandsGate.Dispose();
-        _providerChanges.Dispose();
+        _providerChanges.CompleteWithoutWaiting();
         GC.SuppressFinalize(this);
     }
 

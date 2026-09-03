@@ -156,6 +156,11 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
                         _getItemsTask = null;
                         return items;
                     }
+
+                    if (_getItemsTask is null || _getItemsTaskGeneration == generation)
+                    {
+                        return items;
+                    }
                 }
             }
         }
