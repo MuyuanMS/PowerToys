@@ -26,7 +26,7 @@ namespace
 
     constexpr int ClampBrightnessThreshold(int value)
     {
-        return value < 0 ? 0 : (value > 100 ? 100 : value);
+        return value < 1 ? 1 : (value > 100 ? 100 : value);
     }
 }
 
@@ -236,7 +236,7 @@ public:
             L"brightnessThreshold",
             L"Brightness threshold for switching to light theme.",
             g_settings.m_brightnessThreshold,
-            0,
+            1,
             100,
             1);
 

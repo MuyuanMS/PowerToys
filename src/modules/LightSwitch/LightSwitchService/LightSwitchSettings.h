@@ -73,7 +73,7 @@ struct LightSwitchConfig
     bool changeSystem = false;
     bool changeApps = false;
 
-    // Brightness threshold (0-100). When display brightness reaches or exceeds this value,
+    // Brightness threshold (1-100). When display brightness reaches or exceeds this value,
     // light mode is activated; when it drops below, dark mode is activated.
     int brightnessThreshold = 90;
 };

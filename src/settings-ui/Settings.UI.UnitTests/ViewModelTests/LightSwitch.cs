@@ -39,7 +39,7 @@ public class LightSwitch
         Assert.AreEqual(100, settings.Properties.BrightnessThreshold.Value);
 
         viewModel.BrightnessThreshold = -10;
-        Assert.AreEqual(0, settings.Properties.BrightnessThreshold.Value);
+        Assert.AreEqual(1, settings.Properties.BrightnessThreshold.Value);
     }
 
     [TestMethod]

@@ -318,7 +318,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             get => ModuleSettings.Properties.BrightnessThreshold.Value;
             set
             {
-                var clamped = Math.Max(0, Math.Min(100, value));
+                var clamped = Math.Max(1, Math.Min(100, value));
                 if (ModuleSettings.Properties.BrightnessThreshold.Value != clamped)
                 {
                     ModuleSettings.Properties.BrightnessThreshold.Value = clamped;

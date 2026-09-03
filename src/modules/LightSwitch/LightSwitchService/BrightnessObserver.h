@@ -147,10 +147,19 @@ private:
                     IWbemClassObject* pObj = nullptr;
                     ULONG returned = 0;
                     std::optional<int> maxBrightness;
-                    while (!state->stop &&
-                           pEnum->Next(kNextTimeoutMs, 1, &pObj, &returned) == WBEM_S_NO_ERROR &&
-                           returned)
+                    while (!state->stop)
                     {
+                        hr = pEnum->Next(kNextTimeoutMs, 1, &pObj, &returned);
+                        if (hr == WBEM_S_TIMEDOUT)
+                        {
+                            continue;
+                        }
+
+                        if (hr != WBEM_S_NO_ERROR || !returned)
+                        {
+                            break;
+                        }
+
                         VARIANT vt;
                         VariantInit(&vt);
                         if (SUCCEEDED(pObj->Get(L"CurrentBrightness", 0, &vt, nullptr, nullptr)))

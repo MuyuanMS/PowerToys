@@ -259,7 +259,7 @@ void LightSwitchSettings::LoadSettings()
         if (const auto jsonVal = values.get_int_value(L"brightnessThreshold"))
         {
             int val = *jsonVal;
-            if (val < 0) val = 0;
+            if (val < 1) val = 1;
             if (val > 100) val = 100;
 
             if (m_settings.brightnessThreshold != val)
