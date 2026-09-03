@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Threading.Tasks;
 using Microsoft.CmdPal.UI.ViewModels.Services;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -45,20 +46,21 @@ public class JsonRpcExtensionServiceCrashRecoveryTests
     [TestMethod]
     public void SourceEdit_ResetsCrashCount_AllowsRestartAgain()
     {
+        using var service = new JsonRpcExtensionService(TaskScheduler.Default);
+        const string Directory = @"C:\extensions\sample";
+
         // Drive the extension to the disabled decision.
-        var crashCount = MaxRestartAttempts + 1;
+        service.SetCrashCountForTest(Directory, MaxRestartAttempts + 1);
         Assert.AreEqual(
             JsonRpcExtensionService.CrashAction.Disable,
-            JsonRpcExtensionService.DecideCrashAction(crashCount, MaxRestartAttempts));
+            JsonRpcExtensionService.DecideCrashAction(service.GetCrashCountForTest(Directory), MaxRestartAttempts));
 
-        // A source edit hot-reloads with resetCrashCount: true, which clears the counter
-        // for the directory. The very next crash decision must be Restart again, so the
-        // extension is no longer stranded in the disabled state (p4-07).
-        crashCount = 0;
-        crashCount++;
+        // A source edit hot-reload uses this service state transition before restarting the
+        // provider; the next crash must be counted from a clean slate instead of remaining disabled.
+        service.ResetCrashCountAfterSourceEdit(Directory);
         Assert.AreEqual(
             JsonRpcExtensionService.CrashAction.Restart,
-            JsonRpcExtensionService.DecideCrashAction(crashCount, MaxRestartAttempts),
+            JsonRpcExtensionService.DecideCrashAction(service.GetCrashCountForTest(Directory) + 1, MaxRestartAttempts),
             "After a source edit resets the crash count, the extension must retry loading.");
     }
 }
