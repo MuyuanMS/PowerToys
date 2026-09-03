@@ -186,7 +186,7 @@ namespace Peek.UI
             var items = new List<IFileSystemItem>(paths.Count);
             foreach (var path in paths)
             {
-                string name = Path.GetFileName(path);
+                string name = GetDisplayName(path);
                 items.Add(Directory.Exists(path)
                     ? new FolderItem(path, name, path)
                     : new FileItem(path, name));
@@ -194,6 +194,14 @@ namespace Peek.UI
 
             Items = items;
             CurrentItem = items.Count > 0 ? items[0] : null;
+        }
+
+        private static string GetDisplayName(string path)
+        {
+            var trimmedPath = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var name = Path.GetFileName(trimmedPath.Length > 0 ? trimmedPath : path);
+
+            return string.IsNullOrEmpty(name) ? path : name;
         }
 
         public void Uninitialize()
