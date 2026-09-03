@@ -4,7 +4,10 @@
 
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CmdPal.Ext.ClipboardHistory.Helpers;
@@ -13,21 +16,25 @@ using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.Win32;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage.Streams;
 
 namespace Microsoft.CmdPal.Ext.ClipboardHistory.Pages;
 
 internal sealed partial class ClipboardHistoryListPage : ListPage
 {
     private readonly SettingsManager _settingsManager;
-    private readonly ObservableCollection<ClipboardItem> clipboardHistory;
     private readonly string _defaultIconPath;
+    private readonly object loadGate = new();
+    private volatile ClipboardItem[] clipboardHistory = [];
+    private int hasLoadedOnce;
+    private bool loadInFlight;
+    private bool reloadRequested;
 
     public ClipboardHistoryListPage(SettingsManager settingsManager)
     {
         ArgumentNullException.ThrowIfNull(settingsManager);
 
         _settingsManager = settingsManager;
-        clipboardHistory = [];
         _defaultIconPath = string.Empty;
         Icon = Icons.ClipboardListIcon;
         Name = Properties.Resources.clipboard_history_page_name;
@@ -35,50 +42,56 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
         ShowDetails = true;
 
         Clipboard.HistoryChanged += TrackClipboardHistoryChanged_EventHandler;
+        Clipboard.HistoryEnabledChanged += TrackClipboardHistoryEnabledChanged_EventHandler;
     }
 
-    private void TrackClipboardHistoryChanged_EventHandler(object? sender, ClipboardHistoryChangedEventArgs? e) => RaiseItemsChanged(0);
+    private void TrackClipboardHistoryChanged_EventHandler(object? sender, ClipboardHistoryChangedEventArgs? e)
+    {
+        ReloadClipboardHistoryIfLoaded();
+    }
+
+    private void TrackClipboardHistoryEnabledChanged_EventHandler(object? sender, object? e)
+    {
+        ReloadClipboardHistoryIfLoaded();
+    }
+
+    private void ReloadClipboardHistoryIfLoaded()
+    {
+        if (Volatile.Read(ref hasLoadedOnce) != 0)
+        {
+            LoadClipboardHistoryInSTA();
+        }
+    }
 
     private bool IsClipboardHistoryEnabled()
     {
         var registryKey = @"HKEY_CURRENT_USER\Software\Microsoft\Clipboard\";
         try
         {
-            var enableClipboardHistory = (int)(Registry.GetValue(registryKey, "EnableClipboardHistory", false) ?? 0);
+            var enableClipboardHistory = (int)(Registry.GetValue(registryKey, "EnableClipboardHistory", 0) ?? 0);
             return enableClipboardHistory != 0;
         }
         catch (Exception)
         {
-            return false;
-        }
-    }
-
-    private bool IsClipboardHistoryDisabledByGPO()
-    {
-        var registryKey = @"HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\System\";
-        try
-        {
-            var allowClipboardHistory = Registry.GetValue(registryKey, "AllowClipboardHistory", null);
-            return allowClipboardHistory is not null ? (int)allowClipboardHistory == 0 : false;
-        }
-        catch (Exception)
-        {
-            return false;
+            return true;
         }
     }
 
     private async Task LoadClipboardHistoryAsync()
     {
+        var loadSucceeded = false;
         try
         {
             List<ClipboardItem> items = [];
 
             if (!Clipboard.IsHistoryEnabled())
             {
+                ClearClipboardHistory();
+                loadSucceeded = true;
                 return;
             }
 
-            var historyItems = await Clipboard.GetHistoryItemsAsync();
+            var historyItems = await Clipboard.GetHistoryItemsAsync().AsTask().ConfigureAwait(false);
             if (historyItems.Status != ClipboardHistoryItemsResultStatus.Success)
             {
                 return;
@@ -88,7 +101,7 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
             {
                 if (item.Content.Contains(StandardDataFormats.Text))
                 {
-                    var text = await item.Content.GetTextAsync();
+                    var text = await item.Content.GetTextAsync().AsTask().ConfigureAwait(false);
                     items.Add(new ClipboardItem { Settings = _settingsManager, Content = text, Item = item });
                 }
                 else if (item.Content.Contains(StandardDataFormats.Bitmap))
@@ -97,22 +110,26 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
                 }
             }
 
-            clipboardHistory.Clear();
-
             foreach (var item in items)
             {
                 if (item.Item.Content.Contains(StandardDataFormats.Bitmap))
                 {
-                    var imageReceived = await item.Item.Content.GetBitmapAsync();
+                    var imageReceived = await item.Item.Content.GetBitmapAsync().AsTask().ConfigureAwait(false);
 
                     if (imageReceived is not null)
                     {
                         item.ImageData = imageReceived;
+                        var imagePath = GetImagePath(item.Item.Id);
+                        if (await CacheImageAsync(imageReceived, imagePath).ConfigureAwait(false))
+                        {
+                            item.ImagePath = imagePath;
+                        }
                     }
                 }
-
-                clipboardHistory.Add(item);
             }
+
+            clipboardHistory = [.. items];
+            loadSucceeded = true;
         }
         catch (Exception ex)
         {
@@ -121,39 +138,247 @@ internal sealed partial class ClipboardHistoryListPage : ListPage
             ExtensionHost.ShowStatus(new StatusMessage() { Message = Properties.Resources.clipboard_failed_to_load, State = MessageState.Error }, StatusContext.Page);
             ExtensionHost.LogMessage(ex.ToString());
         }
+        finally
+        {
+            CleanupCachedImages(clipboardHistory.Where(static item => item.ImagePath is not null).Select(static item => item.ImagePath!));
+            var startReload = false;
+            lock (loadGate)
+            {
+                if (loadSucceeded && reloadRequested)
+                {
+                    reloadRequested = false;
+                    startReload = true;
+                }
+                else
+                {
+                    loadInFlight = false;
+                }
+            }
+
+            try
+            {
+                IsLoading = false;
+            }
+            catch (Exception ex)
+            {
+                TryLogMessage($"Failed to clear clipboard history loading state: {ex}");
+            }
+
+            if (loadSucceeded)
+            {
+                try
+                {
+                    RaiseItemsChanged(0);
+                }
+                catch (Exception ex)
+                {
+                    TryLogMessage($"Failed to notify clipboard history update: {ex}");
+                }
+
+                if (startReload)
+                {
+                    StartClipboardHistoryLoad();
+                }
+            }
+        }
+    }
+
+    private static string GetImagePath(string id)
+    {
+        var directory = GetCacheDirectory();
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(id)));
+        return Path.Combine(directory, $"{hash}.png");
+    }
+
+    private static void CleanupCachedImages(IEnumerable<string> activePaths)
+    {
+        try
+        {
+            var activeFileNames = activePaths.Select(Path.GetFileName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var directory = GetCacheDirectory();
+            if (!Directory.Exists(directory))
+            {
+                return;
+            }
+
+            foreach (var path in Directory.EnumerateFiles(directory, "*.png"))
+            {
+                if (!activeFileNames.Contains(Path.GetFileName(path)))
+                {
+                    DeleteCachedImage(path);
+                }
+            }
+
+            foreach (var path in Directory.EnumerateFiles(directory, "*.png.tmp"))
+            {
+                if (File.GetLastWriteTimeUtc(path) < DateTime.UtcNow - TimeSpan.FromMinutes(5))
+                {
+                    DeleteCachedImage(path);
+                }
+            }
+        }
+        catch (IOException ex)
+        {
+            TryLogMessage($"Failed to enumerate cached clipboard images: {ex.Message}");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            TryLogMessage($"Failed to enumerate cached clipboard images: {ex.Message}");
+        }
+    }
+
+    private static void DeleteCachedImage(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (IOException ex)
+        {
+            TryLogMessage($"Failed to remove cached clipboard image: {ex.Message}");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            TryLogMessage($"Failed to remove cached clipboard image: {ex.Message}");
+        }
+    }
+
+    private static async Task<bool> CacheImageAsync(RandomAccessStreamReference imageData, string path)
+    {
+        var temporaryPath = $"{path}.tmp";
+        try
+        {
+            if (File.Exists(path))
+            {
+                return true;
+            }
+
+            using var stream = await imageData.OpenReadAsync().AsTask().ConfigureAwait(false);
+            using var input = stream.AsStreamForRead();
+            var directory = Path.GetDirectoryName(path)!;
+            Directory.CreateDirectory(directory);
+            await using (var output = new FileStream(temporaryPath, FileMode.Create, FileAccess.Write, FileShare.None, 64 * 1024, useAsync: true))
+            {
+                await input.CopyToAsync(output).ConfigureAwait(false);
+                await output.FlushAsync().ConfigureAwait(false);
+            }
+
+            File.Move(temporaryPath, path, overwrite: true);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            TryLogMessage($"Failed to cache clipboard image data: {ex}");
+            return false;
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                try
+                {
+                    File.Delete(temporaryPath);
+                }
+                catch (IOException ex)
+                {
+                    TryLogMessage($"Failed to remove incomplete cached clipboard image: {ex.Message}");
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    TryLogMessage($"Failed to remove incomplete cached clipboard image: {ex.Message}");
+                }
+            }
+        }
+    }
+
+    private static string GetCacheDirectory() => Path.Combine(Path.GetTempPath(), "PowerToys", "CmdPal", "ClipboardHistory");
+
+    private static void TryLogMessage(string message)
+    {
+        try
+        {
+            ExtensionHost.LogMessage(message);
+        }
+        catch (Exception)
+        {
+            // Logging must not take down the unobserved STA worker.
+        }
     }
 
     private void LoadClipboardHistoryInSTA()
     {
+        lock (loadGate)
+        {
+            reloadRequested = true;
+            if (loadInFlight)
+            {
+                return;
+            }
+
+            loadInFlight = true;
+            reloadRequested = false;
+        }
+
+        StartClipboardHistoryLoad();
+    }
+
+    private void ClearClipboardHistory()
+    {
+        clipboardHistory = [];
+        CleanupCachedImages([]);
+    }
+
+    private void StartClipboardHistoryLoad()
+    {
+        IsLoading = true;
+
         // https://github.com/microsoft/windows-rs/issues/317
-        // Clipboard API needs to be called in STA or it
-        // hangs.
+        // The synchronous prefix must run in STA or the clipboard API hangs.
+        // Continuations use the thread pool because this raw thread has no
+        // synchronization context.
         var thread = new Thread(() =>
         {
-            var t = LoadClipboardHistoryAsync();
-            t.ConfigureAwait(false);
-            t.Wait();
-        });
+            try
+            {
+                LoadClipboardHistoryAsync().GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                TryLogMessage($"Clipboard history load thread failed: {ex}");
+            }
+        })
+        {
+            IsBackground = true,
+        };
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        thread.Join();
     }
 
     private ListItem[] GetClipboardHistoryListItems()
     {
-        LoadClipboardHistoryInSTA();
         List<ListItem> listItems = [];
-        for (var i = 0; i < clipboardHistory.Count; i++)
+        foreach (var item in clipboardHistory)
         {
-            var item = clipboardHistory[i];
-            if (item is not null)
-            {
-                listItems.Add(new ClipboardListItem(item, _settingsManager));
-            }
+            listItems.Add(new ClipboardListItem(item, _settingsManager));
         }
 
         return listItems.ToArray();
     }
 
-    public override IListItem[] GetItems() => GetClipboardHistoryListItems();
+    public override IListItem[] GetItems()
+    {
+        // This registry read is only a cheap pre-filter. Clipboard.IsHistoryEnabled()
+        // remains the authoritative check inside the load.
+        var initialLoadRequested = Interlocked.CompareExchange(ref hasLoadedOnce, 1, 0) == 0;
+        if (!IsClipboardHistoryEnabled())
+        {
+            ClearClipboardHistory();
+        }
+        else if (initialLoadRequested)
+        {
+            LoadClipboardHistoryInSTA();
+        }
+
+        return GetClipboardHistoryListItems();
+    }
 }
