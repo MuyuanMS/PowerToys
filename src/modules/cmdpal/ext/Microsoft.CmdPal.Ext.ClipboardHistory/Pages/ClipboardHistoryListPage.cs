@@ -99,7 +99,7 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
                     {
                         item.ImageData = imageReceived;
                         var imagePath = GetImagePath(item.Item.Id);
-                        if (await CacheImageAsync(imageReceived, imagePath).ConfigureAwait(false))
+                        if (File.Exists(imagePath) || await CacheImageAsync(imageReceived, imagePath).ConfigureAwait(false))
                         {
                             item.ImagePath = imagePath;
                         }
@@ -180,9 +180,16 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
                 return;
             }
 
-            foreach (var path in Directory.EnumerateFiles(directory, "*.png"))
+            foreach (var path in Directory.EnumerateFiles(directory))
             {
-                if (!activeFileNames.Contains(Path.GetFileName(path)))
+                var fileName = Path.GetFileName(path);
+                if (!fileName.EndsWith(".png", StringComparison.OrdinalIgnoreCase) &&
+                    !fileName.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (!activeFileNames.Contains(fileName))
                 {
                     try
                     {
