@@ -53,6 +53,11 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
             return;
         }
 
+        if (!hasLoadedOnce.Value)
+        {
+            return;
+        }
+
         reloadRequested.Value = true;
         LoadClipboardHistoryInSTA(waitForCompletion: false);
     }

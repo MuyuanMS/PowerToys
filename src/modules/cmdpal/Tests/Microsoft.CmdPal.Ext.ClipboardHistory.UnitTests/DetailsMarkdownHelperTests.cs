@@ -55,7 +55,7 @@ public class DetailsMarkdownHelperTests
     }
 
     [TestMethod]
-    public void BuildImageBody_ReturnsEmpty_WhenImageDataIsNull()
+    public void BuildImageBody_ReturnsEmpty_WhenImagePathIsNull()
     {
         var body = DetailsMarkdownHelper.BuildImageBody(null, "Image");
 
