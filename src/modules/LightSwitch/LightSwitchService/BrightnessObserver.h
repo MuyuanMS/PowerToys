@@ -172,6 +172,15 @@ private:
                         }
                         catch (...) {}
                     }
+                    else if (!state->stop && !maxBrightness && lastBrightness != -1)
+                    {
+                        lastBrightness = -1;
+                        try
+                        {
+                            state->callback(lastBrightness);
+                        }
+                        catch (...) {}
+                    }
 
                     pEnum->Release();
                 }

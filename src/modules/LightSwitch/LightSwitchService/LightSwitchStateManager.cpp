@@ -149,6 +149,12 @@ void LightSwitchStateManager::OnBrightnessChange(int brightness)
 {
     std::lock_guard<std::mutex> lock(_stateMutex);
 
+    if (brightness < 0)
+    {
+        _state.lastBrightness = -1;
+        return;
+    }
+
     if (_state.lastAppliedMode == ScheduleMode::FollowBrightness && _state.isManualOverride)
     {
         int threshold = LightSwitchSettings::settings_snapshot().brightnessThreshold;
