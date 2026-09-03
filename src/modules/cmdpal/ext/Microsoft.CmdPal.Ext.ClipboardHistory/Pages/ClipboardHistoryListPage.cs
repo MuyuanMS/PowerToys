@@ -26,6 +26,7 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
     private readonly string _defaultIconPath;
     private readonly object loadThreadLock = new();
     private volatile ClipboardItem[] clipboardHistory = [];
+    private InterlockedBoolean pageActivated;
     private InterlockedBoolean hasLoadedOnce;
     private InterlockedBoolean loadInFlight;
     private InterlockedBoolean reloadRequested;
@@ -53,7 +54,7 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
             return;
         }
 
-        if (!hasLoadedOnce.Value)
+        if (!pageActivated.Value)
         {
             return;
         }
@@ -358,9 +359,13 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
 
     public override IListItem[] GetItems()
     {
-        if (!disposed.Value && hasLoadedOnce.Set())
+        if (!disposed.Value)
         {
-            LoadClipboardHistoryInSTA(waitForCompletion: true);
+            pageActivated.Value = true;
+            if (hasLoadedOnce.Set())
+            {
+                LoadClipboardHistoryInSTA(waitForCompletion: true);
+            }
         }
 
         return GetClipboardHistoryListItems();
