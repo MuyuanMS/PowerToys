@@ -173,9 +173,9 @@ internal sealed partial class HotReloadDebouncer : IDisposable
 
             registration.Timer.Dispose();
             _timers.Remove(pending.Key);
-        }
 
-        _callback(pending.Key);
+            _callback(pending.Key);
+        }
     }
 
     private readonly record struct PendingReload(string Key, long Generation, long RegistrationId);

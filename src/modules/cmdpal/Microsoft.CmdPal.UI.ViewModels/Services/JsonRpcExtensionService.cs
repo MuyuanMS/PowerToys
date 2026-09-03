@@ -116,6 +116,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
     // can only be canceled once, so stop-then-load-again would otherwise hand out a
     // permanently canceled token; this wrapper swaps in a fresh source per cycle.
     private readonly ReloadCancellation _reload = new();
+    private readonly SemaphoreSlim _loadStopLock = new(1, 1);
 
     private readonly DirectoryLifecycleGate _directoryGate = new();
 
@@ -144,7 +145,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         _taskScheduler = taskScheduler;
         _hotReloadDebouncer = new HotReloadDebouncer(directory =>
             StartObservedBackgroundTask(
-                () => HotReloadExtensionAsync(directory),
+                _ => HotReloadExtensionAsync(directory),
                 $"hot-reload JS extension at {directory}",
                 _reload.Token));
     }
@@ -191,85 +192,110 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
             return [];
         }
 
-        // Begin a fresh load cycle. This replaces a token that a previous stop left
-        // canceled, so a load after a stop actually runs.
-        _reload.BeginCycle();
-
-        // Re-open crash recovery, which a previous stop closed, so a crash in this cycle is
-        // recovered instead of being dropped as post-shutdown work.
-        _recovery.BeginCycle();
-
-        // A new load cycle clears the shutting-down guard so registrations are accepted
-        // again after a previous SignalStopAsync.
-        lock (_extensionsLock)
+        try
         {
-            _shuttingDown = false;
+            await _loadStopLock.WaitAsync(ct).ConfigureAwait(false);
         }
-
-        var sw = Stopwatch.StartNew();
-
-        if (!EnsureExtensionsDirectory())
+        catch (OperationCanceledException)
         {
             return [];
         }
 
-        // Start the watcher before scanning so a package installed while the scan runs
-        // is still observed (the per-directory gate and the already-loaded check make a
-        // watcher-driven load and a scan-driven load for the same directory idempotent).
-        StartDirectoryWatcher();
+        try
+        {
+            // Begin a fresh load cycle. This replaces a token that a previous stop left
+            // canceled, so a load after a stop actually runs.
+            _reload.BeginCycle();
 
-        var accepted = DiscoverAcceptedManifests(ExtensionsPath);
-        var wrappers = (await ExtensionTaskCoordinator.RunConcurrentlyAsync<(string Directory, JSExtensionManifest Manifest), CommandProviderWrapper>(
-            accepted,
-            item => AddExtensionGatedAsync(item.Directory, item.Manifest, ct),
-            (item, ex) => Logger.LogError($"Failed to load JS extension from {item.Directory}", ex),
-            MaxConcurrentExtensionStarts,
-            ct)
-            .ConfigureAwait(false)).ToList();
+            // Re-open crash recovery, which a previous stop closed, so a crash in this cycle is
+            // recovered instead of being dropped as post-shutdown work.
+            _recovery.BeginCycle();
 
-        // Reconcile once more to pick up anything installed during the scan/watch gap.
-        var stragglers = await AddDiscoveredNotLoadedAsync(ct).ConfigureAwait(false);
-        wrappers.AddRange(stragglers);
+            // A new load cycle clears the shutting-down guard so registrations are accepted
+            // again after a previous SignalStopAsync.
+            lock (_extensionsLock)
+            {
+                _shuttingDown = false;
+            }
 
-        sw.Stop();
-        Logger.LogInfo($"JsonRpcExtensionService: Loaded {wrappers.Count} extension(s) in {sw.ElapsedMilliseconds} ms");
+            var sw = Stopwatch.StartNew();
 
-        return wrappers;
+            if (!EnsureExtensionsDirectory())
+            {
+                return [];
+            }
+
+            // Start the watcher before scanning so a package installed while the scan runs
+            // is still observed (the per-directory gate and the already-loaded check make a
+            // watcher-driven load and a scan-driven load for the same directory idempotent).
+            StartDirectoryWatcher();
+
+            var accepted = DiscoverAcceptedManifests(ExtensionsPath);
+            var wrappers = (await ExtensionTaskCoordinator.RunConcurrentlyAsync<(string Directory, JSExtensionManifest Manifest), CommandProviderWrapper>(
+                accepted,
+                item => AddExtensionGatedAsync(item.Directory, item.Manifest, ct),
+                (item, ex) => Logger.LogError($"Failed to load JS extension from {item.Directory}", ex),
+                MaxConcurrentExtensionStarts,
+                ct)
+                .ConfigureAwait(false)).ToList();
+
+            // Reconcile once more to pick up anything installed during the scan/watch gap.
+            var stragglers = await AddDiscoveredNotLoadedAsync(ct).ConfigureAwait(false);
+            wrappers.AddRange(stragglers);
+            wrappers.RemoveAll(wrapper => !IsProviderWrapperRegistered(wrapper));
+
+            sw.Stop();
+            Logger.LogInfo($"JsonRpcExtensionService: Loaded {wrappers.Count} extension(s) in {sw.ElapsedMilliseconds} ms");
+
+            return wrappers;
+        }
+        finally
+        {
+            _loadStopLock.Release();
+        }
     }
 
     public async Task SignalStopAsync()
     {
         await Task.Yield();
 
-        // Request cancellation first so any in-flight, delayed watcher handlers bail out
-        // before they start an extension after we have already begun shutting down.
-        _reload.Stop();
-
-        // Close crash recovery in the same breath: cancel what is running and refuse new
-        // recovery, so the process exits we are about to cause below cannot queue restart
-        // work behind the shutdown.
-        _recovery.CancelAll();
-
-        StopDirectoryWatcher();
-        StopAllSourceFileWatchers();
-
-        List<JSExtensionWrapper> toStop;
-        lock (_extensionsLock)
+        await _loadStopLock.WaitAsync().ConfigureAwait(false);
+        try
         {
-            _shuttingDown = true;
-            toStop = [.. _extensions];
-            _extensions.Clear();
-            _providerWrappers.Clear();
-            _crashCounts.Clear();
-            _providerIds.Clear();
+            // Request cancellation first so any in-flight, delayed watcher handlers bail out
+            // before they start an extension after we have already begun shutting down.
+            _reload.Stop();
+
+            // Close crash recovery in the same breath: cancel what is running and refuse new
+            // recovery, so the process exits we are about to cause below cannot queue restart
+            // work behind the shutdown.
+            _recovery.CancelAll();
+
+            StopDirectoryWatcher();
+            StopAllSourceFileWatchers();
+
+            List<JSExtensionWrapper> toStop;
+            lock (_extensionsLock)
+            {
+                _shuttingDown = true;
+                toStop = [.. _extensions];
+                _extensions.Clear();
+                _providerWrappers.Clear();
+                _crashCounts.Clear();
+                _providerIds.Clear();
+            }
+
+            await StopExtensionsConcurrentlyAsync(toStop, "stop").ConfigureAwait(false);
+
+            // Everything was canceled above, so this only waits for already-running recovery to
+            // unwind. It cannot deadlock on the directory gate: no gate is held here, and the
+            // recovery tasks' tokens are already canceled.
+            await _recovery.DrainAllAsync().ConfigureAwait(false);
         }
-
-        await StopExtensionsConcurrentlyAsync(toStop, "stop").ConfigureAwait(false);
-
-        // Everything was canceled above, so this only waits for already-running recovery to
-        // unwind. It cannot deadlock on the directory gate: no gate is held here, and the
-        // recovery tasks' tokens are already canceled.
-        await _recovery.DrainAllAsync().ConfigureAwait(false);
+        finally
+        {
+            _loadStopLock.Release();
+        }
     }
 
     public Task<IEnumerable<IExtensionWrapper>> GetInstalledExtensionsAsync(bool includeDisabledExtensions = false)
@@ -420,6 +446,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         _notifications.Dispose();
         _directoryGate.Dispose();
         _reload.Dispose();
+        _loadStopLock.Dispose();
     }
 
     /// <summary>
@@ -628,8 +655,8 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
 
     /// <summary>
     /// Returns true only when a watcher change under <paramref name="root"/> is a top-level
-    /// extension change: the extension directory itself (<c>&lt;root&gt;/&lt;extdir&gt;</c>) or its
-    /// own manifest (<c>&lt;root&gt;/&lt;extdir&gt;/package.json</c>). Anything deeper (a nested
+    /// extension change: the extension directory itself (<c>&lt;root&gt;/&lt;extension&gt;</c>) or its
+    /// own manifest (<c>&lt;root&gt;/&lt;extension&gt;/package.json</c>). Anything deeper (a nested
     /// package.json or a nested directory, for example under <c>node_modules</c> or a nested
     /// package) returns false so the recursive root watcher does not treat it as an extension
     /// upsert. Extracted as a pure helper so the depth filter can be tested without a live
@@ -663,10 +690,10 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
 
             return segments.Length switch
             {
-                // <root>/<extdir> (the extension directory created, renamed, or removed).
+                // <root>/<extension> (the extension directory created, renamed, or removed).
                 1 => true,
 
-                // <root>/<extdir>/package.json (the extension's own manifest).
+                // <root>/<extension>/package.json (the extension's own manifest).
                 2 => string.Equals(segments[1], "package.json", StringComparison.OrdinalIgnoreCase),
 
                 // Anything deeper is a nested file or directory and is not an extension entry.
@@ -714,7 +741,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
     /// Resolves the directory the per-extension source watcher should observe for
     /// <paramref name="directory"/>'s manifest. The manifest's declared
     /// <see cref="JSExtensionManifest.WatchDirectory"/> (cmdpal.watchPath) wins when
-    /// present. Otherwise the directory containing the resolved entry point is used, so an
+    /// present. Otherwise, the directory containing the resolved entry point is used, so an
     /// extension that keeps its runtime output in a subfolder (for example a bundler's
     /// <c>dist/</c>) is not watched more broadly than that just because the host guessed at
     /// the whole package. Falls back to the extension directory itself only if neither can
@@ -1020,7 +1047,18 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         catch (Exception ex)
         {
             Logger.LogError($"Failed to load JS extension from {directory}: {ex.Message}");
-            extensionWrapper?.SignalDispose();
+            if (extensionWrapper is not null)
+            {
+                if (!IsStopping(ct) && !extensionWrapper.IsRunning())
+                {
+                    OnExtensionProcessExited(extensionWrapper, EventArgs.Empty);
+                }
+                else
+                {
+                    extensionWrapper.SignalDispose();
+                }
+            }
+
             return null;
         }
     }
@@ -1074,7 +1112,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
                 _providerWrappers.Add(wrapper);
                 if (resetCrashCount)
                 {
-                    _crashCounts.Remove(CanonicalKey(directory));
+                    ResetCrashCountAfterSourceEditCore(_crashCounts, CanonicalKey(directory));
                 }
             }
         }
@@ -1186,10 +1224,13 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
             int crashCount;
             lock (_extensionsLock)
             {
-                // The wrapper may already be gone (uninstall, hot-reload, or shutdown won the race).
-                if (!_extensions.Remove(wrapper))
+                var wasRegistered = _extensions.Remove(wrapper);
+                if (!wasRegistered)
                 {
-                    return;
+                    if (_shuttingDown || _extensions.Any(e => PathsEqual(e.ManifestDirectory, directory)))
+                    {
+                        return;
+                    }
                 }
 
                 removed = _providerWrappers.FirstOrDefault(w => ReferenceEquals(w.Extension, wrapper));
@@ -1203,9 +1244,12 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
                 crashCount++;
                 _crashCounts[key] = crashCount;
 
-                // Free the provider id as part of the same atomic removal so a different
-                // extension can claim it, and so the restart below can re-reserve it.
-                _providerIds.Release(wrapper.NameKey, key);
+                if (wasRegistered)
+                {
+                    // Free the provider id as part of the same atomic removal so a different
+                    // extension can claim it, and so the restart below can re-reserve it.
+                    _providerIds.Release(wrapper.NameKey, key);
+                }
             }
 
             wrapper.ProcessExited -= OnExtensionProcessExited;
@@ -1256,6 +1300,36 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
     /// <returns><see cref="CrashAction.Restart"/> while at or below the limit; otherwise <see cref="CrashAction.Disable"/>.</returns>
     internal static CrashAction DecideCrashAction(int crashCount, int maxRestartAttempts) =>
         crashCount > maxRestartAttempts ? CrashAction.Disable : CrashAction.Restart;
+
+    internal void SetCrashCountForTest(string directory, int crashCount)
+    {
+        lock (_extensionsLock)
+        {
+            _crashCounts[CanonicalKey(directory)] = crashCount;
+        }
+    }
+
+    internal int GetCrashCountForTest(string directory)
+    {
+        lock (_extensionsLock)
+        {
+            _crashCounts.TryGetValue(CanonicalKey(directory), out var crashCount);
+            return crashCount;
+        }
+    }
+
+    internal void ResetCrashCountAfterSourceEdit(string directory)
+    {
+        lock (_extensionsLock)
+        {
+            ResetCrashCountAfterSourceEditCore(_crashCounts, CanonicalKey(directory));
+        }
+    }
+
+    private static void ResetCrashCountAfterSourceEditCore(IDictionary<string, int> crashCounts, string key)
+    {
+        crashCounts.Remove(key);
+    }
 
     /// <summary>
     /// Returns true when the salient fields of <paramref name="current"/> differ from
@@ -1354,7 +1428,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         }
 
         // The root watcher is recursive, so it also reports nested files and directories.
-        // Only a top-level <root>/<extdir> directory or its own <root>/<extdir>/package.json
+        // Only a top-level <root>/<extension> directory or its own <root>/<extension>/package.json
         // is an extension change; a nested package.json or directory (a nested package or
         // dependency) must not be treated as an extension upsert.
         if (!IsTopLevelExtensionChange(ExtensionsPath, e.FullPath))
@@ -1377,17 +1451,28 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         // a possible removal, ignoring either side that sits under an ignored segment.
         // The new name must also be a top-level extension entry (directory or its own
         // manifest); a nested rename is not an extension change.
-        if (!HasIgnoredDirectorySegment(e.FullPath)
+        var shouldUpsert = !HasIgnoredDirectorySegment(e.FullPath)
             && IsTopLevelExtensionChange(ExtensionsPath, e.FullPath)
-            && (IsManifestPath(e.FullPath) || Directory.Exists(e.FullPath)))
+            && (IsManifestPath(e.FullPath) || Directory.Exists(e.FullPath));
+        var shouldRemove = ShouldRouteDirectoryRemoval(ExtensionsPath, e.OldFullPath);
+        if (!shouldUpsert && !shouldRemove)
         {
-            HandleDirectoryEntryUpsert(e.FullPath);
+            return;
         }
 
-        if (ShouldRouteDirectoryRemoval(ExtensionsPath, e.OldFullPath))
+        var token = _reload.Token;
+        _notifications.Enqueue(async () =>
         {
-            HandleDirectoryEntryRemoved(e.OldFullPath);
-        }
+            if (shouldRemove)
+            {
+                await HandleDirectoryEntryRemovedOrderedAsync(e.OldFullPath, token).ConfigureAwait(false);
+            }
+
+            if (shouldUpsert)
+            {
+                await HandleDirectoryEntryUpsertOrderedAsync(e.FullPath, token).ConfigureAwait(false);
+            }
+        });
     }
 
     private void OnDirectoryWatcherDeleted(object sender, FileSystemEventArgs e)
@@ -1419,8 +1504,9 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         if (error is InternalBufferOverflowException && !_disposed)
         {
             StartObservedBackgroundTask(
-                async () =>
+                async token =>
                 {
+                    token.ThrowIfCancellationRequested();
                     await RefreshInstalledExtensionsAsync().ConfigureAwait(false);
                 },
                 "reconcile after directory watcher overflow",
@@ -1430,20 +1516,23 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
 
     private void HandleDirectoryEntryUpsert(string changedPath)
     {
-        var extensionDirectory = GetExtensionDirectoryForPath(ExtensionsPath, changedPath);
-        if (extensionDirectory is null)
-        {
-            return;
-        }
-
         var token = _reload.Token;
         StartObservedBackgroundTask(
-            () => HandleDirectoryEntryUpsertAsync(extensionDirectory, token),
-            $"install JS extension at {extensionDirectory}",
+            cancellationToken => HandleDirectoryEntryUpsertOrderedAsync(changedPath, cancellationToken),
+            $"install JS extension at {changedPath}",
             token);
     }
 
     private void HandleDirectoryEntryRemoved(string changedPath)
+    {
+        var token = _reload.Token;
+        StartObservedBackgroundTask(
+            cancellationToken => HandleDirectoryEntryRemovedOrderedAsync(changedPath, cancellationToken),
+            $"uninstall JS extension at {changedPath}",
+            token);
+    }
+
+    private async Task HandleDirectoryEntryUpsertOrderedAsync(string changedPath, CancellationToken token)
     {
         var extensionDirectory = GetExtensionDirectoryForPath(ExtensionsPath, changedPath);
         if (extensionDirectory is null)
@@ -1451,11 +1540,21 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
             return;
         }
 
-        var token = _reload.Token;
-        StartObservedBackgroundTask(
-            () => HandleDirectoryEntryRemovedAsync(extensionDirectory),
-            $"uninstall JS extension at {extensionDirectory}",
-            token);
+        await HandleDirectoryEntryUpsertAsync(extensionDirectory, token).ConfigureAwait(false);
+    }
+
+    private async Task HandleDirectoryEntryRemovedOrderedAsync(string changedPath, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+
+        var extensionDirectory = GetExtensionDirectoryForPath(ExtensionsPath, changedPath);
+        if (extensionDirectory is null)
+        {
+            return;
+        }
+
+        token.ThrowIfCancellationRequested();
+        await HandleDirectoryEntryRemovedAsync(extensionDirectory).ConfigureAwait(false);
     }
 
     private async Task HandleDirectoryEntryUpsertAsync(string extensionDirectory, CancellationToken token)
@@ -1509,7 +1608,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         }
     }
 
-    private void StartObservedBackgroundTask(Func<Task> operation, string description, CancellationToken cancellationToken)
+    private void StartObservedBackgroundTask(Func<CancellationToken, Task> operation, string description, CancellationToken cancellationToken)
     {
         _ = ExtensionTaskCoordinator.RunInBackgroundAsync(
             operation,
@@ -1533,6 +1632,14 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
                 ex),
             () => Logger.LogWarning(
                 $"Timed out waiting for {extensions.Count} JS extension(s) to {operation} after {ExtensionTeardownTimeout.TotalSeconds} seconds."));
+    }
+
+    private bool IsProviderWrapperRegistered(CommandProviderWrapper wrapper)
+    {
+        lock (_extensionsLock)
+        {
+            return _providerWrappers.Contains(wrapper);
+        }
     }
 
     private async Task<JSExtensionManifest?> WaitForStableManifestInstanceAsync(string directory, CancellationToken ct)
@@ -1582,7 +1689,13 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         IDisposable? gate = null;
         try
         {
-            gate = await _directoryGate.AcquireAsync(directory, CancellationToken.None).ConfigureAwait(false);
+            using var gateWait = new CancellationTokenSource(ExtensionTeardownTimeout);
+            gate = await _directoryGate.AcquireAsync(directory, gateWait.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.LogWarning(
+                $"Timed out waiting for lifecycle work on JS extension directory {directory}; continuing removal best-effort.");
         }
         catch (ObjectDisposedException)
         {
@@ -1649,7 +1762,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
     /// (per <see cref="ResolveWatchRoot"/>) it is currently rooted at. Tracking the watch
     /// root alongside the watcher instance is what lets <see cref="EnsureSourceFileWatcher"/>
     /// tell an already-correct watcher (no-op) apart from a stale one whose manifest-declared
-    /// root has since moved (repair path), without re-deriving and diffing paths from the
+    /// root has since moved (repair path), without re-deriving and comparing paths from the
     /// manifest on every ensure call.
     /// </summary>
     private sealed record ExtensionSourceWatcher(FileSystemWatcher Watcher, string WatchRoot);
@@ -1682,7 +1795,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
     private void EnsureSourceFileWatcher(string directory, JSExtensionManifest manifest)
     {
         // The watch root is manifest-driven (see ResolveWatchRoot): an explicit
-        // cmdpal.watchPath wins, otherwise the entry point's own directory is used instead
+        // cmdpal.watchPath wins; otherwise, the entry point's own directory is used instead
         // of the whole extension directory, so the host does not have to guess which
         // unrelated subfolders (VCS metadata, docs, and so on) to stay out of.
         var watchRoot = ResolveWatchRoot(directory, manifest);
@@ -1987,7 +2100,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
                     {
                         _extensions.Add(newExtension);
                         _providerWrappers.Add(newWrapper);
-                        _crashCounts.Remove(key);
+                        ResetCrashCountAfterSourceEditCore(_crashCounts, key);
                         swapped = true;
                     }
                     else if (incumbentExtension is not null)

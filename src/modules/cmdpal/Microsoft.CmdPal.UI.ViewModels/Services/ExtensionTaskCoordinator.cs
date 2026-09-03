@@ -124,13 +124,13 @@ internal static class ExtensionTaskCoordinator
     }
 
     internal static Task RunInBackgroundAsync(
-        Func<Task> operation,
+        Func<CancellationToken, Task> operation,
         string description,
         Action<string, Exception> onError,
         CancellationToken cancellationToken)
     {
         return ObserveAsync(
-            Task.Run(operation, cancellationToken),
+            Task.Run(() => operation(cancellationToken), cancellationToken),
             description,
             onError,
             cancellationToken);

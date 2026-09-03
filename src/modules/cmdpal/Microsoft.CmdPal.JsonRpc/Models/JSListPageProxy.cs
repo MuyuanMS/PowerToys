@@ -39,6 +39,10 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
     private readonly object _getItemsLock = new();
     private readonly object _itemCacheLock = new();
     private Task<IListItem[]>? _getItemsTask;
+    private int _getItemsTaskGeneration;
+    private int _itemsChangedGeneration;
+    private int _lastCompletedItemsGeneration;
+    private IListItem[]? _lastCompletedItems;
     private bool? _hasMoreItemsState;
     private bool _disposed;
 
@@ -110,32 +114,83 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
 
     public IListItem[] GetItems()
     {
-        Task<IListItem[]> getItemsTask;
-        lock (_getItemsLock)
+        if (IsDisposed())
         {
-            getItemsTask = _getItemsTask ??= GetItemsCoreAsync();
+            return [];
         }
 
-        try
+        while (true)
         {
-            return getItemsTask.GetAwaiter().GetResult();
-        }
-        finally
-        {
+            Task<IListItem[]> getItemsTask;
+            int generation;
+            lock (_getItemsLock)
+            {
+                if (IsDisposed())
+                {
+                    return [];
+                }
+
+                if (_getItemsTask is null)
+                {
+                    _getItemsTaskGeneration = _itemsChangedGeneration;
+                    _getItemsTask = GetItemsCoreAsync(_getItemsTaskGeneration);
+                }
+
+                generation = _getItemsTaskGeneration;
+                getItemsTask = _getItemsTask;
+            }
+
+            var items = getItemsTask.GetAwaiter().GetResult();
+
             if (getItemsTask.IsCompleted)
             {
                 lock (_getItemsLock)
                 {
-                    if (ReferenceEquals(_getItemsTask, getItemsTask))
+                    if (IsDisposed())
                     {
                         _getItemsTask = null;
+                        _lastCompletedItems = null;
+                        _lastCompletedItemsGeneration = 0;
+                        return [];
+                    }
+
+                    if (ReferenceEquals(_getItemsTask, getItemsTask))
+                    {
+                        if (!IsDisposed() && _itemsChangedGeneration != generation)
+                        {
+                            _getItemsTaskGeneration = _itemsChangedGeneration;
+                            _getItemsTask = GetItemsCoreAsync(_getItemsTaskGeneration);
+                            continue;
+                        }
+
+                        _lastCompletedItemsGeneration = generation;
+                        _lastCompletedItems = items;
+                        _getItemsTask = null;
+                        return items;
+                    }
+
+                    if (_lastCompletedItemsGeneration > generation && _lastCompletedItems is not null)
+                    {
+                        return _lastCompletedItems;
+                    }
+
+                    if (_getItemsTask is null && _itemsChangedGeneration == generation)
+                    {
+                        _lastCompletedItemsGeneration = generation;
+                        _lastCompletedItems = items;
+                        return items;
+                    }
+
+                    if (_getItemsTaskGeneration == generation && _itemsChangedGeneration == generation)
+                    {
+                        return items;
                     }
                 }
             }
         }
     }
 
-    private async Task<IListItem[]> GetItemsCoreAsync()
+    private async Task<IListItem[]> GetItemsCoreAsync(int generation)
     {
         try
         {
@@ -150,8 +205,21 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
                 return [];
             }
 
-            UpdatePageState(response.Result);
-            return ParseListItems(response.Result);
+            if (IsDisposed())
+            {
+                return [];
+            }
+
+            lock (_getItemsLock)
+            {
+                if (IsDisposed() || _itemsChangedGeneration != generation)
+                {
+                    return [];
+                }
+
+                UpdatePageState(response.Result);
+                return ParseListItems(response.Result);
+            }
         }
         catch (Exception ex)
         {
@@ -314,14 +382,32 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
         ItemsChanged?.Invoke(this, new ItemsChangedEventArgs(totalItems));
     }
 
+    private void MarkItemsChanged()
+    {
+        lock (_getItemsLock)
+        {
+            _itemsChangedGeneration++;
+        }
+    }
+
     public override void Dispose()
     {
-        if (_disposed)
+        lock (_stateLock)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
         }
 
-        _disposed = true;
+        lock (_getItemsLock)
+        {
+            _getItemsTask = null;
+            _lastCompletedItems = null;
+            _lastCompletedItemsGeneration = 0;
+        }
 
         _filters.Dispose();
         _emptyContent.Dispose();
@@ -356,6 +442,7 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
 
             foreach (var proxy in registry.Pages.GetLiveTargets(pageId))
             {
+                proxy.MarkItemsChanged();
                 proxy.UpdatePageState(paramsElement);
 
                 var args = new ItemsChangedEventArgs(totalItems);
@@ -422,6 +509,11 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
 
     private IListItem[] ParseListItems(JsonElement? result)
     {
+        if (IsDisposed())
+        {
+            return [];
+        }
+
         if (!result.HasValue)
         {
             ResetAdapterCache();
@@ -445,6 +537,11 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
 
         lock (_itemCacheLock)
         {
+            if (IsDisposed())
+            {
+                return [];
+            }
+
             var previousCache = _adapterCache;
             var nextCache = new Dictionary<string, Queue<JSListItemAdapter>>(StringComparer.Ordinal);
 
@@ -493,6 +590,14 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
             // GetItems hands these adapters to the host, so the cache only owns its
             // references. Host-held adapters remain live until their owners release them.
             _adapterCache = new Dictionary<string, Queue<JSListItemAdapter>>(StringComparer.Ordinal);
+        }
+    }
+
+    private bool IsDisposed()
+    {
+        lock (_stateLock)
+        {
+            return _disposed;
         }
     }
 

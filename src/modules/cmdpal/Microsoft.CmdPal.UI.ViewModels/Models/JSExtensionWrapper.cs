@@ -635,6 +635,10 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
                     // Ask the extension to clean up, giving it a short grace period.
                     connection.SendNotificationAsync("dispose", null, CancellationToken.None)
                         .Wait(TimeSpan.FromSeconds(2));
+
+                    // Keep the transport alive while the extension processes the notification
+                    // and exits, so asynchronous cleanup is not cut off by an immediate kill.
+                    process!.WaitForExit(2000);
                 }
             }
             catch (Exception ex) when (ex is AggregateException or InvalidOperationException or JsonRpcException)
@@ -745,7 +749,7 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
     /// claims and guards stdout before it dynamically imports the extension entry, so a
     /// static top-level stdout write cannot corrupt the JSON-RPC framing. Resolution is
     /// relative to the extension's installed SDK
-    /// (<c>&lt;manifestDirectory&gt;/node_modules/@microsoft/cmdpal-sdk</c>), preferring the
+    /// (<c>&lt;manifestDirectory&gt;/node_modules/.../cmdpal-sdk</c>), preferring the
     /// package's declared <c>bin</c> entry and falling back to the known published
     /// artifacts. Returns <see langword="null"/> when the SDK or its bootstrap is not present.
     /// </summary>
@@ -812,17 +816,6 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
                 {
                     relative = named.GetString();
                 }
-                else
-                {
-                    foreach (var property in bin.EnumerateObject())
-                    {
-                        if (property.Value.ValueKind == JsonValueKind.String)
-                        {
-                            relative = property.Value.GetString();
-                            break;
-                        }
-                    }
-                }
             }
 
             if (string.IsNullOrEmpty(relative))
@@ -830,11 +823,25 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
                 return null;
             }
 
-            return Path.GetFullPath(Path.Combine(sdkRoot, relative));
+            var candidate = Path.GetFullPath(Path.Combine(sdkRoot, relative));
+            if (!IsPathUnderRoot(candidate, sdkRoot))
+            {
+                return null;
+            }
+
+            return candidate;
         }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is ArgumentException or IOException or JsonException or NotSupportedException or PathTooLongException or UnauthorizedAccessException)
         {
             return null;
         }
+    }
+
+    private static bool IsPathUnderRoot(string path, string root)
+    {
+        var normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var normalizedPath = Path.GetFullPath(path);
+
+        return normalizedPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase);
     }
 }

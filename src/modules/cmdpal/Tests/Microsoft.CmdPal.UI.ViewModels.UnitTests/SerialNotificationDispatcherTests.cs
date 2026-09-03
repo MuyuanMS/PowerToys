@@ -21,6 +21,9 @@ namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
 [TestClass]
 public class SerialNotificationDispatcherTests
 {
+    private static readonly string[] ExpectedAsyncOrderBeforeRelease = ["first-start"];
+    private static readonly string[] ExpectedAsyncOrderAfterRelease = ["first-start", "first-end", "second"];
+
     [TestMethod]
     public void Enqueue_RunsNotificationsInFifoOrder()
     {
@@ -56,35 +59,38 @@ public class SerialNotificationDispatcherTests
     public void Enqueue_FromConcurrentThreads_PreservesPerCallerOrder()
     {
         using var dispatcher = new SerialNotificationDispatcher();
-        var removeBeforeAdd = true;
-        var addSeen = false;
+        var orderViolations = 0;
+        var callers = new Task[100];
         var done = new CountdownEvent(200);
+        using var start = new ManualResetEventSlim();
 
         for (var i = 0; i < 100; i++)
         {
-            // Each iteration enqueues a "remove" then an "add" from the same caller. The
-            // add handler must never run before its paired remove handler.
-            var removed = false;
-            dispatcher.Enqueue(() =>
+            callers[i] = Task.Run(() =>
             {
-                removed = true;
-                done.Signal();
-            });
-            dispatcher.Enqueue(() =>
-            {
-                if (!removed)
+                start.Wait();
+                var removed = false;
+                dispatcher.Enqueue(() =>
                 {
-                    removeBeforeAdd = false;
-                }
+                    removed = true;
+                    done.Signal();
+                });
+                dispatcher.Enqueue(() =>
+                {
+                    if (!removed)
+                    {
+                        Interlocked.Increment(ref orderViolations);
+                    }
 
-                addSeen = true;
-                done.Signal();
+                    done.Signal();
+                });
             });
         }
 
+        start.Set();
+        Task.WaitAll(callers);
         Assert.IsTrue(done.Wait(TimeSpan.FromSeconds(5)), "All notifications should have run.");
-        Assert.IsTrue(addSeen);
-        Assert.IsTrue(removeBeforeAdd, "An addition must never overtake the removal enqueued before it.");
+        Assert.AreEqual(0, Volatile.Read(ref orderViolations), "An addition must never overtake the removal enqueued before it.");
     }
 
     [TestMethod]
@@ -114,6 +120,64 @@ public class SerialNotificationDispatcherTests
         dispatcher.Dispose();
 
         Assert.AreEqual(50, Volatile.Read(ref count), "Dispose must let already-queued notifications drain.");
+    }
+
+    [TestMethod]
+    public void Dispose_WaitsUntilAlreadyEnqueuedNotificationCompletes()
+    {
+        var dispatcher = new SerialNotificationDispatcher();
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var count = 0;
+
+        dispatcher.Enqueue(() =>
+        {
+            entered.Set();
+            release.Wait();
+            Interlocked.Increment(ref count);
+        });
+        dispatcher.Enqueue(() => Interlocked.Increment(ref count));
+
+        Assert.IsTrue(entered.Wait(TimeSpan.FromSeconds(5)), "The first notification should start.");
+
+        var dispose = Task.Run(dispatcher.Dispose);
+        Thread.Sleep(100);
+        Assert.IsFalse(dispose.IsCompleted, "Dispose must wait for the queue to drain rather than timing out.");
+
+        release.Set();
+        Assert.IsTrue(dispose.Wait(TimeSpan.FromSeconds(5)));
+        Assert.AreEqual(2, Volatile.Read(ref count));
+    }
+
+    [TestMethod]
+    public void Enqueue_AwaitsAsyncNotificationBeforeNextNotification()
+    {
+        using var dispatcher = new SerialNotificationDispatcher();
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var order = new ConcurrentQueue<string>();
+        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondRan = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        dispatcher.Enqueue(async () =>
+        {
+            order.Enqueue("first-start");
+            firstStarted.SetResult();
+            await release.Task.ConfigureAwait(false);
+            order.Enqueue("first-end");
+        });
+        dispatcher.Enqueue(() =>
+        {
+            order.Enqueue("second");
+            secondRan.SetResult();
+        });
+
+        Assert.IsTrue(firstStarted.Task.Wait(TimeSpan.FromSeconds(5)), "The first async notification should start.");
+        CollectionAssert.AreEqual(ExpectedAsyncOrderBeforeRelease, order.ToArray());
+
+        release.SetResult();
+
+        Assert.IsTrue(secondRan.Task.Wait(TimeSpan.FromSeconds(5)), "The next notification should run after the async work completes.");
+        CollectionAssert.AreEqual(ExpectedAsyncOrderAfterRelease, order.ToArray());
     }
 
     [TestMethod]
