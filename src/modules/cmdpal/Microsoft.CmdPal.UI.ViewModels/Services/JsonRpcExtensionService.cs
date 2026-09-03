@@ -1047,7 +1047,18 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         catch (Exception ex)
         {
             Logger.LogError($"Failed to load JS extension from {directory}: {ex.Message}");
-            extensionWrapper?.SignalDispose();
+            if (extensionWrapper is not null)
+            {
+                if (!IsStopping(ct) && !extensionWrapper.IsRunning())
+                {
+                    OnExtensionProcessExited(extensionWrapper, EventArgs.Empty);
+                }
+                else
+                {
+                    extensionWrapper.SignalDispose();
+                }
+            }
+
             return null;
         }
     }
@@ -1213,10 +1224,13 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
             int crashCount;
             lock (_extensionsLock)
             {
-                // The wrapper may already be gone (uninstall, hot-reload, or shutdown won the race).
-                if (!_extensions.Remove(wrapper))
+                var wasRegistered = _extensions.Remove(wrapper);
+                if (!wasRegistered)
                 {
-                    return;
+                    if (_shuttingDown || _extensions.Any(e => PathsEqual(e.ManifestDirectory, directory)))
+                    {
+                        return;
+                    }
                 }
 
                 removed = _providerWrappers.FirstOrDefault(w => ReferenceEquals(w.Extension, wrapper));
@@ -1230,9 +1244,12 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
                 crashCount++;
                 _crashCounts[key] = crashCount;
 
-                // Free the provider id as part of the same atomic removal so a different
-                // extension can claim it, and so the restart below can re-reserve it.
-                _providerIds.Release(wrapper.NameKey, key);
+                if (wasRegistered)
+                {
+                    // Free the provider id as part of the same atomic removal so a different
+                    // extension can claim it, and so the restart below can re-reserve it.
+                    _providerIds.Release(wrapper.NameKey, key);
+                }
             }
 
             wrapper.ProcessExited -= OnExtensionProcessExited;

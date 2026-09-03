@@ -397,6 +397,8 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
         lock (_getItemsLock)
         {
             _getItemsTask = null;
+            _lastCompletedItems = null;
+            _lastCompletedItemsGeneration = 0;
         }
 
         _filters.Dispose();
