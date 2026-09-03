@@ -12,6 +12,15 @@
 #include <FancyZonesLib/VirtualDesktop.h>
 #include <FancyZonesLib/util.h>
 
+#include <wrl/client.h>
+#include <propsys.h>
+#include <propkey.h>
+
+#pragma comment(lib, "Shell32.lib")
+#pragma comment(lib, "Propsys.lib")
+
+using namespace Microsoft::WRL;
+
 namespace JsonUtils
 {
     struct AppZoneHistoryJSON
@@ -125,9 +134,12 @@ namespace JsonUtils
                 AppZoneHistoryJSON result;
 
                 result.appPath = json.GetNamedString(NonLocalizable::AppZoneHistoryIds::AppPathID);
+                // An explicit empty history is a persisted tombstone for an AUMID-qualified identity.
+                bool hasExplicitEmptyHistory = false;
                 if (json.HasKey(NonLocalizable::AppZoneHistoryIds::HistoryID))
                 {
                     auto appHistoryArray = json.GetNamedArray(NonLocalizable::AppZoneHistoryIds::HistoryID);
+                    hasExplicitEmptyHistory = appHistoryArray.Size() == 0 && result.appPath.find(L'?') != std::wstring::npos;
                     for (uint32_t i = 0; i < appHistoryArray.Size(); ++i)
                     {
                         json::JsonObject json_hist = appHistoryArray.GetObjectAt(i);
@@ -145,7 +157,7 @@ namespace JsonUtils
                         result.data.push_back(std::move(data.value()));
                     }
                 }
-                if (result.data.empty())
+                if (result.data.empty() && !hasExplicitEmptyHistory)
                 {
                     return std::nullopt;
                 }
@@ -314,15 +326,60 @@ void AppZoneHistory::AdjustWorkAreaIds(const std::vector<FancyZonesDataTypes::Mo
     }
 }
 
+std::wstring AppZoneHistory::GetProcessPathWithAUMID(HWND window)
+{
+    auto processPath = get_process_path_waiting_uwp(window);
+    if (processPath.empty())
+    {
+        return {};
+    }
+
+    ComPtr<IPropertyStore> propStore;
+    HRESULT hr = SHGetPropertyStoreForWindow(window, IID_PPV_ARGS(&propStore));
+    if (SUCCEEDED(hr))
+    {
+        wil::unique_prop_variant pv;
+        hr = propStore->GetValue(PKEY_AppUserModel_ID, &pv);
+        if (SUCCEEDED(hr) && pv.vt == VT_LPWSTR && pv.pwszVal != nullptr)
+        {
+            processPath.append(L"?").append(pv.pwszVal);
+        }
+    }
+
+    return processPath;
+}
+
+std::wstring AppZoneHistory::GetProcessPathWithoutAUMID(const std::wstring& processPath)
+{
+    const auto separator = processPath.find(L'?');
+    return separator == std::wstring::npos ? processPath : processPath.substr(0, separator);
+}
+
 bool AppZoneHistory::SetAppLastZones(HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId, const GUID& layoutId, const ZoneIndexSet& zoneIndexSet)
 {
-    if (IsAnotherWindowOfApplicationInstanceZoned(window, workAreaId))
+    auto processPath = GetProcessPathWithAUMID(window);
+    if (processPath.empty())
     {
         return false;
     }
 
-    auto processPath = get_process_path_waiting_uwp(window);
-    if (processPath.empty())
+    const auto legacyProcessPath = GetProcessPathWithoutAUMID(processPath);
+    if (legacyProcessPath != processPath && !m_history.contains(processPath))
+    {
+        auto legacyHistory = m_history.find(legacyProcessPath);
+        if (legacyHistory != m_history.end())
+        {
+            auto qualifiedHistory = legacyHistory->second;
+            for (auto& data : qualifiedHistory)
+            {
+                data.processIdToHandleMap.clear();
+            }
+
+            m_history.emplace(processPath, std::move(qualifiedHistory));
+        }
+    }
+
+    if (IsAnotherWindowOfApplicationInstanceZoned(processPath, window, workAreaId))
     {
         return false;
     }
@@ -378,7 +435,7 @@ bool AppZoneHistory::SetAppLastZones(HWND window, const FancyZonesDataTypes::Wor
 
 bool AppZoneHistory::RemoveAppLastZone(HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId, const GUID& layoutId)
 {
-    auto processPath = get_process_path_waiting_uwp(window);
+    auto processPath = GetProcessPathWithAUMID(window);
     if (processPath.empty())
     {
         return false;
@@ -387,7 +444,30 @@ bool AppZoneHistory::RemoveAppLastZone(HWND window, const FancyZonesDataTypes::W
     auto history = m_history.find(processPath);
     if (history == std::end(m_history))
     {
-        return false;
+        const auto legacyProcessPath = GetProcessPathWithoutAUMID(processPath);
+        if (legacyProcessPath != processPath)
+        {
+            auto legacyHistory = m_history.find(legacyProcessPath);
+            if (legacyHistory != m_history.end())
+            {
+                auto qualifiedHistory = legacyHistory->second;
+                for (auto& data : qualifiedHistory)
+                {
+                    data.processIdToHandleMap.clear();
+                }
+
+                history = m_history.emplace(processPath, std::move(qualifiedHistory)).first;
+            }
+        }
+        else
+        {
+            history = m_history.find(legacyProcessPath);
+        }
+
+        if (history == std::end(m_history))
+        {
+            return false;
+        }
     }
 
     auto layoutIdStrOpt = FancyZonesUtils::GuidToString(layoutId);
@@ -404,7 +484,7 @@ bool AppZoneHistory::RemoveAppLastZone(HWND window, const FancyZonesDataTypes::W
     {
         if (data->workAreaId == workAreaId && data->layoutId == layoutId)
         {
-            if (!IsAnotherWindowOfApplicationInstanceZoned(window, workAreaId))
+            if (!IsAnotherWindowOfApplicationInstanceZoned(processPath, window, workAreaId))
             {
                 DWORD processId = 0;
                 GetWindowThreadProcessId(window, &processId);
@@ -426,7 +506,11 @@ bool AppZoneHistory::RemoveAppLastZone(HWND window, const FancyZonesDataTypes::W
             data = perDesktopData.erase(data);
             if (perDesktopData.empty())
             {
-                m_history.erase(processPath);
+                const bool isQualifiedHistory = history->first == processPath && GetProcessPathWithoutAUMID(processPath) != processPath;
+                if (!isQualifiedHistory)
+                {
+                    m_history.erase(history);
+                }
             }
             SaveData();
             return true;
@@ -492,12 +576,22 @@ std::optional<FancyZonesDataTypes::AppZoneHistoryData> AppZoneHistory::GetZoneHi
     return std::nullopt;
 }
 
-bool AppZoneHistory::IsAnotherWindowOfApplicationInstanceZoned(HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId) const noexcept
+bool AppZoneHistory::IsAnotherWindowOfApplicationInstanceZoned(HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId) const
 {
-    auto processPath = get_process_path_waiting_uwp(window);
+    auto processPath = GetProcessPathWithAUMID(window);
+    return IsAnotherWindowOfApplicationInstanceZoned(processPath, window, workAreaId);
+}
+
+bool AppZoneHistory::IsAnotherWindowOfApplicationInstanceZoned(const std::wstring& processPath, HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId) const
+{
     if (!processPath.empty())
     {
         auto history = m_history.find(processPath);
+        if (history == std::end(m_history))
+        {
+            history = m_history.find(GetProcessPathWithoutAUMID(processPath));
+        }
+
         if (history != std::end(m_history))
         {
             auto& perDesktopData = history->second;
@@ -528,7 +622,7 @@ bool AppZoneHistory::IsAnotherWindowOfApplicationInstanceZoned(HWND window, cons
 
 ZoneIndexSet AppZoneHistory::GetAppLastZoneIndexSet(HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId, const GUID& layoutId) const
 {
-    auto processPath = get_process_path_waiting_uwp(window);
+    auto processPath = GetProcessPathWithAUMID(window);
     if (processPath.empty())
     {
         Logger::error("Process path is empty");
@@ -547,7 +641,11 @@ ZoneIndexSet AppZoneHistory::GetAppLastZoneIndexSet(HWND window, const FancyZone
     auto history = m_history.find(processPath);
     if (history == std::end(m_history))
     {
-        return {};
+        history = m_history.find(GetProcessPathWithoutAUMID(processPath));
+        if (history == std::end(m_history))
+        {
+            return {};
+        }
     }
 
     const auto& perDesktopData = history->second;
@@ -614,8 +712,16 @@ void AppZoneHistory::SyncVirtualDesktops(const GUID& currentVirtualDesktop, cons
 
         if (perDesktopData.empty())
         {
-            it = m_history.erase(it);
-            dirtyFlag = true;
+            const bool isQualifiedHistory = GetProcessPathWithoutAUMID(it->first) != it->first;
+            if (isQualifiedHistory)
+            {
+                ++it;
+            }
+            else
+            {
+                it = m_history.erase(it);
+                dirtyFlag = true;
+            }
         }
         else
         {
