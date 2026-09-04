@@ -1,0 +1,16 @@
+{
+  "command": {
+    "id": "tile-1",
+    "name": "Tile"
+  },
+  "icon": {
+    "dark": {
+      "icon": ""
+    },
+    "light": {
+      "icon": ""
+    }
+  },
+  "id": "tile-1",
+  "title": "Tile One"
+}
