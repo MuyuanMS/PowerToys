@@ -291,6 +291,8 @@ cooldown
 copiedcolorrepresentation
 coppied
 copyable
+COPYASUNCCONTEXTMENU
+COPYASUNCEXT
 COPYPEN
 coreclr
 COREWINDOW
@@ -825,6 +827,7 @@ inetcpl
 Infobar
 INFOEXAMPLE
 Infotip
+INFOW
 INITCOMMONCONTROLSEX
 INITDIALOG
 INITGUID
@@ -859,6 +862,7 @@ Inste
 Interlop
 intput
 INTRESOURCE
+IUnknown
 INVALIDARG
 invalidoperatioexception
 invokecommand
@@ -1988,6 +1992,7 @@ Ultrawide
 ums
 uncompilable
 UNCPRIORITY
+UNCW
 UNDNAME
 unescaped
 unforgeable
@@ -2187,6 +2192,7 @@ WNDCLASSEXW
 WNDCLASSW
 wndproc
 wnode
+WNet
 wom
 WORKSPACESEDITOR
 WORKSPACESLAUNCHER
