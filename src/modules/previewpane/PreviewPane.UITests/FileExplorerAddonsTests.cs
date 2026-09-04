@@ -25,12 +25,16 @@ public class FileExplorerAddonsTests : UITestBase
     private const string MarkdownPreviewHandler = "{60789D87-9C3C-44AF-B18C-3DE2C2820ED3}";
     private const string SvgPreviewHandler = "{FCDD4EED-41AA-492F-8A84-31A1546226E0}";
     private const string PdfPreviewHandler = "{A5A41CC7-02CB-41D4-8C9B-9087040D6098}";
+    private const string BgcodePreviewHandler = "{0E6D5BDD-D5F8-4692-A089-8BB88CDD37F4}";
     private const string GcodePreviewHandler = "{A0257634-8812-4CE8-AF11-FA69ACAEAFAE}";
+    private const string QoiPreviewHandler = "{729B72CD-B72E-4FE9-BCBF-E954B33FE699}";
     private const string MonacoPreviewHandler = "{D8034CFA-F34B-41FE-AD45-62FCBB52A6DA}";
 
     private const string SvgThumbnailProvider = "{10144713-1526-46C9-88DA-1FB52807A9FF}";
     private const string PdfThumbnailProvider = "{D8BB9942-93BD-412D-87E4-33FAB214DC1A}";
+    private const string BgcodeThumbnailProvider = "{5C93A1E4-99D0-4FB3-991C-6C296A27BE21}";
     private const string GcodeThumbnailProvider = "{F2847CBE-CD03-4C83-A359-1A8052C1B9D5}";
+    private const string QoiThumbnailProvider = "{AD856B15-D25E-4008-AFB7-AFAA55586188}";
     private const string StlThumbnailProvider = "{77257004-6F25-4521-B602-50ECC6EC62A6}";
 
     private const int ExplorerTimeoutMS = 30_000;
@@ -50,7 +54,9 @@ public class FileExplorerAddonsTests : UITestBase
     {
         (".svg", SvgThumbnailProvider),
         (".pdf", PdfThumbnailProvider),
+        (".bgcode", BgcodeThumbnailProvider),
         (".gcode", GcodeThumbnailProvider),
+        (".qoi", QoiThumbnailProvider),
         (".stl", StlThumbnailProvider),
     };
 
@@ -91,11 +97,15 @@ public class FileExplorerAddonsTests : UITestBase
                         "md-previewer-toggle-setting",
                         "svg-previewer-toggle-setting",
                         "pdf-previewer-toggle-setting",
+                        "bgcode-previewer-toggle-setting",
                         "gcode-previewer-toggle-setting",
+                        "qoi-previewer-toggle-setting",
                         "monaco-previewer-toggle-setting",
                         "svg-thumbnail-toggle-setting",
                         "pdf-thumbnail-toggle-setting",
+                        "bgcode-thumbnail-toggle-setting",
                         "gcode-thumbnail-toggle-setting",
+                        "qoi-thumbnail-toggle-setting",
                         "stl-thumbnail-toggle-setting",
                     })
                     {
@@ -196,10 +206,24 @@ public class FileExplorerAddonsTests : UITestBase
         TestPreview(".pdf", PdfPreviewHandler, "sample.pdf", "pdf", "PdfPreviewHandler", "PdfPrevHandler");
     }
 
+    [TestMethod("FileExplorerAddons.Preview.Bgcode")]
+    [TestCategory("File Explorer Add-ons")]
+    [TestCategory("Preview Pane")]
+    public void BgcodePreviewShowsToolPathContent()
+    {
+        TestPreview(
+            ".bgcode",
+            BgcodePreviewHandler,
+            "sample.bgcode",
+            "bgcode",
+            "BgcodePreviewHandler",
+            "BgcodePreviewHandler");
+    }
+
     [TestMethod("FileExplorerAddons.Preview.Gcode")]
     [TestCategory("File Explorer Add-ons")]
     [TestCategory("Preview Pane")]
-    public void GcodePreviewShowsToolpathContent()
+    public void GcodePreviewShowsToolPathContent()
     {
         TestPreview(
             ".gcode",
@@ -208,6 +232,14 @@ public class FileExplorerAddonsTests : UITestBase
             "gcode",
             "GcodePreviewHandler",
             "GcodePreviewHandler");
+    }
+
+    [TestMethod("FileExplorerAddons.Preview.QOI")]
+    [TestCategory("File Explorer Add-ons")]
+    [TestCategory("Preview Pane")]
+    public void QoiPreviewShowsImageContent()
+    {
+        TestPreview(".qoi", QoiPreviewHandler, "sample.qoi", "qoi", "QoiPreviewHandler", "QoiPreviewHandler");
     }
 
     [TestMethod("FileExplorerAddons.Preview.SourceCode")]
@@ -250,6 +282,19 @@ public class FileExplorerAddonsTests : UITestBase
             "pdf");
     }
 
+    [TestMethod("FileExplorerAddons.Thumbnail.Bgcode")]
+    [TestCategory("File Explorer Add-ons")]
+    [TestCategory("Icon Preview")]
+    public void BgcodeThumbnailRendersAtMultipleIconSizes()
+    {
+        TestThumbnail(
+            ".bgcode",
+            BgcodeThumbnailProvider,
+            "sample.bgcode",
+            "PowerToys.BgcodeThumbnailProvider",
+            "bgcode");
+    }
+
     [TestMethod("FileExplorerAddons.Thumbnail.Gcode")]
     [TestCategory("File Explorer Add-ons")]
     [TestCategory("Icon Preview")]
@@ -261,6 +306,19 @@ public class FileExplorerAddonsTests : UITestBase
             "sample.gcode",
             "PowerToys.GcodeThumbnailProvider",
             "gcode");
+    }
+
+    [TestMethod("FileExplorerAddons.Thumbnail.QOI")]
+    [TestCategory("File Explorer Add-ons")]
+    [TestCategory("Icon Preview")]
+    public void QoiThumbnailRendersAtMultipleIconSizes()
+    {
+        TestThumbnail(
+            ".qoi",
+            QoiThumbnailProvider,
+            "sample.qoi",
+            "PowerToys.QoiThumbnailProvider",
+            "qoi");
     }
 
     [TestMethod("FileExplorerAddons.Thumbnail.STL")]
@@ -301,7 +359,7 @@ public class FileExplorerAddonsTests : UITestBase
 
         var handlerLog = WaitForProviderLog(
             handlerLogDirectory,
-            $"Starting {handlerName}.exe",
+            $"Starting PowerToys.{handlerName}.exe",
             ExplorerTimeoutMS);
         Assert.IsNotNull(
             handlerLog,
@@ -353,7 +411,7 @@ public class FileExplorerAddonsTests : UITestBase
 
         var providerLog = WaitForProviderLog(
             providerLogDirectory,
-            $"Start {providerName}.exe",
+            $"Start {providerProcessName}",
             ExplorerTimeoutMS);
         Assert.IsNotNull(
             providerLog,
