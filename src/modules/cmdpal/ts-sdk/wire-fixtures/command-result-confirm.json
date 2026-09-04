@@ -1,0 +1,12 @@
+{
+  "args": {
+    "description": "This cannot be undone.",
+    "isPrimaryCommandCritical": true,
+    "primaryCommand": {
+      "id": "do-delete",
+      "name": "Delete"
+    },
+    "title": "Delete?"
+  },
+  "kind": 7
+}

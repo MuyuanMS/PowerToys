@@ -194,18 +194,31 @@ public sealed partial class ImageContentViewer : UserControl
         }
     }
 
+    private void ContextFlyout_Opening(object sender, object e)
+    {
+        CopyImageUriMenuItem.IsEnabled = CanCopyImageUri();
+    }
+
     private void CopyImageUri_Click(object sender, RoutedEventArgs e)
+    {
+        if (CanCopyImageUri(out var srcKey))
+        {
+            ClipboardHelper.SetText(srcKey!);
+            WeakReferenceMessenger.Default.Send(new ShowToastMessage(RS_.GetString("ImageContentViewer_Toast_CopiedLink")));
+        }
+    }
+
+    private bool CanCopyImageUri()
+        => CanCopyImageUri(out _);
+
+    private bool CanCopyImageUri(out string? srcKey)
     {
         var iconVm = ViewModel?.Image;
         var lightTheme = ActualTheme == ElementTheme.Light;
         var data = lightTheme ? iconVm?.Light : iconVm?.Dark;
-        var srcKey = data?.Icon ?? string.Empty;
-        if (Uri.TryCreate(srcKey, UriKind.Absolute, out var uri) &&
-            uri.Scheme is "http" or "https")
-        {
-            ClipboardHelper.SetText(srcKey);
-            WeakReferenceMessenger.Default.Send(new ShowToastMessage(RS_.GetString("ImageContentViewer_Toast_CopiedLink")));
-        }
+        srcKey = data?.Icon;
+        return Uri.TryCreate(srcKey, UriKind.Absolute, out var uri) &&
+               uri.Scheme is "http" or "https";
     }
 
     private static void SendCopiedImageToast()

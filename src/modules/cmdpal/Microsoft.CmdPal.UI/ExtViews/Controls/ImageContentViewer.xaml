@@ -60,7 +60,7 @@
             </Grid>
         </Border>
         <Grid.ContextFlyout>
-            <MenuFlyout>
+            <MenuFlyout Opening="ContextFlyout_Opening">
                 <MenuFlyoutItem
                     x:Uid="ImageContentViewer_OpenZoomViewer"
                     Click="OpenZoomOverlay_Click"
@@ -74,6 +74,7 @@
                     Text="Copy image" />
                 <MenuFlyoutItem
                     x:Uid="ImageContentViewer_CopyImageUri"
+                    x:Name="CopyImageUriMenuItem"
                     Click="CopyImageUri_Click"
                     Icon="Copy"
                     Text="Copy image link" />
