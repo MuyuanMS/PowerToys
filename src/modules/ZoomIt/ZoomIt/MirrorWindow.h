@@ -14,8 +14,7 @@
 #include "CaptureFrameWait.h"
 
 // Posted to the notify window when mirroring must stop because the mirrored
-// window closed. Keep distinct from the WM_USER messages in zoomit.h
-// (which currently run through WM_USER+112 for WM_USER_RECORDING_NO_FRAMES).
+// window closed. Keep distinct from the WM_USER messages in zoomit.h.
 #define WM_USER_MIRROR_STOP		WM_USER+113
 
 // Bright green, distinguishing the mirror border from the yellow
