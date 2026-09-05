@@ -97,9 +97,26 @@ namespace winrt::CmdPalKeyboardService::implementation
     {
         const auto& keyPressInfo = *reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
 
+        // Reset key-press tracking on key-up so the next fresh press is handled.
+        if ((wParam == WM_KEYUP) || (wParam == WM_SYSKEYUP))
+        {
+            if (vkCodePressed == keyPressInfo.vkCode)
+            {
+                vkCodePressed = VK_DISABLED;
+            }
+            return CallNextHookEx(NULL, nCode, wParam, lParam);
+        }
+
         if ((wParam != WM_KEYDOWN) && (wParam != WM_SYSKEYDOWN))
         {
             return CallNextHookEx(NULL, nCode, wParam, lParam);
+        }
+
+        // Swallow auto-repeated key-down events for a handled hotkey so the callback
+        // is not re-fired and the keystroke is not forwarded to the foreground app.
+        if (vkCodePressed == keyPressInfo.vkCode)
+        {
+            return 1;
         }
 
         Hotkey hotkey{
@@ -132,6 +149,7 @@ namespace winrt::CmdPalKeyboardService::implementation
 
         if (do_action)
         {
+            vkCodePressed = keyPressInfo.vkCode;
             m_processCommandCb(hstring{ actionId });
 
             // After invoking the hotkey send a dummy key to prevent Start Menu from activating
