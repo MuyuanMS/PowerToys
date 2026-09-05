@@ -18,6 +18,7 @@ public class BoundedStderrReaderTests
 {
     private static readonly TimeSpan LongWindow = TimeSpan.FromMinutes(5);
     private static readonly string[] HelloWorldLines = { "hello", "world" };
+    private static readonly string[] CarriageReturnLines = { "first", "second" };
     private static readonly string[] TrailingLine = { "no trailing newline" };
     private static readonly string[] RealLine = { "real" };
 
@@ -30,6 +31,18 @@ public class BoundedStderrReaderTests
         await reader.PumpAsync(StreamFrom("hello\r\nworld\n"), CancellationToken.None);
 
         CollectionAssert.AreEqual(HelloWorldLines, lines);
+        Assert.AreEqual(2, reader.LinesEmitted);
+    }
+
+    [TestMethod]
+    public async Task Pump_ForwardsLines_SeparatedByCarriageReturns()
+    {
+        var lines = new List<string>();
+        var reader = new BoundedStderrReader(lines.Add, rateWindow: LongWindow);
+
+        await reader.PumpAsync(StreamFrom("first\rsecond\r"), CancellationToken.None);
+
+        CollectionAssert.AreEqual(CarriageReturnLines, lines);
         Assert.AreEqual(2, reader.LinesEmitted);
     }
 
