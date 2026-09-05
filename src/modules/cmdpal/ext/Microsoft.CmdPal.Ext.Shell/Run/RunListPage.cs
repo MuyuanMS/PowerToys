@@ -49,6 +49,12 @@ namespace Microsoft.CmdPal.Ext.Run;
 /// </summary>
 public sealed partial class RunListPage : AsyncDynamicListPage
 {
+    /// <summary>
+    /// Maximum number of directory suggestions returned to prevent hangs on
+    /// directories with very large numbers of entries (e.g. WinSxS).
+    /// </summary>
+    internal const int MaxDirectorySuggestions = 200;
+
     private static readonly Tag HistoryTag = new() { Icon = Icons.HistoryIcon };
     private readonly Dictionary<string, ListItem> _historyItems = [];
     private readonly List<ListItem> _currentHistoryItems = [];
@@ -63,6 +69,7 @@ public sealed partial class RunListPage : AsyncDynamicListPage
     private bool _loadedInitialHistory;
 
     private string _currentSubdir = string.Empty;
+    private bool _currentPathItemsMayBeIncomplete;
 
     public RunListPage(
         IRunHistoryService runHistoryService,
@@ -363,6 +370,29 @@ public sealed partial class RunListPage : AsyncDynamicListPage
             _currentPathItems.AsReadOnly(),
             _telemetryService);
 
+        var fuzzyString = GetFuzzyString(searchText, directoryPath);
+        if (_currentPathItemsMayBeIncomplete && !string.IsNullOrEmpty(fuzzyString))
+        {
+            var filteredDirectoryItems = await BuildFilteredItemsForDirectory(
+                directoryPath,
+                fuzzyString,
+                withLeadingTilde,
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (filteredDirectoryItems is null)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            newMatchedPathItems = FilterCurrentDirectoryFiles(
+                searchText,
+                directoryPath,
+                _currentSubdir,
+                filteredDirectoryItems.AsReadOnly(),
+                _telemetryService);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
         ListHelpers.InPlaceUpdateList(_pathItems, newMatchedPathItems);
     }
 
@@ -383,7 +413,7 @@ public sealed partial class RunListPage : AsyncDynamicListPage
         // fuzzyString is everything that's after the last slash. We're
         // going to use that as the text to search through the results in
         // the _currentSubdir
-        var fuzzyString = isAnythingAfterSlash ? fullFilePath.Substring(expectedSlice) : string.Empty;
+        var fuzzyString = isAnythingAfterSlash ? GetFuzzyString(fullFilePath, directoryPath) : string.Empty;
         var newMatchedPathItems = new List<ListItem>();
         var searchIsEmpty = string.IsNullOrEmpty(fuzzyString);
 
@@ -393,6 +423,10 @@ public sealed partial class RunListPage : AsyncDynamicListPage
             foreach (var kv in currentPathItems)
             {
                 newMatchedPathItems.Add(kv.Value);
+                if (newMatchedPathItems.Count >= MaxDirectorySuggestions)
+                {
+                    break;
+                }
             }
         }
         else
@@ -402,6 +436,10 @@ public sealed partial class RunListPage : AsyncDynamicListPage
                 if (MatchesFilter(fuzzyString, kv.Key, kv.Value.FullPath))
                 {
                     newMatchedPathItems.Add(kv.Value);
+                    if (newMatchedPathItems.Count >= MaxDirectorySuggestions)
+                    {
+                        break;
+                    }
                 }
             }
         }
@@ -414,6 +452,13 @@ public sealed partial class RunListPage : AsyncDynamicListPage
         });
 
         return newMatchedPathItems;
+    }
+
+    private static string GetFuzzyString(string fullFilePath, string directoryPath)
+    {
+        var endsInSlash = directoryPath.EndsWith("\\", StringComparison.InvariantCultureIgnoreCase);
+        var expectedSlice = directoryPath.Length + (endsInSlash ? 0 : 1);
+        return expectedSlice < fullFilePath.Length ? fullFilePath.Substring(expectedSlice) : string.Empty;
     }
 
     /// <summary>
@@ -477,6 +522,7 @@ public sealed partial class RunListPage : AsyncDynamicListPage
         // Add the commands to the list
         _pathItems.Clear();
         _currentSubdir = directoryPath;
+        _currentPathItemsMayBeIncomplete = newPathItems.Count >= MaxDirectorySuggestions;
         _currentPathItems.Clear();
         foreach ((var k, var v) in newPathItems)
         {
@@ -524,26 +570,81 @@ public sealed partial class RunListPage : AsyncDynamicListPage
         var newPathItems = new Dictionary<string, RunExeItem>(files.Length);
         foreach (var f in files)
         {
-            var textToSuggest = f;
-            if (withLeadingTilde)
-            {
-                var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                if (textToSuggest.StartsWith(userProfile, StringComparison.OrdinalIgnoreCase))
-                {
-                    textToSuggest = string.Concat("~", textToSuggest.AsSpan(userProfile.Length));
-                }
-            }
-
-            var item = new RunExeItem(f, string.Empty, f, null, null)
-            {
-                Title = Path.GetFileName(f),
-                TextToSuggest = textToSuggest,
-            };
-
+            var item = CreatePathItem(f, withLeadingTilde);
             newPathItems.Add(item.Title, item); // matches ToDictionary behavior (throws on duplicate keys)
         }
 
         return newPathItems;
+    }
+
+    private static async Task<Dictionary<string, RunExeItem>?> BuildFilteredItemsForDirectory(
+        string directoryPath,
+        string fuzzyString,
+        bool withLeadingTilde,
+        CancellationToken cancellationToken)
+    {
+        return await Task.Run(
+            () =>
+            {
+                var newPathItems = new Dictionary<string, RunExeItem>(MaxDirectorySuggestions);
+                var expandedDirectoryPath = Environment.ExpandEnvironmentVariables(directoryPath);
+                var options = new EnumerationOptions
+                {
+                    AttributesToSkip = FileAttributes.Hidden,
+                    ReturnSpecialDirectories = false,
+                    IgnoreInaccessible = true,
+                };
+
+                try
+                {
+                    foreach (var path in Directory.EnumerateFileSystemEntries(expandedDirectoryPath, fuzzyString + "*", options))
+                    {
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            return null;
+                        }
+
+                        var title = Path.GetFileName(path);
+                        if (!MatchesFilter(fuzzyString, title, path))
+                        {
+                            continue;
+                        }
+
+                        var item = CreatePathItem(path, withLeadingTilde);
+                        newPathItems[item.Title] = item;
+                        if (newPathItems.Count >= MaxDirectorySuggestions)
+                        {
+                            break;
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    return [];
+                }
+
+                return newPathItems;
+            },
+            CancellationToken.None);
+    }
+
+    private static RunExeItem CreatePathItem(string path, bool withLeadingTilde)
+    {
+        var textToSuggest = path;
+        if (withLeadingTilde)
+        {
+            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (textToSuggest.StartsWith(userProfile, StringComparison.OrdinalIgnoreCase))
+            {
+                textToSuggest = string.Concat("~", textToSuggest.AsSpan(userProfile.Length));
+            }
+        }
+
+        return new RunExeItem(path, string.Empty, path, null, null)
+        {
+            Title = Path.GetFileName(path),
+            TextToSuggest = textToSuggest,
+        };
     }
 
     private void FilterHistoryItems(string newSearch, string searchText)
@@ -748,6 +849,11 @@ public sealed partial class RunListPage : AsyncDynamicListPage
             unsafe
             {
                 Marshal.FreeCoTaskMem((IntPtr)(char*)s);
+            }
+
+            if (results.Count >= MaxDirectorySuggestions)
+            {
+                break;
             }
 
             hr = enumString.Next(enumResult);
