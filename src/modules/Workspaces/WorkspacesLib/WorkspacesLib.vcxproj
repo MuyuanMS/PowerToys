@@ -38,6 +38,7 @@
     <ClInclude Include="JsonUtils.h" />
     <ClInclude Include="LaunchingStateEnum.h" />
     <ClInclude Include="LaunchingStatus.h" />
+    <ClInclude Include="MonitorMatcher.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="PwaHelper.h" />
     <ClInclude Include="Result.h" />
@@ -54,6 +55,7 @@
     <ClCompile Include="CommandLineArgsHelper.cpp" />
     <ClCompile Include="IPCHelper.cpp" />
     <ClCompile Include="JsonUtils.cpp" />
+    <ClCompile Include="MonitorMatcher.cpp" />
     <ClCompile Include="LaunchingStatus.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(UsePrecompiledHeaders)' != 'false'">Create</PrecompiledHeader>

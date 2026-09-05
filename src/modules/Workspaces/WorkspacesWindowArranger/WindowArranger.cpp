@@ -12,6 +12,7 @@
 #include <workspaces-common/WindowUtils.h>
 
 #include <WindowProperties/WorkspacesWindowPropertyUtils.h>
+#include <WorkspacesLib/MonitorMatcher.h>
 #include <WorkspacesLib/PwaHelper.h>
 #include <WorkspacesLib/WindowUtils.h>
 
@@ -474,7 +475,9 @@ bool WindowArranger::moveWindow(HWND window, const WorkspacesData::WorkspacesPro
 
     HMONITOR currentMonitor{};
     UINT currentDpi = DPIAware::DEFAULT_DPI;
-    auto currentMonitorIter = std::find_if(m_monitors.begin(), m_monitors.end(), [&](const WorkspacesData::WorkspacesProject::Monitor& val) { return val.number == app.monitor; });
+
+    const auto currentMonitorIter = WorkspacesData::FindMatchingMonitor(*snapMonitorIter, m_project.monitors, m_monitors);
+
     if (currentMonitorIter != m_monitors.end())
     {
         currentMonitor = currentMonitorIter->monitor;
