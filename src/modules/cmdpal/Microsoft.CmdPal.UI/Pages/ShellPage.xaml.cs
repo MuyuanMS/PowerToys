@@ -1504,6 +1504,8 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         {
             if (_quickAccessShelfContextViewModel is not null)
             {
+                // dirty patch here
+                QuickAccessShelfContextControl.ViewModel.UpdateContextItems();
                 return Task.FromResult<ListItemViewModel?>(_quickAccessShelfContextViewModel);
             }
 
