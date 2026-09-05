@@ -15,13 +15,15 @@ namespace PowerDisplay.Helpers;
 
 /// <summary>
 /// Watches for display/monitor configuration changes and emits coalesced refresh
-/// signals. Two independent sources feed in:
+/// signals. Three independent sources feed in:
 ///
 /// 1. <see cref="DeviceWatcher"/> over <c>DisplayMonitor</c> — picks up device
 ///    enumeration changes (plug, unplug, GPU rebind).
 /// 2. <see cref="PowerSettingsNative.GuidConsoleDisplayState"/> — fires whenever
 ///    the console display transitions on/off/dimmed. Reliable on both S3 and
 ///    S0ix and the only signal that catches idle-blank or lid recovery.
+/// 3. <c>WM_DISPLAYCHANGE</c> from the host window — catches external display
+///    configuration updates (orientation, resolution, color depth).
 ///
 /// Every detected change fires <see cref="DisplayChanging"/> synchronously
 /// (so the ViewModel can lock interactive UI immediately) and then schedules
@@ -56,7 +58,7 @@ public sealed partial class DisplayChangeWatcher : IDisposable
 
     /// <summary>
     /// Event triggered as soon as a display configuration change is detected
-    /// (device added/removed, or console display turning ON). Fires on the
+    /// (device added/removed, <c>WM_DISPLAYCHANGE</c>, or console display turning ON). Fires on the
     /// dispatcher thread, synchronously, BEFORE the debounce delay elapses —
     /// gives subscribers a chance to lock interactive UI so users can't act on
     /// monitors that are about to disappear, change, or be re-enumerated.
@@ -160,6 +162,27 @@ public sealed partial class DisplayChangeWatcher : IDisposable
     {
         // Property-level updates fire frequently and are not actionable here.
         // Added/Removed are the primary device-level triggers.
+        // Rotation changes are detected via WM_DISPLAYCHANGE — see OnWmDisplayChange.
+    }
+
+    /// <summary>
+    /// Handles a <c>WM_DISPLAYCHANGE</c> window message. Windows sends this to every
+    /// top-level window whenever the display configuration changes — including
+    /// orientation (rotation), resolution, or color depth.  Calling this method
+    /// fires <see cref="DisplayChanging"/> synchronously, then schedules the
+    /// debounced <see cref="DisplayChanged"/> so subscribers can re-discover
+    /// hardware with the updated orientation.
+    /// Must be called from the dispatcher thread.
+    /// </summary>
+    public void OnWmDisplayChange()
+    {
+        if (_disposed || !_isRunning || !_initialEnumerationComplete)
+        {
+            return;
+        }
+
+        Logger.LogInfo("[DisplayChangeWatcher] WM_DISPLAYCHANGE received; scheduling rescan");
+        NotifyAndSchedule();
     }
 
     private void OnEnumerationCompleted(DeviceWatcher sender, object args)
