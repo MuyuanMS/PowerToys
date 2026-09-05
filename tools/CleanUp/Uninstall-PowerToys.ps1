@@ -360,7 +360,12 @@ function New-ProtectedDirectory {
         [string]$Path
     )
 
-    New-Item -ItemType Directory -Path $Path -Force | Out-Null
+    $parent = Split-Path -Path $Path -Parent
+    if (-not [string]::IsNullOrWhiteSpace($parent)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+
+    New-Item -ItemType Directory -Path $Path -ErrorAction Stop | Out-Null
 
     $administrators = [Security.Principal.SecurityIdentifier]::new([Security.Principal.WellKnownSidType]::BuiltinAdministratorsSid, $null)
     $system = [Security.Principal.SecurityIdentifier]::new([Security.Principal.WellKnownSidType]::LocalSystemSid, $null)
