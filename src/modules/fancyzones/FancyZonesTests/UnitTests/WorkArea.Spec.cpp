@@ -473,5 +473,102 @@ namespace FancyZonesUnitTests
             const auto& layoutWindows = workArea->GetLayoutWindows();
             Assert::IsTrue(layoutWindows.GetZoneIndexSetFromWindow(window).empty());
         }
+
+        // Regression test for GH #39498: a window snapped to multiple zones must move
+        // to the first valid zone when the layout is switched to one with fewer zones.
+        TEST_METHOD (UpdateWindowPositionsFallsBackToFirstValidZoneAfterLayoutSwitch)
+        {
+            // Start with a 6-zone layout and snap a window to zones {1, 4}.
+            LayoutData largeLayout{
+                .uuid = FancyZonesUtils::GuidFromString(L"{A1B2C3D4-0000-0000-0000-000000000001}").value(),
+                .type = FancyZonesDataTypes::ZoneSetLayoutType::Grid,
+                .showSpacing = false,
+                .spacing = 0,
+                .zoneCount = 6,
+                .sensitivityRadius = 20,
+            };
+            AppliedLayouts::instance().ApplyLayout(m_workAreaId, largeLayout);
+
+            const auto workArea = WorkArea::Create(m_hInst, m_workAreaId, m_parentUniqueId, m_workAreaRect);
+            Assert::IsNotNull(workArea.get());
+            Assert::AreEqual(6, static_cast<int>(workArea->GetLayout()->Zones().size()));
+
+            const auto window = Mocks::WindowCreate(m_hInst, L"", L"", 0, WS_THICKFRAME);
+            SetWindowPos(window, nullptr, 150, 150, 450, 550, SWP_SHOWWINDOW);
+
+            Assert::IsTrue(workArea->Snap(window, { 1, 4 }));
+            Assert::IsTrue((ZoneIndexSet{ 1, 4 }) == workArea->GetLayoutWindows().GetZoneIndexSetFromWindow(window));
+
+            // Switch to a 2-zone layout.
+            LayoutData smallLayout{
+                .uuid = FancyZonesUtils::GuidFromString(L"{A1B2C3D4-0000-0000-0000-000000000002}").value(),
+                .type = FancyZonesDataTypes::ZoneSetLayoutType::Grid,
+                .showSpacing = false,
+                .spacing = 0,
+                .zoneCount = 2,
+                .sensitivityRadius = 20,
+            };
+            AppliedLayouts::instance().ApplyLayout(m_workAreaId, smallLayout);
+            workArea->InitLayout();
+            Assert::AreEqual(2, static_cast<int>(workArea->GetLayout()->Zones().size()));
+
+            // UpdateWindowPositions should fall back to zone 1 (first valid zone from {1, 4}).
+            workArea->UpdateWindowPositions();
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+            const auto actualZones = workArea->GetLayoutWindows().GetZoneIndexSetFromWindow(window);
+            Assert::AreEqual(size_t{ 1 }, actualZones.size());
+            Assert::AreEqual(ZoneIndex{ 1 }, actualZones.at(0));
+
+            RECT zonedWindowRect;
+            GetWindowRect(window, &zonedWindowRect);
+
+            RECT zoneRect = workArea->GetLayout()->Zones().at(1).GetZoneRect();
+            Assert::AreEqual(zoneRect.left, zonedWindowRect.left);
+            Assert::AreEqual(zoneRect.right, zonedWindowRect.right);
+            Assert::AreEqual(zoneRect.top, zonedWindowRect.top);
+            Assert::AreEqual(zoneRect.bottom, zonedWindowRect.bottom);
+        }
+
+        // When ALL zones in a multi-zone set are beyond the new layout's zone count the
+        // window should retain its stale assignment (no crash, no silent misplacement).
+        TEST_METHOD (UpdateWindowPositionsSkipsWindowWhenNoZoneIsValidAfterLayoutSwitch)
+        {
+            // Start with a 6-zone layout and snap a window to zones {4, 5}.
+            LayoutData largeLayout{
+                .uuid = FancyZonesUtils::GuidFromString(L"{A1B2C3D4-0000-0000-0000-000000000003}").value(),
+                .type = FancyZonesDataTypes::ZoneSetLayoutType::Grid,
+                .showSpacing = false,
+                .spacing = 0,
+                .zoneCount = 6,
+                .sensitivityRadius = 20,
+            };
+            AppliedLayouts::instance().ApplyLayout(m_workAreaId, largeLayout);
+
+            const auto workArea = WorkArea::Create(m_hInst, m_workAreaId, m_parentUniqueId, m_workAreaRect);
+            Assert::IsNotNull(workArea.get());
+
+            const auto window = Mocks::WindowCreate(m_hInst);
+            Assert::IsTrue(workArea->Snap(window, { 4, 5 }));
+
+            // Switch to a 2-zone layout (zones 0 and 1 only).
+            LayoutData smallLayout{
+                .uuid = FancyZonesUtils::GuidFromString(L"{A1B2C3D4-0000-0000-0000-000000000004}").value(),
+                .type = FancyZonesDataTypes::ZoneSetLayoutType::Grid,
+                .showSpacing = false,
+                .spacing = 0,
+                .zoneCount = 2,
+                .sensitivityRadius = 20,
+            };
+            AppliedLayouts::instance().ApplyLayout(m_workAreaId, smallLayout);
+            workArea->InitLayout();
+
+            // Should not crash; the window stays with its old (now-invalid) assignment.
+            workArea->UpdateWindowPositions();
+
+            // No zone from {4, 5} fits in a 2-zone layout, so m_layoutWindows is unchanged.
+            const auto actualZones = workArea->GetLayoutWindows().GetZoneIndexSetFromWindow(window);
+            Assert::IsTrue((ZoneIndexSet{ 4, 5 }) == actualZones);
+        }
     };
 }
