@@ -1,5 +1,15 @@
 {
   "RestartAfterRestore": true,
+  "AdditionalSettingsPaths": [
+    {
+      "PathKey": "Microsoft.CommandPalette",
+      "FullPath": "%LOCALAPPDATA%\\Packages\\Microsoft.CommandPalette_8wekyb3d8bbwe\\LocalState"
+    },
+    {
+      "PathKey": "Microsoft.CommandPalette.Dev",
+      "FullPath": "%LOCALAPPDATA%\\Packages\\Microsoft.CommandPalette.Dev_8wekyb3d8bbwe\\LocalState"
+    }
+  ],
   "IncludeFiles": [
     "*Keyboard Manager\\default.json",
     "*settings.json",
