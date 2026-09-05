@@ -41,9 +41,7 @@
 #include "ai_detection.h"
 #include <common/utils/package.h>
 
-#if _DEBUG && _WIN64
 #include "unhandled_exception_handler.h"
-#endif
 #include <common/logger/logger.h>
 #include <common/SettingsAPI/settings_helpers.h>
 #include <runner/settings_window.h>
@@ -182,12 +180,6 @@ int runner(bool isProcessElevated, bool openSettings, std::string settingsWindow
 {
     Logger::info("Runner is starting. Elevated={} openOobe={} openScoobe={} showRestartNotificationAfterUpdate={}", isProcessElevated, openOobe, openScoobe, showRestartNotificationAfterUpdate);
     DPIAware::EnableDPIAwarenessForThisProcess();
-
-#if _DEBUG && _WIN64
-//Global error handlers to diagnose errors.
-//We prefer this not to show any longer until there's a bug to diagnose.
-//init_global_error_handlers();
-#endif
     Trace::RegisterProvider();
 
     // Load settings from file before reading them
@@ -349,8 +341,24 @@ int runner(bool isProcessElevated, bool openSettings, std::string settingsWindow
     catch (std::runtime_error& err)
     {
         std::string err_what = err.what();
+        Logger::critical("Runner failed with a std::runtime_error: {}", err_what);
+        Logger::flush();
         MessageBoxW(nullptr, std::wstring(err_what.begin(), err_what.end()).c_str(), GET_RESOURCE_STRING(IDS_ERROR).c_str(), MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
         result = -1;
+    }
+    catch (std::exception& err)
+    {
+        write_crash_marker_message("[PowerToys Runner] CRASH: runner caught std::exception.\n");
+        Logger::critical("Runner failed with an exception: {}", err.what());
+        Logger::flush();
+        throw;
+    }
+    catch (...)
+    {
+        write_crash_marker_message("[PowerToys Runner] CRASH: runner caught unknown exception.\n");
+        Logger::critical(L"Runner failed with an unknown exception.");
+        Logger::flush();
+        throw;
     }
     Trace::UnregisterProvider();
     // When the full Windows session is ending, the OS reaps the Quick Access
@@ -447,6 +455,23 @@ toast_notification_handler_result toast_notification_handler(const std::wstring_
 
 int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR lpCmdLine, int /*nCmdShow*/)
 {
+    // Register the SEH and SIGABRT crash handlers as the very first operation so that
+    // every subsequent startup path — including ETWTrace, GDI+, winrt::init_apartment,
+    // COM security init, and argument parsing — is covered by the persistent crash-marker
+    // sink.  init_global_error_handlers() opens the crash-marker file before returning so
+    // no allocation or mutex is required from the signal/filter callbacks.
+    init_global_error_handlers();
+
+    // Register the std::terminate handler immediately after the SEH/SIGABRT handlers
+    // so uncaught C++ exceptions from all early startup paths are also captured.
+    // The handler uses only the allocation-free WriteFile crash-marker sink; Logger is
+    // not called here because the terminate handler may fire while a spdlog mutex is
+    // held, which would deadlock before std::abort() is reached.
+    std::set_terminate([]() noexcept {
+        write_crash_marker_message("[PowerToys Runner] CRASH: std::terminate called (uncaught exception or internal error).\n");
+        std::abort();
+    });
+
     Shared::Trace::ETWTrace trace{};
     trace.UpdateState(true);
 
@@ -523,6 +548,8 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
     if (!msi_mutex)
     {
         open_menu_from_another_instance(settings_window);
+        Logger::info("Runner exiting: existing instance detected.");
+        Logger::flush();
         return 0;
     }
 
@@ -624,8 +651,24 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
     catch (std::runtime_error& err)
     {
         std::string err_what = err.what();
+        Logger::critical("WinMain failed with a std::runtime_error: {}", err_what);
+        Logger::flush();
         MessageBoxW(nullptr, std::wstring(err_what.begin(), err_what.end()).c_str(), GET_RESOURCE_STRING(IDS_ERROR).c_str(), MB_OK | MB_ICONERROR);
         result = -1;
+    }
+    catch (std::exception& err)
+    {
+        write_crash_marker_message("[PowerToys Runner] CRASH: WinMain caught std::exception.\n");
+        Logger::critical("WinMain failed with an exception: {}", err.what());
+        Logger::flush();
+        std::terminate();
+    }
+    catch (...)
+    {
+        write_crash_marker_message("[PowerToys Runner] CRASH: WinMain caught unknown exception.\n");
+        Logger::critical(L"WinMain failed with an unknown exception.");
+        Logger::flush();
+        std::terminate();
     }
 
     trace.Flush();
@@ -647,6 +690,9 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
         }
     }
     stop_tray_icon();
+
+    Logger::info("Runner exiting with result: {}", result);
+    Logger::flush();
 
     return result;
 }
