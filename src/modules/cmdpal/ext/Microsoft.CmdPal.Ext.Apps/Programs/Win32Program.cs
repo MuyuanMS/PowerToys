@@ -567,19 +567,30 @@ public partial class Win32Program : IProgram
         var folderQueue = new Queue<string>();
         folderQueue.Enqueue(directory);
 
-        // Keep track of already visited directories to avoid cycles.
+        // Keep track of already visited (resolved) directories to avoid cycles.
         var alreadyVisited = new HashSet<string>();
 
         do
         {
             var currentDirectory = folderQueue.Dequeue();
 
-            if (alreadyVisited.Contains(currentDirectory))
+            // Resolve the real path to detect cycles caused by directory junctions or symbolic links.
+            string resolvedDirectory;
+            try
             {
+                resolvedDirectory = System.IO.Directory.ResolveLinkTarget(currentDirectory, returnFinalTarget: true)?.FullName ?? currentDirectory;
+                resolvedDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(resolvedDirectory));
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is SecurityException)
+            {
+                Logger.LogError($"Failed to resolve link target for '{currentDirectory}'", e);
                 continue;
             }
 
-            alreadyVisited.Add(currentDirectory);
+            if (!alreadyVisited.Add(resolvedDirectory))
+            {
+                continue;
+            }
 
             try
             {
@@ -615,8 +626,10 @@ public partial class Win32Program : IProgram
                 foreach (var childDirectory in Directory.EnumerateDirectories(currentDirectory, "*", new EnumerationOptions()
                 {
                     // https://learn.microsoft.com/dotnet/api/system.io.enumerationoptions?view=net-6.0
-                    // Exclude directories with the Reparse Point file attribute, to avoid loops due to symbolic links / directory junction / mount points.
-                    AttributesToSkip = FileAttributes.Hidden | FileAttributes.System | FileAttributes.ReparsePoint,
+                    // ReparsePoint is intentionally not skipped here so that directory junctions and
+                    // symbolic links are traversed. Cycle detection is handled via the alreadyVisited
+                    // set which tracks resolved (real) paths.
+                    AttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
                     RecurseSubdirectories = false,
                 }))
                 {
