@@ -55,6 +55,9 @@ namespace Microsoft.CropAndLock.UITests
 
         internal static IntPtr Root(IntPtr window) => GetAncestor(window, 2);
 
+        internal static IntPtr RootAtPoint(Point point) =>
+            Root(WindowFromPoint(new NativePoint { X = point.X, Y = point.Y }));
+
         internal static string? PackageFullName(int processId)
         {
             using var process = OpenProcess(0x1000, false, processId);
@@ -124,6 +127,9 @@ namespace Microsoft.CropAndLock.UITests
 
         [DllImport("user32.dll")]
         private static extern IntPtr GetAncestor(IntPtr window, uint flags);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr WindowFromPoint(NativePoint point);
 
         [DllImport("user32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]

@@ -46,6 +46,12 @@ using `Microsoft.PowerToys.UITest.Next` and the real Runner hotkeys.
   pipeline's authenticated Settings IPC companion-signing setup for Runner and
   Settings. A rejected Settings command must fail the runtime assertion; the suite
   never repairs it by editing the enabled map or restarting Runner.
+- CI dispatches this suite through `.pipelines\runUiTestAsUser.ps1` in the logged-on
+  user's limited interactive token. Package activation always starts the fixture
+  non-elevated; an elevated Runner can reparent its HWND but cannot reliably route
+  keyboard focus across that integrity boundary. Both the test host and module
+  must be non-elevated, matching the local standard-user runs. The shared pipeline
+  keeps its administrative setup/signing steps and other suites unchanged.
 
 ## What is asserted
 
