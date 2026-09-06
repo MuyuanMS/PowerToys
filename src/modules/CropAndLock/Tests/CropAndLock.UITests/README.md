@@ -61,6 +61,10 @@ input, sends the real chord and performs a physical crop drag. Overlay/output
 readiness uses module-owned native HWNDs/classes; no UIA inspection occurs while
 selecting or displaying a crop.
 
+Before input, the test waits for the source to own the target screen point. A
+Windows Shell `Shell_LightDismissOverlay` is dismissed with one outside click,
+then ownership is checked again; unrelated occlusion is never accepted as ready.
+
 The tests compare the selected source pixels with the composed crop client area,
 including exact selected dimensions. Runtime reference captures avoid dependence
 on OS-specific window rendering. In addition to the overall comparison, a
