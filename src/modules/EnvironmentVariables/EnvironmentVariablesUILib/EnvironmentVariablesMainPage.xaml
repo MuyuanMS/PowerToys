@@ -73,6 +73,7 @@
                         </StackPanel>
                     </tkcontrols:SettingsCard.Description>
                     <Button
+                        AutomationProperties.AutomationId="VariableOptionsButton"
                         Content="{ui:FontIcon Glyph=&#xE712;}"
                         IsEnabled="{x:Bind IsEditable}"
                         Style="{StaticResource SubtleButtonStyle}">
@@ -212,7 +213,10 @@
                                             x:Uid="ToggleSwitch"
                                             IsOn="{x:Bind IsEnabled, Mode=TwoWay}"
                                             Style="{StaticResource RightAlignedCompactToggleSwitchStyle}" />
-                                        <Button Content="{ui:FontIcon Glyph=&#xE712;}" Style="{StaticResource SubtleButtonStyle}">
+                                        <Button
+                                            AutomationProperties.AutomationId="ProfileOptionsButton"
+                                            Content="{ui:FontIcon Glyph=&#xE712;}"
+                                            Style="{StaticResource SubtleButtonStyle}">
                                             <Button.Flyout>
                                                 <MenuFlyout>
                                                     <MenuFlyoutItem
@@ -486,6 +490,7 @@
                                         x:Uid="More_Options_Button"
                                         Grid.Column="1"
                                         VerticalAlignment="Center"
+                                        AutomationProperties.AutomationId="PathEntryOptionsButton"
                                         Content="&#xE712;"
                                         FontFamily="{ThemeResource SymbolThemeFontFamily}"
                                         Style="{StaticResource SubtleButtonStyle}">
