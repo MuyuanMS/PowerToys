@@ -36,6 +36,12 @@ namespace Microsoft.CropAndLock.UITests
 
         protected override IReadOnlyList<string> StaleProcessNames => [.. base.StaleProcessNames, ModuleProcess];
 
+        [ClassInitialize]
+        public static void RequireNonElevatedHost(TestContext context)
+        {
+            Assert.IsFalse(ElevationHelper.IsCurrentProcessElevated(), "Run this suite non-elevated so Runner and the packaged source have the same integrity level.");
+        }
+
         [TestMethod]
         public void ThumbnailWin32ShowsSelectedRegionAndLiveUpdates()
         {
@@ -296,6 +302,7 @@ namespace Microsoft.CropAndLock.UITests
                 requiredConsecutiveMatches: 3);
             Assert.IsTrue(stable.Succeeded, "Exactly one stable PowerToys.CropAndLock process must be running.");
             moduleProcessId = previous;
+            Assert.IsFalse(ElevationHelper.IsProcessElevated(moduleProcessId) ?? true, "Crop And Lock must match the non-elevated packaged source.");
         }
 
         private void PrepareSource(CropSource fixture)
@@ -386,10 +393,24 @@ namespace Microsoft.CropAndLock.UITests
 
         private void EditSource(string text, IntPtr inputRoot)
         {
-            var point = source!.ScreenInput();
-            Step($"Sending real input at {point} through HWND 0x{inputRoot:X}");
+            Step($"Waiting for the source input to own its screen point through HWND 0x{inputRoot:X}");
             RequireForeground(inputRoot);
-            Assert.IsTrue(WindowControl.IsPointOwnedByWindow(inputRoot, point.X, point.Y), "The source input is occluded or outside the crop.");
+            var ready = WaitHelper.WaitForStable(
+                () =>
+                {
+                    var input = source!.ScreenInput();
+                    return (Point: input, Root: NativeMethods.RootAtPoint(input));
+                },
+                state => state.Root == inputRoot,
+                timeoutMS: 8_000,
+                requiredConsecutiveMatches: 3,
+                recover: _ => WindowControl.TryBringToForeground(inputRoot));
+            Assert.IsTrue(
+                ready.Succeeded,
+                $"The source input is occluded or outside the crop. Point={ready.LastObservation.Point}, expected=0x{inputRoot:X}, " +
+                $"actual=0x{ready.LastObservation.Root:X} ({NativeMethods.ClassName(ready.LastObservation.Root)}), foreground={WindowControl.GetForegroundWindowInfo()}.");
+            var point = ready.LastObservation.Point;
+            Step($"Sending real input at {point} through HWND 0x{inputRoot:X}");
             MouseHelper.LeftClickAt(point.X, point.Y);
             KeyboardHelper.SendKeys(Key.Ctrl, Key.A);
             KeyboardHelper.SendKeys(text.Select(character => Enum.Parse<Key>(character.ToString(), true)).ToArray());

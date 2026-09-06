@@ -353,7 +353,10 @@ jobs:
         Write-Host "##[group]Run UI tests: $base"
         Push-Location $dir
         try {
-          if (Test-Path $exe) {
+          if ($base -eq 'CropAndLock.UITests' -and (Test-Path $exe)) {
+            & "$(build.sourcesdirectory)\.pipelines\runUiTestAsUser.ps1" `
+              -TestExecutable $exe -ResultsDirectory $resultsDir
+          } elseif (Test-Path $exe) {
             & $exe --report-trx --results-directory $resultsDir
           } elseif (Test-Path $dll) {
             & dotnet $dll --report-trx --results-directory $resultsDir
