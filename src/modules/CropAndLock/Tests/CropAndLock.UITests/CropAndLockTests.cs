@@ -395,6 +395,7 @@ namespace Microsoft.CropAndLock.UITests
         {
             Step($"Waiting for the source input to own its screen point through HWND 0x{inputRoot:X}");
             RequireForeground(inputRoot);
+            var dismissedShellOverlay = false;
             var ready = WaitHelper.WaitForStable(
                 () =>
                 {
@@ -404,7 +405,19 @@ namespace Microsoft.CropAndLock.UITests
                 state => state.Root == inputRoot,
                 timeoutMS: 8_000,
                 requiredConsecutiveMatches: 3,
-                recover: _ => WindowControl.TryBringToForeground(inputRoot));
+                recover: state =>
+                {
+                    if (!dismissedShellOverlay && NativeMethods.ClassName(state.Root) == "Shell_LightDismissOverlay")
+                    {
+                        Step($"Dismissing the Shell outside-click overlay 0x{state.Root:X} before source input");
+                        MouseHelper.LeftClickAt(state.Point.X, state.Point.Y);
+                        dismissedShellOverlay = true;
+                    }
+                    else
+                    {
+                        WindowControl.TryBringToForeground(inputRoot);
+                    }
+                });
             Assert.IsTrue(
                 ready.Succeeded,
                 $"The source input is occluded or outside the crop. Point={ready.LastObservation.Point}, expected=0x{inputRoot:X}, " +
