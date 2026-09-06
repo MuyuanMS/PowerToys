@@ -69,3 +69,33 @@ EnvironmentVariableUILib            # Abstracted UI methods and implementations
 - The module reads and writes variables directly to the registry instead of using the Environment API
 - This direct registry access approach is used because the Environment API automatically expands variables and has a timeout for notifications
 - When a profile variable has the same name as an existing User variable, a backup is created with the naming pattern: `VARIABLE_NAME_powertoys_PROFILE_NAME`
+
+## UI tests
+
+`src\modules\EnvironmentVariables\EnvironmentVariables.UITests` uses `UITestAutomation.Next`
+and winappcli. Run it on an isolated interactive desktop: the suite edits the current user's
+environment, including User PATH. Test variables and profiles have unique names; cleanup restores
+the original unexpanded values, registry value kinds, and profile/settings files. TMP and System
+PATH are not modified. Registry reads independently verify the persistent Windows environment
+shown by the OS editor, while UIA assertions verify the module's Applied variables list.
+
+Coverage of [the UI-test checklist](https://github.com/microsoft/PowerToys/issues/40680):
+
+| Checklist items | Automated scenario |
+| --- | --- |
+| 2 | Non-elevated launch, enabled User Add button, disabled System Add and edit controls |
+| 3-5 (User) | Create, edit, and remove a User variable; verify registry and Applied variables |
+| 6-10, 20 | Create an empty profile, edit it, create an enabled two-variable profile, switch/unapply profiles, and delete both from UI and `profiles.json` |
+| 11-13 | Override a dedicated existing User variable, verify its backup, and restore it on unapply |
+| 14-16 | Verify combined PATH and separate profile PATH entries; move, insert, and delete entries |
+| 17-19 | Apply profile PATH, reopen the editor with the profile still enabled, then delete it and verify restoration |
+
+Item 1 and the System-variable repetition of items 3-5 remain **manual-only**. The local VM
+workflow requires a true standard-user test host; the current harness cannot approve credential
+prompts on the UAC secure desktop or automate an elevated editor across that boundary. The suite
+does not weaken UAC, store credentials, or report these scenarios as passing/skipped automated tests.
+
+Build with `tools\build\build.cmd -Path src\modules\EnvironmentVariables\EnvironmentVariables.UITests -Platform x64 -Configuration Debug`.
+Run the resulting `EnvironmentVariables.UITests.exe` with `--report-trx`; the category is
+`EnvironmentVariables`. Use the `ui-tests-local-vm` workflow for full Windows 10 and Windows 11
+default/constrained runs, then select `[EnvironmentVariables.UITests]` in UI Test Automation CI.
