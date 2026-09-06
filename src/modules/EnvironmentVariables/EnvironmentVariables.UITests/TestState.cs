@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Text.Json.Nodes;
 using Microsoft.PowerToys.UITest.Next;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.Win32;
@@ -14,6 +15,7 @@ internal sealed class TestState : IDisposable
 
     internal static readonly string ModuleDirectory = Path.Combine(SettingsConfigHelper.PowerToysSettingsRoot, "EnvironmentVariables");
     internal static readonly string ProfilesPath = Path.Combine(ModuleDirectory, "profiles.json");
+    private static readonly string GlobalSettingsPath = Path.Combine(SettingsConfigHelper.PowerToysSettingsRoot, "settings.json");
 
     private readonly Dictionary<string, (object? Value, RegistryValueKind Kind)> userVariables = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, byte[]?> files = new();
@@ -27,6 +29,15 @@ internal sealed class TestState : IDisposable
             string path = Path.Combine(ModuleDirectory, name);
             files.Add(path, File.Exists(path) ? File.ReadAllBytes(path) : null);
         }
+
+        files.Add(GlobalSettingsPath, File.Exists(GlobalSettingsPath) ? File.ReadAllBytes(GlobalSettingsPath) : null);
+    }
+
+    internal static void ConfigureNonElevatedRunner()
+    {
+        var settings = JsonNode.Parse(File.ReadAllText(GlobalSettingsPath))!.AsObject();
+        settings["run_elevated"] = false;
+        File.WriteAllText(GlobalSettingsPath, settings.ToJsonString());
     }
 
     internal static string? ReadUserVariable(string name)

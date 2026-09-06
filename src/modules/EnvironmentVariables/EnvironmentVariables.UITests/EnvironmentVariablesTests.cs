@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Diagnostics;
 using Microsoft.PowerToys.UITest.Next;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -12,6 +13,7 @@ namespace Microsoft.EnvironmentVariables.UITests;
 public sealed class EnvironmentVariablesTests : UITestBase
 {
     private static TestState state = null!;
+    private static bool ownsPreparedScope;
     private EditorUi editor = null!;
     private string prefix = string.Empty;
 
@@ -28,7 +30,76 @@ public sealed class EnvironmentVariablesTests : UITestBase
     }
 
     [ClassCleanup(ClassCleanupBehavior.EndOfClass)]
-    public static void RestoreState() => state?.Dispose();
+    public static void RestoreState()
+    {
+        try
+        {
+            StopPreparedScope();
+        }
+        finally
+        {
+            state?.Dispose();
+        }
+    }
+
+    protected override void PrepareTestState()
+    {
+        // CI agents can launch the test host elevated. Use the Runner's supported opt-out before
+        // attaching Settings, rather than attempting to invoke its disabled administrator switch.
+        TestState.ConfigureNonElevatedRunner();
+        ownsPreparedScope = true;
+        StartRunner("--dont-elevate");
+        var ready = WaitHelper.WaitForStable(
+            () =>
+            {
+                var processes = Process.GetProcessesByName("PowerToys");
+                try
+                {
+                    return processes.Length == 1 && ElevationHelper.IsProcessElevated(processes[0].Id) == false;
+                }
+                finally
+                {
+                    foreach (var process in processes)
+                    {
+                        process.Dispose();
+                    }
+                }
+            },
+            match => match,
+            timeoutMS: 60_000,
+            requiredConsecutiveMatches: 3,
+            pollIntervalMS: 200);
+        Assert.IsTrue(ready.Succeeded, "The Runner did not establish a non-elevated instance.");
+
+        StartRunner("--open-settings");
+        var settings = WindowsFinder.WaitForWindowByApp("PowerToys.Settings", window => window.Width > 400 && window.Height > 300, timeoutMS: 90_000);
+        Assert.IsNotNull(settings, "The non-elevated Runner did not open Settings.");
+        Assert.IsFalse(settings.IsElevated, "Settings must be non-elevated so the administrator launch option is editable.");
+    }
+
+    private void StartRunner(string arguments)
+    {
+        string executable = SessionHelper.GetExecutablePath(PowerToysModule.Runner);
+        TestContext.WriteLine($"[{DateTime.UtcNow:HH:mm:ss.fff}] Starting Runner {arguments}");
+        using var process = Process.Start(new ProcessStartInfo(executable, arguments)
+        {
+            WorkingDirectory = Path.GetDirectoryName(executable),
+            UseShellExecute = true,
+        });
+        Assert.IsNotNull(process, "The Runner launch did not return a process.");
+    }
+
+    private static void StopPreparedScope()
+    {
+        if (!ownsPreparedScope)
+        {
+            return;
+        }
+
+        Assert.IsTrue(WindowControl.TryKillProcessTreeByNameAndWait("PowerToys.Settings", 10_000), "Could not close the test-owned Settings process.");
+        Assert.IsTrue(WindowControl.TryKillProcessTreeByNameAndWait("PowerToys", 10_000), "Could not close the test-owned Runner process.");
+        ownsPreparedScope = false;
+    }
 
     [TestInitialize]
     public void OpenEditor()
@@ -53,7 +124,14 @@ public sealed class EnvironmentVariablesTests : UITestBase
         }
         finally
         {
-            state.Reset();
+            try
+            {
+                state.Reset();
+            }
+            finally
+            {
+                StopPreparedScope();
+            }
         }
     }
 
@@ -215,10 +293,12 @@ public sealed class EnvironmentVariablesTests : UITestBase
         var settings = new EditorUi(Session, TestContext);
         var adminCard = Session.Find<Element>(By.AccessibilityId("EnvironmentVariablesToggleLaunchAdministrator"));
         EditorUi.SetToggle(settings.Child<ToggleSwitch>(adminCard, "ToggleSwitch"), false);
+        var launchCard = Session.Find<Element>(By.AccessibilityId("EnvironmentVariablesLaunchButtonControl"));
+        launchCard.Focus();
         Assert.IsTrue(
             WindowControl.WaitForForeground(new IntPtr(Session.WindowHandle), timeoutMS: 10_000),
             $"Settings must own foreground before clicking its launch card: {WindowControl.GetForegroundWindowInfo()}");
-        Session.Find<Element>(By.AccessibilityId("EnvironmentVariablesLaunchButtonControl")).Click();
+        launchCard.Click();
         var window = WindowsFinder.WaitForWindowByApp(TestState.ProcessName, candidate => candidate.Width > 400 && candidate.Height > 300, timeoutMS: 30_000);
         Assert.IsNotNull(window, "Environment Variables did not launch from Settings.");
         WindowHelper.SetWindowSize(new IntPtr(window.WindowHandle), WindowSize.Large);
