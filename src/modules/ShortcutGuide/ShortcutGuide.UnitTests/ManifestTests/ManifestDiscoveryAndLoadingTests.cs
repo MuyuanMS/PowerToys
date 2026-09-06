@@ -137,7 +137,7 @@ BackgroundProcess: false
             {
                 File.CreateSymbolicLink(symlinkPath, targetFilePath);
             }
-            catch (UnauthorizedAccessException)
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
                 // In non-elevated CI environments or environments without Developer Mode,
                 // symlink creation is not permitted by Windows. Skip gracefully.
