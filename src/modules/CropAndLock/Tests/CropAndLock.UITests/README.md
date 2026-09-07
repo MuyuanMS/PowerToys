@@ -156,6 +156,7 @@ $certificate = 'C:\PowerToysUiTestVm\shared\PowerToysUiTests\CropAndLock\test-si
 .\.pipelines\signSparsePackages.ps1 `
     -PackageRoot $tests, $runtime `
     -Include CropAndLock.TestApp.msix `
+    -RequiredPackage CropAndLock.TestApp.msix `
     -RequiredAuthenticodeFile PowerToys.exe, PowerToys.Settings.exe `
     -SkipLocalTrust -ExportCertificatePath $certificate
 ```

@@ -25,7 +25,8 @@ namespace Microsoft.CropAndLock.UITests
 
         private CropSource? source;
         private int moduleProcessId;
-        private string? originalClipboard;
+        private object? originalClipboard;
+        private bool originalClipboardCaptured;
         private ToggleSwitch? lifecycleToggle;
         private bool originalToggleState;
 
@@ -141,11 +142,11 @@ namespace Microsoft.CropAndLock.UITests
             });
             Clean(() =>
             {
-                if (originalClipboard is not null)
+                if (originalClipboardCaptured)
                 {
                     Assert.IsTrue(
-                        originalClipboard.Length == 0 ? ClipboardHelper.Clear() : ClipboardHelper.SetText(originalClipboard),
-                        "Could not restore the original clipboard text.");
+                        originalClipboard is null ? ClipboardHelper.Clear() : ClipboardHelper.SetDataObject(originalClipboard),
+                        "Could not restore the original clipboard contents.");
                 }
             });
             if (errors.Count > 0 && !failed)
@@ -315,7 +316,8 @@ namespace Microsoft.CropAndLock.UITests
         private void PrepareSource(CropSource fixture)
         {
             source = fixture;
-            originalClipboard = ClipboardHelper.GetText();
+            Assert.IsTrue(ClipboardHelper.TryGetDataObject(out originalClipboard), "Could not capture the original clipboard contents.");
+            originalClipboardCaptured = true;
             Step($"Opening {fixture.GetType().Name}");
             source.Open(TestContext);
             Assert.IsTrue(NativeMethods.IsWindow(source.Window), "The fixture did not create a source HWND.");

@@ -96,10 +96,16 @@ namespace Microsoft.CropAndLock.UITests
                 process?.Dispose();
                 if (ownsRegistration)
                 {
-                    CancelPendingInstallation();
-                    RemoveRegistrations(RegisteredPackages()
-                        .Where(package => package.Id.Publisher == Publisher)
-                        .Select(package => package.Id.FullName));
+                    try
+                    {
+                        CancelPendingInstallation();
+                    }
+                    finally
+                    {
+                        RemoveRegistrations(RegisteredPackages()
+                            .Where(package => package.Id.Publisher == Publisher)
+                            .Select(package => package.Id.FullName));
+                    }
                 }
             }
         }
