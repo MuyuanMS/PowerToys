@@ -1656,8 +1656,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
     private bool TryHandleQuickAccessShelfItemKeyDown(KeyRoutedEventArgs e, KeyModifiers modifiers)
     {
-        if (!IsQuickAccessShelfVisible ||
-            FindQuickAccessShelfButton(e.OriginalSource as DependencyObject) is not Button { Tag: QuickAccessShelfItem item } anchor)
+        if (!IsQuickAccessShelfVisible)
         {
             return false;
         }
@@ -1673,12 +1672,17 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         {
             case QuickAccessShelfShortcuts.SelectionShortcutTarget.Visible:
                 // Let the matching native access key move focus to the requested shelf item.
-                return false;
+                return true;
             case QuickAccessShelfShortcuts.SelectionShortcutTarget.Unavailable:
                 // Reserve shelf selection chords even when their targets are in overflow so
                 // they cannot invoke a context shortcut on the currently focused shelf item.
                 e.Handled = true;
                 return true;
+        }
+
+        if (FindQuickAccessShelfButton(e.OriginalSource as DependencyObject) is not Button { Tag: QuickAccessShelfItem item } anchor)
+        {
+            return false;
         }
 
         if (e.Key == VirtualKey.Enter && modifiers.OnlyCtrl)
