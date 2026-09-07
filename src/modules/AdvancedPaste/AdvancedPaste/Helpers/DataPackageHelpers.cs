@@ -50,6 +50,7 @@ internal static class DataPackageHelpers
     {
         DataPackage dataPackage = new();
         dataPackage.SetHtmlFormat(HtmlFormatHelper.CreateHtmlFormat(html));
+        dataPackage.SetText(HtmlFormatHelper.GetStaticFragment(html));
         return dataPackage;
     }
 

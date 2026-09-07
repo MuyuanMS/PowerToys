@@ -259,10 +259,10 @@ namespace Microsoft.AdvancedPaste.UITests
         [TestCategory("PasteAsRichText")]
         public void TestCasePasteAsRichText()
         {
-            DeleteAndCopyFile(pasteAsRichTextFileName, tempTxtFileName);
-            ContentCopyAndPasteAsRichText(tempTxtFileName);
+            DeleteAndCopyFile(pasteAsPlainTextRawFileName, tempRTFFileName);
+            ContentCopyAndPasteAsRichText(pasteAsRichTextFileName, tempRTFFileName);
 
-            string resultPath = Path.Combine(testFilesFolderPath, tempTxtFileName);
+            string resultPath = Path.Combine(testFilesFolderPath, tempRTFFileName);
             StringAssert.Contains(FileReader.ReadRTFPlainText(resultPath), "Rich text title");
             StringAssert.Contains(FileReader.ReadRTFPlainText(resultPath), "bold");
             StringAssert.Contains(FileReader.ReadContent(resultPath), "\\b");
@@ -696,33 +696,45 @@ namespace Microsoft.AdvancedPaste.UITests
             window.Close();
         }
 
-        private void ContentCopyAndPasteAsRichText(string fileName)
+        private void ContentCopyAndPasteAsRichText(string sourceFileName, string destinationFileName)
         {
-            string tempFile = Path.Combine(testFilesFolderPath, fileName);
-            Process process = Process.Start(wordpadPath, tempFile);
-            if (process == null)
+            string sourceFile = Path.Combine(testFilesFolderPath, sourceFileName);
+            Process sourceProcess = Process.Start("notepad.exe", sourceFile);
+            if (sourceProcess == null)
             {
-                throw new InvalidOperationException("Failed to start WordPad.");
+                throw new InvalidOperationException("Failed to start Notepad.");
             }
 
             Thread.Sleep(15000);
-            var window = FindWindowWithFlexibleTitle(Path.GetFileName(tempFile), isRTF: true);
-            window.Click();
+            var sourceWindow = FindWindowWithFlexibleTitle(Path.GetFileName(sourceFile), isRTF: false);
+            sourceWindow.Click();
             Thread.Sleep(1000);
 
             this.SendKeys(Key.LCtrl, Key.A);
             Thread.Sleep(1000);
             this.SendKeys(Key.LCtrl, Key.C);
             Thread.Sleep(1000);
-            this.SendKeys(Key.Delete);
-            Thread.Sleep(1000);
+            sourceWindow.Close();
 
+            string destinationFile = Path.Combine(testFilesFolderPath, destinationFileName);
+            Process destinationProcess = Process.Start(wordpadPath, destinationFile);
+            if (destinationProcess == null)
+            {
+                throw new InvalidOperationException("Failed to start WordPad.");
+            }
+
+            Thread.Sleep(15000);
+            var destinationWindow = FindWindowWithFlexibleTitle(Path.GetFileName(destinationFile), isRTF: true);
+            destinationWindow.Click();
+            Thread.Sleep(1000);
+            this.SendKeys(Key.LCtrl, Key.A);
+            Thread.Sleep(1000);
             this.SendKeys(Key.Win, Key.LCtrl, Key.Alt, Key.R);
             Thread.Sleep(1000);
             this.SendKeys(Key.LCtrl, Key.S);
             Thread.Sleep(1000);
 
-            window.Close();
+            destinationWindow.Close();
         }
 
         private void ContentCopyAndPasteAsMarkdownCase2(string fileName, bool isRTF = false)
