@@ -133,7 +133,7 @@ public sealed class ProfileFunctionData : BaseFunctionData
 
         var profile = KbmProfileConverter.ToProfile(Input.Profile);
         var profileJson = JsonSerializer.Serialize(profile, _profileSerializerOptions);
-        _settingsUtils.SaveSettings(profileJson, KeyboardManagerSettings.ModuleName, GetProfileFileName());
+        SaveProfileAtomically(profileJson, GetProfileFileName());
         VerifySavedProfile();
 
         return SignalSettingsChangedEvent();
@@ -219,6 +219,28 @@ public sealed class ProfileFunctionData : BaseFunctionData
         if (!JsonNode.DeepEquals(expectedModel, savedModel))
         {
             throw new IOException("The Keyboard Manager profile could not be persisted.");
+        }
+    }
+
+    private static void SaveProfileAtomically(string profileJson, string fileName)
+    {
+        var path = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName, fileName);
+        var directory = Path.GetDirectoryName(path)
+            ?? throw new IOException("Could not determine the Keyboard Manager settings directory.");
+        Directory.CreateDirectory(directory);
+        var temporaryPath = Path.Combine(directory, $"{Path.GetFileName(path)}.{Guid.NewGuid():N}.tmp");
+
+        try
+        {
+            File.WriteAllText(temporaryPath, profileJson);
+            File.Move(temporaryPath, path, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
         }
     }
 

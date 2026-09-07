@@ -113,6 +113,11 @@ public sealed class ProfileResource : BaseResource
                 WriteMessageOutputLine(DscMessageLevel.Error, ex.Message);
                 return false;
             }
+            catch (JsonException ex)
+            {
+                WriteMessageOutputLine(DscMessageLevel.Error, ex.Message);
+                return false;
+            }
 
             // Report the canonical form of the applied profile as the new state
             data.Output.Profile = KbmProfileConverter.Canonicalize(data.Input.Profile);
