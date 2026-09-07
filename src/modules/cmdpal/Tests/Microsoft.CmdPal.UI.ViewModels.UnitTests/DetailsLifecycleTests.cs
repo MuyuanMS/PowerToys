@@ -230,6 +230,40 @@ public sealed partial class DetailsLifecycleTests
     }
 
     [TestMethod]
+    public async Task AsyncSelection_CompletesAfterQueuedPropertyNotification()
+    {
+        using var entered = new ManualResetEventSlim();
+        using var releaseInitialization = new ManualResetEventSlim();
+        using var notificationEntered = new ManualResetEventSlim();
+        using var releaseNotification = new ManualResetEventSlim();
+        var item = new TrackedListItem
+        {
+            OnSectionRead = () => Block(entered, releaseInitialization),
+            TextToSuggest = "suggestion",
+        };
+        var vm = CreateItem(item);
+        var selection = Task.Run(vm.SafeSlowInitAsync);
+
+        try
+        {
+            Assert.IsTrue(entered.Wait(TimeSpan.FromSeconds(5)));
+            item.OnTitleRead = () => Block(notificationEntered, releaseNotification);
+            item.Title = "updated title";
+            releaseInitialization.Set();
+
+            Assert.IsTrue(notificationEntered.Wait(TimeSpan.FromSeconds(5)));
+            Assert.IsFalse(selection.IsCompleted);
+        }
+        finally
+        {
+            releaseInitialization.Set();
+            releaseNotification.Set();
+        }
+
+        Assert.IsTrue(await selection.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    [TestMethod]
     public async Task Reselection_PublishesCompletedSuggestionAfterOriginalSelectionIsCanceled()
     {
         using var entered = new ManualResetEventSlim();
@@ -916,6 +950,8 @@ public sealed partial class DetailsLifecycleTests
 
         public Action? OnSectionRead { get; set; }
 
+        public Action? OnTitleRead { get; set; }
+
         public override string Section
         {
             get
@@ -925,6 +961,17 @@ public sealed partial class DetailsLifecycleTests
             }
 
             set => base.Section = value;
+        }
+
+        public override string Title
+        {
+            get
+            {
+                OnTitleRead?.Invoke();
+                return base.Title;
+            }
+
+            set => base.Title = value;
         }
 
         public override string TextToSuggest
