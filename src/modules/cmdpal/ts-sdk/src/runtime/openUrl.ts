@@ -4,7 +4,7 @@
 
 /**
  * Opens a URL in the user's default browser. Command Palette runs on Windows,
- * so the default opener launches Explorer directly; macOS and Linux fallbacks
+ * so the default opener invokes the registered URL protocol handler; macOS and Linux fallbacks
  * are provided for local development on other platforms.
  */
 
@@ -33,9 +33,9 @@ export const openUrlInDefaultBrowser: UrlOpener = (url) => {
   }
 
   if (process.platform === 'win32') {
-    // Launch Explorer directly rather than going through cmd.exe. This avoids
-    // command-shell expansion of percent sequences in otherwise valid URLs.
-    const child = spawn('explorer.exe', [url], {
+    // FileProtocolHandler dispatches through the registered URL handler without
+    // exposing the URL to cmd.exe expansion.
+    const child = spawn('rundll32.exe', ['url.dll,FileProtocolHandler', url], {
       detached: true,
       stdio: 'ignore',
       windowsHide: true,

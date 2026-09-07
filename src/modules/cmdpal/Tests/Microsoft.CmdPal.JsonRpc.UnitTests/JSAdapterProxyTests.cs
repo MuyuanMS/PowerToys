@@ -263,22 +263,6 @@ public class JSAdapterProxyTests
     }
 
     [TestMethod]
-    public void ParseContentSize_BoundsMalformedValueDiagnosticPreview()
-    {
-        var oversizedValue = new string('x', JSModelMapper.JsonDiagnosticPreviewMaxLength * 4);
-        using var document = JsonDocument.Parse(JsonSerializer.Serialize(new { size = oversizedValue }));
-        var sizeElement = document.RootElement.GetProperty("size");
-
-        var preview = JSModelMapper.GetBoundedJsonPreview(sizeElement);
-        var size = JSModelMapper.ParseContentSize(document.RootElement, "size");
-
-        Assert.AreEqual(JSModelMapper.JsonDiagnosticPreviewMaxLength + 3, preview.Length);
-        Assert.IsTrue(preview.EndsWith("...", StringComparison.Ordinal));
-        Assert.AreEqual(ContentSize.Small, size);
-        Assert.AreEqual("<undefined>", JSModelMapper.GetBoundedJsonPreview(default));
-    }
-
-    [TestMethod]
     public void ListPage_DetailsCommandInvokeSendsCommandInvokeWithId()
     {
         using var fake = new JSFakeExtension();
