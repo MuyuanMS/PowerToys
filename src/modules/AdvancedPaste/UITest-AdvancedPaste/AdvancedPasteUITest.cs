@@ -257,6 +257,7 @@ namespace Microsoft.AdvancedPaste.UITests
         [TestMethod]
         [TestCategory("AdvancedPasteUITest")]
         [TestCategory("PasteAsRichText")]
+        [Ignore("WordPad is not available in the pipeline image.")]
         public void TestCasePasteAsRichText()
         {
             DeleteAndCopyFile(pasteAsPlainTextRawFileName, tempRTFFileName);
