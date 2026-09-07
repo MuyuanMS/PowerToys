@@ -22,6 +22,7 @@ public class AutoHideCursorSettingsTests : UITestBase
     private const string HideOnIdleToggleId = "MouseUtils_AutoHideCursorHideOnIdleToggleId";
     private const string IdleDelayId = "MouseUtils_AutoHideCursorIdleDelayId";
     private const int SpiSetCursors = 0x57;
+    private const int CursorShowing = 0x00000001;
     private static readonly IDisposable ModuleSettings = SettingsConfigHelper.PreserveModuleSettings(ModuleName);
 
     static AutoHideCursorSettingsTests()
@@ -158,6 +159,35 @@ public class AutoHideCursorSettingsTests : UITestBase
         AssertIdleDelaySetting(60000);
     }
 
+    [TestMethod]
+    [TestCategory("MouseUtils")]
+    [TestCategory("AutoHideCursor")]
+    public void IdleHideAndDisableRestoreTheSystemCursor()
+    {
+        MouseUtilsTestHelper.ReplaceModuleSettings(
+            ModuleName,
+            CreateSettings(hideOnTyping: false, hideOnIdle: true, idleDelayMs: 1000));
+
+        OpenSettings();
+        var originalCursor = GetVisibleCursorHandle();
+        var hiddenCursor = WaitHelper.WaitForStable(
+            GetVisibleCursorHandle,
+            actual => actual != originalCursor && actual != IntPtr.Zero,
+            timeoutMS: 10_000,
+            requiredConsecutiveMatches: 2,
+            pollIntervalMS: 250);
+        Assert.IsTrue(hiddenCursor.Succeeded, "The idle trigger did not replace the active cursor.");
+
+        MouseUtilsTestHelper.SetModuleEnabled(this, ModuleToggleId, false);
+        var restoredCursor = WaitHelper.WaitForStable(
+            GetVisibleCursorHandle,
+            actual => actual == originalCursor,
+            timeoutMS: 10_000,
+            requiredConsecutiveMatches: 2,
+            pollIntervalMS: 250);
+        Assert.IsTrue(restoredCursor.Succeeded, "Disabling Auto Hide Cursor did not restore the active cursor.");
+    }
+
     private void OpenSettings()
     {
         MouseUtilsTestHelper.NavigateToMouseUtilities(this);
@@ -227,6 +257,14 @@ public class AutoHideCursorSettingsTests : UITestBase
             .GetInt32();
     }
 
+    private static IntPtr GetVisibleCursorHandle()
+    {
+        var cursorInfo = new CURSORINFO { CbSize = Marshal.SizeOf<CURSORINFO>() };
+        Assert.IsTrue(GetCursorInfo(out cursorInfo), "Could not read the active cursor.");
+        Assert.AreEqual(CursorShowing, cursorInfo.Flags, "The active cursor was not visible.");
+        return cursorInfo.HCursor;
+    }
+
     private static void AssertWorkerState(bool expectedRunning)
     {
         var result = WaitForWorkerState(expectedRunning, 15_000);
@@ -273,4 +311,23 @@ public class AutoHideCursorSettingsTests : UITestBase
 
     [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW", SetLastError = true)]
     private static extern bool SystemParametersInfo(int uiAction, int uiParam, IntPtr pvParam, int fWinIni);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct CURSORINFO
+    {
+        public int CbSize;
+        public int Flags;
+        public IntPtr HCursor;
+        public POINT Position;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetCursorInfo(out CURSORINFO cursorInfo);
 }
