@@ -46,6 +46,35 @@ public sealed class SessionTests
     }
 
     [TestMethod]
+    public void InspectionAcceptsKnownMatchesEnvelope()
+    {
+        using var document = JsonDocument.Parse("""
+            {"matches":[{"selector":"btn-one-1234","name":"One","type":"Button","className":"Button","width":32,"height":24}]}
+            """);
+
+        var matches = Session.ParseSearchResult(document.RootElement, fromInspection: true);
+
+        Assert.HasCount(1, matches);
+        Assert.AreEqual(new Session.SearchHit("btn-one-1234", "One", "Button", "Button", 0, 0, 32, 24), matches[0]);
+    }
+
+    [TestMethod]
+    public void InspectionPrefersSelectedRootsOverSearchMatches()
+    {
+        using var document = JsonDocument.Parse("""
+            {
+              "windows":[{"elements":[{"selector":"grp-selected-1234","type":"Group"}]}],
+              "matches":[{"selector":"btn-unrelated-5678","type":"Button"}]
+            }
+            """);
+
+        var matches = Session.ParseSearchResult(document.RootElement, fromInspection: true);
+
+        Assert.HasCount(1, matches);
+        Assert.AreEqual("grp-selected-1234", matches[0].Selector);
+    }
+
+    [TestMethod]
     [DataRow("""{"windows":[]}""", true)]
     [DataRow("""{"windows":[{}]}""", true)]
     [DataRow("""{"matches":[]}""", false)]

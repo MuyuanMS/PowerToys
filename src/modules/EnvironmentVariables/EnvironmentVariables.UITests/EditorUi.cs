@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.PowerToys.UITest.Next;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -46,21 +47,49 @@ internal sealed class EditorUi(Session session, TestContext context)
     internal static string Property(JsonElement node, string name) =>
         node.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString()! : string.Empty;
 
-    internal JsonElement Inspect(Element parent) =>
-        WinappCli.InvokeJson("ui", "inspect", parent.Selector, Session.TargetFlag, Session.TargetValue, "--json", "-d", "30");
+    internal JsonElement Inspect(Element parent, int depth = 8) =>
+        WinappCli.InvokeJson("ui", "inspect", parent.Selector, Session.TargetFlag, Session.TargetValue, "--json", "-d", depth.ToString(CultureInfo.InvariantCulture));
 
     internal T Child<T>(Element parent, string className, string? name = null, string? automationId = null)
         where T : Element, new()
     {
         // Element.Find currently searches the whole session; inspect the actual subtree to avoid
         // confusing User, System, profile, and Applied rows that share the same variable name.
-        var tree = Inspect(parent);
-        var matches = Nodes(tree).Where(node =>
+        var match = WaitForDescendant(parent, node =>
             Property(node, "className") == className &&
             (name is null || Property(node, "name") == name) &&
-            (automationId is null || Property(node, "automationId") == automationId)).ToArray();
-        Assert.HasCount(1, matches, $"Expected one {className} '{name ?? automationId}' below {parent.Selector}. Tree: {tree}");
-        return Resolve<T>(matches[0]);
+            (automationId is null || Property(node, "automationId") == automationId),
+            $"{className} '{name ?? automationId}'");
+        return Resolve<T>(match);
+    }
+
+    private JsonElement WaitForDescendant(Element parent, Func<JsonElement, bool> predicate, string description)
+    {
+        JsonElement tree = default;
+        var result = WaitHelper.WaitForStable(
+            () =>
+            {
+                tree = Inspect(parent);
+                return Nodes(tree).Where(predicate).ToArray();
+            },
+            matches => matches?.Length == 1,
+            timeoutMS: 15_000,
+            requiredConsecutiveMatches: 2,
+            pollIntervalMS: 200,
+            shouldRetryException: exception => exception is AssertFailedException &&
+                exception.Message.Contains("stale_element", StringComparison.OrdinalIgnoreCase));
+        if (!result.Succeeded)
+        {
+            string preview = tree.ValueKind == JsonValueKind.Undefined ? "<unavailable>" : tree.GetRawText();
+            if (preview.Length > 2_000)
+            {
+                preview = preview[..2_000] + "... (truncated)";
+            }
+
+            Assert.Fail($"Expected one {description} below {parent.Selector}; last count: {result.LastObservation?.Length}. Tree: {preview}");
+        }
+
+        return result.LastObservation![0];
     }
 
     private T Resolve<T>(JsonElement node)
@@ -77,16 +106,17 @@ internal sealed class EditorUi(Session session, TestContext context)
         var buttons = Session.FindAll<Button>(By.AccessibilityId("PathEntryOptionsButton")).ToArray();
         Assert.IsTrue(index >= 0 && index < buttons.Length, $"PATH entry {index} was not found among {buttons.Length} entries.");
         buttons[index].Invoke();
-        Menu(action);
+        Menu($"{action}PathEntryMenuItem");
     }
 
     internal void SetPathEntry(int index, string value)
     {
         Step($"Setting PATH list entry {index} to {value}");
-        var entries = Nodes(Session.Inspect(depth: 30)).Where(node =>
-            Property(node, "className") == "TextBox" && Property(node, "automationId") == string.Empty).ToArray();
+        var entries = Session.FindAll<TextBox>(By.AccessibilityId("VariableListEntryValueTextBox")).ToArray();
         Assert.IsTrue(index >= 0 && index < entries.Length, $"PATH entry {index} was not found.");
-        Resolve<TextBox>(entries[index]).SetText(value);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(entries[index].Name), "List-entry editors must expose an accessible name.");
+        entries[index].SetText(value);
+        // The product commits list-entry edits in EditVariableValuesListTextBox_LostFocus.
         Session.Find<TextBox>(By.AccessibilityId("EditVariableDialogNameTxtBox")).Focus();
     }
 
@@ -113,27 +143,35 @@ internal sealed class EditorUi(Session session, TestContext context)
         return matches[0];
     }
 
-    internal Element Expand(string name)
+    internal Element Expand(string name) => Expand(Expander(name));
+
+    internal Element ExpandDefaultSet(EnvironmentVariableTarget target) =>
+        Expand(Session.Find<Element>(By.AccessibilityId(target switch
+        {
+            EnvironmentVariableTarget.User => "UserVariablesExpander",
+            EnvironmentVariableTarget.Machine => "SystemVariablesExpander",
+            _ => throw new ArgumentOutOfRangeException(nameof(target)),
+        })));
+
+    private Element Expand(Element expander)
     {
-        var expander = Expander(name);
-        var header = Child<Element>(expander, "Microsoft.UI.Xaml.Controls.Expander", name);
+        var header = Child<Element>(expander, "Microsoft.UI.Xaml.Controls.Expander");
         if (header.GetProperty("ExpandCollapseState") != "Expanded")
         {
-            Step($"Expanding {name}");
+            Step($"Expanding {expander.Name}");
             header.Invoke();
-            Assert.IsTrue(header.WaitForProperty("ExpandCollapseState", "Expanded", 10_000), $"'{name}' did not expand.");
+            Assert.IsTrue(header.WaitForProperty("ExpandCollapseState", "Expanded", 10_000), $"'{expander.Name}' did not expand.");
         }
 
-        return Expander(name);
+        return expander;
     }
 
     internal Element VariableCard(Element parent, string name)
     {
-        var tree = Inspect(parent);
-        var matches = Nodes(tree).Where(node => Property(node, "className") == "SettingsCard" &&
-            Nodes(node).Any(child => Property(child, "type") == "Text" && Property(child, "name") == name)).ToArray();
-        Assert.HasCount(1, matches, $"Expected one variable card for {name}. Tree: {tree}");
-        return Resolve<Element>(matches[0]);
+        var match = WaitForDescendant(parent, node => Property(node, "className") == "SettingsCard" &&
+            Nodes(node).Any(child => Property(child, "type") == "Text" && Property(child, "name") == name),
+            $"variable card for {name}");
+        return Resolve<Element>(match);
     }
 
     internal void SaveDialog()
@@ -145,46 +183,48 @@ internal sealed class EditorUi(Session session, TestContext context)
         Assert.IsTrue(save.WaitForGone(10_000), "The saved dialog did not close.");
     }
 
-    internal void AddUserVariable(string name, string value)
+    internal void AddUserVariableAndVerify(string name, string value)
     {
         Step($"Adding User variable {name}");
         Session.Find<Button>(By.AccessibilityId("AddDefaultVariableUserBtn")).Invoke();
-        Session.Find<TextBox>(By.Name("Name")).SetText(name);
-        Session.Find<TextBox>(By.Name("Value")).SetText(value);
+        Session.Find<TextBox>(By.AccessibilityId("DefaultVariableNameTextBox")).SetText(name);
+        Session.Find<TextBox>(By.AccessibilityId("DefaultVariableValueTextBox")).SetText(value);
         SaveDialog();
         AssertUserVariable(name, value);
         AssertAppliedVariable(name, value);
     }
 
-    internal void VariableMenu(string set, string name, string action)
+    internal void VariableMenu(string profile, string name, string action) => VariableMenu(Expand(profile), name, action);
+
+    internal void VariableMenu(EnvironmentVariableTarget target, string name, string action) => VariableMenu(ExpandDefaultSet(target), name, action);
+
+    private void VariableMenu(Element expander, string name, string action)
     {
-        Step($"{action} variable {name} in {set}");
-        var expander = Expand(set);
+        Step($"{action} variable {name} in {expander.Name}");
         var card = VariableCard(expander, name);
         Child<Button>(card, "Button", automationId: "VariableOptionsButton").Invoke();
-        Menu(action);
+        Menu($"{action}VariableMenuItem");
     }
 
-    internal void Menu(string name) =>
-        Session.FindAll<Element>(By.Name(name)).Single(element => element.ControlType == "MenuItem" && element.Name == name).Invoke();
+    private void Menu(string automationId) => Session.Find<Element>(By.AccessibilityId(automationId)).Invoke();
 
     internal void ConfirmRemoval()
     {
         Step("Confirming removal");
         var yes = Session.Find<Button>(By.AccessibilityId("PrimaryButton"));
-        Assert.AreEqual("Yes", yes.Name);
+        Assert.IsTrue(yes.IsEnabled, "The removal confirmation must be enabled.");
         yes.Invoke();
         Assert.IsTrue(yes.WaitForGone(10_000), "The removal confirmation did not close.");
     }
 
-    internal void CreateProfile(string name, bool enabled, params (string Name, string Value)[] variables)
+    internal void CreateProfileAndVerify(string name, bool enabled, params (string Name, string Value)[] variables)
     {
         Step($"Creating profile {name}");
-        Session.Find<TextBlock>(By.Name("New profile")).Invoke();
+        Session.Find<Button>(By.AccessibilityId("NewProfileButton")).Invoke();
         FillProfile(name, enabled, variables);
     }
 
-    internal void EditProfile(string name, params (string Name, string Value)[] variables)
+    internal void EditProfileAndVerify(string name, params (string Name, string Value)[] variables)
     {
         ProfileMenu(name, "Edit");
         FillProfile(name, false, variables);
@@ -193,17 +233,19 @@ internal sealed class EditorUi(Session session, TestContext context)
     internal void ProfileMenu(string name, string action)
     {
         Step($"{action} profile {name}");
-        Child<Button>(Expander(name), "Button", automationId: "ProfileOptionsButton").Invoke();
-        Menu(action);
+        var options = Child<Button>(Expander(name), "Button", automationId: "ProfileOptionsButton");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(options.Name), "Profile options must expose an accessible name.");
+        options.Invoke();
+        Menu($"{action}ProfileMenuItem");
     }
 
     private void FillProfile(string name, bool enabled, (string Name, string Value)[] variables)
     {
-        Session.Find<TextBox>(By.Name("Name")).SetText(name);
+        Session.Find<TextBox>(By.AccessibilityId("ProfileNameTextBox")).SetText(name);
         foreach (var variable in variables)
         {
             Step($"Adding {variable.Name} to profile {name}");
-            Session.Find<TextBlock>(By.Name("Add variable")).Invoke();
+            Session.Find<Button>(By.AccessibilityId("AddProfileVariableButton")).Invoke();
             Session.Find<TextBox>(By.AccessibilityId("AddNewVariableName")).SetText(variable.Name);
             Session.Find<TextBox>(By.AccessibilityId("AddNewVariableValue")).SetText(variable.Value);
             var add = Session.Find<Button>(By.AccessibilityId("ConfirmAddVariableBtn"));
@@ -212,13 +254,13 @@ internal sealed class EditorUi(Session session, TestContext context)
             Assert.IsTrue(add.WaitForGone(10_000), "The Add variable flyout did not close.");
         }
 
-        var toggle = Session.Find<ToggleSwitch>(By.Name("Enabled"));
+        var toggle = Session.Find<ToggleSwitch>(By.AccessibilityId("ProfileEnabledToggle"));
         SetToggle(toggle, enabled);
         SaveDialog();
         AssertProfile(name, enabled, variables);
     }
 
-    internal void SetProfileEnabled(string name, bool enabled)
+    internal void SetProfileEnabledAndVerify(string name, bool enabled)
     {
         Step($"Setting profile {name} enabled={enabled}");
         SetToggle(Child<ToggleSwitch>(Expander(name), "ToggleSwitch"), enabled);
@@ -235,7 +277,7 @@ internal sealed class EditorUi(Session session, TestContext context)
         Assert.IsTrue(toggle.WaitForProperty("ToggleState", enabled ? "On" : "Off", 10_000), "The toggle state did not update.");
     }
 
-    internal void RemoveProfile(string name)
+    internal void RemoveProfileAndVerify(string name)
     {
         ProfileMenu(name, "Remove");
         ConfirmRemoval();
@@ -269,17 +311,19 @@ internal sealed class EditorUi(Session session, TestContext context)
     internal void AssertAppliedVariable(string name, string? value)
     {
         Step($"Checking Applied variables: {name}={value ?? "<absent>"}");
+        var panel = Session.Find<Element>(By.AccessibilityId("AppliedVariablesScrollViewer"));
         Wait(
             () =>
             {
-                var panel = Session.Find<Element>(By.AccessibilityId("AppliedVariablesScrollViewer"));
-                string[] text = Nodes(Inspect(panel)).Where(node => Property(node, "type") == "Text")
+                string[] text = Nodes(Inspect(panel, depth: 6)).Where(node => Property(node, "type") == "Text")
                     .Select(node => Property(node, "name")).ToArray();
                 if (value is null)
                 {
                     return !text.Contains(name, StringComparer.OrdinalIgnoreCase);
                 }
 
+                // The Applied-variable template exposes name/value TextBlocks in row order.
+                // Windows variable names ignore casing; values must retain their exact text.
                 return Enumerable.Range(0, Math.Max(0, text.Length - 1)).Any(index =>
                     text[index].Equals(name, StringComparison.OrdinalIgnoreCase) && text[index + 1] == value);
             },

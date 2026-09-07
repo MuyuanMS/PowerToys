@@ -469,7 +469,7 @@ public sealed class Session
                 .Where(window => window.TryGetProperty("elements", out var elements) && elements.ValueKind == JsonValueKind.Array)
                 .SelectMany(window => window.GetProperty("elements").EnumerateArray());
         }
-        else if (!fromInspection && root.TryGetProperty("matches", out var array) && array.ValueKind == JsonValueKind.Array)
+        else if (root.TryGetProperty("matches", out var array) && array.ValueKind == JsonValueKind.Array)
         {
             matches = array.EnumerateArray();
         }
