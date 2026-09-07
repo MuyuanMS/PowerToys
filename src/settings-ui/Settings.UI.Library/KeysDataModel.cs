@@ -26,6 +26,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         public string OriginalKeys { get; set; }
 
         [JsonPropertyName("secondKeyOfChord")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public uint SecondKeyOfChord { get; set; }
 
         [JsonPropertyName("newRemapKeys")]
@@ -40,11 +41,32 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         [JsonPropertyName("runProgramArgs")]
         public string RunProgramArgs { get; set; }
 
+        [JsonPropertyName("runProgramStartInDir")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string RunProgramStartInDir { get; set; }
+
+        [JsonPropertyName("runProgramElevationLevel")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? RunProgramElevationLevel { get; set; }
+
+        [JsonPropertyName("runProgramAlreadyRunningAction")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? RunProgramAlreadyRunningAction { get; set; }
+
+        [JsonPropertyName("runProgramStartWindowType")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? RunProgramStartWindowType { get; set; }
+
+        [JsonPropertyName("exactMatch")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? ExactMatch { get; set; }
+
         [JsonPropertyName("openUri")]
         public string OpenUri { get; set; }
 
         [JsonPropertyName("operationType")]
-        public int OperationType { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? OperationType { get; set; }
 
         private enum KeyboardManagerEditorType
         {
