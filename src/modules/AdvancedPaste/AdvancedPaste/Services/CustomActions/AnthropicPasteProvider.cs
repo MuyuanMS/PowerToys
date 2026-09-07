@@ -8,9 +8,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using AdvancedPaste.Helpers;
 using AdvancedPaste.Models;
-using Microsoft.PowerToys.Settings.UI.Library;
-using Microsoft.Extensions.AI;
 using Anthropic;
+using Microsoft.Extensions.AI;
+using Microsoft.PowerToys.Settings.UI.Library;
 
 namespace AdvancedPaste.Services.CustomActions
 {
