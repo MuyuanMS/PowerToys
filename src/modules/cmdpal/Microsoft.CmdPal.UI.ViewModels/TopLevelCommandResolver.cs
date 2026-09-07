@@ -18,14 +18,12 @@ internal static class TopLevelCommandResolver
         IEnumerable<PinnedCommandSettings> pinnedCommands,
         IEnumerable<RecentCommandIdentity> recentCommands,
         IEnumerable<TopLevelViewModel> availableCommands,
+        IListPage allAppsPage,
         bool includeApps,
         int pinnedCommandLimit = int.MaxValue,
         int recentCommandLimit = SettingsModel.DefaultRecentCommandsDisplayLimit,
         bool includeRegular = true)
     {
-        static IListItem? ResolveRecentApp(string commandId) =>
-            AllAppsCommandProvider.Page.TryGetCurrentItem(commandId, out var item) ? item : null;
-
         Func<string, IListItem?>? additionalRecentResolver = includeApps ? ResolveRecentApp : null;
         return Resolve<IListItem>(
             pinnedCommands,
@@ -38,6 +36,16 @@ internal static class TopLevelCommandResolver
             pinnedCommandLimit,
             recentCommandLimit,
             includeRegular);
+
+        IListItem? ResolveRecentApp(string commandId)
+        {
+            if (allAppsPage is AllAppsPage appsPage)
+            {
+                return appsPage.TryGetCurrentItem(commandId, out var item) ? item : null;
+            }
+
+            return allAppsPage.GetItems().FirstOrDefault(item => item.Command?.Id == commandId);
+        }
     }
 
     internal static string GetProviderId(IListItem command) =>

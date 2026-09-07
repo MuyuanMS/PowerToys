@@ -486,7 +486,7 @@
                                     Width="40"
                                     Height="40"
                                     Padding="8"
-                                    AccessKey="{x:Bind ShortcutDigit, Mode=OneWay}"
+                                    AccessKey="{x:Bind ShortcutDigit, Mode=OneTime}"
                                     AutomationProperties.Name="{x:Bind Title, Mode=OneTime}"
                                     Click="QuickAccessShelfItem_Click"
                                     Style="{StaticResource SubtleButtonStyle}"
@@ -499,8 +499,8 @@
                                                 <TextBlock
                                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                     Style="{StaticResource CaptionTextBlockStyle}"
-                                                    Text="{x:Bind ShortcutDigit, Mode=OneWay, Converter={StaticResource QuickAccessShortcutTextConverter}}"
-                                                    Visibility="{x:Bind ShortcutDigit, Mode=OneWay, Converter={StaticResource StringNotEmptyToVisibilityConverter}}" />
+                                                    Text="{x:Bind ShortcutDigit, Mode=OneTime, Converter={StaticResource QuickAccessShortcutTextConverter}}"
+                                                    Visibility="{x:Bind ShortcutDigit, Mode=OneTime, Converter={StaticResource StringNotEmptyToVisibilityConverter}}" />
                                             </StackPanel>
                                         </ToolTip>
                                     </ToolTipService.ToolTip>

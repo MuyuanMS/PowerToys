@@ -3,7 +3,6 @@
 // See the LICENSE file in the project root for more information.
 
 using Microsoft.CmdPal.UI.ViewModels;
-using Microsoft.CmdPal.UI.ViewModels.Commands;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -18,28 +17,19 @@ internal sealed class PowerToysAppHostService : IAppHostService
 
     public AppExtensionHost GetHostForCommand(object? context, AppExtensionHost? currentHost)
     {
-        context = UnwrapRecentCommand(context);
-        AppExtensionHost? topLevelHost = null;
-        if (context is TopLevelViewModel topLevelViewModel)
-        {
-            topLevelHost = topLevelViewModel.ExtensionHost;
-        }
+        var contextProvidedHost = (context as ICommandContextSource)?.ExtensionHost;
 
-        return topLevelHost ?? currentHost ?? CommandPaletteHost.Instance;
+        return contextProvidedHost
+               ?? currentHost
+               ?? CommandPaletteHost.Instance;
     }
 
     public ICommandProviderContext GetProviderContextForCommand(object? command, ICommandProviderContext? currentContext)
     {
-        command = UnwrapRecentCommand(command);
-        ICommandProviderContext? topLevelId = null;
-        if (command is TopLevelViewModel topLevelViewModel)
-        {
-            topLevelId = topLevelViewModel.ProviderContext;
-        }
+        var contextProvidedProviderContext = (command as ICommandContextSource)?.ProviderContext;
 
-        return topLevelId ?? currentContext ?? throw new InvalidOperationException("No command provider context could be found for the given command, and no current context was provided.");
+        return contextProvidedProviderContext
+               ?? currentContext
+               ?? throw new InvalidOperationException("No command provider context could be found for the given command, and no current context was provided.");
     }
-
-    private static object? UnwrapRecentCommand(object? context) =>
-        context is RecentCommandListItem recentCommand ? recentCommand.Source : context;
 }
