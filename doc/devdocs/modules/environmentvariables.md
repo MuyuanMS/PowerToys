@@ -68,16 +68,26 @@ EnvironmentVariableUILib            # Abstracted UI methods and implementations
 
 - The module reads and writes variables directly to the registry instead of using the Environment API
 - This direct registry access approach is used because the Environment API automatically expands variables and has a timeout for notifications
-- When a profile variable has the same name as an existing User variable, a backup is created with the naming pattern: `VARIABLE_NAME_powertoys_PROFILE_NAME`
+- When a profile variable has the same name as an existing User variable, a backup is created with the naming pattern: `VARIABLE_NAME_PowerToys_PROFILE_NAME`
 
 ## UI tests
 
+**Do not run this suite on a working machine.** Use a disposable VM: the PATH scenario temporarily
+replaces the current user's PATH with `path1;path2;path3`. Stopping the test host, a timeout, or a
+machine reset can leave that PATH in place until recovery runs.
+
 `src\modules\EnvironmentVariables\EnvironmentVariables.UITests` uses `UITestAutomation.Next`
-and winappcli. Run it on an isolated interactive desktop: the suite edits the current user's
-environment, including User PATH. Test variables and profiles have unique names; cleanup restores
+and winappcli. Test variables and profiles have unique names; cleanup restores
 the original unexpanded values, registry value kinds, and profile/settings files. TMP and System
 PATH are not modified. Registry reads independently verify the persistent Windows environment
 shown by the OS editor, while UIA assertions verify the module's Applied variables list.
+
+Before modifying state, the fixture persists original variables and profile/module/global settings
+in `%LOCALAPPDATA%\Microsoft\PowerToys\EnvironmentVariables\ui-tests-state.json`. A subsequent suite
+invocation restores an interrupted run before taking a new snapshot. Cleanup attempts all restores
+even if stopping the editor or one restore fails, reports failures, and retains the recovery journal
+until restoration succeeds. Do not delete the journal to bypass recovery or attach it to a public
+issue: it contains the original user state.
 
 Coverage of [the UI-test checklist](https://github.com/microsoft/PowerToys/issues/40680):
 
@@ -99,3 +109,7 @@ Build with `tools\build\build.cmd -Path src\modules\EnvironmentVariables\Environ
 Run the resulting `EnvironmentVariables.UITests.exe` with `--report-trx`; the category is
 `EnvironmentVariables`. Use the `ui-tests-local-vm` workflow for full Windows 10 and Windows 11
 default/constrained runs, then select `[EnvironmentVariables.UITests]` in UI Test Automation CI.
+
+`TestState` intentionally owns this module's profile reconciliation and environment restoration.
+Use `SettingsConfigHelper.PreserveFile` or `PreserveModuleSettings` for ordinary in-process file
+snapshots; extracting a shared crash-recovery fixture is a separate framework change.
