@@ -19,8 +19,8 @@ policies are never removed.
 
 ## Usage
 
-Open 64-bit PowerShell as administrator, change to this directory, and preview
-the detected installations:
+Open 64-bit PowerShell, change to this directory, and preview the detected
+installations:
 
 ```powershell
 .\Uninstall-PowerToys.ps1 -WhatIf
@@ -31,6 +31,10 @@ Remove all detected PowerToys installations:
 ```powershell
 .\Uninstall-PowerToys.ps1
 ```
+
+Run from the affected standard-user profile to remove only its per-user
+installation. Run again from an elevated PowerShell window to remove
+machine-wide installations.
 
 Also remove the current user's settings, logs, and update cache:
 

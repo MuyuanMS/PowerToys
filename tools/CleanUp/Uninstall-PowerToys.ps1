@@ -160,16 +160,44 @@ function Test-MicrosoftSignedFile {
             return $false
         }
 
-        $signerName = $signature.SignerCertificate.GetNameInfo(
-            [Security.Cryptography.X509Certificates.X509NameType]::SimpleName,
-            $false)
-        return [string]::Equals(
-            $signerName,
-            'Microsoft Corporation',
-            [StringComparison]::Ordinal)
+        $organization = $signature.SignerCertificate.SubjectName.Name
+        if ($organization -notmatch '(?i)(^|,\s*)O\s*=\s*Microsoft Corporation(?:,|$)') {
+            return $false
+        }
+
+        $chain = [Security.Cryptography.X509Certificates.X509Chain]::new()
+        $chain.ChainPolicy.RevocationMode = [Security.Cryptography.X509Certificates.X509RevocationMode]::NoCheck
+        if (-not $chain.Build($signature.SignerCertificate)) {
+            return $false
+        }
+
+        $machineRoots = @(
+            Get-ChildItem -Path 'Cert:\LocalMachine\Root' -ErrorAction Stop |
+                ForEach-Object { $_.Thumbprint }
+        )
+        $root = $chain.ChainElements[$chain.ChainElements.Count - 1].Certificate
+        return $machineRoots -contains $root.Thumbprint
     } catch {
         return $false
     }
+}
+
+function Get-MsiDatabaseProperty {
+    param(
+        [string]$Path,
+        [string]$Property
+    )
+
+    $installer = New-Object -ComObject WindowsInstaller.Installer
+    $database = $installer.OpenDatabase($Path, 0)
+    $view = $database.OpenView("SELECT `Value` FROM Property WHERE `Property` = '$Property'")
+    $view.Execute()
+    $record = $view.Fetch()
+    if ($null -eq $record) {
+        return $null
+    }
+
+    return $record.StringData(1)
 }
 
 function Test-PowerToysMsiProduct {
@@ -215,6 +243,7 @@ function Get-PowerToysMsiProducts {
             [pscustomobject]@{
                 Scope = $definition.Scope
                 ProductCode = $code
+                UpgradeCode = $definition.UpgradeCode
                 State = $state
                 StateName = Get-MsiStateName -State $state
             }
@@ -357,7 +386,8 @@ function Get-BundleExecutable {
 
 function New-ProtectedDirectory {
     param(
-        [string]$Path
+        [string]$Path,
+        [switch]$AdministratorOnly
     )
 
     $parent = Split-Path -Path $Path -Parent
@@ -365,19 +395,29 @@ function New-ProtectedDirectory {
         New-Item -ItemType Directory -Path $parent -Force | Out-Null
     }
 
+    if (Test-Path -LiteralPath $Path) {
+        throw "The cleanup run directory already exists: $Path"
+    }
+
     New-Item -ItemType Directory -Path $Path -ErrorAction Stop | Out-Null
+    $directory = Get-Item -LiteralPath $Path -ErrorAction Stop
+    if ($directory.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+        throw "The cleanup run directory is a reparse point: $Path"
+    }
 
-    $administrators = [Security.Principal.SecurityIdentifier]::new([Security.Principal.WellKnownSidType]::BuiltinAdministratorsSid, $null)
-    $system = [Security.Principal.SecurityIdentifier]::new([Security.Principal.WellKnownSidType]::LocalSystemSid, $null)
-    $acl = [Security.AccessControl.DirectorySecurity]::new()
-    $inheritance = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
-    $propagation = [Security.AccessControl.PropagationFlags]::None
-    $rights = [Security.AccessControl.FileSystemRights]::FullControl
+    if ($AdministratorOnly) {
+        $administrators = [Security.Principal.SecurityIdentifier]::new([Security.Principal.WellKnownSidType]::BuiltinAdministratorsSid, $null)
+        $system = [Security.Principal.SecurityIdentifier]::new([Security.Principal.WellKnownSidType]::LocalSystemSid, $null)
+        $acl = [Security.AccessControl.DirectorySecurity]::new()
+        $inheritance = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+        $propagation = [Security.AccessControl.PropagationFlags]::None
+        $rights = [Security.AccessControl.FileSystemRights]::FullControl
 
-    $acl.SetAccessRuleProtection($true, $false)
-    $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($administrators, $rights, $inheritance, $propagation, [Security.AccessControl.AccessControlType]::Allow))
-    $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($system, $rights, $inheritance, $propagation, [Security.AccessControl.AccessControlType]::Allow))
-    Set-Acl -LiteralPath $Path -AclObject $acl
+        $acl.SetAccessRuleProtection($true, $false)
+        $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($administrators, $rights, $inheritance, $propagation, [Security.AccessControl.AccessControlType]::Allow))
+        $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($system, $rights, $inheritance, $propagation, [Security.AccessControl.AccessControlType]::Allow))
+        Set-Acl -LiteralPath $Path -AclObject $acl
+    }
 }
 
 function Copy-BundleExecutableForExecution {
@@ -390,6 +430,33 @@ function Copy-BundleExecutableForExecution {
     Copy-Item -LiteralPath $Path -Destination $destination -Force -ErrorAction Stop
     if (-not (Test-MicrosoftSignedFile -Path $destination)) {
         throw "The staged bundle at $destination is not an authentic Microsoft-signed file."
+    }
+
+    return $destination
+}
+
+function Copy-MsiForExecution {
+    param(
+        [object]$Product,
+        [string]$Path,
+        [string]$DestinationDirectory
+    )
+
+    $destination = Join-Path $DestinationDirectory "$($Product.ProductCode.Trim('{}')).msi"
+    Copy-Item -LiteralPath $Path -Destination $destination -Force -ErrorAction Stop
+    if (-not (Test-MicrosoftSignedFile -Path $destination)) {
+        throw "The staged MSI at $destination is not an authentic Microsoft-signed file."
+    }
+
+    if (-not [string]::Equals(
+            (Get-MsiDatabaseProperty -Path $destination -Property 'ProductCode'),
+            $Product.ProductCode,
+            [StringComparison]::OrdinalIgnoreCase) -or
+        -not [string]::Equals(
+            (Get-MsiDatabaseProperty -Path $destination -Property 'UpgradeCode'),
+            $Product.UpgradeCode,
+            [StringComparison]::OrdinalIgnoreCase)) {
+        throw "The staged MSI at $destination does not identify the expected PowerToys product."
     }
 
     return $destination
@@ -515,20 +582,36 @@ if (-not $PSCmdlet.ShouldProcess($target, 'Remove PowerToys')) {
     return
 }
 
-if (-not (Test-IsAdministrator)) {
-    throw 'Run this script from an elevated PowerShell window so it can remove machine-wide installations.'
+$isAdministrator = Test-IsAdministrator
+$machineTargets = @(
+    $products | Where-Object { $_.Scope -eq 'PerMachine' -and $_.State -ne -1 -and $_.State -ne 2 }
+) + @($bundles | Where-Object { $_.Scope -eq 'PerMachine' })
+if (-not $isAdministrator -and $machineTargets.Count -gt 0) {
+    throw 'Run this script elevated to remove machine-wide PowerToys installations. A non-elevated run can remove only the current user installation.'
 }
 
 $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$stagingDirectory = Join-Path $env:ProgramData "Microsoft\PowerToys\Cleanup\$timestamp"
-$logDirectory = Join-Path $env:ProgramData "Microsoft\PowerToys\CleanupLogs\$timestamp"
-New-ProtectedDirectory -Path $stagingDirectory
-New-ProtectedDirectory -Path $logDirectory
+$runId = "$timestamp-$([Guid]::NewGuid().ToString('N'))"
+if ($isAdministrator) {
+    $stagingDirectory = Join-Path $env:ProgramData "Microsoft\PowerToys\Cleanup\$runId"
+    $logDirectory = Join-Path $env:ProgramData "Microsoft\PowerToys\CleanupLogs\$runId"
+    New-ProtectedDirectory -Path $stagingDirectory -AdministratorOnly
+    New-ProtectedDirectory -Path $logDirectory -AdministratorOnly
+} else {
+    $stagingDirectory = Join-Path $env:LOCALAPPDATA "Microsoft\PowerToys\Cleanup\$runId"
+    $logDirectory = Join-Path $env:LOCALAPPDATA "Microsoft\PowerToys\CleanupLogs\$runId"
+    New-ProtectedDirectory -Path $stagingDirectory
+    New-ProtectedDirectory -Path $logDirectory
+}
 
 try {
     Stop-PowerToysProcesses
 
     foreach ($product in $products) {
+        if (-not $isAdministrator -and $product.Scope -ne 'PerUser') {
+            continue
+        }
+
         if ($product.State -eq -1 -or $product.State -eq 2) {
             Write-Host "Skipping inactive $($product.Scope) MSI $($product.ProductCode) [$($product.StateName)]."
             continue
@@ -541,10 +624,23 @@ try {
             continue
         }
 
-        $logPath = Join-Path $logDirectory "$($product.Scope)-$($product.ProductCode.Trim('{}')).log"
+        $localPackage = Get-MsiProductProperty -ProductCode $product.ProductCode -Property 'LocalPackage'
+        try {
+            $stagedMsi = Copy-MsiForExecution `
+                -Product $product `
+                -Path $localPackage `
+                -DestinationDirectory $stagingDirectory
+        } catch {
+            $script:failures.Add(
+                "Could not stage the cached MSI for $($product.Scope) $($product.ProductCode) " +
+                "in a protected location: $($_.Exception.Message)")
+            continue
+        }
+
+        $logPath = Join-Path $logDirectory "$([Guid]::NewGuid().ToString('N')).log"
         $arguments = @(
             '/x',
-            $product.ProductCode,
+            "`"$stagedMsi`"",
             '/quiet',
             '/norestart',
             '/L*v',
