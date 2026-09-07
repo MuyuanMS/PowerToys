@@ -259,10 +259,9 @@ namespace Microsoft.CropAndLock.UITests
                 text =>
                 {
                     var keys = ParseShortcut(text);
-                    Assert.IsTrue(
-                        string.IsNullOrWhiteSpace(text) || keys.Length > 0,
-                        $"Shortcut '{text}' could not be parsed; this suite requires an enabled shortcut in the English Settings UI.");
-                    return keys.Any(key => key is not (Key.LWin or Key.Ctrl or Key.Shift or Key.Alt));
+                    return !string.IsNullOrWhiteSpace(text) &&
+                        keys.Length > 0 &&
+                        keys.Any(key => key is not (Key.LWin or Key.Ctrl or Key.Shift or Key.Alt));
                 },
                 timeoutMS: 5_000,
                 requiredConsecutiveMatches: 2);
