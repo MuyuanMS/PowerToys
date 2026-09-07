@@ -326,7 +326,7 @@ namespace
 
                 CloseHandle(processInfo.hProcess);
                 CloseHandle(stopEvent);
-                if (!auto_hide_cursor::RestoreSystemCursors())
+                if (auto_hide_cursor::HasRecoveryMarker() && !auto_hide_cursor::RestoreSystemCursors())
                 {
                     Logger::error(L"Failed to restore system cursors after the worker exited. Error: {}", GetLastError());
                 }

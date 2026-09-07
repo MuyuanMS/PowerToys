@@ -188,6 +188,33 @@ public class AutoHideCursorSettingsTests : UITestBase
         Assert.IsTrue(restoredCursor.Succeeded, "Disabling Auto Hide Cursor did not restore the active cursor.");
     }
 
+    [TestMethod]
+    [TestCategory("MouseUtils")]
+    [TestCategory("AutoHideCursor")]
+    public void TypingHidesAndMouseMovementRestoresTheSystemCursor()
+    {
+        OpenSettings();
+
+        var originalCursor = GetVisibleCursorHandle();
+        KeyboardHelper.SendKey(Key.A);
+        var hiddenCursor = WaitHelper.WaitForStable(
+            GetVisibleCursorHandle,
+            actual => actual != originalCursor && actual != IntPtr.Zero,
+            timeoutMS: 10_000,
+            requiredConsecutiveMatches: 2,
+            pollIntervalMS: 250);
+        Assert.IsTrue(hiddenCursor.Succeeded, "Typing did not replace the active cursor.");
+
+        MouseHelper.MoveBy(10, 0);
+        var restoredCursor = WaitHelper.WaitForStable(
+            GetVisibleCursorHandle,
+            actual => actual != IntPtr.Zero && actual != hiddenCursor.LastObservation,
+            timeoutMS: 10_000,
+            requiredConsecutiveMatches: 2,
+            pollIntervalMS: 250);
+        Assert.IsTrue(restoredCursor.Succeeded, "Mouse movement did not restore the active cursor.");
+    }
+
     private void OpenSettings()
     {
         MouseUtilsTestHelper.NavigateToMouseUtilities(this);
