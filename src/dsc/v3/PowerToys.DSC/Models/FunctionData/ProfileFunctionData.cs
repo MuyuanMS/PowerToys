@@ -102,6 +102,7 @@ public sealed class ProfileFunctionData : BaseFunctionData
     /// </summary>
     public void GetState()
     {
+        using var transactionLock = AcquireTransactionLock();
         var profile = ReadSettings<KeyboardManagerProfile>(
             KeyboardManagerSettings.ModuleName, GetProfileFileName());
         Output.Profile = KbmProfileConverter.FromProfile(profile, Warnings);
@@ -119,6 +120,8 @@ public sealed class ProfileFunctionData : BaseFunctionData
         {
             throw new UnauthorizedAccessException("Keyboard Manager profiles must be applied from a non-elevated process.");
         }
+
+        using var transactionLock = AcquireTransactionLock();
 
         // Ensure the module settings exist so the engine can resolve the
         // active configuration; without it LoadSettings() bails out early.
@@ -207,6 +210,31 @@ public sealed class ProfileFunctionData : BaseFunctionData
         {
             throw new IOException("The Keyboard Manager profile could not be persisted.");
         }
+    }
+
+    private static FileStream AcquireTransactionLock()
+    {
+        var settingsPath = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName);
+        var settingsDirectory = Path.GetDirectoryName(settingsPath)
+            ?? throw new IOException("Could not determine the Keyboard Manager settings directory.");
+        var lockPath = Path.Combine(settingsDirectory, "editorTransaction.lock");
+        Directory.CreateDirectory(settingsDirectory);
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+
+        do
+        {
+            try
+            {
+                return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch (IOException) when (DateTime.UtcNow < deadline)
+            {
+                Thread.Sleep(50);
+            }
+        }
+        while (DateTime.UtcNow < deadline);
+
+        throw new IOException("Could not acquire the Keyboard Manager editor transaction lock.");
     }
 
     /// <summary>

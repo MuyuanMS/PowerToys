@@ -145,7 +145,7 @@ public static class KbmProfileConverter
                 errors.Add($"{context}.toText must not be empty");
             }
 
-            if (entry.OpenUri != null && entry.OpenUri.Length == 0)
+            if (entry.OpenUri != null && string.IsNullOrWhiteSpace(entry.OpenUri))
             {
                 errors.Add($"{context}.openUri must not be empty");
             }
@@ -328,9 +328,9 @@ public static class KbmProfileConverter
                     FilePath = stored.RunProgramFilePath,
                     Args = NullIfEmpty(stored.RunProgramArgs),
                     StartInDir = NullIfEmpty(stored.RunProgramStartInDir),
-                    Elevation = FormatEnumValue(stored.RunProgramElevationLevel, _elevationNames),
-                    IfRunning = FormatEnumValue(stored.RunProgramAlreadyRunningAction, _ifRunningNames),
-                    WindowStyle = FormatEnumValue(stored.RunProgramStartWindowType, _windowStyleNames),
+                    Elevation = FormatEnumValue(stored.RunProgramElevationLevel, _elevationNames, warnings, "elevation"),
+                    IfRunning = FormatEnumValue(stored.RunProgramAlreadyRunningAction, _ifRunningNames, warnings, "ifRunning"),
+                    WindowStyle = FormatEnumValue(stored.RunProgramStartWindowType, _windowStyleNames, warnings, "windowStyle"),
                 };
             }
             else if (stored.OperationType == OperationTypeOpenUri)
@@ -377,7 +377,11 @@ public static class KbmProfileConverter
 
         return new KbmProfileModel
         {
-            Keys = keys.OrderBy(k => k.Code).Select(k => k.Entry).ToList(),
+            Keys = keys
+                .OrderBy(k => k.Code)
+                .ThenBy(k => k.Entry.Condition == "alone" ? 1 : 0)
+                .Select(k => k.Entry)
+                .ToList(),
             Shortcuts = shortcuts
                 .OrderBy(s => s.TargetApp ?? string.Empty, StringComparer.Ordinal)
                 .ThenBy(s => s.From, StringComparer.Ordinal)
@@ -558,10 +562,21 @@ public static class KbmProfileConverter
         return index >= 0 ? index : throw new InvalidOperationException($"Invalid value '{name}'");
     }
 
-    private static string? FormatEnumValue(int? value, string[] names)
+    private static string? FormatEnumValue(int? value, string[] names, IList<string>? warnings, string propertyName)
     {
         // Default (0) values are omitted from the canonical form
-        return value is > 0 && value < names.Length ? names[value.Value] : null;
+        if (value is null or 0)
+        {
+            return null;
+        }
+
+        if (value > 0 && value < names.Length)
+        {
+            return names[value.Value];
+        }
+
+        warnings?.Add($"Skipping invalid {propertyName} value '{value}' in remap entry");
+        return null;
     }
 
     private static string? NormalizeTargetApp(string? app)
