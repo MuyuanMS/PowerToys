@@ -37,5 +37,7 @@ public sealed class RichTextHelperTests
         StringAssert.Contains(fragment, "<strong>bold</strong>");
         StringAssert.Contains(text, "Heading");
         StringAssert.Contains(text, "bold");
+        Assert.IsFalse(text.Contains("<h1>", StringComparison.Ordinal));
+        Assert.IsFalse(text.Contains("<strong>", StringComparison.Ordinal));
     }
 }

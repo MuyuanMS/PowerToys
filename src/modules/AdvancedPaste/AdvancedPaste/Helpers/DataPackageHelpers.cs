@@ -46,11 +46,11 @@ internal static class DataPackageHelpers
         return dataPackage;
     }
 
-    internal static DataPackage CreateFromHtml(string html)
+    internal static DataPackage CreateFromHtml(string html, string plainText)
     {
         DataPackage dataPackage = new();
         dataPackage.SetHtmlFormat(HtmlFormatHelper.CreateHtmlFormat(html));
-        dataPackage.SetText(HtmlFormatHelper.GetStaticFragment(html));
+        dataPackage.SetText(plainText);
         return dataPackage;
     }
 

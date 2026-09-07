@@ -53,7 +53,9 @@ public static class TransformHelpers
     private static async Task<DataPackage> ToRichTextAsync(DataPackageView clipboardData)
     {
         Logger.LogTrace();
-        return DataPackageHelpers.CreateFromHtml(await RichTextHelper.ToRichTextAsync(clipboardData));
+        var plainText = await clipboardData.GetTextOrEmptyAsync();
+        var html = await RichTextHelper.ToRichTextAsync(clipboardData);
+        return DataPackageHelpers.CreateFromHtml(html, plainText);
     }
 
     private static async Task<DataPackage> ToJsonAsync(DataPackageView clipboardData)
