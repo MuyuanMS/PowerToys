@@ -84,12 +84,26 @@ public partial class TabViewModel : ExtensionObjectViewModel
         Page = tab.Page;
 
         var tabId = tab.Id;
-        if (string.IsNullOrEmpty(tabId))
+        if (!string.IsNullOrEmpty(tabId))
         {
-            tabId = Page?.Id;
+            TabId = $"tab:{tabId}";
+            return;
         }
 
-        TabId = string.IsNullOrEmpty(tabId) ? _fallbackTabId : tabId;
+        tabId = Page?.Id;
+        if (!string.IsNullOrEmpty(tabId))
+        {
+            TabId = $"page:{tabId}";
+            return;
+        }
+
+        TabId = $"fallback:{_fallbackTabId}";
+    }
+
+    internal void AddCollisionSuffix(string suffix)
+    {
+        TabId = $"{TabId}|duplicate:{suffix}";
+        UpdateProperty(nameof(TabId));
     }
 
     private string GetTitle(ITab tab)

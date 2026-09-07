@@ -46,6 +46,8 @@ public partial class PageViewModel : ExtensionObjectViewModel, IPageContext
     [ObservableProperty]
     public partial bool HasBackButton { get; set; } = true;
 
+    public bool CanPublishContextUpdates { get; set; } = true;
+
     // This is set from the SearchBar
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowSuggestion))]

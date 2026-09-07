@@ -30,16 +30,19 @@ internal sealed partial class SampleTabbedPage : TabbedPage
 
         _issuesTab = new Tab("Issues", new SampleListPage() { Id = "sample.tabbed.issues", Name = "Issues" })
         {
+            Id = "sample.tabbed.tab.issues",
             Icon = new IconInfo("\uE946"), // Info
         };
 
         _pullRequestsTab = new Tab("Pull Requests", new SampleDynamicListPage() { Id = "sample.tabbed.prs", Name = "Pull Requests" })
         {
+            Id = "sample.tabbed.tab.prs",
             Icon = new IconInfo("\uE8AB"), // Switch
         };
 
         _readmeTab = new Tab("Readme", new SampleContentPage() { Id = "sample.tabbed.readme", Name = "Readme" })
         {
+            Id = "sample.tabbed.tab.readme",
             Icon = new IconInfo("\uE8A5"), // Document
         };
 

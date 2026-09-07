@@ -766,7 +766,10 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
         DoOnUiThread(
            () =>
            {
-               WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(Command));
+               if (CanPublishContextUpdates)
+               {
+                   WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(Command));
+               }
            });
     }
 
