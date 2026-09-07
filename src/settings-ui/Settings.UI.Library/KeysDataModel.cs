@@ -60,6 +60,10 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public bool? ExactMatch { get; set; }
 
+        [JsonPropertyName("condition")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string Condition { get; set; }
+
         [JsonPropertyName("openUri")]
         public string OpenUri { get; set; }
 

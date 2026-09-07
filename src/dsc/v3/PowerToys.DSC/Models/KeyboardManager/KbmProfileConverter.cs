@@ -44,7 +44,7 @@ public static class KbmProfileConverter
     public static IList<string> Validate(KbmProfileModel model)
     {
         var errors = new List<string>();
-        var seenKeys = new HashSet<uint>();
+        var seenKeys = new HashSet<(uint Code, string Condition)>();
         var seenShortcuts = new HashSet<(string App, string From)>();
 
         for (var i = 0; i < model.Keys.Count; i++)
@@ -70,10 +70,6 @@ public static class KbmProfileConverter
             {
                 errors.Add($"{context}.from: generic modifiers must use a left or right variant");
             }
-            else if (!seenKeys.Add(from.Keys[0]))
-            {
-                errors.Add($"{context}.from: key '{KbmKeyNames.GetName(from.Keys[0])}' is remapped more than once");
-            }
 
             if (entry.To != null && !TryParseTarget(entry.To, out _, out error))
             {
@@ -83,6 +79,21 @@ public static class KbmProfileConverter
             if (entry.ToText != null && entry.ToText.Length == 0)
             {
                 errors.Add($"{context}.toText must not be empty");
+            }
+
+            var condition = NormalizeCondition(entry.Condition);
+            if (condition == null)
+            {
+                errors.Add($"{context}.condition must be 'always' or 'alone'");
+            }
+            else if (entry.ToText != null && condition == "alone")
+            {
+                errors.Add($"{context}.condition 'alone' requires a key remap target");
+            }
+            else if (KbmShortcutParser.TryParseKey(entry.From, out var parsedFrom, out _)
+                && !seenKeys.Add((parsedFrom.Keys[0], condition)))
+            {
+                errors.Add($"{context}.from: key '{KbmKeyNames.GetName(parsedFrom.Keys[0])}' is remapped more than once with condition '{condition}'");
             }
         }
 
@@ -174,6 +185,7 @@ public static class KbmProfileConverter
             var stored = new KeysDataModel
             {
                 OriginalKeys = from.ToVkString(),
+                Condition = NormalizeCondition(entry.Condition) == "alone" ? "alone" : null,
             };
 
             if (entry.ToText != null)
@@ -275,6 +287,7 @@ public static class KbmProfileConverter
             {
                 From = KbmKeyNames.GetName(from.Keys[0]),
                 To = KbmShortcutParser.Format(KbmShortcutParser.Canonicalize(to)),
+                Condition = stored.Condition == "alone" ? "alone" : null,
             }));
         }
 
@@ -466,6 +479,13 @@ public static class KbmProfileConverter
         }
 
         return true;
+    }
+
+    private static string? NormalizeCondition(string? condition)
+    {
+        return string.IsNullOrEmpty(condition) || condition.Equals("always", StringComparison.OrdinalIgnoreCase)
+            ? "always"
+            : condition.Equals("alone", StringComparison.OrdinalIgnoreCase) ? "alone" : null;
     }
 
     /// <summary>
