@@ -40,14 +40,14 @@ enum class GrabAndMoveModifier
 static GrabAndMoveModifier g_modifierKey = GrabAndMoveModifier::Alt;
 
 static bool g_altPressed = false;
-static bool g_winPressed = false; // true while LWIN or RWIN is held (Win modifier mode)
+static bool g_winPressed = false;  // true while LWIN or RWIN is held (Win modifier mode)
 static bool g_ignoreModifier = false; // true if the user pressed the modifier then clicked the mouse without dragging
-static bool g_winAbsorbed = false; // true if we absorbed a Win keydown
+static bool g_winAbsorbed = false;     // true if we absorbed a Win keydown
 static bool g_dragging = false;
 static bool g_dragFirstMove = false; // true until first WM_MOUSEMOVE of a drag
 static HWND g_dragTarget = nullptr;
-static POINT g_dragStart = {}; // cursor pos at drag start
-static RECT g_dragWndRect = {}; // window rect at drag start
+static POINT g_dragStart = {};    // cursor pos at drag start
+static RECT g_dragWndRect = {};   // window rect at drag start
 static HWND g_hOverlay = nullptr; // semi-transparent overlay during drag
 
 // Edge-snap support: while dragging near a screen edge or corner, preview the
@@ -99,16 +99,18 @@ static constexpr BYTE OVERLAY_FILL_ALPHA = 0x66;
 
 static bool g_shouldAbsorbAlt =
     true; // true if we want to absorb Alt on the next keydown (set when Alt is pressed without dragging, cleared on next non-Alt key or Alt keyup)
-static bool g_altAbsorbed = false; // true if we absorbed an Alt keydown
+static bool g_altAbsorbed = false;     // true if we absorbed an Alt keydown
 static bool g_dragConsumedAlt = false; // true if a drag consumed the absorbed Alt
-static DWORD g_absorbedVk = 0; // VK code of absorbed Alt key
-static DWORD g_absorbedScanCode = 0; // scan code for replay
-static DWORD g_absorbedFlags = 0; // flags for replay (extended key, etc.)
+static DWORD g_absorbedVk = 0;         // VK code of absorbed Alt key
+static DWORD g_absorbedScanCode = 0;   // scan code for replay
+static DWORD g_absorbedFlags = 0;      // flags for replay (extended key, etc.)
 
-static bool g_showGeometry = false; // true if we want to draw the X, Y, W and H on the overlay on move and resize
+static bool g_showGeometry = false;            // true if we want to draw the X, Y, W and H on the overlay on move and
+                                               // resize
 static bool g_doNotActivateOnGameMode = true; // true if GrabAndMove is suppressed when Windows Game Mode is active
 
-static bool g_useAltResize = true; // This can be toggled from the settings. If false, Alt + right click does nothing.
+static bool g_useAltResize = true;      // This can be toggled from the settings. If false, Alt + right click does
+                                         // nothing.
 
 // Count of non-modifier keys currently held. Used to suppress GrabAndMove when the
 // modifier key is pressed while another key is already down (e.g. Q held, then modifier pressed).
@@ -266,7 +268,9 @@ static void CALLBACK WinEventProc(HWINEVENTHOOK, DWORD, HWND hwnd, LONG, LONG, D
     if (!g_altPressed && !g_winPressed && !g_altAbsorbed && !g_winAbsorbed && !g_dragging && !g_resizing)
         return;
 
-    bool modActuallyHeld = (g_modifierKey == GrabAndMoveModifier::Win) ? ((GetAsyncKeyState(VK_LWIN) | GetAsyncKeyState(VK_RWIN)) & 0x8000) != 0 : ((GetAsyncKeyState(VK_LMENU) | GetAsyncKeyState(VK_RMENU)) & 0x8000) != 0;
+    bool modActuallyHeld = (g_modifierKey == GrabAndMoveModifier::Win)
+        ? ((GetAsyncKeyState(VK_LWIN) | GetAsyncKeyState(VK_RWIN)) & 0x8000) != 0
+        : ((GetAsyncKeyState(VK_LMENU) | GetAsyncKeyState(VK_RMENU)) & 0x8000) != 0;
 
     if (!modActuallyHeld)
     {
@@ -563,24 +567,25 @@ static void RenderOverlayContent(HWND hwnd, int cw, int ch)
     if (!hwnd || cw <= 0 || ch <= 0)
         return;
 
-    BITMAPINFO bmi = {};
-    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bmi.bmiHeader.biWidth = cw;
-    bmi.bmiHeader.biHeight = -ch; // top-down so (0,0) is top-left
-    bmi.bmiHeader.biPlanes = 1;
-    bmi.bmiHeader.biBitCount = 32;
+    BITMAPINFO bmi        = {};
+    bmi.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
+    bmi.bmiHeader.biWidth       = cw;
+    bmi.bmiHeader.biHeight      = -ch; // top-down so (0,0) is top-left
+    bmi.bmiHeader.biPlanes      = 1;
+    bmi.bmiHeader.biBitCount    = 32;
     bmi.bmiHeader.biCompression = BI_RGB;
 
     HDC screenDC = GetDC(nullptr);
     DWORD* pBits = nullptr;
-    HBITMAP hDib = CreateDIBSection(screenDC, &bmi, DIB_RGB_COLORS, reinterpret_cast<void**>(&pBits), nullptr, 0);
+    HBITMAP hDib = CreateDIBSection(screenDC, &bmi, DIB_RGB_COLORS,
+                                    reinterpret_cast<void**>(&pBits), nullptr, 0);
     if (!hDib)
     {
         ReleaseDC(nullptr, screenDC);
         return;
     }
 
-    HDC memDC = CreateCompatibleDC(screenDC);
+    HDC     memDC   = CreateCompatibleDC(screenDC);
     HBITMAP hOldBmp = static_cast<HBITMAP>(SelectObject(memDC, hDib));
 
     // Start fully transparent.
@@ -633,24 +638,27 @@ static void RenderOverlayContent(HWND hwnd, int cw, int ch)
     if (g_showGeometry)
     {
         wchar_t text[128];
-        swprintf_s(text, L"X: %d  Y: %d\nW: %d  H: %d", g_overlayInfoX, g_overlayInfoY, g_overlayInfoW, g_overlayInfoH);
+        swprintf_s(text, L"X: %d  Y: %d\nW: %d  H: %d",
+                   g_overlayInfoX, g_overlayInfoY, g_overlayInfoW, g_overlayInfoH);
 
-        HFONT hFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+        HFONT hFont    = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
         HFONT hOldFont = static_cast<HFONT>(SelectObject(memDC, hFont));
 
         RECT textRect = {};
         DrawTextW(memDC, text, -1, &textRect, DT_CALCRECT | DT_CENTER | DT_NOPREFIX);
 
-        const int pad = 10;
+        const int pad  = 10;
         const int boxW = (textRect.right - textRect.left) + pad * 2;
         const int boxH = (textRect.bottom - textRect.top) + pad * 2;
-        RECT boxRect = { cw / 2 - boxW / 2, ch / 2 - boxH / 2, cw / 2 + boxW / 2, ch / 2 + boxH / 2 };
+        RECT boxRect   = {cw / 2 - boxW / 2, ch / 2 - boxH / 2,
+                          cw / 2 + boxW / 2, ch / 2 + boxH / 2};
 
         HBRUSH hBlack = CreateSolidBrush(RGB(0, 0, 0));
         FillRect(memDC, &boxRect, hBlack);
         DeleteObject(hBlack);
 
-        RECT textDrawRect = { boxRect.left + pad, boxRect.top + pad, boxRect.right - pad, boxRect.bottom - pad };
+        RECT textDrawRect = {boxRect.left + pad, boxRect.top + pad,
+                             boxRect.right - pad, boxRect.bottom - pad};
         SetTextColor(memDC, RGB(255, 255, 255));
         SetBkMode(memDC, TRANSPARENT);
         DrawTextW(memDC, text, -1, &textDrawRect, DT_CENTER | DT_NOPREFIX);
@@ -669,9 +677,9 @@ static void RenderOverlayContent(HWND hwnd, int cw, int ch)
                 pBits[y * cw + x] |= 0xFF000000u;
     }
 
-    SIZE sz = { cw, ch };
-    POINT ptSrc = { 0, 0 };
-    BLENDFUNCTION blend = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
+    SIZE          sz    = {cw, ch};
+    POINT         ptSrc = {0, 0};
+    BLENDFUNCTION blend = {AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
     UpdateLayeredWindow(hwnd, screenDC, nullptr, &sz, memDC, &ptSrc, 0, &blend, ULW_ALPHA);
 
     SelectObject(memDC, hOldBmp);
@@ -779,14 +787,14 @@ static ResizeHandle GetClosestHandle(POINT pt, const RECT& rc)
         int y;
         ResizeHandle h;
     } handles[] = {
-        { rc.left, rc.top, RESIZE_TOP_LEFT },
-        { cx, rc.top, RESIZE_TOP },
-        { rc.right, rc.top, RESIZE_TOP_RIGHT },
-        { rc.right, cy, RESIZE_RIGHT },
-        { rc.right, rc.bottom, RESIZE_BOTTOM_RIGHT },
-        { cx, rc.bottom, RESIZE_BOTTOM },
-        { rc.left, rc.bottom, RESIZE_BOTTOM_LEFT },
-        { rc.left, cy, RESIZE_LEFT },
+        {rc.left, rc.top, RESIZE_TOP_LEFT},
+        {cx, rc.top, RESIZE_TOP},
+        {rc.right, rc.top, RESIZE_TOP_RIGHT},
+        {rc.right, cy, RESIZE_RIGHT},
+        {rc.right, rc.bottom, RESIZE_BOTTOM_RIGHT},
+        {cx, rc.bottom, RESIZE_BOTTOM},
+        {rc.left, rc.bottom, RESIZE_BOTTOM_LEFT},
+        {rc.left, cy, RESIZE_LEFT},
     };
 
     ResizeHandle closest = RESIZE_BOTTOM_RIGHT;
@@ -1451,10 +1459,8 @@ static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
         {
             int ddx = ms->pt.x - g_pendingDownPt.x;
             int ddy = ms->pt.y - g_pendingDownPt.y;
-            if (ddx < 0)
-                ddx = -ddx;
-            if (ddy < 0)
-                ddy = -ddy;
+            if (ddx < 0) ddx = -ddx;
+            if (ddy < 0) ddy = -ddy;
             if (ddx >= GetSystemMetrics(SM_CXDRAG) || ddy >= GetSystemMetrics(SM_CYDRAG))
             {
                 bool wasResize = g_pendingResize;
@@ -1524,7 +1530,12 @@ static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
 
                 if (target == SnapTarget::Maximize)
                 {
-                    ShowWindowAsync(g_dragTarget, SW_MAXIMIZE);
+                    HWND previousForeground = GetForegroundWindow();
+                    ShowWindow(g_dragTarget, SW_MAXIMIZE);
+                    if (previousForeground && previousForeground != g_dragTarget)
+                    {
+                        SetForegroundWindow(previousForeground);
+                    }
                 }
                 else if (target != SnapTarget::None)
                 {
@@ -1554,7 +1565,8 @@ static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
             int newY = g_dragWndRect.top + dy;
             int w = g_dragWndRect.right - g_dragWndRect.left;
             int h = g_dragWndRect.bottom - g_dragWndRect.top;
-            SetWindowPos(g_dragTarget, nullptr, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
+            SetWindowPos(g_dragTarget, nullptr, newX, newY, 0, 0,
+                         SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
             EndInteraction(true, false);
             return 1; // swallow the release
         }
@@ -1784,10 +1796,11 @@ static void HandleDragMove(POINT pt)
             float ratioT = (maxH > 0) ? static_cast<float>(g_dragStart.y - maxRect.top) / maxH : 0.5f;
             int newX = g_dragStart.x - static_cast<int>(restoredW * ratioL);
             int newY = g_dragStart.y - static_cast<int>(restoredH * ratioT);
-            SetWindowPos(g_dragTarget, nullptr, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
+            SetWindowPos(g_dragTarget, nullptr, newX, newY, 0, 0,
+                         SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
 
             g_dragStart = pt;
-            g_dragWndRect = { newX, newY, newX + restoredW, newY + restoredH };
+            g_dragWndRect = {newX, newY, newX + restoredW, newY + restoredH};
 
             // Corner radius / invisible-border margins differ once restored.
             PrepareOverlayMetrics(g_dragTarget);
@@ -1867,8 +1880,9 @@ static void HandleDragResize(POINT pt)
 
             int newLeft = pt.x - static_cast<int>(ratioL * newW);
             int newTop = pt.y - static_cast<int>(ratioT * newH);
-            SetWindowPos(g_resizeTarget, nullptr, newLeft, newTop, newW, newH, SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
-            g_resizeWndRect = { newLeft, newTop, newLeft + newW, newTop + newH };
+            SetWindowPos(g_resizeTarget, nullptr, newLeft, newTop, newW, newH,
+                         SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
+            g_resizeWndRect = {newLeft, newTop, newLeft + newW, newTop + newH};
 
             // Corner radius / invisible-border margins differ once restored.
             PrepareOverlayMetrics(g_resizeTarget);
@@ -1895,36 +1909,15 @@ static void HandleDragResize(POINT pt)
     RECT nr = g_resizeWndRect;
     switch (g_currentHandle)
     {
-    case RESIZE_TOP_LEFT:
-        nr.left += dx;
-        nr.top += dy;
-        break;
-    case RESIZE_TOP:
-        nr.top += dy;
-        break;
-    case RESIZE_TOP_RIGHT:
-        nr.right += dx;
-        nr.top += dy;
-        break;
-    case RESIZE_RIGHT:
-        nr.right += dx;
-        break;
-    case RESIZE_BOTTOM_RIGHT:
-        nr.right += dx;
-        nr.bottom += dy;
-        break;
-    case RESIZE_BOTTOM:
-        nr.bottom += dy;
-        break;
-    case RESIZE_BOTTOM_LEFT:
-        nr.left += dx;
-        nr.bottom += dy;
-        break;
-    case RESIZE_LEFT:
-        nr.left += dx;
-        break;
-    default:
-        break;
+    case RESIZE_TOP_LEFT:     nr.left += dx; nr.top += dy; break;
+    case RESIZE_TOP:          nr.top += dy; break;
+    case RESIZE_TOP_RIGHT:    nr.right += dx; nr.top += dy; break;
+    case RESIZE_RIGHT:        nr.right += dx; break;
+    case RESIZE_BOTTOM_RIGHT: nr.right += dx; nr.bottom += dy; break;
+    case RESIZE_BOTTOM:       nr.bottom += dy; break;
+    case RESIZE_BOTTOM_LEFT:  nr.left += dx; nr.bottom += dy; break;
+    case RESIZE_LEFT:         nr.left += dx; break;
+    default: break;
     }
 
     // Enforce minimum window size
@@ -1933,17 +1926,13 @@ static void HandleDragResize(POINT pt)
 
     if (nr.right - nr.left < MIN_WINDOW_WIDTH)
     {
-        if (leftMoving)
-            nr.left = nr.right - MIN_WINDOW_WIDTH;
-        else
-            nr.right = nr.left + MIN_WINDOW_WIDTH;
+        if (leftMoving) nr.left = nr.right - MIN_WINDOW_WIDTH;
+        else            nr.right = nr.left + MIN_WINDOW_WIDTH;
     }
     if (nr.bottom - nr.top < MIN_WINDOW_HEIGHT)
     {
-        if (topMoving)
-            nr.top = nr.bottom - MIN_WINDOW_HEIGHT;
-        else
-            nr.bottom = nr.top + MIN_WINDOW_HEIGHT;
+        if (topMoving) nr.top = nr.bottom - MIN_WINDOW_HEIGHT;
+        else           nr.bottom = nr.top + MIN_WINDOW_HEIGHT;
     }
 
     g_resizeWndRect = nr;
@@ -1954,7 +1943,8 @@ static void HandleDragResize(POINT pt)
 
     // Move target + overlay (separate SetWindowPos – DeferWindowPos doesn't
     // work reliably for cross-process target windows)
-    SetWindowPos(g_resizeTarget, nullptr, nr.left, nr.top, w, h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
+    SetWindowPos(g_resizeTarget, nullptr, nr.left, nr.top, w, h,
+                 SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
     RepositionOverlay(nr.left, nr.top, w, h);
 }
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -2113,11 +2103,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR lpCmdLine, int)
     }
 
     // Pre-load system cursors (fix #6 – avoid LoadCursorW in hot path)
-    g_curSizeAll = LoadCursorW(nullptr, IDC_SIZEALL);
+    g_curSizeAll  = LoadCursorW(nullptr, IDC_SIZEALL);
     g_curSizeNWSE = LoadCursorW(nullptr, IDC_SIZENWSE);
     g_curSizeNESW = LoadCursorW(nullptr, IDC_SIZENESW);
-    g_curSizeWE = LoadCursorW(nullptr, IDC_SIZEWE);
-    g_curSizeNS = LoadCursorW(nullptr, IDC_SIZENS);
+    g_curSizeWE  = LoadCursorW(nullptr, IDC_SIZEWE);
+    g_curSizeNS  = LoadCursorW(nullptr, IDC_SIZENS);
 
     // Install global low-level hooks
     g_hhkKeyboard = SetWindowsHookExW(WH_KEYBOARD_LL, KeyboardProc, hInstance, 0);
@@ -2125,7 +2115,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR lpCmdLine, int)
 
     // Detect foreground switches to elevated processes (where key-up events stop arriving)
     g_hWinEventHook = SetWinEventHook(
-        EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr, WinEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
+        EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND,
+        nullptr, WinEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
 
     if (!g_hhkKeyboard || !g_hhkMouse)
     {
