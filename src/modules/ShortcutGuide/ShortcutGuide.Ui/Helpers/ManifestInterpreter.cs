@@ -36,9 +36,21 @@ namespace ShortcutGuide.Helpers
         /// <exception cref="FileNotFoundException">The requested file was not found.</exception>
         public static ShortcutFile GetShortcutsOfApplication(string applicationName)
         {
-            string path = PathOfManifestFiles;
+            return GetShortcutsOfApplication(applicationName, PathOfManifestFiles);
+        }
+
+        /// <summary>
+        /// Returns the shortcuts for a specific application from a specified manifest directory.
+        /// </summary>
+        /// <param name="applicationName">The manifest id.</param>
+        /// <param name="path">The directory containing manifest files.</param>
+        /// <returns>The deserialized shortcuts file.</returns>
+        /// <exception cref="FileNotFoundException">The requested file was not found.</exception>
+        public static ShortcutFile GetShortcutsOfApplication(string applicationName, string path)
+        {
             string localizedPath = Path.Combine(path, applicationName + $".{Language}.yml");
             string fallbackPath = Path.Combine(path, applicationName + ".en-US.yml");
+            string unlocalizedPath = Path.Combine(path, applicationName + ".yml");
 
             if (File.Exists(localizedPath))
             {
@@ -50,7 +62,12 @@ namespace ShortcutGuide.Helpers
                 return YamlToShortcutList(File.ReadAllText(fallbackPath));
             }
 
-            throw new FileNotFoundException($"The file for the application '{applicationName}' was not found in '{path}' with the language '{Language}' or 'en-US'.");
+            if (File.Exists(unlocalizedPath))
+            {
+                return YamlToShortcutList(File.ReadAllText(unlocalizedPath));
+            }
+
+            throw new FileNotFoundException($"The file for the application '{applicationName}' was not found in '{path}' with the language '{Language}', 'en-US', or the unlocalized name.");
         }
 
         /// <summary>
