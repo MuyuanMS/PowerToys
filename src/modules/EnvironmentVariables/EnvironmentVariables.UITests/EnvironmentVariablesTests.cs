@@ -190,7 +190,7 @@ public sealed class EnvironmentVariablesTests : UITestBase
         {
             foreach (KeyValuePair<string, JsonNode?> property in obj.ToArray())
             {
-                if (property.Key is "name" or "value")
+                if (property.Key is "name" or "value" or "selector")
                 {
                     obj[property.Key] = "[redacted]";
                 }

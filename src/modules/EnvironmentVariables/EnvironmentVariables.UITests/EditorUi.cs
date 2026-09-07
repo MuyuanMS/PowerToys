@@ -80,13 +80,7 @@ internal sealed class EditorUi(Session session, TestContext context)
                 exception.Message.Contains("stale_element", StringComparison.OrdinalIgnoreCase));
         if (!result.Succeeded)
         {
-            string preview = tree.ValueKind == JsonValueKind.Undefined ? "<unavailable>" : tree.GetRawText();
-            if (preview.Length > 2_000)
-            {
-                preview = preview[..2_000] + "... (truncated)";
-            }
-
-            Assert.Fail($"Expected one {description} below {parent.Selector}; last count: {result.LastObservation?.Length}. Tree: {preview}");
+            Assert.Fail($"UIA descendant query did not converge; last count: {result.LastObservation?.Length}.");
         }
 
         return result.LastObservation![0];
@@ -318,7 +312,7 @@ internal sealed class EditorUi(Session session, TestContext context)
     }
 
     internal static void AssertUserVariable(string name, string? value) =>
-        Wait(() => TestState.ReadUserVariable(name) == value, $"User registry value {name} did not become '{value ?? "<absent>"}'.");
+        Wait(() => TestState.ReadUserVariable(name) == value, $"User registry value {name} did not reach the expected state.");
 
     internal void AssertAppliedVariable(string name, string? value)
     {
@@ -339,7 +333,7 @@ internal sealed class EditorUi(Session session, TestContext context)
                 return Enumerable.Range(0, Math.Max(0, text.Length - 1)).Any(index =>
                     text[index].Equals(name, StringComparison.OrdinalIgnoreCase) && text[index + 1] == value);
             },
-            $"Applied variables did not show {name}={value ?? "<absent>"}.");
+            $"Applied variable {name} did not reach the expected state.");
     }
 
     internal static void Wait(Func<bool> condition, string failure)
