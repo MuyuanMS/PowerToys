@@ -23,7 +23,7 @@
     <TestingPlatformDisableCustomTestTarget>true</TestingPlatformDisableCustomTestTarget>
     <RunVSTest>false</RunVSTest>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <OutputPath>$(RepoRoot)$(Platform)\$(Configuration)\tests\CropAndLock.TestApp\</OutputPath>
+    <OutputPath>$(RepoRoot)$(Platform)\$(Configuration)\test-fixtures\CropAndLock.TestApp\</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>
