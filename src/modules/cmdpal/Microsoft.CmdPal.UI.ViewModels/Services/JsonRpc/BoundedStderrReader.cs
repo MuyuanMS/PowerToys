@@ -89,7 +89,7 @@ internal sealed class BoundedStderrReader
     /// <summary>
     /// Gets a value indicating whether the total-volume cap has been reached.
     /// </summary>
-    public bool BudgetExhausted => _budgetNoticeEmitted;
+    public bool BudgetExhausted => _totalLoggedBytes >= _maxTotalBytes;
 
     /// <summary>
     /// Drains <paramref name="stream"/> until EOF or cancellation, forwarding bounded stderr to the sink.

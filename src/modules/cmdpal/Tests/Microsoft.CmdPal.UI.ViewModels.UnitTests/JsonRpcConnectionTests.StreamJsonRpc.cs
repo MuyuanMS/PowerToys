@@ -159,6 +159,50 @@ public partial class JsonRpcConnectionTests
     }
 
     [TestMethod]
+    public async Task InboundRequests_RejectWorkBeyondConcurrencyLimit()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var harness = CreateHarness();
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allSlotsOccupied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var activeRequests = 0;
+
+        try
+        {
+            harness.Host.RegisterRequestHandler("hold", async (_, _) =>
+            {
+                if (Interlocked.Increment(ref activeRequests) == JsonRpcConnection.InboundRequestConcurrencyLimit)
+                {
+                    allSlotsOccupied.TrySetResult();
+                }
+
+                await release.Task;
+                return null;
+            });
+
+            for (var id = 1; id <= JsonRpcConnection.InboundRequestConcurrencyLimit; id++)
+            {
+                await WriteFramedAsync(harness.ExtensionWrites, BuildRequest(id, "hold", null), cts.Token);
+            }
+
+            await allSlotsOccupied.Task.WaitAsync(cts.Token);
+
+            var rejectedId = JsonRpcConnection.InboundRequestConcurrencyLimit + 1;
+            await WriteFramedAsync(harness.ExtensionWrites, BuildRequest(rejectedId, "hold", null), cts.Token);
+
+            var (_, body) = await ReadFramedAsync(harness.ExtensionReads, cts.Token);
+            using var document = JsonDocument.Parse(body);
+            Assert.AreEqual(rejectedId, document.RootElement.GetProperty("id").GetInt32());
+            Assert.AreEqual(JsonRpcError.ServerBusy, document.RootElement.GetProperty("error").GetProperty("code").GetInt32());
+        }
+        finally
+        {
+            release.TrySetResult();
+            harness.Host.Dispose();
+        }
+    }
+
+    [TestMethod]
     public async Task Dispose_KeepsCancellationTokensAliveUntilNotificationPumpExits()
     {
         using var cts = new CancellationTokenSource(TestTimeout);
@@ -231,6 +275,28 @@ public partial class JsonRpcConnectionTests
 
             await notificationReceived.Task.WaitAsync(cts.Token);
             Assert.IsFalse(harness.Host.NotificationConsumerCompletion.IsCompleted);
+        }
+        finally
+        {
+            harness.Host.Dispose();
+        }
+    }
+
+    [TestMethod]
+    public async Task ThrowingDisconnectedSubscriber_DoesNotStopOtherSubscribers()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var harness = CreateHarness();
+        var disconnectedObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        try
+        {
+            harness.Host.Disconnected += (_, _) => throw new InvalidOperationException("subscriber failed");
+            harness.Host.Disconnected += (_, _) => disconnectedObserved.TrySetResult();
+
+            harness.ExtensionWrites.Dispose();
+
+            await disconnectedObserved.Task.WaitAsync(cts.Token);
         }
         finally
         {

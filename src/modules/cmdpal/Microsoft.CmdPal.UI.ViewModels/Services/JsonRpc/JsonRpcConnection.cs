@@ -22,6 +22,7 @@ namespace Microsoft.CmdPal.UI.ViewModels.Services.JsonRpc;
 public sealed class JsonRpcConnection : IDisposable
 {
     private const int NotificationQueueCapacity = 1024;
+    internal const int InboundRequestConcurrencyLimit = 16;
 
     private static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan DisposeDrainTimeout = TimeSpan.FromSeconds(2);
@@ -33,6 +34,7 @@ public sealed class JsonRpcConnection : IDisposable
     private readonly TimeSpan _requestTimeout;
     private readonly CancellationTokenSource _disposalCts = new();
     private readonly CancellationTokenSource _connectionClosedCts = new();
+    private readonly SemaphoreSlim _inboundRequestSlots = new(InboundRequestConcurrencyLimit);
     private readonly ConcurrentDictionary<string, Action<JsonElement>> _notificationHandlers = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Func<JsonElement, CancellationToken, Task<JsonNode?>>> _requestHandlers = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, RpcMethodTarget> _registeredMethods = new(StringComparer.Ordinal);
@@ -339,6 +341,14 @@ public sealed class JsonRpcConnection : IDisposable
         {
             if (_requestHandlers.TryGetValue(method, out var requestHandler))
             {
+                if (!_inboundRequestSlots.Wait(0, CancellationToken.None))
+                {
+                    throw new LocalRpcException("The server is busy and cannot accept the request.")
+                    {
+                        ErrorCode = JsonRpcError.ServerBusy,
+                    };
+                }
+
                 try
                 {
                     return await requestHandler(parameters, cancellationToken).ConfigureAwait(false);
@@ -354,6 +364,10 @@ public sealed class JsonRpcConnection : IDisposable
                     {
                         ErrorCode = JsonRpcError.InternalError,
                     };
+                }
+                finally
+                {
+                    _inboundRequestSlots.Release();
                 }
             }
 
@@ -451,7 +465,23 @@ public sealed class JsonRpcConnection : IDisposable
 
         if (Interlocked.Exchange(ref _disconnectedRaised, 1) == 0)
         {
-            Disconnected?.Invoke(this, EventArgs.Empty);
+            var handlers = Disconnected;
+            if (handlers is null)
+            {
+                return;
+            }
+
+            foreach (EventHandler handler in handlers.GetInvocationList())
+            {
+                try
+                {
+                    handler(this, EventArgs.Empty);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("A JSON-RPC disconnected event handler failed.", ex);
+                }
+            }
         }
     }
 

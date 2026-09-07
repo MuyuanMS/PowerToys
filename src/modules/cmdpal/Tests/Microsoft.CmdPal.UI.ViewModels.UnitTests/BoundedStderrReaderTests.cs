@@ -19,6 +19,7 @@ public class BoundedStderrReaderTests
     private static readonly TimeSpan LongWindow = TimeSpan.FromMinutes(5);
     private static readonly string[] HelloWorldLines = { "hello", "world" };
     private static readonly string[] CarriageReturnLines = { "first", "second" };
+    private static readonly string[] ExactBudgetLine = { "test" };
     private static readonly string[] TrailingLine = { "no trailing newline" };
     private static readonly string[] RealLine = { "real" };
 
@@ -95,6 +96,18 @@ public class BoundedStderrReaderTests
 
         // Total forwarded content stays within the cap plus at most one final line.
         Assert.IsTrue(reader.TotalLoggedBytes <= MaxTotal + 64, $"Total logged bytes {reader.TotalLoggedBytes} exceeded the bound.");
+    }
+
+    [TestMethod]
+    public async Task Pump_ReportsBudgetExhausted_WhenFinalLineReachesLimit()
+    {
+        var lines = new List<string>();
+        var reader = new BoundedStderrReader(lines.Add, maxTotalBytes: 4, rateWindow: LongWindow);
+
+        await reader.PumpAsync(StreamFrom("test\n"), CancellationToken.None);
+
+        Assert.IsTrue(reader.BudgetExhausted);
+        CollectionAssert.AreEqual(ExactBudgetLine, lines);
     }
 
     [TestMethod]
