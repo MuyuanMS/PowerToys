@@ -232,24 +232,24 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
                         TryLogMessage($"Failed to remove cached clipboard image: {ex.Message}");
                     }
                 }
+            }
 
-                var staleTemporaryCutoff = DateTime.UtcNow.AddHours(-1);
-                foreach (var temporaryPath in Directory.EnumerateFiles(directory, "*.tmp"))
+            var staleTemporaryCutoff = DateTime.UtcNow.AddHours(-1);
+            foreach (var temporaryPath in Directory.EnumerateFiles(directory, "*.tmp"))
+            {
+                if (File.GetLastWriteTimeUtc(temporaryPath) < staleTemporaryCutoff)
                 {
-                    if (File.GetLastWriteTimeUtc(temporaryPath) < staleTemporaryCutoff)
+                    try
                     {
-                        try
-                        {
-                            File.Delete(temporaryPath);
-                        }
-                        catch (IOException ex)
-                        {
-                            TryLogMessage($"Failed to remove temporary clipboard image cache: {ex.Message}");
-                        }
-                        catch (UnauthorizedAccessException ex)
-                        {
-                            TryLogMessage($"Failed to remove temporary clipboard image cache: {ex.Message}");
-                        }
+                        File.Delete(temporaryPath);
+                    }
+                    catch (IOException ex)
+                    {
+                        TryLogMessage($"Failed to remove temporary clipboard image cache: {ex.Message}");
+                    }
+                    catch (UnauthorizedAccessException ex)
+                    {
+                        TryLogMessage($"Failed to remove temporary clipboard image cache: {ex.Message}");
                     }
                 }
             }
