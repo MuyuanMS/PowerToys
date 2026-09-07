@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,6 +23,8 @@ namespace AdvancedPaste.Services.CustomActions
         {
             AIServiceType.Anthropic,
         };
+
+        private static readonly ConcurrentDictionary<string, AnthropicClient> Clients = new();
 
         public static PasteAIProviderRegistration Registration { get; } = new(SupportedTypes, config => new AnthropicPasteProvider(config));
 
@@ -68,9 +71,12 @@ namespace AdvancedPaste.Services.CustomActions
 
             var endpoint = string.IsNullOrWhiteSpace(_config.Endpoint) ? null : _config.Endpoint.Trim();
 
-            using AnthropicClient client = !string.IsNullOrWhiteSpace(endpoint)
-                ? new AnthropicClient { ApiKey = apiKey, BaseUrl = endpoint }
-                : new AnthropicClient { ApiKey = apiKey };
+            var clientKey = $"{endpoint ?? string.Empty}\n{apiKey}";
+            var client = Clients.GetOrAdd(
+                clientKey,
+                _ => !string.IsNullOrWhiteSpace(endpoint)
+                    ? new AnthropicClient { ApiKey = apiKey, BaseUrl = endpoint }
+                    : new AnthropicClient { ApiKey = apiKey });
 
             using var chatClient = client.AsIChatClient(modelId, DefaultMaxOutputTokens);
             var messages = new List<ChatMessage>();
