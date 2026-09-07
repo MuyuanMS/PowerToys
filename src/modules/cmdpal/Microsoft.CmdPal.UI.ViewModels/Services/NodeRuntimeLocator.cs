@@ -211,15 +211,27 @@ internal static class NodeRuntimeLocator
                 ? token[..1]
                 : string.Empty;
         var versionText = token[op.Length..];
-        var metadataIndex = versionText.IndexOfAny(['-', '+']);
-        if (metadataIndex >= 0)
+        var buildMetadataIndex = versionText.IndexOf('+');
+        if (buildMetadataIndex >= 0)
         {
-            if (metadataIndex == 0)
+            if (buildMetadataIndex == 0 || buildMetadataIndex == versionText.Length - 1)
             {
                 return false;
             }
 
-            versionText = versionText[..metadataIndex];
+            versionText = versionText[..buildMetadataIndex];
+        }
+
+        string? prerelease = null;
+        var prereleaseIndex = versionText.IndexOf('-');
+        if (prereleaseIndex >= 0)
+        {
+            prerelease = versionText[(prereleaseIndex + 1)..];
+            versionText = versionText[..prereleaseIndex];
+            if (!IsValidPrerelease(prerelease))
+            {
+                return false;
+            }
         }
 
         var parts = versionText.Split('.');
@@ -257,17 +269,24 @@ internal static class NodeRuntimeLocator
 
         if (sawWildcard)
         {
+            if (prerelease is not null)
+            {
+                return false;
+            }
+
             return op switch
             {
                 ">" => upper is not null && actual.CompareTo(upper) >= 0,
                 ">=" => actual.CompareTo(lower) >= 0,
                 "<" => actual.CompareTo(lower) < 0,
                 "<=" => upper is null || actual.CompareTo(upper) < 0,
-                "=" or "" or "^" or "~" => (upper is null || actual.CompareTo(upper) < 0) && actual.CompareTo(lower) >= 0,
+                "^" => actual.CompareTo(lower) >= 0 && actual.CompareTo(GetCaretUpperBound(components)) < 0,
+                "=" or "" or "~" => (upper is null || actual.CompareTo(upper) < 0) && actual.CompareTo(lower) >= 0,
                 _ => false,
             };
         }
 
+        var comparison = CompareActualToRequested(actual, lower, prerelease);
         if (specifiedComponents < 3 && op is "<=")
         {
             return upper is not null && actual.CompareTo(upper) < 0;
@@ -285,15 +304,29 @@ internal static class NodeRuntimeLocator
 
         return op switch
         {
-            ">=" => actual.CompareTo(lower) >= 0,
-            "<=" => actual.CompareTo(lower) <= 0,
-            ">" => actual.CompareTo(lower) > 0,
-            "<" => actual.CompareTo(lower) < 0,
-            "^" => actual.CompareTo(lower) >= 0 && actual.CompareTo(GetCaretUpperBound(components)) < 0,
-            "~" => actual.CompareTo(lower) >= 0 && actual.CompareTo(GetTildeUpperBound(components, specifiedComponents)) < 0,
-            "=" or "" => actual.CompareTo(lower) == 0,
+            ">=" => comparison >= 0,
+            "<=" => comparison <= 0,
+            ">" => comparison > 0,
+            "<" => comparison < 0,
+            "^" => comparison >= 0 && actual.CompareTo(GetCaretUpperBound(components)) < 0,
+            "~" => comparison >= 0 && actual.CompareTo(GetTildeUpperBound(components, specifiedComponents)) < 0,
+            "=" or "" => prerelease is null && comparison == 0,
             _ => false,
         };
+    }
+
+    private static int CompareActualToRequested(Version actual, Version requested, string? requestedPrerelease)
+    {
+        var comparison = actual.CompareTo(requested);
+        return comparison == 0 && requestedPrerelease is not null ? 1 : comparison;
+    }
+
+    private static bool IsValidPrerelease(string prerelease)
+    {
+        return prerelease.Length > 0
+            && prerelease.Split('.').All(identifier =>
+                identifier.Length > 0
+                && identifier.All(character => char.IsAsciiLetterOrDigit(character) || character == '-'));
     }
 
     private static Version? GetPartialUpperBound(int[] components, int specifiedComponents)
