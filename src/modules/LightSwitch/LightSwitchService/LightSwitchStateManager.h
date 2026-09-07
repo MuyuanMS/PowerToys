@@ -58,6 +58,7 @@ private:
     std::mutex _stateMutex;
 
     void EvaluateAndApplyIfNeeded();
+    void OnExternalThemeChangeLocked(std::optional<bool> expectedTheme);
     bool CoordinatesAreValid(const std::wstring& lat, const std::wstring& lon);
 
     // Notify PowerDisplay that LightSwitch applied a new theme.
