@@ -198,6 +198,10 @@ public sealed class ProfileFunctionData : BaseFunctionData
         {
             return new T();
         }
+        catch (NullReferenceException ex)
+        {
+            throw new JsonException($"The settings file '{fileName}' contains a null JSON value.", ex);
+        }
     }
 
     private void VerifySavedProfile()
@@ -205,7 +209,13 @@ public sealed class ProfileFunctionData : BaseFunctionData
         var saved = _settingsUtils.GetSettings<KeyboardManagerProfile>(
             KeyboardManagerSettings.ModuleName, GetProfileFileName());
         var expectedModel = JsonSerializer.SerializeToNode(KbmProfileConverter.Canonicalize(Input.Profile));
-        var savedModel = JsonSerializer.SerializeToNode(KbmProfileConverter.FromProfile(saved));
+        var warnings = new List<string>();
+        var savedModel = JsonSerializer.SerializeToNode(KbmProfileConverter.FromProfile(saved, warnings));
+        if (warnings.Count > 0)
+        {
+            throw new IOException("The persisted Keyboard Manager profile contains malformed remappings.");
+        }
+
         if (!JsonNode.DeepEquals(expectedModel, savedModel))
         {
             throw new IOException("The Keyboard Manager profile could not be persisted.");
