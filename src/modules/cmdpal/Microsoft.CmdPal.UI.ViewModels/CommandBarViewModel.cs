@@ -27,6 +27,7 @@ public sealed partial class CommandBarViewModel : ObservableObject,
         {
             if (ReferenceEquals(field, value))
             {
+                UpdateContextItems();
                 return;
             }
 
