@@ -5,6 +5,7 @@
 #include "ThemeScheduler.h"
 #include <ThemeHelper.h>
 #include <common/interop/shared_constants.h>
+#include "LightSwitchBrightnessLogic.h"
 
 void ApplyTheme(bool shouldBeLight);
 
@@ -158,10 +159,7 @@ void LightSwitchStateManager::OnBrightnessChange(int brightness)
     if (_state.lastAppliedMode == ScheduleMode::FollowBrightness && _state.isManualOverride)
     {
         int threshold = LightSwitchSettings::settings_snapshot().brightnessThreshold;
-        bool wasLight = (_state.lastBrightness >= 0 && _state.lastBrightness >= threshold);
-        bool willBeLight = (brightness >= threshold);
-
-        if (_state.lastBrightness >= 0 && (wasLight != willBeLight))
+        if (LightSwitchBrightnessLogic::CrossedThreshold(_state.lastBrightness, brightness, threshold))
         {
             Logger::info(L"[LightSwitchStateManager] Brightness crossed threshold while manual override active; "
                          L"treating as a boundary and clearing manual override.");
@@ -332,13 +330,13 @@ void LightSwitchStateManager::EvaluateAndApplyIfNeeded()
     {
         // Light mode when brightness >= threshold, dark mode when below threshold.
         // If brightness is unknown (-1), leave the theme unchanged.
-        if (_state.lastBrightness < 0)
+        if (!LightSwitchBrightnessLogic::IsKnown(_state.lastBrightness))
         {
             Logger::debug(L"[LightSwitchStateManager] Brightness unknown, skipping theme evaluation.");
             _state.lastTickMinutes = now;
             return;
         }
-        shouldBeLight = (_state.lastBrightness >= _currentSettings.brightnessThreshold);
+        shouldBeLight = LightSwitchBrightnessLogic::ShouldBeLight(_state.lastBrightness, _currentSettings.brightnessThreshold);
     }
     else
     {
