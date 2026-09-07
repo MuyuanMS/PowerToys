@@ -641,7 +641,7 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
                     process!.WaitForExit(2000);
                 }
             }
-            catch (Exception ex) when (ex is AggregateException or InvalidOperationException or JsonRpcException)
+            catch (Exception ex) when (ex is AggregateException or InvalidOperationException or System.ComponentModel.Win32Exception or JsonRpcException)
             {
                 Logger.LogWarning($"Error sending dispose notification to {_manifest.Name}: {ex.Message}");
             }

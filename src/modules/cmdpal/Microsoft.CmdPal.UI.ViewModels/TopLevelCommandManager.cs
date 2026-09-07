@@ -178,7 +178,21 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     /// <returns>an awaitable task</returns>
     private async Task UpdateCommandsForProvider(CommandProviderWrapper sender, IItemsChangedEventArgs args, int generation, CancellationToken ct)
     {
-        await sender.LoadTopLevelCommands(_serviceProvider);
+        try
+        {
+            await sender.LoadTopLevelCommands(_serviceProvider)
+                .WaitAsync(BackgroundCommandLoadTimeout, ct)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (TimeoutException)
+        {
+            Logger.LogWarning($"Timed out refreshing commands for provider '{sender.ProviderId}'.");
+            return;
+        }
 
         List<TopLevelViewModel> newItems = [.. sender.TopLevelItems];
         foreach (var i in sender.FallbackItems)
@@ -332,7 +346,10 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             _extensionLoadCts.Dispose();
             _extensionLoadCts = new();
             _currentExtensionLoadCancellationToken = _extensionLoadCts.Token;
-            Interlocked.Increment(ref _providerChangeGeneration);
+            lock (_providerPublicationLock)
+            {
+                Interlocked.Increment(ref _providerChangeGeneration);
+            }
 
             // Signal all services to stop their running providers
             foreach (var service in _extensionServices)
@@ -809,18 +826,26 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
                 }
             }
 
-            List<CommandProviderWrapper> registeredWrappersToDispose;
-            lock (_commandProvidersLock)
-            {
-                registeredWrappersToDispose = [.. _commandProviders.Where(w => removedProviderIds.Contains(w.ProviderId))];
-                _commandProviders.RemoveAll(w => removedProviderIds.Contains(w.ProviderId));
-            }
-
             await Task.Factory.StartNew(
             () =>
             {
-                lock (TopLevelCommands)
-                {
+               lock (_providerPublicationLock)
+               {
+                   if (ct.IsCancellationRequested || generation != _providerChangeGeneration)
+                   {
+                       DisposeWrappers(removedWrapperList);
+                       return;
+                   }
+
+                   List<CommandProviderWrapper> registeredWrappersToDispose;
+                   lock (_commandProvidersLock)
+                   {
+                       registeredWrappersToDispose = [.. _commandProviders.Where(w => removedProviderIds.Contains(w.ProviderId))];
+                       _commandProviders.RemoveAll(w => removedProviderIds.Contains(w.ProviderId));
+                   }
+
+               lock (TopLevelCommands)
+               {
                     if (commandsToRemove.Count != 0)
                     {
                         foreach (var deleted in commandsToRemove)
@@ -855,6 +880,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
 
                 var registeredWrappers = new HashSet<CommandProviderWrapper>(registeredWrappersToDispose);
                 DisposeWrappers(removedWrapperList.Where(w => !registeredWrappers.Contains(w)));
+               }
             },
             CancellationToken.None,
             TaskCreationOptions.None,
@@ -1053,8 +1079,44 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
 
         _extensionLoadCts.Cancel();
         _extensionLoadCts.Dispose();
+        _providerChanges.Dispose();
+        List<CommandProviderWrapper> providersToDispose;
+        List<TopLevelViewModel> commandsToCleanup;
+        List<TopLevelViewModel> bandsToCleanup;
+        lock (_providerPublicationLock)
+        {
+            Interlocked.Increment(ref _providerChangeGeneration);
+            lock (TopLevelCommands)
+            {
+                commandsToCleanup = [.. TopLevelCommands];
+                TopLevelCommands.Clear();
+            }
+
+            lock (_dockBandsLock)
+            {
+                bandsToCleanup = [.. DockBands];
+                DockBands.Clear();
+            }
+
+            lock (_commandProvidersLock)
+            {
+                providersToDispose = [.. _commandProviders];
+                _commandProviders.Clear();
+            }
+        }
+
         _reloadCommandsGate.Dispose();
-        _providerChanges.CompleteWithoutWaiting();
+        DisposeWrappers(providersToDispose);
+        foreach (var command in commandsToCleanup)
+        {
+            command.Cleanup();
+        }
+
+        foreach (var band in bandsToCleanup)
+        {
+            band.Cleanup();
+        }
+
         GC.SuppressFinalize(this);
     }
 

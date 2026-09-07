@@ -89,6 +89,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
     private readonly Lock _extensionsLock = new();
     private readonly List<JSExtensionWrapper> _extensions = [];
     private readonly List<CommandProviderWrapper> _providerWrappers = [];
+    private readonly HashSet<JSExtensionWrapper> _handledProcessExits = [];
     private readonly HashSet<string> _disabledExtensions = new(StringComparer.Ordinal);
 
     // Provider ID (normalized manifest name key) reservations shared by every
@@ -201,6 +202,15 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
             return [];
         }
 
+        lock (_extensionsLock)
+        {
+            if (_disposed)
+            {
+                _loadStopLock.Release();
+                return [];
+            }
+        }
+
         try
         {
             // Begin a fresh load cycle. This replaces a token that a previous stop left
@@ -281,6 +291,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
                 toStop = [.. _extensions];
                 _extensions.Clear();
                 _providerWrappers.Clear();
+                _handledProcessExits.Clear();
                 _crashCounts.Clear();
                 _providerIds.Clear();
             }
@@ -414,39 +425,55 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
 
     public void Dispose()
     {
-        List<JSExtensionWrapper> toDispose;
-        lock (_extensionsLock)
+        try
         {
-            if (_disposed)
+            _loadStopLock.Wait();
+        }
+        catch (ObjectDisposedException)
+        {
+            return;
+        }
+        try
+        {
+            List<JSExtensionWrapper> toDispose;
+            lock (_extensionsLock)
             {
-                return;
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _disposed = true;
+                _shuttingDown = true;
+                toDispose = [.. _extensions];
+                _extensions.Clear();
+                _providerWrappers.Clear();
+                _handledProcessExits.Clear();
+                _crashCounts.Clear();
+                _providerIds.Clear();
             }
 
-            _disposed = true;
-            _shuttingDown = true;
-            toDispose = [.. _extensions];
-            _extensions.Clear();
-            _providerWrappers.Clear();
-            _crashCounts.Clear();
-            _providerIds.Clear();
+            _reload.Stop();
+            StopDirectoryWatcher();
+            StopAllSourceFileWatchers();
+            _hotReloadDebouncer.Dispose();
+
+            // Cancel and (briefly) await crash recovery before the collections, dispatcher, and
+            // directory gate it uses are torn down, so no recovery task is left running against
+            // disposed state. The wait is bounded, so disposal on the UI thread cannot hang.
+            _recovery.Dispose();
+
+            StopExtensionsConcurrentlyAsync(toDispose, "dispose").GetAwaiter().GetResult();
+
+            _notifications.Dispose();
+            _directoryGate.Dispose();
+            _reload.Dispose();
         }
-
-        _reload.Stop();
-        StopDirectoryWatcher();
-        StopAllSourceFileWatchers();
-        _hotReloadDebouncer.Dispose();
-
-        // Cancel and (briefly) await crash recovery before the collections, dispatcher, and
-        // directory gate it uses are torn down, so no recovery task is left running against
-        // disposed state. The wait is bounded, so disposal on the UI thread cannot hang.
-        _recovery.Dispose();
-
-        StopExtensionsConcurrentlyAsync(toDispose, "dispose").GetAwaiter().GetResult();
-
-        _notifications.Dispose();
-        _directoryGate.Dispose();
-        _reload.Dispose();
-        _loadStopLock.Dispose();
+        finally
+        {
+            _loadStopLock.Release();
+            _loadStopLock.Dispose();
+        }
     }
 
     /// <summary>
@@ -1166,6 +1193,14 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         if (sender is not JSExtensionWrapper wrapper)
         {
             return;
+        }
+
+        lock (_extensionsLock)
+        {
+            if (!_handledProcessExits.Add(wrapper))
+            {
+                return;
+            }
         }
 
         // Recovery runs on its own task (it has to: this can be raised from inside the
