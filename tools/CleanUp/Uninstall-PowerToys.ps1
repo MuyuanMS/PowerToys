@@ -597,7 +597,7 @@ $machineTargets = @(
     $products | Where-Object { $_.Scope -eq 'PerMachine' -and $_.State -ne -1 -and $_.State -ne 2 }
 ) + @($bundles | Where-Object { $_.Scope -eq 'PerMachine' })
 
-$timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$timestamp = Get-Date -Format 'yyyyMMdd-HHmm'
 $runId = "$timestamp-$([Guid]::NewGuid().ToString('N'))"
 if ($isAdministrator) {
     $stagingDirectory = Join-Path $env:ProgramData "Microsoft\PowerToys\Cleanup\$runId"
@@ -626,7 +626,7 @@ try {
 
         if (-not (Test-PowerToysMsiProduct -Product $product)) {
             $script:failures.Add(
-                "Refusing to run the uninstaller for $($product.Scope) MSI $($product.ProductCode) " +
+                "Refusing to run the uninstall command for $($product.Scope) MSI $($product.ProductCode) " +
                 'because its cached package is not an authentic Microsoft-signed PowerToys MSI.')
             continue
         }

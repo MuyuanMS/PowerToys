@@ -88,7 +88,7 @@
 ### Recovering from mixed-scope installations
 
 If per-user and per-machine installations are both registered, older
-bootstrappers can block each other from uninstalling. Run
+bundle executables can block each other from uninstalling. Run
 [`tools\CleanUp\Uninstall-PowerToys.ps1`](../../../tools/CleanUp/README.md) from
 an elevated PowerShell window to remove both installations before reinstalling
 one scope. The script preserves PowerToys settings unless `-RemoveSettings` is

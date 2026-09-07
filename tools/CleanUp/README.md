@@ -10,7 +10,7 @@ The script:
 1. Finds PowerToys MSI products by their known upgrade codes.
 1. Uninstalls the MSI products directly, bypassing the conflicting bootstrapper
    conditions.
-1. Runs the cached WiX bootstrappers to remove their registrations and caches.
+1. Runs the cached WiX bundle executables to remove their registrations and caches.
 1. Removes known installation-directory and install-scope registry remnants.
 
 PowerToys settings, logs, and update downloads are preserved unless
@@ -54,4 +54,4 @@ MSI logs are written to a unique run directory under
 `%LOCALAPPDATA%\PowerToysCleanupLogs` for per-user runs. A failed
 run preserves those logs and reports any bootstrapper whose cache is missing
 or invalid. For safety, the script only executes cached MSI packages and
-bootstrappers with a valid Microsoft signature and PowerToys identity.
+bundle executables with a valid Microsoft signature and PowerToys identity.
