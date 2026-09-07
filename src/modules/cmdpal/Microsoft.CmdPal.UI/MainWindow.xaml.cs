@@ -27,6 +27,7 @@ using Microsoft.UI;
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.Windows.AppLifecycle;
 using Windows.ApplicationModel.Activation;
 using Windows.Foundation;
@@ -38,6 +39,7 @@ using Windows.Win32.Graphics.Dwm;
 using Windows.Win32.UI.Input.KeyboardAndMouse;
 using Windows.Win32.UI.WindowsAndMessaging;
 using WinUIEx;
+using KeyChordHelpers = Microsoft.CommandPalette.Extensions.Toolkit.KeyChordHelpers;
 using RS_ = Microsoft.CmdPal.UI.Helpers.ResourceLoaderInstance;
 
 namespace Microsoft.CmdPal.UI;
@@ -70,12 +72,13 @@ public sealed partial class MainWindow : WindowEx,
     private readonly WNDPROC? _originalWndProc;
     private readonly List<TopLevelHotkey> _hotkeys = [];
     private readonly KeyboardListener _keyboardListener;
-    private readonly LocalKeyboardListener _localKeyboardListener;
+    private readonly LocalKeyboardListener _localKeyboardListener = new();
     private readonly HiddenOwnerWindowBehavior _hiddenOwnerBehavior = new();
     private readonly ICmdPalProtocolActivation _protocolActivation;
     private readonly ViewModels.Models.IMonitorService _monitorService;
     private readonly IThemeService _themeService;
     private readonly WindowThemeSynchronizer _windowThemeSynchronizer;
+    private readonly AccessKeyModeController _accessKeyMode;
     private readonly List<long> _breakthroughTimestamps = [];
 
     private bool _ignoreHotKeyWhenFullScreen = true;
@@ -137,6 +140,7 @@ public sealed partial class MainWindow : WindowEx,
     {
         _protocolActivation = App.Current.Services.GetRequiredService<ICmdPalProtocolActivation>();
         _monitorService = App.Current.Services.GetRequiredService<ViewModels.Models.IMonitorService>();
+        _accessKeyMode = App.Current.Services.GetRequiredService<AccessKeyModeController>();
 
         InitializeComponent();
 
@@ -210,6 +214,7 @@ public sealed partial class MainWindow : WindowEx,
         AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Collapsed;
         SizeChanged += WindowSizeChanged;
         RootElement.Loaded += RootElementLoaded;
+        RootElement.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(RootElement_PointerPressed), true);
 
         // Load our settings, and then also wire up a settings changed handler
         HotReloadSettings();
@@ -224,8 +229,8 @@ public sealed partial class MainWindow : WindowEx,
             Summon(string.Empty);
         });
 
-        _localKeyboardListener = new LocalKeyboardListener();
         _localKeyboardListener.KeyPressed += LocalKeyboardListener_OnKeyPressed;
+        _localKeyboardListener.KeyStateChanged += LocalKeyboardListener_OnKeyStateChanged;
         _localKeyboardListener.Start();
 
         // Force window to be created, and then cloaked. This will offset initial animation when the window is shown.
@@ -285,6 +290,46 @@ public sealed partial class MainWindow : WindowEx,
             WeakReferenceMessenger.Default.Send(new GoBackMessage());
         }
     }
+
+    private void LocalKeyboardListener_OnKeyStateChanged(object? sender, LocalKeyboardListenerKeyStateChangedEventArgs e)
+    {
+        if (!e.IsDown)
+        {
+            _accessKeyMode.HandleKeyUp(e.Key);
+            return;
+        }
+
+        var modifiers = KeyModifiers.GetCurrent();
+        var chord = KeyChordHelpers.FromModifiers(
+            ctrl: modifiers.Ctrl,
+            alt: modifiers.Alt,
+            shift: modifiers.Shift,
+            win: modifiers.Win,
+            vkey: e.Key);
+        var exitGeneration = _accessKeyMode.HandleKeyDown(chord);
+
+        if (RootElement.MainContent is ShellPage shellPage &&
+            shellPage.TryHandleAccessKey(chord))
+        {
+            AccessKeyManager.ExitDisplayMode();
+            e.Handled = true;
+        }
+
+        if (exitGeneration is long generation)
+        {
+            QueueAccessKeyModeExit(generation);
+        }
+    }
+
+    private void QueueAccessKeyModeExit(long generation)
+    {
+        if (!DispatcherQueue.TryEnqueue(() => _accessKeyMode.ExitIfCurrent(generation)))
+        {
+            _accessKeyMode.ExitIfCurrent(generation);
+        }
+    }
+
+    private void RootElement_PointerPressed(object sender, PointerRoutedEventArgs e) => _accessKeyMode.Exit();
 
     private void SettingsChangedHandler(ISettingsService sender, SettingsModel args)
     {
@@ -362,11 +407,11 @@ public sealed partial class MainWindow : WindowEx,
         {
             var finalRect = rect.Value;
 
-            // In compact mode, center the *visible collapsed card* (the search box) on the
-            // display, not the much larger transparent HWND. The card is anchored to the top
-            // of the HWND, so we offset the HWND upward by the card's center so that growing
-            // the card downward (when results appear) keeps the search box where it was.
-            if (TryGetCompactCardCenterOffsetPhysical(windowDpi, out var cardCenterFromHwndTop))
+            // In compact mode, center the visible collapsed search row on the display, not
+            // the much larger transparent HWND. The card is anchored to the top of the HWND,
+            // so we offset the HWND upward by the search row's center. Growing the card
+            // downward (from the shelf or expanded results) keeps the search box in place.
+            if (TryGetCompactSearchRowCenterOffsetPhysical(windowDpi, out var searchRowCenterFromHwndTop))
             {
                 var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
                 var workArea = displayArea.WorkArea;
@@ -375,7 +420,7 @@ public sealed partial class MainWindow : WindowEx,
                 // so a larger percentage places the search box higher up the display.
                 var fractionFromTop = GetCompactCenterFractionFromTop(settings);
                 var desiredCardCenterY = workArea.Y + (int)Math.Round(workArea.Height * fractionFromTop);
-                finalRect.Y = desiredCardCenterY - cardCenterFromHwndTop;
+                finalRect.Y = desiredCardCenterY - searchRowCenterFromHwndTop;
 
                 if (finalRect.Y < workArea.Y)
                 {
@@ -390,13 +435,14 @@ public sealed partial class MainWindow : WindowEx,
     /// <summary>
     /// When the palette is in compact mode and is being centered on launch, computes the
     /// distance (in physical pixels) from the top of the HWND to the vertical center of the
-    /// collapsed card, so the caller can position the HWND such that the card is centered.
+    /// collapsed search row, so the caller can position the HWND such that the search box is
+    /// centered at the configured height.
     /// Returns false when the card should not be re-centered (compact mode off, or a summon
     /// behavior that restores the last position).
     /// </summary>
-    private bool TryGetCompactCardCenterOffsetPhysical(int windowDpi, out int cardCenterFromHwndTop)
+    private bool TryGetCompactSearchRowCenterOffsetPhysical(int windowDpi, out int searchRowCenterFromHwndTop)
     {
-        cardCenterFromHwndTop = 0;
+        searchRowCenterFromHwndTop = 0;
 
         var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
         if (!settings.CompactMode || !IsCenteringSummon(settings))
@@ -404,18 +450,27 @@ public sealed partial class MainWindow : WindowEx,
             return false;
         }
 
-        // Make sure the card is actually collapsed before we measure it.
-        (RootElement.MainContent as ShellPage)?.EnsureCompactLayout();
+        // Make sure the card is actually collapsed before we measure it. Anchor positioning
+        // to the search row, not the entire card: the optional quick-access shelf makes the
+        // collapsed card taller but should not move the search box on screen.
+        var shellPage = RootElement.MainContent as ShellPage;
+        shellPage?.EnsureCompactLayout();
 
-        var cardHeightDip = RootElement.GetCardHeight();
-        if (cardHeightDip <= 0)
+        var searchRowCenterDip = shellPage?.GetCompactSearchRowCenterY() ?? 0;
+        if (searchRowCenterDip <= 0)
         {
-            return false;
+            var cardHeightDip = RootElement.GetCardHeight();
+            if (cardHeightDip <= 0)
+            {
+                return false;
+            }
+
+            searchRowCenterDip = cardHeightDip / 2.0;
         }
 
         var scale = windowDpi / 96.0;
         var cardTopDip = RootElement.ShadowPadding.Top;
-        cardCenterFromHwndTop = (int)Math.Round((cardTopDip + (cardHeightDip / 2.0)) * scale);
+        searchRowCenterFromHwndTop = (int)Math.Round((cardTopDip + searchRowCenterDip) * scale);
         return true;
     }
 
@@ -1136,6 +1191,11 @@ public sealed partial class MainWindow : WindowEx,
 
     private void SetIsVisibleToUser(bool isVisibleToUser)
     {
+        if (!isVisibleToUser)
+        {
+            _accessKeyMode.Exit();
+        }
+
         if (IsVisibleToUser == isVisibleToUser)
         {
             return;
@@ -1178,6 +1238,7 @@ public sealed partial class MainWindow : WindowEx,
         // Workaround by turning it off before shutdown.
         App.Current.DebugSettings.FailFastOnErrors = false;
         _localKeyboardListener.Dispose();
+        (RootElement.MainContent as ShellPage)?.Dispose();
         DisposeAcrylic();
 
         _keyboardListener.Stop();
@@ -1370,6 +1431,8 @@ public sealed partial class MainWindow : WindowEx,
 
     internal void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
     {
+        _localKeyboardListener.EnableRaisingEvents = args.WindowActivationState != WindowActivationState.Deactivated;
+
         if (!_themeServiceInitialized && args.WindowActivationState != WindowActivationState.Deactivated)
         {
             try
@@ -1385,6 +1448,8 @@ public sealed partial class MainWindow : WindowEx,
 
         if (args.WindowActivationState == WindowActivationState.Deactivated)
         {
+            _accessKeyMode.Exit();
+
             // Save the current window position before hiding the window
             // but not when opened from dock — preserve the pre-dock size.
             if (!_isLoadedFromDock)
@@ -1697,9 +1762,21 @@ public sealed partial class MainWindow : WindowEx,
     {
         switch (uMsg)
         {
+            case PInvoke.WM_ACTIVATEAPP when wParam.Value == 0:
+                _accessKeyMode.Exit();
+                break;
+
             // Prevent the window from maximizing when double-clicking the title bar area
             case PInvoke.WM_NCLBUTTONDBLCLK:
                 return (LRESULT)IntPtr.Zero;
+
+            // LOAD BEARING:
+            // This is necessary to prevent rapid deceleration of the machine running CmdPal.
+            // Handle unmatched menu characters here instead of letting DefWindowProc ignore
+            // them and play the system chime. Repeated chimes may otherwise cause the machine
+            // to experience sudden contact with the floor and subsequent rapid disassembly.
+            case PInvoke.WM_MENUCHAR:
+                return (LRESULT)(1 << 16); // MAKELRESULT(0, MNC_CLOSE)
 
             // When restoring a saved position across monitors with different DPIs,
             // MoveAndResize already sets the correctly-scaled size. Suppress the
