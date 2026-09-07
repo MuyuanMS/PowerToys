@@ -202,6 +202,16 @@ static std::unordered_map<HWND, bool> g_excludedCache;
 // Custom message: posted from the settings thread to invalidate g_excludedCache
 // on the main thread (where all other accesses occur), avoiding a data race.
 static constexpr UINT WM_INVALIDATE_EXCLUDED_CACHE = WM_APP + 1;
+static constexpr UINT WM_APPLY_SNAP = WM_APP + 2;
+
+struct SnapRequest
+{
+    HWND target;
+    SnapTarget snapTarget;
+    RECT targetRect;
+    RECT normalPosition;
+    HWND previousForeground;
+};
 
 static const wchar_t* const CLASS_NAME = L"GrabAndMove_MsgWnd";
 static const wchar_t* const OVERLAY_CLASS_NAME = L"GrabAndMove_Overlay";
@@ -1528,49 +1538,23 @@ static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
                 g_snapTarget = SnapTarget::None;
                 g_snapTargetRect = {};
 
-                if (target == SnapTarget::Maximize)
+                if (g_hMsgWnd)
                 {
-                    HWND previousForeground = GetForegroundWindow();
-                    WINDOWPLACEMENT placement{ sizeof(placement) };
-                    GetWindowPlacement(g_dragTarget, &placement);
-                    const RECT normalPosition = g_dragWndRect;
-                    const int normalWidth = normalPosition.right - normalPosition.left;
-                    const int normalHeight = normalPosition.bottom - normalPosition.top;
-                    placement.rcNormalPosition = {
-                        targetRect.left,
-                        targetRect.top,
-                        targetRect.left + normalWidth,
-                        targetRect.top + normalHeight
-                    };
-                    placement.flags |= WPF_ASYNCWINDOWPLACEMENT;
-                    placement.showCmd = SW_RESTORE;
-                    SetWindowPlacement(g_dragTarget, &placement);
-                    placement.showCmd = SW_SHOWMAXIMIZED;
-                    SetWindowPlacement(g_dragTarget, &placement);
-                    if (previousForeground && previousForeground != g_dragTarget)
+                    auto request = std::make_unique<SnapRequest>(
+                        SnapRequest{
+                            g_dragTarget,
+                            target,
+                            targetRect,
+                            g_dragWndRect,
+                            GetForegroundWindow()});
+                    if (!PostMessageW(g_hMsgWnd, WM_APPLY_SNAP, 0, reinterpret_cast<LPARAM>(request.get())))
                     {
-                        SetForegroundWindow(previousForeground);
+                        TraceLoggingWrite(g_hProvider, "GrabAndMove_SnapQueueFailed");
                     }
-                }
-                else if (target != SnapTarget::None)
-                {
-                    // Position the window directly so its visible frame (DWM extended
-                    // frame bounds) matches the target region. The visible frame is
-                    // inset from the window rect by the invisible resize borders, so
-                    // expand the target rect by those margins (recomputed here because
-                    // they are zeroed while the snap preview is armed).
-                    PrepareOverlayMetrics(g_dragTarget);
-                    RECT windowRect = targetRect;
-                    windowRect.left -= g_overlayMarginL;
-                    windowRect.top -= g_overlayMarginT;
-                    windowRect.right += g_overlayMarginR;
-                    windowRect.bottom += g_overlayMarginB;
-                    WINDOWPLACEMENT placement{ sizeof(placement) };
-                    GetWindowPlacement(g_dragTarget, &placement);
-                    placement.rcNormalPosition = windowRect;
-                    placement.flags |= WPF_ASYNCWINDOWPLACEMENT;
-                    placement.showCmd = SW_RESTORE;
-                    SetWindowPlacement(g_dragTarget, &placement);
+                    else
+                    {
+                        request.release();
+                    }
                 }
 
                 EndInteraction(true, false);
@@ -1901,7 +1885,7 @@ static void HandleDragResize(POINT pt)
             int newLeft = pt.x - static_cast<int>(ratioL * newW);
             int newTop = pt.y - static_cast<int>(ratioT * newH);
             SetWindowPos(g_resizeTarget, nullptr, newLeft, newTop, newW, newH,
-                         SWP_NOZORDER | SWP_NOACTIVATE);
+                         SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
             g_resizeWndRect = {newLeft, newTop, newLeft + newW, newTop + newH};
 
             // Corner radius / invisible-border margins differ once restored.
@@ -1967,6 +1951,82 @@ static void HandleDragResize(POINT pt)
                  SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
     RepositionOverlay(nr.left, nr.top, w, h);
 }
+
+static void ApplySnapRequest(const SnapRequest& request)
+{
+    if (!IsWindow(request.target))
+    {
+        return;
+    }
+
+    if (request.snapTarget == SnapTarget::Maximize)
+    {
+        WINDOWPLACEMENT placement{ sizeof(placement) };
+        if (!GetWindowPlacement(request.target, &placement))
+        {
+            return;
+        }
+
+        HMONITOR monitor = MonitorFromRect(&request.targetRect, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO monitorInfo{ sizeof(monitorInfo) };
+        if (!GetMonitorInfoW(monitor, &monitorInfo))
+        {
+            return;
+        }
+
+        RECT normalPosition = request.normalPosition;
+        const int workOffsetX = monitorInfo.rcWork.left - monitorInfo.rcMonitor.left;
+        const int workOffsetY = monitorInfo.rcWork.top - monitorInfo.rcMonitor.top;
+        normalPosition.left = request.targetRect.left - workOffsetX;
+        normalPosition.top = request.targetRect.top - workOffsetY;
+        normalPosition.right = normalPosition.left + (request.normalPosition.right - request.normalPosition.left);
+        normalPosition.bottom = normalPosition.top + (request.normalPosition.bottom - request.normalPosition.top);
+
+        placement.rcNormalPosition = normalPosition;
+        placement.showCmd = SW_RESTORE;
+        if (!SetWindowPlacement(request.target, &placement))
+        {
+            return;
+        }
+
+        placement.showCmd = SW_SHOWMAXIMIZED;
+        if (!SetWindowPlacement(request.target, &placement))
+        {
+            return;
+        }
+
+        if (request.previousForeground && request.previousForeground != request.target)
+        {
+            SetForegroundWindow(request.previousForeground);
+        }
+        return;
+    }
+
+    SetWindowPos(
+        request.target,
+        nullptr,
+        request.targetRect.left,
+        request.targetRect.top,
+        request.targetRect.right - request.targetRect.left,
+        request.targetRect.bottom - request.targetRect.top,
+        SWP_NOZORDER | SWP_NOACTIVATE);
+
+    PrepareOverlayMetrics(request.target);
+    RECT windowRect = request.targetRect;
+    windowRect.left -= g_overlayMarginL;
+    windowRect.top -= g_overlayMarginT;
+    windowRect.right += g_overlayMarginR;
+    windowRect.bottom += g_overlayMarginB;
+    SetWindowPos(
+        request.target,
+        nullptr,
+        windowRect.left,
+        windowRect.top,
+        windowRect.right - windowRect.left,
+        windowRect.bottom - windowRect.top,
+        SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
@@ -1974,6 +2034,16 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
     case WM_INVALIDATE_EXCLUDED_CACHE:
         g_excludedCache.clear();
         return 0;
+
+    case WM_APPLY_SNAP:
+    {
+        std::unique_ptr<SnapRequest> request(reinterpret_cast<SnapRequest*>(lParam));
+        if (request)
+        {
+            ApplySnapRequest(*request);
+        }
+        return 0;
+    }
 
     case WM_TRAY_ICON:
         if (LOWORD(lParam) == WM_RBUTTONUP)
