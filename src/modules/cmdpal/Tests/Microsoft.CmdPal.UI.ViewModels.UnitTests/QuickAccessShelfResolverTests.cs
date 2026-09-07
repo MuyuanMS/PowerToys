@@ -63,6 +63,7 @@ public partial class QuickAccessShelfResolverTests
             shortcutIndex: 0,
             startsNewSection: false,
             isPinned: false,
+            isPersistedPinned: false,
             canPin: true);
 
         var pinned = QuickAccessShelfItem.CreateOrReuse(
@@ -71,13 +72,35 @@ public partial class QuickAccessShelfResolverTests
             shortcutIndex: 0,
             startsNewSection: false,
             isPinned: true,
+            isPersistedPinned: true,
             canPin: false);
 
         Assert.AreNotSame(recent, pinned);
         Assert.IsFalse(recent.IsPinned);
+        Assert.IsFalse(recent.IsPersistedPinned);
         Assert.IsTrue(recent.CanPin);
         Assert.IsTrue(pinned.IsPinned);
+        Assert.IsTrue(pinned.IsPersistedPinned);
         Assert.IsFalse(pinned.CanPin);
+    }
+
+    [TestMethod]
+    public void CreateOrReuse_RecentSectionItemCanRemainPersistedPinned()
+    {
+        var item = new ListItem { Title = "Recent pinned item" };
+
+        var shelfItem = QuickAccessShelfItem.CreateOrReuse(
+            [],
+            item,
+            shortcutIndex: 0,
+            startsNewSection: false,
+            isPinned: false,
+            isPersistedPinned: true,
+            canPin: false);
+
+        Assert.IsFalse(shelfItem.IsPinned);
+        Assert.IsTrue(shelfItem.IsPersistedPinned);
+        Assert.IsFalse(shelfItem.CanPin);
     }
 
     [TestMethod]

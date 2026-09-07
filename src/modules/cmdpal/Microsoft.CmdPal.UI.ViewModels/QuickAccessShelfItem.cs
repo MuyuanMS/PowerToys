@@ -28,6 +28,8 @@ public sealed class QuickAccessShelfItem : IEquatable<QuickAccessShelfItem>
 
     public bool IsPinned { get; }
 
+    public bool IsPersistedPinned { get; }
+
     public bool CanPin { get; }
 
     public DataPackageView? DataPackage { get; }
@@ -42,6 +44,7 @@ public sealed class QuickAccessShelfItem : IEquatable<QuickAccessShelfItem>
         int shortcutIndex,
         bool startsNewSection,
         bool isPinned,
+        bool isPersistedPinned,
         bool canPin,
         DataPackageView? dataPackage)
     {
@@ -52,6 +55,7 @@ public sealed class QuickAccessShelfItem : IEquatable<QuickAccessShelfItem>
         _shortcutIndex = shortcutIndex;
         StartsNewSection = startsNewSection;
         IsPinned = isPinned;
+        IsPersistedPinned = isPersistedPinned;
         CanPin = canPin;
         DataPackage = dataPackage;
         ProviderId = TopLevelCommandResolver.GetProviderId(item);
@@ -65,6 +69,7 @@ public sealed class QuickAccessShelfItem : IEquatable<QuickAccessShelfItem>
         int shortcutIndex,
         bool startsNewSection,
         bool isPinned = false,
+        bool isPersistedPinned = false,
         bool canPin = false)
     {
         var title = item.Title;
@@ -89,7 +94,7 @@ public sealed class QuickAccessShelfItem : IEquatable<QuickAccessShelfItem>
 
         foreach (var existingItem in existingItems)
         {
-            if (existingItem.Matches(item, title, sourceIcon, shortcutIndex, startsNewSection, isPinned, canPin, dataPackage))
+            if (existingItem.Matches(item, title, sourceIcon, shortcutIndex, startsNewSection, isPinned, isPersistedPinned, canPin, dataPackage))
             {
                 return existingItem;
             }
@@ -101,7 +106,7 @@ public sealed class QuickAccessShelfItem : IEquatable<QuickAccessShelfItem>
             icon.InitializeProperties();
         }
 
-        return new QuickAccessShelfItem(item, title, sourceIcon, icon, shortcutIndex, startsNewSection, isPinned, canPin, dataPackage);
+        return new QuickAccessShelfItem(item, title, sourceIcon, icon, shortcutIndex, startsNewSection, isPinned, isPersistedPinned, canPin, dataPackage);
     }
 
     public PerformCommandMessage GetPerformCommandMessage()
@@ -125,12 +130,26 @@ public sealed class QuickAccessShelfItem : IEquatable<QuickAccessShelfItem>
         _shortcutIndex == other._shortcutIndex &&
         StartsNewSection == other.StartsNewSection &&
         IsPinned == other.IsPinned &&
+        IsPersistedPinned == other.IsPersistedPinned &&
         CanPin == other.CanPin &&
         ReferenceEquals(DataPackage, other.DataPackage);
 
     public override bool Equals(object? obj) => Equals(obj as QuickAccessShelfItem);
 
-    public override int GetHashCode() => HashCode.Combine(_item, _sourceIcon, Title, _shortcutIndex, StartsNewSection, IsPinned, CanPin, DataPackage);
+    public override int GetHashCode()
+    {
+        HashCode hash = default;
+        hash.Add(_item);
+        hash.Add(_sourceIcon);
+        hash.Add(Title);
+        hash.Add(_shortcutIndex);
+        hash.Add(StartsNewSection);
+        hash.Add(IsPinned);
+        hash.Add(IsPersistedPinned);
+        hash.Add(CanPin);
+        hash.Add(DataPackage);
+        return hash.ToHashCode();
+    }
 
     private bool Matches(
         IListItem item,
@@ -139,6 +158,7 @@ public sealed class QuickAccessShelfItem : IEquatable<QuickAccessShelfItem>
         int shortcutIndex,
         bool startsNewSection,
         bool isPinned,
+        bool isPersistedPinned,
         bool canPin,
         DataPackageView? dataPackage) =>
         ReferenceEquals(_item, item) &&
@@ -147,6 +167,7 @@ public sealed class QuickAccessShelfItem : IEquatable<QuickAccessShelfItem>
         _shortcutIndex == shortcutIndex &&
         StartsNewSection == startsNewSection &&
         IsPinned == isPinned &&
+        IsPersistedPinned == isPersistedPinned &&
         CanPin == canPin &&
         ReferenceEquals(DataPackage, dataPackage);
 }
