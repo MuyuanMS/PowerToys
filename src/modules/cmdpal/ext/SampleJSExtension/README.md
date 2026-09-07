@@ -49,8 +49,6 @@ inventing protocol methods:
   clipboard demo copies to the clipboard instead.
 - Toast icon and toast action button (`IToastArgs2`). `ToastArgs` carries a
   message and an optional follow-up result only.
-- Live-updating details through targeted property change. Approximated with a
-  dynamic page that refreshes items on a timer.
 - Win32 foreground-window and other in-process host tricks.
 - Evil samples and issue-specific host-ABI repros.
 

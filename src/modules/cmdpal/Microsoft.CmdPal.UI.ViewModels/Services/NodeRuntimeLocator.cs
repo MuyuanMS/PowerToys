@@ -210,7 +210,7 @@ internal static class NodeRuntimeLocator
             : token.Length > 0 && "> < = ^ ~".Contains(token[0])
                 ? token[..1]
                 : string.Empty;
-        var versionText = token.TrimStart('>', '<', '=', '^', '~');
+        var versionText = token[op.Length..];
         var metadataIndex = versionText.IndexOfAny(['-', '+']);
         if (metadataIndex >= 0)
         {

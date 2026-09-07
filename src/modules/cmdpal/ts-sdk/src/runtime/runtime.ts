@@ -223,7 +223,6 @@ export class ExtensionRuntime {
                 `cmdpal-sdk: late provider disposal failed: ${describeError(error)}\n`,
               );
             });
-          return;
         }
         this.provider = provider;
         this.primed = false;

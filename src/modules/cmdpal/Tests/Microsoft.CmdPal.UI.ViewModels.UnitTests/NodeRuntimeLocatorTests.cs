@@ -175,6 +175,8 @@ public class NodeRuntimeLocatorTests
     [DataRow("22.4.0", ">= 22 < 23", true)]
     [DataRow("23.0.0", ">= 22 < 23", false)]
     [DataRow("22.0.0", ">=22.0.0-0", true)]
+    [DataRow("22.0.0", "=>22", false)]
+    [DataRow("22.0.0", ">>22", false)]
     [DataRow("22.0.0", "22.x.1", false)]
     public void MatchesRequirement_EvaluatesComparatorSetsAndMalformedRanges(string actual, string requirement, bool expected)
     {
