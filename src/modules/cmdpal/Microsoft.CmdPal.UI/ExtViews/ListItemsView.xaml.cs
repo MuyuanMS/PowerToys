@@ -122,6 +122,7 @@ public sealed partial class ListItemsView : UserControl,
         RegisterMessenger();
         _accessKeyMode.IsActiveChanged += AccessKeyMode_IsActiveChanged;
         SetNumberedShortcutCuesVisibility(_accessKeyMode.IsActive);
+        AttachViewModelEvents();
         EnsureNumberedShortcutCueTracking();
         if (ShowNumberedShortcutCues)
         {
@@ -141,6 +142,7 @@ public sealed partial class ListItemsView : UserControl,
         SetItemsScrollViewer(null);
         _accessKeyMode.IsActiveChanged -= AccessKeyMode_IsActiveChanged;
         SetNumberedShortcutCuesVisibility(false);
+        DetachViewModelEvents();
         StopNumberedShortcutCueTracking();
         StopNumberedShortcutItemTracking();
         ClearNumberedShortcutAccelerators();
@@ -791,9 +793,7 @@ public sealed partial class ListItemsView : UserControl,
             @this.CancelPendingContextMenuOpen();
             if (e.OldValue is ListViewModel old)
             {
-                old.ItemsUpdated -= @this.Page_ItemsUpdated;
-                old.PropertyChanged -= @this.ViewModel_PropertyChanged;
-                old.FilteredItems.CollectionChanged -= @this.FilteredItems_CollectionChanged;
+                @this.DetachViewModelEvents(old);
                 @this.StopNumberedShortcutItemTracking();
             }
 
@@ -814,11 +814,9 @@ public sealed partial class ListItemsView : UserControl,
 
             if (e.NewValue is ListViewModel page)
             {
-                page.ItemsUpdated += @this.Page_ItemsUpdated;
-                page.PropertyChanged += @this.ViewModel_PropertyChanged;
-                if (@this.ShowNumberedShortcutCues)
+                if (@this._isLoaded)
                 {
-                    page.FilteredItems.CollectionChanged += @this.FilteredItems_CollectionChanged;
+                    @this.AttachViewModelEvents(page);
                     @this.RefreshNumberedShortcutItemTracking();
                 }
 
@@ -842,6 +840,39 @@ public sealed partial class ListItemsView : UserControl,
                 @this.QueueNumberedShortcutCueUpdate();
             }
         }
+    }
+
+    private void AttachViewModelEvents()
+    {
+        if (ViewModel is ListViewModel page)
+        {
+            AttachViewModelEvents(page);
+        }
+    }
+
+    private void AttachViewModelEvents(ListViewModel page)
+    {
+        page.ItemsUpdated += Page_ItemsUpdated;
+        page.PropertyChanged += ViewModel_PropertyChanged;
+        if (ShowNumberedShortcutCues)
+        {
+            page.FilteredItems.CollectionChanged += FilteredItems_CollectionChanged;
+        }
+    }
+
+    private void DetachViewModelEvents()
+    {
+        if (ViewModel is ListViewModel page)
+        {
+            DetachViewModelEvents(page);
+        }
+    }
+
+    private void DetachViewModelEvents(ListViewModel page)
+    {
+        page.ItemsUpdated -= Page_ItemsUpdated;
+        page.PropertyChanged -= ViewModel_PropertyChanged;
+        page.FilteredItems.CollectionChanged -= FilteredItems_CollectionChanged;
     }
 
     private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
