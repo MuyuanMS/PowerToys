@@ -225,6 +225,19 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
             });
     }
 
+    public void RefreshCommandContext()
+    {
+        WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(this));
+        if (HasDetails)
+        {
+            WeakReferenceMessenger.Default.Send<ShowDetailsMessage>(new(Details));
+        }
+        else
+        {
+            WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+        }
+    }
+
     private List<IContextItemViewModel> BuildCommandViewModels(IContextItem[]? items)
     {
         if (items is null)
