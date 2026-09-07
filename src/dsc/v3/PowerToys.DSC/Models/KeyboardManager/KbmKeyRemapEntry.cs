@@ -37,4 +37,13 @@ public class KbmKeyRemapEntry
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     [Description("The text to type instead of the remapped key or shortcut.")]
     public string? ToText { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the remap applies always or only when the key is
+    /// pressed alone. The default is always.
+    /// </summary>
+    [JsonPropertyName("condition")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [Description("The remap condition: \"always\" or \"alone\".")]
+    public string? Condition { get; set; }
 }

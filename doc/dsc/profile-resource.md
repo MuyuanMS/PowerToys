@@ -60,6 +60,7 @@ The `profile` object is required and has two entry lists. An empty profile
 | `from`   | string | yes      | The key being remapped, e.g. `CapsLock`.                 |
 | `to`     | string | one of   | Target key or shortcut, e.g. `Esc`, `Ctrl+C`, `Disable`. |
 | `toText` | string | one of   | Text to type instead of the key.                         |
+| `condition` | string | no       | `always` (default) or `alone` for tap-alone key remappings. |
 
 Exactly one of `to` or `toText` must be set.
 
