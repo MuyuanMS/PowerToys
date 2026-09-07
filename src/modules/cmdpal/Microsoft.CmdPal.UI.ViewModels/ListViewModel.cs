@@ -1334,7 +1334,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
     private void UpdateEmptyContent()
     {
         UpdateProperty(nameof(ShowEmptyContent));
-        if (!ShowEmptyContent || EmptyContent.Model.Unsafe is null)
+        if (!ShowEmptyContent || EmptyContent.Model.Unsafe is null || !CanPublishContextUpdates)
         {
             return;
         }
