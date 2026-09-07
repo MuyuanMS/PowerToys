@@ -1531,6 +1531,14 @@ static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
                 if (target == SnapTarget::Maximize)
                 {
                     HWND previousForeground = GetForegroundWindow();
+                    SetWindowPos(
+                        g_dragTarget,
+                        nullptr,
+                        targetRect.left,
+                        targetRect.top,
+                        targetRect.right - targetRect.left,
+                        targetRect.bottom - targetRect.top,
+                        SWP_NOZORDER | SWP_NOACTIVATE);
                     ShowWindow(g_dragTarget, SW_MAXIMIZE);
                     if (previousForeground && previousForeground != g_dragTarget)
                     {
