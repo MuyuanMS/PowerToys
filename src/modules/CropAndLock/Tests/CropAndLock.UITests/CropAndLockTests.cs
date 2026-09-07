@@ -121,7 +121,7 @@ namespace Microsoft.CropAndLock.UITests
 
             Clean(() =>
             {
-                foreach (var window in ModuleWindows())
+                foreach (var window in WindowControl.EnumerateProcessWindows(NativeMethods.ProcessIds(ModuleProcess)))
                 {
                     if (window.ClassName is OverlayClass or ThumbnailClass or ReparentClass)
                     {
@@ -188,7 +188,7 @@ namespace Microsoft.CropAndLock.UITests
             Step("Closing the thumbnail; the source must survive unchanged");
             Assert.IsTrue(WindowControl.TryCloseWindow(cropped.ToInt64()), "The thumbnail did not close.");
             AssertRestored(beforeState);
-            EditSource("restored", source.Window);
+            EditSource("restored5", source.Window);
         }
 
         private void RunReparent(CropSource fixture)
@@ -223,7 +223,7 @@ namespace Microsoft.CropAndLock.UITests
             Assert.IsTrue(WindowControl.TryCloseWindow(cropped.ToInt64()), "The reparent window did not close.");
             AssertRestored(beforeState);
             AssertPixels(changed, source.Window, source.CropBounds, "reparent-restored-source");
-            EditSource("restored", source.Window);
+            EditSource("restored5", source.Window);
         }
 
         private void PrepareModule()
@@ -256,7 +256,14 @@ namespace Microsoft.CropAndLock.UITests
             Assert.HasCount(1, buttons, $"Expected exactly one shortcut EditButton inside {cardId}.");
             var shortcut = WaitHelper.WaitForStable(
                 () => buttons[0].HelpText,
-                text => ParseShortcut(text).Any(key => key is not (Key.LWin or Key.Ctrl or Key.Shift or Key.Alt)),
+                text =>
+                {
+                    var keys = ParseShortcut(text);
+                    Assert.IsTrue(
+                        string.IsNullOrWhiteSpace(text) || keys.Length > 0,
+                        $"Shortcut '{text}' could not be parsed; this suite requires an enabled shortcut in the English Settings UI.");
+                    return keys.Any(key => key is not (Key.LWin or Key.Ctrl or Key.Shift or Key.Alt));
+                },
                 timeoutMS: 5_000,
                 requiredConsecutiveMatches: 2);
             Assert.IsTrue(shortcut.Succeeded, $"{cardId} exposed no usable activation shortcut: '{shortcut.LastObservation}'.");
@@ -393,6 +400,8 @@ namespace Microsoft.CropAndLock.UITests
 
         private void EditSource(string text, IntPtr inputRoot)
         {
+            var typedKeys = text.Select(character => ParseKey(character.ToString())).ToArray();
+            Assert.IsTrue(typedKeys.All(key => key.HasValue), $"Unsupported input character in '{text}'.");
             Step($"Waiting for the source input to own its screen point through HWND 0x{inputRoot:X}");
             RequireForeground(inputRoot);
             var dismissedShellOverlay = false;
@@ -418,15 +427,15 @@ namespace Microsoft.CropAndLock.UITests
                         WindowControl.TryBringToForeground(inputRoot);
                     }
                 });
-            Assert.IsTrue(
-                ready.Succeeded,
+            var ownershipDiagnostic =
                 $"The source input is occluded or outside the crop. Point={ready.LastObservation.Point}, expected=0x{inputRoot:X}, " +
-                $"actual=0x{ready.LastObservation.Root:X} ({NativeMethods.ClassName(ready.LastObservation.Root)}), foreground={WindowControl.GetForegroundWindowInfo()}.");
+                $"actual=0x{ready.LastObservation.Root:X} ({NativeMethods.ClassName(ready.LastObservation.Root)}), foreground={WindowControl.GetForegroundWindowInfo()}.";
+            Assert.IsTrue(ready.Succeeded, ownershipDiagnostic);
             var point = ready.LastObservation.Point;
             Step($"Sending real input at {point} through HWND 0x{inputRoot:X}");
             MouseHelper.LeftClickAt(point.X, point.Y);
             KeyboardHelper.SendKeys(Key.Ctrl, Key.A);
-            KeyboardHelper.SendKeys(text.Select(character => Enum.Parse<Key>(character.ToString(), true)).ToArray());
+            KeyboardHelper.SendKeys(typedKeys.Select(key => key!.Value).ToArray());
             Assert.IsTrue(ClipboardHelper.SetText("crop-and-lock-copy-sentinel"), "Could not seed the Copy assertion's clipboard sentinel.");
             KeyboardHelper.SendKeys(Key.Ctrl, Key.A);
             KeyboardHelper.SendKeys(Key.Ctrl, Key.C);
@@ -509,8 +518,13 @@ namespace Microsoft.CropAndLock.UITests
 
         private static Rectangle ClientRegion(IntPtr window) => new(Point.Empty, NativeMethods.ClientBounds(window).Size);
 
-        private IReadOnlyList<WindowControl.ProcessWindow> ModuleWindows() =>
-            moduleProcessId == 0 ? [] : WindowControl.EnumerateProcessWindows([moduleProcessId]);
+        private IReadOnlyList<WindowControl.ProcessWindow> ModuleWindows()
+        {
+            var current = NativeMethods.ProcessIds(ModuleProcess);
+            Assert.HasCount(1, current, $"Expected one {ModuleProcess}; observed: {string.Join(", ", current)}.");
+            Assert.AreEqual(moduleProcessId, current[0], "Crop And Lock exited or restarted during the scenario.");
+            return WindowControl.EnumerateProcessWindows([moduleProcessId]);
+        }
 
         private IntPtr FindModuleWindow(string className) =>
             ModuleWindows().FirstOrDefault(window => window.ClassName == className).Hwnd;

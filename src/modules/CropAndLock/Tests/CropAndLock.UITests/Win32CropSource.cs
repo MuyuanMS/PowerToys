@@ -26,7 +26,7 @@ namespace Microsoft.CropAndLock.UITests
                     form.Shown += (_, _) =>
                     {
                         Window = form.Handle;
-                        SetFixtureGeometry();
+                        SetGeometry(CropSourceForm.CropRectangle, CropSourceForm.InputRectangle);
                         ready.TrySetResult();
                     };
                     Forms.Application.Run(form);

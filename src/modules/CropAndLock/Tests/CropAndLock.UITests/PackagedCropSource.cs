@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.CropAndLock.TestApp;
@@ -29,8 +30,7 @@ namespace Microsoft.CropAndLock.UITests
         {
             var packagePath = Path.Combine(AppContext.BaseDirectory, "CropAndLock.TestApp.msix");
             Assert.IsTrue(File.Exists(packagePath), $"The signed packaged fixture was not staged: {packagePath}.");
-            Assert.HasCount(0, RegisteredPackages(), $"Remove the pre-existing {PackageName} registration before running this isolated suite.");
-            Assert.HasCount(0, NativeMethods.ProcessIds(ProcessName), "The fixture app is already running; refusing to adopt an unrelated process.");
+            ReclaimPreviousRun(context);
 
             context.WriteLine($"[{DateTime.UtcNow:HH:mm:ss.fff}] Installing signed fixture for the current user: {packagePath}");
             ownsRegistration = true;
@@ -41,8 +41,8 @@ namespace Microsoft.CropAndLock.UITests
             var packages = RegisteredPackages();
             Assert.HasCount(1, packages, "Expected exactly one current-user fixture registration.");
             var package = packages[0];
-            packageFullName = package.Id.FullName;
             Assert.AreEqual(Publisher, package.Id.Publisher, "The fixture publisher does not match the shared test signing setup.");
+            packageFullName = package.Id.FullName;
             Assert.AreEqual(
                 RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant(),
                 package.Id.Architecture.ToString().ToLowerInvariant(),
@@ -70,79 +70,135 @@ namespace Microsoft.CropAndLock.UITests
                 window => window.Hwnd != IntPtr.Zero && !WindowHelper.IsWindowCloaked(window.Hwnd),
                 timeoutMS: 20_000,
                 requiredConsecutiveMatches: 3);
+            Assert.IsTrue(ready.Succeeded, $"The packaged fixture did not expose its deterministic source window. Last: {ready.LastObservation}.");
             Window = ready.LastObservation.Hwnd;
-            Assert.IsTrue(ready.Succeeded, "The packaged fixture did not expose its deterministic source window.");
             Assert.AreEqual(process.Id, NativeMethods.ProcessId(Window), "The source HWND must belong to the verified packaged process.");
-            SetFixtureGeometry();
+            SetGeometry(CropSourceForm.CropRectangle, CropSourceForm.InputRectangle);
             context.WriteLine($"Packaged source: HWND=0x{Window:X}, PID={process.Id}, package={package.Id.FullName}, class={NativeMethods.ClassName(Window)}.");
         }
 
         public override void Dispose()
         {
+            // Teardown assertions are intentional: the owning test reports cleanup failures.
             try
             {
-                // Also discover a process whose activation succeeded just before Open failed.
-                // Never close an unpackaged namesake or a process from a different package.
-                foreach (var processId in NativeMethods.ProcessIds(ProcessName))
+                var ownedPackages = new HashSet<string>(StringComparer.Ordinal);
+                if (packageFullName is not null)
                 {
-                    Process owned;
-                    try
-                    {
-                        owned = Process.GetProcessById(processId);
-                    }
-                    catch (ArgumentException)
-                    {
-                        continue;
-                    }
-
-                    using (owned)
-                    {
-                        if (owned.HasExited || packageFullName is null || NativeMethods.PackageFullName(processId) != packageFullName)
-                        {
-                            continue;
-                        }
-
-                        foreach (var window in WindowControl.EnumerateProcessWindows([processId]))
-                        {
-                            WindowControl.TryCloseWindow(window.Hwnd.ToInt64());
-                        }
-
-                        if (!owned.WaitForExit(5_000))
-                        {
-                            owned.Kill(entireProcessTree: true);
-                            Assert.IsTrue(owned.WaitForExit(5_000), "The test-owned packaged source did not exit.");
-                        }
-                    }
+                    ownedPackages.Add(packageFullName);
                 }
+
+                CloseOwnedProcesses(ownedPackages);
             }
             finally
             {
                 process?.Dispose();
                 if (ownsRegistration)
                 {
-                    if (installation is { IsCompleted: false })
-                    {
-                        // A timed-out install must not register its package after cleanup has finished.
-                        installationOperation!.Cancel();
-                        try
-                        {
-                            installation.WaitAsync(TimeSpan.FromSeconds(30)).GetAwaiter().GetResult();
-                        }
-                        catch (OperationCanceledException)
-                        {
-                        }
-                    }
-
-                    foreach (var package in RegisteredPackages().Where(package => package.Id.Publisher == Publisher))
-                    {
-                        var removal = packageManager.RemovePackageAsync(package.Id.FullName)
-                            .AsTask().WaitAsync(TimeSpan.FromSeconds(90)).GetAwaiter().GetResult();
-                        Assert.IsNull(removal.ExtendedErrorCode, $"Fixture removal failed: {removal.ErrorText}. Activity: {removal.ActivityId}.");
-                    }
-
-                    Assert.HasCount(0, RegisteredPackages(), "The fixture package remained registered after cleanup.");
+                    CancelPendingInstallation();
+                    RemoveRegistrations(RegisteredPackages()
+                        .Where(package => package.Id.Publisher == Publisher)
+                        .Select(package => package.Id.FullName));
                 }
             }
+        }
+
+        private void ReclaimPreviousRun(TestContext context)
+        {
+            var previous = RegisteredPackages();
+            foreach (var package in previous)
+            {
+                Assert.AreEqual(Publisher, package.Id.Publisher, $"Refusing to reclaim an unrelated package: {package.Id.FullName}.");
+            }
+
+            var ownedPackages = previous.Select(package => package.Id.FullName).ToHashSet(StringComparer.Ordinal);
+            if (ownedPackages.Count > 0)
+            {
+                context.WriteLine($"[{DateTime.UtcNow:HH:mm:ss.fff}] Reclaiming previous fixture registration(s): {string.Join(", ", ownedPackages)}");
+            }
+
+            CloseOwnedProcesses(ownedPackages, rejectUnrelated: true);
+            RemoveRegistrations(ownedPackages);
+        }
+
+        private static void CloseOwnedProcesses(IReadOnlySet<string> ownedPackages, bool rejectUnrelated = false)
+        {
+            // Package identity, not the executable name alone, establishes ownership.
+            foreach (var processId in NativeMethods.ProcessIds(ProcessName))
+            {
+                Process candidate;
+                try
+                {
+                    candidate = Process.GetProcessById(processId);
+                }
+                catch (ArgumentException)
+                {
+                    continue;
+                }
+
+                using (candidate)
+                {
+                    if (candidate.HasExited)
+                    {
+                        continue;
+                    }
+
+                    string? identity;
+                    try
+                    {
+                        identity = NativeMethods.PackageFullName(processId);
+                    }
+                    catch (Win32Exception) when (candidate.HasExited)
+                    {
+                        continue;
+                    }
+
+                    if (identity is null || !ownedPackages.Contains(identity))
+                    {
+                        Assert.IsFalse(rejectUnrelated, $"Refusing to close unrelated {ProcessName} PID={processId}, package={identity ?? "<none>"}.");
+                        continue;
+                    }
+
+                    foreach (var window in WindowControl.EnumerateProcessWindows([processId]))
+                    {
+                        WindowControl.TryCloseWindow(window.Hwnd.ToInt64());
+                    }
+
+                    if (!candidate.WaitForExit(5_000))
+                    {
+                        candidate.Kill(entireProcessTree: true);
+                        Assert.IsTrue(candidate.WaitForExit(5_000), "The test-owned packaged source did not exit.");
+                    }
+                }
+            }
+        }
+
+        private void CancelPendingInstallation()
+        {
+            if (installation is { IsCompleted: false })
+            {
+                // A timed-out install must not register its package after cleanup has finished.
+                installationOperation!.Cancel();
+                try
+                {
+                    installation.WaitAsync(TimeSpan.FromSeconds(30)).GetAwaiter().GetResult();
+                }
+                catch (OperationCanceledException)
+                {
+                }
+            }
+        }
+
+        private void RemoveRegistrations(IEnumerable<string> identities)
+        {
+            foreach (var identity in identities.ToArray())
+            {
+                var removal = packageManager.RemovePackageAsync(identity)
+                    .AsTask().WaitAsync(TimeSpan.FromSeconds(90)).GetAwaiter().GetResult();
+                Assert.IsNull(removal.ExtendedErrorCode, $"Fixture removal failed: {removal.ErrorText}. Activity: {removal.ActivityId}.");
+            }
+
+            Assert.HasCount(0, RegisteredPackages(), "The fixture package remained registered after cleanup.");
         }
 
         private Package[] RegisteredPackages() =>

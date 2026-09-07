@@ -12,10 +12,15 @@ namespace Microsoft.CropAndLock.UITests
 {
     internal sealed class CropImage
     {
+        private const int BorderInset = 4;
+        private const int ChannelTolerance = 30;
+        private const int ContentThreshold = 40;
+
         private readonly byte[] pixels;
         private readonly int stride;
+        private int background = -1;
 
-        private CropImage(Bitmap bitmap)
+        internal CropImage(Bitmap bitmap)
         {
             Size = bitmap.Size;
             var data = bitmap.LockBits(new Rectangle(Point.Empty, Size), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
@@ -33,9 +38,11 @@ namespace Microsoft.CropAndLock.UITests
 
         internal Size Size { get; }
 
-        internal readonly record struct Comparison(double AllPixels, double ContentPixels, int ContentCount)
+        internal readonly record struct Comparison(double AllPixels, double ContentPixels, int ContentCount, Size ExpectedSize, Size ActualSize)
         {
-            internal bool Matches => AllPixels >= 0.98 && ContentPixels >= 0.90 && ContentCount >= 100;
+            // Validated on Win10 19045 and Win11 26200, including 1-vCPU runs. Keep these fixed
+            // when changing capture: background agreement alone must never admit a blank image.
+            internal bool Matches => ExpectedSize == ActualSize && AllPixels >= 0.98 && ContentPixels >= 0.90 && ContentCount >= 100;
         }
 
         internal static CropImage Capture(IntPtr window, Rectangle clientRegion, string path)
@@ -60,37 +67,21 @@ namespace Microsoft.CropAndLock.UITests
 
         internal static Comparison Compare(CropImage expected, CropImage actual)
         {
-            if (expected.Size != actual.Size)
+            if (expected.Size != actual.Size || expected.Size.Width <= BorderInset * 2 || expected.Size.Height <= BorderInset * 2)
             {
-                return default;
+                return new Comparison(0, 0, 0, expected.Size, actual.Size);
             }
 
             // Weight the foreground separately: a blank input must not pass simply because
-            // its background occupies more than 98% of the crop. Ignore the outer focus border.
-            var colors = new Dictionary<int, int>();
-            for (var y = 4; y < expected.Size.Height - 4; y++)
-            {
-                for (var x = 4; x < expected.Size.Width - 4; x++)
-                {
-                    var index = (y * expected.stride) + (x * 4);
-                    var color = (expected.pixels[index] >> 4) | ((expected.pixels[index + 1] >> 4) << 4) | ((expected.pixels[index + 2] >> 4) << 8);
-                    colors[color] = colors.GetValueOrDefault(color) + 1;
-                }
-            }
-
-            if (colors.Count == 0)
-            {
-                return default;
-            }
-
-            var background = colors.MaxBy(entry => entry.Value).Key;
+            // its background occupies more than 98% of the crop. The inset excludes the outer focus edge.
+            var background = expected.GetBackground();
             var total = 0;
             var matched = 0;
             var content = 0;
             var contentMatched = 0;
-            for (var y = 4; y < expected.Size.Height - 4; y++)
+            for (var y = BorderInset; y < expected.Size.Height - BorderInset; y++)
             {
-                for (var x = 4; x < expected.Size.Width - 4; x++)
+                for (var x = BorderInset; x < expected.Size.Width - BorderInset; x++)
                 {
                     var expectedIndex = (y * expected.stride) + (x * 4);
                     var actualIndex = (y * actual.stride) + (x * 4);
@@ -98,9 +89,11 @@ namespace Microsoft.CropAndLock.UITests
                     var isContent = false;
                     for (var channel = 0; channel < 3; channel++)
                     {
-                        matches &= Math.Abs(expected.pixels[expectedIndex + channel] - actual.pixels[actualIndex + channel]) <= 30;
+                        matches &= Math.Abs(expected.pixels[expectedIndex + channel] - actual.pixels[actualIndex + channel]) <= ChannelTolerance;
                         var backgroundChannel = ((background >> (channel * 4)) & 15) * 16;
-                        isContent |= Math.Abs(expected.pixels[expectedIndex + channel] - backgroundChannel) > 40;
+
+                        // Require more contrast than the permitted channel drift and histogram quantization.
+                        isContent |= Math.Abs(expected.pixels[expectedIndex + channel] - backgroundChannel) > ContentThreshold;
                     }
 
                     total++;
@@ -110,7 +103,29 @@ namespace Microsoft.CropAndLock.UITests
                 }
             }
 
-            return new Comparison((double)matched / total, content == 0 ? 0 : (double)contentMatched / content, content);
+            return new Comparison((double)matched / total, content == 0 ? 0 : (double)contentMatched / content, content, expected.Size, actual.Size);
+        }
+
+        private int GetBackground()
+        {
+            if (background >= 0)
+            {
+                return background;
+            }
+
+            var colors = new Dictionary<int, int>();
+            for (var y = BorderInset; y < Size.Height - BorderInset; y++)
+            {
+                for (var x = BorderInset; x < Size.Width - BorderInset; x++)
+                {
+                    var index = (y * stride) + (x * 4);
+                    var color = (pixels[index] >> 4) | ((pixels[index + 1] >> 4) << 4) | ((pixels[index + 2] >> 4) << 8);
+                    colors[color] = colors.GetValueOrDefault(color) + 1;
+                }
+            }
+
+            background = colors.MaxBy(entry => entry.Value).Key;
+            return background;
         }
     }
 }
