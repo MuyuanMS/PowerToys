@@ -344,6 +344,9 @@ MRUCMPPROC
 MRUINFO
 REGSTR
 
+# Search ranking
+frecency
+
 #Xaml
 NVI
 Storyboards
