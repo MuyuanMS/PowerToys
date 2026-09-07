@@ -132,7 +132,8 @@ export class ExtensionRuntime {
   private readonly onDispose?: () => void;
   private readonly reportFatal?: (code: number) => void;
   private disposed = false;
-  private primed = false;
+  private providerScopeLoaded = false;
+  private fallbackScopeLoaded = false;
 
   private initState: InitState = 'pending';
   private initError: { code: number; message: string } | null = null;
@@ -183,7 +184,8 @@ export class ExtensionRuntime {
    */
   setProvider(provider: ICommandProvider): void {
     this.provider = provider;
-    this.primed = false;
+    this.providerScopeLoaded = false;
+    this.fallbackScopeLoaded = false;
     this.initState = 'ready';
     this.initError = null;
     this.initSettled = Promise.resolve();
@@ -206,7 +208,8 @@ export class ExtensionRuntime {
         }
 
         this.provider = provider;
-        this.primed = false;
+        this.providerScopeLoaded = false;
+        this.fallbackScopeLoaded = false;
         this.initState = 'ready';
       },
       (error: unknown) => {
@@ -248,47 +251,79 @@ export class ExtensionRuntime {
           return await this.getTopLevelCommands(id);
         case 'provider/getFallbackCommands':
           return await this.getFallbackCommands(id);
-        case 'provider/getCommand':
-          return await this.getCommand(id, stringField(params, 'commandId') ?? '');
-        case 'provider/getCommandItem':
-          return await this.getCommandItem(id, stringField(params, 'commandId') ?? '');
+        case 'provider/getCommand': {
+          const commandId = this.requireStringParam(id, params, 'commandId');
+          return commandId === null ? undefined : await this.getCommand(id, commandId);
+        }
+        case 'provider/getCommandItem': {
+          const commandId = this.requireStringParam(id, params, 'commandId');
+          return commandId === null ? undefined : await this.getCommandItem(id, commandId);
+        }
         case 'provider/getSettings':
           return this.getSettings(id);
-        case 'command/invoke':
-          return await this.invokeCommand(id, stringField(params, 'commandId') ?? '');
-        case 'listPage/getItems':
-          return await this.getItems(id, stringField(params, 'pageId') ?? '');
-        case 'listPage/setSearchText':
-          return await this.setSearchText(
-            id,
-            stringField(params, 'pageId') ?? '',
-            stringField(params, 'searchText') ?? '',
-          );
-        case 'listPage/setFilter':
-          return await this.setFilter(
-            id,
-            stringField(params, 'pageId') ?? '',
-            stringField(params, 'filterId') ?? '',
-          );
-        case 'listPage/loadMore':
-          return await this.loadMore(id, stringField(params, 'pageId') ?? '');
-        case 'fallback/updateQuery':
-          await this.applyFallbackQuery(
-            stringField(params, 'commandId') ?? '',
-            stringField(params, 'query') ?? '',
-          );
+        case 'command/invoke': {
+          const commandId = this.requireStringParam(id, params, 'commandId');
+          return commandId === null ? undefined : await this.invokeCommand(id, commandId);
+        }
+        case 'listPage/getItems': {
+          const pageId = this.requireStringParam(id, params, 'pageId');
+          return pageId === null ? undefined : await this.getItems(id, pageId);
+        }
+        case 'listPage/setSearchText': {
+          const pageId = this.requireStringParam(id, params, 'pageId');
+          if (pageId === null) {
+            return;
+          }
+          const searchText = this.requireStringParam(id, params, 'searchText');
+          return searchText === null ? undefined : await this.setSearchText(id, pageId, searchText);
+        }
+        case 'listPage/setFilter': {
+          const pageId = this.requireStringParam(id, params, 'pageId');
+          if (pageId === null) {
+            return;
+          }
+          const filterId = this.requireStringParam(id, params, 'filterId');
+          return filterId === null ? undefined : await this.setFilter(id, pageId, filterId);
+        }
+        case 'listPage/loadMore': {
+          const pageId = this.requireStringParam(id, params, 'pageId');
+          return pageId === null ? undefined : await this.loadMore(id, pageId);
+        }
+        case 'fallback/updateQuery': {
+          const commandId = this.requireStringParam(id, params, 'commandId');
+          if (commandId === null) {
+            return;
+          }
+          const query = this.requireStringParam(id, params, 'query');
+          if (query === null) {
+            return;
+          }
+          await this.applyFallbackQuery(commandId, query);
           this.respond(id, null);
           return;
-        case 'contentPage/getContent':
-          return await this.getContent(id, stringField(params, 'pageId') ?? '');
-        case 'form/submit':
-          return await this.submitForm(
-            id,
-            stringField(params, 'pageId') ?? '',
-            stringField(params, 'formId'),
-            stringField(params, 'inputs') ?? '',
-            stringField(params, 'data') ?? '',
-          );
+        }
+        case 'contentPage/getContent': {
+          const pageId = this.requireStringParam(id, params, 'pageId');
+          return pageId === null ? undefined : await this.getContent(id, pageId);
+        }
+        case 'form/submit': {
+          const pageId = this.requireStringParam(id, params, 'pageId');
+          if (pageId === null) {
+            return;
+          }
+          const inputs = this.requireStringParam(id, params, 'inputs');
+          if (inputs === null) {
+            return;
+          }
+          const data = this.requireStringParam(id, params, 'data');
+          if (data === null) {
+            return;
+          }
+          const formId = this.optionalStringParam(id, params, 'formId');
+          return formId === null
+            ? undefined
+            : await this.submitForm(id, pageId, formId, inputs, data);
+        }
         default:
           this.respondError(id, JsonRpcErrorCode.MethodNotFound, `Method not found: ${method}`);
           return;
@@ -308,10 +343,12 @@ export class ExtensionRuntime {
       return;
     }
     if (method === 'fallback/updateQuery') {
-      await this.applyFallbackQuery(
-        stringField(params, 'commandId') ?? '',
-        stringField(params, 'query') ?? '',
-      );
+      const commandId = stringField(params, 'commandId');
+      const query = stringField(params, 'query');
+      if (commandId === undefined || query === undefined) {
+        return;
+      }
+      await this.applyFallbackQuery(commandId, query);
     }
   }
 
@@ -429,6 +466,7 @@ export class ExtensionRuntime {
     const previous = this.providerScope;
     this.providerScope = scope;
     this.retireMissing(previous.keys(), scope);
+    this.providerScopeLoaded = true;
     this.respond(id, serialized);
   }
 
@@ -444,20 +482,26 @@ export class ExtensionRuntime {
       this.fallbackScope = new Map<string, ICommand>();
       this.fallbacks.clear();
       this.retireMissing(previous.keys(), this.fallbackScope);
+      this.fallbackScopeLoaded = true;
       this.respond(id, null);
       return;
     }
     const scope = new Map<string, ICommand>();
-    this.fallbacks.clear();
+    const fallbacks = new Map<string, IFallbackCommandItem>();
     for (const item of items) {
-      this.fallbacks.set(item.command.id, item);
+      fallbacks.set(item.id ?? item.command.id, item);
     }
     const serialized = await this.withMapSink(scope, () => this.serializer.commandItems(items));
     // Replace the previous fallback generation, releasing commands that are gone
     // and recursively retiring the descendant scopes they owned.
     const previous = this.fallbackScope;
     this.fallbackScope = scope;
+    this.fallbacks.clear();
+    for (const [fallbackId, item] of fallbacks) {
+      this.fallbacks.set(fallbackId, item);
+    }
     this.retireMissing(previous.keys(), scope);
+    this.fallbackScopeLoaded = true;
     this.respond(id, serialized);
   }
 
@@ -513,9 +557,9 @@ export class ExtensionRuntime {
       return;
     }
     const items = await page.getItems();
-    const scope = this.beginPageScope(pageId);
+    const scope = this.createPageScope(pageId);
     const serialized = await this.withScopeSink(scope, () => this.serializer.listItems(items));
-    this.reconcilePageContent(pageId, scope);
+    this.commitPageScope(pageId, scope);
     this.respond(id, { items: serialized, hasMoreItems: page.hasMoreItems ?? false });
   }
 
@@ -554,9 +598,9 @@ export class ExtensionRuntime {
     // Re-serialize the page's current items so the host receives the appended
     // page as a continuation, along with whether further pages remain.
     const items = await page.getItems();
-    const scope = this.beginPageScope(pageId);
+    const scope = this.createPageScope(pageId);
     const serialized = await this.withScopeSink(scope, () => this.serializer.listItems(items));
-    this.reconcilePageContent(pageId, scope);
+    this.commitPageScope(pageId, scope);
     this.respond(id, { items: serialized, hasMoreItems: page.hasMoreItems ?? false });
   }
 
@@ -617,7 +661,7 @@ export class ExtensionRuntime {
       return null;
     }
     const content = await page.getContent();
-    const scope = this.beginPageScope(pageId);
+    const scope = this.createPageScope(pageId);
     const collector = createFormCollector(scope);
     const treeChildren = new Map<Content, Content[]>();
     await reserveExplicitFormIds(content, collector, treeChildren);
@@ -628,13 +672,13 @@ export class ExtensionRuntime {
       }
       return result;
     });
-    this.reconcilePageContent(pageId, scope);
+    this.commitPageScope(pageId, scope);
     return serialized;
   }
 
   private async applyFallbackQuery(commandId: string, query: string): Promise<void> {
     let item = this.fallbacks.get(commandId);
-    if (!item && !this.primed) {
+    if (!item && !this.fallbackScopeLoaded) {
       await this.primeCaches();
       item = this.fallbacks.get(commandId);
     }
@@ -649,24 +693,37 @@ export class ExtensionRuntime {
   }
 
   private async primeCaches(): Promise<void> {
-    if (this.primed) {
-      return;
-    }
-    this.primed = true;
     const provider = this.provider;
     if (!provider) {
       return;
     }
-    const commands = await provider.topLevelCommands();
-    for (const item of commands) {
-      this.providerScope.set(item.command.id, item.command);
+    if (!this.providerScopeLoaded) {
+      const commands = await provider.topLevelCommands();
+      const scope = new Map<string, ICommand>();
+      await this.withMapSink(scope, () => this.serializer.commandItems(commands));
+      const previous = this.providerScope;
+      this.providerScope = scope;
+      this.retireMissing(previous.keys(), scope);
+      this.providerScopeLoaded = true;
     }
-    const fallbacks = (await provider.fallbackCommands?.()) ?? null;
-    if (fallbacks) {
-      for (const item of fallbacks) {
-        this.fallbackScope.set(item.command.id, item.command);
-        this.fallbacks.set(item.command.id, item);
+    if (!this.fallbackScopeLoaded) {
+      const items = (await provider.fallbackCommands?.()) ?? null;
+      const scope = new Map<string, ICommand>();
+      const fallbacks = new Map<string, IFallbackCommandItem>();
+      if (items) {
+        for (const item of items) {
+          fallbacks.set(item.id ?? item.command.id, item);
+        }
+        await this.withMapSink(scope, () => this.serializer.commandItems(items));
       }
+      const previous = this.fallbackScope;
+      this.fallbackScope = scope;
+      this.fallbacks.clear();
+      for (const [fallbackId, item] of fallbacks) {
+        this.fallbacks.set(fallbackId, item);
+      }
+      this.retireMissing(previous.keys(), scope);
+      this.fallbackScopeLoaded = true;
     }
     if (provider.settings?.settingsPage) {
       const page = provider.settings.settingsPage;
@@ -674,15 +731,18 @@ export class ExtensionRuntime {
     }
   }
 
-  private beginPageScope(pageId: string): PageScope {
+  private createPageScope(pageId: string): PageScope {
     const previous = this.pageScopes.get(pageId);
-    const scope: PageScope = {
+    return {
       generation: (previous?.generation ?? 0) + 1,
       commands: new Map(),
       forms: new Map(),
     };
+  }
+
+  private commitPageScope(pageId: string, scope: PageScope): void {
     this.pageScopes.set(pageId, scope);
-    return scope;
+    this.reconcilePageContent(pageId, scope);
   }
 
   private async withMapSink<T>(
@@ -742,7 +802,7 @@ export class ExtensionRuntime {
       this.resolved.set(command.id, command);
       return command;
     }
-    if (!this.primed) {
+    if (!this.providerScopeLoaded || !this.fallbackScopeLoaded) {
       await this.primeCaches();
       return this.lookupCommand(commandId);
     }
@@ -818,6 +878,34 @@ export class ExtensionRuntime {
         }
       }
     }
+  }
+
+  private requireStringParam(
+    id: number | string,
+    params: Record<string, unknown>,
+    key: string,
+  ): string | null {
+    const value = stringField(params, key);
+    if (value === undefined) {
+      this.respondError(
+        id,
+        JsonRpcErrorCode.InvalidParams,
+        `Invalid params: "${key}" must be a string.`,
+      );
+      return null;
+    }
+    return value;
+  }
+
+  private optionalStringParam(
+    id: number | string,
+    params: Record<string, unknown>,
+    key: string,
+  ): string | undefined | null {
+    if (!(key in params)) {
+      return undefined;
+    }
+    return this.requireStringParam(id, params, key);
   }
 
   /**

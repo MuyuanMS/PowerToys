@@ -188,6 +188,9 @@ export class Settings implements ICommandSettings {
    * @returns This collection, so calls can be chained.
    */
   add(setting: AnySetting): this {
+    if (this.items.some((item) => item.key === setting.key)) {
+      throw new Error(`Duplicate setting key: ${setting.key}`);
+    }
     this.items.push(setting);
     return this;
   }

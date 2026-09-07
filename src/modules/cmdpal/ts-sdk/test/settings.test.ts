@@ -96,6 +96,15 @@ describe('Settings Adaptive Card required inputs', () => {
 });
 
 describe('Settings change notification', () => {
+  it('rejects duplicate setting keys', () => {
+    const settings = new Settings();
+    settings.add(new TextSetting('name', 'Name'));
+
+    expect(() => settings.add(new ToggleSetting('name', 'Use name'))).toThrow(
+      'Duplicate setting key: name',
+    );
+  });
+
   it('fires subscribers and updates values on submit', async () => {
     const settings = new Settings();
     settings.add(new ToggleSetting('dark', 'Dark Mode', false));

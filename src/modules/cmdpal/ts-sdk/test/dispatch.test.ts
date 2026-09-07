@@ -203,6 +203,36 @@ describe('ExtensionRuntime request dispatch', () => {
     expect(responseFor(sent, 5)?.error?.code).toBe(-32601);
   });
 
+  it.each([
+    ['provider/getCommand', {}, 'commandId'],
+    ['provider/getCommandItem', { commandId: 1 }, 'commandId'],
+    ['command/invoke', {}, 'commandId'],
+    ['listPage/getItems', {}, 'pageId'],
+    ['listPage/setSearchText', { pageId: 'list' }, 'searchText'],
+    ['listPage/setFilter', { pageId: 'list', filterId: false }, 'filterId'],
+    ['listPage/loadMore', {}, 'pageId'],
+    ['fallback/updateQuery', { commandId: 'fallback' }, 'query'],
+    ['contentPage/getContent', {}, 'pageId'],
+    ['form/submit', { pageId: 'page', inputs: '{}' }, 'data'],
+    ['form/submit', { pageId: 'page', inputs: '{}', data: '{}', formId: 1 }, 'formId'],
+  ])('rejects invalid required params for %s', async (method, params, field) => {
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(provider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 10,
+      method,
+      params,
+    });
+
+    expect(responseFor(sent, 10)?.error).toEqual({
+      code: -32602,
+      message: `Invalid params: "${field}" must be a string.`,
+    });
+    expect(sent).toHaveLength(1);
+  });
+
   it('reports an internal error when no provider is set', async () => {
     const { runtime, sent } = createHarness();
 
@@ -340,6 +370,46 @@ describe('ExtensionRuntime notification dispatch', () => {
       properties: { displayTitle: 'Search: abc' },
     });
   });
+
+  it('routes fallback updates by an explicit item id', async () => {
+    const updateQuery = vi.fn();
+    const fallbackItem: IFallbackCommandItem = {
+      id: 'fallback-item',
+      command: { id: 'fallback-command', name: 'Fallback' },
+      title: 'Fallback',
+      fallbackHandler: { updateQuery },
+    };
+    const fallbackProvider: ICommandProvider = {
+      id: 'ext',
+      displayName: 'Ext',
+      topLevelCommands() {
+        return [];
+      },
+      fallbackCommands() {
+        return [fallbackItem];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(fallbackProvider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'provider/getFallbackCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 3,
+      method: 'fallback/updateQuery',
+      params: { commandId: 'fallback-item', query: 'abc' },
+    });
+
+    expect(updateQuery).toHaveBeenCalledWith('abc');
+    expect(notificationsOf(sent, 'command/propChanged')[0]?.params).toEqual({
+      commandId: 'fallback-item',
+      properties: { displayTitle: 'Fallback' },
+    });
+  });
 });
 
 describe('ExtensionRuntime settings integration', () => {
@@ -443,5 +513,53 @@ describe('ExtensionRuntime cache priming', () => {
     expect(topLevel).toHaveBeenCalledTimes(1);
     expect(fallback).toHaveBeenCalledTimes(1);
     expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reload a previously fetched scope while priming the other scope', async () => {
+    let topGeneration = 0;
+    const topLevel = vi.fn(() => {
+      topGeneration += 1;
+      return [
+        {
+          command: {
+            id: `top-${String(topGeneration)}`,
+            name: 'Top',
+            invoke: () => ({ kind: 'dismiss' }) as CommandResult,
+          },
+          title: 'Top',
+        },
+      ];
+    });
+    const fallback = vi.fn(() => []);
+    const countingProvider: ICommandProvider = {
+      id: 'ext',
+      displayName: 'Ext',
+      topLevelCommands: topLevel,
+      fallbackCommands: fallback,
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(countingProvider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'provider/getTopLevelCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'command/invoke',
+      params: { commandId: 'missing' },
+    });
+
+    expect(topLevel).toHaveBeenCalledTimes(1);
+    expect(fallback).toHaveBeenCalledTimes(1);
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 3,
+      method: 'command/invoke',
+      params: { commandId: 'top-1' },
+    });
+    expect(responseFor(sent, 3)?.result).toEqual({ Kind: 0 });
   });
 });

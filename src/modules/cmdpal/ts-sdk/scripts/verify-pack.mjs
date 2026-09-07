@@ -16,6 +16,7 @@ import { dirname, join } from 'node:path';
 const SHEBANG = '#!/usr/bin/env node';
 const BIN_PATH = 'bin/cmdpal-bootstrap.mjs';
 const BOOTSTRAP_PATH = 'dist/runtime/bootstrap.js';
+const LICENSE_PATH = 'LICENSE';
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -53,7 +54,7 @@ try {
     tarball = join(packageRoot, info.filename);
 
     const files = Array.isArray(info.files) ? info.files.map((entry) => entry.path) : [];
-    for (const required of [BIN_PATH, BOOTSTRAP_PATH]) {
+    for (const required of [BIN_PATH, BOOTSTRAP_PATH, LICENSE_PATH]) {
       if (!files.includes(required)) {
         fail(`tarball is missing required file "${required}".`);
       }

@@ -235,4 +235,50 @@ describe('form identity and routing', () => {
     const tree = content[1] as { children: Array<{ formId: string }> };
     expect(tree.children[0]?.formId).toBe('form-0');
   });
+
+  it('preserves the last successful form scope when serialization fails', async () => {
+    const first = vi.fn((): CommandResult => ({ kind: 'goHome' }));
+    let failSerialization = false;
+    const page: IContentPage = {
+      id: 'page',
+      name: 'Page',
+      title: 'Page',
+      getContent(): Content[] {
+        return failSerialization
+          ? [
+              formContent('duplicate', () => ({ kind: 'dismiss' })),
+              formContent('duplicate', () => ({ kind: 'dismiss' })),
+            ]
+          : [formContent('first', first)];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(providerWith(page));
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'contentPage/getContent',
+      params: { pageId: 'page' },
+    });
+
+    failSerialization = true;
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'contentPage/getContent',
+      params: { pageId: 'page' },
+    });
+    expect(responseFor(sent, 2)?.error?.code).toBe(-32603);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 3,
+      method: 'form/submit',
+      params: { pageId: 'page', formId: 'first', inputs: '{}', data: '{}' },
+    });
+
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(responseFor(sent, 3)?.result).toEqual({ Kind: 1 });
+  });
 });
