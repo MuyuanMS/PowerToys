@@ -465,7 +465,7 @@ namespace winrt::PowerToys::PowerAccentKeyboardService::implementation
     }
 
     // Ignore queued events that no longer describe the current foreground window,
-    // and events for the window associated with this toolbar. Otherwise cancel the
+    // and events for the window associated with this toolbar. Otherwise, cancel the
     // gesture without inserting a character.
     void CALLBACK KeyboardListener::ForegroundEventProc(HWINEVENTHOOK, DWORD event, HWND hwnd, LONG idObject, LONG, DWORD, DWORD) noexcept
     {
