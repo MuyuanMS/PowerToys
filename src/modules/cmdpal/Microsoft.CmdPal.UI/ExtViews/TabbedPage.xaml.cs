@@ -118,8 +118,7 @@ public sealed partial class TabbedPage : Page
         if (child is null)
         {
             // Unsupported tab: the placeholder is shown via binding.
-            TabFrame.Visibility = Visibility.Collapsed;
-            _currentChild = null;
+            UnloadCurrentChild();
             return;
         }
 
@@ -139,8 +138,7 @@ public sealed partial class TabbedPage : Page
 
         if (viewType is null)
         {
-            TabFrame.Visibility = Visibility.Collapsed;
-            _currentChild = null;
+            UnloadCurrentChild();
             return;
         }
 
@@ -152,6 +150,15 @@ public sealed partial class TabbedPage : Page
             TabFrame.BackStack.Clear();
             vm.RefreshActiveChildContext();
         }
+    }
+
+    private void UnloadCurrentChild()
+    {
+        TabFrame.Visibility = Visibility.Collapsed;
+        TabFrame.BackStack.Clear();
+        TabFrame.Content = null;
+        _currentChild = null;
+        ExtensionObjectReleaser.AfterNavigation();
     }
 
     private void NextTab_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
