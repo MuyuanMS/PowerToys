@@ -42,6 +42,7 @@ namespace
         AutoHideCursorModule()
         {
             LoggerHelpers::init_logger(moduleName, L"ModuleInterface", LogSettings::autoHideCursorLoggerName);
+            auto_hide_cursor::RestoreSystemCursorsIfMarked();
             LoadSettings();
         }
 

@@ -5,11 +5,88 @@
 #pragma once
 
 #include <array>
+#include <string>
 #include <vector>
 #include <windows.h>
 
 namespace auto_hide_cursor
 {
+    inline std::wstring RecoveryMarkerPath() noexcept
+    {
+        wchar_t localAppData[MAX_PATH]{};
+        const auto length = GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, std::size(localAppData));
+        if (length == 0 || length >= std::size(localAppData))
+        {
+            return {};
+        }
+
+        return std::wstring{ localAppData, length } + L"\\Microsoft\\PowerToys\\AutoHideCursor\\cursor-recovery.marker";
+    }
+
+    inline bool CreateRecoveryMarker() noexcept
+    {
+        const auto markerPath = RecoveryMarkerPath();
+        if (markerPath.empty())
+        {
+            return false;
+        }
+
+        const auto moduleDirectory = markerPath.substr(0, markerPath.find_last_of(L'\\'));
+        const auto powerToysDirectory = moduleDirectory.substr(0, moduleDirectory.find_last_of(L'\\'));
+        CreateDirectoryW(powerToysDirectory.c_str(), nullptr);
+        CreateDirectoryW(moduleDirectory.c_str(), nullptr);
+
+        const auto marker = CreateFileW(
+            markerPath.c_str(),
+            GENERIC_WRITE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            nullptr,
+            CREATE_ALWAYS,
+            FILE_ATTRIBUTE_HIDDEN,
+            nullptr);
+        if (marker == INVALID_HANDLE_VALUE)
+        {
+            return false;
+        }
+
+        CloseHandle(marker);
+        return true;
+    }
+
+    inline bool HasRecoveryMarker() noexcept
+    {
+        const auto markerPath = RecoveryMarkerPath();
+        if (markerPath.empty())
+        {
+            return false;
+        }
+
+        const auto marker = CreateFileW(
+            markerPath.c_str(),
+            GENERIC_READ,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            nullptr,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_HIDDEN,
+            nullptr);
+        if (marker == INVALID_HANDLE_VALUE)
+        {
+            return false;
+        }
+
+        CloseHandle(marker);
+        return true;
+    }
+
+    inline void RemoveRecoveryMarker() noexcept
+    {
+        const auto markerPath = RecoveryMarkerPath();
+        if (!markerPath.empty())
+        {
+            DeleteFileW(markerPath.c_str());
+        }
+    }
+
     inline void RefreshCurrentCursor() noexcept
     {
         POINT cursorPosition{};
@@ -51,7 +128,16 @@ namespace auto_hide_cursor
         }
 
         RefreshCurrentCursor();
+        RemoveRecoveryMarker();
         return true;
+    }
+
+    inline void RestoreSystemCursorsIfMarked() noexcept
+    {
+        if (HasRecoveryMarker())
+        {
+            RestoreSystemCursors();
+        }
     }
 
     // SetSystemCursor is the only supported API that crosses application boundaries.
@@ -69,6 +155,12 @@ namespace auto_hide_cursor
             if (m_hidden)
             {
                 return true;
+            }
+
+            if (!CreateRecoveryMarker())
+            {
+                SetLastError(ERROR_CANNOT_MAKE);
+                return false;
             }
 
             for (const auto cursorId : systemCursorIds)
