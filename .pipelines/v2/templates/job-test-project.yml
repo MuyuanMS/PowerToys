@@ -344,6 +344,7 @@ jobs:
       $resultsDir = "$(Common.TestResultsDirectory)"
       New-Item -ItemType Directory -Path $resultsDir -Force | Out-Null
 
+      $nonElevatedSuites = @('CropAndLock.UITests')
       $failed = 0
       foreach ($rc in ($entries | Sort-Object FullName -Unique)) {
         $base = $rc.Name -replace '\.runtimeconfig\.json$', ''
@@ -353,7 +354,10 @@ jobs:
         Write-Host "##[group]Run UI tests: $base"
         Push-Location $dir
         try {
-          if ($base -eq 'CropAndLock.UITests' -and (Test-Path $exe)) {
+          if ($nonElevatedSuites -contains $base) {
+            if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
+              throw "$base requires its staged executable for non-elevated dispatch; missing runner: $exe"
+            }
             & "$(build.sourcesdirectory)\.pipelines\runUiTestAsUser.ps1" `
               -TestExecutable $exe -ResultsDirectory $resultsDir
           } elseif (Test-Path $exe) {

@@ -16,6 +16,13 @@ namespace Microsoft.CropAndLock.UITests
         internal const long ChildStyle = 0x40000000;
         internal const long TopmostStyle = 0x00000008;
 
+        private const uint GaRoot = 2;
+        private const uint ProcessQueryLimitedInformation = 0x1000;
+        private const int ErrorInsufficientBuffer = 122;
+        private const int AppModelErrorNoPackage = 15700;
+        private const int GwlStyle = -16;
+        private const int GwlExStyle = -20;
+
         internal readonly record struct WindowState(IntPtr Parent, long Style, long ExtendedStyle, Rectangle Bounds);
 
         internal static Rectangle ClientBounds(IntPtr window)
@@ -35,11 +42,13 @@ namespace Microsoft.CropAndLock.UITests
             var (left, top, right, bottom) = WindowHelper.GetWindowBounds(window);
             return new WindowState(
                 GetParent(window),
-                GetWindowLongPtrW(window, -16).ToInt64(),
-                GetWindowLongPtrW(window, -20).ToInt64(),
+                ReadWindowLong(window, GwlStyle),
+                ReadWindowLong(window, GwlExStyle),
                 Rectangle.FromLTRB(left, top, right, bottom));
         }
 
+        // WindowControl/WindowHelper have private equivalents of these raw queries.
+        // Keep them local until the shared harness exposes window identity and style snapshots.
         internal static string ClassName(IntPtr window)
         {
             var name = new StringBuilder(256);
@@ -53,14 +62,14 @@ namespace Microsoft.CropAndLock.UITests
             return (int)processId;
         }
 
-        internal static IntPtr Root(IntPtr window) => GetAncestor(window, 2);
+        internal static IntPtr Root(IntPtr window) => GetAncestor(window, GaRoot);
 
         internal static IntPtr RootAtPoint(Point point) =>
             Root(WindowFromPoint(new NativePoint { X = point.X, Y = point.Y }));
 
         internal static string? PackageFullName(int processId)
         {
-            using var process = OpenProcess(0x1000, false, processId);
+            using var process = OpenProcess(ProcessQueryLimitedInformation, false, processId);
             if (process.IsInvalid)
             {
                 throw new Win32Exception(Marshal.GetLastWin32Error());
@@ -68,12 +77,12 @@ namespace Microsoft.CropAndLock.UITests
 
             uint length = 0;
             var result = GetPackageFullName(process, ref length, null);
-            if (result == 15700)
+            if (result == AppModelErrorNoPackage)
             {
                 return null; // APPMODEL_ERROR_NO_PACKAGE is the Win32 fixture's expected identity.
             }
 
-            if (result != 122)
+            if (result != ErrorInsufficientBuffer)
             {
                 throw new Win32Exception(result);
             }
@@ -102,6 +111,19 @@ namespace Microsoft.CropAndLock.UITests
                     process.Dispose();
                 }
             }
+        }
+
+        private static long ReadWindowLong(IntPtr window, int index)
+        {
+            Marshal.SetLastSystemError(0);
+            var value = GetWindowLongPtrW(window, index);
+            var error = Marshal.GetLastPInvokeError();
+            if (value == IntPtr.Zero && error != 0)
+            {
+                throw new Win32Exception(error, $"Could not read window style {index} for HWND 0x{window:X}.");
+            }
+
+            return value.ToInt64();
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -139,7 +161,7 @@ namespace Microsoft.CropAndLock.UITests
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool ClientToScreen(IntPtr window, ref NativePoint point);
 
-        [DllImport("user32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
         private static extern IntPtr GetWindowLongPtrW(IntPtr window, int index);
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]

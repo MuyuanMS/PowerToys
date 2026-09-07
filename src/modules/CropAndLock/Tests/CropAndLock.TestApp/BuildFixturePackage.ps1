@@ -27,6 +27,7 @@ if (-not $makeAppx) {
         "$env:ProgramFiles\Windows Kits\10\bin\*\$hostArchitecture\makeappx.exe"
     )
     $makeAppx = Get-ChildItem -Path $sdkTools -ErrorAction SilentlyContinue |
+        Where-Object { $version = $null; [version]::TryParse($_.Directory.Parent.Name, [ref]$version) } |
         Sort-Object { [version]$_.Directory.Parent.Name } -Descending |
         Select-Object -First 1 -ExpandProperty FullName
 }

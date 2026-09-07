@@ -36,7 +36,9 @@ using `Microsoft.PowerToys.UITest.Next` and the real Runner hotkeys.
   the source HWND's process against the installed package's exact
   `GetPackageFullName`, architecture and non-elevated token. Cleanup closes the
   owned process before removing the current-user registration and verifies removal.
-  The fixture refuses to take over a pre-existing registration or running instance.
+  A previous interrupted run is reclaimed only after checking the fixture's exact
+  package name and publisher; process cleanup additionally checks its full package
+  identity. Unrelated registrations and executable namesakes are refused.
 - Use the existing UI-test package signing/trust setup, not test-side certificate
   creation or an unsigned development-registration fallback:
   - Package filename: `CropAndLock.TestApp.msix`
@@ -75,6 +77,8 @@ size, keyboard input through the clipped window, and original parent, styles,
 geometry, content and input after closing it.
 
 Failure media is captured before custom cleanup closes any diagnostic windows.
+Four additional pixel-comparison tests cover dimension diagnostics, repeated
+comparisons, blank-image rejection, and changed foreground content.
 
 ### Why not Windows Settings?
 
@@ -111,6 +115,48 @@ test executable; the existing local/CI signing setup must sign that staged file
 before deployment. The fixture app is not a test-runner executable and adds no
 entrypoint to `CropAndLock.UITests`.
 
+### Sign before local VM deployment
+
+After building the product runtime and tests, run the existing signer on the
+**host**, without adding host trust. These x64 paths assume the normal Release
+output layout; use the corresponding ARM64 paths for an ARM64 guest.
+
+```powershell
+$tests = (Resolve-Path .\x64\Release\tests\CropAndLock.UITests\net10.0-windows10.0.26100.0).Path
+$runtime = (Resolve-Path .\x64\Release).Path
+$certificate = 'C:\PowerToysUiTestVm\shared\PowerToysUiTests\CropAndLock\test-signing.cer'
+
+.\.pipelines\signSparsePackages.ps1 `
+    -PackageRoot $tests, $runtime `
+    -Include CropAndLock.TestApp.msix `
+    -RequiredAuthenticodeFile PowerToys.exe, PowerToys.Settings.exe `
+    -SkipLocalTrust -ExportCertificatePath $certificate
+```
+
+Import the exported **public** certificate only into the running, isolated test
+guest, using the configured administrator control channel:
+
+```powershell
+$vm = 'PowerToysUiTest-Win10'
+Copy-VMFile -VMName $vm -SourcePath $certificate `
+    -DestinationPath C:\PowerToysUiTestExchange\CropAndLock\test-signing.cer `
+    -FileSource Host -CreateFullPath -Force
+
+.\.github\skills\ui-tests-local-vm\scripts\Invoke-GuestScript.ps1 -VmName $vm -ScriptBlock {
+    $certificate = 'C:\PowerToysUiTestExchange\CropAndLock\test-signing.cer'
+    Import-Certificate -FilePath $certificate -CertStoreLocation Cert:\LocalMachine\Root
+    Import-Certificate -FilePath $certificate -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+}
+```
+
+Package/deploy the signed files with the local-VM controller after this step.
+Repeat signing after every rebuild or restaging that replaces the package or
+companions. `-SkipLocalTrust` can report an untrusted signature on the host; the
+guest must trust it. Skipping this step makes the packaged cases fail at
+`AddPackageAsync`, and unsigned Release companions reject Settings IPC.
+After validation, remove the session-added certificate thumbprint from the guest
+Root/TrustedPeople stores; do not remove pre-existing certificates.
+
 Run the staged executable **inside the UI-test VM**, not on a working desktop:
 
 ```powershell
@@ -119,6 +165,6 @@ Run the staged executable **inside the UI-test VM**, not on a working desktop:
 
 For a focused iteration, add
 `--filter "FullyQualifiedName~ThumbnailWin32ShowsSelectedRegionAndLiveUpdates"`.
-Validate the same complete six-test suite on Windows 10 and Windows 11, recording
-the actual Windows edition/build. A build or a focused run alone is not
-end-to-end sign-off.
+Validate the same complete ten-test executable (six UI scenarios and four
+pixel-comparison checks) on Windows 10 and Windows 11, recording the actual
+Windows edition/build. A build or a focused run alone is not end-to-end sign-off.

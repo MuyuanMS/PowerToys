@@ -3,7 +3,6 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Drawing;
-using Microsoft.CropAndLock.TestApp;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Microsoft.CropAndLock.UITests
@@ -33,10 +32,10 @@ namespace Microsoft.CropAndLock.UITests
             return new Point(client.Left + InputBounds.Left + (InputBounds.Width / 2), client.Top + InputBounds.Top + (InputBounds.Height / 2));
         }
 
-        protected void SetFixtureGeometry()
+        protected void SetGeometry(Rectangle cropBounds, Rectangle inputBounds)
         {
-            InputBounds = CropSourceForm.InputRectangle;
-            CropBounds = CropSourceForm.CropRectangle;
+            InputBounds = inputBounds;
+            CropBounds = cropBounds;
         }
     }
 }
