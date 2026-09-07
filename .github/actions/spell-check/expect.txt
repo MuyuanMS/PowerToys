@@ -746,6 +746,7 @@ HORZRES
 HORZSIZE
 Hostbackdropbrush
 hostfxr
+hostpolicy
 hostsfileeditor
 hotfixes
 hotkeycontrol
@@ -1289,6 +1290,7 @@ OFN
 ofs
 OICI
 OICIIO
+OICIID
 olditem
 oldpath
 oldtheme
@@ -1445,6 +1447,7 @@ ppv
 ppwsz
 prc
 Prefixer
+preexisting
 Premul
 prependpath
 prepopulate
