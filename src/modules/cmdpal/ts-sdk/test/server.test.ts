@@ -2,7 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ICommandProvider } from '../src/types.js';
 import { encodeMessage, MessageFramer } from '../src/runtime/framing.js';
 import { startJsonRpcServer } from '../src/runtime/server.js';
@@ -11,6 +11,7 @@ type Writer = typeof process.stdout.write;
 
 const originalStdoutWrite = process.stdout.write;
 const originalStderrWrite = process.stderr.write;
+const originalExitCode = process.exitCode;
 const initialDataListeners = process.stdin.listeners('data');
 const initialEndListeners = process.stdin.listeners('end');
 
@@ -29,6 +30,8 @@ afterEach(async () => {
   }
   process.stdout.write = originalStdoutWrite;
   process.stderr.write = originalStderrWrite;
+  process.exitCode = originalExitCode;
+  vi.restoreAllMocks();
 });
 
 function captureStdout(): string[] {
@@ -88,5 +91,16 @@ describe('startJsonRpcServer', () => {
         error: { code: -32600, message: 'Invalid Request' },
       },
     ]);
+  });
+
+  it('finalizes the server when provider creation fails', async () => {
+    captureStdout();
+    const pause = vi.spyOn(process.stdin, 'pause');
+
+    startJsonRpcServer(() => Promise.reject(new Error('provider failed')));
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(process.exitCode).toBe(1);
+    expect(pause).toHaveBeenCalled();
   });
 });

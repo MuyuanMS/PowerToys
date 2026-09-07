@@ -94,7 +94,7 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
       void chain.then(() => finalize(0));
     },
     reportFatal: (code: number) => {
-      process.exitCode = code;
+      void chain.then(() => finalize(code));
     },
   });
 

@@ -189,7 +189,7 @@ export function serializeCommandResult(
   result: CommandResult | null | undefined,
   serializeCommand: CommandSerializer = defaultCommandSerializer,
 ): WireCommandResult {
-  if (!result) {
+  if (result === null || result === undefined) {
     return { Kind: CommandResultKindValue.dismiss };
   }
 

@@ -35,7 +35,7 @@ export abstract class FallbackCommandItemBase
   /** The command run when the item is activated. */
   abstract readonly command: ICommand;
   protected get notificationId(): string {
-    return this.command.id;
+    return this.id ?? this.command.id;
   }
   /** Primary text shown for the item. */
   abstract title: string;

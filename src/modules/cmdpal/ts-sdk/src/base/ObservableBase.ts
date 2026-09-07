@@ -38,9 +38,10 @@ export abstract class ObservableBase {
       throw new Error(`Property "${propertyName}" requires an items-changed notification.`);
     }
 
+    const value = Reflect.get(this, propertyName);
     sendNotification('command/propChanged', {
       commandId: this.notificationId,
-      properties: { [propertyName]: Reflect.get(this, propertyName) },
+      properties: { [propertyName]: value === undefined ? null : value },
     });
   }
 }
