@@ -335,32 +335,48 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
 
     private void StartClipboardHistoryLoad()
     {
+        var cleanupNow = false;
         try
         {
-            SetLoadingState(true);
-
-            // https://github.com/microsoft/windows-rs/issues/317
-            // The synchronous prefix must run in STA or the clipboard API hangs.
-            // Continuations use the thread pool because this raw thread has no
-            // synchronization context.
-            var thread = new Thread(() =>
+            lock (loadSync)
             {
-                try
+                if (disposed.Value)
                 {
-                    LoadClipboardHistoryAsync().GetAwaiter().GetResult();
+                    loadInFlight.Value = false;
+                    cleanupNow = true;
                 }
-                catch (Exception ex)
+                else
                 {
-                    TryLogMessage($"Clipboard history load thread failed: {ex}");
+                    SetLoadingState(true);
+
+                    // https://github.com/microsoft/windows-rs/issues/317
+                    // The synchronous prefix must run in STA or the clipboard API hangs.
+                    // Continuations use the thread pool because this raw thread has no
+                    // synchronization context.
+                    var thread = new Thread(() =>
+                    {
+                        try
+                        {
+                            LoadClipboardHistoryAsync().GetAwaiter().GetResult();
+                        }
+                        catch (Exception ex)
+                        {
+                            TryLogMessage($"Clipboard history load thread failed: {ex}");
+                        }
+                    });
+                    thread.IsBackground = true;
+                    thread.SetApartmentState(ApartmentState.STA);
+                    thread.Start();
                 }
-            });
-            thread.IsBackground = true;
-            thread.SetApartmentState(ApartmentState.STA);
-            thread.Start();
+            }
+
+            if (cleanupNow)
+            {
+                CleanupCachedImages([]);
+            }
         }
         catch (Exception ex)
         {
-            var cleanupNow = false;
             lock (loadSync)
             {
                 loadInFlight.Value = false;
