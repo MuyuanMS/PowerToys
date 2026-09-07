@@ -190,7 +190,7 @@ export class SampleListPageWithDetails extends ListPageBase {
   private heroImageLoad?: Promise<void>;
 
   override getItems(): IListItem[] {
-    this.heroImageLoad ??= Promise.resolve()
+    this.heroImageLoad ??= new Promise<void>((resolve) => setImmediate(resolve))
       .then(getHeroImage)
       .then((heroImage) => this.heroItem.updateHeroImage(heroImage));
     return this.items;

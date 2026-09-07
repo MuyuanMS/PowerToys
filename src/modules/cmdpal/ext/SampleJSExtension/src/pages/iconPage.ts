@@ -148,7 +148,7 @@ export class SampleIconPage extends ListPageBase {
   private urlIconLoad?: Promise<void>;
 
   private loadIcon(loader: IconLoader, item: MutableIconItem): Promise<void> {
-    return Promise.resolve()
+    return new Promise<void>((resolve) => setImmediate(resolve))
       .then(loader)
       .catch(() => loadingFallback)
       .then((loadedIcon) => item.updateIcon(loadedIcon));

@@ -167,6 +167,7 @@ internal static class NodeRuntimeLocator
 
     private static bool TryMatchClause(Version actual, string clause)
     {
+        clause = clause.Replace("~>", "~", StringComparison.Ordinal);
         var hyphen = clause.IndexOf(" - ", StringComparison.Ordinal);
         if (hyphen >= 0)
         {
@@ -174,7 +175,7 @@ internal static class NodeRuntimeLocator
                 && TryMatchToken(actual, $"<={clause[(hyphen + 3)..].Trim()}");
         }
 
-        var rawTokens = clause.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        var rawTokens = clause.Split((char[]?)null, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         if (rawTokens.Length == 0)
         {
             return false;
@@ -285,7 +286,7 @@ internal static class NodeRuntimeLocator
                 ">=" => actual.CompareTo(lower) >= 0,
                 "<" => actual.CompareTo(lower) < 0,
                 "<=" => upper is null || actual.CompareTo(upper) < 0,
-                "^" => actual.CompareTo(lower) >= 0 && actual.CompareTo(GetCaretUpperBound(components)) < 0,
+                "^" => specifiedComponents == 0 || (actual.CompareTo(lower) >= 0 && actual.CompareTo(GetCaretUpperBound(components)) < 0),
                 "=" or "" or "~" => (upper is null || actual.CompareTo(upper) < 0) && actual.CompareTo(lower) >= 0,
                 _ => false,
             };

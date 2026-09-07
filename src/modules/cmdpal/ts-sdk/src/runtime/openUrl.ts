@@ -4,8 +4,8 @@
 
 /**
  * Opens a URL in the user's default browser. Command Palette runs on Windows,
- * so the default opener uses the shell `start` verb; macOS and Linux fallbacks
- * are provided so the SDK behaves during local development on other platforms.
+ * so the default opener launches Explorer directly; macOS and Linux fallbacks
+ * are provided for local development on other platforms.
  */
 
 import { spawn } from 'node:child_process';
@@ -25,8 +25,7 @@ function hasControlCharacters(value: string): boolean {
 /**
  * Opens a URL in the default browser via the platform launcher.
  *
- * @throws Error when the URL contains a double quote or a control character,
- * which could break out of the launcher command line.
+ * @throws Error when the URL contains a double quote or a control character.
  */
 export const openUrlInDefaultBrowser: UrlOpener = (url) => {
   if (url.includes('"') || hasControlCharacters(url)) {

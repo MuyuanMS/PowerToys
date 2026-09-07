@@ -47,8 +47,6 @@ inventing protocol methods:
   token search state and caret position do not cross the JSON-RPC boundary.
 - Drag and drop via `DataPackage`. `IListItem` has no `DataPackage`, so the
   clipboard demo copies to the clipboard instead.
-- Toast icon and toast action button (`IToastArgs2`). `ToastArgs` carries a
-  message and an optional follow-up result only.
 - Win32 foreground-window and other in-process host tricks.
 - Evil samples and issue-specific host-ABI repros.
 
