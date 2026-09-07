@@ -17,12 +17,22 @@ internal static class DetailsMarkdownHelper
             return string.Empty;
         }
 
-        var fence = "```";
-        while (text.Contains(fence, StringComparison.Ordinal))
+        var longestBacktickRun = 0;
+        var currentBacktickRun = 0;
+        foreach (var character in text)
         {
-            fence += "`";
+            if (character == '`')
+            {
+                currentBacktickRun++;
+                longestBacktickRun = Math.Max(longestBacktickRun, currentBacktickRun);
+            }
+            else
+            {
+                currentBacktickRun = 0;
+            }
         }
 
+        var fence = new string('`', Math.Max(3, longestBacktickRun + 1));
         return $"{fence}text\n{text}\n{fence}";
     }
 

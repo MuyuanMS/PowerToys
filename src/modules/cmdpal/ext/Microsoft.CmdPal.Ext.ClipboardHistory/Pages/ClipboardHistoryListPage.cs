@@ -24,6 +24,7 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
 {
     private readonly SettingsManager _settingsManager;
     private readonly string _defaultIconPath;
+    private readonly object loadSync = new();
     private volatile ClipboardItem[] clipboardHistory = [];
     private InterlockedBoolean hasLoadedOnce;
     private InterlockedBoolean loadInFlight;
@@ -46,13 +47,27 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
 
     private void TrackClipboardHistoryChanged_EventHandler(object? sender, ClipboardHistoryChangedEventArgs? e)
     {
-        if (disposed.Value)
+        var shouldStart = false;
+        lock (loadSync)
         {
-            return;
+            if (disposed.Value)
+            {
+                return;
+            }
+
+            reloadRequested.Value = true;
+            if (!loadInFlight.Value)
+            {
+                reloadRequested.Value = false;
+                loadInFlight.Value = true;
+                shouldStart = true;
+            }
         }
 
-        reloadRequested.Value = true;
-        LoadClipboardHistoryInSTA();
+        if (shouldStart)
+        {
+            StartClipboardHistoryLoad();
+        }
     }
 
     private async Task LoadClipboardHistoryAsync()
@@ -101,8 +116,11 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
                         }
 
                         item.ImageData = imageReceived;
-                        item.ImagePath = GetImagePath(item.Item.Id);
-                        await CacheImageAsync(imageReceived, item.ImagePath).ConfigureAwait(false);
+                        var imagePath = GetImagePath(item.Item.Id);
+                        if (File.Exists(imagePath) || await CacheImageAsync(imageReceived, imagePath).ConfigureAwait(false))
+                        {
+                            item.ImagePath = imagePath;
+                        }
                     }
                 }
             }
@@ -119,9 +137,6 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
         }
         finally
         {
-            loadInFlight.Value = false;
-
-            // Dispose can race this worker, so cleanup happens after the in-flight flag is cleared.
             CleanupCachedImages(disposed.Value
                 ? []
                 : clipboardHistory.Where(static item => item.ImagePath is not null).Select(static item => item.ImagePath!));
@@ -151,9 +166,26 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
                 }
             }
 
-            if (!disposed.Value && reloadRequested.Clear())
+            var shouldReload = false;
+            lock (loadSync)
             {
-                LoadClipboardHistoryInSTA();
+                if (disposed.Value)
+                {
+                    loadInFlight.Value = false;
+                }
+                else if (reloadRequested.Clear())
+                {
+                    shouldReload = true;
+                }
+                else
+                {
+                    loadInFlight.Value = false;
+                }
+            }
+
+            if (shouldReload)
+            {
+                StartClipboardHistoryLoad();
             }
         }
     }
@@ -205,20 +237,39 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
         }
     }
 
-    private static async Task CacheImageAsync(RandomAccessStreamReference imageData, string path)
+    private static async Task<bool> CacheImageAsync(RandomAccessStreamReference imageData, string path)
     {
+        var temporaryPath = $"{path}.{Guid.NewGuid():N}.tmp";
         try
         {
             using var stream = await imageData.OpenReadAsync().AsTask().ConfigureAwait(false);
             using var input = stream.AsStreamForRead();
             var directory = Path.GetDirectoryName(path)!;
             Directory.CreateDirectory(directory);
-            using var output = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read, 64 * 1024, useAsync: true);
+            using var output = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 64 * 1024, useAsync: true);
             await input.CopyToAsync(output).ConfigureAwait(false);
+            await output.FlushAsync().ConfigureAwait(false);
+            File.Move(temporaryPath, path, overwrite: true);
+            return true;
         }
         catch (Exception ex)
         {
             TryLogMessage($"Failed to cache clipboard image data: {ex}");
+            return false;
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(temporaryPath))
+                {
+                    File.Delete(temporaryPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                TryLogMessage($"Failed to remove temporary clipboard image cache: {ex}");
+            }
         }
     }
 
@@ -238,12 +289,17 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
 
     private void LoadClipboardHistoryInSTA()
     {
-        if (!loadInFlight.Set())
+        lock (loadSync)
         {
-            return;
+            if (disposed.Value || loadInFlight.Value)
+            {
+                return;
+            }
+
+            loadInFlight.Value = true;
+            reloadRequested.Clear();
         }
 
-        reloadRequested.Clear();
         StartClipboardHistoryLoad();
     }
 
@@ -268,12 +324,16 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
                     TryLogMessage($"Clipboard history load thread failed: {ex}");
                 }
             });
+            thread.IsBackground = true;
             thread.SetApartmentState(ApartmentState.STA);
             thread.Start();
         }
         catch (Exception ex)
         {
-            loadInFlight.Value = false;
+            lock (loadSync)
+            {
+                loadInFlight.Value = false;
+            }
             hasLoadedOnce.Value = false;
             SetLoadingState(false);
             TryLogMessage($"Failed to start clipboard history load thread: {ex}");
