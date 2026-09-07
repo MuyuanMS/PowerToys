@@ -14,22 +14,12 @@ public class SearchBarKeyboardTests : CommandPaletteTestBase
     [TestMethod]
     public void ModifiedNavigationKeysPreserveSearchText()
     {
-        SetSearchBox("windows");
-
-        var searchBox = this.Find<TextBox>(By.AccessibilityId("MainSearchBox"));
-        var initialText = searchBox.Text;
-        var initialSelection = GetSelectedResult().Name;
-
-        searchBox.Click();
-        this.SendKeys(Key.Ctrl, Key.Up);
-        this.SendKeys(Key.Shift, Key.Right);
-        this.SendKeys(Key.Ctrl, Key.Left);
-        this.SendKeys(Key.Ctrl, Key.PageDown);
-        this.SendKeys(Key.Ctrl, Key.PageUp);
-        this.SendKeys(Key.Shift, Key.Down);
-
-        Assert.AreEqual(initialText, searchBox.Text);
-        Assert.AreEqual(initialSelection, GetSelectedResult().Name);
+        AssertModifiedNavigationKeyDoesNotChangeSelection(Key.Ctrl, Key.Up);
+        AssertModifiedNavigationKeyDoesNotChangeSelection(Key.Shift, Key.Right);
+        AssertModifiedNavigationKeyDoesNotChangeSelection(Key.Ctrl, Key.Left);
+        AssertModifiedNavigationKeyDoesNotChangeSelection(Key.Ctrl, Key.PageDown);
+        AssertModifiedNavigationKeyDoesNotChangeSelection(Key.Ctrl, Key.PageUp);
+        AssertModifiedNavigationKeyDoesNotChangeSelection(Key.Shift, Key.Down);
     }
 
     [TestMethod]
@@ -57,6 +47,12 @@ public class SearchBarKeyboardTests : CommandPaletteTestBase
 
         var initialSelection = GetSelectedResult().Name;
 
+        this.SendKeys(Key.Ctrl, Key.Right);
+        Assert.AreEqual(initialSelection, GetSelectedResult().Name);
+
+        this.SendKeys(Key.Shift, Key.Left);
+        Assert.AreEqual(initialSelection, GetSelectedResult().Name);
+
         this.SendKeys(Key.Right);
         Assert.AreNotEqual(initialSelection, GetSelectedResult().Name);
 
@@ -71,5 +67,20 @@ public class SearchBarKeyboardTests : CommandPaletteTestBase
 
         Assert.IsNotNull(selectedResult, "No selected Command Palette result was found.");
         return selectedResult;
+    }
+
+    private void AssertModifiedNavigationKeyDoesNotChangeSelection(Key modifier, Key key)
+    {
+        SetSearchBox("windows");
+
+        var searchBox = this.Find<TextBox>(By.AccessibilityId("MainSearchBox"));
+        var initialText = searchBox.Text;
+        var initialSelection = GetSelectedResult().Name;
+
+        searchBox.Click();
+        this.SendKeys(modifier, key);
+
+        Assert.AreEqual(initialText, searchBox.Text);
+        Assert.AreEqual(initialSelection, GetSelectedResult().Name);
     }
 }
