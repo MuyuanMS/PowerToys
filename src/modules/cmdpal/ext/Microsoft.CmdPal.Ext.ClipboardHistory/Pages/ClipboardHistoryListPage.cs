@@ -167,11 +167,13 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
             }
 
             var shouldReload = false;
+            var shouldCleanup = false;
             lock (loadSync)
             {
                 if (disposed.Value)
                 {
                     loadInFlight.Value = false;
+                    shouldCleanup = true;
                 }
                 else if (reloadRequested.Clear())
                 {
@@ -186,6 +188,10 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
             if (shouldReload)
             {
                 StartClipboardHistoryLoad();
+            }
+            else if (shouldCleanup)
+            {
+                CleanupCachedImages([]);
             }
         }
     }
@@ -246,9 +252,12 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
             using var input = stream.AsStreamForRead();
             var directory = Path.GetDirectoryName(path)!;
             Directory.CreateDirectory(directory);
-            using var output = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 64 * 1024, useAsync: true);
-            await input.CopyToAsync(output).ConfigureAwait(false);
-            await output.FlushAsync().ConfigureAwait(false);
+            using (var output = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 64 * 1024, useAsync: true))
+            {
+                await input.CopyToAsync(output).ConfigureAwait(false);
+                await output.FlushAsync().ConfigureAwait(false);
+            }
+
             File.Move(temporaryPath, path, overwrite: true);
             return true;
         }
@@ -381,7 +390,16 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
         }
 
         Clipboard.HistoryChanged -= TrackClipboardHistoryChanged_EventHandler;
-        if (!loadInFlight.Value)
+        var cleanupNow = false;
+        lock (loadSync)
+        {
+            if (!loadInFlight.Value)
+            {
+                cleanupNow = true;
+            }
+        }
+
+        if (cleanupNow)
         {
             CleanupCachedImages([]);
         }
