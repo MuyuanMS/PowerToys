@@ -80,20 +80,18 @@ describe('MessageFramer round-trip', () => {
     expect(decodeAll(framer, combined)).toEqual([first, second, third]);
   });
 
-  it('resynchronizes after a header block with no Content-Length', () => {
+  it('rejects a header block with no Content-Length', () => {
     const framer = new MessageFramer();
     const garbage = Buffer.from('X-Nonsense: 1\r\n\r\n', 'ascii');
-    const good = encodeMessage({ ok: true });
-    expect(decodeAll(framer, Buffer.concat([garbage, good]))).toEqual([{ ok: true }]);
+    expect(() => framer.push(garbage)).toThrow('invalid Content-Length');
   });
 
   it.each(['12junk', '1.5', '-1', '01', '9007199254740992'])(
-    'rejects malformed Content-Length value %s and resynchronizes',
+    'rejects malformed Content-Length value %s',
     (length) => {
       const framer = new MessageFramer();
       const malformed = Buffer.from(`Content-Length: ${length}\r\n\r\n`, 'ascii');
-      const good = encodeMessage({ ok: true });
-      expect(decodeAll(framer, Buffer.concat([malformed, good]))).toEqual([{ ok: true }]);
+      expect(() => framer.push(malformed)).toThrow('invalid Content-Length');
     },
   );
 
@@ -102,6 +100,15 @@ describe('MessageFramer round-trip', () => {
     framer.push(Buffer.alloc(8 * 1024 + 1, 0x61));
 
     expect(decodeAll(framer, encodeMessage({ ok: true }))).toEqual([{ ok: true }]);
+  });
+
+  it('terminates on a malformed frame even when its body and a valid frame follow', () => {
+    const framer = new MessageFramer();
+    const malformed = Buffer.from('Content-Length: invalid\r\n\r\nbody', 'ascii');
+
+    expect(() => framer.push(Buffer.concat([malformed, encodeMessage({ ok: true })]))).toThrow(
+      'invalid Content-Length',
+    );
   });
 
   it('drops an oversized advertised message and accepts the next frame', () => {

@@ -93,6 +93,22 @@ describe('startJsonRpcServer', () => {
     ]);
   });
 
+  it('finalizes the server after a fatal framing error', async () => {
+    captureStdout();
+    const pause = vi.spyOn(process.stdin, 'pause');
+
+    startJsonRpcServer(() => ({
+      id: 'test',
+      displayName: 'Test',
+      topLevelCommands: () => [],
+    }));
+    process.stdin.emit('data', Buffer.from('Content-Length: invalid\r\n\r\nbody', 'ascii'));
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(process.exitCode).toBe(1);
+    expect(pause).toHaveBeenCalled();
+  });
+
   it('finalizes the server when provider creation fails', async () => {
     captureStdout();
     const pause = vi.spyOn(process.stdin, 'pause');

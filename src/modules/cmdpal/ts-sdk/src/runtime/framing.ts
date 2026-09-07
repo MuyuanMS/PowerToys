@@ -25,6 +25,9 @@ const CONTENT_LENGTH_PREFIX = 'content-length:';
 const MAX_HEADER_BYTES = 8 * 1024;
 const MAX_MESSAGE_BYTES = 16 * 1024 * 1024;
 
+/** Fatal framing violation whose body boundary cannot be recovered safely. */
+export class MessageFramingError extends Error {}
+
 /** Serializes a value into a single framed message buffer. */
 export function encodeMessage(message: unknown): Buffer {
   const body = Buffer.from(JSON.stringify(message), 'utf8');
@@ -90,15 +93,13 @@ export class MessageFramer {
           break;
         }
         if (headerEnd > MAX_HEADER_BYTES) {
-          this.buffer = this.buffer.subarray(headerEnd + HEADER_TERMINATOR.length);
-          continue;
+          throw new MessageFramingError('Message header exceeds the maximum size.');
         }
         const headerBlock = this.buffer.subarray(0, headerEnd).toString('ascii');
         const length = parseContentLength(headerBlock);
         this.buffer = this.buffer.subarray(headerEnd + HEADER_TERMINATOR.length);
         if (length === null) {
-          // Malformed header block; drop it and resynchronize.
-          continue;
+          throw new MessageFramingError('Message header has an invalid Content-Length.');
         }
         if (length > MAX_MESSAGE_BYTES) {
           // Discard the complete advertised body without buffering it, then

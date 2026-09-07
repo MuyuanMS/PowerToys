@@ -139,7 +139,15 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
   };
 
   process.stdin.on('data', (chunk: Buffer) => {
-    for (const body of framer.push(chunk)) {
+    let bodies: string[];
+    try {
+      bodies = framer.push(chunk);
+    } catch (error) {
+      process.stderr.write(`cmdpal-sdk: framing failed: ${describeError(error)}\n`);
+      void chain.then(() => finalize(1));
+      return;
+    }
+    for (const body of bodies) {
       let parsed: unknown;
       try {
         parsed = JSON.parse(body);
