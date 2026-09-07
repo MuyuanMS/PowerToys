@@ -1534,17 +1534,18 @@ static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
                     WINDOWPLACEMENT placement{ sizeof(placement) };
                     GetWindowPlacement(g_dragTarget, &placement);
                     const RECT normalPosition = g_dragWndRect;
-                    SetWindowPos(
-                        g_dragTarget,
-                        nullptr,
+                    const int normalWidth = normalPosition.right - normalPosition.left;
+                    const int normalHeight = normalPosition.bottom - normalPosition.top;
+                    placement.rcNormalPosition = {
                         targetRect.left,
                         targetRect.top,
-                        targetRect.right - targetRect.left,
-                        targetRect.bottom - targetRect.top,
-                        SWP_NOZORDER | SWP_NOACTIVATE);
-                    ShowWindow(g_dragTarget, SW_MAXIMIZE);
-                    placement.rcNormalPosition = normalPosition;
-                    placement.showCmd = SW_MAXIMIZE;
+                        targetRect.left + normalWidth,
+                        targetRect.top + normalHeight
+                    };
+                    placement.flags |= WPF_ASYNCWINDOWPLACEMENT;
+                    placement.showCmd = SW_RESTORE;
+                    SetWindowPlacement(g_dragTarget, &placement);
+                    placement.showCmd = SW_SHOWMAXIMIZED;
                     SetWindowPlacement(g_dragTarget, &placement);
                     if (previousForeground && previousForeground != g_dragTarget)
                     {
@@ -1558,21 +1559,18 @@ static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
                     // inset from the window rect by the invisible resize borders, so
                     // expand the target rect by those margins (recomputed here because
                     // they are zeroed while the snap preview is armed).
-                    SetWindowPos(
-                        g_dragTarget,
-                        nullptr,
-                        targetRect.left,
-                        targetRect.top,
-                        targetRect.right - targetRect.left,
-                        targetRect.bottom - targetRect.top,
-                        SWP_NOZORDER | SWP_NOACTIVATE);
                     PrepareOverlayMetrics(g_dragTarget);
                     RECT windowRect = targetRect;
                     windowRect.left -= g_overlayMarginL;
                     windowRect.top -= g_overlayMarginT;
                     windowRect.right += g_overlayMarginR;
                     windowRect.bottom += g_overlayMarginB;
-                    SetWindowPos(g_dragTarget, nullptr, windowRect.left, windowRect.top, windowRect.right - windowRect.left, windowRect.bottom - windowRect.top, SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
+                    WINDOWPLACEMENT placement{ sizeof(placement) };
+                    GetWindowPlacement(g_dragTarget, &placement);
+                    placement.rcNormalPosition = windowRect;
+                    placement.flags |= WPF_ASYNCWINDOWPLACEMENT;
+                    placement.showCmd = SW_RESTORE;
+                    SetWindowPlacement(g_dragTarget, &placement);
                 }
 
                 EndInteraction(true, false);
