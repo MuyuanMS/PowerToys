@@ -167,6 +167,16 @@ function Test-MicrosoftSignedFile {
 
         $chain = [Security.Cryptography.X509Certificates.X509Chain]::new()
         $chain.ChainPolicy.RevocationMode = [Security.Cryptography.X509Certificates.X509RevocationMode]::NoCheck
+        if ($null -ne $signature.TimeStamperCertificate) {
+            $verificationStart = [DateTime]::MinValue
+            if ($signature.SignerCertificate.NotBefore -gt $verificationStart) {
+                $verificationStart = $signature.SignerCertificate.NotBefore
+            }
+            if ($signature.TimeStamperCertificate.NotBefore -gt $verificationStart) {
+                $verificationStart = $signature.TimeStamperCertificate.NotBefore
+            }
+            $chain.ChainPolicy.VerificationTime = $verificationStart
+        }
         if (-not $chain.Build($signature.SignerCertificate)) {
             return $false
         }
@@ -583,12 +593,6 @@ if (-not $PSCmdlet.ShouldProcess($target, 'Remove PowerToys')) {
 }
 
 $isAdministrator = Test-IsAdministrator
-$machineTargets = @(
-    $products | Where-Object { $_.Scope -eq 'PerMachine' -and $_.State -ne -1 -and $_.State -ne 2 }
-) + @($bundles | Where-Object { $_.Scope -eq 'PerMachine' })
-if (-not $isAdministrator -and $machineTargets.Count -gt 0) {
-    throw 'Run this script elevated to remove machine-wide PowerToys installations. A non-elevated run can remove only the current user installation.'
-}
 
 $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $runId = "$timestamp-$([Guid]::NewGuid().ToString('N'))"
@@ -653,6 +657,10 @@ try {
     }
 
     foreach ($bundle in $bundles) {
+        if (-not $isAdministrator -and $bundle.Scope -ne 'PerUser') {
+            continue
+        }
+
         $bundleExecutable = Get-BundleExecutable -Bundle $bundle
         if ($null -eq $bundleExecutable) {
             $script:failures.Add(
@@ -680,9 +688,12 @@ try {
 }
 
 $remainingProducts = @(Get-PowerToysMsiProducts | Where-Object {
-    $_.State -eq 0 -or $_.State -eq 1 -or $_.State -ge 3
+    ($isAdministrator -or $_.Scope -eq 'PerUser') -and
+    $_.State -ne -1 -and $_.State -ne 2
 })
-$remainingBundles = @(Get-PowerToysBundles)
+$remainingBundles = @(Get-PowerToysBundles | Where-Object {
+    $isAdministrator -or $_.Scope -eq 'PerUser'
+})
 
 if ($remainingProducts.Count -gt 0) {
     $script:failures.Add(
@@ -695,10 +706,10 @@ if ($remainingBundles.Count -gt 0) {
 }
 
 if ($remainingProducts.Count -eq 0 -and $remainingBundles.Count -eq 0) {
-    $installScopeRegistryKeys = @(
-        'Registry::HKEY_CURRENT_USER\SOFTWARE\Classes\PowerToys',
-        'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Classes\PowerToys'
-    )
+    $installScopeRegistryKeys = @('Registry::HKEY_CURRENT_USER\SOFTWARE\Classes\PowerToys')
+    if ($isAdministrator) {
+        $installScopeRegistryKeys += 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Classes\PowerToys'
+    }
     foreach ($registryKey in $installScopeRegistryKeys) {
         Remove-KnownRegistryValue `
             -Path $registryKey `
@@ -709,12 +720,12 @@ if ($remainingProducts.Count -eq 0 -and $remainingBundles.Count -eq 0) {
             -Description 'legacy installer component registry key'
     }
 
-    $installDirectories = @(
-        (Join-Path $env:LOCALAPPDATA 'PowerToys'),
-        (Join-Path $env:ProgramFiles 'PowerToys')
-    )
-    if (-not [string]::IsNullOrWhiteSpace(${env:ProgramFiles(x86)})) {
-        $installDirectories += Join-Path ${env:ProgramFiles(x86)} 'PowerToys'
+    $installDirectories = @((Join-Path $env:LOCALAPPDATA 'PowerToys'))
+    if ($isAdministrator) {
+        $installDirectories += Join-Path $env:ProgramFiles 'PowerToys'
+        if (-not [string]::IsNullOrWhiteSpace(${env:ProgramFiles(x86)})) {
+            $installDirectories += Join-Path ${env:ProgramFiles(x86)} 'PowerToys'
+        }
     }
 
     foreach ($installDirectory in @($installDirectories | Select-Object -Unique)) {
