@@ -105,6 +105,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
     private bool _pendingTopBarFocusRestore;
     private QuickAccessShelfItem? _draggedQuickAccessShelfItem;
     private string? _quickAccessShelfDragToken;
+    private DataPackageOperation _quickAccessShelfDropOperation;
     private Grid? _quickAccessShelfDropTarget;
     private bool _quickAccessShelfDropAfter;
     private bool _quickAccessShelfDragStarted;
@@ -1093,10 +1094,12 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
             args.Data.Properties[QuickAccessShelfDragProperty] = _quickAccessShelfDragToken;
             args.Data.SetData(QuickAccessShelfDragProperty, _quickAccessShelfDragToken);
-            args.AllowedOperations =
-                args.Data.RequestedOperation |
-                DataPackageOperation.Move |
-                (item.DataPackage is null ? DataPackageOperation.None : DataPackageOperation.Copy);
+            if (item.DataPackage is null)
+            {
+                args.AllowedOperations = DataPackageOperation.Move;
+            }
+
+            _quickAccessShelfDropOperation = GetPreferredQuickAccessShelfDropOperation(args.AllowedOperations);
 
             QuickAccessShelfRemoveDropTarget.BorderThickness = new Thickness(1);
             QuickAccessShelfRemoveDropTarget.Visibility = Visibility.Visible;
@@ -1138,7 +1141,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
         var placeAfter = e.GetPosition(targetGrid).X >= targetGrid.ActualWidth / 2;
         SetQuickAccessShelfDropTarget(targetGrid, placeAfter);
-        e.AcceptedOperation = DataPackageOperation.Move;
+        e.AcceptedOperation = _quickAccessShelfDropOperation;
         e.DragUIOverride.Caption = _quickAccessShelfChangeOrderDragCaption;
         e.DragUIOverride.IsCaptionVisible = true;
         e.Handled = true;
@@ -1165,7 +1168,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         var placeAfter = e.GetPosition(targetGrid).X >= targetGrid.ActualWidth / 2;
         if (QuickAccessShelf.TryPlacePinnedItem(source, target, placeAfter))
         {
-            e.AcceptedOperation = DataPackageOperation.Move;
+            e.AcceptedOperation = _quickAccessShelfDropOperation;
         }
 
         SetQuickAccessShelfDropTarget(null, placeAfter: false);
@@ -1180,7 +1183,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         }
 
         QuickAccessShelfRemoveDropTarget.BorderThickness = new Thickness(2);
-        e.AcceptedOperation = DataPackageOperation.Move;
+        e.AcceptedOperation = _quickAccessShelfDropOperation;
         e.DragUIOverride.Caption = AutomationProperties.GetName(QuickAccessShelfRemoveDropTarget);
         e.DragUIOverride.IsCaptionVisible = true;
         e.Handled = true;
@@ -1194,7 +1197,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         }
 
         QuickAccessShelfPinDropTarget.BorderThickness = new Thickness(2);
-        e.AcceptedOperation = DataPackageOperation.Move;
+        e.AcceptedOperation = _quickAccessShelfDropOperation;
         e.DragUIOverride.Caption = AutomationProperties.GetName(QuickAccessShelfPinDropTarget);
         e.DragUIOverride.IsCaptionVisible = true;
         e.Handled = true;
@@ -1214,7 +1217,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
         if (QuickAccessShelf.TryPinItem(item))
         {
-            e.AcceptedOperation = DataPackageOperation.Move;
+            e.AcceptedOperation = _quickAccessShelfDropOperation;
         }
 
         e.Handled = true;
@@ -1234,7 +1237,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
         if (QuickAccessShelf.TryRemoveItem(item))
         {
-            e.AcceptedOperation = DataPackageOperation.Move;
+            e.AcceptedOperation = _quickAccessShelfDropOperation;
         }
 
         e.Handled = true;
@@ -1254,6 +1257,21 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
         item = _draggedQuickAccessShelfItem;
         return true;
+    }
+
+    private static DataPackageOperation GetPreferredQuickAccessShelfDropOperation(DataPackageOperation allowedOperations)
+    {
+        if ((allowedOperations & DataPackageOperation.Copy) != 0)
+        {
+            return DataPackageOperation.Copy;
+        }
+
+        if ((allowedOperations & DataPackageOperation.Link) != 0)
+        {
+            return DataPackageOperation.Link;
+        }
+
+        return DataPackageOperation.Move;
     }
 
     private void SetQuickAccessShelfDropTarget(Grid? target, bool placeAfter)
@@ -1295,6 +1313,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         QuickAccessShelfRemoveDropTarget.BorderThickness = new Thickness(1);
         _draggedQuickAccessShelfItem = null;
         _quickAccessShelfDragToken = null;
+        _quickAccessShelfDropOperation = DataPackageOperation.None;
 
         if (_quickAccessShelfDragStarted)
         {

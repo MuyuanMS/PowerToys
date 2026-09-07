@@ -138,6 +138,35 @@ public class BookmarksCommandProviderTests
     }
 
     [TestMethod]
+    [Timeout(5000)]
+    public async Task BookmarkListItem_LocalDirectoryDataPackageContainsFolder()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "PowerToysBookmarkTest-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directoryPath);
+        try
+        {
+            var bookmark = new BookmarkData("Local directory", directoryPath);
+            using var item = new BookmarkListItem(
+                bookmark,
+                new MockBookmarkManager(bookmark),
+                new BlockAfterFirstBookmarkResolver(),
+                new IconLocator(),
+                new PlaceholderParser());
+
+            await item.IsInitialized;
+
+            Assert.IsNotNull(item.DataPackage);
+            var storageItems = await item.DataPackage.GetView().GetStorageItemsAsync().AsTask();
+            Assert.AreEqual(1, storageItems.Count);
+            Assert.IsTrue(string.Equals(directoryPath, storageItems[0].Path, StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            Directory.Delete(directoryPath, recursive: true);
+        }
+    }
+
+    [TestMethod]
     public void ProviderWithEmptyData_HasOnlyAddCommand()
     {
         // Arrange
