@@ -353,7 +353,14 @@ public static class KbmProfileConverter
                     continue;
                 }
 
-                entry.To = KbmShortcutParser.Format(KbmShortcutParser.Canonicalize(to));
+                var target = KbmShortcutParser.Format(KbmShortcutParser.Canonicalize(to));
+                if (!TryParseTarget(target, out _, out _))
+                {
+                    warnings?.Add($"Skipping unparsable shortcut remap target '{stored.NewRemapKeys}'");
+                    continue;
+                }
+
+                entry.To = target;
             }
 
             shortcuts.Add(entry);
