@@ -317,4 +317,78 @@ public partial class TabbedPageViewModelTests
 
         viewModel.SafeCleanup();
     }
+
+    [TestMethod]
+    public async Task ItemsChanged_ReorderedIdLessTabs_PreservesActiveTabByPageInstance()
+    {
+        var first = new TestContentPageWithoutId("First");
+        var second = new TestContentPageWithoutId("Second");
+        var page = new TestTabbedPage(
+        [
+            new Tab("First", first),
+            new Tab("Second", second),
+        ]);
+
+        var viewModel = CreateViewModel(page);
+        viewModel.InitializeProperties();
+
+        await WaitFor(() => viewModel.Tabs.Count == 2 && viewModel.SelectedTab is not null, "Tabs did not populate");
+
+        viewModel.SelectedTab = viewModel.Tabs[1];
+        await WaitFor(() => viewModel.ActiveChild?.Title == "Second", "Second tab child was not activated");
+
+        page.SetTabs(
+        [
+            new Tab("Second", second),
+            new Tab("First", first),
+        ]);
+
+        await WaitFor(() => viewModel.Tabs[0].TabId == viewModel.SelectedTab?.TabId, "Active tab was not preserved after reorder");
+        await WaitFor(() => viewModel.ActiveChild?.Title == "Second", "Wrong cached child was activated after reorder");
+
+        viewModel.SafeCleanup();
+    }
+
+    [TestMethod]
+    public async Task ItemsChanged_RetainedIdWithNewPage_RecreatesChild()
+    {
+        var page = new TestTabbedPage(
+        [
+            new Tab("Docs", new TestContentPage("docs")),
+        ]);
+
+        var viewModel = CreateViewModel(page);
+        viewModel.InitializeProperties();
+
+        await WaitFor(() => viewModel.ActiveChild?.Title == "docs", "Initial tab child was not activated");
+
+        page.SetTabs(
+        [
+            new Tab("Docs", new TestContentPage("docs") { Title = "docs updated" }),
+        ]);
+
+        await WaitFor(() => viewModel.ActiveChild?.Title == "docs updated", "Retained tab ID did not recreate the changed page");
+
+        viewModel.SafeCleanup();
+    }
+
+    [TestMethod]
+    public async Task NestedTabbedPage_IsUnsupportedTab()
+    {
+        var nested = new TestTabbedPage(
+        [
+            new Tab("Nested child", new TestContentPage("nested-child")),
+        ]);
+        var page = new TestTabbedPage([new Tab("Nested", nested)]);
+
+        var viewModel = CreateViewModel(page);
+        viewModel.InitializeProperties();
+
+        await WaitFor(() => viewModel.SelectedTab is not null, "Tab was not selected");
+
+        Assert.IsNull(viewModel.ActiveChild);
+        Assert.IsTrue(viewModel.ShowUnsupportedPlaceholder);
+
+        viewModel.SafeCleanup();
+    }
 }

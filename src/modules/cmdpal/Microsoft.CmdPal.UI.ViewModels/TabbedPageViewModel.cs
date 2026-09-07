@@ -3,8 +3,9 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Collections.ObjectModel;
-using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Messaging;
+using Microsoft.CmdPal.UI.ViewModels.Messages;
 using Microsoft.CmdPal.UI.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
@@ -28,9 +29,13 @@ public partial class TabbedPageViewModel : PageViewModel
 {
     private readonly ExtensionObject<ITabbedPage> _model;
     private readonly IPageViewModelFactoryService _factory;
-    private readonly Dictionary<string, PageViewModel> _childCache = [];
+    private readonly Dictionary<string, CachedChild> _childCache = [];
+    private readonly Dictionary<object, string> _fallbackTabIds = new(ReferenceEqualityComparer.Instance);
+    private int _nextFallbackTabId;
 
     private static readonly string _fallbackPlaceholder = "Type here to search...";
+
+    private sealed record CachedChild(IPage Page, PageViewModel ViewModel);
 
     public ObservableCollection<TabViewModel> Tabs { get; } = [];
 
@@ -120,7 +125,7 @@ public partial class TabbedPageViewModel : PageViewModel
                 continue;
             }
 
-            var vm = new TabViewModel(tab, PageContext, i.ToString(CultureInfo.InvariantCulture));
+            var vm = new TabViewModel(tab, PageContext, GetFallbackTabId(tab));
             vm.InitializeProperties();
             result.Add(vm);
         }
@@ -129,6 +134,19 @@ public partial class TabbedPageViewModel : PageViewModel
     }
 
     private static bool PageIsSearchable(IPage? page) => page is IListPage or IParametersPage;
+
+    private string GetFallbackTabId(ITab tab)
+    {
+        var key = tab.Page as object ?? tab;
+        if (_fallbackTabIds.TryGetValue(key, out var fallbackTabId))
+        {
+            return fallbackTabId;
+        }
+
+        fallbackTabId = FormattableString.Invariant($"tab-{_nextFallbackTabId++}");
+        _fallbackTabIds[key] = fallbackTabId;
+        return fallbackTabId;
+    }
 
     //// Dynamic tab set: re-read GetTabs() and preserve the active tab by identity ////
     private void Model_ItemsChanged(object sender, IItemsChangedEventArgs args)
@@ -147,12 +165,21 @@ public partial class TabbedPageViewModel : PageViewModel
             {
                 var activeId = SelectedTab?.TabId;
 
-                // Drop cached children for tabs that no longer exist.
-                var keepIds = new HashSet<string>(newTabs.Select(t => t.TabId));
-                var staleIds = _childCache.Keys.Where(id => !keepIds.Contains(id)).ToList();
+                // Drop cached children for tabs that no longer exist or whose
+                // retained ID now points at a different page instance.
+                var newTabsById = new Dictionary<string, TabViewModel>();
+                foreach (var tab in newTabs)
+                {
+                    newTabsById.TryAdd(tab.TabId, tab);
+                }
+
+                var staleIds = _childCache
+                    .Where(entry => !newTabsById.TryGetValue(entry.Key, out var tab) || !ReferenceEquals(tab.Page, entry.Value.Page))
+                    .Select(entry => entry.Key)
+                    .ToList();
                 foreach (var id in staleIds)
                 {
-                    DisposeChild(_childCache[id]);
+                    DisposeChild(_childCache[id].ViewModel);
                     _childCache.Remove(id);
                 }
 
@@ -204,6 +231,7 @@ public partial class TabbedPageViewModel : PageViewModel
             ActiveTabIsLoading = false;
             SetHasSearchBox(false);
             UpdateProperty(nameof(PlaceholderText));
+            RefreshActiveChildContext();
             return;
         }
 
@@ -221,20 +249,15 @@ public partial class TabbedPageViewModel : PageViewModel
             // Unsupported page type; the host renders a placeholder for this tab.
             ActiveTabIsLoading = false;
             UpdateProperty(nameof(PlaceholderText));
+            RefreshActiveChildContext();
             return;
         }
 
         AttachActiveChildLoading(child);
         ActiveTabIsLoading = child.IsLoading;
 
-        // Forward the shared search text to a searchable child so the active
-        // tab reflects the current query.
-        if (child.HasSearchBox)
-        {
-            child.SearchTextBox = SearchTextBox;
-        }
-
         UpdateProperty(nameof(PlaceholderText));
+        RefreshActiveChildContext();
     }
 
     private void SetHasSearchBox(bool value)
@@ -248,13 +271,13 @@ public partial class TabbedPageViewModel : PageViewModel
 
     private PageViewModel? GetOrCreateChild(TabViewModel tab)
     {
-        if (_childCache.TryGetValue(tab.TabId, out var cached))
+        if (_childCache.TryGetValue(tab.TabId, out var cached) && ReferenceEquals(cached.Page, tab.Page))
         {
-            return cached;
+            return cached.ViewModel;
         }
 
         var page = tab.Page;
-        if (page is null)
+        if (page is null || page is ITabbedPage)
         {
             return null;
         }
@@ -269,7 +292,7 @@ public partial class TabbedPageViewModel : PageViewModel
 
         child.IsRootPage = false;
         child.HasBackButton = false;
-        _childCache[tab.TabId] = child;
+        _childCache[tab.TabId] = new(page, child);
 
         InitializeChild(child);
         return child;
@@ -285,6 +308,7 @@ public partial class TabbedPageViewModel : PageViewModel
             try
             {
                 child.InitializeCommand.Execute(null);
+                DoOnUiThread(RefreshActiveChildContext);
             }
             catch (Exception ex)
             {
@@ -337,6 +361,27 @@ public partial class TabbedPageViewModel : PageViewModel
         }
     }
 
+    public void RefreshActiveChildContext()
+    {
+        switch (ActiveChild)
+        {
+            case ListViewModel list:
+                list.RefreshCurrentCommandContext();
+                break;
+            case ContentPageViewModel content:
+                content.RefreshCommandContext();
+                break;
+            case ICommandBarContext commandBarContext:
+                WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(commandBarContext));
+                WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                break;
+            case null:
+                WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(null));
+                WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                break;
+        }
+    }
+
     private void DisposeChild(PageViewModel child)
     {
         DetachActiveChildLoading(child);
@@ -362,9 +407,9 @@ public partial class TabbedPageViewModel : PageViewModel
 
         foreach (var child in _childCache.Values)
         {
-            DetachActiveChildLoading(child);
-            child.SafeCleanup();
-            if (child is IDisposable disposable)
+            DetachActiveChildLoading(child.ViewModel);
+            child.ViewModel.SafeCleanup();
+            if (child.ViewModel is IDisposable disposable)
             {
                 disposable.Dispose();
             }
