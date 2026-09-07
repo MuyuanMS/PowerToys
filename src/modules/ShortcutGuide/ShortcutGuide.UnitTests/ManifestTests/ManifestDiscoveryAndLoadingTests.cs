@@ -70,15 +70,20 @@ Shortcuts:
         string malformedManifestContent = "PackageName: [invalid: yaml: syntax:::";
         File.WriteAllText(Path.Combine(_tempDirectory, "Corrupt.Manifest.yml"), malformedManifestContent);
 
-        // 3. Act: Generate index.yml
+        // 3. Arrange an incomplete manifest that deserializes successfully but lacks required index fields
+        string incompleteManifestContent = "PackageName: Incomplete.App";
+        File.WriteAllText(Path.Combine(_tempDirectory, "Incomplete.Manifest.yml"), incompleteManifestContent);
+
+        // 4. Act: Generate index.yml
         IndexYmlGenerator.IndexYmlGenerator.CreateIndexYmlFile(_tempDirectory);
 
-        // 4. Assert: index.yml was generated and contains the valid manifest
+        // 5. Assert: index.yml was generated and contains only the valid manifest
         string indexPath = Path.Combine(_tempDirectory, "index.yml");
         Assert.IsTrue(File.Exists(indexPath), "index.yml should be generated even when malformed manifests exist.");
 
         string indexContent = File.ReadAllText(indexPath);
         StringAssert.Contains(indexContent, "Test.ValidApp");
+        Assert.IsFalse(indexContent.Contains("Incomplete.App", StringComparison.Ordinal));
     }
 
     [TestMethod]

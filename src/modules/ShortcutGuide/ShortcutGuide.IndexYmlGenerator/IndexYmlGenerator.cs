@@ -43,6 +43,11 @@ namespace ShortcutGuide.IndexYmlGenerator
                     string content = File.ReadAllText(file);
                     Deserializer deserializer = new();
                     ShortcutFile shortcutFile = deserializer.Deserialize<ShortcutFile>(content);
+                    if (string.IsNullOrWhiteSpace(shortcutFile.PackageName) || string.IsNullOrWhiteSpace(shortcutFile.WindowFilter))
+                    {
+                        continue;
+                    }
+
                     if (processes.TryGetValue((shortcutFile.WindowFilter, shortcutFile.BackgroundProcess), out List<string>? apps))
                     {
                         if (apps.Contains(shortcutFile.PackageName))

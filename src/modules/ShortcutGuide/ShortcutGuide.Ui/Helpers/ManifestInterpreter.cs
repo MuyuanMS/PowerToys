@@ -67,7 +67,7 @@ namespace ShortcutGuide.Helpers
                 return YamlToShortcutList(File.ReadAllText(unlocalizedPath));
             }
 
-            throw new FileNotFoundException($"The file for the application '{applicationName}' was not found in '{path}' with the language '{Language}' or 'en-US'.");
+            throw new FileNotFoundException($"The file for the application '{applicationName}' was not found in '{path}' with the language '{Language}', 'en-US', or the unlocalized name.");
         }
 
         /// <summary>
