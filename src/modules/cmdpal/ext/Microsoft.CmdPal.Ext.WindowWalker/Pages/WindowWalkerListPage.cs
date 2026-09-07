@@ -4,6 +4,7 @@
 
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Messaging;
@@ -118,14 +119,25 @@ internal sealed partial class WindowWalkerListPage : DynamicListPage, IDisposabl
             return AddExplorerInfoIfNeeded(entries);
         }
 
-        var scored = ListHelpers.FilterListWithScores(entries, query, ScoreFunction);
-        var filteredEntries = new List<WindowEntry>(entries.Length);
-        foreach (var result in scored)
+        var scores = WindowSearchScorer.ScoreAll(
+            query,
+            entries,
+            static entry => entry.Item.Title,
+            static entry => entry.Window.Process.Name);
+        var filteredEntries = new List<(WindowEntry Entry, int Score)>(entries.Length);
+        for (var index = 0; index < entries.Length; index++)
         {
-            filteredEntries.Add(result.Item);
+            if (scores[index] > 0)
+            {
+                filteredEntries.Add((entries[index], scores[index]));
+            }
         }
 
-        return AddExplorerInfoIfNeeded(filteredEntries);
+        return AddExplorerInfoIfNeeded(
+            filteredEntries
+                .OrderByDescending(entry => entry.Score)
+                .Select(entry => entry.Entry)
+                .ToArray());
     }
 
     private WindowEntry[] GetCachedEntries()
@@ -372,13 +384,6 @@ internal sealed partial class WindowWalkerListPage : DynamicListPage, IDisposabl
         }
 
         return results;
-    }
-
-    private static int ScoreFunction(string query, WindowEntry entry)
-    {
-        var titleScore = FuzzyStringMatcher.ScoreFuzzy(query, entry.Item.Title);
-        var processNameScore = FuzzyStringMatcher.ScoreFuzzy(query, entry.Window.Process.Name ?? string.Empty);
-        return Math.Max(titleScore, processNameScore);
     }
 
     private void SetLoadingComplete(CancellationTokenSource cancellationTokenSource)
