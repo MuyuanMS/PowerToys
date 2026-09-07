@@ -55,6 +55,7 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
   const stdout = claimProtocolStdout();
   const framer = new MessageFramer();
   let finalized = false;
+  let inputStopped = false;
   let disposeTimeoutMs = DEFAULT_DISPOSE_TIMEOUT_MS;
 
   const writeMessage = (message: JsonRpcMessage): void => {
@@ -85,6 +86,7 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
     setNotificationSink(null);
     ExtensionHost.initialize(null);
     stdout.restore();
+    inputStopped = true;
     process.stdin.pause();
   };
 
@@ -139,10 +141,15 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
   };
 
   process.stdin.on('data', (chunk: Buffer) => {
+    if (inputStopped) {
+      return;
+    }
     let bodies: string[];
     try {
       bodies = framer.push(chunk);
     } catch (error) {
+      inputStopped = true;
+      process.stdin.pause();
       process.stderr.write(`cmdpal-sdk: framing failed: ${describeError(error)}\n`);
       void chain.then(() => finalize(1));
       return;

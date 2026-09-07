@@ -120,6 +120,52 @@ describe('form identity and routing', () => {
     expect(responseFor(sent, 2)?.result).toEqual({ Kind: 3 });
   });
 
+  it('registers a tree root form before child forms', async () => {
+    const root = vi.fn((): CommandResult => ({ kind: 'goHome' }));
+    const child = vi.fn((): CommandResult => ({ kind: 'goBack' }));
+    const page: IContentPage = {
+      id: 'page',
+      name: 'Page',
+      title: 'Page',
+      getContent(): Content[] {
+        return [
+          {
+            type: 'tree',
+            rootContent: formContent(undefined, root),
+            getChildren(): Content[] {
+              return [formContent(undefined, child)];
+            },
+          },
+        ];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(providerWith(page));
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'contentPage/getContent',
+      params: { pageId: 'page' },
+    });
+    const content = responseFor(sent, 1)?.result as Array<{
+      rootContent: { formId: string };
+      children: Array<{ formId: string }>;
+    }>;
+    expect(content[0]?.rootContent.formId).toBe('form-0');
+    expect(content[0]?.children[0]?.formId).toBe('form-1');
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'form/submit',
+      params: { pageId: 'page', inputs: '{}', data: '{}' },
+    });
+
+    expect(root).toHaveBeenCalledTimes(1);
+    expect(child).not.toHaveBeenCalled();
+  });
+
   it('falls back to the first form when the host omits a formId', async () => {
     const first = vi.fn((): CommandResult => ({ kind: 'goHome' }));
     const second = vi.fn((): CommandResult => ({ kind: 'goBack' }));

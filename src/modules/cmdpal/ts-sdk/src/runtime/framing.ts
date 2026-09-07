@@ -88,7 +88,7 @@ export class MessageFramer {
         const headerEnd = this.buffer.indexOf(HEADER_TERMINATOR);
         if (headerEnd === -1) {
           if (this.buffer.length > MAX_HEADER_BYTES) {
-            this.buffer = Buffer.alloc(0);
+            throw new MessageFramingError('Message header exceeds the maximum size.');
           }
           break;
         }

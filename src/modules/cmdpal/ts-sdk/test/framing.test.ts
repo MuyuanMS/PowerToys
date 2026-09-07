@@ -95,11 +95,11 @@ describe('MessageFramer round-trip', () => {
     },
   );
 
-  it('drops an unterminated oversized header and accepts the next frame', () => {
+  it('rejects an unterminated oversized header', () => {
     const framer = new MessageFramer();
-    framer.push(Buffer.alloc(8 * 1024 + 1, 0x61));
-
-    expect(decodeAll(framer, encodeMessage({ ok: true }))).toEqual([{ ok: true }]);
+    expect(() => framer.push(Buffer.alloc(8 * 1024 + 1, 0x61))).toThrow(
+      'header exceeds the maximum size',
+    );
   });
 
   it('terminates on a malformed frame even when its body and a valid frame follow', () => {

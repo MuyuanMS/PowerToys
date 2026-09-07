@@ -232,13 +232,14 @@ export class WireSerializer {
       }
       case 'tree': {
         const children = treeChildren?.get(content) ?? (await content.getChildren());
+        const rootContent = await this.content(content.rootContent, forms, treeChildren);
         const serializedChildren: Record<string, unknown>[] = [];
         for (const child of children) {
           serializedChildren.push(await this.content(child, forms, treeChildren));
         }
         return {
           type: 'tree',
-          rootContent: await this.content(content.rootContent, forms, treeChildren),
+          rootContent,
           children: serializedChildren,
         };
       }
