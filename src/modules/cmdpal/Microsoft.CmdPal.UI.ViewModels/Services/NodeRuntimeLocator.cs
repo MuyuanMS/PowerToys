@@ -168,14 +168,34 @@ internal static class NodeRuntimeLocator
                 && TryMatchToken(actual, $"<={clause[(hyphen + 3)..].Trim()}");
         }
 
-        var tokens = clause.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        if (tokens.Length == 0)
+        var rawTokens = clause.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (rawTokens.Length == 0)
         {
             return false;
         }
 
+        var tokens = new List<string>();
+        for (var index = 0; index < rawTokens.Length; index++)
+        {
+            if (IsComparator(rawTokens[index]))
+            {
+                if (index + 1 >= rawTokens.Length)
+                {
+                    return false;
+                }
+
+                tokens.Add(rawTokens[index] + rawTokens[++index]);
+            }
+            else
+            {
+                tokens.Add(rawTokens[index]);
+            }
+        }
+
         return tokens.All(token => TryMatchToken(actual, token));
     }
+
+    private static bool IsComparator(string token) => token is ">" or ">=" or "<" or "<=" or "=" or "^" or "~";
 
     private static bool TryMatchToken(Version actual, string token)
     {

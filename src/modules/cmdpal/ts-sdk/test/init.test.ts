@@ -60,6 +60,22 @@ describe('initialization failure propagation', () => {
     expect(providerDispose).toHaveBeenCalledTimes(1);
   });
 
+  it('ignores provider initialization rejection after runtime disposal', async () => {
+    let rejectProvider!: (error: Error) => void;
+    const providerPromise = new Promise<ICommandProvider>((_, reject) => {
+      rejectProvider = reject;
+    });
+    const { runtime, fatal } = createHarness();
+
+    runtime.beginInitialization(providerPromise);
+    await runtime.dispose();
+    rejectProvider(new Error('late rejection'));
+    await expect(providerPromise).rejects.toThrow('late rejection');
+    await Promise.resolve();
+
+    expect(fatal).not.toHaveBeenCalled();
+  });
+
   it('answers initialize with an error when provider creation rejects', async () => {
     const { runtime, sent, fatal } = createHarness();
     runtime.beginInitialization(Promise.reject(new Error('creation boom')));
