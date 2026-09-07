@@ -220,7 +220,8 @@ internal static class NodeRuntimeLocator
         var buildMetadataIndex = versionText.IndexOf('+');
         if (buildMetadataIndex >= 0)
         {
-            if (buildMetadataIndex == 0 || buildMetadataIndex == versionText.Length - 1)
+            var buildMetadata = versionText[(buildMetadataIndex + 1)..];
+            if (buildMetadataIndex == 0 || !IsValidBuildMetadata(buildMetadata))
             {
                 return false;
             }
@@ -257,7 +258,7 @@ internal static class NodeRuntimeLocator
                 continue;
             }
 
-            if (sawWildcard || !int.TryParse(parts[index], out components[index]) || components[index] < 0)
+            if (sawWildcard || !IsCanonicalNumericIdentifier(parts[index]) || !int.TryParse(parts[index], out components[index]))
             {
                 return false;
             }
@@ -332,7 +333,23 @@ internal static class NodeRuntimeLocator
         return prerelease.Length > 0
             && prerelease.Split('.').All(identifier =>
                 identifier.Length > 0
+                && identifier.All(character => char.IsAsciiLetterOrDigit(character) || character == '-')
+                && (!identifier.All(char.IsAsciiDigit) || IsCanonicalNumericIdentifier(identifier)));
+    }
+
+    private static bool IsValidBuildMetadata(string buildMetadata)
+    {
+        return buildMetadata.Length > 0
+            && buildMetadata.Split('.').All(identifier =>
+                identifier.Length > 0
                 && identifier.All(character => char.IsAsciiLetterOrDigit(character) || character == '-'));
+    }
+
+    private static bool IsCanonicalNumericIdentifier(string identifier)
+    {
+        return identifier.Length > 0
+            && identifier.All(char.IsAsciiDigit)
+            && (identifier.Length == 1 || identifier[0] != '0');
     }
 
     private static Version? GetPartialUpperBound(int[] components, int specifiedComponents)
