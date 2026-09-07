@@ -301,6 +301,15 @@ internal sealed class EditorUi(Session session, TestContext context)
             $"Profile {name}, enabled={enabled}, was not persisted with the expected variables.");
     }
 
+    internal void AssertProfile(string name, bool enabled)
+    {
+        Wait(
+            () => ReadProfiles().EnumerateArray().Any(profile =>
+                profile.GetProperty("Name").GetString() == name &&
+                profile.GetProperty("IsEnabled").GetBoolean() == enabled),
+            $"Profile {name}, enabled={enabled}, was not persisted with the expected state.");
+    }
+
     internal static JsonElement ReadProfiles()
     {
         using var document = JsonDocument.Parse(File.ReadAllText(TestState.ProfilesPath));

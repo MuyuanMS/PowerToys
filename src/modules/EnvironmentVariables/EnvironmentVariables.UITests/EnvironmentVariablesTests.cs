@@ -29,6 +29,7 @@ public sealed class EnvironmentVariablesTests : UITestBase
     public static void InitializeState(TestContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        StopStaleScopeBeforeRecovery();
         state = new TestState();
     }
 
@@ -44,6 +45,14 @@ public sealed class EnvironmentVariablesTests : UITestBase
         {
             state?.Dispose();
         }
+    }
+
+    private static void StopStaleScopeBeforeRecovery()
+    {
+        bool settingsStopped = WindowControl.TryKillProcessTreeByNameAndWait("PowerToys.Settings", 10_000);
+        bool runnerStopped = WindowControl.TryKillProcessTreeByNameAndWait("PowerToys", 10_000);
+        Assert.IsTrue(settingsStopped, "Could not close stale PowerToys Settings before recovery.");
+        Assert.IsTrue(runnerStopped, "Could not close stale PowerToys Runner before recovery.");
     }
 
     protected override void PrepareTestState()
