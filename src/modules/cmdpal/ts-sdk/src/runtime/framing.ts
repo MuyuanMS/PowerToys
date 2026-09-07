@@ -64,6 +64,7 @@ function parseContentLength(headerBlock: string): number | null {
 export class MessageFramer {
   private buffer: Buffer = Buffer.alloc(0);
   private expectedLength: number | null = null;
+  private discardRemaining = 0;
 
   /** Appends a chunk and returns any newly completed message bodies. */
   push(chunk: Buffer): string[] {
@@ -71,6 +72,15 @@ export class MessageFramer {
 
     const messages: string[] = [];
     for (;;) {
+      if (this.discardRemaining > 0) {
+        const discarded = Math.min(this.buffer.length, this.discardRemaining);
+        this.buffer = this.buffer.subarray(discarded);
+        this.discardRemaining -= discarded;
+        if (this.discardRemaining > 0 || this.buffer.length === 0) {
+          break;
+        }
+      }
+
       if (this.expectedLength === null) {
         const headerEnd = this.buffer.indexOf(HEADER_TERMINATOR);
         if (headerEnd === -1) {
@@ -86,8 +96,14 @@ export class MessageFramer {
         const headerBlock = this.buffer.subarray(0, headerEnd).toString('ascii');
         const length = parseContentLength(headerBlock);
         this.buffer = this.buffer.subarray(headerEnd + HEADER_TERMINATOR.length);
-        if (length === null || length > MAX_MESSAGE_BYTES) {
-          // Malformed or unsupported header block; drop it and resynchronize.
+        if (length === null) {
+          // Malformed header block; drop it and resynchronize.
+          continue;
+        }
+        if (length > MAX_MESSAGE_BYTES) {
+          // Discard the complete advertised body without buffering it, then
+          // resume parsing at the next frame boundary.
+          this.discardRemaining = length;
           continue;
         }
         this.expectedLength = length;
