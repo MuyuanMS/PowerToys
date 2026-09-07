@@ -5,6 +5,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.PowerToys.UITest.Next;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -18,6 +19,7 @@ public sealed class EnvironmentVariablesTests : UITestBase
     private static TestState state = null!;
     private static bool ownsPreparedScope;
     private EditorUi editor = null!;
+    private Session editorWindow = null!;
     private string prefix = string.Empty;
 
     public EnvironmentVariablesTests()
@@ -57,6 +59,11 @@ public sealed class EnvironmentVariablesTests : UITestBase
 
     protected override void PrepareTestState()
     {
+        if (ownsPreparedScope)
+        {
+            StopPreparedScope();
+        }
+
         // CI agents can launch the test host elevated. Use the Runner's supported opt-out before
         // attaching Settings, rather than attempting to invoke its disabled administrator switch.
         // TestState journals the original global settings before this baseline is changed.
@@ -166,7 +173,9 @@ public sealed class EnvironmentVariablesTests : UITestBase
 
             Directory.CreateDirectory(directory);
             string path = Path.Combine(directory, $"{TestContext.TestName}-{Guid.NewGuid():N}-editor.json");
-            File.WriteAllText(path, editor.Session.Inspect(depth: 30).GetRawText());
+            JsonNode? diagnostic = JsonNode.Parse(editor.Session.Inspect(depth: 30).GetRawText());
+            RedactSensitiveUiFields(diagnostic);
+            File.WriteAllText(path, diagnostic?.ToJsonString() ?? "{}");
             TestContext.AddResultFile(path);
         }
         catch (Exception error) when (error is AssertFailedException or IOException or UnauthorizedAccessException or TimeoutException or Win32Exception or InvalidOperationException or ArgumentException or JsonException)
@@ -175,11 +184,36 @@ public sealed class EnvironmentVariablesTests : UITestBase
         }
     }
 
+    private static void RedactSensitiveUiFields(JsonNode? node)
+    {
+        if (node is JsonObject obj)
+        {
+            foreach (KeyValuePair<string, JsonNode?> property in obj.ToArray())
+            {
+                if (property.Key is "name" or "value")
+                {
+                    obj[property.Key] = "[redacted]";
+                }
+                else
+                {
+                    RedactSensitiveUiFields(property.Value);
+                }
+            }
+        }
+        else if (node is JsonArray array)
+        {
+            foreach (JsonNode? child in array)
+            {
+                RedactSensitiveUiFields(child);
+            }
+        }
+    }
+
     [TestMethod]
     public void StandardUserCannotEditSystemVariables()
     {
         Assert.IsTrue(
-            WindowHelper.IsWindowMaximized(new IntPtr(editor.Session.WindowHandle)),
+            WindowHelper.IsWindowMaximized(new IntPtr(editorWindow.WindowHandle)),
             "The editor must be maximized, matching the Settings window's default state.");
         Assert.IsFalse(editor.Session.IsElevated, "Launch as administrator OFF must launch a non-elevated editor.");
         Assert.IsTrue(editor.Session.Find<Button>(By.AccessibilityId("AddDefaultVariableUserBtn")).IsEnabled);
@@ -357,8 +391,9 @@ public sealed class EnvironmentVariablesTests : UITestBase
         launchCard.Click(msPostAction: 0);
         var window = WindowsFinder.WaitForWindowByApp(TestState.ProcessName, candidate => candidate.Width > 400 && candidate.Height > 300, timeoutMS: 30_000);
         Assert.IsNotNull(window, "Environment Variables did not launch from Settings.");
+        editorWindow = window;
         WindowHelper.MaximizeWindow(new IntPtr(window.WindowHandle));
-        editor = new EditorUi(window, TestContext);
+        editor = new EditorUi(Session.FromProcess(window.ProcessId.ToString(), timeoutMS: 10_000), TestContext);
         Assert.IsTrue(window.WaitForElement(By.AccessibilityId("AddDefaultVariableUserBtn"), 15_000), "The editor did not become ready.");
     }
 
