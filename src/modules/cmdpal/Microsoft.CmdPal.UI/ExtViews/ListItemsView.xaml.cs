@@ -118,7 +118,9 @@ public sealed partial class ListItemsView : UserControl,
         SynchronizeGridItems();
         RegisterMessenger();
         _accessKeyMode.IsActiveChanged += AccessKeyMode_IsActiveChanged;
+        EnsureNumberedShortcutCueTracking();
         SetNumberedShortcutCuesVisibility(_accessKeyMode.IsActive);
+        QueueNumberedShortcutCueUpdate();
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -126,6 +128,8 @@ public sealed partial class ListItemsView : UserControl,
         _isLoaded = false;
         _accessKeyMode.IsActiveChanged -= AccessKeyMode_IsActiveChanged;
         SetNumberedShortcutCuesVisibility(false);
+        StopNumberedShortcutCueTracking();
+        ClearNumberedShortcutAccelerators();
 
         // Release before the native panel tears down. A reattached grid rebuilds
         // its groups from the source, which is what it does after any teardown.
@@ -902,7 +906,6 @@ public sealed partial class ListItemsView : UserControl,
         }
         else
         {
-            StopNumberedShortcutCueTracking();
             HideNumberedShortcutCues();
         }
     }
@@ -914,7 +917,7 @@ public sealed partial class ListItemsView : UserControl,
 
     private void QueueNumberedShortcutCueUpdate()
     {
-        if (!_areNumberedShortcutCuesVisible || _numberedShortcutCueUpdatePending)
+        if (!_isLoaded || _numberedShortcutCueUpdatePending)
         {
             return;
         }
@@ -925,10 +928,7 @@ public sealed partial class ListItemsView : UserControl,
                 () =>
                 {
                     _numberedShortcutCueUpdatePending = false;
-                    if (_areNumberedShortcutCuesVisible)
-                    {
-                        UpdateNumberedShortcutCues();
-                    }
+                    UpdateNumberedShortcutCues();
                 }))
         {
             _numberedShortcutCueUpdatePending = false;
@@ -969,7 +969,7 @@ public sealed partial class ListItemsView : UserControl,
 
     private void EnsureNumberedShortcutCueTracking()
     {
-        var itemView = _areNumberedShortcutCuesVisible && ShowNumberedShortcutCues && ViewModel is not null
+        var itemView = _isLoaded && ShowNumberedShortcutCues && ViewModel is not null
             ? ItemView
             : null;
         if (ReferenceEquals(_numberedShortcutCueTrackedView, itemView))
@@ -1044,7 +1044,7 @@ public sealed partial class ListItemsView : UserControl,
 
     private void UpdateNumberedShortcutCues()
     {
-        if (!_areNumberedShortcutCuesVisible || !ShowNumberedShortcutCues || ViewModel is null)
+        if (!ShowNumberedShortcutCues || ViewModel is null)
         {
             HideNumberedShortcutCues();
             return;
@@ -1054,12 +1054,6 @@ public sealed partial class ListItemsView : UserControl,
         EnsureNumberedShortcutCueTracking();
 
         var itemView = ItemView;
-        if (!TryUpdateNumberedShortcutCueClip(itemView))
-        {
-            HideNumberedShortcutCues();
-            return;
-        }
-
         ClearNumberedShortcutAccelerators();
         var cueIndex = 0;
         foreach (var item in ViewModel.FilteredItems)
@@ -1070,11 +1064,19 @@ public sealed partial class ListItemsView : UserControl,
             }
 
             var cue = _numberedShortcutCues![cueIndex];
-            if (itemView.ContainerFromItem(item) is SelectorItem container &&
-                container.ContentTemplateRoot is FrameworkElement anchor)
+            if (itemView.ContainerFromItem(item) is SelectorItem container)
             {
                 SetNumberedShortcutAccelerator(container, cueIndex);
-                PositionNumberedShortcutCue(cue, anchor, itemView);
+                if (_areNumberedShortcutCuesVisible &&
+                    container.ContentTemplateRoot is FrameworkElement anchor &&
+                    TryUpdateNumberedShortcutCueClip(itemView))
+                {
+                    PositionNumberedShortcutCue(cue, anchor, itemView);
+                }
+                else
+                {
+                    cue.Visibility = Visibility.Collapsed;
+                }
             }
             else
             {
@@ -1178,7 +1180,6 @@ public sealed partial class ListItemsView : UserControl,
             return;
         }
 
-        ClearNumberedShortcutAccelerators();
         foreach (var cue in _numberedShortcutCues)
         {
             cue.Visibility = Visibility.Collapsed;
