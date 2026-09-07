@@ -247,8 +247,8 @@ public sealed partial class DetailsLifecycleTests
         try
         {
             Assert.IsTrue(entered.Wait(TimeSpan.FromSeconds(5)));
-            item.OnTitleRead = () => Block(notificationEntered, releaseNotification);
             item.Title = "updated title";
+            item.OnTitleRead = () => Block(notificationEntered, releaseNotification);
             releaseInitialization.Set();
 
             Assert.IsTrue(notificationEntered.Wait(TimeSpan.FromSeconds(5)));
