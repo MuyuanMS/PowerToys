@@ -203,6 +203,7 @@ static std::unordered_map<HWND, bool> g_excludedCache;
 // on the main thread (where all other accesses occur), avoiding a data race.
 static constexpr UINT WM_INVALIDATE_EXCLUDED_CACHE = WM_APP + 1;
 static constexpr UINT WM_APPLY_SNAP = WM_APP + 2;
+static constexpr UINT_PTR SNAP_FOCUS_TIMER_ID = 1;
 
 struct SnapRequest
 {
@@ -212,6 +213,9 @@ struct SnapRequest
     RECT normalPosition;
     HWND previousForeground;
 };
+
+static HWND g_snapFocusWindow = nullptr;
+static HWND g_snapFocusTarget = nullptr;
 
 static const wchar_t* const CLASS_NAME = L"GrabAndMove_MsgWnd";
 static const wchar_t* const OVERLAY_CLASS_NAME = L"GrabAndMove_Overlay";
@@ -1540,12 +1544,17 @@ static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
 
                 if (g_hMsgWnd)
                 {
+                    RECT releasePosition = g_dragWndRect;
+                    OffsetRect(
+                        &releasePosition,
+                        ms->pt.x - g_dragStart.x,
+                        ms->pt.y - g_dragStart.y);
                     auto request = std::make_unique<SnapRequest>(
                         SnapRequest{
                             g_dragTarget,
                             target,
                             targetRect,
-                            g_dragWndRect,
+                            releasePosition,
                             GetForegroundWindow()});
                     if (!PostMessageW(g_hMsgWnd, WM_APPLY_SNAP, 0, reinterpret_cast<LPARAM>(request.get())))
                     {
@@ -1999,7 +2008,9 @@ static void ApplySnapRequest(const SnapRequest& request)
 
         if (request.previousForeground && request.previousForeground != request.target)
         {
-            SetForegroundWindow(request.previousForeground);
+            g_snapFocusWindow = request.previousForeground;
+            g_snapFocusTarget = request.target;
+            SetTimer(g_hMsgWnd, SNAP_FOCUS_TIMER_ID, 100, nullptr);
         }
         return;
     }
@@ -2037,6 +2048,30 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         }
         return 0;
     }
+
+    case WM_TIMER:
+        if (wParam == SNAP_FOCUS_TIMER_ID)
+        {
+            if (!IsWindow(g_snapFocusTarget) || !IsWindow(g_snapFocusWindow))
+            {
+                KillTimer(hwnd, SNAP_FOCUS_TIMER_ID);
+                g_snapFocusTarget = nullptr;
+                g_snapFocusWindow = nullptr;
+            }
+            else if (IsZoomed(g_snapFocusTarget))
+            {
+                KillTimer(hwnd, SNAP_FOCUS_TIMER_ID);
+                SetForegroundWindow(g_snapFocusWindow);
+                g_snapFocusTarget = nullptr;
+                g_snapFocusWindow = nullptr;
+            }
+            else
+            {
+                SetTimer(hwnd, SNAP_FOCUS_TIMER_ID, 100, nullptr);
+            }
+            return 0;
+        }
+        break;
 
     case WM_TRAY_ICON:
         if (LOWORD(lParam) == WM_RBUTTONUP)
