@@ -17,6 +17,7 @@ public partial class PageViewModel : ExtensionObjectViewModel, IPageContext
     private static readonly PropertyChangingEventArgs SearchTextBoxChangingEventArgs = new(nameof(SearchTextBox));
     private static readonly PropertyChangedEventArgs SearchTextBoxChangedEventArgs = new(nameof(SearchTextBox));
     private static readonly PropertyChangedEventArgs ShowSuggestionChangedEventArgs = new(nameof(ShowSuggestion));
+    private volatile bool _canPublishContextUpdates = true;
 
     public TaskScheduler Scheduler { get; private set; }
 
@@ -51,7 +52,11 @@ public partial class PageViewModel : ExtensionObjectViewModel, IPageContext
     [ObservableProperty]
     public partial bool HasBackButton { get; set; } = true;
 
-    public bool CanPublishContextUpdates { get; set; } = true;
+    public bool CanPublishContextUpdates
+    {
+        get => _canPublishContextUpdates;
+        set => _canPublishContextUpdates = value;
+    }
 
     private string _searchTextBox = string.Empty;
 
