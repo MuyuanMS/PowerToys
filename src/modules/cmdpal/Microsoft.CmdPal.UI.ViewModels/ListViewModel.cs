@@ -939,6 +939,30 @@ public partial class ListViewModel : PageViewModel, IDisposable
         TextToSuggest = string.Empty;
     }
 
+    public void RefreshCurrentCommandContext()
+    {
+        var item = _lastSelectedItem;
+        if (item is null)
+        {
+            WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(null));
+            WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+            WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(string.Empty));
+            return;
+        }
+
+        WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(item));
+        if (ShowDetails && item.HasDetails)
+        {
+            WeakReferenceMessenger.Default.Send<ShowDetailsMessage>(new(item.Details));
+        }
+        else
+        {
+            WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+        }
+
+        WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(TextToSuggest));
+    }
+
     public override void InitializeProperties()
     {
         base.InitializeProperties();

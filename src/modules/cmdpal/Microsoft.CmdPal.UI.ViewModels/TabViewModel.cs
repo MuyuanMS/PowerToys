@@ -22,8 +22,9 @@ public partial class TabViewModel : ExtensionObjectViewModel
 
     /// <summary>
     /// Gets the stable identity for this tab, used to preserve the active tab
-    /// across dynamic tab-set updates. This is the hosted page's <c>Id</c> when
-    /// available; otherwise it uses the fallback identity assigned by the host.
+    /// across dynamic tab-set updates. This is the tab's own <c>Id</c> when
+    /// available, then the hosted page's <c>Id</c>, and finally the fallback
+    /// identity assigned by the host.
     /// </summary>
     public string TabId { get; private set; } = string.Empty;
 
@@ -59,8 +60,40 @@ public partial class TabViewModel : ExtensionObjectViewModel
             return;
         }
 
+        UpdatePageAndIdentity(tab);
+
+        Title = GetTitle(tab);
+        Badge = tab.Badge ?? string.Empty;
+
+        Icon = new(tab.Icon);
+        Icon.InitializeProperties();
+
+        UpdateProperty(nameof(TabId));
+        UpdateProperty(nameof(Page));
+        UpdateProperty(nameof(Title));
+        UpdateProperty(nameof(Badge));
+        UpdateProperty(nameof(HasBadge));
+        UpdateProperty(nameof(Icon));
+        UpdateProperty(nameof(HasIcon));
+
+        tab.PropChanged += Model_PropChanged;
+    }
+
+    private void UpdatePageAndIdentity(ITab tab)
+    {
         Page = tab.Page;
 
+        var tabId = tab.Id;
+        if (string.IsNullOrEmpty(tabId))
+        {
+            tabId = Page?.Id;
+        }
+
+        TabId = string.IsNullOrEmpty(tabId) ? _fallbackTabId : tabId;
+    }
+
+    private string GetTitle(ITab tab)
+    {
         var title = tab.Title;
         if (string.IsNullOrEmpty(title))
         {
@@ -73,22 +106,7 @@ public partial class TabViewModel : ExtensionObjectViewModel
             }
         }
 
-        Title = title ?? string.Empty;
-        Badge = tab.Badge ?? string.Empty;
-
-        var pageId = Page?.Id;
-        TabId = string.IsNullOrEmpty(pageId) ? _fallbackTabId : pageId;
-
-        Icon = new(tab.Icon);
-        Icon.InitializeProperties();
-
-        UpdateProperty(nameof(Title));
-        UpdateProperty(nameof(Badge));
-        UpdateProperty(nameof(HasBadge));
-        UpdateProperty(nameof(Icon));
-        UpdateProperty(nameof(HasIcon));
-
-        tab.PropChanged += Model_PropChanged;
+        return title ?? string.Empty;
     }
 
     private void Model_PropChanged(object sender, IPropChangedEventArgs args)
@@ -109,7 +127,15 @@ public partial class TabViewModel : ExtensionObjectViewModel
                     UpdateProperty(nameof(HasBadge));
                     break;
                 case nameof(Title):
-                    Title = string.IsNullOrEmpty(tab.Title) ? Title : tab.Title;
+                    Title = GetTitle(tab);
+                    UpdateProperty(nameof(Title));
+                    break;
+                case nameof(Page):
+                case nameof(ITab.Id):
+                    UpdatePageAndIdentity(tab);
+                    Title = GetTitle(tab);
+                    UpdateProperty(nameof(Page));
+                    UpdateProperty(nameof(TabId));
                     UpdateProperty(nameof(Title));
                     break;
                 case nameof(Icon):

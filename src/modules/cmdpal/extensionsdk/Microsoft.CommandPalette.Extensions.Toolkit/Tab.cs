@@ -6,12 +6,15 @@ namespace Microsoft.CommandPalette.Extensions.Toolkit;
 
 /// <summary>
 /// A single tab within a <see cref="TabbedPage"/>. Wraps an <see cref="IPage"/>
-/// (an <c>IListPage</c>, <c>IDynamicListPage</c> or <c>IContentPage</c> in v1)
-/// and carries its own tab chrome (title, icon, badge) so the tab strip can be
-/// rendered before the hosted page is initialized.
+/// (an <c>IListPage</c>, <c>IDynamicListPage</c>, <c>IParametersPage</c> or
+/// <c>IContentPage</c> in v1) and carries its own tab chrome (title, icon,
+/// badge) so the tab strip can be rendered before the hosted page is
+/// initialized.
 /// </summary>
 public partial class Tab : BaseObservable, ITab
 {
+    public virtual string Id { get; set => SetProperty(ref field, value); } = string.Empty;
+
     public virtual string Title { get; set => SetProperty(ref field, value); } = string.Empty;
 
     public virtual IIconInfo? Icon { get; set => SetProperty(ref field, value); }

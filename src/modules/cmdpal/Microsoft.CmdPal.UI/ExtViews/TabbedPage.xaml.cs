@@ -4,9 +4,8 @@
 
 using System.ComponentModel;
 using System.Threading;
-using CommunityToolkit.Mvvm.Messaging;
+using Microsoft.CmdPal.UI.Helpers;
 using Microsoft.CmdPal.UI.ViewModels;
-using Microsoft.CmdPal.UI.ViewModels.Messages;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -75,7 +74,7 @@ public sealed partial class TabbedPage : Page
         ViewModel = null;
         _currentChild = null;
 
-        GC.Collect();
+        ExtensionObjectReleaser.AfterNavigation();
     }
 
     private static void OnViewModelChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -148,11 +147,11 @@ public sealed partial class TabbedPage : Page
         _currentChild = child;
         TabFrame.Visibility = Visibility.Visible;
 
-        // Clear the command bar before swapping; the newly loaded tab page
-        // re-populates it as if it had been opened on its own.
-        WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(null));
-
-        TabFrame.Navigate(viewType, new AsyncNavigationRequest(child, CancellationToken.None), _noAnimation);
+        if (TabFrame.Navigate(viewType, new AsyncNavigationRequest(child, CancellationToken.None), _noAnimation))
+        {
+            TabFrame.BackStack.Clear();
+            vm.RefreshActiveChildContext();
+        }
     }
 
     private void NextTab_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)

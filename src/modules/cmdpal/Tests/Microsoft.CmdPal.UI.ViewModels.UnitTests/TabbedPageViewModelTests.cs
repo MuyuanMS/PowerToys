@@ -72,6 +72,18 @@ public partial class TabbedPageViewModelTests
         public override IContent[] GetContent() => [];
     }
 
+    private sealed partial class TestTabbedPageAsChild : Microsoft.CommandPalette.Extensions.Toolkit.TabbedPage
+    {
+        public TestTabbedPageAsChild(string id)
+        {
+            Id = id;
+            Name = id;
+            Title = id;
+        }
+
+        public override ITab[] GetTabs() => [];
+    }
+
     private static CommandPalettePageViewModelFactory CreateFactory() =>
         new(TaskScheduler.Default, DefaultContextMenuFactory.Instance);
 
@@ -314,6 +326,97 @@ public partial class TabbedPageViewModelTests
 
         viewModel.SelectedTab = viewModel.Tabs[0];
         await WaitFor(() => viewModel.ActiveChild?.Title == "First", "First tab child was not activated");
+
+        viewModel.SafeCleanup();
+    }
+
+    [TestMethod]
+    public async Task ItemsChanged_RecreatesCachedChildWhenPageInstanceChanges()
+    {
+        var page = new TestTabbedPage(
+        [
+            new Tab("Docs", new TestContentPage("docs")) { Id = "docs-tab" },
+        ]);
+
+        var viewModel = CreateViewModel(page);
+        viewModel.InitializeProperties();
+
+        await WaitFor(() => viewModel.ActiveChild is not null, "Initial child was not created");
+        var firstChild = viewModel.ActiveChild;
+
+        page.SetTabs(
+        [
+            new Tab("Docs", new TestContentPage("docs-updated")) { Id = "docs-tab" },
+        ]);
+
+        await WaitFor(() => viewModel.ActiveChild is not null && !ReferenceEquals(viewModel.ActiveChild, firstChild), "Cached child was not recreated");
+        Assert.AreEqual("docs-updated", viewModel.ActiveChild!.Id);
+
+        viewModel.SafeCleanup();
+    }
+
+    [TestMethod]
+    public async Task TabPagePropertyChange_RecreatesActiveChild()
+    {
+        var tab = new Tab("Docs", new TestContentPage("docs")) { Id = "docs-tab" };
+        var page = new TestTabbedPage([tab]);
+
+        var viewModel = CreateViewModel(page);
+        viewModel.InitializeProperties();
+
+        await WaitFor(() => viewModel.ActiveChild is not null, "Initial child was not created");
+        var firstChild = viewModel.ActiveChild;
+
+        tab.Page = new TestContentPage("docs-updated");
+        viewModel.Tabs[0].ApplyPendingUpdates();
+
+        await WaitFor(() => viewModel.ActiveChild is not null && !ReferenceEquals(viewModel.ActiveChild, firstChild), "Active child was not recreated after Page changed");
+        Assert.AreEqual("docs-updated", viewModel.ActiveChild!.Id);
+
+        viewModel.SafeCleanup();
+    }
+
+    [TestMethod]
+    public async Task ActivateCachedTab_DoesNotOverwriteChildSearchText()
+    {
+        var page = new TestTabbedPage(
+        [
+            new Tab("Issues", new TestListPage("issues")),
+            new Tab("Docs", new TestContentPage("docs")),
+        ]);
+
+        var viewModel = CreateViewModel(page);
+        viewModel.InitializeProperties();
+
+        await WaitFor(() => viewModel.ActiveChild is ListViewModel, "List child was not created");
+        var listChild = (ListViewModel)viewModel.ActiveChild!;
+        listChild.SearchTextBox = "preserved query";
+
+        viewModel.SelectedTab = viewModel.Tabs[1];
+        await WaitFor(() => viewModel.ActiveChild is ContentPageViewModel, "Content child was not activated");
+
+        viewModel.SelectedTab = viewModel.Tabs[0];
+        await WaitFor(() => ReferenceEquals(viewModel.ActiveChild, listChild), "List child was not reactivated");
+
+        Assert.AreEqual("preserved query", listChild.SearchTextBox);
+
+        viewModel.SafeCleanup();
+    }
+
+    [TestMethod]
+    public async Task NestedTabbedPage_ShowsUnsupportedPlaceholder()
+    {
+        var page = new TestTabbedPage(
+        [
+            new Tab("Nested", new TestTabbedPageAsChild("nested")),
+        ]);
+
+        var viewModel = CreateViewModel(page);
+        viewModel.InitializeProperties();
+
+        await WaitFor(() => viewModel.SelectedTab is not null, "Tab was not selected");
+        await WaitFor(() => viewModel.ShowUnsupportedPlaceholder, "Placeholder was not shown for nested tabbed page");
+        Assert.IsNull(viewModel.ActiveChild);
 
         viewModel.SafeCleanup();
     }

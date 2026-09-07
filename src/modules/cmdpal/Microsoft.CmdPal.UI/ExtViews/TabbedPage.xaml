@@ -84,6 +84,10 @@
             ItemsSource="{x:Bind ViewModel.Tabs, Mode=OneWay}"
             SelectedItem="{x:Bind ViewModel.SelectedTab, Mode=TwoWay}"
             SelectionMode="Single"
+            ScrollViewer.HorizontalScrollBarVisibility="Auto"
+            ScrollViewer.HorizontalScrollMode="Enabled"
+            ScrollViewer.VerticalScrollBarVisibility="Disabled"
+            ScrollViewer.VerticalScrollMode="Disabled"
             Visibility="{x:Bind ViewModel.HasTabs, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
             <ListView.ItemsPanel>
                 <ItemsPanelTemplate>
