@@ -93,6 +93,7 @@ namespace CopyAsUNCLibUnitTests
         TEST_METHOD(IsCopyablePathAcceptsUNCAndMappedDrivePaths)
         {
             Assert::IsTrue(copy_as_unc::IsCopyablePath(L"\\\\server\\share\\file.txt", RemoteDriveType));
+            Assert::IsTrue(copy_as_unc::IsCopyablePath(L"\\\\?\\UNC\\server\\share\\file.txt", RemoteDriveType));
             Assert::IsTrue(copy_as_unc::IsCopyablePath(L"Z:\\folder\\file.txt", RemoteDriveType));
         }
 
@@ -101,6 +102,8 @@ namespace CopyAsUNCLibUnitTests
             Assert::IsFalse(copy_as_unc::IsCopyablePath(L"C:\\folder\\file.txt", RemoteDriveType));
             Assert::IsFalse(copy_as_unc::IsCopyablePath(L"relative.txt", RemoteDriveType));
             Assert::IsFalse(copy_as_unc::IsCopyablePath(L"", RemoteDriveType));
+            Assert::IsFalse(copy_as_unc::IsCopyablePath(L"\\\\?\\C:\\folder\\file.txt", RemoteDriveType));
+            Assert::IsFalse(copy_as_unc::IsCopyablePath(L"\\\\.\\C:\\folder\\file.txt", RemoteDriveType));
         }
 
         TEST_METHOD(ResolveToUNCPathPreservesExistingUNCPath)
@@ -113,6 +116,33 @@ namespace CopyAsUNCLibUnitTests
                     result,
                     FakeUniversalNameResolver));
             Assert::AreEqual(L"\\\\server\\share\\folder\\file.txt", result.c_str());
+            Assert::AreEqual(0, resolverCallCount);
+        }
+
+        TEST_METHOD(ResolveToUNCPathPreservesExtendedUNCPath)
+        {
+            std::wstring result;
+            Assert::AreEqual(
+                S_OK,
+                copy_as_unc::ResolveToUNCPath(
+                    L"\\\\?\\UNC\\server\\share\\folder\\file.txt",
+                    result,
+                    FakeUniversalNameResolver));
+            Assert::AreEqual(L"\\\\?\\UNC\\server\\share\\folder\\file.txt", result.c_str());
+            Assert::AreEqual(0, resolverCallCount);
+        }
+
+        TEST_METHOD(ResolveToUNCPathRejectsLocalDevicePaths)
+        {
+            for (const std::wstring_view path : { L"\\\\?\\C:\\folder\\file.txt", L"\\\\.\\C:\\folder\\file.txt" })
+            {
+                std::wstring result;
+                Assert::AreEqual(
+                    HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+                    copy_as_unc::ResolveToUNCPath(path, result, FakeUniversalNameResolver));
+                Assert::IsTrue(result.empty());
+            }
+
             Assert::AreEqual(0, resolverCallCount);
         }
 

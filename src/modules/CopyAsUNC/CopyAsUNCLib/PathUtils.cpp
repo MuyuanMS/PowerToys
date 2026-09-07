@@ -1,12 +1,49 @@
 #include "pch.h"
 #include "PathUtils.h"
 
+#include <cwctype>
 #include <cstring>
 #include <vector>
 
 namespace
 {
     constexpr DWORD MaxUniversalNameBufferSize = sizeof(UNIVERSAL_NAME_INFOW) + (32768 * sizeof(wchar_t));
+
+    bool IsExtendedUNCPath(std::wstring_view path) noexcept
+    {
+        return path.size() >= 8 &&
+               path[0] == L'\\' &&
+               path[1] == L'\\' &&
+               path[2] == L'?' &&
+               path[3] == L'\\' &&
+               towupper(path[4]) == L'U' &&
+               towupper(path[5]) == L'N' &&
+               towupper(path[6]) == L'C' &&
+               path[7] == L'\\';
+    }
+
+    bool IsUNCPath(std::wstring_view path) noexcept
+    {
+        if (IsExtendedUNCPath(path))
+        {
+            return true;
+        }
+
+        return path.size() >= 3 &&
+               path[0] == L'\\' &&
+               path[1] == L'\\' &&
+               path[2] != L'?' &&
+               path[2] != L'.';
+    }
+
+    constexpr bool IsDevicePath(std::wstring_view path) noexcept
+    {
+        return path.size() >= 4 &&
+               path[0] == L'\\' &&
+               path[1] == L'\\' &&
+               (path[2] == L'?' || path[2] == L'.') &&
+               path[3] == L'\\';
+    }
 
     HRESULT LastErrorToHRESULT(DWORD fallback)
     {
@@ -19,7 +56,7 @@ namespace copy_as_unc
 {
     bool IsCopyablePath(std::wstring_view path, DriveTypeResolver getDriveType) noexcept
     {
-        if (path.starts_with(L"\\\\"))
+        if (IsUNCPath(path))
         {
             return true;
         }
@@ -42,10 +79,15 @@ namespace copy_as_unc
             return E_INVALIDARG;
         }
 
-        if (path.starts_with(L"\\\\"))
+        if (IsUNCPath(path))
         {
             uncPath.assign(path);
             return S_OK;
+        }
+
+        if (IsDevicePath(path))
+        {
+            return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
         }
 
         const std::wstring nullTerminatedPath{ path };
