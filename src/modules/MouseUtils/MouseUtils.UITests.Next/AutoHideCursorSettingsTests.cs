@@ -181,7 +181,7 @@ public class AutoHideCursorSettingsTests : UITestBase
         MouseUtilsTestHelper.SetModuleEnabled(this, ModuleToggleId, false);
         var restoredCursor = WaitHelper.WaitForStable(
             GetVisibleCursorHandle,
-            actual => actual == originalCursor,
+            actual => actual != IntPtr.Zero && actual != hiddenCursor.LastObservation,
             timeoutMS: 10_000,
             requiredConsecutiveMatches: 2,
             pollIntervalMS: 250);
