@@ -321,8 +321,14 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
     {
         lock (loadSync)
         {
-            if (disposed.Value || loadInFlight.Value)
+            if (disposed.Value)
             {
+                return;
+            }
+
+            if (loadInFlight.Value)
+            {
+                reloadRequested.Value = true;
                 return;
             }
 
