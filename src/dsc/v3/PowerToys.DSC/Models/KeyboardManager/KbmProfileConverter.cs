@@ -453,6 +453,12 @@ public static class KbmProfileConverter
             return false;
         }
 
+        if (result.Keys.Count > 1 && result.Keys.Contains(KbmKeyNames.VkDisabled))
+        {
+            error = $"'{input.Trim()}' cannot use 'Disable' with modifiers";
+            return false;
+        }
+
         if (GetIllegalShortcutName(result) is { } illegal)
         {
             error = $"'{illegal}' is reserved by Windows and cannot be used as a remap target";

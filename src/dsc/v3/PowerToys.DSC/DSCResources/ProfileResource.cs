@@ -38,7 +38,21 @@ public sealed class ProfileResource : BaseResource
     public override bool ExportState(string? input)
     {
         var data = new ProfileFunctionData();
-        data.GetState();
+        try
+        {
+            data.GetState();
+        }
+        catch (JsonException ex)
+        {
+            WriteMessageOutputLine(DscMessageLevel.Error, ex.Message);
+            return false;
+        }
+        catch (IOException ex)
+        {
+            WriteMessageOutputLine(DscMessageLevel.Error, ex.Message);
+            return false;
+        }
+
         WriteWarnings(data);
         WriteJsonOutputLine(data.Output.ToJson());
         return true;
@@ -59,7 +73,21 @@ public sealed class ProfileResource : BaseResource
             return false;
         }
 
-        data.GetState();
+        try
+        {
+            data.GetState();
+        }
+        catch (JsonException ex)
+        {
+            WriteMessageOutputLine(DscMessageLevel.Error, ex.Message);
+            return false;
+        }
+        catch (IOException ex)
+        {
+            WriteMessageOutputLine(DscMessageLevel.Error, ex.Message);
+            return false;
+        }
+
         WriteWarnings(data);
 
         // Capture the diff before updating the output
@@ -68,9 +96,22 @@ public sealed class ProfileResource : BaseResource
         // Only call Set if the desired state is different from the current state
         if (!data.TestState())
         {
-            if (!data.SetState())
+            try
             {
-                WriteMessageOutputLine(DscMessageLevel.Info, Resources.FailedToSignalSettingsEvent);
+                if (!data.SetState())
+                {
+                    WriteMessageOutputLine(DscMessageLevel.Info, Resources.FailedToSignalSettingsEvent);
+                }
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                WriteMessageOutputLine(DscMessageLevel.Error, ex.Message);
+                return false;
+            }
+            catch (IOException ex)
+            {
+                WriteMessageOutputLine(DscMessageLevel.Error, ex.Message);
+                return false;
             }
 
             // Report the canonical form of the applied profile as the new state
@@ -91,7 +132,21 @@ public sealed class ProfileResource : BaseResource
             return false;
         }
 
-        data.GetState();
+        try
+        {
+            data.GetState();
+        }
+        catch (JsonException ex)
+        {
+            WriteMessageOutputLine(DscMessageLevel.Error, ex.Message);
+            return false;
+        }
+        catch (IOException ex)
+        {
+            WriteMessageOutputLine(DscMessageLevel.Error, ex.Message);
+            return false;
+        }
+
         WriteWarnings(data);
         data.Output.InDesiredState = data.TestState();
 

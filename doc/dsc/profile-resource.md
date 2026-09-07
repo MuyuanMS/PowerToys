@@ -44,6 +44,9 @@ When the profile is applied while PowerToys is running, the Keyboard Manager
 engine reloads it immediately; otherwise the profile takes effect the next
 time PowerToys starts. Note that the remappings are only active when the
 Keyboard Manager utility is enabled (see the [KeyboardManager module][02]).
+Profile writes must be run from a non-elevated process. Elevated `dsc` or
+`winget configure` invocations fail with an error rather than changing the
+profile.
 
 ## Profile schema
 
