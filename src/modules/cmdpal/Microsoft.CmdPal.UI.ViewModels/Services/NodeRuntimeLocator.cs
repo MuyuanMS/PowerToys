@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 
 namespace Microsoft.CmdPal.UI.ViewModels.Services;
 
@@ -89,11 +90,36 @@ internal static class NodeRuntimeLocator
                 return false;
             }
 
-            var output = process.StandardOutput.ReadToEnd().Trim();
+            var standardOutput = new StringBuilder();
+            var standardError = new StringBuilder();
+            process.OutputDataReceived += (_, args) =>
+            {
+                if (args.Data is not null)
+                {
+                    standardOutput.AppendLine(args.Data);
+                }
+            };
+            process.ErrorDataReceived += (_, args) =>
+            {
+                if (args.Data is not null)
+                {
+                    standardError.AppendLine(args.Data);
+                }
+            };
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            if (!process.WaitForExit(5000))
+            {
+                process.Kill(entireProcessTree: true);
+                reason = "Node.js version probe timed out.";
+                return false;
+            }
             process.WaitForExit();
+
+            var output = standardOutput.ToString().Trim();
             if (!Version.TryParse(output.TrimStart('v'), out var actual))
             {
-                reason = $"Node.js returned an invalid version '{output}'.";
+                reason = $"Node.js returned an invalid version '{output}'. {standardError}".Trim();
                 return false;
             }
 
@@ -121,6 +147,13 @@ internal static class NodeRuntimeLocator
 
     private static bool TryMatchClause(Version actual, string clause)
     {
+        var hyphen = clause.IndexOf(" - ", StringComparison.Ordinal);
+        if (hyphen >= 0)
+        {
+            return TryMatchToken(actual, $">={clause[..hyphen].Trim()}")
+                && TryMatchToken(actual, $"<={clause[(hyphen + 3)..].Trim()}");
+        }
+
         var tokens = clause.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         if (tokens.Length == 0)
         {
@@ -138,6 +171,20 @@ internal static class NodeRuntimeLocator
                 ? token[..1]
                 : string.Empty;
         var versionText = token.TrimStart('>', '<', '=', '^', '~');
+        var wildcard = versionText.IndexOfAny(['x', 'X', '*']);
+        if (wildcard >= 0)
+        {
+            var wildcardParts = versionText[..wildcard].TrimEnd('.');
+            if (!int.TryParse(wildcardParts.Split('.')[0], out var wildcardMajor))
+            {
+                return false;
+            }
+
+            var lower = new Version(wildcardMajor, 0);
+            var upper = new Version(wildcardMajor + 1, 0);
+            return actual.CompareTo(lower) >= 0 && actual.CompareTo(upper) < 0;
+        }
+
         var parts = versionText.Split('.');
         if (parts.Length > 3 || !int.TryParse(parts[0], out var major))
         {
@@ -150,7 +197,21 @@ internal static class NodeRuntimeLocator
             return false;
         }
         var requested = new Version(major, hasMinor ? minor : 0, hasPatch ? patch : 0);
-        if (op is "" && parts.Length < 3)
+        if (parts.Length < 3 && op is "<=")
+        {
+            var upper = parts.Length == 1
+                ? new Version(major + 1, 0)
+                : new Version(major, minor + 1);
+            return actual.CompareTo(upper) < 0;
+        }
+        if (parts.Length < 3 && op is ">")
+        {
+            var lower = parts.Length == 1
+                ? new Version(major + 1, 0)
+                : new Version(major, minor + 1);
+            return actual.CompareTo(lower) >= 0;
+        }
+        if (parts.Length < 3 && op is "" )
         {
             var upper = parts.Length == 1
                 ? new Version(major + 1, 0)
