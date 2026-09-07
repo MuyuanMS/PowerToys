@@ -52,7 +52,7 @@ public sealed class TextExtractorService : ITextExtractorService
         {
             OcrCaptureMode.Region => OcrTextFormatter.FormatDocument(document, request.Language.LanguageTag),
             OcrCaptureMode.SingleLine => OcrTextFormatter.FormatSingleLine(document, request.Language.LanguageTag),
-            OcrCaptureMode.Table => TableTextFormatter.Format(document.Lines, request.Language.LanguageTag),
+            OcrCaptureMode.Table => TableTextFormatter.Format(document.Words.ToArray(), request.Language.LanguageTag),
             OcrCaptureMode.Word => GetClickedWord(document, TransformPoint(request.ClickPoint, prepared)),
             _ => throw new ArgumentOutOfRangeException(nameof(request.Mode), "Unknown OcrCaptureMode value."),
         };

@@ -14,6 +14,13 @@ public static class TableTextFormatter
     private const double OcrBoundsTolerance = 6;
     private const double MinimumBoundsSizeForTolerance = 10;
 
+    public static string Format(IReadOnlyList<OcrWordData> cells, string languageTag)
+        => Format(
+            cells
+                .Select(word => new OcrLineData(word.Text, word.Bounds, [word]))
+                .ToArray(),
+            languageTag);
+
     public static string Format(IReadOnlyList<OcrLineData> cells, string languageTag)
     {
         if (cells.Count == 0)

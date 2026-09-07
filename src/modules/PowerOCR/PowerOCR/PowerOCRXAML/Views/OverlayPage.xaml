@@ -11,7 +11,10 @@
     mc:Ignorable="d">
 
     <UserControl.Resources>
-        <Style x:Key="SubtleButtonStyle" TargetType="Button">
+        <Style
+            x:Key="SubtleButtonStyle"
+            BasedOn="{StaticResource DefaultButtonStyle}"
+            TargetType="Button">
             <Setter Property="Background" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
             <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
             <Setter Property="BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
@@ -19,7 +22,10 @@
             <Setter Property="Padding" Value="8,4" />
             <Setter Property="CornerRadius" Value="4" />
         </Style>
-        <Style x:Key="SubtleToggleButtonStyle" TargetType="ToggleButton">
+        <Style
+            x:Key="SubtleToggleButtonStyle"
+            BasedOn="{StaticResource DefaultToggleButtonStyle}"
+            TargetType="ToggleButton">
             <Setter Property="Background" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
             <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
             <Setter Property="BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />

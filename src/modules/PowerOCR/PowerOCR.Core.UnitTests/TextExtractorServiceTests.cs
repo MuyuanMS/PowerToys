@@ -140,6 +140,26 @@ public sealed class TextExtractorServiceTests
     }
 
     [TestMethod]
+    public async Task ExtractAsync_TableMode_UsesWordBoundsWithinSingleOcrLine()
+    {
+        var document = new OcrDocument(
+        [
+            new OcrLineData(
+                "A1 B1",
+                new OcrRect(0, 0, 140, 20),
+                [new("A1", new(0, 0, 40, 20)), new("B1", new(100, 0, 40, 20))]),
+        ]);
+        var recognizer = new FakeRecognizer { Document = document };
+        var service = new TextExtractorService(new BitmapPreprocessor(), recognizer);
+        using var bitmap = new Bitmap(200, 100, PixelFormat.Format32bppArgb);
+        var request = new OcrExtractionRequest(bitmap, EnglishLanguage, OcrCaptureMode.Table);
+
+        string result = await service.ExtractAsync(request, CancellationToken.None);
+
+        Assert.AreEqual("A1\tB1", result);
+    }
+
+    [TestMethod]
     public async Task ExtractAsync_WordMode_ReturnsClickedWord()
     {
         var recognizer = new FakeRecognizer { Document = MakeDocument() };
