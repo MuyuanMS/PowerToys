@@ -216,6 +216,7 @@ struct SnapRequest
 
 static HWND g_snapFocusWindow = nullptr;
 static HWND g_snapFocusTarget = nullptr;
+static unsigned int g_snapFocusRetries = 0;
 
 static const wchar_t* const CLASS_NAME = L"GrabAndMove_MsgWnd";
 static const wchar_t* const OVERLAY_CLASS_NAME = L"GrabAndMove_Overlay";
@@ -2010,6 +2011,7 @@ static void ApplySnapRequest(const SnapRequest& request)
         {
             g_snapFocusWindow = request.previousForeground;
             g_snapFocusTarget = request.target;
+            g_snapFocusRetries = 0;
             SetTimer(g_hMsgWnd, SNAP_FOCUS_TIMER_ID, 100, nullptr);
         }
         return;
@@ -2052,18 +2054,23 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
     case WM_TIMER:
         if (wParam == SNAP_FOCUS_TIMER_ID)
         {
-            if (!IsWindow(g_snapFocusTarget) || !IsWindow(g_snapFocusWindow))
+            if (++g_snapFocusRetries > 20 || !IsWindow(g_snapFocusTarget) || !IsWindow(g_snapFocusWindow))
             {
                 KillTimer(hwnd, SNAP_FOCUS_TIMER_ID);
                 g_snapFocusTarget = nullptr;
                 g_snapFocusWindow = nullptr;
+                g_snapFocusRetries = 0;
             }
             else if (IsZoomed(g_snapFocusTarget))
             {
                 KillTimer(hwnd, SNAP_FOCUS_TIMER_ID);
-                SetForegroundWindow(g_snapFocusWindow);
+                if (GetForegroundWindow() == g_snapFocusTarget)
+                {
+                    SetForegroundWindow(g_snapFocusWindow);
+                }
                 g_snapFocusTarget = nullptr;
                 g_snapFocusWindow = nullptr;
+                g_snapFocusRetries = 0;
             }
             else
             {
