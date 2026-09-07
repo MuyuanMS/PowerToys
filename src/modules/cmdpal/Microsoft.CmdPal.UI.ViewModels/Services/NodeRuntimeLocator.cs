@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 
 namespace Microsoft.CmdPal.UI.ViewModels.Services;
 
@@ -71,53 +72,90 @@ internal static class NodeRuntimeLocator
             return true;
         }
 
-        using var process = Process.Start(new ProcessStartInfo
+        try
         {
-            FileName = nodeExecutable,
-            Arguments = "--version",
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-        });
-        if (process is null)
-        {
-            reason = "Node.js version could not be determined.";
-            return false;
-        }
-
-        var output = process.StandardOutput.ReadToEnd().Trim();
-        process.WaitForExit();
-        if (!Version.TryParse(output.TrimStart('v'), out var actual))
-        {
-            reason = $"Node.js returned an invalid version '{output}'.";
-            return false;
-        }
-
-        foreach (var clause in requirement.Split("||", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
-        {
-            if (TryMatchClause(actual, clause))
+            using var process = Process.Start(new ProcessStartInfo
             {
-                return true;
+                FileName = nodeExecutable,
+                Arguments = "--version",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+            });
+            if (process is null)
+            {
+                reason = "Node.js version could not be determined.";
+                return false;
+            }
+
+            var output = process.StandardOutput.ReadToEnd().Trim();
+            process.WaitForExit();
+            if (!Version.TryParse(output.TrimStart('v'), out var actual))
+            {
+                reason = $"Node.js returned an invalid version '{output}'.";
+                return false;
+            }
+
+            foreach (var clause in requirement.Split("||", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (TryMatchClause(actual, clause))
+                {
+                    return true;
+                }
             }
         }
+        catch (Exception ex) when (
+            ex is ArgumentException
+            or FileNotFoundException
+            or InvalidOperationException
+            or System.ComponentModel.Win32Exception)
+        {
+            reason = $"Node.js version could not be determined: {ex.Message}";
+            return false;
+        }
 
-        reason = $"Node.js {actual} does not satisfy the declared engine requirement '{requirement}'.";
+        reason ??= $"Node.js does not satisfy the declared engine requirement '{requirement}'.";
         return false;
     }
 
     private static bool TryMatchClause(Version actual, string clause)
     {
-        var value = clause.Trim();
-        var op = value.StartsWith(">=") || value.StartsWith("<=")
-            ? value[..2]
-            : value.Length > 0 && "> < = ^ ~".Contains(value[0])
-                ? value[..1]
-                : string.Empty;
-        var versionText = value.TrimStart('>', '<', '=', '^', '~', ' ');
-        if (!Version.TryParse(versionText, out var requested))
+        var tokens = clause.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (tokens.Length == 0)
         {
             return false;
+        }
+
+        return tokens.All(token => TryMatchToken(actual, token));
+    }
+
+    private static bool TryMatchToken(Version actual, string token)
+    {
+        var op = token.StartsWith(">=") || token.StartsWith("<=")
+            ? token[..2]
+            : token.Length > 0 && "> < = ^ ~".Contains(token[0])
+                ? token[..1]
+                : string.Empty;
+        var versionText = token.TrimStart('>', '<', '=', '^', '~');
+        var parts = versionText.Split('.');
+        if (parts.Length > 3 || !int.TryParse(parts[0], out var major))
+        {
+            return false;
+        }
+        var hasMinor = parts.Length > 1 && int.TryParse(parts[1], out var minor);
+        var hasPatch = parts.Length > 2 && int.TryParse(parts[2], out var patch);
+        if ((parts.Length > 1 && !hasMinor) || (parts.Length > 2 && !hasPatch))
+        {
+            return false;
+        }
+        var requested = new Version(major, hasMinor ? minor : 0, hasPatch ? patch : 0);
+        if (op is "" && parts.Length < 3)
+        {
+            var upper = parts.Length == 1
+                ? new Version(major + 1, 0)
+                : new Version(major, minor + 1);
+            return actual.CompareTo(requested) >= 0 && actual.CompareTo(upper) < 0;
         }
 
         return op switch

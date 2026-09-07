@@ -69,8 +69,8 @@ jobs:
       npm run typecheck &&
       npm run lint &&
       npm test &&
-      npm run verify:pack &&
-      npm run build
+      npm run build &&
+      npm run verify:pack
     workingDirectory: $(Build.SourcesDirectory)\src\modules\cmdpal\ts-sdk
     displayName: Build CmdPal TypeScript SDK dependency
 
