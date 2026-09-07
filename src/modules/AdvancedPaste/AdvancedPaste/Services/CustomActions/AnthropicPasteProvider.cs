@@ -3,8 +3,9 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using AdvancedPaste.Helpers;
@@ -24,7 +25,9 @@ namespace AdvancedPaste.Services.CustomActions
             AIServiceType.Anthropic,
         };
 
-        private static readonly ConcurrentDictionary<string, AnthropicClient> Clients = new();
+        private static readonly object ClientLock = new();
+        private static AnthropicClient client;
+        private static string clientFingerprint;
 
         public static PasteAIProviderRegistration Registration { get; } = new(SupportedTypes, config => new AnthropicPasteProvider(config));
 
@@ -71,12 +74,7 @@ namespace AdvancedPaste.Services.CustomActions
 
             var endpoint = string.IsNullOrWhiteSpace(_config.Endpoint) ? null : _config.Endpoint.Trim();
 
-            var clientKey = $"{endpoint ?? string.Empty}\n{apiKey}";
-            var client = Clients.GetOrAdd(
-                clientKey,
-                _ => !string.IsNullOrWhiteSpace(endpoint)
-                    ? new AnthropicClient { ApiKey = apiKey, BaseUrl = endpoint }
-                    : new AnthropicClient { ApiKey = apiKey });
+            var client = GetClient(apiKey, endpoint);
 
             using var chatClient = client.AsIChatClient(modelId, DefaultMaxOutputTokens);
             var messages = new List<ChatMessage>();
@@ -123,6 +121,25 @@ namespace AdvancedPaste.Services.CustomActions
             }
 
             return response.Text ?? string.Empty;
+        }
+
+        private static AnthropicClient GetClient(string apiKey, string endpoint)
+        {
+            var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{endpoint ?? string.Empty}\n{apiKey}")));
+
+            lock (ClientLock)
+            {
+                if (client is null || !string.Equals(clientFingerprint, fingerprint, StringComparison.Ordinal))
+                {
+                    client?.Dispose();
+                    client = !string.IsNullOrWhiteSpace(endpoint)
+                        ? new AnthropicClient { ApiKey = apiKey, BaseUrl = endpoint }
+                        : new AnthropicClient { ApiKey = apiKey };
+                    clientFingerprint = fingerprint;
+                }
+
+                return client;
+            }
         }
     }
 }

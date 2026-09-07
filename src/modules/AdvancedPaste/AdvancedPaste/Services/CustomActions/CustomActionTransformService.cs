@@ -12,6 +12,7 @@ using AdvancedPaste.Helpers;
 using AdvancedPaste.Models;
 using AdvancedPaste.Settings;
 using AdvancedPaste.Telemetry;
+using Anthropic.Exceptions;
 using ManagedCommon;
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.PowerToys.Telemetry;
@@ -151,6 +152,11 @@ namespace AdvancedPaste.Services.CustomActions
             if (exception is HttpRequestException httpRequestException && httpRequestException.StatusCode is HttpStatusCode statusCode)
             {
                 return (int)statusCode;
+            }
+
+            if (exception is AnthropicApiException anthropicApiException)
+            {
+                return (int)anthropicApiException.StatusCode;
             }
 
             return -1;
