@@ -1,0 +1,183 @@
+// Copyright (c) Microsoft Corporation
+// The Microsoft Corporation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using Microsoft.CmdPal.UI.ViewModels.Models;
+using Microsoft.CommandPalette.Extensions;
+
+namespace Microsoft.CmdPal.UI.ViewModels;
+
+/// <summary>
+/// View model for a single tab within a <see cref="TabbedPageViewModel"/>. Wraps
+/// an extension-provided <see cref="ITab"/> and surfaces its chrome (title, icon,
+/// observable badge) so the tab strip can render before the hosted page is
+/// initialized. The hosted <see cref="IPage"/> itself is exposed via
+/// <see cref="Page"/> and only turned into a child view model lazily, the first
+/// time the tab becomes active.
+/// </summary>
+public partial class TabViewModel : ExtensionObjectViewModel
+{
+    private readonly ExtensionObject<ITab> _model;
+    private readonly string _fallbackTabId;
+    private string _baseTabId = string.Empty;
+
+    /// <summary>
+    /// Gets the stable identity for this tab, used to preserve the active tab
+    /// across dynamic tab-set updates. This is the tab's own <c>Id</c> when
+    /// available, then the hosted page's <c>Id</c>, and finally the fallback
+    /// identity assigned by the host.
+    /// </summary>
+    public string TabId { get; private set; } = string.Empty;
+
+    public string Title { get; private set; } = string.Empty;
+
+    public string Badge { get; private set; } = string.Empty;
+
+    public bool HasBadge => !string.IsNullOrEmpty(Badge);
+
+    public IconInfoViewModel Icon { get; private set; } = new(null);
+
+    public bool HasIcon => Icon.IsSet;
+
+    /// <summary>
+    /// Gets the raw extension page hosted by this tab. The host turns this into
+    /// a child <see cref="PageViewModel"/> through the page view model factory
+    /// when the tab is first activated.
+    /// </summary>
+    public IPage? Page { get; private set; }
+
+    public TabViewModel(ITab tab, WeakReference<IPageContext> context, string fallbackTabId)
+        : base(context)
+    {
+        _model = new(tab);
+        _fallbackTabId = fallbackTabId;
+    }
+
+    public override void InitializeProperties()
+    {
+        var tab = _model.Unsafe;
+        if (tab is null)
+        {
+            return;
+        }
+
+        UpdatePageAndIdentity(tab);
+
+        Title = GetTitle(tab);
+        Badge = tab.Badge ?? string.Empty;
+
+        Icon = new(tab.Icon);
+        Icon.InitializeProperties();
+
+        UpdateProperty(nameof(TabId));
+        UpdateProperty(nameof(Page));
+        UpdateProperty(nameof(Title));
+        UpdateProperty(nameof(Badge));
+        UpdateProperty(nameof(HasBadge));
+        UpdateProperty(nameof(Icon));
+        UpdateProperty(nameof(HasIcon));
+
+        tab.PropChanged += Model_PropChanged;
+    }
+
+    private void UpdatePageAndIdentity(ITab tab)
+    {
+        Page = tab.Page;
+
+        var tabId = tab.Id;
+        if (!string.IsNullOrEmpty(tabId))
+        {
+            _baseTabId = $"tab:{tabId}";
+            TabId = _baseTabId;
+            return;
+        }
+
+        tabId = Page?.Id;
+        if (!string.IsNullOrEmpty(tabId))
+        {
+            _baseTabId = $"page:{tabId}";
+            TabId = _baseTabId;
+            return;
+        }
+
+        _baseTabId = $"fallback:{_fallbackTabId}";
+        TabId = _baseTabId;
+    }
+
+    internal void ApplyCollisionSuffix(string? suffix)
+    {
+        TabId = string.IsNullOrEmpty(suffix) ? _baseTabId : $"{_baseTabId}|duplicate:{suffix}";
+        UpdateProperty(nameof(TabId));
+    }
+
+    private string GetTitle(ITab tab)
+    {
+        var title = tab.Title;
+        if (string.IsNullOrEmpty(title))
+        {
+            // Fall back to the hosted page's own name/title so the strip is
+            // never blank when the extension didn't set a tab title.
+            title = Page?.Title;
+            if (string.IsNullOrEmpty(title))
+            {
+                title = Page?.Name;
+            }
+        }
+
+        return title ?? string.Empty;
+    }
+
+    private void Model_PropChanged(object sender, IPropChangedEventArgs args)
+    {
+        try
+        {
+            var tab = _model.Unsafe;
+            if (tab is null)
+            {
+                return;
+            }
+
+            switch (args.PropertyName)
+            {
+                case nameof(Badge):
+                    Badge = tab.Badge ?? string.Empty;
+                    UpdateProperty(nameof(Badge));
+                    UpdateProperty(nameof(HasBadge));
+                    break;
+                case nameof(Title):
+                    Title = GetTitle(tab);
+                    UpdateProperty(nameof(Title));
+                    break;
+                case nameof(Page):
+                case nameof(ITab.Id):
+                    UpdatePageAndIdentity(tab);
+                    Title = GetTitle(tab);
+                    UpdateProperty(nameof(Page));
+                    UpdateProperty(nameof(TabId));
+                    UpdateProperty(nameof(Title));
+                    break;
+                case nameof(Icon):
+                    Icon = new(tab.Icon);
+                    Icon.InitializeProperties();
+                    UpdateProperty(nameof(Icon));
+                    UpdateProperty(nameof(HasIcon));
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowException(ex);
+        }
+    }
+
+    protected override void UnsafeCleanup()
+    {
+        base.UnsafeCleanup();
+
+        var tab = _model.Unsafe;
+        if (tab is not null)
+        {
+            tab.PropChanged -= Model_PropChanged;
+        }
+    }
+}

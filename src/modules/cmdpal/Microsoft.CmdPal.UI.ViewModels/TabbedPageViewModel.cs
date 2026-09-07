@@ -1,0 +1,592 @@
+// Copyright (c) Microsoft Corporation
+// The Microsoft Corporation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using System.Collections.ObjectModel;
+using System.Globalization;
+using System.Threading;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Messaging;
+using Microsoft.CmdPal.UI.ViewModels.Messages;
+using Microsoft.CmdPal.UI.ViewModels.Models;
+using Microsoft.CommandPalette.Extensions;
+using Microsoft.CommandPalette.Extensions.Toolkit;
+
+namespace Microsoft.CmdPal.UI.ViewModels;
+
+/// <summary>
+/// Host view model for an extension <see cref="ITabbedPage"/>. It renders a strip
+/// of tabs where each tab is its own independent <see cref="IPage"/>
+/// (a list, dynamic list, parameters, or content page in v1).
+/// </summary>
+/// <remarks>
+/// The tabbed page and its <see cref="ITab"/> metadata (title/icon/badge) load
+/// eagerly so the strip renders immediately. A tab's <em>page</em> is only turned
+/// into a child <see cref="PageViewModel"/> the first time that tab is activated,
+/// then cached until the whole tabbed page is disposed. The shared search box is
+/// forwarded to the active tab; the bottom command bar is driven by the active
+/// child exactly as if that page had been opened on its own.
+/// </remarks>
+public partial class TabbedPageViewModel : PageViewModel
+{
+    private readonly ExtensionObject<ITabbedPage> _model;
+    private readonly IPageViewModelFactoryService _factory;
+    private readonly Dictionary<string, CachedChild> _childCache = [];
+    private readonly Dictionary<TabViewModel, string> _tabCacheKeys = [];
+    private bool _isDisposed;
+    private bool _normalizingTabIds;
+
+    private static readonly string _fallbackPlaceholder = "Type here to search...";
+
+    public ObservableCollection<TabViewModel> Tabs { get; } = [];
+
+    /// <summary>
+    /// Gets a value indicating whether the tab strip should be shown. A tabbed
+    /// page with a single tab still renders the strip so the badge/title are
+    /// visible, but a page that produced no tabs hides it entirely.
+    /// </summary>
+    public bool HasTabs => Tabs.Count > 0;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowUnsupportedPlaceholder))]
+    public partial TabViewModel? SelectedTab { get; set; }
+
+    /// <summary>
+    /// Gets the child page view model for the currently active tab, or
+    /// <see langword="null"/> when the active tab hosts an unsupported page type
+    /// (in which case the host shows a placeholder).
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowUnsupportedPlaceholder))]
+    public partial PageViewModel? ActiveChild { get; private set; }
+
+    /// <summary>
+    /// Gets a value indicating whether the host should show the "unsupported
+    /// tab" placeholder, which happens when a tab is selected but its page type
+    /// can't be rendered in v1.
+    /// </summary>
+    public bool ShowUnsupportedPlaceholder => SelectedTab is not null && ActiveChild is null;
+
+    /// <summary>
+    /// Gets a value indicating whether the active tab's page is still loading.
+    /// This drives the in-host progress bar that sits beneath the tab strip, and
+    /// is distinct from the shell-level progress bar that reflects the tabbed
+    /// page loading its own tab set.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool ActiveTabIsLoading { get; private set; }
+
+    /// <inheritdoc/>
+    public override string PlaceholderText => ActiveChild?.PlaceholderText ?? _fallbackPlaceholder;
+
+    public TabbedPageViewModel(ITabbedPage model, TaskScheduler scheduler, AppExtensionHost host, ICommandProviderContext providerContext, IPageViewModelFactoryService factory)
+        : base(model, scheduler, host, providerContext)
+    {
+        _model = new(model);
+        _factory = factory;
+    }
+
+    public override void InitializeProperties()
+    {
+        base.InitializeProperties();
+
+        var model = _model.Unsafe;
+        if (model is null)
+        {
+            return;
+        }
+
+        var newTabs = BuildTabViewModels(model.GetTabs());
+
+        DoOnUiThread(() =>
+        {
+            if (_isDisposed)
+            {
+                foreach (var tab in newTabs)
+                {
+                    tab.SafeCleanup();
+                }
+
+                return;
+            }
+
+            ListHelpers.InPlaceUpdateList(Tabs, newTabs);
+            AttachTabPropertyChanged();
+            UpdateProperty(nameof(HasTabs));
+
+            // First tab is the default active tab.
+            SelectedTab = Tabs.Count > 0 ? Tabs[0] : null;
+        });
+
+        model.ItemsChanged += Model_ItemsChanged;
+    }
+
+    private List<TabViewModel> BuildTabViewModels(ITab[]? tabs)
+    {
+        List<TabViewModel> result = [];
+        if (tabs is null)
+        {
+            return result;
+        }
+
+        for (var i = 0; i < tabs.Length; i++)
+        {
+            var tab = tabs[i];
+            if (tab is null)
+            {
+                continue;
+            }
+
+            var vm = new TabViewModel(tab, PageContext, i.ToString(CultureInfo.InvariantCulture));
+            vm.InitializeProperties();
+            result.Add(vm);
+        }
+
+        EnsureUniqueTabIds(result);
+        return result;
+    }
+
+    private static void EnsureUniqueTabIds(List<TabViewModel> tabs)
+    {
+        HashSet<string> seen = [];
+        for (var i = 0; i < tabs.Count; i++)
+        {
+            var tab = tabs[i];
+            tab.ApplyCollisionSuffix(null);
+            if (!seen.Add(tab.TabId))
+            {
+                tab.ApplyCollisionSuffix(i.ToString(CultureInfo.InvariantCulture));
+                seen.Add(tab.TabId);
+            }
+        }
+    }
+
+    private static bool PageIsSearchable(IPage? page) => page is IListPage or IParametersPage;
+
+    //// Dynamic tab set: re-read GetTabs() and preserve the active tab by identity ////
+    private void Model_ItemsChanged(object sender, IItemsChangedEventArgs args)
+    {
+        try
+        {
+            var model = _model.Unsafe;
+            if (model is null)
+            {
+                return;
+            }
+
+            var newTabs = BuildTabViewModels(model.GetTabs());
+
+            DoOnUiThread(() =>
+            {
+                if (_isDisposed)
+                {
+                    foreach (var tab in newTabs)
+                    {
+                        tab.SafeCleanup();
+                    }
+
+                    return;
+                }
+
+                var activeId = SelectedTab?.TabId;
+
+                // Drop cached children for tabs that no longer exist.
+                var keepIds = new HashSet<string>(newTabs.Select(t => t.TabId));
+                var staleIds = _childCache.Keys.Where(id => !keepIds.Contains(id)).ToList();
+                foreach (var id in staleIds)
+                {
+                    DisposeChild(_childCache[id]);
+                    _childCache.Remove(id);
+                }
+
+                foreach (var tab in newTabs)
+                {
+                    if (_childCache.TryGetValue(tab.TabId, out var cached) && !ReferenceEquals(cached.Page, tab.Page))
+                    {
+                        DisposeChild(cached);
+                        _childCache.Remove(tab.TabId);
+                    }
+                }
+
+                foreach (var old in Tabs)
+                {
+                    old.PropertyChanged -= Tab_PropertyChanged;
+                    _tabCacheKeys.Remove(old);
+                    old.SafeCleanup();
+                }
+
+                ListHelpers.InPlaceUpdateList(Tabs, newTabs);
+                AttachTabPropertyChanged();
+                UpdateProperty(nameof(HasTabs));
+
+                // Preserve the active tab when it still exists, else fall back to
+                // the first tab.
+                TabViewModel? next = null;
+                if (!string.IsNullOrEmpty(activeId))
+                {
+                    next = Tabs.FirstOrDefault(t => t.TabId == activeId);
+                }
+
+                next ??= Tabs.Count > 0 ? Tabs[0] : null;
+
+                if (ReferenceEquals(next, SelectedTab))
+                {
+                    // Selection object is unchanged; make sure the content still
+                    // reflects it (the underlying page instance may be new).
+                    ActivateTab(next);
+                }
+                else
+                {
+                    SelectedTab = next;
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            ShowException(ex, _model?.Unsafe?.Name);
+        }
+    }
+
+    partial void OnSelectedTabChanged(TabViewModel? oldValue, TabViewModel? newValue) => ActivateTab(newValue);
+
+    private void ActivateTab(TabViewModel? tab)
+    {
+        if (ActiveChild is not null)
+        {
+            ActiveChild.CanPublishContextUpdates = false;
+        }
+
+        DetachActiveChildLoading(ActiveChild);
+
+        if (tab is null)
+        {
+            ActiveChild = null;
+            ActiveTabIsLoading = false;
+            SetHasSearchBox(false);
+            UpdateProperty(nameof(PlaceholderText));
+            RefreshActiveChildContext();
+            return;
+        }
+
+        var child = GetOrCreateChild(tab);
+        ActiveChild = child;
+
+        // The shared search box follows the active tab: it activates for a
+        // searchable page (list, dynamic list or parameters) and deactivates
+        // otherwise. Deriving this from the page type keeps it correct
+        // immediately, without waiting for the child's async initialization.
+        SetHasSearchBox(PageIsSearchable(tab.Page));
+
+        if (child is null)
+        {
+            // Unsupported page type; the host renders a placeholder for this tab.
+            ActiveTabIsLoading = false;
+            UpdateProperty(nameof(PlaceholderText));
+            RefreshActiveChildContext();
+            return;
+        }
+
+        AttachActiveChildLoading(child);
+        child.CanPublishContextUpdates = true;
+        ActiveTabIsLoading = child.IsLoading;
+
+        UpdateProperty(nameof(PlaceholderText));
+        RefreshActiveChildContext();
+    }
+
+    private void SetHasSearchBox(bool value)
+    {
+        HasSearchBox = value;
+
+        // Always raise so the shell re-evaluates search-box visibility for the
+        // active tab, even when the value matches the previous tab's.
+        UpdateProperty(nameof(HasSearchBox));
+    }
+
+    private PageViewModel? GetOrCreateChild(TabViewModel tab)
+    {
+        if (_childCache.TryGetValue(tab.TabId, out var cached) && ReferenceEquals(cached.Page, tab.Page))
+        {
+            return cached.Child;
+        }
+
+        var page = tab.Page;
+        if (page is null || page is ITabbedPage)
+        {
+            return null;
+        }
+
+        var child = _factory.TryCreatePageViewModel(page, true, ExtensionHost, ProviderContext);
+        if (child is null)
+        {
+            // Unsupported page type; cache nothing and let the host show a
+            // placeholder.
+            return null;
+        }
+
+        child.IsRootPage = false;
+        child.HasBackButton = false;
+        child.CanPublishContextUpdates = false;
+        var newCached = new CachedChild(page, child);
+        _childCache[tab.TabId] = newCached;
+
+        newCached.InitializationTask = InitializeChild(newCached);
+        return child;
+    }
+
+    private void AttachTabPropertyChanged()
+    {
+        foreach (var tab in Tabs)
+        {
+            _tabCacheKeys[tab] = tab.TabId;
+            tab.PropertyChanged += Tab_PropertyChanged;
+        }
+    }
+
+    private void Tab_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (sender is not TabViewModel tab)
+        {
+            return;
+        }
+
+        if (e.PropertyName is nameof(TabViewModel.Page) or nameof(TabViewModel.TabId))
+        {
+            if (_normalizingTabIds)
+            {
+                return;
+            }
+
+            var oldCacheKeys = new Dictionary<TabViewModel, string>(_tabCacheKeys);
+
+            _normalizingTabIds = true;
+            try
+            {
+                EnsureUniqueTabIds(Tabs.ToList());
+            }
+            finally
+            {
+                _normalizingTabIds = false;
+            }
+
+            foreach (var currentTab in Tabs)
+            {
+                var oldCacheKey = oldCacheKeys.GetValueOrDefault(currentTab);
+                if (!string.IsNullOrEmpty(oldCacheKey) && oldCacheKey != currentTab.TabId && _childCache.Remove(oldCacheKey, out var oldCached))
+                {
+                    DisposeChild(oldCached);
+                }
+
+                _tabCacheKeys[currentTab] = currentTab.TabId;
+            }
+
+            var staleIds = _childCache
+                .Where(entry => !Tabs.Any(tabViewModel => tabViewModel.TabId == entry.Key && ReferenceEquals(tabViewModel.Page, entry.Value.Page)))
+                .Select(entry => entry.Key)
+                .ToList();
+
+            foreach (var id in staleIds)
+            {
+                DisposeChild(_childCache[id]);
+                _childCache.Remove(id);
+            }
+
+            if (_childCache.TryGetValue(tab.TabId, out var cached) && !ReferenceEquals(cached.Page, tab.Page))
+            {
+                DisposeChild(cached);
+                _childCache.Remove(tab.TabId);
+            }
+
+            if (ReferenceEquals(tab, SelectedTab))
+            {
+                ActivateTab(tab);
+            }
+        }
+    }
+
+    private Task InitializeChild(CachedChild cached)
+    {
+        // Mirror ShellViewModel.LoadPageViewModelAsync: initialize on a
+        // background thread so the tab strip stays responsive. The child view
+        // model marshals IsInitialized/property updates back onto the UI thread.
+        return Task.Run(async () =>
+        {
+            try
+            {
+                if (cached.InitializationCts.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                cached.Child.InitializeCommand.Execute(null);
+                if (cached.Child.InitializeCommand.ExecutionTask is not null)
+                {
+                    await cached.Child.InitializeCommand.ExecutionTask;
+                }
+
+                if (!cached.InitializationCts.IsCancellationRequested)
+                {
+                    DoOnUiThread(() =>
+                    {
+                        if (!_isDisposed && ReferenceEquals(ActiveChild, cached.Child) && cached.Child.CanPublishContextUpdates)
+                        {
+                            RefreshActiveChildContext();
+                        }
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowException(ex);
+            }
+        });
+    }
+
+    private void AttachActiveChildLoading(PageViewModel child) => child.PropertyChanged += ActiveChild_PropertyChanged;
+
+    private void DetachActiveChildLoading(PageViewModel? child)
+    {
+        if (child is not null)
+        {
+            child.PropertyChanged -= ActiveChild_PropertyChanged;
+        }
+    }
+
+    private void ActiveChild_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (sender is not PageViewModel child || !ReferenceEquals(child, ActiveChild))
+        {
+            return;
+        }
+
+        switch (e.PropertyName)
+        {
+            case nameof(IsLoading):
+                ActiveTabIsLoading = child.IsLoading;
+                break;
+            case nameof(PlaceholderText):
+                UpdateProperty(nameof(PlaceholderText));
+                break;
+            case nameof(HasSearchBox):
+                // Follow the active child if it revises its searchability once
+                // its async initialization completes.
+                SetHasSearchBox(child.HasSearchBox);
+                break;
+        }
+    }
+
+    protected override void OnSearchTextBoxUpdated(string searchTextBox)
+    {
+        // Forward the shared query to the active tab when it supports search.
+        // On non-searchable tabs the box is deactivated, so there is nothing to
+        // forward.
+        if (ActiveChild is { HasSearchBox: true } child)
+        {
+            child.SearchTextBox = searchTextBox;
+        }
+    }
+
+    public void RefreshActiveChildContext()
+    {
+        switch (ActiveChild)
+        {
+            case ListViewModel list:
+                list.RefreshCurrentCommandContext();
+                break;
+            case ContentPageViewModel content:
+                content.RefreshCommandContext();
+                break;
+            case ParametersPageViewModel:
+                WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(null));
+                WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(string.Empty));
+                break;
+            case ICommandBarContext commandBarContext:
+                WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(commandBarContext));
+                WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                break;
+            case null:
+                WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(null));
+                WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(string.Empty));
+                break;
+        }
+    }
+
+    private void DisposeChild(CachedChild cached)
+    {
+        if (!cached.TryStartDispose())
+        {
+            return;
+        }
+
+        var child = cached.Child;
+        DetachActiveChildLoading(child);
+        child.CanPublishContextUpdates = false;
+        cached.InitializationCts.Cancel();
+
+        void Cleanup()
+        {
+            child.SafeCleanup();
+            if (child is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+
+            cached.InitializationCts.Dispose();
+        }
+
+        if (cached.InitializationTask is { IsCompleted: false } task)
+        {
+            _ = task.ContinueWith(_ => DoOnUiThread(Cleanup), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+        }
+        else
+        {
+            Cleanup();
+        }
+    }
+
+    protected override void UnsafeCleanup()
+    {
+        base.UnsafeCleanup();
+        _isDisposed = true;
+
+        var model = _model.Unsafe;
+        if (model is not null)
+        {
+            model.ItemsChanged -= Model_ItemsChanged;
+        }
+
+        DetachActiveChildLoading(ActiveChild);
+        ActiveChild = null;
+
+        foreach (var child in _childCache.Values.ToList())
+        {
+            DisposeChild(child);
+        }
+
+        _childCache.Clear();
+
+        foreach (var tab in Tabs)
+        {
+            tab.PropertyChanged -= Tab_PropertyChanged;
+            _tabCacheKeys.Remove(tab);
+            tab.SafeCleanup();
+        }
+    }
+
+    private sealed class CachedChild(IPage page, PageViewModel child)
+    {
+        private int _disposeStarted;
+
+        public IPage Page { get; } = page;
+
+        public PageViewModel Child { get; } = child;
+
+        public CancellationTokenSource InitializationCts { get; } = new();
+
+        public Task? InitializationTask { get; set; }
+
+        public bool TryStartDispose() => Interlocked.Exchange(ref _disposeStarted, 1) == 0;
+    }
+}
