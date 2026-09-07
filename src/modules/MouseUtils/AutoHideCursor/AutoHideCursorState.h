@@ -52,10 +52,12 @@ namespace auto_hide_cursor
 
         static constexpr Configuration NormalizeConfiguration(Configuration configuration) noexcept
         {
-            configuration.idleDelayMs = std::clamp(
+            configuration.idleDelayMs = (std::clamp(
                 configuration.idleDelayMs,
                 minimumIdleDelayMs,
-                maximumIdleDelayMs);
+                maximumIdleDelayMs) /
+                                       1000) *
+                1000;
             return configuration;
         }
 
