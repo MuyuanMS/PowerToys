@@ -5,12 +5,14 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Security.Principal;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Threading;
 using Microsoft.PowerToys.Settings.UI.Library;
+using Microsoft.PowerToys.Settings.UI.Library.Interfaces;
 using PowerToys.DSC.Models.KeyboardManager;
 using PowerToys.DSC.Models.ResourceObjects;
 
@@ -100,7 +102,7 @@ public sealed class ProfileFunctionData : BaseFunctionData
     /// </summary>
     public void GetState()
     {
-        var profile = _settingsUtils.GetSettingsOrDefault<KeyboardManagerProfile>(
+        var profile = ReadSettings<KeyboardManagerProfile>(
             KeyboardManagerSettings.ModuleName, GetProfileFileName());
         Output.Profile = KbmProfileConverter.FromProfile(profile, Warnings);
     }
@@ -129,6 +131,7 @@ public sealed class ProfileFunctionData : BaseFunctionData
         var profile = KbmProfileConverter.ToProfile(Input.Profile);
         var profileJson = JsonSerializer.Serialize(profile, _profileSerializerOptions);
         _settingsUtils.SaveSettings(profileJson, KeyboardManagerSettings.ModuleName, GetProfileFileName());
+        VerifySavedProfile();
 
         return SignalSettingsChangedEvent();
     }
@@ -142,7 +145,7 @@ public sealed class ProfileFunctionData : BaseFunctionData
     {
         var input = JsonSerializer.SerializeToNode(KbmProfileConverter.Canonicalize(Input.Profile));
         var output = JsonSerializer.SerializeToNode(Output.Profile);
-        return JsonNode.DeepEquals(input, output);
+        return Warnings.Count == 0 && JsonNode.DeepEquals(input, output);
     }
 
     /// <summary>
@@ -176,9 +179,34 @@ public sealed class ProfileFunctionData : BaseFunctionData
     /// <returns>The profile file name.</returns>
     private static string GetProfileFileName()
     {
-        var settings = _settingsUtils.GetSettingsOrDefault<KeyboardManagerSettings>(KeyboardManagerSettings.ModuleName);
+        var settings = ReadSettings<KeyboardManagerSettings>(KeyboardManagerSettings.ModuleName);
         var activeConfiguration = settings.Properties?.ActiveConfiguration?.Value;
         return $"{(string.IsNullOrEmpty(activeConfiguration) ? "default" : activeConfiguration)}.json";
+    }
+
+    private static T ReadSettings<T>(string moduleName, string fileName = SettingsUtils.DefaultFileName)
+        where T : ISettingsConfig, new()
+    {
+        try
+        {
+            return _settingsUtils.GetSettings<T>(moduleName, fileName);
+        }
+        catch (FileNotFoundException)
+        {
+            return new T();
+        }
+    }
+
+    private void VerifySavedProfile()
+    {
+        var saved = _settingsUtils.GetSettings<KeyboardManagerProfile>(
+            KeyboardManagerSettings.ModuleName, GetProfileFileName());
+        var expectedModel = JsonSerializer.SerializeToNode(KbmProfileConverter.Canonicalize(Input.Profile));
+        var savedModel = JsonSerializer.SerializeToNode(KbmProfileConverter.FromProfile(saved));
+        if (!JsonNode.DeepEquals(expectedModel, savedModel))
+        {
+            throw new IOException("The Keyboard Manager profile could not be persisted.");
+        }
     }
 
     /// <summary>
