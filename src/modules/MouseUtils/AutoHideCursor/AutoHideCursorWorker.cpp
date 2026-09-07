@@ -282,7 +282,6 @@ namespace
             if (code >= 0 && s_instance)
             {
                 const auto* mouse = reinterpret_cast<const MSLLHOOKSTRUCT*>(data);
-                if ((mouse->flags & (LLMHF_INJECTED | LLMHF_LOWER_IL_INJECTED)) == 0)
                 {
                     auto inputKind = auto_hide_cursor::MouseInputKind::ButtonOrWheel;
                     if (message == WM_MOUSEMOVE)
