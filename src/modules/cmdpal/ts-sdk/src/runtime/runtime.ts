@@ -834,7 +834,10 @@ export class ExtensionRuntime {
    * result commands) so the whole subtree is released together. Safe for ids
    * that own no scope.
    */
-  private retire(commandId: string): void {
+  private retire(commandId: string, ignoreResolvedReference = false): void {
+    if (this.hasLiveReference(commandId, ignoreResolvedReference)) {
+      return;
+    }
     this.resolved.delete(commandId);
     this.pageScopes.delete(commandId);
     const contentChildren = this.pageContentChildren.get(commandId);
@@ -848,9 +851,25 @@ export class ExtensionRuntime {
     }
     if (resultChildren) {
       for (const childId of resultChildren) {
-        this.retire(childId);
+        this.retire(childId, true);
       }
     }
+  }
+
+  private hasLiveReference(commandId: string, ignoreResolvedReference: boolean): boolean {
+    if (
+      this.providerScope.has(commandId) ||
+      this.fallbackScope.has(commandId) ||
+      (!ignoreResolvedReference && this.resolved.has(commandId))
+    ) {
+      return true;
+    }
+    for (const scope of this.pageScopes.values()) {
+      if (scope.commands.has(commandId)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Retires every id in `ids` that is absent from the surviving `keep` map. */

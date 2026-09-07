@@ -240,6 +240,76 @@ describe('bounded command registry eviction', () => {
     });
     expect(responseFor(sent, 4)?.error?.code).toBe(JsonRpcErrorCode.MethodNotFound);
   });
+
+  it('preserves a shared page scope while another provider scope still references it', async () => {
+    const sharedPage: IListPage = {
+      id: 'shared',
+      name: 'Shared',
+      title: 'Shared',
+      getItems() {
+        return [item('shared-child')];
+      },
+    };
+    let includeTopLevel = true;
+    let includeFallback = true;
+    const provider: ICommandProvider = {
+      id: 'ext',
+      displayName: 'Ext',
+      topLevelCommands() {
+        return includeTopLevel ? [{ command: sharedPage, title: 'Shared' }] : [];
+      },
+      fallbackCommands() {
+        return includeFallback ? [{ command: sharedPage, title: 'Shared' }] : [];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(provider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'provider/getTopLevelCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'provider/getFallbackCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 3,
+      method: 'listPage/getItems',
+      params: { pageId: 'shared' },
+    });
+
+    includeTopLevel = false;
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 4,
+      method: 'provider/getTopLevelCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 5,
+      method: 'command/invoke',
+      params: { commandId: 'shared-child' },
+    });
+    expect(responseFor(sent, 5)?.result).toEqual({ Kind: 4 });
+
+    includeFallback = false;
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 6,
+      method: 'provider/getFallbackCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 7,
+      method: 'command/invoke',
+      params: { commandId: 'shared-child' },
+    });
+    expect(responseFor(sent, 7)?.error?.code).toBe(JsonRpcErrorCode.MethodNotFound);
+  });
 });
 
 describe('recursive scope retirement', () => {
