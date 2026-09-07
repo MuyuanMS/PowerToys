@@ -43,11 +43,17 @@ describe('initialization failure propagation', () => {
     const providerPromise = new Promise<ICommandProvider>((resolve) => {
       resolveProvider = resolve;
     });
-    const providerDispose = vi.fn();
+    let finishDispose!: () => void;
+    const providerDispose = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishDispose = resolve;
+        }),
+    );
     const { runtime } = createHarness();
 
     runtime.beginInitialization(providerPromise);
-    await runtime.dispose();
+    const disposal = runtime.dispose();
     resolveProvider({
       id: 'late',
       displayName: 'Late',
@@ -58,6 +64,16 @@ describe('initialization failure propagation', () => {
     await Promise.resolve();
 
     expect(providerDispose).toHaveBeenCalledTimes(1);
+    let disposalFinished = false;
+    void disposal.then(() => {
+      disposalFinished = true;
+    });
+    await Promise.resolve();
+    expect(disposalFinished).toBe(false);
+
+    finishDispose();
+    await disposal;
+    expect(disposalFinished).toBe(true);
   });
 
   it('ignores provider initialization rejection after runtime disposal', async () => {
@@ -68,10 +84,10 @@ describe('initialization failure propagation', () => {
     const { runtime, fatal } = createHarness();
 
     runtime.beginInitialization(providerPromise);
-    await runtime.dispose();
+    const disposal = runtime.dispose();
     rejectProvider(new Error('late rejection'));
     await expect(providerPromise).rejects.toThrow('late rejection');
-    await Promise.resolve();
+    await disposal;
 
     expect(fatal).not.toHaveBeenCalled();
   });

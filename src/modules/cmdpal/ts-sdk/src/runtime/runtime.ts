@@ -216,7 +216,7 @@ export class ExtensionRuntime {
     this.initSettled = init.then(
       (provider) => {
         if (this.disposed) {
-          void Promise.resolve()
+          return Promise.resolve()
             .then(() => provider.dispose?.())
             .catch((error: unknown) => {
               process.stderr.write(
@@ -228,6 +228,7 @@ export class ExtensionRuntime {
         this.provider = provider;
         this.primed = false;
         this.initState = 'ready';
+        return undefined;
       },
       (error: unknown) => {
         if (this.disposed) {
@@ -349,8 +350,12 @@ export class ExtensionRuntime {
     this.disposed = true;
     const provider = this.provider;
     try {
-      if (provider?.dispose) {
-        await withTimeout(Promise.resolve(provider.dispose()), timeoutMs);
+      if (provider) {
+        if (provider.dispose) {
+          await withTimeout(Promise.resolve().then(() => provider.dispose?.()), timeoutMs);
+        }
+      } else {
+        await withTimeout(this.initSettled, timeoutMs);
       }
     } catch (error) {
       process.stderr.write(`cmdpal-sdk: provider disposal failed: ${describeError(error)}\n`);

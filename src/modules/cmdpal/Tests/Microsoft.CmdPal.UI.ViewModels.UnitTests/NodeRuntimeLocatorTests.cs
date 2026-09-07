@@ -174,10 +174,22 @@ public class NodeRuntimeLocatorTests
     [DataRow("23.0.0", "20 || >=22 <23", false)]
     [DataRow("22.4.0", ">= 22 < 23", true)]
     [DataRow("23.0.0", ">= 22 < 23", false)]
+    [DataRow("22.0.0", ">=22.0.0-0", true)]
     [DataRow("22.0.0", "22.x.1", false)]
     public void MatchesRequirement_EvaluatesComparatorSetsAndMalformedRanges(string actual, string requirement, bool expected)
     {
         Assert.AreEqual(expected, NodeRuntimeLocator.MatchesRequirement(Version.Parse(actual), requirement));
+    }
+
+    [TestMethod]
+    [DataRow("20.0.0", null, false)]
+    [DataRow("20.0.0", ">=18", false)]
+    [DataRow("22.0.0", null, true)]
+    [DataRow("22.0.0", ">=22", true)]
+    [DataRow("22.0.0", ">=24", false)]
+    public void IsSupportedNodeVersion_EnforcesSdkMinimumAndManifestRange(string actual, string? requirement, bool expected)
+    {
+        Assert.AreEqual(expected, NodeRuntimeLocator.IsSupportedNodeVersion(Version.Parse(actual), requirement));
     }
 
     [TestMethod]

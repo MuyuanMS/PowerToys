@@ -66,9 +66,7 @@ jobs:
 
   - pwsh: |-
       npm ci --cache "$(Pipeline.Workspace)\.npm" --prefer-offline &&
-      npm run typecheck &&
-      npm run lint &&
-      npm test &&
+      npm run check &&
       npm run build &&
       npm run verify:pack
     workingDirectory: $(Build.SourcesDirectory)\src\modules\cmdpal\ts-sdk

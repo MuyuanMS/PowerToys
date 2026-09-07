@@ -23,6 +23,7 @@ namespace Microsoft.CmdPal.UI.ViewModels.Services;
 internal static class NodeRuntimeLocator
 {
     private const string NodeExecutableName = "node.exe";
+    private static readonly Version MinimumSupportedVersion = new(22, 0, 0);
 
     /// <summary>
     /// Resolves <c>node.exe</c> from the current process PATH.
@@ -68,11 +69,6 @@ internal static class NodeRuntimeLocator
     internal static bool IsCompatible(string nodeExecutable, string? requirement, out string? reason)
     {
         reason = null;
-        if (string.IsNullOrWhiteSpace(requirement))
-        {
-            return true;
-        }
-
         try
         {
             using var process = Process.Start(new ProcessStartInfo
@@ -124,7 +120,7 @@ internal static class NodeRuntimeLocator
                 return false;
             }
 
-            if (MatchesRequirement(actual, requirement))
+            if (IsSupportedNodeVersion(actual, requirement))
             {
                 return true;
             }
@@ -139,8 +135,18 @@ internal static class NodeRuntimeLocator
             return false;
         }
 
-        reason ??= $"Node.js does not satisfy the declared engine requirement '{requirement}'.";
+        reason ??= string.IsNullOrWhiteSpace(requirement)
+            ? "Node.js 22.0.0 or newer is required."
+            : $"Node.js does not satisfy the supported minimum and declared engine requirement '{requirement}'.";
         return false;
+    }
+
+    internal static bool IsSupportedNodeVersion(Version actual, string? requirement)
+    {
+        ArgumentNullException.ThrowIfNull(actual);
+
+        return actual.CompareTo(MinimumSupportedVersion) >= 0
+            && (string.IsNullOrWhiteSpace(requirement) || MatchesRequirement(actual, requirement));
     }
 
     internal static bool MatchesRequirement(Version actual, string requirement)
@@ -205,6 +211,17 @@ internal static class NodeRuntimeLocator
                 ? token[..1]
                 : string.Empty;
         var versionText = token.TrimStart('>', '<', '=', '^', '~');
+        var metadataIndex = versionText.IndexOfAny(['-', '+']);
+        if (metadataIndex >= 0)
+        {
+            if (metadataIndex == 0)
+            {
+                return false;
+            }
+
+            versionText = versionText[..metadataIndex];
+        }
+
         var parts = versionText.Split('.');
         if (parts.Length > 3 || parts.Length == 0)
         {
