@@ -73,6 +73,11 @@ void LightSwitchStateManager::OnManualOverride()
 void LightSwitchStateManager::OnExternalThemeChange(std::optional<bool> expectedTheme)
 {
     std::lock_guard<std::mutex> lock(_stateMutex);
+    OnExternalThemeChangeLocked(expectedTheme);
+}
+
+void LightSwitchStateManager::OnExternalThemeChangeLocked(std::optional<bool> expectedTheme)
+{
     const auto settings = LightSwitchSettings::settings_snapshot();
 
     bool shouldBeLight = false;
@@ -150,6 +155,18 @@ void LightSwitchStateManager::OnBrightnessChange(int brightness)
 {
     std::lock_guard<std::mutex> lock(_stateMutex);
 
+    const auto settings = LightSwitchSettings::settings_snapshot();
+    if (settings.scheduleMode == ScheduleMode::FollowBrightness &&
+        !_state.isManualOverride &&
+        LightSwitchBrightnessLogic::IsKnown(_state.lastBrightness))
+    {
+        // Register a manual theme change before evaluating a new sample. This
+        // prevents same-side brightness updates from overwriting the user's
+        // theme while the periodic external-change check is pending.
+        OnExternalThemeChangeLocked(
+            LightSwitchBrightnessLogic::ShouldBeLight(_state.lastBrightness, settings.brightnessThreshold));
+    }
+
     if (brightness < 0)
     {
         _state.lastBrightness = -1;
@@ -158,7 +175,7 @@ void LightSwitchStateManager::OnBrightnessChange(int brightness)
 
     if (_state.lastAppliedMode == ScheduleMode::FollowBrightness && _state.isManualOverride)
     {
-        int threshold = LightSwitchSettings::settings_snapshot().brightnessThreshold;
+        int threshold = settings.brightnessThreshold;
         if (LightSwitchBrightnessLogic::CrossedThreshold(_state.lastBrightness, brightness, threshold))
         {
             Logger::info(L"[LightSwitchStateManager] Brightness crossed threshold while manual override active; "
