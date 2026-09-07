@@ -115,6 +115,7 @@ internal sealed class EditorUi(Session session, TestContext context)
         var entries = Session.FindAll<TextBox>(By.AccessibilityId("VariableListEntryValueTextBox")).ToArray();
         Assert.IsTrue(index >= 0 && index < entries.Length, $"PATH entry {index} was not found.");
         Assert.IsFalse(string.IsNullOrWhiteSpace(entries[index].Name), "List-entry editors must expose an accessible name.");
+        entries[index].Focus();
         entries[index].SetText(value);
         // The product commits list-entry edits in EditVariableValuesListTextBox_LostFocus.
         Session.Find<TextBox>(By.AccessibilityId("EditVariableDialogNameTxtBox")).Focus();

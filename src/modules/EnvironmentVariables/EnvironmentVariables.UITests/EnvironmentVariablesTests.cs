@@ -101,9 +101,15 @@ public sealed class EnvironmentVariablesTests : UITestBase
             return;
         }
 
-        Assert.IsTrue(WindowControl.TryKillProcessTreeByNameAndWait("PowerToys.Settings", 10_000), "Could not close the test-owned Settings process.");
-        Assert.IsTrue(WindowControl.TryKillProcessTreeByNameAndWait("PowerToys", 10_000), "Could not close the test-owned Runner process.");
-        ownsPreparedScope = false;
+        bool settingsStopped = WindowControl.TryKillProcessTreeByNameAndWait("PowerToys.Settings", 10_000);
+        bool runnerStopped = WindowControl.TryKillProcessTreeByNameAndWait("PowerToys", 10_000);
+        if (settingsStopped && runnerStopped)
+        {
+            ownsPreparedScope = false;
+        }
+
+        Assert.IsTrue(settingsStopped, "Could not close the test-owned Settings process.");
+        Assert.IsTrue(runnerStopped, "Could not close the test-owned Runner process.");
     }
 
     [TestInitialize]
