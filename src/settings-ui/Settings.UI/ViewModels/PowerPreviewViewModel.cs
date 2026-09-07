@@ -6,6 +6,7 @@ using System;
 using System.Runtime.CompilerServices;
 
 using global::PowerToys.GPOWrapper;
+using ManagedCommon;
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.PowerToys.Settings.UI.Library.Helpers;
 using Microsoft.PowerToys.Settings.UI.Library.Interfaces;
@@ -235,6 +236,15 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
 
             _stlThumbnailColor = Settings.Properties.StlThumbnailColor.Value;
+
+            _isCopyAsUNCEnabled = GeneralSettingsConfig.Enabled.CopyAsUNC;
+            _copyAsUNCEnabledGpoRuleConfiguration = GPOWrapper.GetConfiguredCopyAsUNCEnabledValue();
+            if (_copyAsUNCEnabledGpoRuleConfiguration == GpoRuleConfigured.Disabled || _copyAsUNCEnabledGpoRuleConfiguration == GpoRuleConfigured.Enabled)
+            {
+                // Get the enabled state from GPO.
+                _copyAsUNCEnabledStateIsGPOConfigured = true;
+                _isCopyAsUNCEnabled = _copyAsUNCEnabledGpoRuleConfiguration == GpoRuleConfigured.Enabled;
+            }
 
             _qoiThumbnailEnabledGpoRuleConfiguration = GPOWrapper.GetConfiguredQoiThumbnailsEnabledValue();
             if (_qoiThumbnailEnabledGpoRuleConfiguration == GpoRuleConfigured.Disabled || _qoiThumbnailEnabledGpoRuleConfiguration == GpoRuleConfigured.Enabled)
@@ -1146,6 +1156,42 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             {
                 return GeneralSettingsConfig.IsElevated;
             }
+        }
+
+        private GpoRuleConfigured _copyAsUNCEnabledGpoRuleConfiguration;
+        private bool _copyAsUNCEnabledStateIsGPOConfigured;
+        private bool _isCopyAsUNCEnabled;
+
+        public bool IsCopyAsUNCEnabled
+        {
+            get => _isCopyAsUNCEnabled;
+            set
+            {
+                if (_copyAsUNCEnabledStateIsGPOConfigured)
+                {
+                    return;
+                }
+
+                if (_isCopyAsUNCEnabled != value)
+                {
+                    _isCopyAsUNCEnabled = value;
+                    GeneralSettingsConfig.Enabled.CopyAsUNC = value;
+                    OnPropertyChanged(nameof(IsCopyAsUNCEnabled));
+
+                    OutGoingGeneralSettings outgoing = new OutGoingGeneralSettings(GeneralSettingsConfig);
+                    SendConfigMSG(outgoing.ToString());
+                }
+            }
+        }
+
+        public bool IsCopyAsUNCEnabledGpoConfigured
+        {
+            get => _copyAsUNCEnabledStateIsGPOConfigured;
+        }
+
+        public bool IsCopyAsUNCAvailable
+        {
+            get => OSVersionHelper.IsWindows11();
         }
 
         private void RaisePropertyChanged([CallerMemberName] string propertyName = null)

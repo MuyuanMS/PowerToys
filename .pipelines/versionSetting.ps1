@@ -128,6 +128,15 @@ $fileLocksmithContextMenuAppManifest.Package.Identity.Version = $manifestVersion
 Write-Host "FileLocksmithContextMenu version" $fileLocksmithContextMenuAppManifest.Package.Identity.Version
 $fileLocksmithContextMenuAppManifest.Save($fileLocksmithContextMenuAppManifestWriteFileLocation);
 
+# Set CopyAsUNCContextMenu package version in AppManifest.xml
+$copyAsUNCContextMenuAppManifestWriteFileLocation = $PSScriptRoot + '/../src/modules/CopyAsUNC/CopyAsUNCContextMenu/AppxManifest.xml';
+$copyAsUNCContextMenuAppManifestReadFileLocation = $copyAsUNCContextMenuAppManifestWriteFileLocation;
+
+[XML]$copyAsUNCContextMenuAppManifest = Get-Content $copyAsUNCContextMenuAppManifestReadFileLocation
+$copyAsUNCContextMenuAppManifest.Package.Identity.Version = $manifestVersionNumber
+Write-Host "CopyAsUNCContextMenu version" $copyAsUNCContextMenuAppManifest.Package.Identity.Version
+$copyAsUNCContextMenuAppManifest.Save($copyAsUNCContextMenuAppManifestWriteFileLocation);
+
 # Set NewPlusContextMenu package version in AppManifest.xml
 $newPlusContextMenuAppManifestWriteFileLocation = $PSScriptRoot + '/../src/modules/NewPlus/NewShellExtensionContextMenu/AppxManifest.xml';
 $newPlusContextMenuAppManifestReadFileLocation = $newPlusContextMenuAppManifestWriteFileLocation;
