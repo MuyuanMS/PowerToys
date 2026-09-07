@@ -82,6 +82,7 @@ public sealed partial class ListItemsView : UserControl,
     private RectangleGeometry? _numberedShortcutCueClip;
     private ListViewBase? _numberedShortcutCueTrackedView;
     private ScrollViewer? _numberedShortcutCueScrollViewer;
+
     public bool ShowNumberedShortcutCues { get; set; }
 
     public ListViewModel? ViewModel
