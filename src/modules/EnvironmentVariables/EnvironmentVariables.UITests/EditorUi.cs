@@ -316,7 +316,7 @@ internal sealed class EditorUi(Session session, TestContext context)
 
     internal void AssertAppliedVariable(string name, string? value)
     {
-        Step($"Checking Applied variables: {name}={value ?? "<absent>"}");
+        Step($"Checking Applied variable state: {name} ({(value is null ? "absent" : "present")})");
         var panel = Session.Find<Element>(By.AccessibilityId("AppliedVariablesScrollViewer"));
         Wait(
             () =>
