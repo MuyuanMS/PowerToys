@@ -34,6 +34,7 @@ public partial class TabbedPageViewModel : PageViewModel
     private readonly Dictionary<string, CachedChild> _childCache = [];
     private readonly Dictionary<TabViewModel, string> _tabCacheKeys = [];
     private bool _isDisposed;
+    private bool _normalizingTabIds;
 
     private static readonly string _fallbackPlaceholder = "Type here to search...";
 
@@ -99,6 +100,16 @@ public partial class TabbedPageViewModel : PageViewModel
 
         DoOnUiThread(() =>
         {
+            if (_isDisposed)
+            {
+                foreach (var tab in newTabs)
+                {
+                    tab.SafeCleanup();
+                }
+
+                return;
+            }
+
             ListHelpers.InPlaceUpdateList(Tabs, newTabs);
             AttachTabPropertyChanged();
             UpdateProperty(nameof(HasTabs));
@@ -141,9 +152,10 @@ public partial class TabbedPageViewModel : PageViewModel
         for (var i = 0; i < tabs.Count; i++)
         {
             var tab = tabs[i];
+            tab.ApplyCollisionSuffix(null);
             if (!seen.Add(tab.TabId))
             {
-                tab.AddCollisionSuffix(i.ToString(CultureInfo.InvariantCulture));
+                tab.ApplyCollisionSuffix(i.ToString(CultureInfo.InvariantCulture));
                 seen.Add(tab.TabId);
             }
         }
@@ -166,6 +178,16 @@ public partial class TabbedPageViewModel : PageViewModel
 
             DoOnUiThread(() =>
             {
+                if (_isDisposed)
+                {
+                    foreach (var tab in newTabs)
+                    {
+                        tab.SafeCleanup();
+                    }
+
+                    return;
+                }
+
                 var activeId = SelectedTab?.TabId;
 
                 // Drop cached children for tabs that no longer exist.
@@ -330,13 +352,33 @@ public partial class TabbedPageViewModel : PageViewModel
 
         if (e.PropertyName is nameof(TabViewModel.Page) or nameof(TabViewModel.TabId))
         {
-            var oldCacheKey = _tabCacheKeys.GetValueOrDefault(tab);
-            if (!string.IsNullOrEmpty(oldCacheKey) && oldCacheKey != tab.TabId && _childCache.Remove(oldCacheKey, out var oldCached))
+            if (_normalizingTabIds)
             {
-                DisposeChild(oldCached);
+                return;
             }
 
-            _tabCacheKeys[tab] = tab.TabId;
+            var oldCacheKeys = new Dictionary<TabViewModel, string>(_tabCacheKeys);
+
+            _normalizingTabIds = true;
+            try
+            {
+                EnsureUniqueTabIds(Tabs.ToList());
+            }
+            finally
+            {
+                _normalizingTabIds = false;
+            }
+
+            foreach (var currentTab in Tabs)
+            {
+                var oldCacheKey = oldCacheKeys.GetValueOrDefault(currentTab);
+                if (!string.IsNullOrEmpty(oldCacheKey) && oldCacheKey != currentTab.TabId && _childCache.Remove(oldCacheKey, out var oldCached))
+                {
+                    DisposeChild(oldCached);
+                }
+
+                _tabCacheKeys[currentTab] = currentTab.TabId;
+            }
 
             var staleIds = _childCache
                 .Where(entry => !Tabs.Any(tabViewModel => tabViewModel.TabId == entry.Key && ReferenceEquals(tabViewModel.Page, entry.Value.Page)))
@@ -367,7 +409,7 @@ public partial class TabbedPageViewModel : PageViewModel
         // Mirror ShellViewModel.LoadPageViewModelAsync: initialize on a
         // background thread so the tab strip stays responsive. The child view
         // model marshals IsInitialized/property updates back onto the UI thread.
-        return Task.Run(() =>
+        return Task.Run(async () =>
         {
             try
             {
@@ -377,6 +419,10 @@ public partial class TabbedPageViewModel : PageViewModel
                 }
 
                 cached.Child.InitializeCommand.Execute(null);
+                if (cached.Child.InitializeCommand.ExecutionTask is not null)
+                {
+                    await cached.Child.InitializeCommand.ExecutionTask;
+                }
 
                 if (!cached.InitializationCts.IsCancellationRequested)
                 {
@@ -492,7 +538,7 @@ public partial class TabbedPageViewModel : PageViewModel
 
         if (cached.InitializationTask is { IsCompleted: false } task)
         {
-            _ = task.ContinueWith(_ => Cleanup(), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+            _ = task.ContinueWith(_ => DoOnUiThread(Cleanup), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
         }
         else
         {
