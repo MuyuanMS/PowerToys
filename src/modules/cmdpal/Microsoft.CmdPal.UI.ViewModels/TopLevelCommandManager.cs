@@ -1079,7 +1079,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
 
         _extensionLoadCts.Cancel();
         _extensionLoadCts.Dispose();
-        _providerChanges.Dispose();
+        _providerChanges.CompleteWithoutWaiting();
         List<CommandProviderWrapper> providersToDispose;
         List<TopLevelViewModel> commandsToCleanup;
         List<TopLevelViewModel> bandsToCleanup;
