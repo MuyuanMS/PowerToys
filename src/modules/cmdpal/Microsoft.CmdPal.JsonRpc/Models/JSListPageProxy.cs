@@ -38,6 +38,7 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
     private readonly JSLazyCache<ICommandItem?> _emptyContent;
     private readonly object _getItemsLock = new();
     private readonly object _itemCacheLock = new();
+    private readonly CancellationTokenSource _getItemsCancellation = new();
     private Task<IListItem[]>? _getItemsTask;
     private int _getItemsTaskGeneration;
     private int _itemsChangedGeneration;
@@ -197,7 +198,7 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
             var response = await Connection.SendRequestAsync(
                 "listPage/getItems",
                 new JsonObject { ["pageId"] = _pageId },
-                CancellationToken.None).ConfigureAwait(false);
+                _getItemsCancellation.Token).ConfigureAwait(false);
 
             if (response.Error != null)
             {
@@ -220,6 +221,10 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
                 UpdatePageState(response.Result);
                 return ParseListItems(response.Result);
             }
+        }
+        catch (OperationCanceledException) when (IsDisposed())
+        {
+            return [];
         }
         catch (Exception ex)
         {
@@ -401,6 +406,8 @@ internal sealed partial class JSListPageProxy : JSObservableProxyBase, IListPage
 
             _disposed = true;
         }
+
+        _getItemsCancellation.Cancel();
 
         lock (_getItemsLock)
         {
