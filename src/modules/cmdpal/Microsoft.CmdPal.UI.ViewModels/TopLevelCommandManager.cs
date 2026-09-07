@@ -829,58 +829,58 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             await Task.Factory.StartNew(
             () =>
             {
-               lock (_providerPublicationLock)
-               {
-                   if (ct.IsCancellationRequested || generation != _providerChangeGeneration)
-                   {
-                       DisposeWrappers(removedWrapperList);
-                       return;
-                   }
-
-                   List<CommandProviderWrapper> registeredWrappersToDispose;
-                   lock (_commandProvidersLock)
-                   {
-                       registeredWrappersToDispose = [.. _commandProviders.Where(w => removedProviderIds.Contains(w.ProviderId))];
-                       _commandProviders.RemoveAll(w => removedProviderIds.Contains(w.ProviderId));
-                   }
-
-               lock (TopLevelCommands)
-               {
-                    if (commandsToRemove.Count != 0)
+                lock (_providerPublicationLock)
+                {
+                    if (ct.IsCancellationRequested || generation != _providerChangeGeneration)
                     {
-                        foreach (var deleted in commandsToRemove)
+                        DisposeWrappers(removedWrapperList);
+                        return;
+                    }
+
+                    List<CommandProviderWrapper> registeredWrappersToDispose;
+                    lock (_commandProvidersLock)
+                    {
+                        registeredWrappersToDispose = [.. _commandProviders.Where(w => removedProviderIds.Contains(w.ProviderId))];
+                        _commandProviders.RemoveAll(w => removedProviderIds.Contains(w.ProviderId));
+                    }
+
+                    lock (TopLevelCommands)
+                    {
+                        if (commandsToRemove.Count != 0)
                         {
-                            TopLevelCommands.Remove(deleted);
+                            foreach (var deleted in commandsToRemove)
+                            {
+                                TopLevelCommands.Remove(deleted);
+                            }
                         }
                     }
-                }
 
-                lock (_dockBandsLock)
-                {
-                    if (bandsToRemove.Count != 0)
+                    lock (_dockBandsLock)
                     {
-                        foreach (var deleted in bandsToRemove)
+                        if (bandsToRemove.Count != 0)
                         {
-                            DockBands.Remove(deleted);
+                            foreach (var deleted in bandsToRemove)
+                            {
+                                DockBands.Remove(deleted);
+                            }
                         }
                     }
+
+                    foreach (var deleted in commandsToRemove)
+                    {
+                        deleted.Cleanup();
+                    }
+
+                    foreach (var deleted in bandsToRemove)
+                    {
+                        deleted.Cleanup();
+                    }
+
+                    DisposeWrappers(registeredWrappersToDispose);
+
+                    var registeredWrappers = new HashSet<CommandProviderWrapper>(registeredWrappersToDispose);
+                    DisposeWrappers(removedWrapperList.Where(w => !registeredWrappers.Contains(w)));
                 }
-
-                foreach (var deleted in commandsToRemove)
-                {
-                    deleted.Cleanup();
-                }
-
-                foreach (var deleted in bandsToRemove)
-                {
-                    deleted.Cleanup();
-                }
-
-                DisposeWrappers(registeredWrappersToDispose);
-
-                var registeredWrappers = new HashSet<CommandProviderWrapper>(registeredWrappersToDispose);
-                DisposeWrappers(removedWrapperList.Where(w => !registeredWrappers.Contains(w)));
-               }
             },
             CancellationToken.None,
             TaskCreationOptions.None,

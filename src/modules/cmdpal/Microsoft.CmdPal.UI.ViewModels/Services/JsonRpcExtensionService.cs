@@ -433,6 +433,7 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IDispos
         {
             return;
         }
+
         try
         {
             List<JSExtensionWrapper> toDispose;
