@@ -41,7 +41,20 @@ public:
         _state->stop = true;
         if (_thread.joinable())
         {
-            _thread.join();
+            auto done = _state->done.get_future();
+            if (done.wait_for(std::chrono::seconds(2)) == std::future_status::ready)
+            {
+                _thread.join();
+            }
+            else
+            {
+                // Keep ownership until the WMI call exits; never abandon a joinable
+                // worker and its COM/WMI resources.
+                auto retiringThread = std::move(_thread);
+                std::thread([thread = std::move(retiringThread)]() mutable {
+                    thread.join();
+                }).detach();
+            }
         }
     }
 
