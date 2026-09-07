@@ -5,17 +5,16 @@
 #include <common/utils/resources.h>
 
 #include "CopyAsUNCLib/Settings.h"
+#include "CopyAsUNCLib/PathUtils.h"
 
 #include <Shlwapi.h>
 #include <shobjidl_core.h>
-#include <winnetwk.h>
 #include <string>
-#include <vector>
+#include <wil/resource.h>
 #include <wrl/module.h>
 
 #include "Generated Files/resource.h"
 
-#pragma comment(lib, "Mpr.lib")
 #pragma comment(lib, "Shlwapi.lib")
 
 using namespace Microsoft::WRL;
@@ -93,9 +92,7 @@ public:
                 LPWSTR filePath = nullptr;
                 if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &filePath)))
                 {
-                    // Check first 3 chars for drive root (e.g. "Z:\")
-                    std::wstring root(filePath, min((size_t)3, wcslen(filePath)));
-                    if (PathIsUNCW(filePath) || GetDriveTypeW(root.c_str()) == DRIVE_REMOTE)
+                    if (copy_as_unc::IsCopyablePath(filePath))
                     {
                         *cmdState = ECS_ENABLED;
                     }
@@ -118,80 +115,27 @@ public:
         if (FAILED(selection->GetCount(&count)) || count != 1)
             return S_OK;
 
-        IShellItem* item = nullptr;
-        if (FAILED(selection->GetItemAt(0, &item)))
-            return S_OK;
-
-        LPWSTR filePath = nullptr;
-        if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &filePath)))
+        ComPtr<IShellItem> item;
+        HRESULT result = selection->GetItemAt(0, item.ReleaseAndGetAddressOf());
+        if (FAILED(result))
         {
-            std::wstring uncPath;
-
-            // If already a UNC path, use it directly
-            if (wcslen(filePath) >= 2 && filePath[0] == L'\\' && filePath[1] == L'\\')
-            {
-                uncPath = filePath;
-            }
-            else
-            {
-                // Resolve mapped drive letter to UNC via WNetGetUniversalName
-                DWORD bufSize = MAX_PATH * 2;
-                std::vector<BYTE> buf(bufSize);
-                DWORD result = WNetGetUniversalNameW(filePath, UNIVERSAL_NAME_INFO_LEVEL, buf.data(), &bufSize);
-
-                if (result == ERROR_MORE_DATA)
-                {
-                    buf.resize(bufSize);
-                    result = WNetGetUniversalNameW(filePath, UNIVERSAL_NAME_INFO_LEVEL, buf.data(), &bufSize);
-                }
-
-                if (result == NO_ERROR)
-                {
-                    auto info = reinterpret_cast<UNIVERSAL_NAME_INFOW*>(buf.data());
-                    uncPath = info->lpUniversalName;
-                }
-            }
-
-            if (!uncPath.empty())
-            {
-                size_t byteLen = (uncPath.size() + 1) * sizeof(wchar_t);
-                HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, byteLen);
-                if (hMem)
-                {
-                    void* locked = GlobalLock(hMem);
-                    if (locked)
-                    {
-                        memcpy(locked, uncPath.c_str(), byteLen);
-                        GlobalUnlock(hMem);
-
-                        HWND clipboardOwner = nullptr;
-                        if (!m_site || FAILED(IUnknown_GetWindow(m_site.Get(), &clipboardOwner)))
-                        {
-                            clipboardOwner = GetForegroundWindow();
-                        }
-
-                        if (clipboardOwner && OpenClipboard(clipboardOwner))
-                        {
-                            if (EmptyClipboard() && SetClipboardData(CF_UNICODETEXT, hMem) != nullptr)
-                            {
-                                hMem = nullptr;
-                            }
-                            CloseClipboard();
-                        }
-                    }
-
-                    if (hMem)
-                    {
-                        GlobalFree(hMem);
-                    }
-                }
-            }
-
-            CoTaskMemFree(filePath);
+            return result;
         }
 
-        item->Release();
-        return S_OK;
+        wil::unique_cotaskmem_string filePath;
+        result = item->GetDisplayName(SIGDN_FILESYSPATH, filePath.put());
+        if (FAILED(result))
+        {
+            return result;
+        }
+
+        HWND clipboardOwner = nullptr;
+        if (!m_site || FAILED(IUnknown_GetWindow(m_site.Get(), &clipboardOwner)))
+        {
+            clipboardOwner = GetForegroundWindow();
+        }
+
+        return copy_as_unc::ResolveAndCopyPath(filePath.get(), clipboardOwner);
     }
     catch (...)
     {
