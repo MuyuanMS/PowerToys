@@ -215,6 +215,14 @@ export class ExtensionRuntime {
     this.initError = null;
     this.initSettled = init.then(
       (provider) => {
+        if (this.disposed) {
+          void Promise.resolve(provider.dispose?.()).catch((error: unknown) => {
+            process.stderr.write(
+              `cmdpal-sdk: late provider disposal failed: ${describeError(error)}\n`,
+            );
+          });
+          return;
+        }
         this.provider = provider;
         this.primed = false;
         this.initState = 'ready';

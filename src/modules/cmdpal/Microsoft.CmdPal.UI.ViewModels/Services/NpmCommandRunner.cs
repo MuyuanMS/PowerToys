@@ -601,7 +601,8 @@ public sealed class NpmCommandRunner : INpmCommandRunner
 
             // lockfileVersion 2 and 3 use a "packages" map keyed by install path. The root package has
             // an empty key and no resolution of its own. A "link": true entry points at a local
-            // workspace and is skipped. Every other entry must carry a trusted resolved URL and hash.
+            // workspace and is not acceptable in an installed registry package. Every other
+            // entry must carry a trusted resolved URL and hash.
             if (root.TryGetProperty("packages", out var packages) && packages.ValueKind == JsonValueKind.Object)
             {
                 foreach (var package in packages.EnumerateObject())
@@ -614,7 +615,7 @@ public sealed class NpmCommandRunner : INpmCommandRunner
                     if (package.Value.TryGetProperty("link", out var link)
                         && link.ValueKind == JsonValueKind.True)
                     {
-                        continue;
+                        return Resources.npm_runner_lockfile_untrusted;
                     }
 
                     if (!IsTrustedResolution(package.Value))

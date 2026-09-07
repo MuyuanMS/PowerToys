@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 
 namespace Microsoft.CmdPal.UI.ViewModels.Services;
@@ -60,6 +61,76 @@ internal static class NodeRuntimeLocator
         }
 
         return null;
+    }
+
+    internal static bool IsCompatible(string nodeExecutable, string? requirement, out string? reason)
+    {
+        reason = null;
+        if (string.IsNullOrWhiteSpace(requirement))
+        {
+            return true;
+        }
+
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = nodeExecutable,
+            Arguments = "--version",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+        });
+        if (process is null)
+        {
+            reason = "Node.js version could not be determined.";
+            return false;
+        }
+
+        var output = process.StandardOutput.ReadToEnd().Trim();
+        process.WaitForExit();
+        if (!Version.TryParse(output.TrimStart('v'), out var actual))
+        {
+            reason = $"Node.js returned an invalid version '{output}'.";
+            return false;
+        }
+
+        foreach (var clause in requirement.Split("||", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (TryMatchClause(actual, clause))
+            {
+                return true;
+            }
+        }
+
+        reason = $"Node.js {actual} does not satisfy the declared engine requirement '{requirement}'.";
+        return false;
+    }
+
+    private static bool TryMatchClause(Version actual, string clause)
+    {
+        var value = clause.Trim();
+        var op = value.StartsWith(">=") || value.StartsWith("<=")
+            ? value[..2]
+            : value.Length > 0 && "> < = ^ ~".Contains(value[0])
+                ? value[..1]
+                : string.Empty;
+        var versionText = value.TrimStart('>', '<', '=', '^', '~', ' ');
+        if (!Version.TryParse(versionText, out var requested))
+        {
+            return false;
+        }
+
+        return op switch
+        {
+            ">=" => actual.CompareTo(requested) >= 0,
+            "<=" => actual.CompareTo(requested) <= 0,
+            ">" => actual.CompareTo(requested) > 0,
+            "<" => actual.CompareTo(requested) < 0,
+            "^" => actual.CompareTo(requested) >= 0 && actual.Major == requested.Major,
+            "~" => actual.CompareTo(requested) >= 0 && actual.Major == requested.Major && actual.Minor == requested.Minor,
+            "=" or "" => actual.CompareTo(requested) == 0,
+            _ => false,
+        };
     }
 
     private static IReadOnlyList<string> GetPathDirectories()

@@ -38,6 +38,28 @@ const provider: ICommandProvider = {
 };
 
 describe('initialization failure propagation', () => {
+  it('disposes a provider that finishes initialization after runtime disposal', async () => {
+    let resolveProvider!: (provider: ICommandProvider) => void;
+    const providerPromise = new Promise<ICommandProvider>((resolve) => {
+      resolveProvider = resolve;
+    });
+    const providerDispose = vi.fn();
+    const { runtime } = createHarness();
+
+    runtime.beginInitialization(providerPromise);
+    await runtime.dispose();
+    resolveProvider({
+      id: 'late',
+      displayName: 'Late',
+      topLevelCommands: () => [],
+      dispose: providerDispose,
+    });
+    await providerPromise;
+    await Promise.resolve();
+
+    expect(providerDispose).toHaveBeenCalledTimes(1);
+  });
+
   it('answers initialize with an error when provider creation rejects', async () => {
     const { runtime, sent, fatal } = createHarness();
     runtime.beginInitialization(Promise.reject(new Error('creation boom')));

@@ -66,6 +66,10 @@ jobs:
 
   - pwsh: |-
       npm ci --cache "$(Pipeline.Workspace)\.npm" --prefer-offline &&
+      npm run typecheck &&
+      npm run lint &&
+      npm test &&
+      npm run verify:pack &&
       npm run build
     workingDirectory: $(Build.SourcesDirectory)\src\modules\cmdpal\ts-sdk
     displayName: Build CmdPal TypeScript SDK dependency

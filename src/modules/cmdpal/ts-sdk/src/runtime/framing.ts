@@ -41,8 +41,12 @@ function parseContentLength(headerBlock: string): number | null {
     if (`${name}:` !== CONTENT_LENGTH_PREFIX) {
       continue;
     }
-    const value = Number.parseInt(line.slice(separator + 1).trim(), 10);
-    return Number.isNaN(value) || value < 0 ? null : value;
+    const rawValue = line.slice(separator + 1).trim();
+    if (!/^\d+$/.test(rawValue)) {
+      return null;
+    }
+    const value = Number(rawValue);
+    return Number.isSafeInteger(value) ? value : null;
   }
   return null;
 }
