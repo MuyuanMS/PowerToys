@@ -349,7 +349,10 @@ internal sealed class EditorUi(Session session, TestContext context)
             timeoutMS: 20_000,
             requiredConsecutiveMatches: 2,
             pollIntervalMS: 200,
-            shouldRetryException: exception => exception is IOException or JsonException);
+            shouldRetryException: exception =>
+                exception is IOException or JsonException ||
+                exception is AssertFailedException &&
+                exception.Message.Contains("stale_element", StringComparison.OrdinalIgnoreCase));
         Assert.IsTrue(result.Succeeded, $"{failure} Last transient error: {result.LastException}");
     }
 }
