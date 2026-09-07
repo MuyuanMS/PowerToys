@@ -4,7 +4,10 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Text;
 
 namespace Microsoft.CmdPal.UI.ViewModels.Services;
 
@@ -20,6 +23,7 @@ namespace Microsoft.CmdPal.UI.ViewModels.Services;
 internal static class NodeRuntimeLocator
 {
     private const string NodeExecutableName = "node.exe";
+    private static readonly Version MinimumSupportedVersion = new(22, 0, 0);
 
     /// <summary>
     /// Resolves <c>node.exe</c> from the current process PATH.
@@ -60,6 +64,324 @@ internal static class NodeRuntimeLocator
         }
 
         return null;
+    }
+
+    internal static bool IsCompatible(string nodeExecutable, string? requirement, out string? reason)
+    {
+        reason = null;
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = nodeExecutable,
+                Arguments = "--version",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+            });
+            if (process is null)
+            {
+                reason = "Node.js version could not be determined.";
+                return false;
+            }
+
+            var standardOutput = new StringBuilder();
+            var standardError = new StringBuilder();
+            process.OutputDataReceived += (_, args) =>
+            {
+                if (args.Data is not null)
+                {
+                    standardOutput.AppendLine(args.Data);
+                }
+            };
+            process.ErrorDataReceived += (_, args) =>
+            {
+                if (args.Data is not null)
+                {
+                    standardError.AppendLine(args.Data);
+                }
+            };
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            if (!process.WaitForExit(5000))
+            {
+                process.Kill(entireProcessTree: true);
+                reason = "Node.js version probe timed out.";
+                return false;
+            }
+
+            process.WaitForExit();
+
+            var output = standardOutput.ToString().Trim();
+            if (!Version.TryParse(output.TrimStart('v'), out var actual))
+            {
+                reason = $"Node.js returned an invalid version '{output}'. {standardError}".Trim();
+                return false;
+            }
+
+            if (IsSupportedNodeVersion(actual, requirement))
+            {
+                return true;
+            }
+        }
+        catch (Exception ex) when (
+            ex is ArgumentException
+            or FileNotFoundException
+            or InvalidOperationException
+            or System.ComponentModel.Win32Exception)
+        {
+            reason = $"Node.js version could not be determined: {ex.Message}";
+            return false;
+        }
+
+        reason ??= string.IsNullOrWhiteSpace(requirement)
+            ? "Node.js 22.0.0 or newer is required."
+            : $"Node.js does not satisfy the supported minimum and declared engine requirement '{requirement}'.";
+        return false;
+    }
+
+    internal static bool IsSupportedNodeVersion(Version actual, string? requirement)
+    {
+        ArgumentNullException.ThrowIfNull(actual);
+
+        return actual.CompareTo(MinimumSupportedVersion) >= 0
+            && (string.IsNullOrWhiteSpace(requirement) || MatchesRequirement(actual, requirement));
+    }
+
+    internal static bool MatchesRequirement(Version actual, string requirement)
+    {
+        ArgumentNullException.ThrowIfNull(actual);
+        ArgumentException.ThrowIfNullOrWhiteSpace(requirement);
+
+        foreach (var clause in requirement.Split("||", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (TryMatchClause(actual, clause))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryMatchClause(Version actual, string clause)
+    {
+        clause = clause.Replace("~>", "~", StringComparison.Ordinal);
+        var hyphen = clause.IndexOf(" - ", StringComparison.Ordinal);
+        if (hyphen >= 0)
+        {
+            return TryMatchToken(actual, $">={clause[..hyphen].Trim()}")
+                && TryMatchToken(actual, $"<={clause[(hyphen + 3)..].Trim()}");
+        }
+
+        var rawTokens = clause.Split((char[]?)null, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (rawTokens.Length == 0)
+        {
+            return false;
+        }
+
+        var tokens = new List<string>();
+        for (var index = 0; index < rawTokens.Length; index++)
+        {
+            if (IsComparator(rawTokens[index]))
+            {
+                if (index + 1 >= rawTokens.Length)
+                {
+                    return false;
+                }
+
+                tokens.Add(rawTokens[index] + rawTokens[++index]);
+            }
+            else
+            {
+                tokens.Add(rawTokens[index]);
+            }
+        }
+
+        return tokens.All(token => TryMatchToken(actual, token));
+    }
+
+    private static bool IsComparator(string token) => token is ">" or ">=" or "<" or "<=" or "=" or "^" or "~";
+
+    private static bool TryMatchToken(Version actual, string token)
+    {
+        var op = token.StartsWith(">=", StringComparison.Ordinal) || token.StartsWith("<=", StringComparison.Ordinal)
+            ? token[..2]
+            : token.Length > 0 && "> < = ^ ~".Contains(token[0])
+                ? token[..1]
+                : string.Empty;
+        var versionText = token[op.Length..];
+        if (versionText.StartsWith('v'))
+        {
+            versionText = versionText[1..];
+        }
+
+        var buildMetadataIndex = versionText.IndexOf('+');
+        if (buildMetadataIndex >= 0)
+        {
+            var buildMetadata = versionText[(buildMetadataIndex + 1)..];
+            if (buildMetadataIndex == 0 || !IsValidBuildMetadata(buildMetadata))
+            {
+                return false;
+            }
+
+            versionText = versionText[..buildMetadataIndex];
+        }
+
+        string? prerelease = null;
+        var prereleaseIndex = versionText.IndexOf('-');
+        if (prereleaseIndex >= 0)
+        {
+            prerelease = versionText[(prereleaseIndex + 1)..];
+            versionText = versionText[..prereleaseIndex];
+            if (!IsValidPrerelease(prerelease))
+            {
+                return false;
+            }
+        }
+
+        var parts = versionText.Split('.');
+        if (parts.Length > 3 || parts.Length == 0)
+        {
+            return false;
+        }
+
+        var components = new int[3];
+        var specifiedComponents = 0;
+        var sawWildcard = false;
+        for (var index = 0; index < parts.Length; index++)
+        {
+            if (parts[index] is "x" or "X" or "*")
+            {
+                sawWildcard = true;
+                continue;
+            }
+
+            if (sawWildcard || !IsCanonicalNumericIdentifier(parts[index]) || !int.TryParse(parts[index], out components[index]))
+            {
+                return false;
+            }
+
+            specifiedComponents++;
+        }
+
+        if (sawWildcard && specifiedComponents == parts.Length)
+        {
+            return false;
+        }
+
+        var lower = new Version(components[0], components[1], components[2]);
+        var upper = GetPartialUpperBound(components, specifiedComponents);
+
+        if (sawWildcard)
+        {
+            if (prerelease is not null)
+            {
+                return false;
+            }
+
+            return op switch
+            {
+                ">" => upper is not null && actual.CompareTo(upper) >= 0,
+                ">=" => actual.CompareTo(lower) >= 0,
+                "<" => actual.CompareTo(lower) < 0,
+                "<=" => upper is null || actual.CompareTo(upper) < 0,
+                "^" => specifiedComponents == 0 || (actual.CompareTo(lower) >= 0 && actual.CompareTo(GetCaretUpperBound(components)) < 0),
+                "=" or "" or "~" => (upper is null || actual.CompareTo(upper) < 0) && actual.CompareTo(lower) >= 0,
+                _ => false,
+            };
+        }
+
+        var comparison = CompareActualToRequested(actual, lower, prerelease);
+        if (specifiedComponents < 3 && op is "<=")
+        {
+            return upper is not null && actual.CompareTo(upper) < 0;
+        }
+
+        if (specifiedComponents < 3 && op is ">")
+        {
+            return upper is not null && actual.CompareTo(upper) >= 0;
+        }
+
+        if (specifiedComponents < 3 && op is ("" or "="))
+        {
+            return upper is not null && actual.CompareTo(lower) >= 0 && actual.CompareTo(upper) < 0;
+        }
+
+        return op switch
+        {
+            ">=" => comparison >= 0,
+            "<=" => comparison <= 0,
+            ">" => comparison > 0,
+            "<" => comparison < 0,
+            "^" => comparison >= 0 && actual.CompareTo(GetCaretUpperBound(components)) < 0,
+            "~" => comparison >= 0 && actual.CompareTo(GetTildeUpperBound(components, specifiedComponents)) < 0,
+            "=" or "" => prerelease is null && comparison == 0,
+            _ => false,
+        };
+    }
+
+    private static int CompareActualToRequested(Version actual, Version requested, string? requestedPrerelease)
+    {
+        var comparison = actual.CompareTo(requested);
+        return comparison == 0 && requestedPrerelease is not null ? 1 : comparison;
+    }
+
+    private static bool IsValidPrerelease(string prerelease)
+    {
+        return prerelease.Length > 0
+            && prerelease.Split('.').All(identifier =>
+                identifier.Length > 0
+                && identifier.All(character => char.IsAsciiLetterOrDigit(character) || character == '-')
+                && (!identifier.All(char.IsAsciiDigit) || IsCanonicalNumericIdentifier(identifier)));
+    }
+
+    private static bool IsValidBuildMetadata(string buildMetadata)
+    {
+        return buildMetadata.Length > 0
+            && buildMetadata.Split('.').All(identifier =>
+                identifier.Length > 0
+                && identifier.All(character => char.IsAsciiLetterOrDigit(character) || character == '-'));
+    }
+
+    private static bool IsCanonicalNumericIdentifier(string identifier)
+    {
+        return identifier.Length > 0
+            && identifier.All(char.IsAsciiDigit)
+            && (identifier.Length == 1 || identifier[0] != '0');
+    }
+
+    private static Version? GetPartialUpperBound(int[] components, int specifiedComponents)
+    {
+        return specifiedComponents switch
+        {
+            0 => null,
+            1 => new Version(components[0] + 1, 0, 0),
+            _ => new Version(components[0], components[1] + 1, 0),
+        };
+    }
+
+    private static Version GetCaretUpperBound(int[] components)
+    {
+        if (components[0] > 0)
+        {
+            return new Version(components[0] + 1, 0, 0);
+        }
+
+        if (components[1] > 0)
+        {
+            return new Version(0, components[1] + 1, 0);
+        }
+
+        return new Version(0, 0, components[2] + 1);
+    }
+
+    private static Version GetTildeUpperBound(int[] components, int specifiedComponents)
+    {
+        return specifiedComponents == 1
+            ? new Version(components[0] + 1, 0, 0)
+            : new Version(components[0], components[1] + 1, 0);
     }
 
     private static IReadOnlyList<string> GetPathDirectories()

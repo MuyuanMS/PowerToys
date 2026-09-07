@@ -38,6 +38,60 @@ const provider: ICommandProvider = {
 };
 
 describe('initialization failure propagation', () => {
+  it('disposes a provider that finishes initialization after runtime disposal', async () => {
+    let resolveProvider!: (provider: ICommandProvider) => void;
+    const providerPromise = new Promise<ICommandProvider>((resolve) => {
+      resolveProvider = resolve;
+    });
+    let finishDispose!: () => void;
+    const providerDispose = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishDispose = resolve;
+        }),
+    );
+    const { runtime } = createHarness();
+
+    runtime.beginInitialization(providerPromise);
+    const disposal = runtime.dispose();
+    resolveProvider({
+      id: 'late',
+      displayName: 'Late',
+      topLevelCommands: () => [],
+      dispose: providerDispose,
+    });
+    await providerPromise;
+    await Promise.resolve();
+
+    expect(providerDispose).toHaveBeenCalledTimes(1);
+    let disposalFinished = false;
+    void disposal.then(() => {
+      disposalFinished = true;
+    });
+    await Promise.resolve();
+    expect(disposalFinished).toBe(false);
+
+    finishDispose();
+    await disposal;
+    expect(disposalFinished).toBe(true);
+  });
+
+  it('ignores provider initialization rejection after runtime disposal', async () => {
+    let rejectProvider!: (error: Error) => void;
+    const providerPromise = new Promise<ICommandProvider>((_, reject) => {
+      rejectProvider = reject;
+    });
+    const { runtime, fatal } = createHarness();
+
+    runtime.beginInitialization(providerPromise);
+    const disposal = runtime.dispose();
+    rejectProvider(new Error('late rejection'));
+    await expect(providerPromise).rejects.toThrow('late rejection');
+    await disposal;
+
+    expect(fatal).not.toHaveBeenCalled();
+  });
+
   it('answers initialize with an error when provider creation rejects', async () => {
     const { runtime, sent, fatal } = createHarness();
     runtime.beginInitialization(Promise.reject(new Error('creation boom')));

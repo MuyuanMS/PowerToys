@@ -299,6 +299,12 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
             return;
         }
 
+        if (!NodeRuntimeLocator.IsCompatible(nodeExecutable, _manifest.Engines?.Node, out var versionError))
+        {
+            Logger.LogError($"Cannot start JS extension {_manifest.Name}: {versionError}");
+            return;
+        }
+
         Process? nodeProcess = null;
         JsonRpcConnection? connection = null;
         try

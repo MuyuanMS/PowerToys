@@ -215,11 +215,24 @@ export class ExtensionRuntime {
     this.initError = null;
     this.initSettled = init.then(
       (provider) => {
+        if (this.disposed) {
+          return Promise.resolve()
+            .then(() => provider.dispose?.())
+            .catch((error: unknown) => {
+              process.stderr.write(
+                `cmdpal-sdk: late provider disposal failed: ${describeError(error)}\n`,
+              );
+            });
+        }
         this.provider = provider;
         this.primed = false;
         this.initState = 'ready';
+        return undefined;
       },
       (error: unknown) => {
+        if (this.disposed) {
+          return;
+        }
         this.initState = 'failed';
         this.initError = { code: JsonRpcErrorCode.InternalError, message: describeError(error) };
         this.reportFatal?.(1);
@@ -336,8 +349,12 @@ export class ExtensionRuntime {
     this.disposed = true;
     const provider = this.provider;
     try {
-      if (provider?.dispose) {
-        await withTimeout(Promise.resolve(provider.dispose()), timeoutMs);
+      if (provider) {
+        if (provider.dispose) {
+          await withTimeout(Promise.resolve().then(() => provider.dispose?.()), timeoutMs);
+        }
+      } else {
+        await withTimeout(this.initSettled, timeoutMs);
       }
     } catch (error) {
       process.stderr.write(`cmdpal-sdk: provider disposal failed: ${describeError(error)}\n`);

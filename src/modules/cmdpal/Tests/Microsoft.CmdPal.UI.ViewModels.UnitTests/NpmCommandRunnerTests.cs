@@ -413,6 +413,24 @@ public class NpmCommandRunnerTests
     }
 
     [TestMethod]
+    public void VerifyLockfileIntegrity_RejectsLinkedPackage()
+    {
+        var dir = CreateTempDirectory();
+        var lockfile = """
+        {
+          "lockfileVersion": 3,
+          "packages": {
+            "": { "name": "root" },
+            "node_modules/local": { "link": true }
+          }
+        }
+        """;
+        File.WriteAllText(Path.Combine(dir, "package-lock.json"), lockfile);
+
+        Assert.IsNotNull(NpmCommandRunner.VerifyLockfileIntegrity(dir));
+    }
+
+    [TestMethod]
     public void VerifyLockfileIntegrity_RejectsIntegrityLessResolution()
     {
         var dir = CreateTempDirectory();
