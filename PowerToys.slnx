@@ -801,6 +801,7 @@
     <Project Path="src/modules/LightSwitch/LightSwitchService/LightSwitchService.vcxproj" Id="08e71c67-6a7e-4ca1-b04e-2fb336410bac" />
   </Folder>
   <Folder Name="/modules/LightSwitch/Tests/">
+    <Project Path="src/modules/LightSwitch/LightSwitchService.UnitTests/LightSwitchService.UnitTests.vcxproj" Id="d9fa7f6d-72d5-4f8d-9d7a-cf5b45a4a2d8" />
     <Project Path="src/modules/LightSwitch/Tests/LightSwitch.UITests/LightSwitch.UITests.csproj">
       <Platform Solution="*|ARM64" Project="ARM64" />
       <Platform Solution="*|x64" Project="x64" />
@@ -1297,4 +1298,3 @@
   <Project Path="tools/CliShim/CliShim.vcxproj" Id="8a7fb7fa-65ea-4004-ba73-1b237435a57b" />
   <Project Path="tools/CliShim.UnitTests/CliShim.UnitTests.vcxproj" Id="d4b0ed68-867d-46b4-a03f-ec52b9fbebe5" />
 </Solution>
-
