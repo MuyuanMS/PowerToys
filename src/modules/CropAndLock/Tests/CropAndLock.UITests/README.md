@@ -183,7 +183,7 @@ guest must trust it. Missing this setup skips only the signing-dependent scenari
 in local Test Explorer and fails the prerequisite in CI; unsigned Release
 companions cannot exercise authenticated Settings IPC.
 After validation, remove the session-added certificate thumbprint from the guest
-Root/TrustedPeople stores; do not remove pre-existing certificates.
+Root/TrustedPeople stores; do not remove preexisting certificates.
 
 Run the staged executable **inside the UI-test VM**, not on a working desktop:
 

@@ -167,5 +167,5 @@ After the same-machine prepared run, close PowerToys/tests and return to an
 This removes the recorded test certificates from trust stores and removes their
 private keys; use it only for the disposable signer used by this run. For the
 separate-host/guest workflow, remove only the trust entries added to the guest,
-without deleting a pre-existing host signing key. Restoring the disposable VM's
+without deleting a preexisting host signing key. Restoring the disposable VM's
 baseline checkpoint is another way to return to a clean test environment.

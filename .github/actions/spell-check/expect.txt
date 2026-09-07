@@ -1984,6 +1984,7 @@ UIA
 UIDs
 UIEx
 uild
+UITEST
 uitests
 UITo
 ULONGLONG
