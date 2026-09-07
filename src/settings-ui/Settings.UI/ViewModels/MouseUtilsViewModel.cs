@@ -47,7 +47,13 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             ArgumentNullException.ThrowIfNull(autoHideCursorSettingsRepository);
 
             AutoHideCursorSettingsConfig = autoHideCursorSettingsRepository.SettingsConfig;
-            AutoHideCursorSettingsConfig.UpgradeSettingsConfiguration();
+            if (AutoHideCursorSettingsConfig.UpgradeSettingsConfiguration())
+            {
+                SettingsUtils.SaveSettings(
+                    AutoHideCursorSettingsConfig.ToJsonString(),
+                    AutoHideCursorSettings.ModuleName);
+            }
+
             _autoHideCursorHideOnTyping = AutoHideCursorSettingsConfig.Properties.HideOnTyping.Value;
             _autoHideCursorHideOnIdle = AutoHideCursorSettingsConfig.Properties.HideOnIdle.Value;
             _autoHideCursorIdleDelaySeconds = Math.Clamp(

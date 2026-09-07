@@ -53,9 +53,11 @@ namespace AutoHideCursorUnitTests
         TEST_METHOD (IdleDelayIsClamped)
         {
             const auto tooShort = State::NormalizeConfiguration({ false, true, 1 });
+            const auto rounded = State::NormalizeConfiguration({ false, true, 1500 });
             const auto tooLong = State::NormalizeConfiguration({ false, true, UINT32_MAX });
 
             Assert::AreEqual(minimumIdleDelayMs, tooShort.idleDelayMs);
+            Assert::AreEqual(1000u, rounded.idleDelayMs);
             Assert::AreEqual(maximumIdleDelayMs, tooLong.idleDelayMs);
         }
 
