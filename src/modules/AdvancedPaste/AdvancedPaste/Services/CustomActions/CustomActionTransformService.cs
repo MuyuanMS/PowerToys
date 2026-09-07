@@ -71,9 +71,9 @@ namespace AdvancedPaste.Services.CustomActions
             if (!IsProviderAllowedByGPO(providerConfig.ProviderType))
             {
                 throw new PasteActionException(
-                    "AI provider is disabled by policy",
+                    ResourceLoaderInstance.ResourceLoader.GetString("AIProviderDisabledByPolicy"),
                     new InvalidOperationException($"Advanced Paste AI provider '{providerConfig.ProviderType}' is disabled by policy."),
-                    aiServiceMessage: "This AI provider is disabled by your organization's policy.");
+                    aiServiceMessage: ResourceLoaderInstance.ResourceLoader.GetString("AIProviderDisabledByPolicyDetails"));
             }
 
             var systemPrompt = providerConfig.SystemPrompt ?? DefaultSystemPrompt;

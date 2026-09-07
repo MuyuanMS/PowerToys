@@ -111,9 +111,9 @@ namespace AdvancedPaste.Services.CustomActions
             if (string.Equals(response.FinishReason?.Value, ChatFinishReason.Length.Value, StringComparison.Ordinal))
             {
                 throw new PasteActionException(
-                    "Anthropic response was truncated",
+                    ResourceLoaderInstance.ResourceLoader.GetString("AnthropicResponseTruncated"),
                     new InvalidOperationException("Anthropic response exceeded the configured output token limit."),
-                    aiServiceMessage: "The Anthropic response was truncated. Try a shorter clipboard selection or prompt.");
+                    aiServiceMessage: ResourceLoaderInstance.ResourceLoader.GetString("AnthropicResponseTruncatedDetails"));
             }
 
             return response.Text ?? string.Empty;
