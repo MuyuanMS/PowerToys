@@ -2591,7 +2591,7 @@ classDiagram
         Boolean ShowSubtitle
     }
 
-    ITab --|> ITabbedPage
+    ITabbedPage o-- ITab
     class ITab {
         String Title
         IIconInfo Icon

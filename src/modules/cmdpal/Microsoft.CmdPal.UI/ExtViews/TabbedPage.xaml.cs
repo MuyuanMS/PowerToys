@@ -5,6 +5,7 @@
 using System.ComponentModel;
 using System.Threading;
 using CommunityToolkit.Mvvm.Messaging;
+using Microsoft.CmdPal.UI.Helpers;
 using Microsoft.CmdPal.UI.ViewModels;
 using Microsoft.CmdPal.UI.ViewModels.Messages;
 using Microsoft.UI.Xaml;
@@ -75,7 +76,7 @@ public sealed partial class TabbedPage : Page
         ViewModel = null;
         _currentChild = null;
 
-        GC.Collect();
+        ExtensionObjectReleaser.AfterNavigation();
     }
 
     private static void OnViewModelChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)

@@ -142,10 +142,11 @@ public partial class TabbedPageViewModel : PageViewModel
             }
 
             var newTabs = BuildTabViewModels(model.GetTabs());
-            var activeId = SelectedTab?.TabId;
 
             DoOnUiThread(() =>
             {
+                var activeId = SelectedTab?.TabId;
+
                 // Drop cached children for tabs that no longer exist.
                 var keepIds = new HashSet<string>(newTabs.Select(t => t.TabId));
                 var staleIds = _childCache.Keys.Where(id => !keepIds.Contains(id)).ToList();
