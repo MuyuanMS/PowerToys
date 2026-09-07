@@ -1978,10 +1978,10 @@ static void ApplySnapRequest(const SnapRequest& request)
         const bool isToolWindow = (GetWindowLongPtrW(request.target, GWL_EXSTYLE) & WS_EX_TOOLWINDOW) != 0;
         const int workOffsetX = isToolWindow ? 0 : monitorInfo.rcWork.left - monitorInfo.rcMonitor.left;
         const int workOffsetY = isToolWindow ? 0 : monitorInfo.rcWork.top - monitorInfo.rcMonitor.top;
-        normalPosition.left = request.targetRect.left - workOffsetX;
-        normalPosition.top = request.targetRect.top - workOffsetY;
-        normalPosition.right = normalPosition.left + (request.normalPosition.right - request.normalPosition.left);
-        normalPosition.bottom = normalPosition.top + (request.normalPosition.bottom - request.normalPosition.top);
+        normalPosition.left -= workOffsetX;
+        normalPosition.right -= workOffsetX;
+        normalPosition.top -= workOffsetY;
+        normalPosition.bottom -= workOffsetY;
 
         placement.rcNormalPosition = normalPosition;
         placement.flags |= WPF_ASYNCWINDOWPLACEMENT;
