@@ -1975,14 +1975,16 @@ static void ApplySnapRequest(const SnapRequest& request)
         }
 
         RECT normalPosition = request.normalPosition;
-        const int workOffsetX = monitorInfo.rcWork.left - monitorInfo.rcMonitor.left;
-        const int workOffsetY = monitorInfo.rcWork.top - monitorInfo.rcMonitor.top;
+        const bool isToolWindow = (GetWindowLongPtrW(request.target, GWL_EXSTYLE) & WS_EX_TOOLWINDOW) != 0;
+        const int workOffsetX = isToolWindow ? 0 : monitorInfo.rcWork.left - monitorInfo.rcMonitor.left;
+        const int workOffsetY = isToolWindow ? 0 : monitorInfo.rcWork.top - monitorInfo.rcMonitor.top;
         normalPosition.left = request.targetRect.left - workOffsetX;
         normalPosition.top = request.targetRect.top - workOffsetY;
         normalPosition.right = normalPosition.left + (request.normalPosition.right - request.normalPosition.left);
         normalPosition.bottom = normalPosition.top + (request.normalPosition.bottom - request.normalPosition.top);
 
         placement.rcNormalPosition = normalPosition;
+        placement.flags |= WPF_ASYNCWINDOWPLACEMENT;
         placement.showCmd = SW_RESTORE;
         if (!SetWindowPlacement(request.target, &placement))
         {
@@ -2002,15 +2004,6 @@ static void ApplySnapRequest(const SnapRequest& request)
         return;
     }
 
-    SetWindowPos(
-        request.target,
-        nullptr,
-        request.targetRect.left,
-        request.targetRect.top,
-        request.targetRect.right - request.targetRect.left,
-        request.targetRect.bottom - request.targetRect.top,
-        SWP_NOZORDER | SWP_NOACTIVATE);
-
     PrepareOverlayMetrics(request.target);
     RECT windowRect = request.targetRect;
     windowRect.left -= g_overlayMarginL;
@@ -2024,7 +2017,7 @@ static void ApplySnapRequest(const SnapRequest& request)
         windowRect.top,
         windowRect.right - windowRect.left,
         windowRect.bottom - windowRect.top,
-        SWP_NOZORDER | SWP_NOACTIVATE);
+        SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
 }
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
