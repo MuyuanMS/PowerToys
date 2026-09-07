@@ -136,25 +136,24 @@ public partial class ListItemViewModel : CommandItemViewModel
             return;
         }
 
-        var initialized = false;
-        try
+        _lifetime.Run(() =>
         {
-            _lifetime.Run(() =>
+            var initialized = false;
+            try
             {
                 InitializeSelectedProperties();
                 initialized = !_lifetime.IsClosed && !IsInErrorState;
-            });
-        }
-        catch
-        {
-            initialized = false;
-            _lifetime.Close(CleanupItem);
-            throw;
-        }
-        finally
-        {
-            completion.TrySetResult(initialized);
-        }
+            }
+            catch
+            {
+                _lifetime.Close(CleanupItem);
+                completion.TrySetResult(false);
+                throw;
+            }
+
+            // Queue completion after notifications raised during initialization.
+            _lifetime.Run(() => completion.TrySetResult(initialized));
+        });
 
         if (_lifetime.IsClosed)
         {
