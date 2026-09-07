@@ -14,6 +14,8 @@
 #include "dllmain.h"
 #include "Generated Files/resource.h"
 
+#include <filesystem>
+
 class CopyAsUNCModule : public PowertoyModuleIface
 {
 public:
@@ -57,11 +59,11 @@ public:
 
         if (package::IsWin11OrGreater())
         {
-            std::wstring modulePath = get_module_folderpath(globals::instance);
-            std::wstring packageUri = modulePath + L"\\CopyAsUNCContextMenuPackage.msix";
+            const std::filesystem::path modulePath = get_module_folderpath(globals::instance);
+            const std::wstring packageUri = (modulePath / L"CopyAsUNCContextMenuPackage.msix").wstring();
             if (!package::IsPackageRegisteredWithPowerToysVersion(constants::nonlocalizable::ContextMenuPackageName))
             {
-                package::RegisterSparsePackage(get_module_folderpath(), packageUri);
+                package::RegisterSparsePackage(modulePath.parent_path().wstring(), packageUri);
             }
         }
 
