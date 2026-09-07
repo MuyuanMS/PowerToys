@@ -88,6 +88,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BrightnessObserver.h" />
+    <ClInclude Include="LightSwitchBrightnessLogic.h" />
     <ClInclude Include="LightSwitchSettings.h" />
     <ClInclude Include="LightSwitchStateManager.h" />
     <ClInclude Include="LightSwitchUtils.h" />

@@ -41,15 +41,7 @@ public:
         _state->stop = true;
         if (_thread.joinable())
         {
-            auto done = _state->done.get_future();
-            if (done.wait_for(std::chrono::seconds(2)) == std::future_status::ready)
-            {
-                _thread.join();
-            }
-            else
-            {
-                _thread.detach();
-            }
+            _thread.join();
         }
     }
 
@@ -86,9 +78,8 @@ private:
 
         int lastBrightness = -1;
 
-        // Bounded wait so a stalled WMI provider cannot block Next() indefinitely;
-        // this keeps Stop()/join() responsive to _stop between polls.
-        constexpr long kNextTimeoutMs = 1000;
+            // Bounded wait so a stalled WMI provider cannot block Next() indefinitely.
+            constexpr long kNextTimeoutMs = 1000;
 
         while (!state->stop)
         {
