@@ -19,6 +19,7 @@ public partial class TabViewModel : ExtensionObjectViewModel
 {
     private readonly ExtensionObject<ITab> _model;
     private readonly string _fallbackTabId;
+    private string _baseTabId = string.Empty;
 
     /// <summary>
     /// Gets the stable identity for this tab, used to preserve the active tab
@@ -86,23 +87,26 @@ public partial class TabViewModel : ExtensionObjectViewModel
         var tabId = tab.Id;
         if (!string.IsNullOrEmpty(tabId))
         {
-            TabId = $"tab:{tabId}";
+            _baseTabId = $"tab:{tabId}";
+            TabId = _baseTabId;
             return;
         }
 
         tabId = Page?.Id;
         if (!string.IsNullOrEmpty(tabId))
         {
-            TabId = $"page:{tabId}";
+            _baseTabId = $"page:{tabId}";
+            TabId = _baseTabId;
             return;
         }
 
-        TabId = $"fallback:{_fallbackTabId}";
+        _baseTabId = $"fallback:{_fallbackTabId}";
+        TabId = _baseTabId;
     }
 
-    internal void AddCollisionSuffix(string suffix)
+    internal void ApplyCollisionSuffix(string? suffix)
     {
-        TabId = $"{TabId}|duplicate:{suffix}";
+        TabId = string.IsNullOrEmpty(suffix) ? _baseTabId : $"{_baseTabId}|duplicate:{suffix}";
         UpdateProperty(nameof(TabId));
     }
 

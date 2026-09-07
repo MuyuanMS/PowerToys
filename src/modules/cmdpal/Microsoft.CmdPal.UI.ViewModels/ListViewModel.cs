@@ -1169,7 +1169,10 @@ public partial class ListViewModel : PageViewModel, IDisposable
         DoOnUiThread(
            () =>
            {
-               WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(EmptyContent));
+               if (CanPublishContextUpdates)
+               {
+                   WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(EmptyContent));
+               }
            });
     }
 

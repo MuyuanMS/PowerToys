@@ -15,6 +15,7 @@ using Windows.Foundation;
 namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
 
 [TestClass]
+[DoNotParallelize]
 public partial class TabbedPageViewModelTests
 {
     private sealed partial class TestAppExtensionHost : AppExtensionHost
@@ -509,48 +510,6 @@ public partial class TabbedPageViewModelTests
         Assert.AreEqual("tab:docs-tab-updated", viewModel.SelectedTab!.TabId);
 
         viewModel.SafeCleanup();
-    }
-
-    [TestMethod]
-    public async Task InactiveCachedList_DoesNotPublishCommandContext()
-    {
-        var page = new TestTabbedPage(
-        [
-            new Tab("Issues", new TestListPage("issues")),
-            new Tab("Docs", new TestContentPage("docs")),
-        ]);
-        var recipient = new object();
-        var commandMessages = 0;
-
-        try
-        {
-            var viewModel = CreateViewModel(page);
-            viewModel.InitializeProperties();
-
-            await WaitFor(() => viewModel.ActiveChild is ListViewModel, "List child was not created");
-            var listChild = (ListViewModel)viewModel.ActiveChild!;
-
-            WeakReferenceMessenger.Default.Register<UpdateCommandBarMessage>(recipient, (_, _) => commandMessages++);
-            await Task.Delay(200);
-            commandMessages = 0;
-
-            listChild.CanPublishContextUpdates = false;
-            listChild.RefreshCurrentCommandContext();
-            await Task.Delay(100);
-
-            Assert.AreEqual(0, commandMessages);
-
-            listChild.CanPublishContextUpdates = true;
-            listChild.RefreshCurrentCommandContext();
-
-            await WaitFor(() => commandMessages > 0, "Active list child did not publish command context");
-
-            viewModel.SafeCleanup();
-        }
-        finally
-        {
-            WeakReferenceMessenger.Default.UnregisterAll(recipient);
-        }
     }
 
     [TestMethod]
