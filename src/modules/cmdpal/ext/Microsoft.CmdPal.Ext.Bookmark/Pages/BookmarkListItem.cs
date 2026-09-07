@@ -122,8 +122,8 @@ internal sealed partial class BookmarkListItem : ListItem, IDisposable
         AddCommonContextMenuItems(_bookmark, _bookmarksManager, bookmarkSavedHandler, contextMenu);
 
         var localFilePath =
-            classification.Kind is CommandKind.FileExecutable or CommandKind.FileDocument or CommandKind.Shortcut or CommandKind.InternetShortcut &&
-            File.Exists(classification.Target)
+            classification.Kind is CommandKind.FileExecutable or CommandKind.FileDocument or CommandKind.Shortcut or CommandKind.InternetShortcut or CommandKind.Directory &&
+            (File.Exists(classification.Target) || Directory.Exists(classification.Target))
                 ? classification.Target
                 : null;
 
