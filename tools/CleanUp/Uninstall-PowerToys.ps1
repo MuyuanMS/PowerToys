@@ -593,6 +593,9 @@ if (-not $PSCmdlet.ShouldProcess($target, 'Remove PowerToys')) {
 }
 
 $isAdministrator = Test-IsAdministrator
+$machineTargets = @(
+    $products | Where-Object { $_.Scope -eq 'PerMachine' -and $_.State -ne -1 -and $_.State -ne 2 }
+) + @($bundles | Where-Object { $_.Scope -eq 'PerMachine' })
 
 $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $runId = "$timestamp-$([Guid]::NewGuid().ToString('N'))"
@@ -603,7 +606,7 @@ if ($isAdministrator) {
     New-ProtectedDirectory -Path $logDirectory -AdministratorOnly
 } else {
     $stagingDirectory = Join-Path $env:LOCALAPPDATA "Microsoft\PowerToys\Cleanup\$runId"
-    $logDirectory = Join-Path $env:LOCALAPPDATA "Microsoft\PowerToys\CleanupLogs\$runId"
+    $logDirectory = Join-Path $env:LOCALAPPDATA "PowerToysCleanupLogs\$runId"
     New-ProtectedDirectory -Path $stagingDirectory
     New-ProtectedDirectory -Path $logDirectory
 }
@@ -753,7 +756,12 @@ if ($script:failures.Count -gt 0) {
 }
 
 Write-Host ''
-Write-Host 'PowerToys was removed successfully.' -ForegroundColor Green
+if (-not $isAdministrator -and $machineTargets.Count -gt 0) {
+    Write-Host 'The current user PowerToys installation was removed successfully.' -ForegroundColor Green
+    Write-Host 'Machine-wide installations remain. Run the script again from an elevated PowerShell window.' -ForegroundColor Yellow
+} else {
+    Write-Host 'PowerToys was removed successfully.' -ForegroundColor Green
+}
 Write-Host "MSI logs: $logDirectory"
 if ($script:rebootRequired) {
     Write-Host 'Restart Windows to complete the cleanup.' -ForegroundColor Yellow
