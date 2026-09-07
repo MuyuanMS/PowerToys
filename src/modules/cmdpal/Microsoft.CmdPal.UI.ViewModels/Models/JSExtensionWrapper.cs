@@ -43,6 +43,7 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
     private readonly string _effectiveIcon;
     private readonly Lock _lock = new();
     private readonly List<ProviderType> _providerTypes = [];
+    private readonly CancellationTokenSource _startCancellation = new();
 
     private Process? _nodeProcess;
     private JsonRpcConnection? _connection;
@@ -238,7 +239,7 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
     {
         try
         {
-            await StartCoreAsync().ConfigureAwait(false);
+            await StartCoreAsync(_startCancellation.Token).ConfigureAwait(false);
         }
         finally
         {
@@ -249,7 +250,7 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
         }
     }
 
-    private async Task StartCoreAsync()
+    private async Task StartCoreAsync(CancellationToken ct)
     {
         lock (_lock)
         {
@@ -361,7 +362,7 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
             var initResponse = await connection.SendRequestAsync(
                 "initialize",
                 new JsonObject { ["extensionId"] = _manifest.Name },
-                CancellationToken.None).ConfigureAwait(false);
+                ct).ConfigureAwait(false);
 
             if (initResponse.Error is not null)
             {
@@ -451,6 +452,7 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
         {
             _isDisposed = true;
             _stopping = true;
+            _startCancellation.Cancel();
             process = _nodeProcess;
             connection = _connection;
             proxy = _commandProviderProxy;
