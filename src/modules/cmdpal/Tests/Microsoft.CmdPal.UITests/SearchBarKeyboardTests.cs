@@ -16,6 +16,7 @@ public class SearchBarKeyboardTests : CommandPaletteTestBase
     {
         AssertModifiedNavigationKeyDoesNotChangeSelection(Key.Ctrl, Key.Up);
         AssertModifiedNavigationKeyDoesNotChangeSelection(Key.Shift, Key.Right);
+        AssertModifiedNavigationKeyDoesNotChangeSelection(Key.Ctrl, Key.Right);
         AssertModifiedNavigationKeyDoesNotChangeSelection(Key.Ctrl, Key.Left);
         AssertModifiedNavigationKeyDoesNotChangeSelection(Key.Ctrl, Key.PageDown);
         AssertModifiedNavigationKeyDoesNotChangeSelection(Key.Ctrl, Key.PageUp);
@@ -78,6 +79,7 @@ public class SearchBarKeyboardTests : CommandPaletteTestBase
         var initialSelection = GetSelectedResult().Name;
 
         searchBox.Click();
+        searchBox.SendKeys(OpenQA.Selenium.Keys.End);
         this.SendKeys(modifier, key);
 
         Assert.AreEqual(initialText, searchBox.Text);
