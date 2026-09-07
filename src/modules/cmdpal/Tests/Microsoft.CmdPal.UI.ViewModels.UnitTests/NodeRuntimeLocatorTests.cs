@@ -139,4 +139,54 @@ public class NodeRuntimeLocatorTests
             tempDirectory.Delete(recursive: true);
         }
     }
+
+    [TestMethod]
+    [DataRow("22.1.5", "22.1.x", true)]
+    [DataRow("22.2.0", "22.1.x", false)]
+    [DataRow("24.0.0", "*", true)]
+    [DataRow("23.0.0", ">=22.x", true)]
+    [DataRow("21.9.0", ">=22.x", false)]
+    [DataRow("22.9.0", "<=22.x", true)]
+    [DataRow("23.0.0", "<=22.x", false)]
+    public void MatchesRequirement_EvaluatesWildcardRanges(string actual, string requirement, bool expected)
+    {
+        Assert.AreEqual(expected, NodeRuntimeLocator.MatchesRequirement(Version.Parse(actual), requirement));
+    }
+
+    [TestMethod]
+    [DataRow("22.8.0", "~22", true)]
+    [DataRow("23.0.0", "~22", false)]
+    [DataRow("22.1.5", "~22.1", true)]
+    [DataRow("22.2.0", "~22.1", false)]
+    [DataRow("22.1.9", "20.10.0 - 22.x", true)]
+    [DataRow("23.0.0", "20.10.0 - 22.x", false)]
+    public void MatchesRequirement_EvaluatesTildeAndHyphenRanges(string actual, string requirement, bool expected)
+    {
+        Assert.AreEqual(expected, NodeRuntimeLocator.MatchesRequirement(Version.Parse(actual), requirement));
+    }
+
+    [TestMethod]
+    [DataRow("22.1.5", "<=22.1", true)]
+    [DataRow("22.2.0", "<=22.1", false)]
+    [DataRow("22.2.0", ">22.1", true)]
+    [DataRow("22.1.9", ">22.1", false)]
+    [DataRow("22.4.0", "20 || >=22 <23", true)]
+    [DataRow("23.0.0", "20 || >=22 <23", false)]
+    [DataRow("22.0.0", "22.x.1", false)]
+    public void MatchesRequirement_EvaluatesComparatorSetsAndMalformedRanges(string actual, string requirement, bool expected)
+    {
+        Assert.AreEqual(expected, NodeRuntimeLocator.MatchesRequirement(Version.Parse(actual), requirement));
+    }
+
+    [TestMethod]
+    public void IsCompatible_ReturnsReasonWhenVersionProbeCannotStart()
+    {
+        var result = NodeRuntimeLocator.IsCompatible(
+            Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "node.exe"),
+            ">=22",
+            out var reason);
+
+        Assert.IsFalse(result);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(reason));
+    }
 }

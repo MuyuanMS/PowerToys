@@ -114,6 +114,7 @@ internal static class NodeRuntimeLocator
                 reason = "Node.js version probe timed out.";
                 return false;
             }
+
             process.WaitForExit();
 
             var output = standardOutput.ToString().Trim();
@@ -123,12 +124,9 @@ internal static class NodeRuntimeLocator
                 return false;
             }
 
-            foreach (var clause in requirement.Split("||", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            if (MatchesRequirement(actual, requirement))
             {
-                if (TryMatchClause(actual, clause))
-                {
-                    return true;
-                }
+                return true;
             }
         }
         catch (Exception ex) when (
@@ -142,6 +140,22 @@ internal static class NodeRuntimeLocator
         }
 
         reason ??= $"Node.js does not satisfy the declared engine requirement '{requirement}'.";
+        return false;
+    }
+
+    internal static bool MatchesRequirement(Version actual, string requirement)
+    {
+        ArgumentNullException.ThrowIfNull(actual);
+        ArgumentException.ThrowIfNullOrWhiteSpace(requirement);
+
+        foreach (var clause in requirement.Split("||", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (TryMatchClause(actual, clause))
+            {
+                return true;
+            }
+        }
+
         return false;
     }
 
@@ -165,71 +179,116 @@ internal static class NodeRuntimeLocator
 
     private static bool TryMatchToken(Version actual, string token)
     {
-        var op = token.StartsWith(">=") || token.StartsWith("<=")
+        var op = token.StartsWith(">=", StringComparison.Ordinal) || token.StartsWith("<=", StringComparison.Ordinal)
             ? token[..2]
             : token.Length > 0 && "> < = ^ ~".Contains(token[0])
                 ? token[..1]
                 : string.Empty;
         var versionText = token.TrimStart('>', '<', '=', '^', '~');
-        var wildcard = versionText.IndexOfAny(['x', 'X', '*']);
-        if (wildcard >= 0)
+        var parts = versionText.Split('.');
+        if (parts.Length > 3 || parts.Length == 0)
         {
-            var wildcardParts = versionText[..wildcard].TrimEnd('.');
-            if (!int.TryParse(wildcardParts.Split('.')[0], out var wildcardMajor))
+            return false;
+        }
+
+        var components = new int[3];
+        var specifiedComponents = 0;
+        var sawWildcard = false;
+        for (var index = 0; index < parts.Length; index++)
+        {
+            if (parts[index] is "x" or "X" or "*")
+            {
+                sawWildcard = true;
+                continue;
+            }
+
+            if (sawWildcard || !int.TryParse(parts[index], out components[index]) || components[index] < 0)
             {
                 return false;
             }
 
-            var lower = new Version(wildcardMajor, 0);
-            var upper = new Version(wildcardMajor + 1, 0);
-            return actual.CompareTo(lower) >= 0 && actual.CompareTo(upper) < 0;
+            specifiedComponents++;
         }
 
-        var parts = versionText.Split('.');
-        if (parts.Length > 3 || !int.TryParse(parts[0], out var major))
+        if (sawWildcard && specifiedComponents == parts.Length)
         {
             return false;
         }
-        var hasMinor = parts.Length > 1 && int.TryParse(parts[1], out var minor);
-        var hasPatch = parts.Length > 2 && int.TryParse(parts[2], out var patch);
-        if ((parts.Length > 1 && !hasMinor) || (parts.Length > 2 && !hasPatch))
+
+        var lower = new Version(components[0], components[1], components[2]);
+        var upper = GetPartialUpperBound(components, specifiedComponents);
+
+        if (sawWildcard)
         {
-            return false;
+            return op switch
+            {
+                ">" => upper is not null && actual.CompareTo(upper) >= 0,
+                ">=" => actual.CompareTo(lower) >= 0,
+                "<" => actual.CompareTo(lower) < 0,
+                "<=" => upper is null || actual.CompareTo(upper) < 0,
+                "=" or "" or "^" or "~" => (upper is null || actual.CompareTo(upper) < 0) && actual.CompareTo(lower) >= 0,
+                _ => false,
+            };
         }
-        var requested = new Version(major, hasMinor ? minor : 0, hasPatch ? patch : 0);
-        if (parts.Length < 3 && op is "<=")
+
+        if (specifiedComponents < 3 && op is "<=")
         {
-            var upper = parts.Length == 1
-                ? new Version(major + 1, 0)
-                : new Version(major, minor + 1);
-            return actual.CompareTo(upper) < 0;
+            return upper is not null && actual.CompareTo(upper) < 0;
         }
-        if (parts.Length < 3 && op is ">")
+
+        if (specifiedComponents < 3 && op is ">")
         {
-            var lower = parts.Length == 1
-                ? new Version(major + 1, 0)
-                : new Version(major, minor + 1);
-            return actual.CompareTo(lower) >= 0;
+            return upper is not null && actual.CompareTo(upper) >= 0;
         }
-        if (parts.Length < 3 && op is "" )
+
+        if (specifiedComponents < 3 && op is ("" or "="))
         {
-            var upper = parts.Length == 1
-                ? new Version(major + 1, 0)
-                : new Version(major, minor + 1);
-            return actual.CompareTo(requested) >= 0 && actual.CompareTo(upper) < 0;
+            return upper is not null && actual.CompareTo(lower) >= 0 && actual.CompareTo(upper) < 0;
         }
 
         return op switch
         {
-            ">=" => actual.CompareTo(requested) >= 0,
-            "<=" => actual.CompareTo(requested) <= 0,
-            ">" => actual.CompareTo(requested) > 0,
-            "<" => actual.CompareTo(requested) < 0,
-            "^" => actual.CompareTo(requested) >= 0 && actual.Major == requested.Major,
-            "~" => actual.CompareTo(requested) >= 0 && actual.Major == requested.Major && actual.Minor == requested.Minor,
-            "=" or "" => actual.CompareTo(requested) == 0,
+            ">=" => actual.CompareTo(lower) >= 0,
+            "<=" => actual.CompareTo(lower) <= 0,
+            ">" => actual.CompareTo(lower) > 0,
+            "<" => actual.CompareTo(lower) < 0,
+            "^" => actual.CompareTo(lower) >= 0 && actual.CompareTo(GetCaretUpperBound(components)) < 0,
+            "~" => actual.CompareTo(lower) >= 0 && actual.CompareTo(GetTildeUpperBound(components, specifiedComponents)) < 0,
+            "=" or "" => actual.CompareTo(lower) == 0,
             _ => false,
         };
+    }
+
+    private static Version? GetPartialUpperBound(int[] components, int specifiedComponents)
+    {
+        return specifiedComponents switch
+        {
+            0 => null,
+            1 => new Version(components[0] + 1, 0, 0),
+            _ => new Version(components[0], components[1] + 1, 0),
+        };
+    }
+
+    private static Version GetCaretUpperBound(int[] components)
+    {
+        if (components[0] > 0)
+        {
+            return new Version(components[0] + 1, 0, 0);
+        }
+
+        if (components[1] > 0)
+        {
+            return new Version(0, components[1] + 1, 0);
+        }
+
+        return new Version(0, 0, components[2] + 1);
+    }
+
+    private static Version GetTildeUpperBound(int[] components, int specifiedComponents)
+    {
+        return specifiedComponents == 1
+            ? new Version(components[0] + 1, 0, 0)
+            : new Version(components[0], components[1] + 1, 0);
     }
 
     private static IReadOnlyList<string> GetPathDirectories()
