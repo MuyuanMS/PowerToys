@@ -146,6 +146,38 @@ describe('form identity and routing', () => {
     expect(responseFor(sent, 1)?.result).toEqual({ Kind: 1 });
   });
 
+  it('routes an explicit empty formId instead of treating it as omitted', async () => {
+    const first = vi.fn((): CommandResult => ({ kind: 'goHome' }));
+    const empty = vi.fn((): CommandResult => ({ kind: 'goBack' }));
+    const page: IContentPage = {
+      id: 'page',
+      name: 'Page',
+      title: 'Page',
+      getContent(): Content[] {
+        return [formContent('first', first), formContent('', empty)];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(providerWith(page));
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'contentPage/getContent',
+      params: { pageId: 'page' },
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'form/submit',
+      params: { pageId: 'page', formId: '', inputs: '{}', data: '{}' },
+    });
+
+    expect(empty).toHaveBeenCalledTimes(1);
+    expect(first).not.toHaveBeenCalled();
+    expect(responseFor(sent, 2)?.result).toEqual({ Kind: 2 });
+  });
+
   it('falls back to the first nested form when the host omits a formId', async () => {
     const nested = vi.fn((): CommandResult => ({ kind: 'hide' }));
     const page: IContentPage = {

@@ -616,7 +616,7 @@ export class ExtensionRuntime {
     inputs: string,
     data: string,
   ): Promise<void> {
-    if (formId) {
+    if (formId !== undefined) {
       let handler = this.pageScopes.get(pageId)?.forms.get(formId);
       if (!handler) {
         // The page may not have been serialized yet, or its content changed;

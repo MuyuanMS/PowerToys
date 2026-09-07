@@ -2,9 +2,9 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pathToFileURL } from 'node:url';
-import { bootstrap, resolveCliEntry } from '../src/runtime/bootstrap.js';
+import { bootstrap, resolveCliEntry, runBootstrapCli } from '../src/runtime/bootstrap.js';
 import { claimProtocolStdout } from '../src/runtime/stdio.js';
 import { encodeMessage } from '../src/runtime/framing.js';
 
@@ -12,10 +12,13 @@ type Writer = typeof process.stdout.write;
 
 const originalStdoutWrite = process.stdout.write;
 const originalStderrWrite = process.stderr.write;
+const originalArgv = process.argv;
 
 afterEach(() => {
   process.stdout.write = originalStdoutWrite;
   process.stderr.write = originalStderrWrite;
+  process.argv = originalArgv;
+  vi.restoreAllMocks();
 });
 
 function captureStreams(): { out: string[]; err: string[] } {
@@ -80,6 +83,35 @@ describe('bootstrap loader', () => {
       expect(module.loaded).toBe(true);
     } finally {
       stdout.restore();
+    }
+  });
+
+  it('forces process termination after a failed dynamic import', async () => {
+    process.argv = [
+      'node',
+      'bootstrap.js',
+      new URL('./fixtures/missing-entry.ts', import.meta.url).href,
+    ];
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(((
+      _chunk: unknown,
+      callback?: () => void,
+    ): boolean => {
+      callback?.();
+      return true;
+    }) as typeof process.stderr.write);
+    const exit = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`exit:${String(code)}`);
+    }) as typeof process.exit);
+
+    try {
+      await expect(runBootstrapCli()).rejects.toThrow('exit:1');
+      expect(stderr).toHaveBeenCalledWith(
+        expect.stringContaining('cmdpal-sdk: failed to load extension entry'),
+        expect.any(Function),
+      );
+      expect(exit).toHaveBeenCalledWith(1);
+    } finally {
+      claimProtocolStdout().restore();
     }
   });
 });

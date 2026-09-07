@@ -93,8 +93,13 @@ export async function runBootstrapCli(): Promise<void> {
     await bootstrap(entry);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`cmdpal-sdk: failed to load extension entry "${entry}": ${message}\n`);
-    process.exitCode = 1;
+    await new Promise<void>((resolve) => {
+      process.stderr.write(
+        `cmdpal-sdk: failed to load extension entry "${entry}": ${message}\n`,
+        () => resolve(),
+      );
+    });
+    process.exit(1);
   }
 }
 
