@@ -205,7 +205,8 @@ public class AutoHideCursorSettingsTests : UITestBase
             pollIntervalMS: 250);
         Assert.IsTrue(hiddenCursor.Succeeded, "Typing did not replace the active cursor.");
 
-        MouseHelper.MoveBy(10, 0);
+        var cursorPosition = GetCursorPosition();
+        Assert.IsTrue(SetCursorPos(cursorPosition.X + 10, cursorPosition.Y), "Could not move the system cursor.");
         var restoredCursor = WaitHelper.WaitForStable(
             GetVisibleCursorHandle,
             actual => actual != IntPtr.Zero && actual != hiddenCursor.LastObservation,
@@ -292,6 +293,13 @@ public class AutoHideCursorSettingsTests : UITestBase
         return cursorInfo.HCursor;
     }
 
+    private static POINT GetCursorPosition()
+    {
+        var cursorInfo = new CURSORINFO { CbSize = Marshal.SizeOf<CURSORINFO>() };
+        Assert.IsTrue(GetCursorInfo(out cursorInfo), "Could not read the cursor position.");
+        return cursorInfo.Position;
+    }
+
     private static void AssertWorkerState(bool expectedRunning)
     {
         var result = WaitForWorkerState(expectedRunning, 15_000);
@@ -338,6 +346,9 @@ public class AutoHideCursorSettingsTests : UITestBase
 
     [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW", SetLastError = true)]
     private static extern bool SystemParametersInfo(int uiAction, int uiParam, IntPtr pvParam, int fWinIni);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetCursorPos(int x, int y);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct POINT
