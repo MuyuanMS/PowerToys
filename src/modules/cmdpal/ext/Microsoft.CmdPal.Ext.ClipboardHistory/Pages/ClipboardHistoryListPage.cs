@@ -27,6 +27,7 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
     private readonly object loadSync = new();
     private volatile ClipboardItem[] clipboardHistory = [];
     private InterlockedBoolean hasLoadedOnce;
+    private InterlockedBoolean pageRequested;
     private InterlockedBoolean loadInFlight;
     private InterlockedBoolean reloadRequested;
     private InterlockedBoolean disposed;
@@ -56,7 +57,7 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
             }
 
             reloadRequested.Value = true;
-            if (!loadInFlight.Value)
+            if (pageRequested.Value && !loadInFlight.Value)
             {
                 reloadRequested.Value = false;
                 loadInFlight.Value = true;
@@ -231,6 +232,26 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
                         TryLogMessage($"Failed to remove cached clipboard image: {ex.Message}");
                     }
                 }
+
+                var staleTemporaryCutoff = DateTime.UtcNow.AddHours(-1);
+                foreach (var temporaryPath in Directory.EnumerateFiles(directory, "*.tmp"))
+                {
+                    if (File.GetLastWriteTimeUtc(temporaryPath) < staleTemporaryCutoff)
+                    {
+                        try
+                        {
+                            File.Delete(temporaryPath);
+                        }
+                        catch (IOException ex)
+                        {
+                            TryLogMessage($"Failed to remove temporary clipboard image cache: {ex.Message}");
+                        }
+                        catch (UnauthorizedAccessException ex)
+                        {
+                            TryLogMessage($"Failed to remove temporary clipboard image cache: {ex.Message}");
+                        }
+                    }
+                }
             }
         }
         catch (IOException ex)
@@ -339,13 +360,20 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
         }
         catch (Exception ex)
         {
+            var cleanupNow = false;
             lock (loadSync)
             {
                 loadInFlight.Value = false;
+                cleanupNow = disposed.Value;
             }
 
             hasLoadedOnce.Value = false;
             SetLoadingState(false);
+            if (cleanupNow)
+            {
+                CleanupCachedImages([]);
+            }
+
             TryLogMessage($"Failed to start clipboard history load thread: {ex}");
         }
     }
@@ -375,6 +403,7 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
 
     public override IListItem[] GetItems()
     {
+        pageRequested.Value = true;
         if (!disposed.Value && hasLoadedOnce.Set())
         {
             LoadClipboardHistoryInSTA();
