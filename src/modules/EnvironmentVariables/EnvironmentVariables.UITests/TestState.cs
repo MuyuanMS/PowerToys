@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -38,7 +39,7 @@ internal sealed class TestState : IDisposable
     private static readonly IntPtr HwndBroadcast = new(0xffff);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern IntPtr SendNotifyMessage(IntPtr hWnd, uint message, IntPtr wParam, string lParam);
+    private static extern bool SendNotifyMessage(IntPtr hWnd, uint message, IntPtr wParam, string lParam);
 
     private readonly Dictionary<string, UserVariableSnapshot> userVariables = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, byte[]?> files = new(StringComparer.Ordinal);
@@ -236,7 +237,13 @@ internal sealed class TestState : IDisposable
             "restore the raw user registry value",
             failures);
         AttemptRestore(
-            () => SendNotifyMessage(HwndBroadcast, WmSettingChange, new IntPtr(0x12345), "Environment"),
+            () =>
+            {
+                if (!SendNotifyMessage(HwndBroadcast, WmSettingChange, new IntPtr(0x12345), "Environment"))
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error(), "The environment change notification failed.");
+                }
+            },
             "notify the restored user environment",
             failures);
         ThrowRestorationFailures(failures);

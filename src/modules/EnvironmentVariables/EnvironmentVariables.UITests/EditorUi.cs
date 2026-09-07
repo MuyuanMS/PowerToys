@@ -294,6 +294,7 @@ internal sealed class EditorUi(Session session, TestContext context)
             () => ReadProfiles().EnumerateArray().Any(profile =>
                 profile.GetProperty("Name").GetString() == name &&
                 profile.GetProperty("IsEnabled").GetBoolean() == enabled &&
+                profile.GetProperty("Variables").GetArrayLength() == variables.Length &&
                 variables.All(variable => profile.GetProperty("Variables").EnumerateArray().Any(entry =>
                     entry.GetProperty("Name").GetString() == variable.Name &&
                     entry.GetProperty("Values").GetString() == variable.Value))),
