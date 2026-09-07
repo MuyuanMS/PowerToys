@@ -175,6 +175,7 @@ public class NodeRuntimeLocatorTests
     [DataRow("22.4.0", ">= 22 < 23", true)]
     [DataRow("23.0.0", ">= 22 < 23", false)]
     [DataRow("22.0.0", ">=22.0.0-0", true)]
+    [DataRow("22.0.0", ">= v22.0.0", true)]
     [DataRow("22.0.0", "22.0.0-beta", false)]
     [DataRow("22.0.0", "22.0.0-", false)]
     [DataRow("22.5.0", "^22.1.x", true)]

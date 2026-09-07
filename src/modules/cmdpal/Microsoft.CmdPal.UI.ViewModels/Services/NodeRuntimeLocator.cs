@@ -211,6 +211,11 @@ internal static class NodeRuntimeLocator
                 ? token[..1]
                 : string.Empty;
         var versionText = token[op.Length..];
+        if (versionText.StartsWith('v'))
+        {
+            versionText = versionText[1..];
+        }
+
         var buildMetadataIndex = versionText.IndexOf('+');
         if (buildMetadataIndex >= 0)
         {
