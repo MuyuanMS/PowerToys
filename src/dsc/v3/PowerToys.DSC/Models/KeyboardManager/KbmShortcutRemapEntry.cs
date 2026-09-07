@@ -14,6 +14,13 @@ namespace PowerToys.DSC.Models.KeyboardManager;
 /// </summary>
 public sealed class KbmShortcutRemapEntry : KbmKeyRemapEntry
 {
+    [JsonIgnore]
+    public new string? Condition
+    {
+        get => null;
+        set { }
+    }
+
     /// <summary>
     /// Gets or sets the process name of the application the remapping applies
     /// to, e.g. "notepad.exe". When not set the remapping is global.
