@@ -289,6 +289,9 @@ public sealed partial class QuickAccessShelfViewModel : ObservableObject, IDispo
         var includeRecentCommands = IncludesRecentCommands(configuration.RecentCommandsPlacement);
 
         var pinnedCommands = _topLevelCommandManager.GetPinnedCommandsSnapshot();
+        var persistedPins = pinnedCommands
+            .Select(command => (command.ProviderId, command.CommandId))
+            .ToHashSet();
 
         TopLevelViewModel[] availableCommands;
         lock (_topLevelCommandManager.TopLevelCommands)
@@ -323,7 +326,10 @@ public sealed partial class QuickAccessShelfViewModel : ObservableObject, IDispo
             item =>
             {
                 var provider = _topLevelCommandManager.LookupProvider(TopLevelCommandResolver.GetProviderId(item.Item));
-                var canPin = !item.IsPinned &&
+                var isPersistedPinned = persistedPins.Contains((
+                    TopLevelCommandResolver.GetProviderId(item.Item),
+                    TopLevelCommandResolver.GetCommandId(item.Item)));
+                var canPin = !isPersistedPinned &&
                     provider is not null &&
                     (item.Item is TopLevelViewModel || provider.SupportsPinning);
                 return QuickAccessShelfItem.CreateOrReuse(
@@ -332,6 +338,7 @@ public sealed partial class QuickAccessShelfViewModel : ObservableObject, IDispo
                     item.ShortcutIndex,
                     item.StartsNewSection,
                     item.IsPinned,
+                    isPersistedPinned,
                     canPin);
             }).ToArray();
     }

@@ -1077,7 +1077,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         if (sender is not Grid { Tag: QuickAccessShelfItem target } targetGrid ||
             !TryGetDraggedQuickAccessShelfItem(e, out var source) ||
             !target.IsPinned ||
-            (!source.IsPinned && !source.CanPin) ||
+            (!source.IsPersistedPinned && !source.CanPin) ||
             (source.ProviderId == target.ProviderId && source.CommandId == target.CommandId))
         {
             return;
@@ -1104,7 +1104,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         if (sender is not Grid { Tag: QuickAccessShelfItem target } targetGrid ||
             !TryGetDraggedQuickAccessShelfItem(e, out var source) ||
             !target.IsPinned ||
-            (!source.IsPinned && !source.CanPin))
+            (!source.IsPersistedPinned && !source.CanPin))
         {
             return;
         }
