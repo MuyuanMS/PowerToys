@@ -23,6 +23,35 @@ public static class ClipboardHelper
     /// <summary>Set the clipboard text. Returns true on success, false on error.</summary>
     public static bool SetText(string value) => RunSTA(() => { FormsClipboard.SetText(value); return true; });
 
+    /// <summary>Capture every native clipboard format into a detached data object.</summary>
+    public static bool TryGetDataObject(out object? data)
+    {
+        object? snapshot = null;
+        var success = RunSTA(() =>
+        {
+            var source = FormsClipboard.GetDataObject();
+            var formats = source?.GetFormats(autoConvert: false) ?? [];
+            if (formats.Length == 0)
+            {
+                return true;
+            }
+
+            var copy = new System.Windows.Forms.DataObject();
+            foreach (var format in formats)
+            {
+                copy.SetData(format, autoConvert: false, source!.GetData(format, autoConvert: false));
+            }
+
+            snapshot = copy;
+            return true;
+        });
+        data = snapshot;
+        return success;
+    }
+
+    /// <summary>Restore a previously captured clipboard data object.</summary>
+    public static bool SetDataObject(object data) => RunSTA(() => { FormsClipboard.SetDataObject(data, copy: true); return true; });
+
     /// <summary>
     /// Poll the clipboard up to <paramref name="timeoutMS"/> for the first non-empty text
     /// different from <paramref name="ignoredValue"/>. Returns <see cref="string.Empty"/> on
