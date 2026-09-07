@@ -2472,9 +2472,12 @@ data.
 
 Tabbed pages consist of an array of `ITab` associated with an `IPage` and
 include a `Title`, `Icon`, and `Badge` that are displayed on the tab itself.
+Each tab includes a stable `Id` that must be unique within the tabbed page so
+the host can preserve selection and cached child pages across dynamic updates.
 
 ```csharp
 interface ITab requires INotifyPropChanged {
+    String Id { get; };
     String Title { get; };
     IIconInfo Icon { get; };
     String Badge { get; };

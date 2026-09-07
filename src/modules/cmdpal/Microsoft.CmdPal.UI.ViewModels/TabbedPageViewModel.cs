@@ -388,6 +388,11 @@ public partial class TabbedPageViewModel : PageViewModel
             case ContentPageViewModel content:
                 content.RefreshCommandContext();
                 break;
+            case ParametersPageViewModel:
+                WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(null));
+                WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(string.Empty));
+                break;
             case ICommandBarContext commandBarContext:
                 WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(commandBarContext));
                 WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
@@ -395,6 +400,7 @@ public partial class TabbedPageViewModel : PageViewModel
             case null:
                 WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(null));
                 WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(string.Empty));
                 break;
         }
     }
