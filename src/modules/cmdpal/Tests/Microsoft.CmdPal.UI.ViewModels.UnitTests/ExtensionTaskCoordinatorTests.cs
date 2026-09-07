@@ -349,10 +349,10 @@ public sealed class ExtensionTaskCoordinatorTests
         var stopwatch = Stopwatch.StartNew();
 
         var observed = ExtensionTaskCoordinator.RunInBackgroundAsync(
-            () =>
+            token =>
             {
                 started.Set();
-                release.Wait(TimeSpan.FromSeconds(5));
+                release.Wait(TimeSpan.FromSeconds(5), token);
                 return Task.CompletedTask;
             },
             "watcher",

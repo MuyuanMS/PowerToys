@@ -27,7 +27,7 @@ namespace Microsoft.CmdPal.UI.ViewModels.Services;
 /// </remarks>
 internal sealed partial class SerialNotificationDispatcher : IDisposable
 {
-    private readonly Channel<Action> _queue = Channel.CreateUnbounded<Action>(
+    private readonly Channel<Func<Task>> _queue = Channel.CreateUnbounded<Func<Task>>(
         new UnboundedChannelOptions
         {
             SingleReader = true,
@@ -43,20 +43,36 @@ internal sealed partial class SerialNotificationDispatcher : IDisposable
     }
 
     /// <summary>
-    /// Queues a notification to run on the worker after everything already queued. Silently
-    /// dropped once the dispatcher has been disposed.
+    /// Queues a notification to run on the worker after everything already queued.
     /// </summary>
     /// <param name="notification">The action to run, in order, on the background worker.</param>
-    public void Enqueue(Action notification)
+    /// <returns><see langword="true"/> if the notification was accepted; otherwise <see langword="false"/>.</returns>
+    public bool Enqueue(Action notification)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+
+        return Enqueue(() =>
+        {
+            notification();
+            return Task.CompletedTask;
+        });
+    }
+
+    /// <summary>
+    /// Queues an asynchronous notification to run on the worker after everything already queued.
+    /// </summary>
+    /// <param name="notification">The asynchronous work to run, in order, on the background worker.</param>
+    /// <returns><see langword="true"/> if the notification was accepted; otherwise <see langword="false"/>.</returns>
+    public bool Enqueue(Func<Task> notification)
     {
         ArgumentNullException.ThrowIfNull(notification);
 
         if (_disposed)
         {
-            return;
+            return false;
         }
 
-        _queue.Writer.TryWrite(notification);
+        return _queue.Writer.TryWrite(notification);
     }
 
     public void Dispose()
@@ -72,14 +88,18 @@ internal sealed partial class SerialNotificationDispatcher : IDisposable
         // so nothing queued before disposal is stranded.
         _queue.Writer.TryComplete();
 
-        try
+        _worker.GetAwaiter().GetResult();
+    }
+
+    public void CompleteWithoutWaiting()
+    {
+        if (_disposed)
         {
-            _worker.Wait(TimeSpan.FromSeconds(2));
+            return;
         }
-        catch (AggregateException)
-        {
-            // RunAsync already catches and logs handler exceptions; nothing to do here.
-        }
+
+        _disposed = true;
+        _queue.Writer.TryComplete();
     }
 
     private async Task RunAsync()
@@ -92,7 +112,7 @@ internal sealed partial class SerialNotificationDispatcher : IDisposable
                 {
                     try
                     {
-                        notification();
+                        await notification().ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {

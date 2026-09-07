@@ -108,7 +108,7 @@ public class JsonRpcExtensionServiceWatcherRoutingTests
     public void ShouldReloadForSourceChange_UnderGit_IsTrueWhenSourceExtension()
     {
         // .git is no longer a host-guessed ignore segment. A .js file that happens to sit
-        // under .git (for example a hook or a vendored dependency) is not specially
+        // under .git (for example a hook or a bundled dependency) is not specially
         // exempted; keeping it out of the watch is now the manifest's job (a narrower
         // cmdpal.watchPath or entry-point-directory default), not a hardcoded directory name.
         var path = Path3(@"C:\ext\my-extension", ".git", "hook.js");
@@ -184,7 +184,7 @@ public class JsonRpcExtensionServiceWatcherRoutingTests
     }
 
     // r3-p4-02: the recursive root watcher reports every descendant path. Only a top-level
-    // <root>/<extdir> directory or its own <root>/<extdir>/package.json manifest is an
+    // <root>/<extension> directory or its own <root>/<extension>/package.json manifest is an
     // extension entry; anything deeper (a nested package or a node_modules manifest) must be
     // ignored so a nested package.json is not treated as an extension upsert.
     [TestMethod]
@@ -221,7 +221,7 @@ public class JsonRpcExtensionServiceWatcherRoutingTests
     [TestMethod]
     public void IsTopLevelExtensionChange_NonManifestTopLevelFile_IsFalse()
     {
-        // A file that sits at <root>/<extdir>/<file> but is not the manifest is not an entry.
+        // A file that sits at <root>/<extension>/<file> but is not the manifest is not an entry.
         Assert.IsFalse(JsonRpcExtensionService.IsTopLevelExtensionChange(
             @"C:\root", Path.Combine(@"C:\root", "my-extension", "index.js")));
     }

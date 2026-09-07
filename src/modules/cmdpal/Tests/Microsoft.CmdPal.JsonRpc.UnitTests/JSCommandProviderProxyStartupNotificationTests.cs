@@ -4,6 +4,7 @@
 
 using System;
 using System.Text.Json.Nodes;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CmdPal.JsonRpc.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -22,6 +23,15 @@ public class JSCommandProviderProxyStartupNotificationTests
     private static JSCommandProviderProxy CreateProvider(JSFakeExtension fake) =>
         new(fake.Connection, "startup.ext", "Startup Extension");
 
+    private static async Task WaitForPendingHostActionsAsync(JSCommandProviderProxy provider, int count)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        while (provider.PendingHostActionCount < count)
+        {
+            await Task.Delay(10, timeout.Token);
+        }
+    }
+
     [TestMethod]
     public async Task StartupStatus_EmittedBeforeHostAttaches_IsDeliveredAfterAttach()
     {
@@ -36,6 +46,7 @@ public class JSCommandProviderProxyStartupNotificationTests
                 ["statusId"] = "startup-1",
                 ["message"] = new JsonObject { ["message"] = "Starting", ["state"] = 0 },
             });
+        await WaitForPendingHostActionsAsync(provider, 1);
 
         var host = new RecordingExtensionHost();
         provider.InitializeWithHost(host);
@@ -56,6 +67,7 @@ public class JSCommandProviderProxyStartupNotificationTests
         await fake.PushNotificationAsync(
             "host/logMessage",
             new JsonObject { ["message"] = "activating", ["state"] = 0 });
+        await WaitForPendingHostActionsAsync(provider, 1);
 
         var host = new RecordingExtensionHost();
         provider.InitializeWithHost(host);
@@ -78,6 +90,7 @@ public class JSCommandProviderProxyStartupNotificationTests
         await fake.PushNotificationAsync(
             "host/logMessage",
             new JsonObject { ["message"] = "second", ["state"] = 0 });
+        await WaitForPendingHostActionsAsync(provider, 2);
 
         var host = new RecordingExtensionHost();
         provider.InitializeWithHost(host);
@@ -102,6 +115,7 @@ public class JSCommandProviderProxyStartupNotificationTests
                 ["statusId"] = "startup-1",
                 ["message"] = new JsonObject { ["message"] = "Starting", ["state"] = 0 },
             });
+        await WaitForPendingHostActionsAsync(provider, 1);
 
         fake.Dispose();
 

@@ -37,6 +37,11 @@ public class JSCommandProviderProxyStatusLifecycleTests
         ["message"] = new JsonObject { ["message"] = message, ["state"] = state },
     };
 
+    private static JsonObject ShowAnonymousStatus(string message, int state) => new()
+    {
+        ["message"] = new JsonObject { ["message"] = message, ["state"] = state },
+    };
+
     [TestMethod]
     public async Task RepeatedStatusId_UpdatesInPlace_WithoutDuplicateShow()
     {
@@ -88,6 +93,23 @@ public class JSCommandProviderProxyStatusLifecycleTests
 
         // Disconnecting the extension (its process exiting) must clear active statuses
         // even though no explicit hide arrived.
+        fake.Dispose();
+
+        await host.WaitForHiddenCountAsync(1);
+        Assert.AreSame(host.Shown[0], host.Hidden[0]);
+
+        provider.Dispose();
+    }
+
+    [TestMethod]
+    public async Task AnonymousStatus_IsCleared_OnDisconnect()
+    {
+        using var fake = new JSFakeExtension();
+        var provider = CreateInitialized(fake, out var host);
+
+        await fake.PushNotificationAsync("host/showStatus", ShowAnonymousStatus("Anonymous", 0));
+        await host.WaitForShownCountAsync(1);
+
         fake.Dispose();
 
         await host.WaitForHiddenCountAsync(1);

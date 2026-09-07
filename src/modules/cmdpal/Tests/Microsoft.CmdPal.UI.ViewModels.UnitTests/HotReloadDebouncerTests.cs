@@ -4,6 +4,7 @@
 
 using System;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CmdPal.UI.ViewModels.Services;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -172,5 +173,29 @@ public class HotReloadDebouncerTests
         debouncer.Notify(@"C:\ext", @"C:\ext\index.js");
 
         Assert.IsTrue(fired.Wait(TimeSpan.FromSeconds(2)), "A change after CancelAll should still reload.");
+    }
+
+    [TestMethod]
+    public void CancelAll_WaitsForCallbackAlreadyPassingGenerationGate()
+    {
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        using var debouncer = new HotReloadDebouncer(
+            _ =>
+            {
+                entered.Set();
+                release.Wait();
+            },
+            TimeSpan.FromMilliseconds(10));
+
+        debouncer.Notify(@"C:\ext", @"C:\ext\index.js");
+        Assert.IsTrue(entered.Wait(TimeSpan.FromSeconds(2)), "The callback should have entered before cancellation.");
+
+        var cancel = Task.Run(debouncer.CancelAll);
+        Thread.Sleep(100);
+        Assert.IsFalse(cancel.IsCompleted, "CancelAll must not return while a prior-generation callback is still starting.");
+
+        release.Set();
+        Assert.IsTrue(cancel.Wait(TimeSpan.FromSeconds(2)));
     }
 }

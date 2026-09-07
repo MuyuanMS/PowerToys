@@ -28,6 +28,10 @@ internal sealed partial class RecordingExtensionHost : IExtensionHost
     private readonly List<(int Target, TaskCompletionSource Signal)> _hiddenWaiters = [];
     private readonly List<(int Target, TaskCompletionSource Signal)> _logWaiters = [];
 
+    public TaskCompletionSource? ShowStatusEntered { get; set; }
+
+    public ManualResetEventSlim? ReleaseShowStatus { get; set; }
+
     public IReadOnlyList<IStatusMessage> Shown
     {
         get
@@ -69,6 +73,9 @@ internal sealed partial class RecordingExtensionHost : IExtensionHost
 
     public IAsyncAction ShowStatus(IStatusMessage? message, StatusContext context)
     {
+        ShowStatusEntered?.TrySetResult();
+        ReleaseShowStatus?.Wait(DefaultTimeout);
+
         if (message is not null)
         {
             Record(_shown, _shownWaiters, message);
