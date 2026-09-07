@@ -4,6 +4,7 @@
 
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.CmdPal.UI.ViewModels.Messages;
@@ -31,6 +32,8 @@ public partial class TabbedPageViewModel : PageViewModel
     private readonly ExtensionObject<ITabbedPage> _model;
     private readonly IPageViewModelFactoryService _factory;
     private readonly Dictionary<string, CachedChild> _childCache = [];
+    private readonly Dictionary<TabViewModel, string> _tabCacheKeys = [];
+    private bool _isDisposed;
 
     private static readonly string _fallbackPlaceholder = "Type here to search...";
 
@@ -128,7 +131,22 @@ public partial class TabbedPageViewModel : PageViewModel
             result.Add(vm);
         }
 
+        EnsureUniqueTabIds(result);
         return result;
+    }
+
+    private static void EnsureUniqueTabIds(List<TabViewModel> tabs)
+    {
+        HashSet<string> seen = [];
+        for (var i = 0; i < tabs.Count; i++)
+        {
+            var tab = tabs[i];
+            if (!seen.Add(tab.TabId))
+            {
+                tab.AddCollisionSuffix(i.ToString(CultureInfo.InvariantCulture));
+                seen.Add(tab.TabId);
+            }
+        }
     }
 
     private static bool PageIsSearchable(IPage? page) => page is IListPage or IParametersPage;
@@ -155,7 +173,7 @@ public partial class TabbedPageViewModel : PageViewModel
                 var staleIds = _childCache.Keys.Where(id => !keepIds.Contains(id)).ToList();
                 foreach (var id in staleIds)
                 {
-                    DisposeChild(_childCache[id].Child);
+                    DisposeChild(_childCache[id]);
                     _childCache.Remove(id);
                 }
 
@@ -163,7 +181,7 @@ public partial class TabbedPageViewModel : PageViewModel
                 {
                     if (_childCache.TryGetValue(tab.TabId, out var cached) && !ReferenceEquals(cached.Page, tab.Page))
                     {
-                        DisposeChild(cached.Child);
+                        DisposeChild(cached);
                         _childCache.Remove(tab.TabId);
                     }
                 }
@@ -171,6 +189,7 @@ public partial class TabbedPageViewModel : PageViewModel
                 foreach (var old in Tabs)
                 {
                     old.PropertyChanged -= Tab_PropertyChanged;
+                    _tabCacheKeys.Remove(old);
                     old.SafeCleanup();
                 }
 
@@ -210,6 +229,11 @@ public partial class TabbedPageViewModel : PageViewModel
 
     private void ActivateTab(TabViewModel? tab)
     {
+        if (ActiveChild is not null)
+        {
+            ActiveChild.CanPublishContextUpdates = false;
+        }
+
         DetachActiveChildLoading(ActiveChild);
 
         if (tab is null)
@@ -241,6 +265,7 @@ public partial class TabbedPageViewModel : PageViewModel
         }
 
         AttachActiveChildLoading(child);
+        child.CanPublishContextUpdates = true;
         ActiveTabIsLoading = child.IsLoading;
 
         UpdateProperty(nameof(PlaceholderText));
@@ -279,9 +304,11 @@ public partial class TabbedPageViewModel : PageViewModel
 
         child.IsRootPage = false;
         child.HasBackButton = false;
-        _childCache[tab.TabId] = new(page, child);
+        child.CanPublishContextUpdates = false;
+        var newCached = new CachedChild(page, child);
+        _childCache[tab.TabId] = newCached;
 
-        InitializeChild(child);
+        newCached.InitializationTask = InitializeChild(newCached);
         return child;
     }
 
@@ -289,6 +316,7 @@ public partial class TabbedPageViewModel : PageViewModel
     {
         foreach (var tab in Tabs)
         {
+            _tabCacheKeys[tab] = tab.TabId;
             tab.PropertyChanged += Tab_PropertyChanged;
         }
     }
@@ -302,9 +330,28 @@ public partial class TabbedPageViewModel : PageViewModel
 
         if (e.PropertyName is nameof(TabViewModel.Page) or nameof(TabViewModel.TabId))
         {
+            var oldCacheKey = _tabCacheKeys.GetValueOrDefault(tab);
+            if (!string.IsNullOrEmpty(oldCacheKey) && oldCacheKey != tab.TabId && _childCache.Remove(oldCacheKey, out var oldCached))
+            {
+                DisposeChild(oldCached);
+            }
+
+            _tabCacheKeys[tab] = tab.TabId;
+
+            var staleIds = _childCache
+                .Where(entry => !Tabs.Any(tabViewModel => tabViewModel.TabId == entry.Key && ReferenceEquals(tabViewModel.Page, entry.Value.Page)))
+                .Select(entry => entry.Key)
+                .ToList();
+
+            foreach (var id in staleIds)
+            {
+                DisposeChild(_childCache[id]);
+                _childCache.Remove(id);
+            }
+
             if (_childCache.TryGetValue(tab.TabId, out var cached) && !ReferenceEquals(cached.Page, tab.Page))
             {
-                DisposeChild(cached.Child);
+                DisposeChild(cached);
                 _childCache.Remove(tab.TabId);
             }
 
@@ -315,17 +362,32 @@ public partial class TabbedPageViewModel : PageViewModel
         }
     }
 
-    private void InitializeChild(PageViewModel child)
+    private Task InitializeChild(CachedChild cached)
     {
         // Mirror ShellViewModel.LoadPageViewModelAsync: initialize on a
         // background thread so the tab strip stays responsive. The child view
         // model marshals IsInitialized/property updates back onto the UI thread.
-        _ = Task.Run(() =>
+        return Task.Run(() =>
         {
             try
             {
-                child.InitializeCommand.Execute(null);
-                DoOnUiThread(RefreshActiveChildContext);
+                if (cached.InitializationCts.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                cached.Child.InitializeCommand.Execute(null);
+
+                if (!cached.InitializationCts.IsCancellationRequested)
+                {
+                    DoOnUiThread(() =>
+                    {
+                        if (!_isDisposed && ReferenceEquals(ActiveChild, cached.Child) && cached.Child.CanPublishContextUpdates)
+                        {
+                            RefreshActiveChildContext();
+                        }
+                    });
+                }
             }
             catch (Exception ex)
             {
@@ -405,19 +467,43 @@ public partial class TabbedPageViewModel : PageViewModel
         }
     }
 
-    private void DisposeChild(PageViewModel child)
+    private void DisposeChild(CachedChild cached)
     {
-        DetachActiveChildLoading(child);
-        child.SafeCleanup();
-        if (child is IDisposable disposable)
+        if (!cached.TryStartDispose())
         {
-            disposable.Dispose();
+            return;
+        }
+
+        var child = cached.Child;
+        DetachActiveChildLoading(child);
+        child.CanPublishContextUpdates = false;
+        cached.InitializationCts.Cancel();
+
+        void Cleanup()
+        {
+            child.SafeCleanup();
+            if (child is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+
+            cached.InitializationCts.Dispose();
+        }
+
+        if (cached.InitializationTask is { IsCompleted: false } task)
+        {
+            _ = task.ContinueWith(_ => Cleanup(), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+        }
+        else
+        {
+            Cleanup();
         }
     }
 
     protected override void UnsafeCleanup()
     {
         base.UnsafeCleanup();
+        _isDisposed = true;
 
         var model = _model.Unsafe;
         if (model is not null)
@@ -428,14 +514,9 @@ public partial class TabbedPageViewModel : PageViewModel
         DetachActiveChildLoading(ActiveChild);
         ActiveChild = null;
 
-        foreach (var child in _childCache.Values.Select(cached => cached.Child))
+        foreach (var child in _childCache.Values.ToList())
         {
-            DetachActiveChildLoading(child);
-            child.SafeCleanup();
-            if (child is IDisposable disposable)
-            {
-                disposable.Dispose();
-            }
+            DisposeChild(child);
         }
 
         _childCache.Clear();
@@ -443,9 +524,23 @@ public partial class TabbedPageViewModel : PageViewModel
         foreach (var tab in Tabs)
         {
             tab.PropertyChanged -= Tab_PropertyChanged;
+            _tabCacheKeys.Remove(tab);
             tab.SafeCleanup();
         }
     }
 
-    private sealed record CachedChild(IPage Page, PageViewModel Child);
+    private sealed class CachedChild(IPage page, PageViewModel child)
+    {
+        private int _disposeStarted;
+
+        public IPage Page { get; } = page;
+
+        public PageViewModel Child { get; } = child;
+
+        public CancellationTokenSource InitializationCts { get; } = new();
+
+        public Task? InitializationTask { get; set; }
+
+        public bool TryStartDispose() => Interlocked.Exchange(ref _disposeStarted, 1) == 0;
+    }
 }

@@ -51,6 +51,8 @@ public partial class PageViewModel : ExtensionObjectViewModel, IPageContext
     [ObservableProperty]
     public partial bool HasBackButton { get; set; } = true;
 
+    public bool CanPublishContextUpdates { get; set; } = true;
+
     private string _searchTextBox = string.Empty;
 
     // This is set from the SearchBar.

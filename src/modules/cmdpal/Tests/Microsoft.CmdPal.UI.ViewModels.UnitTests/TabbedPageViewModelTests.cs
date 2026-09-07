@@ -5,9 +5,12 @@
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using CommunityToolkit.Mvvm.Messaging;
+using Microsoft.CmdPal.UI.ViewModels.Messages;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Windows.Foundation;
 
 namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
 
@@ -82,6 +85,21 @@ public partial class TabbedPageViewModelTests
         }
 
         public override ITab[] GetTabs() => [];
+    }
+
+    private sealed partial class TestParametersPage : Page, IParametersPage
+    {
+        public TestParametersPage(string id)
+        {
+            Id = id;
+            Name = id;
+            Title = id;
+            Command = new ListItem(new NoOpCommand() { Name = $"Run {id}" });
+        }
+
+        public IParameterRun[] Parameters => [];
+
+        public IListItem Command { get; }
     }
 
     private static CommandPalettePageViewModelFactory CreateFactory() =>
@@ -288,7 +306,7 @@ public partial class TabbedPageViewModelTests
         await WaitFor(() => viewModel.Tabs.Count == 2 && viewModel.SelectedTab is not null, "Tabs did not populate");
 
         viewModel.SelectedTab = viewModel.Tabs[1];
-        Assert.AreEqual("docs", viewModel.SelectedTab!.TabId);
+        Assert.AreEqual("page:docs", viewModel.SelectedTab!.TabId);
 
         // Dynamic update: the extension re-publishes the tabs (new instances) and
         // adds a third. The active tab identity ("docs") must be preserved.
@@ -300,7 +318,7 @@ public partial class TabbedPageViewModelTests
         ]);
 
         await WaitFor(() => viewModel.Tabs.Count == 3, "Tabs did not update");
-        await WaitFor(() => viewModel.SelectedTab?.TabId == "docs", "Active tab was not preserved");
+        await WaitFor(() => viewModel.SelectedTab?.TabId == "page:docs", "Active tab was not preserved");
 
         viewModel.SafeCleanup();
     }
@@ -377,6 +395,29 @@ public partial class TabbedPageViewModelTests
     }
 
     [TestMethod]
+    public async Task TabIdAndPagePropertyChange_RecreatesActiveChild()
+    {
+        var tab = new Tab("Docs", new TestContentPage("docs")) { Id = "docs-tab" };
+        var page = new TestTabbedPage([tab]);
+
+        var viewModel = CreateViewModel(page);
+        viewModel.InitializeProperties();
+
+        await WaitFor(() => viewModel.ActiveChild is not null, "Initial child was not created");
+        var firstChild = viewModel.ActiveChild;
+
+        tab.Id = "docs-tab-updated";
+        tab.Page = new TestContentPage("docs-updated");
+        viewModel.Tabs[0].ApplyPendingUpdates();
+
+        await WaitFor(() => viewModel.ActiveChild is not null && !ReferenceEquals(viewModel.ActiveChild, firstChild), "Active child was not recreated after Id and Page changed");
+        Assert.AreEqual("tab:docs-tab-updated", viewModel.SelectedTab!.TabId);
+        Assert.AreEqual("docs-updated", viewModel.ActiveChild!.Id);
+
+        viewModel.SafeCleanup();
+    }
+
+    [TestMethod]
     public async Task ActivateCachedTab_DoesNotOverwriteChildSearchText()
     {
         var page = new TestTabbedPage(
@@ -419,5 +460,135 @@ public partial class TabbedPageViewModelTests
         Assert.IsNull(viewModel.ActiveChild);
 
         viewModel.SafeCleanup();
+    }
+
+    [TestMethod]
+    public async Task TabIds_UseDisjointNamespacesAndDuplicateSuffixes()
+    {
+        var firstDuplicate = new Tab("One", new TestContentPage("shared-page")) { Id = "shared" };
+        var secondDuplicate = new Tab("Two", new TestContentPage("other-page")) { Id = "shared" };
+        var page = new TestTabbedPage(
+        [
+            new Tab("Raw zero", new TestContentPageWithoutId("No page id")) { Id = "0" },
+            new Tab("Fallback zero", new TestContentPageWithoutId("Fallback zero")),
+            new Tab("Page id", new TestContentPage("0")),
+            firstDuplicate,
+            secondDuplicate,
+        ]);
+
+        var viewModel = CreateViewModel(page);
+        viewModel.InitializeProperties();
+
+        await WaitFor(() => viewModel.Tabs.Count == 5, "Tabs did not populate");
+
+        Assert.AreEqual("tab:0", viewModel.Tabs[0].TabId);
+        Assert.AreEqual("fallback:1", viewModel.Tabs[1].TabId);
+        Assert.AreEqual("page:0", viewModel.Tabs[2].TabId);
+        Assert.AreEqual("tab:shared", viewModel.Tabs[3].TabId);
+        Assert.AreEqual("tab:shared|duplicate:4", viewModel.Tabs[4].TabId);
+
+        viewModel.SafeCleanup();
+    }
+
+    [TestMethod]
+    public async Task TabIdPropertyChange_PrunesOldCacheAndRecreatesActiveChild()
+    {
+        var tab = new Tab("Docs", new TestContentPage("docs")) { Id = "docs-tab" };
+        var page = new TestTabbedPage([tab]);
+
+        var viewModel = CreateViewModel(page);
+        viewModel.InitializeProperties();
+
+        await WaitFor(() => viewModel.ActiveChild is not null, "Initial child was not created");
+        var firstChild = viewModel.ActiveChild;
+
+        tab.Id = "docs-tab-updated";
+        viewModel.Tabs[0].ApplyPendingUpdates();
+
+        await WaitFor(() => viewModel.ActiveChild is not null && !ReferenceEquals(viewModel.ActiveChild, firstChild), "Active child was not recreated after Id changed");
+        Assert.AreEqual("tab:docs-tab-updated", viewModel.SelectedTab!.TabId);
+
+        viewModel.SafeCleanup();
+    }
+
+    [TestMethod]
+    public async Task InactiveCachedList_DoesNotPublishCommandContext()
+    {
+        var page = new TestTabbedPage(
+        [
+            new Tab("Issues", new TestListPage("issues")),
+            new Tab("Docs", new TestContentPage("docs")),
+        ]);
+        var recipient = new object();
+        var commandMessages = 0;
+
+        try
+        {
+            var viewModel = CreateViewModel(page);
+            viewModel.InitializeProperties();
+
+            await WaitFor(() => viewModel.ActiveChild is ListViewModel, "List child was not created");
+            var listChild = (ListViewModel)viewModel.ActiveChild!;
+
+            WeakReferenceMessenger.Default.Register<UpdateCommandBarMessage>(recipient, (_, _) => commandMessages++);
+            await Task.Delay(200);
+            commandMessages = 0;
+
+            listChild.CanPublishContextUpdates = false;
+            listChild.RefreshCurrentCommandContext();
+            await Task.Delay(100);
+
+            Assert.AreEqual(0, commandMessages);
+
+            listChild.CanPublishContextUpdates = true;
+            listChild.RefreshCurrentCommandContext();
+
+            await WaitFor(() => commandMessages > 0, "Active list child did not publish command context");
+
+            viewModel.SafeCleanup();
+        }
+        finally
+        {
+            WeakReferenceMessenger.Default.UnregisterAll(recipient);
+        }
+    }
+
+    [TestMethod]
+    public async Task ParametersTab_ClearsPreviousCommandContext()
+    {
+        var page = new TestTabbedPage(
+        [
+            new Tab("Issues", new TestListPage("issues")),
+            new Tab("Parameters", new TestParametersPage("parameters")),
+        ]);
+        var recipient = new object();
+        ICommandBarContext? lastCommandContext = null;
+        var hideDetailsMessages = 0;
+        string? lastSuggestion = null;
+
+        WeakReferenceMessenger.Default.Register<UpdateCommandBarMessage>(recipient, (_, message) => lastCommandContext = message.ViewModel);
+        WeakReferenceMessenger.Default.Register<HideDetailsMessage>(recipient, (_, _) => hideDetailsMessages++);
+        WeakReferenceMessenger.Default.Register<UpdateSuggestionMessage>(recipient, (_, message) => lastSuggestion = message.TextToSuggest);
+
+        try
+        {
+            var viewModel = CreateViewModel(page);
+            viewModel.InitializeProperties();
+
+            await WaitFor(() => viewModel.ActiveChild is ListViewModel, "List child was not created");
+            lastCommandContext = new ContentPageViewModel(new TestContentPage("previous"), TaskScheduler.Default, new TestAppExtensionHost(), CommandProviderContext.Empty);
+
+            viewModel.SelectedTab = viewModel.Tabs[1];
+
+            await WaitFor(() => viewModel.ActiveChild is ParametersPageViewModel, "Parameters child was not activated");
+            viewModel.RefreshActiveChildContext();
+            await WaitFor(() => lastCommandContext is null && hideDetailsMessages > 0 && lastSuggestion == string.Empty, "Parameters tab did not clear prior context");
+
+            viewModel.SafeCleanup();
+        }
+        finally
+        {
+            WeakReferenceMessenger.Default.UnregisterAll(recipient);
+        }
     }
 }
