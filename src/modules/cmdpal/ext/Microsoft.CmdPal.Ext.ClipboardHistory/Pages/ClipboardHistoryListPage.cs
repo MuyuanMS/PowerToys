@@ -343,6 +343,7 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable
             {
                 loadInFlight.Value = false;
             }
+
             hasLoadedOnce.Value = false;
             SetLoadingState(false);
             TryLogMessage($"Failed to start clipboard history load thread: {ex}");
