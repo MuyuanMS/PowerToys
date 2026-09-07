@@ -146,7 +146,7 @@ internal sealed partial class LocalKeyboardListener : IDisposable
     {
         try
         {
-            if (nCode >= 0)
+            if (nCode == 0)
             {
                 var virtualKey = (VirtualKey)wParam.Value;
                 if (IsKeyDownHook(lParam))

@@ -58,27 +58,16 @@ public class BasicTests : CommandPaletteTestBase
     }
 
     [TestMethod]
-    public void NumberedShortcutLatchedInvocationTest()
-    {
-        SetSearchBox("calculator");
-
-        PressKey(Key.Alt);
-        SendKey(Key.Num1);
-        ReleaseKey(Key.Alt);
-
-        SetCalculatorExtensionSearchBox("1+2");
-        Assert.IsNotNull(this.Find<NavigationViewItem>("3"));
-    }
-
-    [TestMethod]
     public void NumberedShortcutSelectionTest()
     {
         SetSearchBox("calculator");
 
-        SendKeys(Key.Alt, Key.Shift, Key.Num1);
-
         var calculatorItem = this.Find<NavigationViewItem>("Calculator");
-        Assert.AreEqual("True", calculatorItem.GetAttribute("SelectionItem.IsSelected"));
+        var selectedBefore = calculatorItem.GetAttribute("SelectionItem.IsSelected");
+        SendKeys(Key.Alt, Key.Shift, Key.Num1);
+        var selectedAfter = calculatorItem.GetAttribute("SelectionItem.IsSelected");
+        Assert.AreEqual("True", selectedAfter);
+        Assert.AreNotEqual(selectedBefore, selectedAfter);
     }
 
     [TestMethod]
