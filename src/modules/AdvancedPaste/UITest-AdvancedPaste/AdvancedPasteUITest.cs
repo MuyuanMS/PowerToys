@@ -41,6 +41,7 @@ namespace Microsoft.AdvancedPaste.UITests
 
         private readonly string pasteAsJsonFileName = "PasteAsJsonFile.xml";
         private readonly string pasteAsJsonResultFile = "PasteAsJsonResultFile.txt";
+        private readonly string pasteAsRichTextFileName = "PasteAsRichTextFile.txt";
 
         private bool _notepadSettingsChanged;
 
@@ -50,6 +51,7 @@ namespace Microsoft.AdvancedPaste.UITests
             // Using the predefined settings.
             // paste as plain text: win + ctrl + alt + o
             // paste as markdown text: win + ctrl + alt + m
+            // paste as rich text: win + ctrl + alt + r
             // paste as json text: win + ctrl + alt + j
             CopySettingsFileBeforeTests();
         }
@@ -250,6 +252,20 @@ namespace Microsoft.AdvancedPaste.UITests
                 Path.Combine(testFilesFolderPath, pasteAsJsonResultFile),
                 compareFormatting: true);
             Assert.IsTrue(result.IsConsistent, "Paste as Json using shortcut failed.");
+        }
+
+        [TestMethod]
+        [TestCategory("AdvancedPasteUITest")]
+        [TestCategory("PasteAsRichText")]
+        public void TestCasePasteAsRichText()
+        {
+            DeleteAndCopyFile(pasteAsRichTextFileName, tempTxtFileName);
+            ContentCopyAndPasteAsRichText(tempTxtFileName);
+
+            string resultPath = Path.Combine(testFilesFolderPath, tempTxtFileName);
+            StringAssert.Contains(FileReader.ReadRTFPlainText(resultPath), "Rich text title");
+            StringAssert.Contains(FileReader.ReadRTFPlainText(resultPath), "bold");
+            StringAssert.Contains(FileReader.ReadContent(resultPath), "\\b");
         }
 
         /*
@@ -674,6 +690,35 @@ namespace Microsoft.AdvancedPaste.UITests
             this.SendKeys(Key.Win, Key.LCtrl, Key.Alt, Key.M);
             Thread.Sleep(1000);
 
+            this.SendKeys(Key.LCtrl, Key.S);
+            Thread.Sleep(1000);
+
+            window.Close();
+        }
+
+        private void ContentCopyAndPasteAsRichText(string fileName)
+        {
+            string tempFile = Path.Combine(testFilesFolderPath, fileName);
+            Process process = Process.Start(wordpadPath, tempFile);
+            if (process == null)
+            {
+                throw new InvalidOperationException("Failed to start WordPad.");
+            }
+
+            Thread.Sleep(15000);
+            var window = FindWindowWithFlexibleTitle(Path.GetFileName(tempFile), isRTF: true);
+            window.Click();
+            Thread.Sleep(1000);
+
+            this.SendKeys(Key.LCtrl, Key.A);
+            Thread.Sleep(1000);
+            this.SendKeys(Key.LCtrl, Key.C);
+            Thread.Sleep(1000);
+            this.SendKeys(Key.Delete);
+            Thread.Sleep(1000);
+
+            this.SendKeys(Key.Win, Key.LCtrl, Key.Alt, Key.R);
+            Thread.Sleep(1000);
             this.SendKeys(Key.LCtrl, Key.S);
             Thread.Sleep(1000);
 

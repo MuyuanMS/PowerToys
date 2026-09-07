@@ -36,7 +36,7 @@ public enum PasteFormats
         CanPreview = false,
         SupportedClipboardFormats = ClipboardFormat.Text,
         KernelFunctionDescription = "Takes markdown or plain text from the clipboard and formats it as rich HTML text.")]
-    RichText = 11,
+    RichText = 12,
 
     [PasteFormatMetadata(
         IsCoreAction = true,
@@ -57,7 +57,7 @@ public enum PasteFormats
         SupportedClipboardFormats = ClipboardFormat.Text,
         IPCKey = AdvancedPasteAdditionalActions.PropertyNames.FixSpellingAndGrammar,
         KernelFunctionDescription = "Fixes all spelling and grammar errors in the clipboard text and returns the corrected version.")]
-    FixSpellingAndGrammar = 12,
+    FixSpellingAndGrammar = 11,
 
     [PasteFormatMetadata(
         IsCoreAction = false,
