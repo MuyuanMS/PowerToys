@@ -160,6 +160,7 @@ public sealed partial class CommandBar : UserControl,
             PrimaryButton.Focus(FocusState.Programmatic);
         }
     }
+
     private void ContextMenuFlyout_Opened(object sender, object e)
     {
         // Focus the filter box so the flyout captures keyboard input,
