@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation
+// Copyright (c) Microsoft Corporation
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -41,6 +41,7 @@ namespace Microsoft.AdvancedPaste.UITests
 
         private readonly string pasteAsJsonFileName = "PasteAsJsonFile.xml";
         private readonly string pasteAsJsonResultFile = "PasteAsJsonResultFile.txt";
+        private readonly string pasteAsRichTextFileName = "PasteAsRichTextFile.txt";
 
         private bool _notepadSettingsChanged;
 
@@ -50,6 +51,7 @@ namespace Microsoft.AdvancedPaste.UITests
             // Using the predefined settings.
             // paste as plain text: win + ctrl + alt + o
             // paste as markdown text: win + ctrl + alt + m
+            // paste as rich text: win + ctrl + alt + r
             // paste as json text: win + ctrl + alt + j
             CopySettingsFileBeforeTests();
         }
@@ -242,7 +244,7 @@ namespace Microsoft.AdvancedPaste.UITests
             }
 
             // Copy some text(same as in the previous step or different.If nothing is coppied between steps, previously pasted JSON text will be picked up from clipboard and converted again to nested JSON).
-            // Open Advanced Paste window using hotkey, press Ctrl + 3 and confirm that pasted text is converted to markdown
+            // Open Advanced Paste window using hotkey, press Ctrl + 4 and confirm that pasted text is converted to JSON
             DeleteAndCopyFile(pasteAsJsonFileName, tempTxtFileName);
             ContentCopyAndPasteAsJsonCase3(tempTxtFileName);
             var result = FileReader.CompareRtfFiles(
@@ -250,6 +252,21 @@ namespace Microsoft.AdvancedPaste.UITests
                 Path.Combine(testFilesFolderPath, pasteAsJsonResultFile),
                 compareFormatting: true);
             Assert.IsTrue(result.IsConsistent, "Paste as Json using shortcut failed.");
+        }
+
+        [TestMethod]
+        [TestCategory("AdvancedPasteUITest")]
+        [TestCategory("PasteAsRichText")]
+        [Ignore("WordPad is not available in the pipeline image.")]
+        public void TestCasePasteAsRichText()
+        {
+            DeleteAndCopyFile(pasteAsPlainTextRawFileName, tempRTFFileName);
+            ContentCopyAndPasteAsRichText(pasteAsRichTextFileName, tempRTFFileName);
+
+            string resultPath = Path.Combine(testFilesFolderPath, tempRTFFileName);
+            StringAssert.Contains(FileReader.ReadRTFPlainText(resultPath), "Rich text title");
+            StringAssert.Contains(FileReader.ReadRTFPlainText(resultPath), "bold");
+            StringAssert.Contains(FileReader.ReadContent(resultPath), "\\b");
         }
 
         /*
@@ -680,6 +697,47 @@ namespace Microsoft.AdvancedPaste.UITests
             window.Close();
         }
 
+        private void ContentCopyAndPasteAsRichText(string sourceFileName, string destinationFileName)
+        {
+            string sourceFile = Path.Combine(testFilesFolderPath, sourceFileName);
+            Process sourceProcess = Process.Start("notepad.exe", sourceFile);
+            if (sourceProcess == null)
+            {
+                throw new InvalidOperationException("Failed to start Notepad.");
+            }
+
+            Thread.Sleep(15000);
+            var sourceWindow = FindWindowWithFlexibleTitle(Path.GetFileName(sourceFile), isRTF: false);
+            sourceWindow.Click();
+            Thread.Sleep(1000);
+
+            this.SendKeys(Key.LCtrl, Key.A);
+            Thread.Sleep(1000);
+            this.SendKeys(Key.LCtrl, Key.C);
+            Thread.Sleep(1000);
+            sourceWindow.Close();
+
+            string destinationFile = Path.Combine(testFilesFolderPath, destinationFileName);
+            Process destinationProcess = Process.Start(wordpadPath, destinationFile);
+            if (destinationProcess == null)
+            {
+                throw new InvalidOperationException("Failed to start WordPad.");
+            }
+
+            Thread.Sleep(15000);
+            var destinationWindow = FindWindowWithFlexibleTitle(Path.GetFileName(destinationFile), isRTF: true);
+            destinationWindow.Click();
+            Thread.Sleep(1000);
+            this.SendKeys(Key.LCtrl, Key.A);
+            Thread.Sleep(1000);
+            this.SendKeys(Key.Win, Key.LCtrl, Key.Alt, Key.R);
+            Thread.Sleep(1000);
+            this.SendKeys(Key.LCtrl, Key.S);
+            Thread.Sleep(1000);
+
+            destinationWindow.Close();
+        }
+
         private void ContentCopyAndPasteAsMarkdownCase2(string fileName, bool isRTF = false)
         {
             string tempFile = Path.Combine(testFilesFolderPath, fileName);
@@ -855,7 +913,7 @@ namespace Microsoft.AdvancedPaste.UITests
             this.SendKeys(Key.Win, Key.Shift, Key.V);
             Thread.Sleep(15000);
 
-            this.SendKeys(Key.LCtrl, Key.Num3);
+            this.SendKeys(Key.LCtrl, Key.Num4);
             Thread.Sleep(1000);
 
             this.SendKeys(Key.LCtrl, Key.S);
