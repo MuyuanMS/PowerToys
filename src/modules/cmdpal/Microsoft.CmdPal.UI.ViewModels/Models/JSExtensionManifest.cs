@@ -160,7 +160,14 @@ public sealed record JSExtensionManifest
             return JSExtensionManifestParseResult.Failure("The package.json 'name' field is missing or empty.");
         }
 
-        // Rule 3: either cmdpal.main or top-level main must resolve to an existing file.
+        // Rule 3: an explicit inspector port must be usable as a TCP port. Port 0 is not
+        // supported because the host must know which port the extension selected.
+        if (package.CmdPal.DebugPort is <= 0 or > 65535)
+        {
+            return JSExtensionManifestParseResult.Failure("The 'cmdpal.debugPort' field must be between 1 and 65535.");
+        }
+
+        // Rule 4: either cmdpal.main or top-level main must resolve to an existing file.
         var entryPoint = !string.IsNullOrWhiteSpace(package.CmdPal.Main)
             ? package.CmdPal.Main
             : package.Main;
@@ -176,7 +183,7 @@ public sealed record JSExtensionManifest
             return JSExtensionManifestParseResult.Failure(resolutionError!);
         }
 
-        // Rule 4: Node must be able to run the entry point directly. Only .js, .mjs, and .cjs are
+        // Rule 5: Node must be able to run the entry point directly. Only .js, .mjs, and .cjs are
         // supported. Uncompiled .ts source is rejected.
         if (!IsSupportedEntryPointExtension(resolvedEntryPoint))
         {
@@ -188,7 +195,7 @@ public sealed record JSExtensionManifest
             return JSExtensionManifestParseResult.Failure($"The entry point '{entryPoint}' does not resolve to an existing file.");
         }
 
-        // Rule 5: a symbolic link or junction must not redirect the entry point outside the extension
+        // Rule 6: a symbolic link or junction must not redirect the entry point outside the extension
         // directory, even when the text path stays inside it. Check the real filesystem after the file
         // is known to exist.
         if (!IsEntryPointContainmentTrusted(extensionDirectory, resolvedEntryPoint, out var containmentError))
@@ -376,9 +383,9 @@ public sealed record JSExtensionManifest
         }
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
         {
-            // A missing segment cannot be a trusted but unverified link. The caller already confirmed
-            // the entry point exists, so treat a vanished segment as not a reparse point.
-            return false;
+            // The entry point was present before validation began. If a segment disappears during
+            // the walk, fail closed rather than trusting a path whose attributes were not verified.
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or System.Security.SecurityException)
         {

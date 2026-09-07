@@ -39,10 +39,12 @@ public sealed class JsonRpcConnection : IDisposable
     private readonly Channel<NotificationEnvelope> _notificationQueue = Channel.CreateBounded<NotificationEnvelope>(
         new BoundedChannelOptions(NotificationQueueCapacity)
         {
-            SingleReader = true,
+            SingleReader = false,
             SingleWriter = false,
             FullMode = BoundedChannelFullMode.Wait,
         });
+
+    private readonly object _registrationLock = new();
 
     private Task? _notificationConsumerTask;
     private Task? _errorPumpTask;
@@ -307,7 +309,15 @@ public sealed class JsonRpcConnection : IDisposable
 
     private void RegisterMethod(string method)
     {
-        _registeredMethods.GetOrAdd(method, AddRpcMethodTarget, this);
+        lock (_registrationLock)
+        {
+            if (_registeredMethods.ContainsKey(method))
+            {
+                return;
+            }
+
+            _registeredMethods[method] = AddRpcMethodTarget(method, this);
+        }
     }
 
     private static RpcMethodTarget AddRpcMethodTarget(string name, JsonRpcConnection connection)

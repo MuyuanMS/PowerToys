@@ -68,6 +68,30 @@ public class JSExtensionManifestTests
         Assert.AreEqual(Path.Combine(_testDirectory, "dist", "index.js"), manifest.EntryPointPath);
     }
 
+    [DataTestMethod]
+    [DataRow(-1)]
+    [DataRow(0)]
+    [DataRow(65536)]
+    public void TryParse_InvalidDebugPort_IsRejected(int debugPort)
+    {
+        CreateEntryPoint("index.js");
+        var json = $$"""
+        {
+            "name": "invalid-debug-port",
+            "main": "index.js",
+            "cmdpal": {
+                "debug": true,
+                "debugPort": {{debugPort}}
+            }
+        }
+        """;
+
+        var result = JSExtensionManifest.TryParse(json, _testDirectory);
+
+        Assert.IsFalse(result.IsValid);
+        StringAssert.Contains(result.FailureReason, "between 1 and 65535");
+    }
+
     [TestMethod]
     public void TryParse_CmdPalMain_OverridesTopLevelMain()
     {
