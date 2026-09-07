@@ -276,10 +276,11 @@ public static class KbmProfileConverter
 
         foreach (var stored in profile.RemapKeys?.InProcessRemapKeys ?? [])
         {
-            if (!KbmShortcutParser.TryParseVkString(stored.OriginalKeys, 0, out var from) || !from.IsSingleKey ||
+            if (stored == null ||
+                !KbmShortcutParser.TryParseVkString(stored.OriginalKeys, 0, out var from) || !from.IsSingleKey ||
                 !KbmShortcutParser.TryParseVkString(stored.NewRemapKeys, 0, out var to))
             {
-                warnings?.Add($"Skipping unparsable key remap entry '{stored.OriginalKeys}'");
+                warnings?.Add($"Skipping unparsable key remap entry '{stored?.OriginalKeys}'");
                 continue;
             }
 
@@ -293,10 +294,11 @@ public static class KbmProfileConverter
 
         foreach (var stored in profile.RemapKeysToText?.InProcessRemapKeys ?? [])
         {
-            if (!KbmShortcutParser.TryParseVkString(stored.OriginalKeys, 0, out var from) || !from.IsSingleKey ||
+            if (stored == null ||
+                !KbmShortcutParser.TryParseVkString(stored.OriginalKeys, 0, out var from) || !from.IsSingleKey ||
                 string.IsNullOrEmpty(stored.NewRemapString))
             {
-                warnings?.Add($"Skipping unparsable key-to-text remap entry '{stored.OriginalKeys}'");
+                warnings?.Add($"Skipping unparsable key-to-text remap entry '{stored?.OriginalKeys}'");
                 continue;
             }
 
@@ -310,7 +312,7 @@ public static class KbmProfileConverter
         foreach (var (stored, app) in EnumerateShortcuts(profile.RemapShortcuts))
         {
             var entry = CreateShortcutEntry(stored, app, warnings);
-            if (entry == null)
+            if (entry == null || stored == null)
             {
                 continue;
             }
@@ -360,7 +362,7 @@ public static class KbmProfileConverter
         foreach (var (stored, app) in EnumerateShortcuts(profile.RemapShortcutsToText))
         {
             var entry = CreateShortcutEntry(stored, app, warnings);
-            if (entry == null)
+            if (entry == null || stored == null)
             {
                 continue;
             }
@@ -403,7 +405,7 @@ public static class KbmProfileConverter
         return FromProfile(ToProfile(model));
     }
 
-    private static IEnumerable<(KeysDataModel Stored, string? App)> EnumerateShortcuts(ShortcutsKeyDataModel? section)
+    private static IEnumerable<(KeysDataModel? Stored, string? App)> EnumerateShortcuts(ShortcutsKeyDataModel? section)
     {
         foreach (var stored in section?.GlobalRemapShortcuts ?? [])
         {
@@ -412,15 +414,16 @@ public static class KbmProfileConverter
 
         foreach (var stored in section?.AppSpecificRemapShortcuts ?? [])
         {
-            yield return (stored, stored.TargetApp);
+            yield return (stored, stored?.TargetApp);
         }
     }
 
-    private static KbmShortcutRemapEntry? CreateShortcutEntry(KeysDataModel stored, string? app, IList<string>? warnings)
+    private static KbmShortcutRemapEntry? CreateShortcutEntry(KeysDataModel? stored, string? app, IList<string>? warnings)
     {
-        if (!KbmShortcutParser.TryParseVkString(stored.OriginalKeys, stored.SecondKeyOfChord, out var from) || from.Keys.Count < 2)
+        if (stored == null ||
+            !KbmShortcutParser.TryParseVkString(stored.OriginalKeys, stored.SecondKeyOfChord, out var from) || from.Keys.Count < 2)
         {
-            warnings?.Add($"Skipping unparsable shortcut remap entry '{stored.OriginalKeys}'");
+            warnings?.Add($"Skipping unparsable shortcut remap entry '{stored?.OriginalKeys}'");
             return null;
         }
 
@@ -442,9 +445,16 @@ public static class KbmProfileConverter
             return null;
         }
 
+        var canonicalFrom = KbmShortcutParser.Format(KbmShortcutParser.Canonicalize(from));
+        if (!KbmShortcutParser.TryParseKeyOrShortcut(canonicalFrom, out _, out _))
+        {
+            warnings?.Add($"Skipping unparsable shortcut remap entry '{stored.OriginalKeys}'");
+            return null;
+        }
+
         return new KbmShortcutRemapEntry
         {
-            From = KbmShortcutParser.Format(KbmShortcutParser.Canonicalize(from)),
+            From = canonicalFrom,
             TargetApp = app?.ToLowerInvariant(),
             ExactMatch = stored.ExactMatch == true ? true : null,
         };
