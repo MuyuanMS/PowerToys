@@ -49,6 +49,7 @@ namespace Microsoft.CropAndLock.UITests
         private static SigningPrerequisites.Signature[] MissingSignatures() =>
         [
             new("NotSigned", "Unsigned fixture.", string.Empty, false),
+            new("Missing", "Fixture was not staged.", string.Empty, false),
             new("NotTrusted", "Untrusted signer.", "Microsoft Corporation", false),
             new("UnknownError", "Trust verification unavailable.", "Microsoft Corporation", false),
             new("Valid", "Different publisher.", "Another publisher", true),

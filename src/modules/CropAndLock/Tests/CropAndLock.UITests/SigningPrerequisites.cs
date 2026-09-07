@@ -47,7 +47,7 @@ namespace Microsoft.CropAndLock.UITests
 
             var message = $"{requirement} Signature status: {signature.Status}; signer: '{signature.Signer}'; " +
                 $"machine trust: {signature.MachineTrusted}. {signature.Message}";
-            var missingSetup = signature.Status is "NotSigned" or "NotTrusted" or "UnknownError" or "Valid";
+            var missingSetup = signature.Status is "Missing" or "NotSigned" or "NotTrusted" or "UnknownError" or "Valid";
             if (isInPipeline || !missingSetup)
             {
                 Assert.Fail(message);
@@ -59,7 +59,11 @@ namespace Microsoft.CropAndLock.UITests
 
         private static Signature ReadSignature(string path)
         {
-            Assert.IsTrue(File.Exists(path), $"Required test/runtime file was not staged: '{path}'.");
+            if (!File.Exists(path))
+            {
+                return new Signature("Missing", $"Required test/runtime file was not staged: '{path}'.", string.Empty, false);
+            }
+
             const string command = """
                 $ErrorActionPreference = 'Stop'
                 $signature = Get-AuthenticodeSignature -LiteralPath $env:POWERTOYS_UITEST_SIGNATURE_PATH

@@ -29,7 +29,6 @@ namespace Microsoft.CropAndLock.UITests
         internal override void Open(TestContext context)
         {
             var packagePath = Path.Combine(AppContext.BaseDirectory, "CropAndLock.TestApp.msix");
-            Assert.IsTrue(File.Exists(packagePath), $"The signed packaged fixture was not staged: {packagePath}.");
             SigningPrerequisites.RequirePackage(packagePath);
             ReclaimPreviousRun(context);
 
