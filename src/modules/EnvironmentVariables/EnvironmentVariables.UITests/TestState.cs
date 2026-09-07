@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -32,6 +33,12 @@ internal sealed class TestState : IDisposable
         RespectRequiredConstructorParameters = true,
         AllowDuplicateProperties = false,
     };
+
+    private const uint WmSettingChange = 0x001A;
+    private static readonly IntPtr HwndBroadcast = new(0xffff);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr SendNotifyMessage(IntPtr hWnd, uint message, IntPtr wParam, string lParam);
 
     private readonly Dictionary<string, UserVariableSnapshot> userVariables = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, byte[]?> files = new(StringComparer.Ordinal);
@@ -214,13 +221,8 @@ internal sealed class TestState : IDisposable
     {
         var failures = new List<Exception>();
         AttemptRestore(
-            () => Environment.SetEnvironmentVariable(name, original.Value, EnvironmentVariableTarget.User),
-            "notify the user environment change",
-            failures);
-        AttemptRestore(
             () =>
             {
-                // Preserve raw text and kind even if the notifying OS API failed or converted the value.
                 using var key = Registry.CurrentUser.CreateSubKey("Environment", writable: true);
                 if (original.Value is null)
                 {
@@ -232,6 +234,10 @@ internal sealed class TestState : IDisposable
                 }
             },
             "restore the raw user registry value",
+            failures);
+        AttemptRestore(
+            () => SendNotifyMessage(HwndBroadcast, WmSettingChange, new IntPtr(0x12345), "Environment"),
+            "notify the restored user environment",
             failures);
         ThrowRestorationFailures(failures);
     }
