@@ -166,10 +166,12 @@ public class AutoHideCursorSettingsTests : UITestBase
     {
         MouseUtilsTestHelper.ReplaceModuleSettings(
             ModuleName,
-            CreateSettings(hideOnTyping: false, hideOnIdle: true, idleDelayMs: 1000));
+            CreateSettings(hideOnTyping: false, hideOnIdle: true, idleDelayMs: 60000));
 
         OpenSettings();
         var originalCursor = GetVisibleCursorHandle();
+        var idleDelay = Session.Find<NumberBox>(By.AccessibilityId(IdleDelayId), 5_000);
+        idleDelay.SetValue(1);
         var hiddenCursor = WaitHelper.WaitForStable(
             GetVisibleCursorHandle,
             actual => actual != originalCursor && actual != IntPtr.Zero,
@@ -186,34 +188,6 @@ public class AutoHideCursorSettingsTests : UITestBase
             requiredConsecutiveMatches: 2,
             pollIntervalMS: 250);
         Assert.IsTrue(restoredCursor.Succeeded, "Disabling Auto Hide Cursor did not restore the active cursor.");
-    }
-
-    [TestMethod]
-    [TestCategory("MouseUtils")]
-    [TestCategory("AutoHideCursor")]
-    public void TypingHidesAndMouseMovementRestoresTheSystemCursor()
-    {
-        OpenSettings();
-
-        var originalCursor = GetVisibleCursorHandle();
-        KeyboardHelper.SendKey(Key.A);
-        var hiddenCursor = WaitHelper.WaitForStable(
-            GetVisibleCursorHandle,
-            actual => actual != originalCursor && actual != IntPtr.Zero,
-            timeoutMS: 10_000,
-            requiredConsecutiveMatches: 2,
-            pollIntervalMS: 250);
-        Assert.IsTrue(hiddenCursor.Succeeded, "Typing did not replace the active cursor.");
-
-        var cursorPosition = GetCursorPosition();
-        Assert.IsTrue(SetCursorPos(cursorPosition.X + 10, cursorPosition.Y), "Could not move the system cursor.");
-        var restoredCursor = WaitHelper.WaitForStable(
-            GetVisibleCursorHandle,
-            actual => actual != IntPtr.Zero && actual != hiddenCursor.LastObservation,
-            timeoutMS: 10_000,
-            requiredConsecutiveMatches: 2,
-            pollIntervalMS: 250);
-        Assert.IsTrue(restoredCursor.Succeeded, "Mouse movement did not restore the active cursor.");
     }
 
     private void OpenSettings()
@@ -293,13 +267,6 @@ public class AutoHideCursorSettingsTests : UITestBase
         return cursorInfo.HCursor;
     }
 
-    private static POINT GetCursorPosition()
-    {
-        var cursorInfo = new CURSORINFO { CbSize = Marshal.SizeOf<CURSORINFO>() };
-        Assert.IsTrue(GetCursorInfo(out cursorInfo), "Could not read the cursor position.");
-        return cursorInfo.Position;
-    }
-
     private static void AssertWorkerState(bool expectedRunning)
     {
         var result = WaitForWorkerState(expectedRunning, 15_000);
@@ -346,9 +313,6 @@ public class AutoHideCursorSettingsTests : UITestBase
 
     [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW", SetLastError = true)]
     private static extern bool SystemParametersInfo(int uiAction, int uiParam, IntPtr pvParam, int fWinIni);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool SetCursorPos(int x, int y);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct POINT

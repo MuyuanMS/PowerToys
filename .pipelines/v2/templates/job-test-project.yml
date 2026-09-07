@@ -358,7 +358,8 @@ jobs:
             if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
               throw "$base requires its staged executable for non-elevated dispatch; missing runner: $exe"
             }
-            & "$(build.sourcesdirectory)\.pipelines\runUiTestAsUser.ps1" `
+            & (Get-Process -Id $PID).Path -NoLogo -NoProfile -NonInteractive `
+              -File "$(build.sourcesdirectory)\.pipelines\runUiTestAsUser.ps1" `
               -TestExecutable $exe -ResultsDirectory $resultsDir
           } elseif (Test-Path $exe) {
             & $exe --report-trx --results-directory $resultsDir
