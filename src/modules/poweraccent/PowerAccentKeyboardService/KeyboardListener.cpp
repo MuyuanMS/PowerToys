@@ -231,7 +231,12 @@ namespace winrt::PowerToys::PowerAccentKeyboardService::implementation
 
         if (letterKey == m_foregroundCancelledLetter)
         {
-            return true;
+            if (GetAsyncKeyState(info.vkCode) & 0x8000)
+            {
+                return true;
+            }
+
+            m_foregroundCancelledLetter = LetterKey::None;
         }
 
         // Shift key is detected only if the toolbar is already visible to avoid conflicts with uppercase
@@ -485,7 +490,18 @@ namespace winrt::PowerToys::PowerAccentKeyboardService::implementation
             return;
         }
 
-        if (s_instance == nullptr || !s_instance->m_toolbarVisible)
+        if (s_instance == nullptr)
+        {
+            return;
+        }
+
+        if (s_instance->m_foregroundCancelledLetter != LetterKey::None &&
+            !(GetAsyncKeyState(static_cast<int>(s_instance->m_foregroundCancelledLetter)) & 0x8000))
+        {
+            s_instance->m_foregroundCancelledLetter = LetterKey::None;
+        }
+
+        if (!s_instance->m_toolbarVisible)
         {
             return;
         }
@@ -498,10 +514,16 @@ namespace winrt::PowerToys::PowerAccentKeyboardService::implementation
         Logger::debug(L"Foreground window changed; cancelling accent gesture");
 
         const auto cancelledLetter = s_instance->letterPressed;
+        const bool cancelledLetterStillPressed =
+            cancelledLetter != LetterKey::None &&
+            (GetAsyncKeyState(static_cast<int>(cancelledLetter)) & 0x8000);
 
         // Reset before the callback so a reentrant foreground event is a no-op.
         s_instance->ForceReset();
-        s_instance->m_foregroundCancelledLetter = cancelledLetter;
+        if (cancelledLetterStillPressed)
+        {
+            s_instance->m_foregroundCancelledLetter = cancelledLetter;
+        }
 
         if (s_instance->m_hideToolbarCb)
         {
