@@ -396,7 +396,12 @@ public sealed class JsonRpcConnection : IDisposable
                 continue;
             }
 
-            return;
+            if (_notificationQueue.Reader.Completion.IsCompleted)
+            {
+                return;
+            }
+
+            Thread.Yield();
         }
     }
 
