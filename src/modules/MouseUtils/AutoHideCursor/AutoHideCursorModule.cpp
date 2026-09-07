@@ -153,7 +153,7 @@ namespace
             }
 
             CloseSupervisorEvents();
-            if (!auto_hide_cursor::RestoreSystemCursors())
+            if (auto_hide_cursor::HasRecoveryMarker() && !auto_hide_cursor::RestoreSystemCursors())
             {
                 Logger::error(L"Failed to restore system cursors while disabling Auto Hide Cursor. Error: {}", GetLastError());
             }
