@@ -281,14 +281,15 @@ namespace Microsoft.CropAndLock.UITests
 
         private static Key? ParseKey(string text)
         {
-            return text.ToLowerInvariant() switch
+            var normalized = text.Replace(" ", string.Empty, StringComparison.Ordinal);
+            return normalized.ToLowerInvariant() switch
             {
                 "win" or "windows" => Key.LWin,
                 "ctrl" or "control" => Key.Ctrl,
                 "shift" => Key.Shift,
                 "alt" => Key.Alt,
-                _ when text.Length == 1 && char.IsAsciiDigit(text[0]) => Enum.Parse<Key>($"Num{text}"),
-                _ when char.IsAsciiLetter(text[0]) && Enum.TryParse<Key>(text, true, out var key) => key,
+                _ when normalized.Length == 1 && char.IsAsciiDigit(normalized[0]) => Enum.Parse<Key>($"Num{normalized}"),
+                _ when !char.IsDigit(normalized[0]) && Enum.TryParse<Key>(normalized, true, out var key) => key,
                 _ => null,
             };
         }
