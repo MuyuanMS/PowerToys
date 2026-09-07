@@ -14,6 +14,7 @@
 #include <atomic>
 #include <cmath>
 #include <functional>
+#include <mutex>
 #include <thread>
 
 // Mouse Button Lock
@@ -196,6 +197,7 @@ private:
     // to it in its constructor).
     WinInjector m_injector;
     mousebuttonlock::Engine m_engine{ m_injector };
+    std::mutex m_settingsAndEngineMutex;
 
     // Hook thread + lifecycle.
     HHOOK m_mouseHook = nullptr;
@@ -262,6 +264,7 @@ public:
             PowerToysSettings::PowerToyValues values =
                 PowerToysSettings::PowerToyValues::from_json_string(config, get_key());
 
+            std::scoped_lock lock(m_settingsAndEngineMutex);
             parse_settings(values);
 
             // If a button's lock was just turned off while it was logically held, release it now.
@@ -496,7 +499,10 @@ void MouseButtonLock::HookThreadMain()
     // hook callback here, so a direct SendInput is safe: clear the target thread to make ReleaseAll's
     // injections run inline, guaranteeing no button is left stranded in the locked state.
     m_injector.SetTargetThread(0);
-    m_engine.ReleaseAll();
+    {
+        std::scoped_lock lock(m_settingsAndEngineMutex);
+        m_engine.ReleaseAll();
+    }
 }
 
 LRESULT CALLBACK MouseButtonLock::MouseHookProc(int nCode, WPARAM wParam, LPARAM lParam)
@@ -522,6 +528,7 @@ bool MouseButtonLock::HandleMouseMessage(WPARAM wParam, const MSLLHOOKSTRUCT* da
         return false;
     }
 
+    std::scoped_lock lock(m_settingsAndEngineMutex);
     const mousebuttonlock::Settings snapshot = SettingsSnapshot();
     const uint64_t tick = GetTickCount64();
     const mousebuttonlock::PointL pt{ data->pt.x, data->pt.y };

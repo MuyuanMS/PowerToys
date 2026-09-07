@@ -7,6 +7,7 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <mutex>
 
 // The per-button ClickLock state machine, deliberately decoupled from Win32 so it can be unit
 // tested. The caller (the module's low-level mouse hook) feeds it events with a monotonic
@@ -79,6 +80,7 @@ namespace mousebuttonlock
         // is chorded, so releasing a right/middle lock this way fires no context menu.
         bool OnButtonDown(MouseButton button, uint64_t tick, PointL pt, const Settings& s)
         {
+            std::scoped_lock lock(m_stateMutex);
             ButtonState& st = State(button);
 
             // Tap-to-release the pressed button's own lock. exchange() claims the lock atomically so a
@@ -119,6 +121,7 @@ namespace mousebuttonlock
         // up, and the later clean release is a single injected up).
         bool OnButtonUp(MouseButton button, uint64_t tick, const Settings& s)
         {
+            std::scoped_lock lock(m_stateMutex);
             ButtonState& st = State(button);
 
             if (st.swallowNextRealUp)
@@ -158,6 +161,7 @@ namespace mousebuttonlock
         // so the button-up passes through normally instead of latching.
         void OnMove(uint64_t /*tick*/, PointL pt, const Settings& s)
         {
+            std::scoped_lock lock(m_stateMutex);
             const int pixels = s.moveCancelPixels < 0 ? 0 : s.moveCancelPixels;
             CheckMoveCancel(m_left, pixels, pt);
             CheckMoveCancel(m_right, pixels, pt);
@@ -167,6 +171,7 @@ namespace mousebuttonlock
         // Release any button whose lock has just been turned off in settings.
         void EnforceEnabled(const Settings& s)
         {
+            std::scoped_lock lock(m_stateMutex);
             if (!s.lmbEnabled)
             {
                 ReleaseButton(m_left, MouseButton::Left);
@@ -184,6 +189,7 @@ namespace mousebuttonlock
         // Release every locked button (crash/shutdown safety).
         void ReleaseAll()
         {
+            std::scoped_lock lock(m_stateMutex);
             ReleaseButton(m_left, MouseButton::Left);
             ReleaseButton(m_right, MouseButton::Right);
             ReleaseButton(m_middle, MouseButton::Middle);
@@ -193,6 +199,7 @@ namespace mousebuttonlock
         // disable/enable cycle can't produce a spurious lock or a swallowed later click.
         void ResetTransient()
         {
+            std::scoped_lock lock(m_stateMutex);
             ResetOne(m_left);
             ResetOne(m_right);
             ResetOne(m_middle);
@@ -200,11 +207,13 @@ namespace mousebuttonlock
 
         bool IsLocked(MouseButton button) const
         {
+            std::scoped_lock lock(m_stateMutex);
             return State(button).locked.load();
         }
 
         void OnInjectionFailed(MouseButton button)
         {
+            std::scoped_lock lock(m_stateMutex);
             ButtonState& st = State(button);
             if (st.swallowNextRealUp)
             {
@@ -329,6 +338,7 @@ namespace mousebuttonlock
         }
 
         IButtonUpInjector& m_injector;
+        mutable std::mutex m_stateMutex;
         ButtonState m_left;
         ButtonState m_right;
         ButtonState m_middle;

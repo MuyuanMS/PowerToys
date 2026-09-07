@@ -58,10 +58,20 @@ namespace MouseUtils.UITests
             var holdDuration = foundCustom.Find<Slider>(By.AccessibilityId(MouseUtilsSettings.AccessibilityIds.MouseButtonLockHoldDuration));
             Assert.IsNotNull(holdDuration);
 
-            holdDuration.QuickSetValue(800);
+            holdDuration.Click();
+            holdDuration.SendKeys(Key.Home);
+            for (int i = 0; i < 6; i++)
+            {
+                holdDuration.SendKeys(Key.Right);
+            }
+
             Assert.AreEqual(800, holdDuration.GetValue());
 
-            holdDuration.QuickSetValue(1200);
+            for (int i = 0; i < 4; i++)
+            {
+                holdDuration.SendKeys(Key.Right);
+            }
+
             Assert.AreEqual(1200, holdDuration.GetValue());
 
             // [Test Case] Drag threshold accepts a value. The NumberBox surfaces to automation as an edit control.

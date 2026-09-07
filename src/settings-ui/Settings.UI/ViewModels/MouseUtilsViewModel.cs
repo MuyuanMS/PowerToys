@@ -1472,6 +1472,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             OnPropertyChanged(nameof(IsMousePointerCrosshairsEnabled));
             OnPropertyChanged(nameof(IsCursorWrapEnabled));
             OnPropertyChanged(nameof(IsMouseButtonLockEnabled));
+            OnPropertyChanged(nameof(IsMouseButtonLockEnabledGpoConfigured));
         }
 
         private Func<string, int> SendConfigMSG { get; }
