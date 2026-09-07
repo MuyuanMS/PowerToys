@@ -63,6 +63,7 @@ namespace winrt::PowerToys::PowerAccentKeyboardService::implementation
         HWINEVENTHOOK s_foregroundEventHook = nullptr;
         bool m_toolbarVisible;
         HWND m_toolbarForegroundWindow = nullptr;
+        LetterKey m_foregroundCancelledLetter{ LetterKey::None };
         PowerAccentSettings m_settings;
         std::function<void(LetterKey, int32_t)> m_showToolbarCb;
         std::function<void()> m_cancelToolbarCb;
