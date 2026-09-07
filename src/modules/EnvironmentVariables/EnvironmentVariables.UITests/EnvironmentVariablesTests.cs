@@ -358,7 +358,7 @@ public sealed class EnvironmentVariablesTests : UITestBase
         var window = WindowsFinder.WaitForWindowByApp(TestState.ProcessName, candidate => candidate.Width > 400 && candidate.Height > 300, timeoutMS: 30_000);
         Assert.IsNotNull(window, "Environment Variables did not launch from Settings.");
         WindowHelper.MaximizeWindow(new IntPtr(window.WindowHandle));
-        editor = new EditorUi(Session.FromProcess(TestState.ProcessName, timeoutMS: 10_000), TestContext);
+        editor = new EditorUi(window, TestContext);
         Assert.IsTrue(window.WaitForElement(By.AccessibilityId("AddDefaultVariableUserBtn"), 15_000), "The editor did not become ready.");
     }
 
