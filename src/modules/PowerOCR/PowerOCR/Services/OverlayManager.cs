@@ -424,9 +424,9 @@ internal sealed class OverlayManager : IOverlayManager
     private void PopulateLanguages(OverlaySessionViewModel viewModel)
     {
         var recognizers = OcrEngine.AvailableRecognizerLanguages;
-        foreach (var lang in recognizers)
+        for (int index = 0; index < recognizers.Count; index++)
         {
-            viewModel.Languages.Add(lang);
+            viewModel.Languages.Add(recognizers[index]);
         }
 
         if (viewModel.Languages.Count == 0)

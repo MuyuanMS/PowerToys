@@ -44,9 +44,11 @@ public sealed class WindowsOcrRecognizer : IOcrRecognizer
                 Windows.Media.Ocr.OcrResult ocrResult =
                     await engine.RecognizeAsync(softwareBitmap).AsTask(cancellationToken);
 
-                IReadOnlyList<OcrLineData> lines = ocrResult.Lines
-                    .Select(MapLine)
-                    .ToList();
+                var lines = new List<OcrLineData>(ocrResult.Lines.Count);
+                for (int index = 0; index < ocrResult.Lines.Count; index++)
+                {
+                    lines.Add(MapLine(ocrResult.Lines[index]));
+                }
 
                 return new OcrDocument(lines);
             }
@@ -63,15 +65,18 @@ public sealed class WindowsOcrRecognizer : IOcrRecognizer
 
     private static OcrLineData MapLine(Windows.Media.Ocr.OcrLine line)
     {
-        IReadOnlyList<OcrWordData> words = line.Words
-            .Select(word => new OcrWordData(
+        var words = new List<OcrWordData>(line.Words.Count);
+        for (int index = 0; index < line.Words.Count; index++)
+        {
+            var word = line.Words[index];
+            words.Add(new OcrWordData(
                 word.Text,
                 new OcrRect(
                     word.BoundingRect.X,
                     word.BoundingRect.Y,
                     word.BoundingRect.Width,
-                    word.BoundingRect.Height)))
-            .ToList();
+                    word.BoundingRect.Height)));
+        }
 
         OcrRect bounds = words.Count == 0
             ? new OcrRect(0, 0, 0, 0)
