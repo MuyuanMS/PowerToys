@@ -1552,6 +1552,14 @@ static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
                     // inset from the window rect by the invisible resize borders, so
                     // expand the target rect by those margins (recomputed here because
                     // they are zeroed while the snap preview is armed).
+                    SetWindowPos(
+                        g_dragTarget,
+                        nullptr,
+                        targetRect.left,
+                        targetRect.top,
+                        targetRect.right - targetRect.left,
+                        targetRect.bottom - targetRect.top,
+                        SWP_NOZORDER | SWP_NOACTIVATE);
                     PrepareOverlayMetrics(g_dragTarget);
                     RECT windowRect = targetRect;
                     windowRect.left -= g_overlayMarginL;
@@ -1889,7 +1897,7 @@ static void HandleDragResize(POINT pt)
             int newLeft = pt.x - static_cast<int>(ratioL * newW);
             int newTop = pt.y - static_cast<int>(ratioT * newH);
             SetWindowPos(g_resizeTarget, nullptr, newLeft, newTop, newW, newH,
-                         SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
+                         SWP_NOZORDER | SWP_NOACTIVATE);
             g_resizeWndRect = {newLeft, newTop, newLeft + newW, newTop + newH};
 
             // Corner radius / invisible-border margins differ once restored.
