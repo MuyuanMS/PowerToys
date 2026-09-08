@@ -53,11 +53,9 @@ public partial class ListViewModel : PageViewModel, IDisposable
     private bool _isUpdatingFilteredItems;
     private Action? _pendingFilteredItemsUpdate;
 
-    [ThreadStatic]
-    private static Dictionary<ListViewModel, int>? _getItemsDepthByViewModel;
-
     private InterlockedBoolean _isLoadingMore;
     private int _activeFetchCount;
+    private int _activeGetItemsCount;
     private int _latestFetchGeneration;
     private bool _deferredFetchRequested;
     private bool _deferredFetchKeepSelection = true;
@@ -246,7 +244,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
             return;
         }
 
-        if (IsGetItemsActiveOnCurrentThread())
+        if (IsGetItemsActive())
         {
             lock (_fetchStateLock)
             {
@@ -662,56 +660,34 @@ public partial class ListViewModel : PageViewModel, IDisposable
     }
 
     /// <summary>
-    /// Detects if we're currently within a GetItems call on this thread for this view model. This is used to detect
-    /// reentrant calls to GetItems, so we can defer subsequent calls until the first one finishes, to avoid
-    /// concurrent GetItems calls which most extensions won't be expecting.
+    /// Detects if a GetItems call is active for this view model. This is used to
+    /// defer subsequent calls until all active calls finish, avoiding concurrent
+    /// GetItems calls which most extensions won't be expecting.
     /// </summary>
     /// <returns>
     /// <see langword="true"/> if we're currently within a GetItems call on this thread for this view model; otherwise, <see langword="false"/>.
     /// </returns>
-    private bool IsGetItemsActiveOnCurrentThread()
-    {
-        var depths = _getItemsDepthByViewModel;
-        return depths is not null &&
-               depths.TryGetValue(this, out var depth) &&
-               depth > 0;
-    }
+    private bool IsGetItemsActive() => Volatile.Read(ref _activeGetItemsCount) > 0;
 
     private void EnterGetItemsScope()
     {
-        var depths = _getItemsDepthByViewModel ??= [];
-        depths.TryGetValue(this, out var depth);
-        depths[this] = depth + 1;
+        Interlocked.Increment(ref _activeGetItemsCount);
     }
 
     private void ExitGetItemsScope()
     {
-        var depths = _getItemsDepthByViewModel;
-        if (depths is null || !depths.TryGetValue(this, out var depth))
+        if (Interlocked.Decrement(ref _activeGetItemsCount) != 0)
         {
             return;
         }
 
-        if (depth == 1)
+        try
         {
-            depths.Remove(this);
-            if (depths.Count == 0)
-            {
-                _getItemsDepthByViewModel = null;
-            }
-
-            try
-            {
-                QueueDeferredFetchIfNeeded();
-            }
-            catch (Exception ex)
-            {
-                CoreLogger.LogError("Failed to queue deferred fetch", ex);
-            }
+            QueueDeferredFetchIfNeeded();
         }
-        else
+        catch (Exception ex)
         {
-            depths[this] = depth - 1;
+            CoreLogger.LogError("Failed to queue deferred fetch", ex);
         }
     }
 
