@@ -119,6 +119,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     // For cancelling a deferred SafeSlowInit when the user navigates rapidly
     private CancellationTokenSource? _selectedItemCts;
+    private int _selectedItemGeneration;
 
     public override bool IsInitialized
     {
@@ -827,7 +828,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
         if (item is not null)
         {
-            SetSelectedItem(item);
+            _ = SetSelectedItemAsync(item);
         }
         else
         {
@@ -835,8 +836,9 @@ public partial class ListViewModel : PageViewModel, IDisposable
         }
     }
 
-    private void SetSelectedItem(ListItemViewModel item)
+    internal Task SetSelectedItemAsync(ListItemViewModel item)
     {
+        var generation = Interlocked.Increment(ref _selectedItemGeneration);
         _lastSelectedItem = item;
         _lastSelectedItem.PropertyChanged += SelectedItemPropertyChanged;
 
@@ -849,45 +851,68 @@ public partial class ListViewModel : PageViewModel, IDisposable
         var cts = _selectedItemCts = new CancellationTokenSource();
         var ct = cts.Token;
 
-        _ = Task.Run(
-            () =>
+        return Task.Run(
+            async () =>
             {
-                if (ct.IsCancellationRequested)
+                if (ct.IsCancellationRequested || generation != Volatile.Read(ref _selectedItemGeneration))
                 {
                     return;
                 }
 
-                if (!item.SafeSlowInit())
+                if (!await item.SafeSlowInitAsync().ConfigureAwait(false))
                 {
-                    if (ct.IsCancellationRequested)
+                    if (ct.IsCancellationRequested || generation != Volatile.Read(ref _selectedItemGeneration))
                     {
                         return;
                     }
 
-                    WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                    DoOnUiThread(() =>
+                    {
+                        if (ct.IsCancellationRequested || generation != Volatile.Read(ref _selectedItemGeneration))
+                        {
+                            return;
+                        }
+
+                        WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                    });
 
                     return;
                 }
 
-                if (ct.IsCancellationRequested)
+                if (ct.IsCancellationRequested || generation != Volatile.Read(ref _selectedItemGeneration))
                 {
                     return;
                 }
 
-                // SafeSlowInit completed on a background thread — details
-                // messages will be marshalled to the UI thread by the receiver.
-                if (ShowDetails && item.HasDetails)
+                // Publish the details state on the UI scheduler so the generation
+                // check covers the actual message publication.
+                DoOnUiThread(() =>
                 {
-                    WeakReferenceMessenger.Default.Send<ShowDetailsMessage>(new(item.Details));
-                }
-                else
-                {
-                    WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
-                }
+                    if (ct.IsCancellationRequested || generation != Volatile.Read(ref _selectedItemGeneration))
+                    {
+                        return;
+                    }
+
+                    var details = item.Details;
+                    var showDetails = ShowDetails && details is not null;
+                    if (showDetails)
+                    {
+                        WeakReferenceMessenger.Default.Send<ShowDetailsMessage>(new(details!));
+                    }
+                    else
+                    {
+                        WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                    }
+                });
 
                 var suggestion = item.TextToSuggest;
                 DoOnUiThread(() =>
                 {
+                    if (ct.IsCancellationRequested || generation != Volatile.Read(ref _selectedItemGeneration))
+                    {
+                        return;
+                    }
+
                     TextToSuggest = suggestion;
                     WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(suggestion));
                 });
@@ -931,6 +956,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     private void ClearSelectedItem()
     {
+        Interlocked.Increment(ref _selectedItemGeneration);
         CancelAndDisposeTokenSource(ref _selectedItemCts);
 
         WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(null));

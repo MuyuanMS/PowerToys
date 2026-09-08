@@ -49,6 +49,8 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
     public bool IsInErrorState => Initialized.HasFlag(InitializedState.Error);
 
+    protected void MarkErrorState() => Initialized |= InitializedState.Error;
+
     // These are properties that are "observable" from the extension object
     // itself, in the sense that they get raised by PropChanged events from the
     // extension. However, we don't want to actually make them
