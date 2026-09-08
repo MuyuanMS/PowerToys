@@ -146,6 +146,7 @@ public partial class ListItemViewModel : CommandItemViewModel
             }
             catch
             {
+                MarkErrorState();
                 _lifetime.Close(CleanupItem);
                 completion.TrySetResult(false);
                 throw;

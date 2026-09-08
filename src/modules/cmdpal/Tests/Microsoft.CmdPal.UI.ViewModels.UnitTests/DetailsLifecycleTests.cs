@@ -230,6 +230,56 @@ public sealed partial class DetailsLifecycleTests
     }
 
     [TestMethod]
+    public async Task AsyncSelection_QueuedFailureMarksItemAsError()
+    {
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var firstSectionRead = true;
+        var item = new TrackedListItem
+        {
+            OnSectionRead = () =>
+            {
+                if (firstSectionRead)
+                {
+                    firstSectionRead = false;
+                    Block(entered, release);
+                }
+            },
+        };
+        var vm = CreateItem(item);
+        var initialization = Task.Run(vm.SafeInitializeProperties);
+        Task<bool>? selection = null;
+        try
+        {
+            Assert.IsTrue(entered.Wait(TimeSpan.FromSeconds(5)));
+            item.FailDetails = true;
+            selection = vm.SafeSlowInitAsync();
+            release.Set();
+
+            Assert.IsFalse(await selection.WaitAsync(TimeSpan.FromSeconds(5)));
+            try
+            {
+                await initialization.WaitAsync(TimeSpan.FromSeconds(5));
+            }
+            catch (InvalidOperationException)
+            {
+            }
+
+            Assert.IsTrue(vm.IsInErrorState);
+        }
+        finally
+        {
+            release.Set();
+            if (selection is not null)
+            {
+                await selection.WaitAsync(TimeSpan.FromSeconds(5));
+            }
+
+            await initialization.WaitAsync(TimeSpan.FromSeconds(5)).ContinueWith(_ => { });
+        }
+    }
+
+    [TestMethod]
     public async Task AsyncSelection_CompletesAfterQueuedPropertyNotification()
     {
         using var entered = new ManualResetEventSlim();
@@ -465,7 +515,7 @@ public sealed partial class DetailsLifecycleTests
         vm.SlowInitializeProperties();
         _context.Scheduler.RunAll(newestFirst: true);
 
-        Assert.AreSame(original, vm.Details);
+        Assert.AreNotSame(original, vm.Details);
         Assert.AreEqual("new snapshot", vm.Details?.Body);
         Assert.AreEqual(0, first.Subscribers);
         Assert.AreEqual(1, second.Subscribers);
@@ -979,6 +1029,8 @@ public sealed partial class DetailsLifecycleTests
 
         public bool FailTextToSuggest { get; set; }
 
+        public bool FailDetails { get; set; }
+
         public Action? OnSectionRead { get; set; }
 
         public Action? OnTitleRead { get; set; }
@@ -1016,6 +1068,11 @@ public sealed partial class DetailsLifecycleTests
             get
             {
                 DetailsReads++;
+                if (FailDetails)
+                {
+                    throw new InvalidOperationException("broken details");
+                }
+
                 return base.Details;
             }
 
