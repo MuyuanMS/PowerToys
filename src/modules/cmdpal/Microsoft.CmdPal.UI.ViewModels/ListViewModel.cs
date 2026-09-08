@@ -866,7 +866,15 @@ public partial class ListViewModel : PageViewModel, IDisposable
                         return;
                     }
 
-                    WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                    DoOnUiThread(() =>
+                    {
+                        if (ct.IsCancellationRequested || generation != Volatile.Read(ref _selectedItemGeneration))
+                        {
+                            return;
+                        }
+
+                        WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                    });
 
                     return;
                 }
@@ -878,8 +886,6 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
                 // Publish the details state on the UI scheduler so the generation
                 // check covers the actual message publication.
-                var details = item.Details;
-                var showDetails = ShowDetails && details is not null;
                 DoOnUiThread(() =>
                 {
                     if (ct.IsCancellationRequested || generation != Volatile.Read(ref _selectedItemGeneration))
@@ -887,6 +893,8 @@ public partial class ListViewModel : PageViewModel, IDisposable
                         return;
                     }
 
+                    var details = item.Details;
+                    var showDetails = ShowDetails && details is not null;
                     if (showDetails)
                     {
                         WeakReferenceMessenger.Default.Send<ShowDetailsMessage>(new(details!));
