@@ -26,7 +26,7 @@
 
   <Target Name="DownloadMonacoEditor"
           BeforeTargets="AssignTargetPaths"
-          Condition="'$(DesignTimeBuild)' != 'true' and !Exists('$(MSBuildThisFileDirectory)Monaco\monacoSRC\min')">
+          Condition="'$(DesignTimeBuild)' != 'true'">
     <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)common\FilePreviewCommon\downloadMonaco.ps1&quot;" />
   </Target>
 

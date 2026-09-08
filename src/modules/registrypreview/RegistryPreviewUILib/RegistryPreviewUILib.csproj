@@ -82,6 +82,6 @@
 
 	<!-- Ensures FilePreviewCommon is built before this project, so that Monaco is available -->
   <ItemGroup>
-    <ProjectReference Include="..\..\..\common\FilePreviewCommon\FilePreviewCommon.csproj" />
+    <ProjectReference Include="..\..\..\common\FilePreviewCommon\FilePreviewCommon.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>
