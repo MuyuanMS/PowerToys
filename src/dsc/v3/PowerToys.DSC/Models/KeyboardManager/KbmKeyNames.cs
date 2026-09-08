@@ -86,7 +86,7 @@ public static class KbmKeyNames
         return false;
     }
 
-    private static bool IsStorableCode(uint code)
+    internal static bool IsStorableCode(uint code)
     {
         return code <= byte.MaxValue ||
             code is VkDisabled or VkWinBoth ||

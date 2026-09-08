@@ -226,7 +226,9 @@ public static class KbmShortcutParser
         var keys = new List<uint>();
         foreach (var part in vkString.Split(VkSeparator))
         {
-            if (!uint.TryParse(part.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var code) || code == 0)
+            if (!uint.TryParse(part.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var code) ||
+                code == 0 ||
+                !KbmKeyNames.IsStorableCode(code))
             {
                 return false;
             }

@@ -85,6 +85,7 @@ public sealed class KbmShortcutParserTests
         Assert.AreEqual(75u, result.SecondKeyOfChord);
 
         Assert.IsFalse(KbmShortcutParser.TryParseVkString("162;abc", 0, out _));
+        Assert.IsFalse(KbmShortcutParser.TryParseVkString("162;4294967295", 0, out _));
         Assert.IsFalse(KbmShortcutParser.TryParseVkString(string.Empty, 0, out _));
         Assert.IsFalse(KbmShortcutParser.TryParseVkString(null, 0, out _));
     }
