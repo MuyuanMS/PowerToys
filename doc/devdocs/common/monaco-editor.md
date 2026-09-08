@@ -15,7 +15,7 @@ Monaco is primarily used in:
 
 Monaco is embedded into PowerToys' WinUI 3 applications using WebView2. This integration allows PowerToys to leverage Monaco's web-based capabilities within desktop applications.
 
-The [`FilePreviewCommon`](/src/common/FilePreviewCommon/FilePreviewCommon.csproj) project downloads the monaco editor source code and adds it to [`/src/Monaco/MonacoSRC`] before the build step.
+The shared [`Monaco.props`](/src/Monaco.props) file downloads the Monaco editor source code when [`/src/Monaco/monacoSRC`] does not exist, then adds the generated files to projects that import the props file.
 
 ### Directory Structure
 
