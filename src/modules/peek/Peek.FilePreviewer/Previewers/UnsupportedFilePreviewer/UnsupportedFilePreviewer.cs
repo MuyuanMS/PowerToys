@@ -103,6 +103,9 @@ namespace Peek.FilePreviewer.Previewers
             Preview.DateModified = item.DateModified?.ToString(CultureInfo.CurrentCulture);
             Preview.FileType = null;
             Preview.FileSize = null;
+            Preview.FolderContents = null;
+            Preview.FolderScanState = FolderScanState.Completed;
+            Preview.IsFolder = item is FolderItem;
             Preview.IconPreview = DefaultIcon;
         }
 
@@ -223,9 +226,9 @@ namespace Peek.FilePreviewer.Previewers
             }
         }
 
-        private async Task LoadDisplayInfoAsync(IProgress<FolderScanProgress> sizeProgress, CancellationToken cancellationToken)
+        private async Task LoadDisplayInfoAsync(IFileSystemItem item, IProgress<FolderScanProgress> sizeProgress, CancellationToken cancellationToken)
         {
-            string type = await GetContentTypeAsync(item, cancellationToken);
+            string type = await Task.Run(item.GetContentTypeAsync, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -237,14 +240,14 @@ namespace Peek.FilePreviewer.Previewers
                 }
             });
 
-            if (Item is FolderItem)
+            if (item is FolderItem folderItem)
             {
                 await Task.Run(
                     () => CalculateFolderSizeWithProgress(folderItem.Path, sizeProgress, cancellationToken), cancellationToken);
             }
             else
             {
-                sizeProgress.Report(new FolderScanProgress(Item.FileSizeBytes, 0, 0, FolderScanState.Completed));
+                sizeProgress.Report(new FolderScanProgress(item.FileSizeBytes, 0, 0, FolderScanState.Completed));
             }
         }
 

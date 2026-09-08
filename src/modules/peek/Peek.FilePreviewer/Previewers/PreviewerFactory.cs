@@ -13,6 +13,7 @@ using Peek.FilePreviewer.Previewers.Archives;
 using Peek.FilePreviewer.Previewers.Drive;
 using Peek.FilePreviewer.Previewers.MediaPreviewer;
 using Peek.UI.Telemetry.Events;
+using SQLitePreviewer = Peek.FilePreviewer.Previewers.SqlitePreviewer.SqlitePreviewer;
 
 namespace Peek.FilePreviewer.Previewers
 {
@@ -40,7 +41,7 @@ namespace Peek.FilePreviewer.Previewers
                 new(typeof(VideoPreviewer), VideoPreviewer.IsItemSupported, item => new VideoPreviewer(item)),
                 new(typeof(AudioPreviewer), AudioPreviewer.IsItemSupported, item => new AudioPreviewer(item)),
                 new(typeof(WebBrowserPreviewer), WebBrowserPreviewer.IsItemSupported, item => new WebBrowserPreviewer(item, previewSettings)),
-                new(typeof(SqlitePreviewer), SqlitePreviewer.IsItemSupported, item => new SqlitePreviewer(item)),
+                new(typeof(SQLitePreviewer), SQLitePreviewer.IsItemSupported, item => new SQLitePreviewer(item)),
                 new(typeof(ArchivePreviewer), ArchivePreviewer.IsItemSupported, item => new ArchivePreviewer(item)),
                 new(typeof(ShellPreviewHandlerPreviewer), ShellPreviewHandlerPreviewer.IsItemSupported, item => new ShellPreviewHandlerPreviewer(item)),
                 new(typeof(DrivePreviewer), DrivePreviewer.IsItemSupported, item => new DrivePreviewer(item)),

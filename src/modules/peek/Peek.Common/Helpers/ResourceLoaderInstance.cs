@@ -9,7 +9,7 @@ namespace Peek.Common.Helpers
 {
     public static class ResourceLoaderInstance
     {
-        public static readonly Lazy<ResourceLoader?> _resourceLoader = new(() =>
+        private static readonly Lazy<ResourceLoader?> _resourceLoader = new(() =>
         {
             try
             {

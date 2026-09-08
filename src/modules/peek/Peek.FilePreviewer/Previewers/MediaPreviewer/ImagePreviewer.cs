@@ -36,8 +36,8 @@ namespace Peek.FilePreviewer.Previewers
     /// are intrinsic source-image dimensions in whole pixels. They are represented as
     /// <see cref="Size"/> (double) only because that is the interop currency consumed by
     /// the sizing layer; no sub-pixel precision is implied. Fractional values first arise
-    /// in <c>WindowConstants</c> when the display scale is applied, and are quantized
-    /// back to device pixels by <c>WindowConstants.ToPhysicalPixels</c>.
+    /// when the display scale is applied by the sizing layer, and are quantized back
+    /// to device pixels by <c>WindowExtensions.CenterOnMonitor</c>.
     /// </remarks>
     public partial class ImagePreviewer : ObservableObject, IImagePreviewer, IReusablePreviewer
     {
