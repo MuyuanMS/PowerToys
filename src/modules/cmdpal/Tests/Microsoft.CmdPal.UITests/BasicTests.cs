@@ -128,6 +128,20 @@ public class BasicTests : CommandPaletteTestBase
     }
 
     [TestMethod]
+    public void SearchBoxKeepsFocusAfterClickingEmptyShellSpace()
+    {
+        var searchBox = this.Find<TextBox>(By.AccessibilityId("MainSearchBox"));
+        searchBox.SetText("cmdpal-focus-regression", true);
+
+        var (_, _, right, bottom) = Session.GetMainWindowRect();
+        Session.MoveMouseTo(right - 30, bottom - 30);
+        Session.PerformMouseAction(MouseActionType.LeftClick);
+        Session.SendKey(Key.A);
+
+        Assert.AreEqual("cmdpal-focus-regressiona", searchBox.Text);
+    }
+
+    [TestMethod]
     public void DockSettingsAutoHideToggleTest()
     {
         OpenSettingsWindow();
