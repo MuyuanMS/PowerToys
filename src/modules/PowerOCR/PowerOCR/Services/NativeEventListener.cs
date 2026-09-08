@@ -47,11 +47,20 @@ internal sealed partial class NativeEventListener : INativeEventListener
     public void Dispose()
     {
         _cancellation.Cancel();
-        if (!Task.WaitAll(_listeners.ToArray(), TimeSpan.FromSeconds(2)))
+        try
         {
-            Logger.LogWarning("Timed out while stopping Text Extractor native event listeners.");
+            if (!Task.WaitAll(_listeners.ToArray(), TimeSpan.FromSeconds(2)))
+            {
+                Logger.LogWarning("Timed out while stopping Text Extractor native event listeners.");
+            }
         }
-
-        _cancellation.Dispose();
+        catch (AggregateException exception)
+        {
+            Logger.LogError("A Text Extractor native event listener failed while stopping.", exception);
+        }
+        finally
+        {
+            _cancellation.Dispose();
+        }
     }
 }

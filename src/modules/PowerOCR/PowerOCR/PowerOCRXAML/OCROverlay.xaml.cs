@@ -66,6 +66,7 @@ public sealed partial class OCROverlay : WindowEx
             // A constructor failure occurs before the window joins the manager's session.
             // Release the native screenshot/window without depending on a later close event.
             OverlayContent.StopNativeSelection();
+            Close();
             throw;
         }
     }
