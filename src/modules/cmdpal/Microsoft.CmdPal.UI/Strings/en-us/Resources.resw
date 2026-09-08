@@ -553,9 +553,6 @@ Right-click to remove the key combination, thereby deactivating the shortcut.</v
   <data name="SettingsButton.AccessKey" xml:space="preserve">
     <value>S</value>
   </data>
-  <data name="SettingsButton.AccessKey" xml:space="preserve">
-    <value>S</value>
-  </data>
   <data name="Settings_GeneralPage_ActivationSettingsHeader.Text" xml:space="preserve">
     <value>Activation</value>
   </data>
@@ -1121,15 +1118,6 @@ Right-click to remove the key combination, thereby deactivating the shortcut.</v
   </data>
   <data name="FiltersDropDown_DefaultText" xml:space="preserve">
     <value>Filters</value>
-  </data>
-  <data name="FiltersDropDown.AccessKey" xml:space="preserve">
-    <value>F</value>
-  </data>
-  <data name="FiltersDropDown_AccessKey" xml:space="preserve">
-    <value>F</value>
-  </data>
-  <data name="DevRibbonButton.AccessKey" xml:space="preserve">
-    <value>D</value>
   </data>
   <data name="FiltersDropDown.AccessKey" xml:space="preserve">
     <value>F</value>

@@ -1168,7 +1168,7 @@ public sealed partial class ListItemsView : UserControl,
             }
         }
 
-        Array.Clear(_numberedShortcutCueContainers);
+        Array.Clear(_numberedShortcutCueContainers, 0, _numberedShortcutCueContainers.Length);
     }
 
     private void HideNumberedShortcutCues()
