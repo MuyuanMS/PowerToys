@@ -15,7 +15,7 @@ namespace Microsoft.CmdPal.UI.Dock;
 public sealed partial class DockItemControl
 {
     public static readonly DependencyProperty LabelWidthConstraintsProperty =
-        DependencyProperty.Register(nameof(LabelWidthConstraints), typeof(object), typeof(DockItemControl), new PropertyMetadata(null, OnLabelWidthConstraintsChanged));
+        DependencyProperty.Register(nameof(LabelWidthConstraints), typeof(DockLabelWidthConstraints), typeof(DockItemControl), new PropertyMetadata(null, OnLabelWidthConstraintsChanged));
 
     public DockLabelWidthConstraints? LabelWidthConstraints
     {

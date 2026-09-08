@@ -35,7 +35,7 @@ public partial class SamplePagesCommandsProvider : CommandProvider
 
     public override ICommandItem[] GetDockBands()
     {
-        return _bands;
+        return [.. _bands];
     }
 
     public override void Dispose()
