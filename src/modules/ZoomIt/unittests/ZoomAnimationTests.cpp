@@ -63,7 +63,7 @@ namespace ZoomAnimationTests
             Assert::IsFalse(animation.IsActive());
         }
 
-        TEST_METHOD(RetargetingContinuesFromDisplayedZoom)
+        TEST_METHOD(RetargetContinuesFromDisplayedZoom)
         {
             ZoomAnimation animation;
             animation.Start(1.0f, 8.0f, 0, 180);
@@ -185,11 +185,18 @@ namespace ZoomAnimationTests
             Assert::AreEqual<std::uint64_t>(160, ZoomAnimation::OriginalDuration(2.0f, 1.0f, false, 40));
         }
 
-        TEST_METHOD(SmoothAnimationDurationIsExtendedByFiftyPercent)
+        TEST_METHOD(StaticAnimationDurationIsExtendedByFiftyPercent)
         {
-            Assert::AreEqual<std::uint64_t>(420, ZoomAnimation::Duration(1.0f, 2.0f, true));
-            Assert::AreEqual<std::uint64_t>(420, ZoomAnimation::Duration(4.0f, 1.0f, false));
-            Assert::AreEqual<std::uint64_t>(240, ZoomAnimation::Duration(2.0f, 1.0f, false));
+            Assert::AreEqual<std::uint64_t>(210, ZoomAnimation::Duration(1.0f, 2.0f, true));
+            Assert::AreEqual<std::uint64_t>(210, ZoomAnimation::Duration(4.0f, 1.0f, false));
+            Assert::AreEqual<std::uint64_t>(120, ZoomAnimation::Duration(2.0f, 1.0f, false));
+        }
+
+        TEST_METHOD(LiveAnimationDurationUsesLiveZoomCadence)
+        {
+            Assert::AreEqual<std::uint64_t>(420, ZoomAnimation::Duration(1.0f, 2.0f, true, 40));
+            Assert::AreEqual<std::uint64_t>(420, ZoomAnimation::Duration(4.0f, 1.0f, false, 40));
+            Assert::AreEqual<std::uint64_t>(240, ZoomAnimation::Duration(2.0f, 1.0f, false, 40));
         }
     };
 }

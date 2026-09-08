@@ -6,7 +6,7 @@ class ZoomAnimation
 {
 public:
     static std::uint64_t OriginalDuration(float currentZoom, float targetZoom, bool firstStepWasImmediate, std::uint64_t stepTimeMilliseconds = 20);
-    static std::uint64_t Duration(float currentZoom, float targetZoom, bool firstStepWasImmediate);
+    static std::uint64_t Duration(float currentZoom, float targetZoom, bool firstStepWasImmediate, std::uint64_t stepTimeMilliseconds = 20);
 
     void Start(float currentZoom, float targetZoom, std::uint64_t startTimeMilliseconds, std::uint64_t durationMilliseconds);
     float Retarget(float targetZoom, std::uint64_t startTimeMilliseconds, std::uint64_t durationMilliseconds);

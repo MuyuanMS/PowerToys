@@ -8526,12 +8526,6 @@ LRESULT APIENTRY MainWndProc(
                     }
 #endif
                 }
-                OutputDebug(L"LIVEDRAW SMOOTHING: %d\n", g_SmoothImage);
-                if (!pMagSetLensUseBitmapSmoothing(g_hWndLiveZoomMag, g_SmoothImage))
-                {
-                    OutputDebug(L"MagSetLensUseBitmapSmoothing failed: %d\n", GetLastError());
-                }
-
                 if ( g_RecordToggle )
                 {
                     g_SelectRectangle.UpdateOwner( g_hWndLiveZoom );
@@ -11947,7 +11941,7 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 
                     zoomLevel = static_cast<float>(1);
                     zoomAnimation.Start( zoomLevel, zoomTelescopeTarget, GetTickCount64(),
-                                         ZoomAnimation::Duration( zoomLevel, zoomTelescopeTarget, true ) );
+                                         ZoomAnimation::Duration( zoomLevel, zoomTelescopeTarget, true, LIVEZOOM_ANIMATION_STEP_TIME ) );
 
                 } else {
 
@@ -11968,7 +11962,7 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
             GetCursorPos( &lastCursorPos );
             SetCursorPos( lastCursorPos.x, lastCursorPos.y );
 
-            SetTimer( hWnd, 0, ZOOM_ANIMATION_FRAME_TIME, NULL );
+            SetTimer( hWnd, 0, zoomAnimation.IsActive() ? ZOOM_ANIMATION_FRAME_TIME : LIVEZOOM_REFRESH_FRAME_TIME, NULL );
             SendMessage( hWnd, WM_TIMER, 0, 0);
 
         } else {
@@ -11992,13 +11986,10 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
                 if( pMagShowSystemCursor ) pMagShowSystemCursor( TRUE );
             }
 
-            // Keep the magnifier control resident on current Windows. Re-creating it costs ~200ms while warm and can
-            // take much longer after its ~76MB of fullscreen surfaces have left the standby list.
+            // Keep the magnifier control warm for a bounded idle period. Re-creating it costs ~200ms while warm and
+            // can take much longer after its fullscreen surfaces have left the standby list.
             KillTimer( hWnd, 1 );
-            if( g_OsVersion < WIN7_VERSION && !IsPresentationMode()) {
-
-                SetTimer( hWnd, 1, LIVEZOOM_WINDOW_TIMEOUT, NULL );
-            }
+            SetTimer( hWnd, 1, LIVEZOOM_WINDOW_TIMEOUT, NULL );
             UnregisterHotKey( hWnd, 0 );
             UnregisterHotKey( hWnd, 1 );
         }
@@ -12052,11 +12043,15 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
                         pMagSetLensUseBitmapSmoothing( g_hWndLiveZoomMag, TRUE );
                 }
                 zoomLevel = zoomAnimation.Sample( GetTickCount64() );
-                if( animationSmoothingForced && !zoomAnimation.IsActive() ) {
+                if( !zoomAnimation.IsActive() ) {
 
-                    animationSmoothingForced = FALSE;
-                    if( pMagSetLensUseBitmapSmoothing )
-                        pMagSetLensUseBitmapSmoothing( g_hWndLiveZoomMag, g_SmoothImage );
+                    if( animationSmoothingForced ) {
+
+                        animationSmoothingForced = FALSE;
+                        if( pMagSetLensUseBitmapSmoothing )
+                            pMagSetLensUseBitmapSmoothing( g_hWndLiveZoomMag, g_SmoothImage );
+                    }
+                    SetTimer( hWnd, 0, LIVEZOOM_REFRESH_FRAME_TIME, NULL );
                 }
                 // Time to exit zoom mode?
                 if( zoomTelescopeTarget == 1 && zoomLevel == 1 ) {
@@ -12254,7 +12249,8 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
         } else {
 
             zoomLevel = zoomAnimation.Retarget( zoomTelescopeTarget, GetTickCount64(),
-                                                ZoomAnimation::Duration( zoomLevel, zoomTelescopeTarget, false ) );
+                                                ZoomAnimation::Duration( zoomLevel, zoomTelescopeTarget, false, LIVEZOOM_ANIMATION_STEP_TIME ) );
+            SetTimer( hWnd, 0, ZOOM_ANIMATION_FRAME_TIME, NULL );
         }
         }
         break;
@@ -12271,7 +12267,8 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
             } else {
 
                 zoomLevel = zoomAnimation.Retarget( zoomTelescopeTarget, GetTickCount64(),
-                                                    ZoomAnimation::Duration( zoomLevel, zoomTelescopeTarget, false ) );
+                                                    ZoomAnimation::Duration( zoomLevel, zoomTelescopeTarget, false, LIVEZOOM_ANIMATION_STEP_TIME ) );
+                SetTimer( hWnd, 0, ZOOM_ANIMATION_FRAME_TIME, NULL );
             }
             break;
 
@@ -12341,7 +12338,8 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
                 zoomTelescopeTarget = static_cast<float>(wParam);
                 zoomLevel = 1.0;
                 zoomAnimation.Start( zoomLevel, zoomTelescopeTarget, GetTickCount64(),
-                                     ZoomAnimation::Duration( zoomLevel, zoomTelescopeTarget, false ) );
+                                     ZoomAnimation::Duration( zoomLevel, zoomTelescopeTarget, false, LIVEZOOM_ANIMATION_STEP_TIME ) );
+                SetTimer( hWnd, 0, ZOOM_ANIMATION_FRAME_TIME, NULL );
 
                 break;
             }
