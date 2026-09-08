@@ -2,9 +2,14 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage.Streams;
 
 namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
 
@@ -46,6 +51,104 @@ public partial class QuickAccessShelfResolverTests
         Assert.IsTrue(iconReadCount > 0);
         Assert.AreSame(original, reused);
         Assert.AreEqual(iconReadCount, icon.ReadCount);
+    }
+
+    [TestMethod]
+    public void CreateOrReuse_PinStateChangeCreatesUpdatedShelfItem()
+    {
+        var item = new ListItem { Title = "Recent" };
+        var recent = QuickAccessShelfItem.CreateOrReuse(
+            [],
+            item,
+            shortcutIndex: 0,
+            startsNewSection: false,
+            isPinned: false,
+            isPersistedPinned: false,
+            canPin: true);
+
+        var pinned = QuickAccessShelfItem.CreateOrReuse(
+            [recent],
+            item,
+            shortcutIndex: 0,
+            startsNewSection: false,
+            isPinned: true,
+            isPersistedPinned: true,
+            canPin: false);
+
+        Assert.AreNotSame(recent, pinned);
+        Assert.IsFalse(recent.IsPinned);
+        Assert.IsFalse(recent.IsPersistedPinned);
+        Assert.IsTrue(recent.CanPin);
+        Assert.IsTrue(pinned.IsPinned);
+        Assert.IsTrue(pinned.IsPersistedPinned);
+        Assert.IsFalse(pinned.CanPin);
+    }
+
+    [TestMethod]
+    public void CreateOrReuse_RecentSectionItemCanRemainPersistedPinned()
+    {
+        var item = new ListItem { Title = "Recent pinned item" };
+
+        var shelfItem = QuickAccessShelfItem.CreateOrReuse(
+            [],
+            item,
+            shortcutIndex: 0,
+            startsNewSection: false,
+            isPinned: false,
+            isPersistedPinned: true,
+            canPin: false);
+
+        Assert.IsFalse(shelfItem.IsPinned);
+        Assert.IsTrue(shelfItem.IsPersistedPinned);
+        Assert.IsFalse(shelfItem.CanPin);
+    }
+
+    [TestMethod]
+    public async Task ShelfItemDataPackage_PreservesRequestedOperationPropertiesAndDeferredFormats()
+    {
+        var source = new DataPackage { RequestedOperation = DataPackageOperation.Link };
+        source.Properties["TestProperty"] = "TestValue";
+        source.SetText("Test payload");
+        var item = new ListItem { Title = "Recent", DataPackageView = source.GetView() };
+        var shelfItem = QuickAccessShelfItem.CreateOrReuse([], item, shortcutIndex: 0, startsNewSection: false);
+        var destination = new DataPackage();
+
+        await DataPackageTransfer.CopyAsync(shelfItem.DataPackage!, destination);
+
+        var destinationView = destination.GetView();
+        Assert.AreEqual(DataPackageOperation.Link, destinationView.RequestedOperation);
+        Assert.AreEqual("TestValue", destinationView.Properties["TestProperty"]);
+        Assert.AreEqual("Test payload", await destinationView.GetTextAsync().AsTask());
+    }
+
+    [TestMethod]
+    public async Task ShelfItemDataPackage_PreservesResourceMap()
+    {
+        var source = new DataPackage();
+        var resource = RandomAccessStreamReference.CreateFromUri(new Uri("https://example.com/image.png"));
+        source.ResourceMap["image.png"] = resource;
+        var destination = new DataPackage();
+
+        await DataPackageTransfer.CopyAsync(source.GetView(), destination);
+
+        var destinationResourceMap = await destination.GetView().GetResourceMapAsync();
+        Assert.AreEqual(1, destinationResourceMap.Count);
+        Assert.AreSame(resource, destinationResourceMap["image.png"]);
+    }
+
+    [TestMethod]
+    public async Task DataPackageTransfer_TryCopyRequiresPreparedResourceMap()
+    {
+        var source = new DataPackage();
+        source.ResourceMap["image.png"] = RandomAccessStreamReference.CreateFromUri(new Uri("https://example.com/image.png"));
+        var pendingResourceMap = new TaskCompletionSource<IReadOnlyDictionary<string, RandomAccessStreamReference>?>();
+
+        Assert.IsFalse(DataPackageTransfer.TryCopy(source.GetView(), new DataPackage(), pendingResourceMap.Task));
+
+        var preparedResourceMap = await DataPackageTransfer.PrepareResourceMapAsync(source.GetView());
+        var destination = new DataPackage();
+        Assert.IsTrue(DataPackageTransfer.TryCopy(source.GetView(), destination, Task.FromResult(preparedResourceMap)));
+        Assert.AreEqual(1, (await destination.GetView().GetResourceMapAsync()).Count);
     }
 
     [TestMethod]

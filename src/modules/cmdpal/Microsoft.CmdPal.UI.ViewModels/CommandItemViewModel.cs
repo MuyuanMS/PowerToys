@@ -11,6 +11,7 @@ using Microsoft.CmdPal.UI.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage.Streams;
 
 namespace Microsoft.CmdPal.UI.ViewModels;
 
@@ -120,6 +121,8 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
     public virtual bool HasText => HasTitle || HasSubtitle;
 
     public DataPackageView? DataPackage { get; private set; }
+
+    public Task<IReadOnlyDictionary<string, RandomAccessStreamReference>?>? DataPackageResourceMapTask { get; private set; }
 
     public IReadOnlyList<IContextItemViewModel> AllCommands => _allCommandsSnapshot;
 
@@ -526,6 +529,7 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
             dataPackageView is DataPackageView view
                 ? view
                 : null;
+        DataPackageResourceMapTask = DataPackage is null ? null : DataPackageTransfer.PrepareResourceMapAsync(DataPackage);
         UpdateProperty(nameof(DataPackage));
     }
 
