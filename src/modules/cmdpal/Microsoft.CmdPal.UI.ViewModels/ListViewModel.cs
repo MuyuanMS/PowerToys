@@ -119,6 +119,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     // For cancelling a deferred SafeSlowInit when the user navigates rapidly
     private CancellationTokenSource? _selectedItemCts;
+    private int _selectedItemGeneration;
 
     public override bool IsInitialized
     {
@@ -837,6 +838,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     internal Task SetSelectedItemAsync(ListItemViewModel item)
     {
+        var generation = Interlocked.Increment(ref _selectedItemGeneration);
         _lastSelectedItem = item;
         _lastSelectedItem.PropertyChanged += SelectedItemPropertyChanged;
 
@@ -852,14 +854,14 @@ public partial class ListViewModel : PageViewModel, IDisposable
         return Task.Run(
             async () =>
             {
-                if (ct.IsCancellationRequested)
+                if (ct.IsCancellationRequested || generation != Volatile.Read(ref _selectedItemGeneration))
                 {
                     return;
                 }
 
                 if (!await item.SafeSlowInitAsync().ConfigureAwait(false))
                 {
-                    if (ct.IsCancellationRequested)
+                    if (ct.IsCancellationRequested || generation != Volatile.Read(ref _selectedItemGeneration))
                     {
                         return;
                     }
@@ -869,7 +871,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
                     return;
                 }
 
-                if (ct.IsCancellationRequested)
+                if (ct.IsCancellationRequested || generation != Volatile.Read(ref _selectedItemGeneration))
                 {
                     return;
                 }
@@ -887,7 +889,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
                 var suggestion = item.TextToSuggest;
                 DoOnUiThread(() =>
                 {
-                    if (ct.IsCancellationRequested)
+                    if (ct.IsCancellationRequested || generation != Volatile.Read(ref _selectedItemGeneration))
                     {
                         return;
                     }
@@ -935,6 +937,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     private void ClearSelectedItem()
     {
+        Interlocked.Increment(ref _selectedItemGeneration);
         CancelAndDisposeTokenSource(ref _selectedItemCts);
 
         WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(null));
