@@ -2788,7 +2788,7 @@ From there, simply click on one of the supported files in the File Explorer and 
     <value>Auto Hide Cursor</value>
   </data>
   <data name="MouseUtils_AutoHideCursor.Description" xml:space="preserve">
-    <value>Hide the pointer globally after keyboard input, pointer inactivity, or both</value>
+    <value>Hide standard system cursors globally after keyboard input, pointer inactivity, or both</value>
   </data>
   <data name="MouseUtils_AutoHideCursor_Behavior.Header" xml:space="preserve">
     <value>Activation</value>
