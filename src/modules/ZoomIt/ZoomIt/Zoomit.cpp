@@ -11634,41 +11634,29 @@ LRESULT APIENTRY MainWndProc(
                 SetStretchBltMode( hDc, COLORONCOLOR );
             }
 #endif
-            // Render with the continuous fractional viewport whenever we are not drawing/typing/tracing so the
-            // animation moves at device-pixel granularity and converges without snapping on the final frame.
-            const bool renderFractionalZoom = zoomAnimation.IsActive() ||
-                ( !g_Drawing && !g_Tracing && g_TypeMode == TypeModeOff );
-            if( renderFractionalZoom ) {
-                float sourceX;
-                float sourceY;
-                GetAnimatedZoomSourceCoordinates( zoomLevel, &cursorPos, width, height, &sourceX, &sourceY );
+            // Keep the same fractional viewport while drawing and typing so entering annotation cannot shift the
+            // magnified content by up to one source pixel.
+            float sourceX;
+            float sourceY;
+            GetAnimatedZoomSourceCoordinates( zoomLevel, &cursorPos, width, height, &sourceX, &sourceY );
 
-                const int sourceLeft = static_cast<int>( std::floor( sourceX ) );
-                const int sourceTop = static_cast<int>( std::floor( sourceY ) );
-                const int sourceRight = min( width, static_cast<int>( std::ceil( sourceX + static_cast<float>( width ) / zoomLevel ) ) );
-                const int sourceBottom = min( height, static_cast<int>( std::ceil( sourceY + static_cast<float>( height ) / zoomLevel ) ) );
-                const int srcW = sourceRight - sourceLeft;
-                const int srcH = sourceBottom - sourceTop;
-                // Enlarge with StretchBlt (so HALFTONE interpolates) and offset the destination to compensate the
-                // sub-pixel origin, giving smooth device-pixel-granular motion instead of source-pixel snapping.
-                const int destX = static_cast<int>( std::lround( ( static_cast<float>( sourceLeft ) - sourceX ) * zoomLevel ) );
-                const int destY = static_cast<int>( std::lround( ( static_cast<float>( sourceTop ) - sourceY ) * zoomLevel ) );
-                const int destW = static_cast<int>( std::lround( static_cast<float>( srcW ) * zoomLevel ) );
-                const int destH = static_cast<int>( std::lround( static_cast<float>( srcH ) * zoomLevel ) );
-                StretchBlt( ps.hdc,
-                        destX, destY, destW, destH,
-                        hdcScreenCompat,
-                        sourceLeft, sourceTop, srcW, srcH,
-                        SRCCOPY|CAPTUREBLT );
-            } else {
-                StretchBlt( ps.hdc,
-                        0, 0,
-                        bmp.bmWidth, bmp.bmHeight,
-                        hdcScreenCompat,
-                        x, y,
-                        static_cast<int>(width/zoomLevel), static_cast<int>(height/zoomLevel),
-                        SRCCOPY|CAPTUREBLT );
-            }
+            const int sourceLeft = static_cast<int>( std::floor( sourceX ) );
+            const int sourceTop = static_cast<int>( std::floor( sourceY ) );
+            const int sourceRight = min( width, static_cast<int>( std::ceil( sourceX + static_cast<float>( width ) / zoomLevel ) ) );
+            const int sourceBottom = min( height, static_cast<int>( std::ceil( sourceY + static_cast<float>( height ) / zoomLevel ) ) );
+            const int srcW = sourceRight - sourceLeft;
+            const int srcH = sourceBottom - sourceTop;
+            // Enlarge with StretchBlt (so HALFTONE interpolates) and offset the destination to compensate the
+            // sub-pixel origin, giving smooth device-pixel-granular motion instead of source-pixel snapping.
+            const int destX = static_cast<int>( std::lround( ( static_cast<float>( sourceLeft ) - sourceX ) * zoomLevel ) );
+            const int destY = static_cast<int>( std::lround( ( static_cast<float>( sourceTop ) - sourceY ) * zoomLevel ) );
+            const int destW = static_cast<int>( std::lround( static_cast<float>( srcW ) * zoomLevel ) );
+            const int destH = static_cast<int>( std::lround( static_cast<float>( srcH ) * zoomLevel ) );
+            StretchBlt( ps.hdc,
+                    destX, destY, destW, destH,
+                    hdcScreenCompat,
+                    sourceLeft, sourceTop, srcW, srcH,
+                    SRCCOPY|CAPTUREBLT );
 #endif
         } else if( g_TimerActive ) {
 
