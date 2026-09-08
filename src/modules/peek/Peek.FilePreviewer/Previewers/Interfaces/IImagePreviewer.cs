@@ -3,12 +3,15 @@
 // See the LICENSE file in the project root for more information.
 
 using Microsoft.UI.Xaml.Media;
+using Windows.Foundation;
 
 namespace Peek.FilePreviewer.Previewers.Interfaces
 {
     public interface IImagePreviewer : IPreviewer, IPreviewTarget, IReusablePreviewer
     {
         public ImageSource? Preview { get; }
+
+        public Size MaxImageSize { get; }
 
         public double ScalingFactor { get; set; }
     }

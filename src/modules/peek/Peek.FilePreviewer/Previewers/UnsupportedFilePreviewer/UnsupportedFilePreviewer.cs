@@ -153,6 +153,12 @@ namespace Peek.FilePreviewer.Previewers
 
                 await RunOnUIThreadAsync(async () =>
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (Item != currentItem)
+                    {
+                        return;
+                    }
+
                     Preview.FileName = currentItem.Name;
                     Preview.DateModified = currentItem.DateModified?.ToString(CultureInfo.CurrentCulture);
 
@@ -198,9 +204,15 @@ namespace Peek.FilePreviewer.Previewers
 
         internal virtual async Task LoadIconPreviewAsync(IFileSystemItem item, CancellationToken cancellationToken)
         {
-            Preview.IconPreview = await ThumbnailHelper.GetThumbnailAsync(item.Path, cancellationToken) ??
+            var iconPreview = await ThumbnailHelper.GetThumbnailAsync(item.Path, cancellationToken) ??
                 await ThumbnailHelper.GetIconAsync(item.Path, cancellationToken) ??
                 DefaultIcon;
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Item == item)
+            {
+                Preview.IconPreview = iconPreview;
+            }
         }
 
         internal virtual async Task<string> GetContentTypeAsync(IFileSystemItem item, CancellationToken cancellationToken) =>

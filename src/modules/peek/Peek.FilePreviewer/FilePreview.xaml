@@ -34,6 +34,8 @@
         <controls:DoubleBufferedImageControl
             x:Name="ImagePreview"
             HorizontalAlignment="Stretch"
+            MaxWidth="{x:Bind ImagePreviewer.MaxImageSize.Width, Mode=OneWay}"
+            MaxHeight="{x:Bind ImagePreviewer.MaxImageSize.Height, Mode=OneWay}"
             VerticalAlignment="Stretch"
             Opacity="{x:Bind GetImagePreviewOpacity(IsLoadingIndicatorVisible), Mode=OneWay}"
             PointerMoved="ToolTipParentControl_PointerMoved"

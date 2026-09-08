@@ -80,11 +80,11 @@ public sealed partial class DoubleBufferedImageControl : UserControl
             return;
         }
 
-        // Active image visible: stage the back buffer. Callers that need to synchronize
-        // presentation with another surface should use PrepareNextImage instead.
+        // Ordinary Source changes should present immediately. Coordinated transitions use PrepareNextImage.
         _currentImage.Opacity = 1;
+        _currentImage.Source = newSource;
+        _hiddenImage.Source = null;
         _hiddenImage.Opacity = 0;
-        _hiddenImage.Source = newSource;
     }
 
     /// <summary>Stages an already-loaded source in the back buffer.</summary>

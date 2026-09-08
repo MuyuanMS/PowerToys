@@ -53,6 +53,9 @@ namespace Peek.FilePreviewer.Previewers
         [ObservableProperty]
         private double scalingFactor = 1.0;
 
+        [ObservableProperty]
+        private Size maxImageSize;
+
         public ImagePreviewer(IFileSystemItem file)
         {
             Item = file;
@@ -94,6 +97,26 @@ namespace Peek.FilePreviewer.Previewers
         public static bool IsItemSupported(IFileSystemItem item)
         {
             return _supportedFileTypes.Contains(item.Extension);
+        }
+
+        partial void OnImageSizeChanged(Size? value)
+        {
+            UpdateMaxImageSize();
+        }
+
+        partial void OnScalingFactorChanged(double value)
+        {
+            UpdateMaxImageSize();
+        }
+
+        private void UpdateMaxImageSize()
+        {
+            double imageWidth = ImageSize?.Width ?? 0;
+            double imageHeight = ImageSize?.Height ?? 0;
+
+            MaxImageSize = ScalingFactor != 0
+                ? new Size(imageWidth / ScalingFactor, imageHeight / ScalingFactor)
+                : new Size(imageWidth, imageHeight);
         }
 
         internal virtual async Task<Size?> CalculateImageSizeAsync(
