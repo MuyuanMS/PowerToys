@@ -222,7 +222,7 @@ public sealed partial class ListItemsView : UserControl,
             var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
             if (settings.SingleClickActivates)
             {
-                ViewModel?.InvokeItemCommand.Execute(item);
+                ViewModel?.InvokeItemFromPointer(item);
             }
             else
             {
@@ -242,7 +242,7 @@ public sealed partial class ListItemsView : UserControl,
             var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
             if (!settings.SingleClickActivates)
             {
-                ViewModel?.InvokeItemCommand.Execute(vm);
+                ViewModel?.InvokeItemFromPointer(vm);
             }
         }
     }
