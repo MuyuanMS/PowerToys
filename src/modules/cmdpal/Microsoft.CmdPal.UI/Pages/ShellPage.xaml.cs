@@ -233,6 +233,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         AddHandler(PointerReleasedEvent, new PointerEventHandler(ShellPage_OnPointerReleased), true);
         AddHandler(PointerCanceledEvent, new PointerEventHandler(ShellPage_OnPointerCanceled), true);
         AddHandler(PointerCaptureLostEvent, new PointerEventHandler(ShellPage_OnPointerCaptureLost), true);
+        AddHandler(LosingFocusEvent, new TypedEventHandler<UIElement, LosingFocusEventArgs>(ShellPage_LosingFocus), false);
 
         RootFrame.Navigate(typeof(LoadingPage), new AsyncNavigationRequest(ViewModel, CancellationToken.None));
 
@@ -1017,6 +1018,26 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         if (sender is Button button && button.DataContext is CommandViewModel commandViewModel)
         {
             WeakReferenceMessenger.Default.Send<PerformCommandMessage>(new(commandViewModel.Model));
+        }
+    }
+
+    private void ShellPage_LosingFocus(UIElement sender, LosingFocusEventArgs args)
+    {
+        if (HostWindow?.IsVisibleToUser != true || args.NewFocusedElement is null)
+        {
+            return;
+        }
+
+        // Empty-space clicks can move focus to a window ancestor, outside both the search bar's and the shell's key-event routes.
+        // Keep the current control focused, but allow focus to move to other controls, flyouts, and dialogs.
+        // With a bit of luck this won't bite us later.
+        for (var ancestor = VisualTreeHelper.GetParent(this); ancestor is not null; ancestor = VisualTreeHelper.GetParent(ancestor))
+        {
+            if (ReferenceEquals(args.NewFocusedElement, ancestor))
+            {
+                args.TryCancel();
+                return;
+            }
         }
     }
 
