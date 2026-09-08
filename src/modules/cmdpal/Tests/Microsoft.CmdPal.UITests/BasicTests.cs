@@ -63,11 +63,11 @@ public class BasicTests : CommandPaletteTestBase
         SetSearchBox("calculator");
 
         var calculatorItem = this.Find<NavigationViewItem>("Calculator");
-        var selectedBefore = calculatorItem.GetAttribute("SelectionItem.IsSelected");
+        this.SendKeySequence(Key.Down);
+        Assert.AreEqual("False", calculatorItem.GetAttribute("SelectionItem.IsSelected"));
+
         SendKeys(Key.Alt, Key.Shift, Key.Num1);
-        var selectedAfter = calculatorItem.GetAttribute("SelectionItem.IsSelected");
-        Assert.AreEqual("True", selectedAfter);
-        Assert.AreNotEqual(selectedBefore, selectedAfter);
+        Assert.AreEqual("True", calculatorItem.GetAttribute("SelectionItem.IsSelected"));
     }
 
     [TestMethod]

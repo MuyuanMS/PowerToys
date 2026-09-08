@@ -20,6 +20,7 @@ namespace Microsoft.CmdPal.UI.Controls;
 public sealed partial class FiltersDropDown : UserControl,
     ICurrentPageAware
 {
+    private static readonly string _filterAccessKey = ResourceLoaderInstance.GetString("FiltersDropDown_AccessKey");
     private bool _isDropDownOpen;
     private string? _pendingSearchText;
     private IFilterItemViewModel[] _allItems = [];
@@ -348,7 +349,7 @@ public sealed partial class FiltersDropDown : UserControl,
     private void FilterFlyout_Closed(object sender, object e)
     {
         _isDropDownOpen = false;
-        FilterDropDownButton.AccessKey = "F";
+        FilterDropDownButton.AccessKey = _filterAccessKey;
         _pendingSearchText = null;
         FilterSearchBox.Text = string.Empty;
     }
