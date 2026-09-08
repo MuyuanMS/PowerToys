@@ -21,6 +21,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <winrt/base.h>
 
 extern "C" IMAGE_DOS_HEADER __ImageBase;
 
@@ -114,6 +115,10 @@ namespace
             {
                 Logger::error("Invalid JSON when parsing Auto Hide Cursor settings.");
             }
+            catch (const winrt::hresult_error&)
+            {
+                Logger::error("Invalid JSON types when parsing Auto Hide Cursor settings.");
+            }
         }
 
         void enable() override
@@ -191,6 +196,10 @@ namespace
             {
                 Logger::error("Invalid JSON when loading Auto Hide Cursor settings.");
             }
+            catch (const winrt::hresult_error&)
+            {
+                Logger::error("Invalid JSON types when loading Auto Hide Cursor settings.");
+            }
         }
 
         void ParseSettings(PowerToysSettings::PowerToyValues& settings)
@@ -237,8 +246,13 @@ namespace
                     initialWorkerFailureDelayMs << (std::min)(consecutiveWorkerFailures, 6u),
                     maximumWorkerFailureDelayMs);
                 ++consecutiveWorkerFailures;
-                return WaitForSingleObject(m_terminateEvent, delay) == WAIT_OBJECT_0;
-            };
+                    const HANDLE retryEvents[] = { m_terminateEvent, m_restartEvent };
+                    return WaitForMultipleObjects(
+                               static_cast<DWORD>(std::size(retryEvents)),
+                               retryEvents,
+                               FALSE,
+                               delay) == WAIT_OBJECT_0;
+                };
 
             while (m_enabled)
             {
