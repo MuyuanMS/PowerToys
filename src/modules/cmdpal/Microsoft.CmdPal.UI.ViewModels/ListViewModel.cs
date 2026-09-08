@@ -39,6 +39,8 @@ public partial class ListViewModel : PageViewModel, IDisposable
     private int _settledFetchGeneration;
     private bool _staticFilterForceFirstPending;
     private bool _staticFilterEnsureSelectionVisible;
+    private bool _awaitingForcedFirstSelection;
+    private ListItemViewModel? _expectedForcedFirstSelection;
     private string _staticFilterQuery = string.Empty;
     private volatile bool _isDisposed;
 
@@ -816,6 +818,8 @@ public partial class ListViewModel : PageViewModel, IDisposable
                     _staticFilterForceFirstPending = false;
                     _staticFilterEnsureSelectionVisible = false;
                     _forceFirstItemPending = false;
+                    _awaitingForcedFirstSelection = forceFirst;
+                    _expectedForcedFirstSelection = forceFirst ? FilteredItems.FirstOrDefault(candidate => candidate.IsInteractive) : null;
                     _isLoadingMore.Clear();
                     UpdateEmptyContent();
                     _publishedStaticFilterVersion = request.Version;
@@ -841,12 +845,15 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
                 if (!ReferenceEquals(item, _lastSelectedItem) ||
                     (item is not null && (!item.IsInteractive || !FilteredItems.Contains(item, ReferenceEqualityComparer.Instance))) ||
-                    (item is null && FilteredItems.Any(candidate => candidate.IsInteractive)))
+                    (item is null && FilteredItems.Any(candidate => candidate.IsInteractive)) ||
+                    (_awaitingForcedFirstSelection && !ReferenceEquals(item, _expectedForcedFirstSelection)))
                 {
                     return false;
                 }
 
                 _selectedStaticFilterVersion = version;
+                _awaitingForcedFirstSelection = false;
+                _expectedForcedFirstSelection = null;
                 if (_pendingStaticActivation is { HasTarget: false } activation)
                 {
                     _pendingStaticActivation = activation with { Target = item, HasTarget = true };
