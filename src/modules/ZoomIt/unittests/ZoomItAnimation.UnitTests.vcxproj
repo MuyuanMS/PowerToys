@@ -19,6 +19,7 @@
     <ClCompile>
       <AdditionalIncludeDirectories>..\ZoomIt;$(VCInstallDir)UnitTest\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
       <UseFullPaths>true</UseFullPaths>
     </ClCompile>
