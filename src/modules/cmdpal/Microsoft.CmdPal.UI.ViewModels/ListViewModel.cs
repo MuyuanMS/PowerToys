@@ -799,7 +799,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
                         return;
                     }
 
-                    ListHelpers.InPlaceUpdateList(FilteredItems, filtered);
+                    ListHelpers.InPlaceUpdateList(FilteredItems, filtered, out _);
                     if (!IsCurrentStaticFilter(request))
                     {
                         return;
@@ -898,7 +898,14 @@ public partial class ListViewModel : PageViewModel, IDisposable
                 }
 
                 var item = activation.Target;
-                if (!ReferenceEquals(item, _lastSelectedItem))
+                if (activation.IsExplicitTarget &&
+                    (item is null || !FilteredItems.Contains(item, ReferenceEqualityComparer.Instance)))
+                {
+                    _pendingStaticActivation = null;
+                    return;
+                }
+
+                if (!activation.IsExplicitTarget && !ReferenceEquals(item, _lastSelectedItem))
                 {
                     _pendingStaticActivation = null;
                     return;
@@ -922,7 +929,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
         Secondary,
     }
 
-    private readonly record struct PendingStaticActivation(StaticActivationKind Kind, ListItemViewModel? Target, bool HasTarget);
+    private readonly record struct PendingStaticActivation(
+        StaticActivationKind Kind,
+        ListItemViewModel? Target,
+        bool HasTarget,
+        bool IsExplicitTarget);
 
     private sealed record StaticFilterRequest(long Version, int FetchGeneration, string Query);
 
@@ -1142,7 +1153,12 @@ public partial class ListViewModel : PageViewModel, IDisposable
     [RelayCommand]
     private void InvokeSecondaryCommand(ListItemViewModel? item) => InvokeListItem(item, StaticActivationKind.Secondary);
 
-    private void InvokeListItem(ListItemViewModel? item, StaticActivationKind activation)
+    public void InvokeItemFromPointer(ListItemViewModel item)
+    {
+        InvokeListItem(item, StaticActivationKind.Primary, isExplicitTarget: true);
+    }
+
+    private void InvokeListItem(ListItemViewModel? item, StaticActivationKind activation, bool isExplicitTarget = false)
     {
         lock (_fetchStateLock)
         {
@@ -1156,7 +1172,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
                 if (!_isDynamic && !IsStaticFilterSelectionCurrent)
                 {
                     var confirmed = IsStaticFilterSelectionConfirmed;
-                    _pendingStaticActivation = new(activation, confirmed ? _lastSelectedItem : null, confirmed);
+                    _pendingStaticActivation = new(
+                        activation,
+                        isExplicitTarget ? item : (confirmed ? _lastSelectedItem : null),
+                        isExplicitTarget || confirmed,
+                        isExplicitTarget);
                     return;
                 }
 
@@ -1169,6 +1189,14 @@ public partial class ListViewModel : PageViewModel, IDisposable
                     }
 
                     var command = activation == StaticActivationKind.Secondary ? item.SecondaryCommand?.Command : item.Command;
+                    if (activation == StaticActivationKind.Secondary &&
+                        command is null &&
+                        !item.Initialized.HasFlag(InitializedState.SelectionInitialized))
+                    {
+                        _pendingStaticActivation = new(activation, item, true, true);
+                        return;
+                    }
+
                     if (command is not null)
                     {
                         WeakReferenceMessenger.Default.Send<PerformCommandMessage>(new(command.Model, item.Model));
@@ -1199,7 +1227,8 @@ public partial class ListViewModel : PageViewModel, IDisposable
     {
         lock (_listLock)
         {
-            if (_pendingStaticActivation is { HasTarget: true } activation && !ReferenceEquals(item, activation.Target))
+            if (_pendingStaticActivation is { HasTarget: true, IsExplicitTarget: false } activation &&
+                !ReferenceEquals(item, activation.Target))
             {
                 _pendingStaticActivation = null;
             }
