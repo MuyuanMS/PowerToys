@@ -269,31 +269,43 @@ public partial class ListViewModel : PageViewModel, IDisposable
         }
     }
 
-    private void QueueDeferredFetchIfNeeded()
+    private void ExitGetItemsScope()
     {
-        bool deferredFetchRequested;
-        bool keepSelection;
-        bool ensureSelectionVisible;
+        bool queueDeferredFetch;
+        bool keepSelection = true;
+        bool ensureSelectionVisible = false;
         lock (_fetchStateLock)
         {
-            deferredFetchRequested = _deferredFetchRequested;
-            keepSelection = _deferredFetchKeepSelection;
-            ensureSelectionVisible = _deferredFetchEnsureSelectionVisible;
-            _deferredFetchRequested = false;
-            _deferredFetchKeepSelection = true;
-            _deferredFetchEnsureSelectionVisible = false;
-
-            if (deferredFetchRequested)
+            if (--_activeGetItemsCount != 0)
             {
+                return;
+            }
+
+            queueDeferredFetch = _deferredFetchRequested;
+            if (queueDeferredFetch)
+            {
+                keepSelection = _deferredFetchKeepSelection;
+                ensureSelectionVisible = _deferredFetchEnsureSelectionVisible;
+                _deferredFetchRequested = false;
+                _deferredFetchKeepSelection = true;
+                _deferredFetchEnsureSelectionVisible = false;
                 _activeGetItemsCount = 1;
             }
         }
 
-        if (deferredFetchRequested)
+        if (queueDeferredFetch)
         {
-            QueueObservedBackgroundFetch(
-                () => FetchItems(keepSelection, ensureSelectionVisible),
-                "Failed to execute deferred fetch");
+            try
+            {
+                QueueObservedBackgroundFetch(
+                    () => FetchItems(keepSelection, ensureSelectionVisible),
+                    "Failed to execute deferred fetch");
+            }
+            catch (Exception ex)
+            {
+                CoreLogger.LogError("Failed to queue deferred fetch", ex);
+                ExitGetItemsScope();
+            }
         }
     }
 
@@ -688,30 +700,6 @@ public partial class ListViewModel : PageViewModel, IDisposable
     /// <returns>
     /// <see langword="true"/> if a GetItems call is active or reserved for this view model; otherwise, <see langword="false"/>.
     /// </returns>
-    private void ExitGetItemsScope()
-    {
-        var queueDeferredFetch = false;
-        lock (_fetchStateLock)
-        {
-            if (--_activeGetItemsCount == 0)
-            {
-                queueDeferredFetch = true;
-            }
-        }
-
-        if (queueDeferredFetch)
-        {
-            try
-            {
-                QueueDeferredFetchIfNeeded();
-            }
-            catch (Exception ex)
-            {
-                CoreLogger.LogError("Failed to queue deferred fetch", ex);
-            }
-        }
-    }
-
     private static void CancelAndDisposeTokenSource(ref CancellationTokenSource? tokenSource)
     {
         var tokenSourceToDispose = Interlocked.Exchange(ref tokenSource, null);
