@@ -18,13 +18,24 @@
       <Link>Assets\Monaco\monaco_languages.json</Link>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Include="$(MSBuildThisFileDirectory)\Monaco\monacoSRC\**">
-      <Link>Assets\Monaco\monacoSRC\%(RecursiveDir)%(FileName)%(Extension)</Link>
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
    <None Include="$(MSBuildThisFileDirectory)\Monaco\customLanguages\**">
       <Link>Assets\Monaco\customLanguages\%(RecursiveDir)%(FileName)%(Extension)</Link>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <Target Name="DownloadMonacoEditor"
+          BeforeTargets="AssignTargetPaths"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)common\FilePreviewCommon\downloadMonaco.ps1&quot;" />
+  </Target>
+
+  <Target Name="AddMonacoEditorAssets" BeforeTargets="AssignTargetPaths" DependsOnTargets="DownloadMonacoEditor">
+    <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)Monaco\monacoSRC')">
+      <None Include="$(MSBuildThisFileDirectory)Monaco\monacoSRC\**">
+        <Link>Assets\Monaco\monacoSRC\%(RecursiveDir)%(FileName)%(Extension)</Link>
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+  </Target>
 </Project>
