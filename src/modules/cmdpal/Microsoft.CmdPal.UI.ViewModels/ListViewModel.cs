@@ -682,7 +682,8 @@ public partial class ListViewModel : PageViewModel, IDisposable
         if (sender is ListItemViewModel item &&
             (string.IsNullOrEmpty(e.PropertyName) ||
              e.PropertyName is nameof(ListItemViewModel.Title) or nameof(ListItemViewModel.Subtitle) or
-                 nameof(ListItemViewModel.Name) or nameof(ListItemViewModel.IsInErrorState) or nameof(IsInitialized)))
+                 nameof(ListItemViewModel.Name) or nameof(ListItemViewModel.IsInErrorState) or
+                 nameof(ListItemViewModel.IsInteractive) or nameof(IsInitialized)))
         {
             RefreshStaticFilterItem(item);
         }
