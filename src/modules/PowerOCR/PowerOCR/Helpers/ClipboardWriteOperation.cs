@@ -16,6 +16,7 @@ namespace PowerOCR.Helpers;
 internal static class ClipboardWriteOperation
 {
     private const int CannotOpenClipboard = unchecked((int)0x800401D0);
+    private const int MaximumSetContentAttempts = 5;
     private const int MaximumFlushAttempts = 5;
     private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(50);
 
@@ -30,7 +31,19 @@ internal static class ClipboardWriteOperation
         delay ??= Task.Delay;
 
         cancellationToken.ThrowIfCancellationRequested();
-        setContent();
+        for (int attempt = 1; ; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                setContent();
+                break;
+            }
+            catch (COMException exception) when (exception.HResult == CannotOpenClipboard && attempt < MaximumSetContentAttempts)
+            {
+                await delay(RetryDelay, cancellationToken).ConfigureAwait(true);
+            }
+        }
 
         // SetContent already succeeded. Repeating it can trigger clipboard listeners again
         // and overwrite content copied by another application while we were waiting.

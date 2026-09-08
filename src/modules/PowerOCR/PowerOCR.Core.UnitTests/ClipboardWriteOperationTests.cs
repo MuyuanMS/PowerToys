@@ -100,17 +100,24 @@ public sealed class ClipboardWriteOperationTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_SetContentBusyFailure_DoesNotFlushOrRetry()
+    public async Task ExecuteAsync_SetContentBusyFailure_RetriesUntilSuccess()
     {
         var failure = CreateComException("SetContent is busy.", CannotOpenClipboard);
-        var calls = new CallRecorder { OnSet = () => throw failure };
+        var calls = new CallRecorder();
+        calls.OnSet = () =>
+        {
+            if (calls.SetCalls < 3)
+            {
+                throw failure;
+            }
+        };
 
-        COMException actual = await Assert.ThrowsExactlyAsync<COMException>(() => calls.ExecuteAsync());
+        int attempts = await calls.ExecuteAsync();
 
-        Assert.AreSame(failure, actual);
-        Assert.AreEqual(1, calls.SetCalls);
-        Assert.AreEqual(0, calls.FlushCalls);
-        Assert.AreEqual(0, calls.DelayIntervals.Count);
+        Assert.AreEqual(1, attempts);
+        Assert.AreEqual(3, calls.SetCalls);
+        Assert.AreEqual(1, calls.FlushCalls);
+        Assert.AreEqual(2, calls.DelayIntervals.Count);
     }
 
     [TestMethod]
