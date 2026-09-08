@@ -113,12 +113,9 @@ internal sealed partial class ClipboardListItem : ListItem
         }
 
         // The clipboard text is unchanged, but its file may have changed since the last fetch.
-        var previousDetails = Interlocked.Exchange(ref _lazyDetails, new(CreateDetails));
+        Interlocked.Exchange(ref _lazyDetails, new(CreateDetails));
         RefreshCommands(force: true);
-        if (previousDetails.IsValueCreated)
-        {
-            OnPropertyChanged(nameof(Details));
-        }
+        OnPropertyChanged(nameof(Details));
     }
 
     internal void RefreshCommands(bool force = false)

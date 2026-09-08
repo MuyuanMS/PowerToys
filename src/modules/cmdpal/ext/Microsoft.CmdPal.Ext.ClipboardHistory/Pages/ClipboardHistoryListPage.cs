@@ -133,16 +133,21 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable, 
         }
         catch (Exception ex)
         {
+            var reportError = false;
             lock (_gate)
             {
                 if (!_disposed && (refresh is null || ReferenceEquals(refresh, _observedRefresh)))
                 {
                     _refreshFailed = true;
+                    reportError = true;
                 }
             }
 
-            ExtensionHost.ShowStatus(new StatusMessage() { Message = Properties.Resources.clipboard_failed_to_load, State = MessageState.Error }, StatusContext.Page);
-            ExtensionHost.LogMessage(ex.ToString());
+            if (reportError)
+            {
+                ExtensionHost.ShowStatus(new StatusMessage() { Message = Properties.Resources.clipboard_failed_to_load, State = MessageState.Error }, StatusContext.Page);
+                ExtensionHost.LogMessage(ex.ToString());
+            }
         }
         finally
         {
@@ -203,14 +208,14 @@ internal sealed partial class ClipboardHistoryListPage : ListPage, IDisposable, 
 
         try
         {
+            await _cache.DisposeAsync().ConfigureAwait(false);
+        }
+        finally
+        {
             if (disposeSource)
             {
                 _source.Dispose();
             }
-        }
-        finally
-        {
-            await _cache.DisposeAsync().ConfigureAwait(false);
         }
     }
 

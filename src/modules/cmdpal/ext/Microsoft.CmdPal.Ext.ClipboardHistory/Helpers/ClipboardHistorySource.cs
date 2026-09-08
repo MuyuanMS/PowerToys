@@ -92,7 +92,7 @@ internal sealed partial class ClipboardHistorySource : IClipboardHistorySource
         var text = item.Content.Contains(StandardDataFormats.Text)
             ? await item.Content.GetTextAsync().AsTask(cancellationToken)
             : null;
-        var image = item.Content.Contains(StandardDataFormats.Bitmap)
+        var image = text is null && item.Content.Contains(StandardDataFormats.Bitmap)
             ? await item.Content.GetBitmapAsync().AsTask(cancellationToken)
             : null;
 
