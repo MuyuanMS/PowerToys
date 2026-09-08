@@ -190,6 +190,7 @@ namespace ZoomAnimationTests
             Assert::AreEqual<std::uint64_t>(210, ZoomAnimation::Duration(1.0f, 2.0f, true));
             Assert::AreEqual<std::uint64_t>(210, ZoomAnimation::Duration(4.0f, 1.0f, false));
             Assert::AreEqual<std::uint64_t>(120, ZoomAnimation::Duration(2.0f, 1.0f, false));
+            Assert::AreEqual<std::uint64_t>(30, ZoomAnimation::Duration(1.25f, 1.0f, true));
         }
 
         TEST_METHOD(LiveAnimationDurationUsesLiveZoomCadence)

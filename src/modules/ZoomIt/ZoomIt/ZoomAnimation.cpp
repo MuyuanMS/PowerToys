@@ -41,9 +41,15 @@ std::uint64_t ZoomAnimation::OriginalDuration(float currentZoom, float targetZoo
 
 std::uint64_t ZoomAnimation::Duration(float currentZoom, float targetZoom, bool firstStepWasImmediate, std::uint64_t stepTimeMilliseconds)
 {
+    if (currentZoom <= 0.0f || targetZoom <= 0.0f || currentZoom == targetZoom)
+    {
+        return 0;
+    }
+
     constexpr std::uint64_t durationNumerator = 3;
     constexpr std::uint64_t durationDenominator = 2;
-    return OriginalDuration(currentZoom, targetZoom, firstStepWasImmediate, stepTimeMilliseconds) * durationNumerator / durationDenominator;
+    const auto originalDuration = OriginalDuration(currentZoom, targetZoom, firstStepWasImmediate, stepTimeMilliseconds);
+    return std::max(originalDuration, stepTimeMilliseconds) * durationNumerator / durationDenominator;
 }
 
 void ZoomAnimation::Start(float currentZoom, float targetZoom, std::uint64_t startTimeMilliseconds, std::uint64_t durationMilliseconds)

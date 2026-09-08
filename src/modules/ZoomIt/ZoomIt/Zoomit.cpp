@@ -11848,6 +11848,7 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
     static float	zoomTelescopeTarget;
     static ZoomAnimation zoomAnimation;
     static BOOLEAN animationSmoothingForced = FALSE;
+    static BOOLEAN transformDirty = FALSE;
     static BOOL		dwmEnabled = FALSE;
     static BOOLEAN	startedInPresentationMode = FALSE;
     MAGTRANSFORM matrix;
@@ -11895,6 +11896,7 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
         if( wParam == TRUE ) {
 
             animationSmoothingForced = FALSE;
+            transformDirty = TRUE;
             KillTimer( hWnd, 1 );
 
             // The cached control relinquishes cursor rendering while hidden. Restore it before live zoom is shown.
@@ -12091,7 +12093,9 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
                 int yOffset = cursorPos.y - lastSourceRect.top;
                 zoomCenterPos.x = 0;
                 zoomCenterPos.y = 0;
-                if( xOffset < moveWidth )
+                if( transformDirty ) {
+                    zoomCenterPos = cursorPos;
+                } else if( xOffset < moveWidth )
                     zoomCenterPos.x = lastSourceRect.left + sourceRectWidth/2 - (moveWidth - xOffset);
                 else if( xOffset > moveWidth * (LIVEZOOM_MOVE_REGIONS-1) )
                     zoomCenterPos.x = lastSourceRect.left + sourceRectWidth/2 + (xOffset - moveWidth*(LIVEZOOM_MOVE_REGIONS-1));
@@ -12162,6 +12166,7 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 
                     pMagSetWindowTransform(g_hWndLiveZoomMag, &matrix);
                 }
+                transformDirty = FALSE;
             }
 
             if( !g_fullScreenWorkaround ) {
@@ -12250,7 +12255,7 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 
             zoomLevel = zoomAnimation.Retarget( zoomTelescopeTarget, GetTickCount64(),
                                                 ZoomAnimation::Duration( zoomLevel, zoomTelescopeTarget, false, LIVEZOOM_ANIMATION_STEP_TIME ) );
-            SetTimer( hWnd, 0, ZOOM_ANIMATION_FRAME_TIME, NULL );
+            SetTimer( hWnd, 0, zoomAnimation.IsActive() ? ZOOM_ANIMATION_FRAME_TIME : LIVEZOOM_REFRESH_FRAME_TIME, NULL );
         }
         }
         break;
@@ -12268,7 +12273,7 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 
                 zoomLevel = zoomAnimation.Retarget( zoomTelescopeTarget, GetTickCount64(),
                                                     ZoomAnimation::Duration( zoomLevel, zoomTelescopeTarget, false, LIVEZOOM_ANIMATION_STEP_TIME ) );
-                SetTimer( hWnd, 0, ZOOM_ANIMATION_FRAME_TIME, NULL );
+                SetTimer( hWnd, 0, zoomAnimation.IsActive() ? ZOOM_ANIMATION_FRAME_TIME : LIVEZOOM_REFRESH_FRAME_TIME, NULL );
             }
             break;
 
@@ -12339,7 +12344,7 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
                 zoomLevel = 1.0;
                 zoomAnimation.Start( zoomLevel, zoomTelescopeTarget, GetTickCount64(),
                                      ZoomAnimation::Duration( zoomLevel, zoomTelescopeTarget, false, LIVEZOOM_ANIMATION_STEP_TIME ) );
-                SetTimer( hWnd, 0, ZOOM_ANIMATION_FRAME_TIME, NULL );
+                SetTimer( hWnd, 0, zoomAnimation.IsActive() ? ZOOM_ANIMATION_FRAME_TIME : LIVEZOOM_REFRESH_FRAME_TIME, NULL );
 
                 break;
             }
