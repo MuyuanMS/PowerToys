@@ -11,79 +11,67 @@
 
 namespace auto_hide_cursor
 {
-    inline std::wstring RecoveryMarkerPath() noexcept
-    {
-        wchar_t localAppData[MAX_PATH]{};
-        const auto length = GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, std::size(localAppData));
-        if (length == 0 || length >= std::size(localAppData))
-        {
-            return {};
-        }
-
-        return std::wstring{ localAppData, length } + L"\\Microsoft\\PowerToys\\AutoHideCursor\\cursor-recovery.marker";
-    }
+    constexpr wchar_t recoveryMarkerKey[] = L"Software\\Microsoft\\PowerToys\\AutoHideCursor";
+    constexpr wchar_t recoveryMarkerValue[] = L"CursorRecovery";
 
     inline bool CreateRecoveryMarker() noexcept
     {
-        const auto markerPath = RecoveryMarkerPath();
-        if (markerPath.empty())
+        HKEY key = nullptr;
+        if (RegCreateKeyExW(
+                HKEY_CURRENT_USER,
+                recoveryMarkerKey,
+                0,
+                nullptr,
+                REG_OPTION_NON_VOLATILE,
+                KEY_SET_VALUE,
+                nullptr,
+                &key,
+                nullptr) != ERROR_SUCCESS)
         {
             return false;
         }
 
-        const auto moduleDirectory = markerPath.substr(0, markerPath.find_last_of(L'\\'));
-        const auto powerToysDirectory = moduleDirectory.substr(0, moduleDirectory.find_last_of(L'\\'));
-        CreateDirectoryW(powerToysDirectory.c_str(), nullptr);
-        CreateDirectoryW(moduleDirectory.c_str(), nullptr);
-
-        const auto marker = CreateFileW(
-            markerPath.c_str(),
-            GENERIC_WRITE,
-            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-            nullptr,
-            CREATE_ALWAYS,
-            FILE_ATTRIBUTE_HIDDEN,
-            nullptr);
-        if (marker == INVALID_HANDLE_VALUE)
-        {
-            return false;
-        }
-
-        CloseHandle(marker);
-        return true;
+        constexpr DWORD markerValue = 1;
+        const auto result = RegSetValueExW(
+            key,
+            recoveryMarkerValue,
+            0,
+            REG_DWORD,
+            reinterpret_cast<const BYTE*>(&markerValue),
+            sizeof(markerValue));
+        RegCloseKey(key);
+        return result == ERROR_SUCCESS;
     }
 
     inline bool HasRecoveryMarker() noexcept
     {
-        const auto markerPath = RecoveryMarkerPath();
-        if (markerPath.empty())
+        HKEY key = nullptr;
+        if (RegOpenKeyExW(HKEY_CURRENT_USER, recoveryMarkerKey, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS)
         {
             return false;
         }
 
-        const auto marker = CreateFileW(
-            markerPath.c_str(),
-            GENERIC_READ,
-            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        DWORD type = 0;
+        DWORD value = 0;
+        DWORD valueSize = sizeof(value);
+        const auto result = RegQueryValueExW(
+            key,
+            recoveryMarkerValue,
             nullptr,
-            OPEN_EXISTING,
-            FILE_ATTRIBUTE_HIDDEN,
-            nullptr);
-        if (marker == INVALID_HANDLE_VALUE)
-        {
-            return false;
-        }
-
-        CloseHandle(marker);
-        return true;
+            &type,
+            reinterpret_cast<BYTE*>(&value),
+            &valueSize);
+        RegCloseKey(key);
+        return result == ERROR_SUCCESS && type == REG_DWORD && value == 1;
     }
 
     inline void RemoveRecoveryMarker() noexcept
     {
-        const auto markerPath = RecoveryMarkerPath();
-        if (!markerPath.empty())
+        HKEY key = nullptr;
+        if (RegOpenKeyExW(HKEY_CURRENT_USER, recoveryMarkerKey, 0, KEY_SET_VALUE, &key) == ERROR_SUCCESS)
         {
-            DeleteFileW(markerPath.c_str());
+            RegDeleteValueW(key, recoveryMarkerValue);
+            RegCloseKey(key);
         }
     }
 
@@ -175,7 +163,6 @@ namespace auto_hide_cursor
                 if (!SetSystemCursor(transparentCursor, cursorId))
                 {
                     const auto error = GetLastError();
-                    DestroyCursor(transparentCursor);
                     RestoreSystemCursors();
                     SetLastError(error);
                     return false;
