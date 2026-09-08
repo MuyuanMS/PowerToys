@@ -244,19 +244,29 @@ public partial class ListViewModel : PageViewModel, IDisposable
             return;
         }
 
-        if (IsGetItemsActive())
+        if (!TryReserveGetItems(keepSelection, ensureSelectionVisible))
         {
-            lock (_fetchStateLock)
-            {
-                _deferredFetchRequested = true;
-                _deferredFetchKeepSelection &= keepSelection;
-                _deferredFetchEnsureSelectionVisible |= ensureSelectionVisible;
-            }
-
             return;
         }
 
         FetchItems(keepSelection, ensureSelectionVisible);
+    }
+
+    private bool TryReserveGetItems(bool keepSelection, bool ensureSelectionVisible)
+    {
+        lock (_fetchStateLock)
+        {
+            if (_activeGetItemsCount != 0)
+            {
+                _deferredFetchRequested = true;
+                _deferredFetchKeepSelection &= keepSelection;
+                _deferredFetchEnsureSelectionVisible |= ensureSelectionVisible;
+                return false;
+            }
+
+            _activeGetItemsCount = 1;
+            return true;
+        }
     }
 
     private void QueueDeferredFetchIfNeeded()
@@ -272,6 +282,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
             _deferredFetchRequested = false;
             _deferredFetchKeepSelection = true;
             _deferredFetchEnsureSelectionVisible = false;
+
+            if (deferredFetchRequested)
+            {
+                _activeGetItemsCount = 1;
+            }
         }
 
         if (deferredFetchRequested)
@@ -329,6 +344,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
         List<ListItemViewModel> createdViewModels = [];
         var itemsTransferredToList = false;
         var fetchCountIncremented = false;
+        var getItemsReservationReleased = false;
 
         try
         {
@@ -343,12 +359,12 @@ public partial class ListViewModel : PageViewModel, IDisposable
             IListItem[] newItems;
             try
             {
-                EnterGetItemsScope();
                 newItems = _model.Unsafe!.GetItems();
             }
             finally
             {
                 ExitGetItemsScope();
+                getItemsReservationReleased = true;
             }
 
             ThrowIfFetchCanceledOrStale(fetchGeneration, cancellationToken);
@@ -489,6 +505,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
         }
         finally
         {
+            if (!getItemsReservationReleased)
+            {
+                ExitGetItemsScope();
+            }
+
             if (fetchCountIncremented && Interlocked.Decrement(ref _activeFetchCount) == 0)
             {
                 UpdateEmptyContent();
@@ -665,29 +686,29 @@ public partial class ListViewModel : PageViewModel, IDisposable
     /// GetItems calls which most extensions won't be expecting.
     /// </summary>
     /// <returns>
-    /// <see langword="true"/> if we're currently within a GetItems call on this thread for this view model; otherwise, <see langword="false"/>.
+    /// <see langword="true"/> if a GetItems call is active or reserved for this view model; otherwise, <see langword="false"/>.
     /// </returns>
-    private bool IsGetItemsActive() => Volatile.Read(ref _activeGetItemsCount) > 0;
-
-    private void EnterGetItemsScope()
-    {
-        Interlocked.Increment(ref _activeGetItemsCount);
-    }
-
     private void ExitGetItemsScope()
     {
-        if (Interlocked.Decrement(ref _activeGetItemsCount) != 0)
+        var queueDeferredFetch = false;
+        lock (_fetchStateLock)
         {
-            return;
+            if (--_activeGetItemsCount == 0)
+            {
+                queueDeferredFetch = true;
+            }
         }
 
-        try
+        if (queueDeferredFetch)
         {
-            QueueDeferredFetchIfNeeded();
-        }
-        catch (Exception ex)
-        {
-            CoreLogger.LogError("Failed to queue deferred fetch", ex);
+            try
+            {
+                QueueDeferredFetchIfNeeded();
+            }
+            catch (Exception ex)
+            {
+                CoreLogger.LogError("Failed to queue deferred fetch", ex);
+            }
         }
     }
 
@@ -961,7 +982,10 @@ public partial class ListViewModel : PageViewModel, IDisposable
         }
 
         model.ItemsChanged += Model_ItemsChanged;
-        FetchItems(keepSelection: true, ensureSelectionVisible: true);
+        if (TryReserveGetItems(keepSelection: true, ensureSelectionVisible: true))
+        {
+            FetchItems(keepSelection: true, ensureSelectionVisible: true);
+        }
     }
 
     private static IGridPropertiesViewModel? LoadGridPropertiesViewModel(IGridProperties? gridProperties)
