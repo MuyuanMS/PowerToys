@@ -945,9 +945,15 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     private sealed record StaticFilterRequest(long Version, int FetchGeneration, string Query);
 
-    internal readonly record struct StaticFilterItem(ListItemViewModel ViewModel, string Title, string Subtitle, bool IsInErrorState)
+    internal readonly record struct StaticFilterItem(
+        ListItemViewModel ViewModel,
+        string Title,
+        string Subtitle,
+        bool IsInErrorState,
+        bool IsInteractive = true)
     {
-        internal static StaticFilterItem Capture(ListItemViewModel item) => new(item, item.Title, item.Subtitle, item.IsInErrorState);
+        internal static StaticFilterItem Capture(ListItemViewModel item) =>
+            new(item, item.Title, item.Subtitle, item.IsInErrorState, item.IsInteractive);
     }
 
     internal static ListItemViewModel[] FilterSnapshot(StaticFilterItem[] items, string query, CancellationToken cancellationToken)
