@@ -14,9 +14,10 @@
 #include "../../../common/utils/gpo.h"
 #include "../../../common/utils/logger_helper.h"
 #include "../../../common/utils/process_path.h"
-#include "../../../interface/powertoy_module_interface.h"
+#include "../../interface/powertoy_module_interface.h"
 
 #include <algorithm>
+#include <chrono>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -35,6 +36,7 @@ namespace
     constexpr wchar_t jsonIdleDelayMs[] = L"idle_delay_ms";
     constexpr DWORD initialWorkerFailureDelayMs = 1000;
     constexpr DWORD maximumWorkerFailureDelayMs = 60000;
+    constexpr auto stableWorkerLifetime = std::chrono::seconds(10);
 
     class AutoHideCursorModule : public PowertoyModuleIface
     {
@@ -284,6 +286,7 @@ namespace
                     continue;
                 }
 
+                const auto workerStartTime = std::chrono::steady_clock::now();
                 const HANDLE waitHandles[] = { m_terminateEvent, m_restartEvent, processInfo.hProcess };
                 const auto waitResult = WaitForMultipleObjects(
                     static_cast<DWORD>(std::size(waitHandles)),
@@ -334,6 +337,12 @@ namespace
                 if (stopping)
                 {
                     break;
+                }
+
+                if (workerFailed &&
+                    std::chrono::steady_clock::now() - workerStartTime >= stableWorkerLifetime)
+                {
+                    consecutiveWorkerFailures = 0;
                 }
 
                 if (!restarting && workerFailed && waitBeforeWorkerRetry())
