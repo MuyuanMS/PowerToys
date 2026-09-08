@@ -161,11 +161,23 @@ Thank you for using PowerToys!
 | Microsoft.PowerToys.CropAndLock_EnableCropAndLock | Triggered when Crop and Lock is enabled. |
 | Microsoft.PowerToys.CropAndLock_Settings | Occurs when settings related to Crop and Lock are modified. |
 
+### Auto Hide Cursor
+
+| Event Name | Description |
+| --- | --- |
+| Microsoft.PowerToys.AutoHideCursor_EnableAutoHideCursor | Triggered when Auto Hide Cursor is enabled or disabled. |
+
 ### Cursor Wrap
 
 | Event Name | Description |
 | --- | --- |
 | Microsoft.PowerToys.CursorWrap_EnableCursorWrap | Triggered when Cursor Wrap is enabled or disabled. |
+
+### Auto Hide Cursor
+
+| Event Name | Description |
+| --- | --- |
+| Microsoft.PowerToys.AutoHideCursor_EnableAutoHideCursor | Triggered when Auto Hide Cursor is enabled or disabled. Includes the `Enabled` state. |
 
 ### Environment Variables
 
