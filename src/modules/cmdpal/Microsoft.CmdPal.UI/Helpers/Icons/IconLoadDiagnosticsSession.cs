@@ -82,6 +82,9 @@ internal sealed class IconLoadDiagnosticsSession
     private int _gen1CollectionsStopped;
     private int _gen2CollectionsStopped;
     private long _workingSetStoppedBytes;
+
+    private bool IsStopped => Volatile.Read(ref _stoppedAt) != 0;
+
     private long _nextRequestId;
     private long _nextLoadId;
     private long _requestsStarted;
@@ -150,26 +153,59 @@ internal sealed class IconLoadDiagnosticsSession
         }
     }
 
-    internal void RecordUiProbeEnqueued() => Interlocked.Increment(ref _uiProbeEnqueued);
+    internal void RecordUiProbeEnqueued()
+    {
+        if (!IsStopped)
+        {
+            Interlocked.Increment(ref _uiProbeEnqueued);
+        }
+    }
 
     internal void RecordUiProbeCompleted(long elapsedTicks)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         Interlocked.Increment(ref _uiProbeCompleted);
         _uiProbeWaitLatency.Record(elapsedTicks);
         IconLoadEventSource.Log.UiResponsivenessProbeCompleted(Id, ToMicroseconds(elapsedTicks));
     }
 
-    internal void RecordUiProbeSkipped() => Interlocked.Increment(ref _uiProbeSkipped);
+    internal void RecordUiProbeSkipped()
+    {
+        if (!IsStopped)
+        {
+            Interlocked.Increment(ref _uiProbeSkipped);
+        }
+    }
 
-    internal void RecordUiProbeRejected() => Interlocked.Increment(ref _uiProbeRejected);
+    internal void RecordUiProbeRejected()
+    {
+        if (!IsStopped)
+        {
+            Interlocked.Increment(ref _uiProbeRejected);
+        }
+    }
 
     internal void RecordCacheLookup(Size iconSize, int capacity, bool hit, int entryCount)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         GetCacheMeasurements(iconSize, capacity).RecordLookup(hit, entryCount);
     }
 
     internal void RecordCacheEntryAdded(Size iconSize, int capacity, int entryCount)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         GetCacheMeasurements(iconSize, capacity).RecordAdded(entryCount);
     }
 
@@ -179,16 +215,31 @@ internal sealed class IconLoadDiagnosticsSession
         int entryCount,
         AdaptiveCacheRemovalReason reason)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         GetCacheMeasurements(iconSize, capacity).RecordRemoved(entryCount, reason);
     }
 
     internal bool IsLoadDemanded(long loadId)
     {
+        if (IsStopped)
+        {
+            return false;
+        }
+
         return _loadDemandStates.TryGetValue(loadId, out var demandState) && demandState.IsDemanded;
     }
 
     public IconRequestMeasurement BeginRequest(IconRequestReason reason, double scale, IconRequestOrigin origin)
     {
+        if (IsStopped)
+        {
+            return default;
+        }
+
         origin = origin.Normalize();
         var requestId = Interlocked.Increment(ref _nextRequestId);
         Interlocked.Increment(ref _requestsStarted);
@@ -206,8 +257,13 @@ internal sealed class IconLoadDiagnosticsSession
         return new IconRequestMeasurement(this, requestId, Stopwatch.GetTimestamp());
     }
 
-    public IconLoadMeasurement CreateLoad(IconLoadInputKind inputKind, double width, double height, double scale)
+    public IconLoadMeasurement? CreateLoad(IconLoadInputKind inputKind, double width, double height, double scale)
     {
+        if (IsStopped)
+        {
+            return null;
+        }
+
         var loadId = Interlocked.Increment(ref _nextLoadId);
         Interlocked.Increment(ref _loadsCreated);
         Interlocked.Increment(ref _inputKinds[(int)inputKind]);
@@ -218,6 +274,11 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void RecordProviderResolution(long requestId, long loadId, IconProviderResolution resolution)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         Interlocked.Increment(ref _providerResolutions[(int)resolution]);
         if (_requestDemandStates.TryGetValue(requestId, out var requestState))
         {
@@ -258,6 +319,11 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void InvalidateRequest(long requestId)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         if (!_requestDemandStates.TryGetValue(requestId, out var requestState))
         {
             return;
@@ -271,6 +337,11 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void RegisterLoad(Task<IconSource?> task, IconLoadMeasurement load)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         _loadsByTask.Add(task, load);
     }
 
@@ -281,6 +352,11 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void CompleteRequest(long requestId, IconRequestStatus status, IconLoadResultKind resultKind, long elapsedTicks)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         Interlocked.Increment(ref _requestStatuses[(int)status]);
         _requestLatency.Record(elapsedTicks);
         IconLoadEventSource.Log.RequestCompleted(Id, requestId, (int)status, ToMicroseconds(elapsedTicks));
@@ -375,6 +451,11 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void RecordLoadEnqueued(long loadId, IconLoadPriority priority)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         ref var currentDepth = ref (priority == IconLoadPriority.High
             ? ref _currentHighQueueDepth
             : ref _currentLowQueueDepth);
@@ -528,6 +609,11 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void RecordLoadRejected(long loadId)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         Interlocked.Increment(ref _loadsRejected);
         if (_loadDemandStates.TryGetValue(loadId, out var demandState))
         {
@@ -548,6 +634,11 @@ internal sealed class IconLoadDiagnosticsSession
         long queueTicks,
         int workerCount)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         if (priority == IconLoadPriority.High)
         {
             Interlocked.Decrement(ref _currentHighQueueDepth);
@@ -582,6 +673,11 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void RecordBackgroundPreparation(long loadId, IconLoadInputKind inputKind, long elapsedTicks)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         _backgroundPreparationLatency.Record(elapsedTicks);
         _inputKindMeasurements[(int)inputKind].BackgroundPreparationLatency.Record(elapsedTicks);
         IconLoadEventSource.Log.BackgroundPreparationCompleted(Id, loadId, ToMicroseconds(elapsedTicks));
@@ -593,6 +689,11 @@ internal sealed class IconLoadDiagnosticsSession
         IconDispatcherMaterializationKind materializationKind,
         bool isDemanded)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         _ = loadId;
         _ = inputKind;
         IncrementDemandCount(
@@ -612,6 +713,11 @@ internal sealed class IconLoadDiagnosticsSession
         long startedAt,
         long elapsedTicks)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         Interlocked.Decrement(ref _currentDispatcherWaits);
         var currentCallbacks = Interlocked.Increment(ref _currentDispatcherCallbacks);
         UpdateMaximum(ref _maximumDispatcherCallbacks, currentCallbacks);
@@ -642,6 +748,11 @@ internal sealed class IconLoadDiagnosticsSession
         long startedAt,
         long elapsedTicks)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         Interlocked.Decrement(ref _currentDispatcherWaits);
         Interlocked.Increment(ref _dispatcherWaitFailures);
         _dispatcherWaitLatency.Record(elapsedTicks);
@@ -668,6 +779,11 @@ internal sealed class IconLoadDiagnosticsSession
         long startedAt,
         long elapsedTicks)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         _dispatcherUiExecutionLatency.Record(elapsedTicks);
         _dispatcherUiExecutionLatencyByDemand[DemandIndex(isDemanded)].Record(elapsedTicks);
         _dispatcherUiExecutionLatencyBySliceKind[(int)sliceKind].Record(elapsedTicks);
@@ -701,6 +817,11 @@ internal sealed class IconLoadDiagnosticsSession
         long startedAt,
         long elapsedTicks)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         _dispatcherAsyncSuspensionLatency.Record(elapsedTicks);
         _dispatcherAsyncSuspensionLatencyByDemand[DemandIndex(isDemanded)].Record(elapsedTicks);
         _inputKindMeasurements[(int)inputKind].DispatcherAsyncSuspensionLatency.Record(elapsedTicks);
@@ -729,6 +850,11 @@ internal sealed class IconLoadDiagnosticsSession
         long startedAt,
         long elapsedTicks)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         Interlocked.Decrement(ref _currentDispatcherCallbacks);
         IncrementDemandCount(
             isDemanded,
@@ -751,6 +877,11 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void RecordLoadCompleted(long loadId, IconLoadInputKind inputKind, IconLoadResultKind resultKind, long elapsedTicks)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         Interlocked.Decrement(ref _activeWorkers);
         Interlocked.Increment(ref _resultKinds[(int)resultKind]);
         _loadLatency.Record(elapsedTicks);
@@ -761,6 +892,11 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void RecordDirectGlyphCompleted(long loadId, IconLoadInputKind inputKind, IconLoadResultKind resultKind, long elapsedTicks)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         Interlocked.Increment(ref _directGlyphLoads);
         Interlocked.Increment(ref _resultKinds[(int)resultKind]);
         _directGlyphLatency.Record(elapsedTicks);
@@ -793,6 +929,11 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void RecordElementUpdate(bool reused, IconLoadResultKind resultKind, long elapsedTicks)
     {
+        if (IsStopped)
+        {
+            return;
+        }
+
         var measurements = _elementKindMeasurements[(int)resultKind];
         if (reused)
         {
@@ -822,6 +963,7 @@ internal sealed class IconLoadDiagnosticsSession
             {
                 _stoppedUtc = DateTimeOffset.UtcNow;
                 var stoppedAt = Stopwatch.GetTimestamp();
+                Volatile.Write(ref _stoppedAt, stoppedAt);
                 _uiResponsivenessProbe?.Stop();
                 _processCpuStoppedTicks = GetProcessCpuTicks();
                 _managedAllocatedBytesStopped = GC.GetTotalAllocatedBytes(precise: false);
@@ -830,7 +972,6 @@ internal sealed class IconLoadDiagnosticsSession
                 _gen1CollectionsStopped = GC.CollectionCount(1);
                 _gen2CollectionsStopped = GC.CollectionCount(2);
                 _workingSetStoppedBytes = GetWorkingSetBytes();
-                Volatile.Write(ref _stoppedAt, stoppedAt);
             }
         }
     }
