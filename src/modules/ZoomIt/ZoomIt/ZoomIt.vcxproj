@@ -177,7 +177,7 @@
       <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)..\..\..\common\version;$(MSBuildThisFileDirectory)PowerToys;$(MSBuildThisFileDirectory)..\ZoomItBreak\$(Platform)\$(Configuration)\</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>Shlwapi.lib;comctl32.lib;odbc32.lib;odbccp32.lib;version.lib;version.lib;Winmm.lib;gdiplus.lib;Msimg32.lib;Wtsapi32.lib;windowscodecs.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Shlwapi.lib;comctl32.lib;odbc32.lib;odbccp32.lib;version.lib;Winmm.lib;gdiplus.lib;Msimg32.lib;Wtsapi32.lib;windowscodecs.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACUIAccess>true</UACUIAccess>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>

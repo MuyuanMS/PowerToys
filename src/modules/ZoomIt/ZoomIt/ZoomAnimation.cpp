@@ -41,10 +41,9 @@ std::uint64_t ZoomAnimation::OriginalDuration(float currentZoom, float targetZoo
 
 std::uint64_t ZoomAnimation::Duration(float currentZoom, float targetZoom, bool firstStepWasImmediate)
 {
-    constexpr std::uint64_t stepTimeMilliseconds = 40;
     constexpr std::uint64_t durationNumerator = 3;
     constexpr std::uint64_t durationDenominator = 2;
-    return OriginalDuration(currentZoom, targetZoom, firstStepWasImmediate, stepTimeMilliseconds) * durationNumerator / durationDenominator;
+    return OriginalDuration(currentZoom, targetZoom, firstStepWasImmediate) * durationNumerator / durationDenominator;
 }
 
 void ZoomAnimation::Start(float currentZoom, float targetZoom, std::uint64_t startTimeMilliseconds, std::uint64_t durationMilliseconds)
