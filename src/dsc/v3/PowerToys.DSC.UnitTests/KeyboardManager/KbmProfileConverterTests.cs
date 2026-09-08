@@ -334,6 +334,29 @@ public sealed class KbmProfileConverterTests
         StringAssert.Contains(warnings[1], "without a program path");
     }
 
+    [TestMethod]
+    public void FromProfile_NullSectionsEmitWarnings()
+    {
+        var profile = new KeyboardManagerProfile
+        {
+            RemapKeys = null,
+            RemapKeysToText = null,
+            RemapShortcuts = null,
+            RemapShortcutsToText = null,
+        };
+        var warnings = new System.Collections.Generic.List<string>();
+
+        var model = KbmProfileConverter.FromProfile(profile, warnings);
+
+        Assert.AreEqual(0, model.Keys.Count);
+        Assert.AreEqual(0, model.Shortcuts.Count);
+        Assert.AreEqual(4, warnings.Count, string.Join(" | ", warnings));
+        StringAssert.Contains(warnings[0], "'remapKeys'");
+        StringAssert.Contains(warnings[1], "'remapKeysToText'");
+        StringAssert.Contains(warnings[2], "'remapShortcuts'");
+        StringAssert.Contains(warnings[3], "'remapShortcutsToText'");
+    }
+
     private static void AssertHasError(System.Collections.Generic.IList<string> errors, string expectedFragment)
     {
         Assert.IsTrue(errors.Any(e => e.Contains(expectedFragment, System.StringComparison.Ordinal)), $"Expected an error containing '{expectedFragment}'; got: {string.Join(" | ", errors)}");

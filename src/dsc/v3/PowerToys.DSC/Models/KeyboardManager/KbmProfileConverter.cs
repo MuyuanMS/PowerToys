@@ -274,6 +274,11 @@ public static class KbmProfileConverter
         var keys = new List<(uint Code, KbmKeyRemapEntry Entry)>();
         var shortcuts = new List<KbmShortcutRemapEntry>();
 
+        AddNullSectionWarning(profile.RemapKeys, "remapKeys", warnings);
+        AddNullSectionWarning(profile.RemapKeysToText, "remapKeysToText", warnings);
+        AddNullSectionWarning(profile.RemapShortcuts, "remapShortcuts", warnings);
+        AddNullSectionWarning(profile.RemapShortcutsToText, "remapShortcutsToText", warnings);
+
         foreach (var stored in profile.RemapKeys?.InProcessRemapKeys ?? [])
         {
             if (stored == null ||
@@ -396,6 +401,14 @@ public static class KbmProfileConverter
                 .ThenBy(s => s.From, StringComparer.Ordinal)
                 .ToList(),
         };
+    }
+
+    private static void AddNullSectionWarning(object? section, string sectionName, IList<string>? warnings)
+    {
+        if (section == null)
+        {
+            warnings?.Add($"Stored profile section '{sectionName}' is null");
+        }
     }
 
     /// <summary>
