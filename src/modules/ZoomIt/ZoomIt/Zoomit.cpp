@@ -10911,14 +10911,13 @@ LRESULT APIENTRY MainWndProc(
 
             // Translate the viewport selection into coordinates for the 1:1 source
             // bitmap hdcScreenCompat.
-            int viewportX, viewportY;
-            GetZoomedTopLeftCoordinates(
-                zoomLevel, &cursorPos, &viewportX, width, &viewportY, height );
+            float viewportX, viewportY;
+            GetAnimatedZoomSourceCoordinates( zoomLevel, &cursorPos, width, height, &viewportX, &viewportY );
 
-            int saveX = viewportX + static_cast<int>( copyX / zoomLevel );
-            int saveY = viewportY + static_cast<int>( copyY / zoomLevel );
-            int saveWidth = static_cast<int>( copyWidth / zoomLevel );
-            int saveHeight = static_cast<int>( copyHeight / zoomLevel );
+            int saveX = static_cast<int>( std::floor( viewportX + static_cast<float>( copyX ) / zoomLevel ) );
+            int saveY = static_cast<int>( std::floor( viewportY + static_cast<float>( copyY ) / zoomLevel ) );
+            int saveWidth = static_cast<int>( std::ceil( static_cast<float>( copyWidth ) / zoomLevel ) );
+            int saveHeight = static_cast<int>( std::ceil( static_cast<float>( copyHeight ) / zoomLevel ) );
 
             // Create a pixel-accurate copy of the desired area from the source bitmap.
             wil::unique_hdc hdcActualSize( CreateCompatibleDC( hdcScreen ) );
@@ -11827,7 +11826,7 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
     BOOLEAN		zoomIn;
 #endif
     static POINT	lastCursorPos;
-    POINT			adjustedCursorPos, zoomCenterPos;
+    POINT			adjustedCursorPos, zoomCenterPos{};
     int				moveWidth, moveHeight;
     int				sourceRectHeight, sourceRectWidth;
     RECT			sourceRect{};
@@ -12023,6 +12022,8 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
             sourceRectHeight = lastSourceRect.bottom - lastSourceRect.top;
             moveWidth = sourceRectWidth/LIVEZOOM_MOVE_REGIONS;
             moveHeight = sourceRectHeight/LIVEZOOM_MOVE_REGIONS;
+            bool updateZoomCenterX = false;
+            bool updateZoomCenterY = false;
             if( zoomAnimation.IsActive() ) {
 
                 // Force interpolated magnification while the scale changes so sub-pixel motion is smooth, not blocky.
@@ -12074,30 +12075,38 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
                 // Add back monitor boundary.
                 zoomCenterPos.x += monInfo.rcMonitor.left + static_cast<LONG>(width / zoomLevel / 2);
                 zoomCenterPos.y += monInfo.rcMonitor.top + static_cast<LONG>(height / zoomLevel / 2);
+                updateZoomCenterX = true;
+                updateZoomCenterY = true;
 
             } else {
 
                 int xOffset = cursorPos.x - lastSourceRect.left;
                 int yOffset = cursorPos.y - lastSourceRect.top;
-                zoomCenterPos.x = 0;
-                zoomCenterPos.y = 0;
                 if( transformDirty ) {
                     zoomCenterPos = cursorPos;
-                } else if( xOffset < moveWidth )
+                    updateZoomCenterX = true;
+                    updateZoomCenterY = true;
+                } else if( xOffset < moveWidth ) {
                     zoomCenterPos.x = lastSourceRect.left + sourceRectWidth/2 - (moveWidth - xOffset);
-                else if( xOffset > moveWidth * (LIVEZOOM_MOVE_REGIONS-1) )
+                    updateZoomCenterX = true;
+                } else if( xOffset > moveWidth * (LIVEZOOM_MOVE_REGIONS-1) ) {
                     zoomCenterPos.x = lastSourceRect.left + sourceRectWidth/2 + (xOffset - moveWidth*(LIVEZOOM_MOVE_REGIONS-1));
-                if( yOffset < moveHeight )
+                    updateZoomCenterX = true;
+                }
+                if( yOffset < moveHeight ) {
                     zoomCenterPos.y = lastSourceRect.top + sourceRectHeight/2 - (moveHeight - yOffset);
-                else if( yOffset > moveHeight * (LIVEZOOM_MOVE_REGIONS-1) )
+                    updateZoomCenterY = true;
+                } else if( yOffset > moveHeight * (LIVEZOOM_MOVE_REGIONS-1) ) {
                     zoomCenterPos.y = lastSourceRect.top + sourceRectHeight/2 + (yOffset - moveHeight*(LIVEZOOM_MOVE_REGIONS-1));
+                    updateZoomCenterY = true;
+                }
             }
-            if( matrix.v[0][0] || zoomCenterPos.x || zoomCenterPos.y ) {
+            if( matrix.v[0][0] || updateZoomCenterX || updateZoomCenterY ) {
 
-                if( zoomCenterPos.y == 0 )
-                    zoomCenterPos.y = lastSourceRect.top + sourceRectHeight/2;
-                if( zoomCenterPos.x == 0 )
+                if( !updateZoomCenterX )
                     zoomCenterPos.x = lastSourceRect.left + sourceRectWidth/2;
+                if( !updateZoomCenterY )
+                    zoomCenterPos.y = lastSourceRect.top + sourceRectHeight/2;
 
                 int zoomWidth = static_cast<int>(width / zoomLevel);
                 int zoomHeight = static_cast<int>(height/ zoomLevel);
