@@ -876,15 +876,26 @@ public partial class ListViewModel : PageViewModel, IDisposable
                     return;
                 }
 
-                // Reselection waits for the same initialization without blocking extension callbacks.
-                if (ShowDetails && item.HasDetails)
+                // Publish the details state on the UI scheduler so the generation
+                // check covers the actual message publication.
+                var details = item.Details;
+                var showDetails = ShowDetails && details is not null;
+                DoOnUiThread(() =>
                 {
-                    WeakReferenceMessenger.Default.Send<ShowDetailsMessage>(new(item.Details));
-                }
-                else
-                {
-                    WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
-                }
+                    if (ct.IsCancellationRequested || generation != Volatile.Read(ref _selectedItemGeneration))
+                    {
+                        return;
+                    }
+
+                    if (showDetails)
+                    {
+                        WeakReferenceMessenger.Default.Send<ShowDetailsMessage>(new(details!));
+                    }
+                    else
+                    {
+                        WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                    }
+                });
 
                 var suggestion = item.TextToSuggest;
                 DoOnUiThread(() =>
