@@ -474,6 +474,25 @@ public sealed partial class DetailsLifecycleTests
     }
 
     [TestMethod]
+    public void Selection_NonObservableDetailsRefreshFailurePreservesPreviousDetails()
+    {
+        var details = new SnapshotDetails();
+        var vm = CreateItem(new TrackedListItem { Details = details });
+        vm.SlowInitializeProperties();
+        var original = vm.Details;
+
+        details.OnBodyRead = () => throw new InvalidOperationException("refresh failed");
+
+        Assert.IsTrue(vm.SafeSlowInit());
+        Assert.IsFalse(vm.IsInErrorState);
+        Assert.AreSame(original, vm.Details);
+        details.OnBodyRead = null;
+        Assert.AreEqual("initial", vm.Details?.Body);
+        Assert.HasCount(1, _context.Errors);
+        Assert.IsInstanceOfType<InvalidOperationException>(_context.Errors[0]);
+    }
+
+    [TestMethod]
     public void ContentReplacementBeforeUiPublication_DetachesOldGraphAndPublishesLatest()
     {
         var first = new TrackedMarkdown();
@@ -872,7 +891,19 @@ public sealed partial class DetailsLifecycleTests
 
         public string Title => "Legacy details";
 
-        public string Body { get; set; } = "initial";
+        public string BodyValue { get; set; } = "initial";
+
+        public Action? OnBodyRead { get; set; }
+
+        public string Body
+        {
+            get
+            {
+                OnBodyRead?.Invoke();
+                return BodyValue;
+            }
+            set => BodyValue = value;
+        }
 
         public IDetailsElement[] Metadata => [];
 

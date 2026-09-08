@@ -268,7 +268,29 @@ public partial class ListItemViewModel : CommandItemViewModel
 
         if (Details?.Represents(model) == true)
         {
-            Details.InitializeProperties();
+            if (Details.IsObservable)
+            {
+                Details.InitializeProperties();
+                return;
+            }
+
+            DetailsViewModel? refreshed = new(model!, PageContext);
+            try
+            {
+                refreshed.InitializeProperties();
+            }
+            catch (Exception ex)
+            {
+                refreshed.SafeCleanup();
+                ShowException(ex, Title);
+                return;
+            }
+
+            var previousDetails = Details;
+            Details = refreshed;
+            previousDetails.SafeCleanup();
+            UpdateProperty(nameof(Details), nameof(HasDetails));
+            UpdateShowDetailsCommand();
             return;
         }
 
