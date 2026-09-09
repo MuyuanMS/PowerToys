@@ -272,38 +272,29 @@ internal static class GeneratedIconProtocol
         string? value, ElementTheme theme, InitialsPathFactory createPathData, out byte[] svg)
     {
         svg = [];
-
-        try
+        if (Classify(value) != Kind.Initials
+            || !TryParseInitials(
+                value!.AsSpan(InitialsPrefix.Length),
+                out var initials,
+                out var light,
+                out var dark,
+                out _,
+                out var shape))
         {
-            if (Classify(value) != Kind.Initials
-                || !TryParseInitials(
-                    value!.AsSpan(InitialsPrefix.Length),
-                    out var initials,
-                    out var light,
-                    out var dark,
-                    out _,
-                    out var shape))
-            {
-                return false;
-            }
-
-            var hasGlyph = createPathData(
-                initials,
-                out var pathData,
-                out var useEvenOddFill);
-            svg = CreateInitialsSvg(
-                hasGlyph ? pathData : null,
-                useEvenOddFill,
-                SelectColor(light, dark, theme),
-                theme,
-                shape);
-            return true;
-        }
-        catch
-        {
-            svg = [];
             return false;
         }
+
+        var hasGlyph = createPathData(
+            initials,
+            out var pathData,
+            out var useEvenOddFill);
+        svg = CreateInitialsSvg(
+            hasGlyph ? pathData : null,
+            useEvenOddFill,
+            SelectColor(light, dark, theme),
+            theme,
+            shape);
+        return true;
     }
 
     private static bool IsThemeDependent(string? value)

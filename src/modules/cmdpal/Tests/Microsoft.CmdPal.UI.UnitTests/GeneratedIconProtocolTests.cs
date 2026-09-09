@@ -279,6 +279,17 @@ public class GeneratedIconProtocolTests
         Assert.IsFalse(string.IsNullOrEmpty(path.Attribute("d")?.Value));
     }
 
+    [TestMethod]
+    public void InitialsRendererExceptionsPropagateInsteadOfFallingBackToACachedTile()
+    {
+        Assert.ThrowsException<InvalidOperationException>(
+            () => GeneratedIconProtocol.TryCreateInitialsSvg(
+                "|Initials|A|#0067C0|circle|",
+                ElementTheme.Light,
+                ThrowOnInitialsPathData,
+                out _));
+    }
+
     [DataTestMethod]
     [DataRow(null)]
     [DataRow("")]
@@ -341,6 +352,16 @@ public class GeneratedIconProtocolTests
     }
 
     private static XElement ParseSvg(byte[] svg) => XDocument.Parse(Encoding.UTF8.GetString(svg)).Root!;
+
+    private static bool ThrowOnInitialsPathData(
+        string text,
+        out string pathData,
+        out bool useEvenOddFill)
+    {
+        pathData = string.Empty;
+        useEvenOddFill = false;
+        throw new InvalidOperationException("Synthetic initials-renderer failure");
+    }
 
     private static string? GetBackgroundFill(byte[] svg)
     {
