@@ -131,6 +131,8 @@ public class ShellItemIconLocatorTests
         Assert.IsTrue(ShellItemIconLocator.Instance.TryLocate(secondRequest, out var second));
         Assert.AreEqual(ShellIconIdentityKind.ItemThumbnail, first.Identity.Kind);
         Assert.AreNotEqual(first.Identity, second.Identity);
+        Assert.IsFalse(first.CacheRawRequestAlias);
+        Assert.IsFalse(second.CacheRawRequestAlias);
     }
 
     [TestMethod]
@@ -153,6 +155,8 @@ public class ShellItemIconLocatorTests
             Assert.AreEqual(ShellIconIdentityKind.ItemThumbnail, first.Identity.Kind);
             Assert.AreEqual(path, first.Identity.ItemPath);
             Assert.AreNotEqual(first.Identity, second.Identity);
+            Assert.IsFalse(first.CacheRawRequestAlias);
+            Assert.IsFalse(second.CacheRawRequestAlias);
         }
         finally
         {

@@ -302,7 +302,8 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
             }
         }
 
-        if (locatedIcon is { } canonicalLocation)
+        if (locatedIcon is { } canonicalLocation
+            && CanUseLocatedShellIcon(canonicalLocation))
         {
             return GetOrCreateLocatedShellItemLoad(
                 request,
@@ -380,6 +381,10 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
 
         return pending.Task;
     }
+
+    private bool CanUseLocatedShellIcon(LocatedShellIcon locatedIcon) =>
+        locatedIcon.Identity.Kind != ShellIconIdentityKind.SystemImageList
+        || _loader.ShellIconLocations.IsCurrent(locatedIcon);
 
     private Task<IconSource?> GetOrCreateLocatedShellItemLoad(
         ShellItemIconRequest request,

@@ -49,7 +49,8 @@ internal sealed partial class ShellItemIconLocator : IShellItemIconLocator
                 ShellIconIdentity.FromItemThumbnail(
                     request.ItemPath,
                     request.Jumbo,
-                    GetItemVersion(request.ItemPath)));
+                    GetItemVersion(request.ItemPath)),
+                CacheRawRequestAlias: false);
             return true;
         }
 
