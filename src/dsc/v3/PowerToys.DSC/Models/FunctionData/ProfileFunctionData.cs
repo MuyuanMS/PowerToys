@@ -141,12 +141,12 @@ public sealed class ProfileFunctionData : BaseFunctionData
             throw new UnauthorizedAccessException("Keyboard Manager profiles must be applied from a non-elevated process.");
         }
 
+        using var transactionLock = AcquireTransactionLock();
+
         if (_isKeyboardManagerEditorOpen())
         {
             throw new IOException("Keyboard Manager profiles cannot be applied while the Keyboard Manager editor is open.");
         }
-
-        using var transactionLock = AcquireTransactionLock();
 
         // Ensure the module settings exist so the engine can resolve the
         // active configuration; without it LoadSettings() bails out early.
@@ -377,9 +377,15 @@ public sealed class ProfileFunctionData : BaseFunctionData
 
             for (var i = 0; i < list.Count; i++)
             {
-                if (list[i] is not JsonObject)
+                if (list[i] is not JsonObject item)
                 {
                     errors.Add($"'{context}[{i.ToString(CultureInfo.InvariantCulture)}]' must be an object");
+                    continue;
+                }
+
+                if (listName == "shortcuts" && item.ContainsKey("condition"))
+                {
+                    errors.Add($"'{context}[{i.ToString(CultureInfo.InvariantCulture)}].condition' is not supported for shortcut remaps");
                 }
             }
         }

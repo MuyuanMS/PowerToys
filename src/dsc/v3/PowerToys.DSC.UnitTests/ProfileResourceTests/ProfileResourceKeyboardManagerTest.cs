@@ -217,6 +217,7 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
     [DataRow(/*lang=json,strict*/ """{"profile":[]}""", "'profile' must be an object")]
     [DataRow(/*lang=json,strict*/ """{"profile":{"keys":null}}""", "'profile.keys' must be an array")]
     [DataRow(/*lang=json,strict*/ """{"profile":{"shortcuts":[null]}}""", "'profile.shortcuts[0]' must be an object")]
+    [DataRow(/*lang=json,strict*/ """{"profile":{"shortcuts":[{"from":"Ctrl+A","to":"Esc","condition":"alone"}]}}""", "'profile.shortcuts[0].condition' is not supported")]
     [DataRow(/*lang=json,strict*/ """{"profile":{"shortcut":[]}}""", "could not be mapped")]
     public void Set_MalformedInput_FailsAndLeavesFileUntouched(string input, string expectedError)
     {
@@ -233,6 +234,29 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
         Assert.AreEqual(DscMessageLevel.Error, messages[0].Level);
         StringAssert.Contains(messages[0].Message, expectedError);
         Assert.AreEqual(1, GetProfile(DefaultProfileFileName).RemapKeys.InProcessRemapKeys.Count);
+    }
+
+    [TestMethod]
+    public void Set_AloneCondition_RoundTripsAndTestsIdempotently()
+    {
+        // Arrange
+        var profile = new KbmProfileModel
+        {
+            Keys = [new() { From = "CapsLock", To = "Esc", Condition = "alone" }],
+        };
+        var input = CreateInputResourceObject(profile);
+
+        // Act
+        var setResult = ExecuteDscCommand<SetCommand>("--resource", ProfileResource.ResourceName, "--module", Module, "--input", input);
+        var testResult = ExecuteDscCommand<TestCommand>("--resource", ProfileResource.ResourceName, "--module", Module, "--input", input);
+        var (state, diff) = testResult.OutputStateAndDiff<ProfileResourceObject>();
+
+        // Assert
+        Assert.IsTrue(setResult.Success);
+        Assert.AreEqual("alone", GetProfile(DefaultProfileFileName).RemapKeys.InProcessRemapKeys[0].Condition);
+        Assert.IsTrue(testResult.Success);
+        Assert.IsTrue(state.InDesiredState);
+        CollectionAssert.AreEqual(new List<string>(), diff);
     }
 
     [TestMethod]
