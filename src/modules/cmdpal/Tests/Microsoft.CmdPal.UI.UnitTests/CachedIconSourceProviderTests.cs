@@ -41,6 +41,32 @@ public class CachedIconSourceProviderTests
 
     [TestMethod]
     [Timeout(5_000)]
+    public async Task ConcurrentRequestsShareRegisteredLoadDiagnostics()
+    {
+        IconLoadDiagnostics.Start();
+        var loader = new ControllableIconLoader();
+        var provider = new CachedIconSourceProvider(loader, new Size(20, 20), cacheSize: 16);
+        var icon = new IconDataViewModel { Icon = "test" };
+        var firstRequest = IconLoadDiagnostics.BeginRequest(IconRequestReason.SourceChanged, 1.0);
+        var first = provider.GetIconSource(icon, 1.0, firstRequest);
+        var secondRequest = IconLoadDiagnostics.BeginRequest(IconRequestReason.SourceChanged, 1.0);
+        var second = provider.GetIconSource(icon, 1.0, secondRequest);
+
+        Assert.AreSame(first, second);
+        loader.CompleteNext(null);
+        await Task.WhenAll(first, second);
+        firstRequest.Complete(IconRequestStatus.Empty);
+        secondRequest.Complete(IconRequestStatus.Empty);
+
+        var report = IconLoadDiagnostics.StopAndCreateReport();
+
+        Assert.IsNotNull(report);
+        StringAssert.Contains(report.Text, "Requests linked to session loads: 2");
+        IconLoadDiagnostics.Reset();
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
     public async Task SuccessfulLoadIsCachedBeforeInFlightEntryIsRemoved()
     {
         var loader = new ControllableIconLoader();
