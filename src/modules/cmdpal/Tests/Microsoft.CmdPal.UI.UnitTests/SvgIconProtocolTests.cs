@@ -265,6 +265,35 @@ public class SvgIconProtocolTests
         }
     }
 
+    [TestMethod]
+    public void ThemedSvgFileHonorsLongUtf8XmlDeclarationBeyondFastProbe()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"CmdPal-{Guid.NewGuid():N}.svg");
+        try
+        {
+            const string title = "Žluťoučký kůň";
+            var declaration = $"<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\" {new string(' ', 1100)}?>";
+            var template = declaration +
+                $"<svg xmlns=\"http://www.w3.org/2000/svg\"><title>{title}</title>" +
+                "<path id=\"theme\" fill=\"{{ThemeColor}}\" />" +
+                "<path id=\"accent\" fill=\"{{AccentColor}}\" /></svg>";
+            File.WriteAllBytes(path, Encoding.UTF8.GetBytes(template));
+
+            var value = $"|ThemedSvg|success|{path}";
+            Assert.IsTrue(SvgIconProtocol.TryCreateSvg(value, ElementTheme.Dark, out var svg));
+
+            var resolved = Encoding.UTF8.GetString(svg);
+            Assert.IsFalse(resolved.Contains("<?xml", StringComparison.OrdinalIgnoreCase));
+            StringAssert.Contains(resolved, $"<title>{title}</title>");
+            StringAssert.Contains(resolved, "id=\"theme\" fill=\"#FFFFFF\"");
+            StringAssert.Contains(resolved, "id=\"accent\" fill=\"#6CCB5F\"");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [DataTestMethod]
     [DataRow(false)]
     [DataRow(true)]

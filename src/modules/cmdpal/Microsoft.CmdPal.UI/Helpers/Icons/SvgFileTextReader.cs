@@ -29,21 +29,12 @@ internal static class SvgFileTextReader
             return false;
         }
 
-        using var stream = new MemoryStream(bytes, writable: false);
-
-        // An XML declaration contains only version, encoding, and standalone.
-        // Bound the probe so a malformed file cannot grow stack or parsing work.
-        Span<byte> prefix = stackalloc byte[MaximumXmlDeclarationByteCount];
-        var prefixLength = stream.ReadAtLeast(
-            prefix,
-            prefix.Length,
-            throwOnEndOfStream: false);
-        if (!TryGetEncoding(prefix[..prefixLength], out var encoding))
+        if (!TryGetEncodingFromBoundedContent(bytes, out var encoding))
         {
             return false;
         }
 
-        stream.Position = 0;
+        using var stream = new MemoryStream(bytes, writable: false);
         using var reader = new StreamReader(
             stream,
             encoding,
@@ -66,6 +57,22 @@ internal static class SvgFileTextReader
         bytes = new byte[(int)stream.Length];
         stream.ReadExactly(bytes);
         return true;
+    }
+
+    private static bool TryGetEncodingFromBoundedContent(
+        ReadOnlySpan<byte> bytes,
+        out Encoding encoding)
+    {
+        // An XML declaration contains only version, encoding, and standalone.
+        // Keep a small probe as the fast path, then retry against the bounded
+        // full buffer if the declaration extends beyond the probe.
+        var prefixLength = Math.Min(bytes.Length, MaximumXmlDeclarationByteCount);
+        if (TryGetEncoding(bytes[..prefixLength], out encoding))
+        {
+            return true;
+        }
+
+        return prefixLength < bytes.Length && TryGetEncoding(bytes, out encoding);
     }
 
     private static bool TryGetEncoding(ReadOnlySpan<byte> prefix, out Encoding encoding)
