@@ -181,19 +181,18 @@ public sealed partial class QuickAccessShelfViewModel : ObservableObject, IDispo
             availableCommands = [.. _topLevelCommandManager.TopLevelCommands];
         }
 
-        IEnumerable<string> recentCommandIds = includeRecentCommands
-            ? _recentCommands.EnumerateRecentCommandIds()
+        IEnumerable<RecentCommandIdentity> recentCommands = includeRecentCommands
+            ? _recentCommands.EnumerateRecentCommands()
             : [];
         var sections = TopLevelCommandResolver.Resolve(
             pinnedCommands,
-            recentCommandIds,
+            recentCommands,
             availableCommands,
             AllAppsCommandProvider.Page,
             includeApps: includeRecentCommands && _topLevelCommandManager.IsProviderActive(AllAppsCommandProvider.WellKnownId),
             pinnedCommandLimit: configuration.PinnedCommandLimit,
             recentCommandLimit: configuration.RecentCommandLimit,
-            includeRegular: false,
-            recentCommandsFirst: configuration.RecentCommandsPlacement == RecentCommandsPlacement.BeforePinned);
+            includeRegular: false);
 
         var resolvedItems = QuickAccessShelfResolver.ComposeSections(
             sections.Pinned,
@@ -272,10 +271,7 @@ public sealed partial class QuickAccessShelfViewModel : ObservableObject, IDispo
                 pinnedCommandLimit,
                 SettingsModel.MinQuickAccessShelfPinnedCommandLimit,
                 SettingsModel.MaxQuickAccessShelfPinnedCommandLimit),
-            Math.Clamp(
-                recentCommandLimit,
-                SettingsModel.MinRecentCommandsDisplayLimit,
-                SettingsModel.MaxRecentCommandsDisplayLimit));
+            QuickAccessShelfResolver.NormalizeRecentCommandLimit(recentCommandLimit));
     }
 
     private static bool IncludesRecentCommands(RecentCommandsPlacement recentCommandsPlacement) =>

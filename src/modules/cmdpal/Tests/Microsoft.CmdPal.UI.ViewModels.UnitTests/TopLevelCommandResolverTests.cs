@@ -41,7 +41,7 @@ public class TopLevelCommandResolverTests
     }
 
     [TestMethod]
-    public void Resolve_PinnedLimitCountsResolvedPinsAndLetsDroppedPinsAppearInRecent()
+    public void Resolve_PinnedLimitCountsResolvedPinsAndKeepsDroppedPinsReserved()
     {
         var pins = new[]
         {
@@ -57,7 +57,7 @@ public class TopLevelCommandResolverTests
 
         var sections = TopLevelCommandResolver.Resolve(
             pins,
-            ["second", "first"],
+            [new(null, "second"), new(null, "first")],
             commands,
             static command => command.ProviderId,
             static command => command.CommandId,
@@ -66,12 +66,12 @@ public class TopLevelCommandResolverTests
             recentCommandLimit: 2);
 
         CollectionAssert.AreEqual(new[] { commands[0] }, sections.Pinned.ToArray());
-        CollectionAssert.AreEqual(new[] { commands[1] }, sections.Recent.ToArray());
+        Assert.AreEqual(0, sections.Recent.Count);
         Assert.AreEqual(0, sections.Regular.Count);
     }
 
     [TestMethod]
-    public void Resolve_RecentFirstExcludesRecentItemsFromPinsAndBackfillsPinnedLimit()
+    public void Resolve_RecentPlacementDoesNotChangePinnedOwnership()
     {
         var pins = new[]
         {
@@ -89,17 +89,16 @@ public class TopLevelCommandResolverTests
 
         var sections = TopLevelCommandResolver.Resolve(
             pins,
-            ["recent-pin", "recent-only"],
+            [new("provider-a", "recent-pin"), new("provider-d", "recent-only")],
             commands,
             static command => command.ProviderId,
             static command => command.CommandId,
             static command => command.IsEligible,
             pinnedCommandLimit: 2,
-            recentCommandLimit: 2,
-            recentCommandsFirst: true);
+            recentCommandLimit: 2);
 
-        CollectionAssert.AreEqual(new[] { commands[0], commands[3] }, sections.Recent.ToArray());
-        CollectionAssert.AreEqual(new[] { commands[1], commands[2] }, sections.Pinned.ToArray());
+        CollectionAssert.AreEqual(new[] { commands[0], commands[1] }, sections.Pinned.ToArray());
+        CollectionAssert.AreEqual(new[] { commands[3] }, sections.Recent.ToArray());
         Assert.AreEqual(0, sections.Regular.Count);
     }
 
@@ -117,7 +116,13 @@ public class TopLevelCommandResolverTests
 
         var sections = TopLevelCommandResolver.Resolve(
             [new PinnedCommandSettings("provider-a", "pinned")],
-            ["pinned", "missing", "newer", "older", "regular"],
+            [
+                new("provider-a", "pinned"),
+                new(null, "missing"),
+                new("provider-c", "newer"),
+                new("provider-b", "older"),
+                new("provider-d", "regular"),
+            ],
             commands,
             static command => command.ProviderId,
             static command => command.CommandId,
@@ -137,7 +142,7 @@ public class TopLevelCommandResolverTests
 
         var sections = TopLevelCommandResolver.Resolve(
             [],
-            ["missing", "recent-app"],
+            [new(null, "missing"), new("AllApps", "recent-app")],
             [regular],
             static command => command.ProviderId,
             static command => command.CommandId,
@@ -146,6 +151,42 @@ public class TopLevelCommandResolverTests
 
         CollectionAssert.AreEqual(new[] { recentApp }, sections.Recent.ToArray());
         CollectionAssert.AreEqual(new[] { regular }, sections.Regular.ToArray());
+    }
+
+    [TestMethod]
+    public void Resolve_ProviderQualifiedHistorySelectsMatchingProviderOnIdCollision()
+    {
+        var first = new TestCommand("provider-a", "shared", IsEligible: true);
+        var second = new TestCommand("provider-b", "shared", IsEligible: true);
+
+        var sections = TopLevelCommandResolver.Resolve(
+            [],
+            [new RecentCommandIdentity("provider-b", "shared")],
+            [first, second],
+            static command => command.ProviderId,
+            static command => command.CommandId,
+            static command => command.IsEligible);
+
+        CollectionAssert.AreEqual(new[] { second }, sections.Recent.ToArray());
+        CollectionAssert.AreEqual(new[] { first }, sections.Regular.ToArray());
+    }
+
+    [TestMethod]
+    public void Resolve_LegacyIdOnlyHistoryStillResolvesFirstMatchingCommand()
+    {
+        var first = new TestCommand("provider-a", "shared", IsEligible: true);
+        var second = new TestCommand("provider-b", "shared", IsEligible: true);
+
+        var sections = TopLevelCommandResolver.Resolve(
+            [],
+            [new RecentCommandIdentity(null, "shared")],
+            [first, second],
+            static command => command.ProviderId,
+            static command => command.CommandId,
+            static command => command.IsEligible);
+
+        CollectionAssert.AreEqual(new[] { first }, sections.Recent.ToArray());
+        CollectionAssert.AreEqual(new[] { second }, sections.Regular.ToArray());
     }
 
     [TestMethod]

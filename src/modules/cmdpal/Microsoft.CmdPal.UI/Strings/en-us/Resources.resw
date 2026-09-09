@@ -413,7 +413,7 @@ Right-click to remove the key combination, thereby deactivating the shortcut.</v
     <value>Quick access shelf</value>
   </data>
   <data name="Settings_GeneralPage_QuickAccessShelf_SettingsCard.Description" xml:space="preserve">
-    <value>Shows quick access commands below the search box while compact mode is collapsed. Use Alt+1 through Alt+9 for visible items, starting from the left, and Alt+0 for overflow.</value>
+    <value>Shows quick access commands below the search box while compact mode is collapsed. Pinned commands keep Alt+1 through Alt+9 in pinned order, recent commands use any remaining shortcuts, and Alt+0 opens overflow.</value>
   </data>
   <data name="Settings_GeneralPage_QuickAccessShelfPinnedCommandLimit_SettingsCard.Header" xml:space="preserve">
     <value>Maximum pinned commands</value>
@@ -446,7 +446,7 @@ Right-click to remove the key combination, thereby deactivating the shortcut.</v
     <value>Maximum recent items</value>
   </data>
   <data name="Settings_GeneralPage_RecentCommandsDisplayLimit_SettingsCard.Description" xml:space="preserve">
-    <value>Choose how many recently used commands and launched apps, from 1 through 10, can appear on Home and the quick access shelf.</value>
+    <value>Choose how many recently used commands and launched apps, from 1 through 10, can appear on Home. The quick access shelf shows at most five.</value>
   </data>
   <data name="Settings_GeneralPage_ClearRecentCommands_SettingsCard.Header" xml:space="preserve">
     <value>Recent history</value>

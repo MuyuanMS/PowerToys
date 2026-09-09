@@ -6,6 +6,8 @@ namespace Microsoft.CmdPal.UI.ViewModels;
 
 internal static class QuickAccessShelfResolver
 {
+    internal const int MaxRecentCommandLimit = 5;
+
     internal sealed record ResolvedItem<T>(T Item, bool IsPinned, int ShortcutIndex, bool StartsNewSection);
 
     internal static string IndexToShortcutDigit(int index)
@@ -16,6 +18,9 @@ internal static class QuickAccessShelfResolver
             _ => string.Empty,
         };
     }
+
+    internal static int NormalizeRecentCommandLimit(int limit) =>
+        Math.Clamp(limit, SettingsModel.MinRecentCommandsDisplayLimit, MaxRecentCommandLimit);
 
     internal static int CalculateVisibleCapacity(
         int itemCount,
@@ -57,7 +62,7 @@ internal static class QuickAccessShelfResolver
         {
             for (var i = 0; i < pinnedCount; i++)
             {
-                result.Add(new ResolvedItem<T>(pinnedItems[i], true, result.Count, startsNewSection && i == 0));
+                result.Add(new ResolvedItem<T>(pinnedItems[i], true, i, startsNewSection && i == 0));
             }
         }
 
@@ -65,7 +70,7 @@ internal static class QuickAccessShelfResolver
         {
             for (var i = 0; i < recentCount; i++)
             {
-                result.Add(new ResolvedItem<T>(recentItems[i], false, result.Count, startsNewSection && i == 0));
+                result.Add(new ResolvedItem<T>(recentItems[i], false, pinnedCount + i, startsNewSection && i == 0));
             }
         }
 

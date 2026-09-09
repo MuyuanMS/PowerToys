@@ -530,22 +530,22 @@ public sealed partial class MainListPage : DynamicListPage,
             allCommands = [.. _tlcManager.TopLevelCommands];
         }
 
-        IEnumerable<string> recentCommandIds = _recentCommandsOnHome == RecentCommandsPlacement.Hidden
+        IEnumerable<RecentCommandIdentity> recentCommands = _recentCommandsOnHome == RecentCommandsPlacement.Hidden
             ? []
-            : _recentCommands.EnumerateRecentCommandIds();
+            : _recentCommands.EnumerateRecentCommands();
         var sections = TopLevelCommandResolver.Resolve(
             pinnedSettings,
-            recentCommandIds,
+            recentCommands,
             allCommands,
             _allAppsPage,
             includeApps: _includeApps,
-            recentCommandLimit: _recentCommandsDisplayLimit,
-            recentCommandsFirst: _recentCommandsOnHome == RecentCommandsPlacement.BeforePinned);
+            recentCommandLimit: _recentCommandsDisplayLimit);
 
         var recent = sections.Recent
             .Select(item => (IListItem)RecentCommandListItem.CreateOrReuse(
                 existing?.Recent,
                 item,
+                ProviderIdForTopLevelOrAppItem(item),
                 IdForTopLevelOrAppItem(item)))
             .ToArray();
         return new(generation, [.. sections.Pinned], recent, [.. sections.Regular]);
@@ -982,7 +982,8 @@ public sealed partial class MainListPage : DynamicListPage,
             return 0;
         }
 
-        var frecencyWeight = history.GetCommandHistoryWeight(id, now ?? DateTimeOffset.UtcNow);
+        var providerId = ProviderIdForTopLevelOrAppItem(topLevelOrAppItem);
+        var frecencyWeight = history.GetCommandHistoryWeight(providerId, id, now ?? DateTimeOffset.UtcNow);
         var aliasSubstringBonus = isAliasSubstringMatch && !isAliasMatch ? MainListRanker.AliasSubstringBonus : 0.0;
 
         // Per-provider weight is a within-tier nudge only. Resolving it here (rather than in
@@ -1030,13 +1031,22 @@ public sealed partial class MainListPage : DynamicListPage,
     public void UpdateHistory(IListItem topLevelOrAppItem)
     {
         var id = IdForTopLevelOrAppItem(topLevelOrAppItem);
+        var providerId = ProviderIdForTopLevelOrAppItem(topLevelOrAppItem);
         _appStateService.UpdateState(state => state with
         {
-            RecentCommands = state.RecentCommands.WithHistoryItem(id),
+            RecentCommands = state.RecentCommands.WithHistoryItem(providerId, id),
         });
 
         _searchTelemetry.ReportSelection(topLevelOrAppItem, _resultsSeparator, _fallbacksSeparator);
     }
+
+    internal static string ProviderIdForTopLevelOrAppItem(IListItem topLevelOrAppItem) =>
+        topLevelOrAppItem switch
+        {
+            RecentCommandListItem recentItem => recentItem.ProviderId,
+            TopLevelViewModel topLevel => topLevel.CommandProviderId,
+            _ => AllAppsCommandProvider.WellKnownId,
+        };
 
     internal static string IdForTopLevelOrAppItem(IListItem topLevelOrAppItem)
     {
