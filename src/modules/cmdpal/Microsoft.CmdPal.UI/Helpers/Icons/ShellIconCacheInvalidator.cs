@@ -14,6 +14,7 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
 {
     private const int ShcnrfShellLevel = 0x0002;
     private const int ShcnrfNewDelivery = 0x8000;
+    private const int ShcneUpdateImage = 0x00008000;
     private const int ShcneAssocChanged = 0x08000000;
 
     private static readonly Guid DesktopFolderId = new("B4BFCC3A-DB2C-424C-B029-7FE99A87C641");
@@ -103,7 +104,7 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
             _registrationId = NativeMethods.SHChangeNotifyRegister(
                 _windowHandle,
                 ShcnrfShellLevel | ShcnrfNewDelivery,
-                ShcneAssocChanged,
+                ShcneAssocChanged | ShcneUpdateImage,
                 _messageId,
                 1,
                 &entry);

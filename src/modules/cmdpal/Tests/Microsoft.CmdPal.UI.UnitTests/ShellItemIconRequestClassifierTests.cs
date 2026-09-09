@@ -16,6 +16,7 @@ public class ShellItemIconRequestClassifierTests
     [DataRow("C:\\Files\\README")]
     [DataRow("C:\\Files\\Folder")]
     [DataRow("C:\\Files\\folder,with-comma\\report.txt")]
+    [DataRow("C:\\folder.exe,assets\\report.txt")]
     [DataRow("\\\\server\\share\\report.txt")]
     public void LegacyFilesystemItemsUseShellIdentity(string value)
     {

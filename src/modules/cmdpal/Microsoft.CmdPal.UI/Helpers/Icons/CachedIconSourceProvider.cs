@@ -261,7 +261,9 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
                 var exact = await exactTask.ConfigureAwait(false);
                 shellDiagnostics.ExactRefinementCompleted(
                     ReferenceEquals(intermediate, exact));
-                return exact ?? intermediate;
+                return exact is not null && !ShellItemIconFallback.IsFallback(exact)
+                    ? exact
+                    : intermediate ?? exact;
             }
             catch
             {

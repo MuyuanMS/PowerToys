@@ -49,7 +49,7 @@ internal static class ShellItemIconRequestClassifier
             if (!MightBeFullyQualifiedPath(value)
                 || !Path.IsPathFullyQualified(value)
                 || IsDirectImagePath(value)
-                || LooksLikeBinaryIconReference(value))
+                || IconPathParser.TryParseBinaryIconReference(value, out _))
             {
                 return false;
             }
@@ -71,20 +71,6 @@ internal static class ShellItemIconRequestClassifier
         || (value.Length >= 2 && IsDirectorySeparator(value[0]) && IsDirectorySeparator(value[1]));
 
     private static bool IsDirectorySeparator(char value) => value is '\\' or '/';
-
-    private static bool LooksLikeBinaryIconReference(string value)
-    {
-        var path = value.AsSpan();
-        var commaIndex = path.IndexOf(',');
-        if (commaIndex >= 0)
-        {
-            path = path[..commaIndex];
-        }
-
-        return path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
-            || path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
-            || path.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase);
-    }
 
     public static bool IsDirectImagePath(string path) => ThumbnailHelper.IsImagePath(path);
 }
