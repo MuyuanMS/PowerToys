@@ -31,4 +31,5 @@ internal enum ShellIconDiagnosticStep
     ExactRefinementFailed = 20,
     IntermediatePresentationApplied = 21,
     IntermediatePresentationSkipped = 22,
+    UpdateImageNotification = 23,
 }

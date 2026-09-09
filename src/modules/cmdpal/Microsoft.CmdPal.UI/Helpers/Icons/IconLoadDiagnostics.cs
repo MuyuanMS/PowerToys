@@ -161,6 +161,12 @@ internal static class IconLoadDiagnostics
             0,
             0);
 
+    internal static void RecordShellUpdateImageNotification() =>
+        GetCurrentSession()?.RecordShellIconStep(
+            ShellIconDiagnosticStep.UpdateImageNotification,
+            0,
+            0);
+
     internal static void RecordShellIconCacheInvalidation(ShellIconCacheInvalidationReason reason) =>
         GetCurrentSession()?.RecordShellIconStep(
             ShellIconDiagnosticStep.LocationCacheInvalidated,

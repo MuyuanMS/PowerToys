@@ -538,8 +538,10 @@ public class IconLoadDiagnosticsTests
         first.IntermediatePresentationCompleted(typeFallbackStartedAt, applied: true);
         first.ExactRefinementCompleted(sameSource: true);
         IconLoadDiagnostics.RecordShellAssociationChangedNotification();
+        IconLoadDiagnostics.RecordShellUpdateImageNotification();
         IconLoadDiagnostics.RecordShellIconCacheInvalidation(ShellIconCacheInvalidationReason.AssociationChanged);
         IconLoadDiagnostics.RecordShellIconCacheInvalidation(ShellIconCacheInvalidationReason.ShellRestarted);
+        IconLoadDiagnostics.RecordShellIconCacheInvalidation(ShellIconCacheInvalidationReason.UpdateImage);
 
         var secondRequest = new ShellItemIconRequest(@"C:\Windows\System32\second.txt", false);
         var second = IconLoadDiagnostics.BeginShellIconRequest(secondRequest);
@@ -562,9 +564,11 @@ public class IconLoadDiagnosticsTests
         var invalidationBlock =
             $"  Location invalidation{Environment.NewLine}" +
             $"    Association-change notifications received: 1{Environment.NewLine}" +
+            $"    Image-list update notifications received: 1{Environment.NewLine}" +
             $"    Invalidations by reason{Environment.NewLine}" +
             $"      AssociationChanged: 1{Environment.NewLine}" +
-            "      ShellRestarted: 1";
+            $"      ShellRestarted: 1{Environment.NewLine}" +
+            "      UpdateImage: 1";
         StringAssert.Contains(report.Text, invalidationBlock);
         var progressiveBlock =
             $"  Progressive type fallback{Environment.NewLine}" +

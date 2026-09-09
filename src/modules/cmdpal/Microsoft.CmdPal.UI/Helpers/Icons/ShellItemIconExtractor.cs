@@ -27,6 +27,11 @@ internal sealed class ShellItemIconExtractor : IShellItemIconExtractor
                     targetPixelSize));
         }
 
+        if (locatedIcon.Request.LocationMode == ShellItemIconLocationMode.FileType)
+        {
+            return ValueTask.FromResult(ShellIconExtractionResult.Empty());
+        }
+
         return ExtractStreamAsync(locatedIcon.Request);
     }
 

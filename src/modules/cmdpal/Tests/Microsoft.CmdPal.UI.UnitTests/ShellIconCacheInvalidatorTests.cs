@@ -11,6 +11,7 @@ namespace Microsoft.CmdPal.UI.UnitTests;
 public class ShellIconCacheInvalidatorTests
 {
     private const uint NotificationMessage = 0x8001;
+    private const int ShellUpdateImageEvent = 0x00008000;
 
     [TestMethod]
     public void DifferentWindowMessageIsIgnored()
@@ -55,5 +56,16 @@ public class ShellIconCacheInvalidatorTests
 
         invalidator.OnShellRestarted();
         Assert.AreEqual(generation + 2, cache.Generation);
+    }
+
+    [TestMethod]
+    public void UpdateImageNotificationsUseDedicatedInvalidationReason()
+    {
+        Assert.AreEqual(
+            ShellIconCacheInvalidationReason.UpdateImage,
+            ShellIconCacheInvalidator.GetInvalidationReason(ShellUpdateImageEvent));
+        Assert.AreEqual(
+            ShellIconCacheInvalidationReason.AssociationChanged,
+            ShellIconCacheInvalidator.GetInvalidationReason(0));
     }
 }

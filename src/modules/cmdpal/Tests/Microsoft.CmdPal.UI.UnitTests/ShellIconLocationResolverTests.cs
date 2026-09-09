@@ -83,6 +83,28 @@ public class ShellIconLocationResolverTests
         Assert.IsFalse(cache.TryGet(request, out _));
     }
 
+    [TestMethod]
+    public void FileTypeFallbackDoesNotCacheExtensionAlias()
+    {
+        var cache = new ShellIconLocationCache();
+        var locator = new MissingLocator();
+        var resolver = new ShellIconLocationResolver(locator, cache);
+        Assert.IsTrue(
+            ShellItemIconTypeRequest.TryCreate(
+                new ShellItemIconRequest("C:\\Files\\missing.txt", jumbo: false),
+                out var request));
+
+        var first = resolver.Resolve(request);
+        var second = resolver.Resolve(request);
+
+        Assert.AreEqual(2, locator.CallCount);
+        Assert.AreEqual(ShellIconIdentityKind.ItemPath, first.Identity.Kind);
+        Assert.AreEqual(request.ItemPath, first.Identity.ItemPath);
+        Assert.IsFalse(first.CacheRawRequestAlias);
+        Assert.AreEqual(first, second);
+        Assert.IsFalse(cache.TryGet(request, out _));
+    }
+
     private sealed class FixedLocator(
         int systemImageListIndex,
         bool cacheRawRequestAlias = true) : IShellItemIconLocator
@@ -132,6 +154,18 @@ public class ShellIconLocationResolverTests
             }
 
             return true;
+        }
+    }
+
+    private sealed class MissingLocator : IShellItemIconLocator
+    {
+        public int CallCount { get; private set; }
+
+        public bool TryLocate(ShellItemIconRequest request, out LocatedShellIcon locatedIcon)
+        {
+            CallCount++;
+            locatedIcon = default;
+            return false;
         }
     }
 }

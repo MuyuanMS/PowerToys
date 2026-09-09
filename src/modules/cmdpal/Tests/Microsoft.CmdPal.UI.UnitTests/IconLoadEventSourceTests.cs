@@ -52,6 +52,7 @@ public sealed class IconLoadEventSourceTests
         Assert.AreEqual(20, (int)ShellIconDiagnosticStep.ExactRefinementFailed);
         Assert.AreEqual(21, (int)ShellIconDiagnosticStep.IntermediatePresentationApplied);
         Assert.AreEqual(22, (int)ShellIconDiagnosticStep.IntermediatePresentationSkipped);
+        Assert.AreEqual(23, (int)ShellIconDiagnosticStep.UpdateImageNotification);
     }
 
     [TestMethod]

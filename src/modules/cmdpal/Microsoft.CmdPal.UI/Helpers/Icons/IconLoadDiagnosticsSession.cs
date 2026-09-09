@@ -197,6 +197,7 @@ internal sealed class IconLoadDiagnosticsSession
     private long _shellExactRefinementsDifferent;
     private long _shellExactRefinementsFailed;
     private long _shellIconAssociationChangedNotifications;
+    private long _shellIconUpdateImageNotifications;
     private long _shellImageListRequestedPixelTotal;
     private long _shellImageListSourceWidthTotal;
     private long _shellImageListSourceHeightTotal;
@@ -315,6 +316,9 @@ internal sealed class IconLoadDiagnosticsSession
                 break;
             case ShellIconDiagnosticStep.AssociationChangedNotification:
                 Interlocked.Increment(ref _shellIconAssociationChangedNotifications);
+                break;
+            case ShellIconDiagnosticStep.UpdateImageNotification:
+                Interlocked.Increment(ref _shellIconUpdateImageNotifications);
                 break;
             case ShellIconDiagnosticStep.LocationCacheInvalidated:
                 Interlocked.Increment(ref _shellIconCacheInvalidationReasons[detail]);
@@ -1765,6 +1769,7 @@ internal sealed class IconLoadDiagnosticsSession
         AppendEnumCounts<ShellIconRequestKind>(builder, _shellIconRequestKinds, "    ");
         builder.AppendLine("  Location invalidation");
         AppendValue(builder, "Association-change notifications received", Volatile.Read(ref _shellIconAssociationChangedNotifications), "    ");
+        AppendValue(builder, "Image-list update notifications received", Volatile.Read(ref _shellIconUpdateImageNotifications), "    ");
         builder.AppendLine("    Invalidations by reason");
         AppendEnumCounts<ShellIconCacheInvalidationReason>(builder, _shellIconCacheInvalidationReasons, "      ");
         builder.AppendLine("  Progressive type fallback");

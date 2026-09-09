@@ -84,4 +84,33 @@ public class ShellItemIconExtractorTests
             File.Delete(path);
         }
     }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task FileTypeFallbackDoesNotExtractPathSpecificBitmapStream()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            Assert.IsTrue(
+                ShellItemIconTypeRequest.TryCreate(
+                    new ShellItemIconRequest(path, jumbo: false),
+                    out var typeRequest));
+            var locatedIcon = new LocatedShellIcon(
+                typeRequest,
+                ShellIconIdentity.FromItemPath(path, jumbo: false),
+                CacheRawRequestAlias: false);
+
+            using var extraction = await ShellItemIconExtractor.Instance.ExtractAsync(
+                locatedIcon,
+                targetPixelSize: 20);
+
+            Assert.IsNull(extraction.SoftwareBitmap);
+            Assert.IsNull(extraction.BitmapStream);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
 }

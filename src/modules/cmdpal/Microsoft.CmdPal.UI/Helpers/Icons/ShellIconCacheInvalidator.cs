@@ -35,7 +35,7 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
         Register();
     }
 
-    public bool TryHandleMessage(uint message, nint wParam, nint lParam)
+    public unsafe bool TryHandleMessage(uint message, nint wParam, nint lParam)
     {
         if (_messageId == 0 || message != _messageId)
         {
@@ -44,18 +44,29 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
 
         // New-delivery notifications use Shell-owned shared memory. We do not need the
         // PIDLs for this global event, but locking and unlocking acknowledges the payload.
+        nint itemIdLists = 0;
+        var eventId = ShcneAssocChanged;
         var notificationLock = NativeMethods.SHChangeNotification_Lock(
             wParam,
             unchecked((uint)lParam),
-            0,
-            0);
+            &itemIdLists,
+            &eventId);
         if (notificationLock != 0)
         {
             _ = NativeMethods.SHChangeNotification_Unlock(notificationLock);
         }
 
-        IconLoadDiagnostics.RecordShellAssociationChangedNotification();
-        Invalidate(ShellIconCacheInvalidationReason.AssociationChanged);
+        var reason = GetInvalidationReason(eventId);
+        if (reason == ShellIconCacheInvalidationReason.UpdateImage)
+        {
+            IconLoadDiagnostics.RecordShellUpdateImageNotification();
+        }
+        else
+        {
+            IconLoadDiagnostics.RecordShellAssociationChangedNotification();
+        }
+
+        Invalidate(reason);
         return true;
     }
 
@@ -73,6 +84,11 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
     }
 
     public void Dispose() => Deregister();
+
+    internal static ShellIconCacheInvalidationReason GetInvalidationReason(int eventId) =>
+        (eventId & ShcneUpdateImage) != 0
+            ? ShellIconCacheInvalidationReason.UpdateImage
+            : ShellIconCacheInvalidationReason.AssociationChanged;
 
     private unsafe void Register()
     {
@@ -159,11 +175,11 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
 
         [LibraryImport("shell32.dll")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
-        internal static partial nint SHChangeNotification_Lock(
+        internal static unsafe partial nint SHChangeNotification_Lock(
             nint changeHandle,
             uint processId,
-            nint itemIdLists,
-            nint eventId);
+            nint* itemIdLists,
+            int* eventId);
 
         [LibraryImport("shell32.dll")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
