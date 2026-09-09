@@ -40,8 +40,7 @@ namespace Microsoft.CropAndLock.UITests
         internal static void RequireSignature(Signature signature, bool requireMicrosoftPublisher, bool isInPipeline, string requirement)
         {
             if (signature.Status == "Valid" &&
-                signature.MachineTrusted &&
-                (!requireMicrosoftPublisher || signature.Signer == "Microsoft Corporation"))
+                (!requireMicrosoftPublisher || (signature.Signer == "Microsoft Corporation" && signature.MachineTrusted)))
             {
                 return;
             }
