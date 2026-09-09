@@ -15,6 +15,8 @@ namespace Microsoft.CmdPal.AdaptiveCards.IncrementalRendering;
 /// </summary>
 internal static class AdaptiveCardSemanticFingerprint
 {
+    private const int JsonParseMaxDepth = 256;
+
     public static string Create(string cardJson) => Create(cardJson, null, null);
 
     public static string Create(
@@ -37,7 +39,10 @@ internal static class AdaptiveCardSemanticFingerprint
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(cardJson);
 
-        using var document = JsonDocument.Parse(cardJson);
+        using var document = JsonDocument.Parse(cardJson, new JsonDocumentOptions
+        {
+            MaxDepth = JsonParseMaxDepth,
+        });
         var authoredTextBlockCount = 0;
         var authoredInlineSvgImageCount = 0;
         CountPatchableElements(
