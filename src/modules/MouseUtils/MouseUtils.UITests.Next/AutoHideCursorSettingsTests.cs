@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using Microsoft.PowerToys.UITest.Next;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Microsoft.Win32;
 
 namespace MouseUtils.UITests;
 
@@ -15,6 +16,8 @@ public class AutoHideCursorSettingsTests : UITestBase
 {
     private const string ModuleName = "AutoHideCursor";
     private const string WorkerProcessName = "PowerToys.AutoHideCursor";
+    private const string RecoveryMarkerKey = @"Software\Microsoft\PowerToys\AutoHideCursor";
+    private const string RecoveryMarkerValue = "CursorRecovery";
     private const string GroupId = "MouseUtils_AutoHideCursorTestId";
     private const string ModuleToggleId = "MouseUtils_AutoHideCursorToggleId";
     private const string SettingsExpanderId = "MouseUtilsAutoHideCursorSettingsExpander";
@@ -33,6 +36,8 @@ public class AutoHideCursorSettingsTests : UITestBase
         : base(PowerToysModule.PowerToysSettings, enableModules: new[] { ModuleName })
     {
     }
+
+    protected override IReadOnlyList<string> StaleProcessNames => [.. base.StaleProcessNames, WorkerProcessName];
 
     [ClassCleanup]
     public static void RestoreModuleSettings() => ModuleSettings.Dispose();
@@ -190,6 +195,52 @@ public class AutoHideCursorSettingsTests : UITestBase
         Assert.IsTrue(restoredCursor.Succeeded, "Disabling Auto Hide Cursor did not restore the active cursor.");
     }
 
+    [TestMethod]
+    [TestCategory("MouseUtils")]
+    [TestCategory("AutoHideCursor")]
+    public void WorkerCrashRestoresTheSystemCursorAndClearsTheRecoveryMarker()
+    {
+        MouseUtilsTestHelper.ReplaceModuleSettings(
+            ModuleName,
+            CreateSettings(hideOnTyping: false, hideOnIdle: true, idleDelayMs: 60000));
+
+        OpenSettings();
+        var originalCursor = GetVisibleCursorHandle();
+        var idleDelay = Session.Find<NumberBox>(By.AccessibilityId(IdleDelayId), 5_000);
+        idleDelay.SetValue(1);
+        var hiddenCursor = WaitHelper.WaitForStable(
+            GetVisibleCursorHandle,
+            actual => actual != originalCursor && actual != IntPtr.Zero,
+            timeoutMS: 10_000,
+            requiredConsecutiveMatches: 2,
+            pollIntervalMS: 250);
+        Assert.IsTrue(hiddenCursor.Succeeded, "The idle trigger did not replace the active cursor before the crash-recovery check.");
+        Assert.IsTrue(HasRecoveryMarker(), "The crash-recovery marker was not created after hiding the cursor.");
+
+        Assert.IsTrue(
+            WindowControl.TryKillProcessTreeByNameAndWait(WorkerProcessName, 5_000),
+            "Could not terminate the Auto Hide Cursor worker process.");
+
+        var restoredCursor = WaitHelper.WaitForStable(
+            GetVisibleCursorHandle,
+            actual => actual != IntPtr.Zero && actual != hiddenCursor.LastObservation,
+            timeoutMS: 10_000,
+            requiredConsecutiveMatches: 2,
+            pollIntervalMS: 250);
+        Assert.IsTrue(restoredCursor.Succeeded, "An unexpected worker exit did not restore the active cursor.");
+
+        var clearedMarker = WaitHelper.WaitForStable(
+            HasRecoveryMarker,
+            actual => !actual,
+            timeoutMS: 10_000,
+            requiredConsecutiveMatches: 2,
+            pollIntervalMS: 250);
+        Assert.IsTrue(clearedMarker.Succeeded, "An unexpected worker exit did not clear the recovery marker.");
+
+        MouseHelper.MoveBy(20, 0, steps: 1, delayMs: 20);
+        AssertWorkerState(expectedRunning: true);
+    }
+
     private void OpenSettings()
     {
         MouseUtilsTestHelper.NavigateToMouseUtilities(this);
@@ -265,6 +316,12 @@ public class AutoHideCursorSettingsTests : UITestBase
         Assert.IsTrue(GetCursorInfo(out cursorInfo), "Could not read the active cursor.");
         Assert.AreEqual(CursorShowing, cursorInfo.Flags, "The active cursor was not visible.");
         return cursorInfo.HCursor;
+    }
+
+    private static bool HasRecoveryMarker()
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(RecoveryMarkerKey, writable: false);
+        return key?.GetValue(RecoveryMarkerValue) is int value && value == 1;
     }
 
     private static void AssertWorkerState(bool expectedRunning)
