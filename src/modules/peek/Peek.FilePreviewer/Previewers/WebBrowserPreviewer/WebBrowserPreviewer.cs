@@ -127,7 +127,7 @@ namespace Peek.FilePreviewer.Previewers
                 Uri? generatedPreview = null;
                 if (extension != ".md" && extension != ".svg" && extension != ".html" && extension != ".htm" && extension != ".pdf")
                 {
-                    var raw = await ReadHelper.Read(File.Path.ToString());
+                    var raw = await ReadHelper.Read(File.Path.ToString(), cancellationToken);
                     generatedPreview = new Uri(MonacoHelper.PreviewTempFile(raw, extension, TempFolderPath.Path, _previewSettings.SourceCodeTryFormat, _previewSettings.SourceCodeWrapText, _previewSettings.SourceCodeStickyScroll, _previewSettings.SourceCodeFontSize, _previewSettings.SourceCodeMinimap));
                 }
 
@@ -144,7 +144,7 @@ namespace Peek.FilePreviewer.Previewers
                     if (extension == ".md")
                     {
                         // Markdown files use custom renderer
-                        var raw = await ReadHelper.Read(File.Path.ToString());
+                        var raw = await ReadHelper.Read(File.Path.ToString(), cancellationToken);
                         Preview = new Uri(MarkdownHelper.PreviewTempFile(raw, File.Path, TempFolderPath.Path));
                     }
                     else if (extension == ".svg")

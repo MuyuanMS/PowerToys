@@ -99,7 +99,7 @@ namespace Peek.FilePreviewer.Previewers
         /// <returns>True if the buffer contains a Unicode BOM; otherwise, false.</returns>
         private static bool HasUnicodeBom(byte[] buffer, int bytesRead)
         {
-            // UTF-32 BOMs must be checked before UTF-16, since the UTF-32LE BOM (FF FE 00 00) starts with the UTF-16LE BOM (FF FE).
+            // UTF-32 byte-order marks must be checked before UTF-16, since the UTF-32LE BOM (FF FE 00 00) starts with the UTF-16LE BOM (FF FE).
             bool isUtf32 = bytesRead >= 4 &&
                 ((buffer[0] == 0xFF && buffer[1] == 0xFE && buffer[2] == 0x00 && buffer[3] == 0x00) ||
                  (buffer[0] == 0x00 && buffer[1] == 0x00 && buffer[2] == 0xFE && buffer[3] == 0xFF));

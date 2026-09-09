@@ -24,7 +24,7 @@ namespace Peek.FilePreviewer.UnitTests
         [TestMethod]
         public void IsItemSupported_UnrecognizedExtension_ShouldReturnFalse()
         {
-            var item = new FileItem(@"C:\some\file.zzzzunknown", "file.zzzzunknown");
+            var item = new FileItem(@"C:\some\file.unrecognized", "file.unrecognized");
 
             Assert.IsFalse(WebBrowserPreviewer.IsItemSupported(item));
         }
@@ -32,7 +32,7 @@ namespace Peek.FilePreviewer.UnitTests
         [TestMethod]
         public void IsFallbackCandidate_UnrecognizedExtension_ShouldReturnTrue()
         {
-            var item = new FileItem(@"C:\some\file.zzzzunknown", "file.zzzzunknown");
+            var item = new FileItem(@"C:\some\file.unrecognized", "file.unrecognized");
 
             Assert.IsTrue(WebBrowserPreviewer.IsFallbackCandidate(item));
         }
@@ -57,7 +57,7 @@ namespace Peek.FilePreviewer.UnitTests
         [TestMethod]
         public void IsFallbackCandidate_MissingFile_ShouldReturnTrue()
         {
-            string missingPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".zzzzunknown");
+            string missingPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".unrecognized");
             var item = new FileItem(missingPath, Path.GetFileName(missingPath));
 
             Assert.IsTrue(WebBrowserPreviewer.IsFallbackCandidate(item));

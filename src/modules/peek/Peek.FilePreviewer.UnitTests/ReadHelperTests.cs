@@ -5,6 +5,7 @@
 using System;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Peek.FilePreviewer.Previewers;
@@ -48,6 +49,16 @@ namespace Peek.FilePreviewer.UnitTests
             File.WriteAllBytes(_tempFilePath, buffer);
 
             await Assert.ThrowsExceptionAsync<InvalidOperationException>(() => ReadHelper.Read(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task Read_Cancelled_ShouldThrow()
+        {
+            File.WriteAllText(_tempFilePath, "Hello, world!", Encoding.UTF8);
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            await Assert.ThrowsExceptionAsync<TaskCanceledException>(() => ReadHelper.Read(_tempFilePath, cts.Token));
         }
     }
 }

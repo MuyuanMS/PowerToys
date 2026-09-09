@@ -5,6 +5,7 @@
 using System;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 using UtfUnknown;
@@ -17,15 +18,16 @@ namespace Peek.FilePreviewer.Previewers
         // WebView2, so an unbounded read can cause a large memory spike.
         public const long MaxReadableFileSizeBytes = 10 * 1024 * 1024; // 10 MB
 
-        public static async Task<string> Read(string path)
+        public static async Task<string> Read(string path, CancellationToken cancellationToken = default)
         {
             using var fs = OpenReadOnly(path);
             if (fs.Length > MaxReadableFileSizeBytes)
             {
-                throw new InvalidOperationException($"File '{path}' exceeds the maximum previewable size of {MaxReadableFileSizeBytes} bytes.");
+                throw new InvalidOperationException($"File '{path}' exceeds the maximum preview size of {MaxReadableFileSizeBytes} bytes.");
             }
 
-            DetectionResult result = CharsetDetector.DetectFromFile(path);
+            DetectionResult result = await CharsetDetector.DetectFromStreamAsync(fs, MaxReadableFileSizeBytes, cancellationToken);
+            fs.Position = 0;
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
             // Check if the detected encoding is not null; otherwise, default to UTF-8
@@ -39,13 +41,13 @@ namespace Peek.FilePreviewer.Previewers
             var buffer = new char[81920];
             var content = new StringBuilder();
             int charsRead;
-            while ((charsRead = await sr.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            while ((charsRead = await sr.ReadAsync(buffer.AsMemory(), cancellationToken)) > 0)
             {
                 content.Append(buffer, 0, charsRead);
 
                 if (fs.Position > MaxReadableFileSizeBytes)
                 {
-                    throw new InvalidOperationException($"File '{path}' exceeds the maximum previewable size of {MaxReadableFileSizeBytes} bytes.");
+                    throw new InvalidOperationException($"File '{path}' exceeds the maximum preview size of {MaxReadableFileSizeBytes} bytes.");
                 }
             }
 
