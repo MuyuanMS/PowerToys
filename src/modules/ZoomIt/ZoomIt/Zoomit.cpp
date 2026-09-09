@@ -6091,13 +6091,12 @@ RECT BoundMouse( float zoomLevel, MONITORINFO *monInfo, int width, int height,
                     POINT *cursorPos )
 {
     RECT		rc;
-    int			x, y;
-
-    GetZoomedTopLeftCoordinates( zoomLevel, cursorPos, &x, width, &y, height );
-    rc.left = monInfo->rcMonitor.left + x;
-    rc.right = rc.left + static_cast<int>(width/zoomLevel);
-    rc.top = monInfo->rcMonitor.top + y;
-    rc.bottom = rc.top + static_cast<int>(height/zoomLevel);
+    const auto viewport = GetAnimatedZoomViewport( zoomLevel, cursorPos, width, height,
+                                                   0, 0, width, height );
+    rc.left = monInfo->rcMonitor.left + viewport.sourceLeft;
+    rc.right = rc.left + viewport.sourceWidth;
+    rc.top = monInfo->rcMonitor.top + viewport.sourceTop;
+    rc.bottom = rc.top + viewport.sourceHeight;
 
     OutputDebug( L"x: %d y: %d width: %d height: %d zoomLevel: %g\n",
         cursorPos->x, cursorPos->y, width, height, zoomLevel);
@@ -6335,8 +6334,8 @@ VOID SendPenMessage(HWND hWnd, UINT Message, LPARAM lParam)
 // signature will be missing).
 //
 //----------------------------------------------------------------------------
-LPARAM ScalePenPosition( float zoomLevel, MONITORINFO *monInfo, RECT boundRc,
-                    UINT message, LPARAM lParam )
+LPARAM ScalePenPosition( float zoomLevel, MONITORINFO *monInfo, int width, int height, RECT boundRc,
+                    POINT cursorPos, UINT message, LPARAM lParam )
 {
     RECT	rc;
     WORD	x, y;
@@ -6355,9 +6354,13 @@ LPARAM ScalePenPosition( float zoomLevel, MONITORINFO *monInfo, RECT boundRc,
 
             x = LOWORD(lParam);
             y = HIWORD(lParam);
+            const auto viewport = GetAnimatedZoomViewport( zoomLevel, &cursorPos, width, height,
+                                                           0, 0, width, height );
 
-            x = static_cast<WORD>((x - static_cast<WORD>(monInfo->rcMonitor.left))/ zoomLevel) + static_cast<WORD>(boundRc.left - monInfo->rcMonitor.left);
-            y = static_cast<WORD>((y - static_cast<WORD>(monInfo->rcMonitor.top)) / zoomLevel) + static_cast<WORD>(boundRc.top - monInfo->rcMonitor.top);
+            x = static_cast<WORD>( std::floor( viewport.sourceX +
+                static_cast<float>( x - monInfo->rcMonitor.left ) / zoomLevel ) );
+            y = static_cast<WORD>( std::floor( viewport.sourceY +
+                static_cast<float>( y - monInfo->rcMonitor.top ) / zoomLevel ) );
 
             lParam = MAKELPARAM(x, y);
         }
@@ -6406,7 +6409,6 @@ BOOLEAN DrawHighlightedCursor( float ZoomLevel, int Width, int Height )
 void InvalidateCursorMoveArea( HWND hWnd, float zoomLevel, int width, int height,
                               POINT currentPt, POINT prevPt, POINT cursorPos )
 {
-    int		x, y;
     RECT	rc;
     int		invWidth = g_PenWidth + CURSOR_SAVE_MARGIN;
 
@@ -6414,11 +6416,16 @@ void InvalidateCursorMoveArea( HWND hWnd, float zoomLevel, int width, int height
 
         invWidth = g_PenWidth * 3 + 1;
     }
-    GetZoomedTopLeftCoordinates( zoomLevel, &cursorPos, &x, width, &y, height );
-    rc.left = static_cast<int>(max( 0, (int) ((min( prevPt.x, currentPt.x)-invWidth - x) * zoomLevel)));
-    rc.right = static_cast<int>((max( prevPt.x, currentPt.x)+invWidth - x) * zoomLevel);
-    rc.top = static_cast<int>(max( 0, (int) ((min( prevPt.y, currentPt.y)-invWidth - y) * zoomLevel)));
-    rc.bottom = static_cast<int>((max( prevPt.y, currentPt.y)+invWidth -y) * zoomLevel);
+    const auto viewport = GetAnimatedZoomViewport( zoomLevel, &cursorPos, width, height,
+                                                   0, 0, width, height );
+    rc.left = static_cast<int>( max( 0.0f,
+        std::floor( ( static_cast<float>( min( prevPt.x, currentPt.x ) - invWidth ) - viewport.sourceX ) * zoomLevel ) ) );
+    rc.right = static_cast<int>(
+        std::ceil( ( static_cast<float>( max( prevPt.x, currentPt.x ) + invWidth ) - viewport.sourceX ) * zoomLevel ) );
+    rc.top = static_cast<int>( max( 0.0f,
+        std::floor( ( static_cast<float>( min( prevPt.y, currentPt.y ) - invWidth ) - viewport.sourceY ) * zoomLevel ) ) );
+    rc.bottom = static_cast<int>(
+        std::ceil( ( static_cast<float>( max( prevPt.y, currentPt.y ) + invWidth ) - viewport.sourceY ) * zoomLevel ) );
     InvalidateRect( hWnd, &rc, FALSE );
 
     OutputDebug( L"INVALIDATE: (%d, %d) - (%d, %d)\n", rc.left, rc.top, rc.right, rc.bottom);
@@ -9920,7 +9927,7 @@ LRESULT APIENTRY MainWndProc(
                 POINT currentPt;
 
                 // Are we in pen mode on a tablet?
-                lParam = ScalePenPosition( zoomLevel, &monInfo, boundRc, message, lParam);
+                lParam = ScalePenPosition( zoomLevel, &monInfo, width, height, boundRc, cursorPos, message, lParam);
                 currentPt.x = LOWORD(lParam);
                 currentPt.y = HIWORD(lParam);
 
@@ -10245,8 +10252,8 @@ LRESULT APIENTRY MainWndProc(
             }
 
             // Are we in pen mode on a tablet?
-            lParam = ScalePenPosition( zoomLevel, &monInfo, boundRc,
-                        message, lParam);
+            lParam = ScalePenPosition( zoomLevel, &monInfo, width, height, boundRc,
+                        cursorPos, message, lParam);
 
             if (lParam == 0) {
 
@@ -10392,8 +10399,8 @@ LRESULT APIENTRY MainWndProc(
         if( g_Zoomed && g_Drawing && g_Tracing ) {
 
             // Are we in pen mode on a tablet?
-            lParam = ScalePenPosition( zoomLevel, &monInfo, boundRc,
-                        message, lParam);
+            lParam = ScalePenPosition( zoomLevel, &monInfo, width, height, boundRc,
+                        cursorPos, message, lParam);
             OutputDebug(L"LBUTTONUP: %d, %d\n", LOWORD(lParam), HIWORD(lParam));
             if (lParam == 0) {
 
