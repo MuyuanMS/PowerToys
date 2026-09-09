@@ -28,7 +28,6 @@ public partial class IconBox : ContentControl
     private long _requestVersion;
     private IconRequestMeasurement _activeRequestDiagnostics;
     private IIconRequestDemand? _activeRequestDemand;
-    private XamlRoot? _subscribedXamlRoot;
     private long _diagnosticId;
     private IconRequestSite _derivedRequestSite;
     private bool _hasDerivedRequestSite;
@@ -123,11 +122,12 @@ public partial class IconBox : ContentControl
 
     private void UpdateLastFontSize()
     {
+        // Auto-sized icons need a stable intrinsic size. Feeding ActualWidth or
+        // ActualHeight back into FontSize creates a measure/size-change cycle
+        // inside a Viewbox, especially when a container is recycled to a new glyph.
         _lastFontSize =
             Pick(Width)
             ?? Pick(Height)
-            ?? Pick(ActualWidth)
-            ?? Pick(ActualHeight)
             ?? DefaultIconFontSize;
 
         return;
@@ -146,7 +146,14 @@ public partial class IconBox : ContentControl
         }
     }
 
-    private void UpdatePaddingForFontIcon() => Padding = new Thickness(Math.Round(_lastFontSize * -0.2));
+    private void UpdatePaddingForFontIcon()
+    {
+        // Fixed icon slots compensate for font metrics. An auto-sized icon
+        // must measure its full glyph, otherwise a Viewbox scales a cropped box.
+        Padding = double.IsFinite(Width) || double.IsFinite(Height)
+            ? new Thickness(Math.Round(_lastFontSize * -0.2))
+            : default;
+    }
 
     private void OnActualThemeChanged(FrameworkElement sender, object args)
     {
@@ -174,15 +181,9 @@ public partial class IconBox : ContentControl
         _lastScale = newScale;
         UpdateLastFontSize();
 
-        if (_subscribedXamlRoot is not null)
+        if (XamlRoot is not null)
         {
-            _subscribedXamlRoot.Changed -= OnXamlRootChanged;
-        }
-
-        _subscribedXamlRoot = XamlRoot;
-        if (_subscribedXamlRoot is not null)
-        {
-            _subscribedXamlRoot.Changed += OnXamlRootChanged;
+            XamlRoot.Changed += OnXamlRootChanged;
         }
 
         if (SourceKey is not null && (changedTheme || changedScale))
@@ -215,10 +216,9 @@ public partial class IconBox : ContentControl
             return;
         }
 
-        if (_subscribedXamlRoot is not null)
+        if (XamlRoot is not null)
         {
-            _subscribedXamlRoot.Changed -= OnXamlRootChanged;
-            _subscribedXamlRoot = null;
+            XamlRoot.Changed -= OnXamlRootChanged;
         }
 
         if (_activeRequestDemand is not null)
