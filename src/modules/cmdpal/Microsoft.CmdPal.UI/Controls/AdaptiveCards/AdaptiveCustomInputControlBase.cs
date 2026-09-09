@@ -68,6 +68,8 @@ internal abstract partial class AdaptiveCustomInputControlBase : Grid, IAdaptive
 
     public UIElement ValidationErrorElement => ValidationError;
 
+    public abstract void RestoreValue(string value);
+
     public bool ValidateInput()
     {
         ValidationWasRequested = true;
@@ -136,6 +138,11 @@ internal abstract partial class AdaptiveListInputControlBase : AdaptiveCustomInp
     protected AdaptiveListInputControlBase(AdaptiveListInputElement element)
         : base(element.Header, element.Description, element.IsRequired)
     {
+        if (!string.IsNullOrEmpty(element.Id))
+        {
+            AutomationProperties.SetAutomationId(this, element.Id);
+        }
+
         ItemsList = new ListBox
         {
             HorizontalAlignment = HorizontalAlignment.Stretch,
