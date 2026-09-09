@@ -50,7 +50,17 @@ namespace Peek.FilePreviewer.Previewers
                 }
 
                 var buffer = new byte[bytesToRead];
-                int bytesRead = await stream.ReadAsync(buffer.AsMemory(0, bytesToRead), cancellationToken);
+                int bytesRead = 0;
+                while (bytesRead < bytesToRead)
+                {
+                    int currentRead = await stream.ReadAsync(buffer.AsMemory(bytesRead, bytesToRead - bytesRead), cancellationToken);
+                    if (currentRead == 0)
+                    {
+                        break;
+                    }
+
+                    bytesRead += currentRead;
+                }
 
                 // If the file starts with a Unicode BOM, we can assume it's a text file.
                 if (HasUnicodeBom(buffer, bytesRead))

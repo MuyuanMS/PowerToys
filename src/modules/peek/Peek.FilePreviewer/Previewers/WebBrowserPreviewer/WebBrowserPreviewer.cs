@@ -99,6 +99,7 @@ namespace Peek.FilePreviewer.Previewers
             State = PreviewState.Loading;
             DisplayInfoTask = LoadDisplayInfoAsync(cancellationToken);
             await DisplayInfoTask; // Wait for the display info to load before checking for errors
+            cancellationToken.ThrowIfCancellationRequested();
 
             if (HasFailedLoadingPreview())
             {
@@ -123,8 +124,18 @@ namespace Peek.FilePreviewer.Previewers
                     throw new NotSupportedException($"'{File.Path}' has an unrecognized extension and its content was not sniffed as text.");
                 }
 
+                Uri? generatedPreview = null;
+                if (extension != ".md" && extension != ".svg" && extension != ".html" && extension != ".htm" && extension != ".pdf")
+                {
+                    var raw = await ReadHelper.Read(File.Path.ToString());
+                    generatedPreview = new Uri(MonacoHelper.PreviewTempFile(raw, extension, TempFolderPath.Path, _previewSettings.SourceCodeTryFormat, _previewSettings.SourceCodeWrapText, _previewSettings.SourceCodeStickyScroll, _previewSettings.SourceCodeFontSize, _previewSettings.SourceCodeMinimap));
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
                 await Dispatcher.RunOnUiThread(async () =>
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     // Default: non-dev file preview with standard context menu
                     IsDevFilePreview = false;
                     CustomContextMenu = false;
@@ -154,11 +165,10 @@ namespace Peek.FilePreviewer.Previewers
                     else
                     {
                         // Source code files use Monaco editor. Extensions Monaco doesn't recognize
-                        // (including files with no extension) fall back to plaintext highlighting..
+                        // (including files with no extension) fall back to plaintext highlighting.
                         IsDevFilePreview = true;
                         CustomContextMenu = true;
-                        var raw = await ReadHelper.Read(File.Path.ToString());
-                        Preview = new Uri(MonacoHelper.PreviewTempFile(raw, extension, TempFolderPath.Path, _previewSettings.SourceCodeTryFormat, _previewSettings.SourceCodeWrapText, _previewSettings.SourceCodeStickyScroll, _previewSettings.SourceCodeFontSize, _previewSettings.SourceCodeMinimap));
+                        Preview = generatedPreview;
                     }
                 });
             });
