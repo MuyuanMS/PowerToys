@@ -106,7 +106,8 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
             &desktopItemIdList);
         if (result < 0 || desktopItemIdList == 0)
         {
-            Logger.LogWarning("Failed to resolve the Shell desktop for icon association notifications; Shell icon aliases will expire normally");
+            _locations.Disable();
+            Logger.LogWarning("Failed to resolve the Shell desktop for icon association notifications; disabling Shell icon alias caching");
             return;
         }
 
@@ -132,8 +133,12 @@ internal sealed partial class ShellIconCacheInvalidator : IDisposable
 
         if (_registrationId == 0)
         {
-            Logger.LogWarning("Failed to register for Shell icon association changes; Shell icon aliases will expire normally");
+            _locations.Disable();
+            Logger.LogWarning("Failed to register for Shell icon association changes; disabling Shell icon alias caching");
+            return;
         }
+
+        _locations.Enable();
     }
 
     private void Deregister()

@@ -13,12 +13,21 @@ internal sealed class ShellIconLocationCache
     private const int DefaultCapacity = 8192;
 
     private AdaptiveCache<string, LocatedShellIcon> _cache = CreateCache();
+    private int _cacheEnabled = 1;
     private int _generation;
 
     public int Generation => Volatile.Read(ref _generation);
 
+    public bool IsEnabled => Volatile.Read(ref _cacheEnabled) != 0;
+
     public bool TryGet(string cacheIdentity, out LocatedShellIcon locatedIcon)
     {
+        if (!IsEnabled)
+        {
+            locatedIcon = default;
+            return false;
+        }
+
         var generation = Generation;
         var cache = Volatile.Read(ref _cache);
         if (cache.TryGet(cacheIdentity, out locatedIcon)
@@ -47,6 +56,11 @@ internal sealed class ShellIconLocationCache
             Identity = locatedIcon.Identity.WithCacheGeneration(expectedGeneration),
         };
 
+        if (!IsEnabled)
+        {
+            return expectedGeneration == Generation;
+        }
+
         if (expectedGeneration != Generation)
         {
             cachedLocation = default;
@@ -74,6 +88,14 @@ internal sealed class ShellIconLocationCache
         return locatedIcon.Identity.CacheGeneration == generation
             && generation == Generation;
     }
+
+    public void Disable()
+    {
+        Interlocked.Exchange(ref _cacheEnabled, 0);
+        Clear();
+    }
+
+    public void Enable() => Interlocked.Exchange(ref _cacheEnabled, 1);
 
     public void Clear()
     {

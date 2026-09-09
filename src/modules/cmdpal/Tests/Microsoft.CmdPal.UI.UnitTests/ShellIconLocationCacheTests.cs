@@ -49,4 +49,24 @@ public class ShellIconLocationCacheTests
 
         Assert.IsFalse(cache.IsCurrent(current));
     }
+
+    [TestMethod]
+    public void DisabledCacheReturnsCurrentIdentityWithoutStoringAlias()
+    {
+        var cache = new ShellIconLocationCache();
+        var request = new ShellItemIconRequest("C:\\Files\\report.txt", jumbo: false);
+        var resolved = new LocatedShellIcon(
+            request,
+            ShellIconIdentity.FromSystemImageList(42, jumbo: false));
+
+        cache.Disable();
+
+        Assert.IsTrue(cache.TryAdd(request, resolved, cache.Generation, out var current));
+        Assert.IsTrue(cache.IsCurrent(current));
+        Assert.IsFalse(cache.TryGet(request, out _));
+
+        cache.Enable();
+        Assert.IsTrue(cache.TryAdd(request, resolved, cache.Generation, out _));
+        Assert.IsTrue(cache.TryGet(request, out _));
+    }
 }
