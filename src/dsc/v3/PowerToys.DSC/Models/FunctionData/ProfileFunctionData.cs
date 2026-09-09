@@ -251,7 +251,10 @@ public sealed class ProfileFunctionData : BaseFunctionData
     {
         var settings = ReadSettings<KeyboardManagerSettings>(KeyboardManagerSettings.ModuleName);
         var activeConfiguration = settings.Properties?.ActiveConfiguration?.Value;
-        if (string.IsNullOrWhiteSpace(activeConfiguration))
+        if (string.IsNullOrWhiteSpace(activeConfiguration) ||
+            activeConfiguration.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+            !string.Equals(Path.GetFileName(activeConfiguration), activeConfiguration, StringComparison.Ordinal) ||
+            activeConfiguration is "." or "..")
         {
             throw new JsonException("The Keyboard Manager settings file does not define a valid active configuration.");
         }
