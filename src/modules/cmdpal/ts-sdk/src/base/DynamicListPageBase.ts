@@ -3,14 +3,13 @@
 // See the LICENSE file in the project root for more information.
 
 import type { IDynamicListPage } from '../types.js';
-import { sendNotification } from '../runtime/notifications.js';
 import { ListPageBase } from './ListPageBase.js';
 
 /**
  * Base class for a list page that receives the search text as the user types
  * and produces results dynamically.
  *
- * Call {@link DynamicListPageBase.notifyItemsChanged} after updating internal
+ * Call {@link ListPageBase.notifyItemsChanged} after updating internal
  * state so the host re-fetches the visible items.
  *
  * @example
@@ -36,16 +35,9 @@ export abstract class DynamicListPageBase extends ListPageBase implements IDynam
   /**
    * Called whenever the search text changes so the page can update its results.
    * Typically stores the query and calls
-   * {@link DynamicListPageBase.notifyItemsChanged}.
+   * {@link ListPageBase.notifyItemsChanged}.
    *
    * @param text The current text in the search box.
    */
   abstract setSearchText(text: string): void | Promise<void>;
-
-  /**
-   * Tells the host that this page's items have changed and should be re-fetched.
-   */
-  protected notifyItemsChanged(): void {
-    sendNotification('listPage/itemsChanged', { pageId: this.id });
-  }
 }

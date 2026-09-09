@@ -136,6 +136,12 @@ describe('CommandResult validation of untyped shapes', () => {
     );
   });
 
+  it.each([false, 0, ''])('rejects a falsy non-null result (%j)', (result) => {
+    expect(() => serializeCommandResult(result as unknown as CommandResult)).toThrow(
+      InvalidCommandResultError,
+    );
+  });
+
   it('rejects foreign args on an argument-less kind', () => {
     expect(() =>
       serializeCommandResult({

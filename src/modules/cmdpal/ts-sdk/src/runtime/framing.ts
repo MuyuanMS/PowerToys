@@ -22,6 +22,11 @@
 
 const HEADER_TERMINATOR = Buffer.from('\r\n\r\n', 'ascii');
 const CONTENT_LENGTH_PREFIX = 'content-length:';
+const MAX_HEADER_BYTES = 8 * 1024;
+const MAX_MESSAGE_BYTES = 16 * 1024 * 1024;
+
+/** Fatal framing violation whose body boundary cannot be recovered safely. */
+export class MessageFramingError extends Error {}
 
 /** Serializes a value into a single framed message buffer. */
 export function encodeMessage(message: unknown): Buffer {
@@ -41,8 +46,13 @@ function parseContentLength(headerBlock: string): number | null {
     if (`${name}:` !== CONTENT_LENGTH_PREFIX) {
       continue;
     }
-    const value = Number.parseInt(line.slice(separator + 1).trim(), 10);
-    return Number.isNaN(value) || value < 0 ? null : value;
+    const rawValue = line.slice(separator + 1).trim();
+    if (!/^(?:0|[1-9]\d*)$/.test(rawValue)) {
+      return null;
+    }
+
+    const value = Number(rawValue);
+    return Number.isSafeInteger(value) ? value : null;
   }
   return null;
 }
@@ -57,6 +67,7 @@ function parseContentLength(headerBlock: string): number | null {
 export class MessageFramer {
   private buffer: Buffer = Buffer.alloc(0);
   private expectedLength: number | null = null;
+  private discardRemaining = 0;
 
   /** Appends a chunk and returns any newly completed message bodies. */
   push(chunk: Buffer): string[] {
@@ -64,22 +75,46 @@ export class MessageFramer {
 
     const messages: string[] = [];
     for (;;) {
+      if (this.discardRemaining > 0) {
+        const discarded = Math.min(this.buffer.length, this.discardRemaining);
+        this.buffer = this.buffer.subarray(discarded);
+        this.discardRemaining -= discarded;
+        if (this.discardRemaining > 0 || this.buffer.length === 0) {
+          break;
+        }
+      }
+
       if (this.expectedLength === null) {
         const headerEnd = this.buffer.indexOf(HEADER_TERMINATOR);
         if (headerEnd === -1) {
+          if (this.buffer.length > MAX_HEADER_BYTES) {
+            throw new MessageFramingError('Message header exceeds the maximum size.');
+          }
           break;
+        }
+        if (headerEnd > MAX_HEADER_BYTES) {
+          throw new MessageFramingError('Message header exceeds the maximum size.');
         }
         const headerBlock = this.buffer.subarray(0, headerEnd).toString('ascii');
         const length = parseContentLength(headerBlock);
         this.buffer = this.buffer.subarray(headerEnd + HEADER_TERMINATOR.length);
         if (length === null) {
-          // Malformed or unsupported header block; drop it and resynchronize.
+          throw new MessageFramingError('Message header has an invalid Content-Length.');
+        }
+        if (length > MAX_MESSAGE_BYTES) {
+          // Discard the complete advertised body without buffering it, then
+          // resume parsing at the next frame boundary.
+          this.discardRemaining = length;
           continue;
         }
         this.expectedLength = length;
       }
 
       if (this.buffer.length < this.expectedLength) {
+        if (this.buffer.length > MAX_MESSAGE_BYTES) {
+          this.buffer = Buffer.alloc(0);
+          this.expectedLength = null;
+        }
         break;
       }
 

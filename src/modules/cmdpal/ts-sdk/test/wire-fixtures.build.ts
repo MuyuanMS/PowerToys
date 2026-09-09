@@ -45,6 +45,12 @@ function collector(): FormCollector {
   let counter = 0;
   const forms = new Map<string, FormSubmitHandler>();
   return {
+    reserve(formId: string): void {
+      if (forms.has(formId)) {
+        throw new Error(`Duplicate form id: ${formId}`);
+      }
+      forms.set(formId, () => ({ kind: 'dismiss' }));
+    },
     nextId(): string {
       const id = `form-${String(counter)}`;
       counter += 1;

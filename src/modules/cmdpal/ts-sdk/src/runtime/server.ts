@@ -55,6 +55,7 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
   const stdout = claimProtocolStdout();
   const framer = new MessageFramer();
   let finalized = false;
+  let inputStopped = false;
   let disposeTimeoutMs = DEFAULT_DISPOSE_TIMEOUT_MS;
 
   const writeMessage = (message: JsonRpcMessage): void => {
@@ -64,6 +65,7 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
   const notify = (method: string, params?: unknown): void => {
     writeMessage({ jsonrpc: JSONRPC_VERSION, method, params });
   };
+  let chain: Promise<void> = Promise.resolve();
 
   // Idempotent shutdown: dispose the provider within the host-supplied bound,
   // release the host bridge, restore stdout, and prefer setting process.exitCode
@@ -84,16 +86,17 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
     setNotificationSink(null);
     ExtensionHost.initialize(null);
     stdout.restore();
+    inputStopped = true;
     process.stdin.pause();
   };
 
   const runtime = new ExtensionRuntime({
     send: writeMessage,
     onDispose: () => {
-      void finalize(0);
+      void chain.then(() => finalize(0));
     },
     reportFatal: (code: number) => {
-      process.exitCode = code;
+      void chain.then(() => finalize(code));
     },
   });
 
@@ -107,8 +110,6 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
       return provider;
     })(),
   );
-
-  let chain: Promise<void> = Promise.resolve();
 
   const enqueue = (message: unknown): void => {
     chain = chain
@@ -126,6 +127,12 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
             }
           }
           await runtime.handleNotification(message);
+        } else {
+          writeMessage({
+            jsonrpc: JSONRPC_VERSION,
+            id: null,
+            error: { code: -32600, message: 'Invalid Request' },
+          });
         }
       })
       .catch((error: unknown) => {
@@ -134,11 +141,29 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
   };
 
   process.stdin.on('data', (chunk: Buffer) => {
-    for (const body of framer.push(chunk)) {
+    if (inputStopped) {
+      return;
+    }
+    let bodies: string[];
+    try {
+      bodies = framer.push(chunk);
+    } catch (error) {
+      inputStopped = true;
+      process.stdin.pause();
+      process.stderr.write(`cmdpal-sdk: framing failed: ${describeError(error)}\n`);
+      void chain.then(() => finalize(1));
+      return;
+    }
+    for (const body of bodies) {
       let parsed: unknown;
       try {
         parsed = JSON.parse(body);
       } catch {
+        writeMessage({
+          jsonrpc: JSONRPC_VERSION,
+          id: null,
+          error: { code: -32700, message: 'Parse error' },
+        });
         continue;
       }
       enqueue(parsed);
@@ -146,7 +171,7 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
   });
 
   process.stdin.on('end', () => {
-    void finalize(0);
+    void chain.then(() => finalize(0));
   });
 }
 
@@ -183,7 +208,8 @@ const ExtensionHostBridgeProxy: IExtensionHost = {
   log: (message, state) => {
     ExtensionHost.log(message, state);
   },
-  showStatus: (message, state, progress, context) => ExtensionHost.showStatus(message, state, progress, context),
+  showStatus: (message, state, progress, context) =>
+    ExtensionHost.showStatus(message, state, progress, context),
   updateStatus: (statusId, message, state, progress) => {
     ExtensionHost.updateStatus(statusId, message, state, progress);
   },

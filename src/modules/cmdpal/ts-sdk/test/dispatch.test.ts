@@ -13,6 +13,7 @@ import type {
 import { ExtensionRuntime } from '../src/runtime/runtime.js';
 import {
   JSONRPC_VERSION,
+  JsonRpcErrorCode,
   type JsonRpcMessage,
   type JsonRpcNotification,
   type JsonRpcResponse,
@@ -65,6 +66,7 @@ const listPage: IListPage = {
   id: 'list',
   name: 'List',
   title: 'List',
+  setFilter: vi.fn(),
   getItems() {
     return [{ command: { id: 'item-cmd', name: 'Item' }, title: 'Item One' }];
   },
@@ -178,6 +180,21 @@ describe('ExtensionRuntime request dispatch', () => {
     expect(result.items[0]).toMatchObject({ id: 'item-cmd', title: 'Item One' });
   });
 
+  it('passes a filter identifier to a list page filter callback', async () => {
+    const { runtime, sent } = createHarness();
+    await runtime.setProvider(provider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 9,
+      method: 'listPage/setFilter',
+      params: { pageId: 'list', filterId: 'recent' },
+    });
+
+    expect(listPage.setFilter).toHaveBeenLastCalledWith('recent');
+    expect(responseFor(sent, 9)?.result).toBeNull();
+  });
+
   it('reports method not found for unknown methods', async () => {
     const { runtime, sent } = createHarness();
     await runtime.setProvider(provider);
@@ -185,6 +202,36 @@ describe('ExtensionRuntime request dispatch', () => {
     await runtime.handleRequest({ jsonrpc: JSONRPC_VERSION, id: 5, method: 'does/notExist' });
 
     expect(responseFor(sent, 5)?.error?.code).toBe(-32601);
+  });
+
+  it.each([
+    ['provider/getCommand', {}, 'commandId'],
+    ['provider/getCommandItem', { commandId: 1 }, 'commandId'],
+    ['command/invoke', {}, 'commandId'],
+    ['listPage/getItems', {}, 'pageId'],
+    ['listPage/setSearchText', { pageId: 'list' }, 'searchText'],
+    ['listPage/setFilter', { pageId: 'list', filterId: false }, 'filterId'],
+    ['listPage/loadMore', {}, 'pageId'],
+    ['fallback/updateQuery', { commandId: 'fallback' }, 'query'],
+    ['contentPage/getContent', {}, 'pageId'],
+    ['form/submit', { pageId: 'page', inputs: '{}' }, 'data'],
+    ['form/submit', { pageId: 'page', inputs: '{}', data: '{}', formId: 1 }, 'formId'],
+  ])('rejects invalid required params for %s', async (method, params, field) => {
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(provider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 10,
+      method,
+      params,
+    });
+
+    expect(responseFor(sent, 10)?.error).toEqual({
+      code: -32602,
+      message: `Invalid params: "${field}" must be a string.`,
+    });
+    expect(sent).toHaveLength(1);
   });
 
   it('reports an internal error when no provider is set', async () => {
@@ -324,6 +371,103 @@ describe('ExtensionRuntime notification dispatch', () => {
       properties: { displayTitle: 'Search: abc' },
     });
   });
+
+  it('routes fallback updates by an explicit item id', async () => {
+    const updateQuery = vi.fn();
+    const fallbackItem: IFallbackCommandItem = {
+      id: 'fallback-item',
+      command: { id: 'fallback-command', name: 'Fallback' },
+      title: 'Fallback',
+      fallbackHandler: { updateQuery },
+    };
+    const fallbackProvider: ICommandProvider = {
+      id: 'ext',
+      displayName: 'Ext',
+      topLevelCommands() {
+        return [];
+      },
+      fallbackCommands() {
+        return [fallbackItem];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(fallbackProvider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'provider/getFallbackCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 3,
+      method: 'fallback/updateQuery',
+      params: { commandId: 'fallback-item', query: 'abc' },
+    });
+
+    expect(updateQuery).toHaveBeenCalledWith('abc');
+    expect(notificationsOf(sent, 'command/propChanged')[0]?.params).toEqual({
+      commandId: 'fallback-item',
+      properties: { displayTitle: 'Fallback' },
+    });
+  });
+
+  it('rejects duplicate explicit fallback item ids and preserves the previous mapping', async () => {
+    const originalUpdateQuery = vi.fn();
+    const replacementUpdateQuery = vi.fn();
+    let returnDuplicates = false;
+
+    const originalItem: IFallbackCommandItem = {
+      id: 'shared-fallback',
+      command: { id: 'fb-original', name: 'Original' },
+      title: 'Original',
+      fallbackHandler: { updateQuery: originalUpdateQuery },
+    };
+    const replacementItem: IFallbackCommandItem = {
+      id: 'shared-fallback',
+      command: { id: 'fb-replacement', name: 'Replacement' },
+      title: 'Replacement',
+      fallbackHandler: { updateQuery: replacementUpdateQuery },
+    };
+    const fallbackProvider: ICommandProvider = {
+      id: 'ext',
+      displayName: 'Ext',
+      topLevelCommands() {
+        return [];
+      },
+      fallbackCommands() {
+        return returnDuplicates ? [originalItem, replacementItem] : [originalItem];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    await runtime.setProvider(fallbackProvider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 4,
+      method: 'provider/getFallbackCommands',
+    });
+
+    returnDuplicates = true;
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 5,
+      method: 'provider/getFallbackCommands',
+    });
+
+    expect(responseFor(sent, 5)?.error?.code).toBe(JsonRpcErrorCode.InternalError);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 6,
+      method: 'fallback/updateQuery',
+      params: { commandId: 'shared-fallback', query: 'abc' },
+    });
+
+    expect(responseFor(sent, 6)?.result).toBeNull();
+    expect(originalUpdateQuery).toHaveBeenCalledWith('abc');
+    expect(replacementUpdateQuery).not.toHaveBeenCalled();
+  });
 });
 
 describe('ExtensionRuntime settings integration', () => {
@@ -372,6 +516,50 @@ describe('ExtensionRuntime settings integration', () => {
     });
     expect(responseFor(sent, 3)?.result).toEqual({ Kind: 1 });
     expect(settings.getSetting<ToggleSetting>('dark')?.value).toBe(true);
+  });
+
+  it('rejects a settings page whose id collides with an already loaded command', async () => {
+    const settings = new Settings();
+    settings.add(new ToggleSetting('dark', 'Dark Mode', false));
+    const colliding: IInvokableCommand = {
+      id: '__settings__',
+      name: 'Colliding settings',
+      invoke(): CommandResult {
+        return { kind: 'keepOpen' };
+      },
+    };
+    const settingsProvider: ICommandProvider = {
+      id: 'ext',
+      displayName: 'Ext',
+      settings,
+      topLevelCommands() {
+        return [{ command: colliding, title: 'Colliding settings' }];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    await runtime.setProvider(settingsProvider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 4,
+      method: 'provider/getTopLevelCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 5,
+      method: 'provider/getSettings',
+    });
+
+    expect(responseFor(sent, 5)?.error?.code).toBe(JsonRpcErrorCode.InternalError);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 6,
+      method: 'command/invoke',
+      params: { commandId: '__settings__' },
+    });
+
+    expect(responseFor(sent, 6)?.result).toEqual({ Kind: 4 });
   });
 });
 
@@ -427,5 +615,53 @@ describe('ExtensionRuntime cache priming', () => {
     expect(topLevel).toHaveBeenCalledTimes(1);
     expect(fallback).toHaveBeenCalledTimes(1);
     expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reload a previously fetched scope while priming the other scope', async () => {
+    let topGeneration = 0;
+    const topLevel = vi.fn(() => {
+      topGeneration += 1;
+      return [
+        {
+          command: {
+            id: `top-${String(topGeneration)}`,
+            name: 'Top',
+            invoke: () => ({ kind: 'dismiss' }) as CommandResult,
+          },
+          title: 'Top',
+        },
+      ];
+    });
+    const fallback = vi.fn(() => []);
+    const countingProvider: ICommandProvider = {
+      id: 'ext',
+      displayName: 'Ext',
+      topLevelCommands: topLevel,
+      fallbackCommands: fallback,
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(countingProvider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'provider/getTopLevelCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'command/invoke',
+      params: { commandId: 'missing' },
+    });
+
+    expect(topLevel).toHaveBeenCalledTimes(1);
+    expect(fallback).toHaveBeenCalledTimes(1);
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 3,
+      method: 'command/invoke',
+      params: { commandId: 'top-1' },
+    });
+    expect(responseFor(sent, 3)?.result).toEqual({ Kind: 0 });
   });
 });

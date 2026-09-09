@@ -195,6 +195,310 @@ describe('bounded command registry eviction', () => {
     expect((await invoke('fb-2'))?.result).toEqual({ Kind: 4 });
     expect((await invoke('fb-1'))?.error?.code).toBe(JsonRpcErrorCode.MethodNotFound);
   });
+
+  it('retires fallback commands when the provider stops returning fallbacks', async () => {
+    const provider: ICommandProvider = {
+      id: 'ext',
+      displayName: 'Ext',
+      topLevelCommands() {
+        return [];
+      },
+      fallbackCommands() {
+        return [{ command: item('fb').command, title: 'Fallback' }];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(provider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'provider/getFallbackCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'command/invoke',
+      params: { commandId: 'fb' },
+    });
+    expect(responseFor(sent, 2)?.result).toEqual({ Kind: 4 });
+
+    // JavaScript extensions can return an undefined fallback result despite
+    // the TypeScript declaration requiring an array.
+    Object.defineProperty(provider, 'fallbackCommands', { value: () => undefined });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 3,
+      method: 'provider/getFallbackCommands',
+    });
+    expect(responseFor(sent, 3)?.result).toBeNull();
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 4,
+      method: 'command/invoke',
+      params: { commandId: 'fb' },
+    });
+    expect(responseFor(sent, 4)?.error?.code).toBe(JsonRpcErrorCode.MethodNotFound);
+  });
+
+  it('rejects a top-level response that reuses one command id for distinct commands', async () => {
+    let returnDuplicates = false;
+    const original = item('cmd-a').command;
+    const replacement = {
+      ...item('cmd-a').command,
+      invoke(): CommandResult {
+        return { kind: 'goBack' };
+      },
+    };
+    const provider: ICommandProvider = {
+      id: 'ext',
+      displayName: 'Ext',
+      topLevelCommands() {
+        if (returnDuplicates) {
+          return [
+            { command: original, title: 'Original' },
+            { command: replacement, title: 'Replacement' },
+          ];
+        }
+        return [{ command: original, title: 'Original' }];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(provider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'provider/getTopLevelCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'command/invoke',
+      params: { commandId: 'cmd-a' },
+    });
+    expect(responseFor(sent, 2)?.result).toEqual({ Kind: 4 });
+
+    returnDuplicates = true;
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 3,
+      method: 'provider/getTopLevelCommands',
+    });
+    expect(responseFor(sent, 3)?.error?.code).toBe(JsonRpcErrorCode.InternalError);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 4,
+      method: 'command/invoke',
+      params: { commandId: 'cmd-a' },
+    });
+    expect(responseFor(sent, 4)?.result).toEqual({ Kind: 4 });
+  });
+
+  it('allows repeated top-level references to the same command object', async () => {
+    const shared = item('shared').command;
+    const provider: ICommandProvider = {
+      id: 'ext',
+      displayName: 'Ext',
+      topLevelCommands() {
+        return [
+          { command: shared, title: 'First reference' },
+          { command: shared, title: 'Second reference' },
+        ];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(provider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'provider/getTopLevelCommands',
+    });
+    expect(responseFor(sent, 1)?.result).toEqual([
+      expect.objectContaining({ id: 'shared' }),
+      expect.objectContaining({ id: 'shared' }),
+    ]);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'command/invoke',
+      params: { commandId: 'shared' },
+    });
+    expect(responseFor(sent, 2)?.result).toEqual({ Kind: 4 });
+  });
+
+  it('rejects a fallback response that reuses one command id for distinct commands', async () => {
+    let returnDuplicates = false;
+    const original = item('fb').command;
+    const replacement = {
+      ...item('fb').command,
+      invoke(): CommandResult {
+        return { kind: 'goBack' };
+      },
+    };
+    const provider: ICommandProvider = {
+      id: 'ext',
+      displayName: 'Ext',
+      topLevelCommands() {
+        return [];
+      },
+      fallbackCommands() {
+        if (returnDuplicates) {
+          return [
+            { command: original, title: 'Original' },
+            { command: replacement, title: 'Replacement' },
+          ];
+        }
+        return [{ command: original, title: 'Original' }];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(provider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'provider/getFallbackCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'command/invoke',
+      params: { commandId: 'fb' },
+    });
+    expect(responseFor(sent, 2)?.result).toEqual({ Kind: 4 });
+
+    returnDuplicates = true;
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 3,
+      method: 'provider/getFallbackCommands',
+    });
+    expect(responseFor(sent, 3)?.error?.code).toBe(JsonRpcErrorCode.InternalError);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 4,
+      method: 'command/invoke',
+      params: { commandId: 'fb' },
+    });
+    expect(responseFor(sent, 4)?.result).toEqual({ Kind: 4 });
+  });
+
+  it('rejects a new scope when a different live scope already owns the command id', async () => {
+    const topLevel = item('shared').command;
+    const fallback = {
+      ...item('shared').command,
+      invoke(): CommandResult {
+        return { kind: 'goBack' };
+      },
+    };
+    const provider: ICommandProvider = {
+      id: 'ext',
+      displayName: 'Ext',
+      topLevelCommands() {
+        return [{ command: topLevel, title: 'Top level' }];
+      },
+      fallbackCommands() {
+        return [{ command: fallback, title: 'Fallback' }];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(provider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'provider/getTopLevelCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'provider/getFallbackCommands',
+    });
+    expect(responseFor(sent, 2)?.error?.code).toBe(JsonRpcErrorCode.InternalError);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 3,
+      method: 'command/invoke',
+      params: { commandId: 'shared' },
+    });
+    expect(responseFor(sent, 3)?.result).toEqual({ Kind: 4 });
+  });
+
+  it('preserves a shared page scope while another provider scope still references it', async () => {
+    const sharedPage: IListPage = {
+      id: 'shared',
+      name: 'Shared',
+      title: 'Shared',
+      getItems() {
+        return [item('shared-child')];
+      },
+    };
+    let includeTopLevel = true;
+    let includeFallback = true;
+    const provider: ICommandProvider = {
+      id: 'ext',
+      displayName: 'Ext',
+      topLevelCommands() {
+        return includeTopLevel ? [{ command: sharedPage, title: 'Shared' }] : [];
+      },
+      fallbackCommands() {
+        return includeFallback ? [{ command: sharedPage, title: 'Shared' }] : [];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(provider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'provider/getTopLevelCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'provider/getFallbackCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 3,
+      method: 'listPage/getItems',
+      params: { pageId: 'shared' },
+    });
+
+    includeTopLevel = false;
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 4,
+      method: 'provider/getTopLevelCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 5,
+      method: 'command/invoke',
+      params: { commandId: 'shared-child' },
+    });
+    expect(responseFor(sent, 5)?.result).toEqual({ Kind: 4 });
+
+    includeFallback = false;
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 6,
+      method: 'provider/getFallbackCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 7,
+      method: 'command/invoke',
+      params: { commandId: 'shared-child' },
+    });
+    expect(responseFor(sent, 7)?.error?.code).toBe(JsonRpcErrorCode.MethodNotFound);
+  });
 });
 
 describe('recursive scope retirement', () => {
@@ -318,5 +622,87 @@ describe('recursive scope retirement', () => {
     // Retiring the opener across a refresh must retire the nested command too.
     await getTopLevel();
     expect((await invoke('nested-primary'))?.error?.code).toBe(JsonRpcErrorCode.MethodNotFound);
+  });
+
+  it('keeps a shared nested result command while another live owner still references it', async () => {
+    const shared: IInvokableCommand = {
+      id: 'shared-primary',
+      name: 'Shared primary',
+      invoke(): CommandResult {
+        return { kind: 'keepOpen' };
+      },
+    };
+    const ownerA: IInvokableCommand = {
+      id: 'owner-a',
+      name: 'Owner A',
+      invoke(): CommandResult {
+        return {
+          kind: 'confirm',
+          args: { title: 'A', description: 'A', primaryCommand: shared },
+        };
+      },
+    };
+    const ownerB: IInvokableCommand = {
+      id: 'owner-b',
+      name: 'Owner B',
+      invoke(): CommandResult {
+        return {
+          kind: 'confirm',
+          args: { title: 'B', description: 'B', primaryCommand: shared },
+        };
+      },
+    };
+    let generation = 0;
+    const provider: ICommandProvider = {
+      id: 'ext',
+      displayName: 'Ext',
+      topLevelCommands() {
+        generation += 1;
+        if (generation === 1) {
+          return [
+            { command: ownerA, title: 'Owner A' },
+            { command: ownerB, title: 'Owner B' },
+          ];
+        }
+        if (generation === 2) {
+          return [{ command: ownerB, title: 'Owner B' }];
+        }
+        return [];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(provider);
+
+    let messageId = 0;
+    const getTopLevel = async (): Promise<void> => {
+      messageId += 1;
+      await runtime.handleRequest({
+        jsonrpc: JSONRPC_VERSION,
+        id: messageId,
+        method: 'provider/getTopLevelCommands',
+      });
+    };
+    const invoke = async (commandId: string): Promise<JsonRpcResponse | undefined> => {
+      messageId += 1;
+      const thisId = messageId;
+      await runtime.handleRequest({
+        jsonrpc: JSONRPC_VERSION,
+        id: thisId,
+        method: 'command/invoke',
+        params: { commandId },
+      });
+      return responseFor(sent, thisId);
+    };
+
+    await getTopLevel();
+    await invoke('owner-a');
+    await invoke('owner-b');
+    expect((await invoke('shared-primary'))?.result).toEqual({ Kind: 4 });
+
+    await getTopLevel();
+    expect((await invoke('shared-primary'))?.result).toEqual({ Kind: 4 });
+
+    await getTopLevel();
+    expect((await invoke('shared-primary'))?.error?.code).toBe(JsonRpcErrorCode.MethodNotFound);
   });
 });

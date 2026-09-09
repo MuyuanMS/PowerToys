@@ -120,6 +120,52 @@ describe('form identity and routing', () => {
     expect(responseFor(sent, 2)?.result).toEqual({ Kind: 3 });
   });
 
+  it('registers a tree root form before child forms', async () => {
+    const root = vi.fn((): CommandResult => ({ kind: 'goHome' }));
+    const child = vi.fn((): CommandResult => ({ kind: 'goBack' }));
+    const page: IContentPage = {
+      id: 'page',
+      name: 'Page',
+      title: 'Page',
+      getContent(): Content[] {
+        return [
+          {
+            type: 'tree',
+            rootContent: formContent(undefined, root),
+            getChildren(): Content[] {
+              return [formContent(undefined, child)];
+            },
+          },
+        ];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(providerWith(page));
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'contentPage/getContent',
+      params: { pageId: 'page' },
+    });
+    const content = responseFor(sent, 1)?.result as Array<{
+      rootContent: { formId: string };
+      children: Array<{ formId: string }>;
+    }>;
+    expect(content[0]?.rootContent.formId).toBe('form-0');
+    expect(content[0]?.children[0]?.formId).toBe('form-1');
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'form/submit',
+      params: { pageId: 'page', inputs: '{}', data: '{}' },
+    });
+
+    expect(root).toHaveBeenCalledTimes(1);
+    expect(child).not.toHaveBeenCalled();
+  });
+
   it('falls back to the first form when the host omits a formId', async () => {
     const first = vi.fn((): CommandResult => ({ kind: 'goHome' }));
     const second = vi.fn((): CommandResult => ({ kind: 'goBack' }));
@@ -146,6 +192,70 @@ describe('form identity and routing', () => {
     expect(responseFor(sent, 1)?.result).toEqual({ Kind: 1 });
   });
 
+  it('routes an explicit empty formId instead of treating it as omitted', async () => {
+    const first = vi.fn((): CommandResult => ({ kind: 'goHome' }));
+    const empty = vi.fn((): CommandResult => ({ kind: 'goBack' }));
+    const page: IContentPage = {
+      id: 'page',
+      name: 'Page',
+      title: 'Page',
+      getContent(): Content[] {
+        return [formContent('first', first), formContent('', empty)];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(providerWith(page));
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'contentPage/getContent',
+      params: { pageId: 'page' },
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'form/submit',
+      params: { pageId: 'page', formId: '', inputs: '{}', data: '{}' },
+    });
+
+    expect(empty).toHaveBeenCalledTimes(1);
+    expect(first).not.toHaveBeenCalled();
+    expect(responseFor(sent, 2)?.result).toEqual({ Kind: 2 });
+  });
+
+  it('falls back to the first nested form when the host omits a formId', async () => {
+    const nested = vi.fn((): CommandResult => ({ kind: 'hide' }));
+    const page: IContentPage = {
+      id: 'page',
+      name: 'Page',
+      title: 'Page',
+      getContent(): Content[] {
+        return [
+          {
+            type: 'tree',
+            rootContent: { type: 'markdown', body: 'root' },
+            getChildren(): Content[] {
+              return [formContent('nested', nested)];
+            },
+          },
+        ];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(providerWith(page));
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'form/submit',
+      params: { pageId: 'page', inputs: '{}', data: '{}' },
+    });
+
+    expect(nested).toHaveBeenCalledTimes(1);
+    expect(responseFor(sent, 1)?.result).toEqual({ Kind: 3 });
+  });
+
   it('assigns a deterministic formId when the author omits one', async () => {
     const page: IContentPage = {
       id: 'page',
@@ -168,5 +278,85 @@ describe('form identity and routing', () => {
     const content = responseFor(sent, 1)?.result as Array<Record<string, unknown>>;
     expect(typeof content[0]?.formId).toBe('string');
     expect((content[0]?.formId as string).length).toBeGreaterThan(0);
+  });
+
+  it('reserves nested explicit form IDs before assigning generated IDs', async () => {
+    const page: IContentPage = {
+      id: 'page',
+      name: 'Page',
+      title: 'Page',
+      getContent(): Content[] {
+        return [
+          formContent(undefined, () => ({ kind: 'goHome' })),
+          {
+            type: 'tree',
+            rootContent: { type: 'plainText', text: 'root' },
+            getChildren(): Content[] {
+              return [formContent('form-0', () => ({ kind: 'goBack' }))];
+            },
+          },
+        ];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(providerWith(page));
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'contentPage/getContent',
+      params: { pageId: 'page' },
+    });
+
+    const content = responseFor(sent, 1)?.result as Array<Record<string, unknown>>;
+    expect(content[0]?.formId).toBe('form-1');
+    const tree = content[1] as { children: Array<{ formId: string }> };
+    expect(tree.children[0]?.formId).toBe('form-0');
+  });
+
+  it('preserves the last successful form scope when serialization fails', async () => {
+    const first = vi.fn((): CommandResult => ({ kind: 'goHome' }));
+    let failSerialization = false;
+    const page: IContentPage = {
+      id: 'page',
+      name: 'Page',
+      title: 'Page',
+      getContent(): Content[] {
+        return failSerialization
+          ? [
+              formContent('duplicate', () => ({ kind: 'dismiss' })),
+              formContent('duplicate', () => ({ kind: 'dismiss' })),
+            ]
+          : [formContent('first', first)];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(providerWith(page));
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'contentPage/getContent',
+      params: { pageId: 'page' },
+    });
+
+    failSerialization = true;
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'contentPage/getContent',
+      params: { pageId: 'page' },
+    });
+    expect(responseFor(sent, 2)?.error?.code).toBe(-32603);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 3,
+      method: 'form/submit',
+      params: { pageId: 'page', formId: 'first', inputs: '{}', data: '{}' },
+    });
+
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(responseFor(sent, 3)?.result).toEqual({ Kind: 1 });
   });
 });

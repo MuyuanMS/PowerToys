@@ -10,6 +10,7 @@
 
 import type {
   CommandResult,
+  Content,
   ICommand,
   ICommandProvider,
   IContentPage,
@@ -32,6 +33,13 @@ import { getSdkVersion, isProtocolCompatible, PROTOCOL_VERSION } from './protoco
 import { WireSerializer, type FormCollector, type FormSubmitHandler } from './serialize.js';
 
 type MessageSender = (message: JsonRpcMessage) => void;
+
+interface LiveCommandCollisionOptions {
+  excludeProviderScope?: boolean;
+  excludeFallbackScope?: boolean;
+  excludeResolvedScope?: boolean;
+  excludePageScopeId?: string;
+}
 
 /** Default bound, in milliseconds, for awaiting provider disposal on shutdown. */
 export const DEFAULT_DISPOSE_TIMEOUT_MS = 5000;
@@ -131,7 +139,8 @@ export class ExtensionRuntime {
   private readonly onDispose?: () => void;
   private readonly reportFatal?: (code: number) => void;
   private disposed = false;
-  private primed = false;
+  private providerScopeLoaded = false;
+  private fallbackScopeLoaded = false;
 
   private initState: InitState = 'pending';
   private initError: { code: number; message: string } | null = null;
@@ -182,7 +191,8 @@ export class ExtensionRuntime {
    */
   setProvider(provider: ICommandProvider): void {
     this.provider = provider;
-    this.primed = false;
+    this.providerScopeLoaded = false;
+    this.fallbackScopeLoaded = false;
     this.initState = 'ready';
     this.initError = null;
     this.initSettled = Promise.resolve();
@@ -198,12 +208,22 @@ export class ExtensionRuntime {
     this.initState = 'pending';
     this.initError = null;
     this.initSettled = init.then(
-      (provider) => {
+      async (provider) => {
+        if (this.disposed) {
+          await disposeProvider(provider, DEFAULT_DISPOSE_TIMEOUT_MS);
+          return;
+        }
+
         this.provider = provider;
-        this.primed = false;
+        this.providerScopeLoaded = false;
+        this.fallbackScopeLoaded = false;
         this.initState = 'ready';
       },
       (error: unknown) => {
+        if (this.disposed) {
+          return;
+        }
+
         this.initState = 'failed';
         this.initError = { code: JsonRpcErrorCode.InternalError, message: describeError(error) };
         this.reportFatal?.(1);
@@ -238,47 +258,79 @@ export class ExtensionRuntime {
           return await this.getTopLevelCommands(id);
         case 'provider/getFallbackCommands':
           return await this.getFallbackCommands(id);
-        case 'provider/getCommand':
-          return await this.getCommand(id, stringField(params, 'commandId') ?? '');
-        case 'provider/getCommandItem':
-          return await this.getCommandItem(id, stringField(params, 'commandId') ?? '');
+        case 'provider/getCommand': {
+          const commandId = this.requireStringParam(id, params, 'commandId');
+          return commandId === null ? undefined : await this.getCommand(id, commandId);
+        }
+        case 'provider/getCommandItem': {
+          const commandId = this.requireStringParam(id, params, 'commandId');
+          return commandId === null ? undefined : await this.getCommandItem(id, commandId);
+        }
         case 'provider/getSettings':
           return this.getSettings(id);
-        case 'command/invoke':
-          return await this.invokeCommand(id, stringField(params, 'commandId') ?? '');
-        case 'listPage/getItems':
-          return await this.getItems(id, stringField(params, 'pageId') ?? '');
-        case 'listPage/setSearchText':
-          return await this.setSearchText(
-            id,
-            stringField(params, 'pageId') ?? '',
-            stringField(params, 'searchText') ?? '',
-          );
-        case 'listPage/setFilter':
-          return await this.setFilter(
-            id,
-            stringField(params, 'pageId') ?? '',
-            stringField(params, 'filterId') ?? '',
-          );
-        case 'listPage/loadMore':
-          return await this.loadMore(id, stringField(params, 'pageId') ?? '');
-        case 'fallback/updateQuery':
-          await this.applyFallbackQuery(
-            stringField(params, 'commandId') ?? '',
-            stringField(params, 'query') ?? '',
-          );
+        case 'command/invoke': {
+          const commandId = this.requireStringParam(id, params, 'commandId');
+          return commandId === null ? undefined : await this.invokeCommand(id, commandId);
+        }
+        case 'listPage/getItems': {
+          const pageId = this.requireStringParam(id, params, 'pageId');
+          return pageId === null ? undefined : await this.getItems(id, pageId);
+        }
+        case 'listPage/setSearchText': {
+          const pageId = this.requireStringParam(id, params, 'pageId');
+          if (pageId === null) {
+            return;
+          }
+          const searchText = this.requireStringParam(id, params, 'searchText');
+          return searchText === null ? undefined : await this.setSearchText(id, pageId, searchText);
+        }
+        case 'listPage/setFilter': {
+          const pageId = this.requireStringParam(id, params, 'pageId');
+          if (pageId === null) {
+            return;
+          }
+          const filterId = this.requireStringParam(id, params, 'filterId');
+          return filterId === null ? undefined : await this.setFilter(id, pageId, filterId);
+        }
+        case 'listPage/loadMore': {
+          const pageId = this.requireStringParam(id, params, 'pageId');
+          return pageId === null ? undefined : await this.loadMore(id, pageId);
+        }
+        case 'fallback/updateQuery': {
+          const commandId = this.requireStringParam(id, params, 'commandId');
+          if (commandId === null) {
+            return;
+          }
+          const query = this.requireStringParam(id, params, 'query');
+          if (query === null) {
+            return;
+          }
+          await this.applyFallbackQuery(commandId, query);
           this.respond(id, null);
           return;
-        case 'contentPage/getContent':
-          return await this.getContent(id, stringField(params, 'pageId') ?? '');
-        case 'form/submit':
-          return await this.submitForm(
-            id,
-            stringField(params, 'pageId') ?? '',
-            stringField(params, 'formId'),
-            stringField(params, 'inputs') ?? '',
-            stringField(params, 'data') ?? '',
-          );
+        }
+        case 'contentPage/getContent': {
+          const pageId = this.requireStringParam(id, params, 'pageId');
+          return pageId === null ? undefined : await this.getContent(id, pageId);
+        }
+        case 'form/submit': {
+          const pageId = this.requireStringParam(id, params, 'pageId');
+          if (pageId === null) {
+            return;
+          }
+          const inputs = this.requireStringParam(id, params, 'inputs');
+          if (inputs === null) {
+            return;
+          }
+          const data = this.requireStringParam(id, params, 'data');
+          if (data === null) {
+            return;
+          }
+          const formId = this.optionalStringParam(id, params, 'formId');
+          return formId === null
+            ? undefined
+            : await this.submitForm(id, pageId, formId, inputs, data);
+        }
         default:
           this.respondError(id, JsonRpcErrorCode.MethodNotFound, `Method not found: ${method}`);
           return;
@@ -298,10 +350,12 @@ export class ExtensionRuntime {
       return;
     }
     if (method === 'fallback/updateQuery') {
-      await this.applyFallbackQuery(
-        stringField(params, 'commandId') ?? '',
-        stringField(params, 'query') ?? '',
-      );
+      const commandId = stringField(params, 'commandId');
+      const query = stringField(params, 'query');
+      if (commandId === undefined || query === undefined) {
+        return;
+      }
+      await this.applyFallbackQuery(commandId, query);
     }
   }
 
@@ -414,11 +468,13 @@ export class ExtensionRuntime {
     const items = await provider.topLevelCommands();
     const scope = new Map<string, ICommand>();
     const serialized = await this.withMapSink(scope, () => this.serializer.commandItems(items));
+    this.assertNoLiveCommandCollisions(scope.values(), { excludeProviderScope: true });
     // Replace the previous generation, releasing commands that are gone and
     // recursively retiring the descendant scopes they owned.
     const previous = this.providerScope;
     this.providerScope = scope;
     this.retireMissing(previous.keys(), scope);
+    this.providerScopeLoaded = true;
     this.respond(id, serialized);
   }
 
@@ -430,36 +486,56 @@ export class ExtensionRuntime {
     }
     const items = (await provider.fallbackCommands?.()) ?? null;
     if (!items) {
+      const previous = this.fallbackScope;
+      this.fallbackScope = new Map<string, ICommand>();
+      this.fallbacks.clear();
+      this.retireMissing(previous.keys(), this.fallbackScope);
+      this.fallbackScopeLoaded = true;
       this.respond(id, null);
       return;
     }
     const scope = new Map<string, ICommand>();
-    this.fallbacks.clear();
-    for (const item of items) {
-      this.fallbacks.set(item.command.id, item);
-    }
+    const fallbacks = this.collectFallbackItems(items);
     const serialized = await this.withMapSink(scope, () => this.serializer.commandItems(items));
+    this.assertNoLiveCommandCollisions(scope.values(), { excludeFallbackScope: true });
     // Replace the previous fallback generation, releasing commands that are gone
     // and recursively retiring the descendant scopes they owned.
     const previous = this.fallbackScope;
     this.fallbackScope = scope;
+    this.fallbacks.clear();
+    for (const [fallbackId, item] of fallbacks) {
+      this.fallbacks.set(fallbackId, item);
+    }
     this.retireMissing(previous.keys(), scope);
+    this.fallbackScopeLoaded = true;
     this.respond(id, serialized);
   }
 
   private async getCommand(id: number | string, commandId: string): Promise<void> {
     const command = await this.resolveCommand(commandId);
-    const serialized = command
-      ? await this.withMapSink(this.resolved, () => this.serializer.command(command))
-      : null;
+    let serialized: Record<string, unknown> | null = null;
+    if (command) {
+      const resolved = new Map<string, ICommand>();
+      serialized = await this.withMapSink(resolved, () => this.serializer.command(command));
+      this.assertNoLiveCommandCollisions(resolved.values());
+      for (const [registeredId, registeredCommand] of resolved) {
+        this.resolved.set(registeredId, registeredCommand);
+      }
+    }
     this.respond(id, serialized);
   }
 
   private async getCommandItem(id: number | string, commandId: string): Promise<void> {
     const item = (await this.provider?.getCommandItem?.(commandId)) ?? null;
-    const serialized = item
-      ? await this.withMapSink(this.resolved, () => this.serializer.commandItem(item))
-      : null;
+    let serialized: Record<string, unknown> | null = null;
+    if (item) {
+      const resolved = new Map<string, ICommand>();
+      serialized = await this.withMapSink(resolved, () => this.serializer.commandItem(item));
+      this.assertNoLiveCommandCollisions(resolved.values());
+      for (const [registeredId, registeredCommand] of resolved) {
+        this.resolved.set(registeredId, registeredCommand);
+      }
+    }
     this.respond(id, serialized);
   }
 
@@ -470,6 +546,7 @@ export class ExtensionRuntime {
       this.respond(id, null);
       return;
     }
+    this.registerSettingsPage(page);
     // Send the whole settings page so the host can render it without another fetch.
     // `serializer.command` registers the page with the active sink, so later
     // content/form requests can resolve it.
@@ -499,9 +576,10 @@ export class ExtensionRuntime {
       return;
     }
     const items = await page.getItems();
-    const scope = this.beginPageScope(pageId);
+    const scope = this.createPageScope(pageId);
     const serialized = await this.withScopeSink(scope, () => this.serializer.listItems(items));
-    this.reconcilePageContent(pageId, scope);
+    this.assertNoLiveCommandCollisions(scope.commands.values(), { excludePageScopeId: pageId });
+    this.commitPageScope(pageId, scope);
     this.respond(id, { items: serialized, hasMoreItems: page.hasMoreItems ?? false });
   }
 
@@ -540,9 +618,10 @@ export class ExtensionRuntime {
     // Re-serialize the page's current items so the host receives the appended
     // page as a continuation, along with whether further pages remain.
     const items = await page.getItems();
-    const scope = this.beginPageScope(pageId);
+    const scope = this.createPageScope(pageId);
     const serialized = await this.withScopeSink(scope, () => this.serializer.listItems(items));
-    this.reconcilePageContent(pageId, scope);
+    this.assertNoLiveCommandCollisions(scope.commands.values(), { excludePageScopeId: pageId });
+    this.commitPageScope(pageId, scope);
     this.respond(id, { items: serialized, hasMoreItems: page.hasMoreItems ?? false });
   }
 
@@ -558,7 +637,7 @@ export class ExtensionRuntime {
     inputs: string,
     data: string,
   ): Promise<void> {
-    if (formId) {
+    if (formId !== undefined) {
       let handler = this.pageScopes.get(pageId)?.forms.get(formId);
       if (!handler) {
         // The page may not have been serialized yet, or its content changed;
@@ -576,20 +655,18 @@ export class ExtensionRuntime {
     }
 
     // Fallback for a host that does not yet send a formId: preserve today's
-    // behavior by submitting the first form on the page.
-    const command = await this.resolveCommand(pageId);
-    const page = command ? asContentPage(command) : null;
-    if (!page) {
+    // behavior by submitting the first form discovered in the page content.
+    const serialized = await this.serializePageContent(pageId);
+    if (!serialized) {
       this.respondError(id, JsonRpcErrorCode.MethodNotFound, `Form page not found: ${pageId}`);
       return;
     }
-    const content = await page.getContent();
-    const form = content.find((item) => item.type === 'form');
-    if (!form) {
+    const handler = this.pageScopes.get(pageId)?.forms.values().next().value;
+    if (!handler) {
       this.respondError(id, JsonRpcErrorCode.MethodNotFound, `Form content not found: ${pageId}`);
       return;
     }
-    const result = await form.submitForm(inputs, data);
+    const result = await handler(inputs, data);
     this.respond(id, await this.serializeOwnedResult(pageId, result));
   }
 
@@ -605,18 +682,25 @@ export class ExtensionRuntime {
       return null;
     }
     const content = await page.getContent();
-    const scope = this.beginPageScope(pageId);
+    const scope = this.createPageScope(pageId);
     const collector = createFormCollector(scope);
-    const serialized = await this.withScopeSink(scope, () =>
-      Promise.all(content.map((item) => this.serializer.content(item, collector))),
-    );
-    this.reconcilePageContent(pageId, scope);
+    const treeChildren = new Map<Content, Content[]>();
+    await reserveExplicitFormIds(content, collector, treeChildren);
+    const serialized = await this.withScopeSink(scope, async () => {
+      const result: Record<string, unknown>[] = [];
+      for (const item of content) {
+        result.push(await this.serializer.content(item, collector, treeChildren));
+      }
+      return result;
+    });
+    this.assertNoLiveCommandCollisions(scope.commands.values(), { excludePageScopeId: pageId });
+    this.commitPageScope(pageId, scope);
     return serialized;
   }
 
   private async applyFallbackQuery(commandId: string, query: string): Promise<void> {
     let item = this.fallbacks.get(commandId);
-    if (!item && !this.primed) {
+    if (!item && !this.fallbackScopeLoaded) {
       await this.primeCaches();
       item = this.fallbacks.get(commandId);
     }
@@ -631,48 +715,80 @@ export class ExtensionRuntime {
   }
 
   private async primeCaches(): Promise<void> {
-    if (this.primed) {
-      return;
-    }
-    this.primed = true;
     const provider = this.provider;
     if (!provider) {
       return;
     }
-    const commands = await provider.topLevelCommands();
-    for (const item of commands) {
-      this.providerScope.set(item.command.id, item.command);
+    if (!this.providerScopeLoaded) {
+      const commands = await provider.topLevelCommands();
+      const scope = new Map<string, ICommand>();
+      await this.withMapSink(scope, () => this.serializer.commandItems(commands));
+      this.assertNoLiveCommandCollisions(scope.values(), { excludeProviderScope: true });
+      const previous = this.providerScope;
+      this.providerScope = scope;
+      this.retireMissing(previous.keys(), scope);
+      this.providerScopeLoaded = true;
     }
-    const fallbacks = (await provider.fallbackCommands?.()) ?? null;
-    if (fallbacks) {
-      for (const item of fallbacks) {
-        this.fallbackScope.set(item.command.id, item.command);
-        this.fallbacks.set(item.command.id, item);
+    if (!this.fallbackScopeLoaded) {
+      const items = (await provider.fallbackCommands?.()) ?? null;
+      const scope = new Map<string, ICommand>();
+      const fallbacks = items
+        ? this.collectFallbackItems(items)
+        : new Map<string, IFallbackCommandItem>();
+      if (items) {
+        await this.withMapSink(scope, () => this.serializer.commandItems(items));
+        this.assertNoLiveCommandCollisions(scope.values(), { excludeFallbackScope: true });
       }
+      const previous = this.fallbackScope;
+      this.fallbackScope = scope;
+      this.fallbacks.clear();
+      for (const [fallbackId, item] of fallbacks) {
+        this.fallbacks.set(fallbackId, item);
+      }
+      this.retireMissing(previous.keys(), scope);
+      this.fallbackScopeLoaded = true;
     }
     if (provider.settings?.settingsPage) {
-      const page = provider.settings.settingsPage;
-      this.resolved.set(page.id, page);
+      this.registerSettingsPage(provider.settings.settingsPage);
     }
   }
 
-  private beginPageScope(pageId: string): PageScope {
+  private collectFallbackItems(
+    items: Iterable<IFallbackCommandItem>,
+  ): Map<string, IFallbackCommandItem> {
+    const fallbacks = new Map<string, IFallbackCommandItem>();
+    for (const item of items) {
+      const fallbackId = item.id ?? item.command.id;
+      const existing = fallbacks.get(fallbackId);
+      if (existing && existing !== item) {
+        throw new Error(`Duplicate fallback item id: ${fallbackId}`);
+      }
+      fallbacks.set(fallbackId, item);
+    }
+    return fallbacks;
+  }
+
+  private createPageScope(pageId: string): PageScope {
     const previous = this.pageScopes.get(pageId);
-    const scope: PageScope = {
+    return {
       generation: (previous?.generation ?? 0) + 1,
       commands: new Map(),
       forms: new Map(),
     };
+  }
+
+  private commitPageScope(pageId: string, scope: PageScope): void {
     this.pageScopes.set(pageId, scope);
-    return scope;
+    this.reconcilePageContent(pageId, scope);
   }
 
   private async withMapSink<T>(
     target: Map<string, ICommand>,
     produce: () => T | Promise<T>,
   ): Promise<T> {
+    const seen = new Set<string>();
     return this.withSink((command) => {
-      target.set(command.id, command);
+      this.registerUnique(target, seen, command);
     }, produce);
   }
 
@@ -696,17 +812,25 @@ export class ExtensionRuntime {
     }
   }
 
+  private registerSettingsPage(page: ICommand): void {
+    const resolved = new Map<string, ICommand>();
+    const seen = new Set<string>();
+    this.registerUnique(resolved, seen, page);
+    this.assertNoLiveCommandCollisions(resolved.values());
+    for (const [commandId, command] of resolved) {
+      this.resolved.set(commandId, command);
+    }
+  }
+
   private registerUnique(
     target: Map<string, ICommand>,
     seen: Set<string>,
     command: ICommand,
   ): void {
+    const existing = target.get(command.id);
     if (seen.has(command.id)) {
-      const existing = target.get(command.id);
       if (existing && existing !== command) {
-        process.stderr.write(
-          `cmdpal-sdk: duplicate command id "${command.id}" in one response; keeping the first.\n`,
-        );
+        throw new Error(`Duplicate command id: ${command.id}`);
       }
       return;
     }
@@ -724,7 +848,7 @@ export class ExtensionRuntime {
       this.resolved.set(command.id, command);
       return command;
     }
-    if (!this.primed) {
+    if (!this.providerScopeLoaded || !this.fallbackScopeLoaded) {
       await this.primeCaches();
       return this.lookupCommand(commandId);
     }
@@ -756,7 +880,10 @@ export class ExtensionRuntime {
    * result commands) so the whole subtree is released together. Safe for ids
    * that own no scope.
    */
-  private retire(commandId: string): void {
+  private retire(commandId: string, ignoreResolvedReference = false): void {
+    if (this.hasLiveReference(commandId, ignoreResolvedReference)) {
+      return;
+    }
     this.resolved.delete(commandId);
     this.pageScopes.delete(commandId);
     const contentChildren = this.pageContentChildren.get(commandId);
@@ -770,9 +897,92 @@ export class ExtensionRuntime {
     }
     if (resultChildren) {
       for (const childId of resultChildren) {
-        this.retire(childId);
+        this.retire(childId, true);
       }
     }
+  }
+
+  private hasLiveReference(commandId: string, ignoreResolvedReference: boolean): boolean {
+    if (
+      this.hasRegistryReference(commandId, ignoreResolvedReference) ||
+      this.hasLiveResultOwnerReference(commandId)
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  private hasRegistryReference(commandId: string, ignoreResolvedReference: boolean): boolean {
+    if (
+      this.providerScope.has(commandId) ||
+      this.fallbackScope.has(commandId) ||
+      (!ignoreResolvedReference && this.resolved.has(commandId))
+    ) {
+      return true;
+    }
+    for (const scope of this.pageScopes.values()) {
+      if (scope.commands.has(commandId)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private hasLiveResultOwnerReference(commandId: string): boolean {
+    for (const [ownerId, children] of this.resultChildren) {
+      if (children.has(commandId) && this.hasRegistryReference(ownerId, false)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private assertNoLiveCommandCollisions(
+    commands: Iterable<ICommand>,
+    options: LiveCommandCollisionOptions = {},
+  ): void {
+    for (const command of commands) {
+      if (this.hasLiveCommandCollision(command, options)) {
+        throw new Error(`Duplicate command id across live scopes: ${command.id}`);
+      }
+    }
+  }
+
+  private hasLiveCommandCollision(
+    command: ICommand,
+    options: LiveCommandCollisionOptions,
+  ): boolean {
+    if (
+      !options.excludeProviderScope &&
+      this.commandConflict(this.providerScope.get(command.id), command)
+    ) {
+      return true;
+    }
+    if (
+      !options.excludeFallbackScope &&
+      this.commandConflict(this.fallbackScope.get(command.id), command)
+    ) {
+      return true;
+    }
+    if (
+      !options.excludeResolvedScope &&
+      this.commandConflict(this.resolved.get(command.id), command)
+    ) {
+      return true;
+    }
+    for (const [pageId, scope] of this.pageScopes) {
+      if (pageId === options.excludePageScopeId) {
+        continue;
+      }
+      if (this.commandConflict(scope.commands.get(command.id), command)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private commandConflict(existing: ICommand | undefined, command: ICommand): boolean {
+    return existing !== undefined && existing !== command;
   }
 
   /** Retires every id in `ids` that is absent from the surviving `keep` map. */
@@ -802,6 +1012,34 @@ export class ExtensionRuntime {
     }
   }
 
+  private requireStringParam(
+    id: number | string,
+    params: Record<string, unknown>,
+    key: string,
+  ): string | null {
+    const value = stringField(params, key);
+    if (value === undefined) {
+      this.respondError(
+        id,
+        JsonRpcErrorCode.InvalidParams,
+        `Invalid params: "${key}" must be a string.`,
+      );
+      return null;
+    }
+    return value;
+  }
+
+  private optionalStringParam(
+    id: number | string,
+    params: Record<string, unknown>,
+    key: string,
+  ): string | undefined | null {
+    if (!(key in params)) {
+      return undefined;
+    }
+    return this.requireStringParam(id, params, key);
+  }
+
   /**
    * Serializes a command result, attributing any nested commands it emits (a
    * confirm dialog's primary command, or a toast continuation) to `ownerId` so
@@ -812,14 +1050,16 @@ export class ExtensionRuntime {
     ownerId: string,
     result: CommandResult,
   ): Promise<ReturnType<WireSerializer['commandResult']>> {
+    const resolved = new Map<string, ICommand>();
     const children = new Set<string>();
-    const serialized = await this.withSink(
-      (command) => {
-        this.resolved.set(command.id, command);
-        children.add(command.id);
-      },
-      () => this.serializer.commandResult(result),
+    const serialized = await this.withMapSink(resolved, () =>
+      this.serializer.commandResult(result),
     );
+    this.assertNoLiveCommandCollisions(resolved.values());
+    for (const [commandId, command] of resolved) {
+      this.resolved.set(commandId, command);
+      children.add(commandId);
+    }
     if (children.size > 0) {
       const existing = this.resultChildren.get(ownerId);
       if (existing) {
@@ -848,16 +1088,54 @@ export class ExtensionRuntime {
 
 function createFormCollector(scope: PageScope): FormCollector {
   let counter = 0;
+  const allocatedIds = new Set<string>();
+  const registeredIds = new Set<string>();
   return {
+    reserve(formId: string): void {
+      if (registeredIds.has(formId)) {
+        throw new Error(`Duplicate form id: ${formId}`);
+      }
+      registeredIds.add(formId);
+    },
     nextId(): string {
+      while (
+        allocatedIds.has(`form-${String(counter)}`) ||
+        registeredIds.has(`form-${String(counter)}`)
+      ) {
+        counter += 1;
+      }
       const id = `form-${String(counter)}`;
       counter += 1;
+      allocatedIds.add(id);
       return id;
     },
     register(formId: string, handler: FormSubmitHandler): void {
+      if (scope.forms.has(formId)) {
+        throw new Error(`Duplicate form id: ${formId}`);
+      }
+      if (allocatedIds.has(formId)) {
+        allocatedIds.delete(formId);
+      }
+      registeredIds.add(formId);
       scope.forms.set(formId, handler);
     },
   };
+}
+
+async function reserveExplicitFormIds(
+  content: Content[],
+  forms: FormCollector,
+  treeChildren: Map<Content, Content[]>,
+): Promise<void> {
+  for (const item of content) {
+    if (item.type === 'form' && item.formId) {
+      forms.reserve(item.formId);
+    } else if (item.type === 'tree') {
+      const children = await item.getChildren();
+      treeChildren.set(item, children);
+      await reserveExplicitFormIds([item.rootContent, ...children], forms, treeChildren);
+    }
+  }
 }
 
 function withTimeout(work: Promise<void>, timeoutMs: number): Promise<void> {
@@ -868,6 +1146,7 @@ function withTimeout(work: Promise<void>, timeoutMs: number): Promise<void> {
     void work.catch(() => undefined);
     return Promise.resolve();
   }
+
   if (!Number.isFinite(timeoutMs)) {
     // An explicit, non-finite bound (Infinity) means wait without a deadline.
     return work;
@@ -888,6 +1167,21 @@ function withTimeout(work: Promise<void>, timeoutMs: number): Promise<void> {
       },
     );
   });
+}
+
+async function disposeProvider(
+  provider: ICommandProvider,
+  timeoutMs: number = DEFAULT_DISPOSE_TIMEOUT_MS,
+): Promise<void> {
+  if (!provider.dispose) {
+    return;
+  }
+
+  try {
+    await withTimeout(Promise.resolve(provider.dispose()), timeoutMs);
+  } catch (error) {
+    process.stderr.write(`cmdpal-sdk: provider disposal failed: ${describeError(error)}\n`);
+  }
 }
 
 function describeError(error: unknown): string {

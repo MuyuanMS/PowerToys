@@ -81,9 +81,30 @@ describe('Settings Adaptive Card required inputs', () => {
     expect(inputs.theme?.type).toBe('Input.ChoiceSet');
     expect(inputs.theme?.isRequired).toBe(true);
   });
+
+  it('uses input labels instead of separate visual label blocks', () => {
+    const settings = new Settings();
+    settings.add(new ToggleSetting('agree', 'Agree'));
+    settings.add(new TextSetting('name', 'Name'));
+    settings.add(new ChoiceSetSetting('theme', 'Theme', []));
+
+    const inputs = cardInputs(settings);
+    expect(inputs.agree?.title).toBe('Agree');
+    expect(inputs.name?.label).toBe('Name');
+    expect(inputs.theme?.label).toBe('Theme');
+  });
 });
 
 describe('Settings change notification', () => {
+  it('rejects duplicate setting keys', () => {
+    const settings = new Settings();
+    settings.add(new TextSetting('name', 'Name'));
+
+    expect(() => settings.add(new ToggleSetting('name', 'Use name'))).toThrow(
+      'Duplicate setting key: name',
+    );
+  });
+
   it('fires subscribers and updates values on submit', async () => {
     const settings = new Settings();
     settings.add(new ToggleSetting('dark', 'Dark Mode', false));

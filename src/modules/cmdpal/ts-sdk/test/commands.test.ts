@@ -36,10 +36,22 @@ describe('OpenUrlCommand', () => {
     expect(opener).toHaveBeenCalledWith('https://example.com/');
   });
 
-  it('derives an id and defaults the name to the URL', () => {
-    const command = new OpenUrlCommand('https://example.com/', undefined, vi.fn());
-    expect(command.id).toBe('open-url:https://example.com/');
-    expect(command.name).toBe('https://example.com/');
+  it('keeps the target URL out of the generated id and default name', () => {
+    const url = 'https://example.com/?token=secret';
+    const command = new OpenUrlCommand(url, undefined, vi.fn());
+
+    expect(command.id).toMatch(/^open-url:[0-9a-f]{16}$/);
+    expect(command.id).not.toContain(url);
+    expect(command.name).toBe('Open');
+  });
+
+  it('derives stable, distinct ids from the full target URL', () => {
+    const first = new OpenUrlCommand('https://example.com/?value=one', undefined, vi.fn());
+    const same = new OpenUrlCommand('https://example.com/?value=one', undefined, vi.fn());
+    const different = new OpenUrlCommand('https://example.com/?value=two', undefined, vi.fn());
+
+    expect(first.id).toBe(same.id);
+    expect(first.id).not.toBe(different.id);
   });
 });
 

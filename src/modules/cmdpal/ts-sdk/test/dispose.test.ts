@@ -13,6 +13,30 @@ function createRuntime(): { runtime: ExtensionRuntime; onDispose: ReturnType<typ
 }
 
 describe('graceful async disposal', () => {
+  it('disposes a provider that resolves after shutdown starts', async () => {
+    const dispose = vi.fn();
+    let resolveProvider!: (provider: ICommandProvider) => void;
+    const providerPromise = new Promise<ICommandProvider>((resolve) => {
+      resolveProvider = resolve;
+    });
+    const { runtime, onDispose } = createRuntime();
+    runtime.beginInitialization(providerPromise);
+
+    await runtime.dispose();
+    resolveProvider({
+      id: 'ext',
+      displayName: 'Ext',
+      topLevelCommands: () => [],
+      dispose,
+    });
+    await providerPromise;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(onDispose).toHaveBeenCalledTimes(1);
+    expect(runtime.isDisposed).toBe(true);
+  });
+
   it('awaits an asynchronous provider disposal before completing', async () => {
     let disposed = false;
     const provider: ICommandProvider = {

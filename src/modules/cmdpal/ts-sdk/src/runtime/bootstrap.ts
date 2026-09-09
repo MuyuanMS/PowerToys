@@ -49,12 +49,15 @@ export async function bootstrap(entry: string): Promise<unknown> {
  *
  * @returns The resolved entry specifier, or `null` when none was provided.
  */
-export function resolveCliEntry(argv: readonly string[], env: NodeJS.ProcessEnv): string | null {
+export function resolveCliEntry(
+  argv: readonly string[],
+  env: Readonly<Record<string, string | undefined>>,
+): string | null {
   const raw = argv[2] ?? env.CMDPAL_EXTENSION_ENTRY;
   if (raw === undefined || raw.length === 0) {
     return null;
   }
-  if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(raw)) {
+  if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(raw) && !/^[a-zA-Z]:[\\/]/.test(raw)) {
     // Already a URL (for example a file: URL); import it as-is.
     return raw;
   }
@@ -93,8 +96,13 @@ export async function runBootstrapCli(): Promise<void> {
     await bootstrap(entry);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`cmdpal-sdk: failed to load extension entry "${entry}": ${message}\n`);
-    process.exitCode = 1;
+    await new Promise<void>((resolve) => {
+      process.stderr.write(
+        `cmdpal-sdk: failed to load extension entry "${entry}": ${message}\n`,
+        () => resolve(),
+      );
+    });
+    process.exit(1);
   }
 }
 

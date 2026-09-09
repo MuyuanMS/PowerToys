@@ -44,13 +44,13 @@ export class OpenUrlCommand implements IInvokableCommand {
    * Creates a command that opens a URL.
    *
    * @param url URL to open.
-   * @param name Display name. Defaults to the URL.
+   * @param name Display name. Defaults to `'Open'`.
    * @param opener Function used to open the URL. Defaults to the system browser;
    * override in tests.
    */
   constructor(url: string, name?: string, opener: UrlOpener = openUrlInDefaultBrowser) {
-    this.id = `open-url:${url}`;
-    this.name = name ?? url;
+    this.name = name ?? 'Open';
+    this.id = stableId('open-url', { url, name: this.name });
     this.url = url;
     this.opener = opener;
   }

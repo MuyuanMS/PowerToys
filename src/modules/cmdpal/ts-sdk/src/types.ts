@@ -144,6 +144,12 @@ export type ObservablePropertyName =
   | 'displayTitle'
   | 'commands';
 
+/** Observable properties that can be sent directly without command serialization. */
+export type DirectObservablePropertyName = Exclude<
+  ObservablePropertyName,
+  'command' | 'emptyContent' | 'commands' | 'moreCommands' | 'details'
+>;
+
 /** The base contract for every command and page. */
 export interface ICommand {
   /** Unique identifier. */
@@ -411,6 +417,8 @@ export interface IListPage extends IPage {
   gridProperties?: GridProperties | null;
   /** Whether more items can be loaded (infinite scroll). */
   hasMoreItems?: boolean;
+  /** Handles a filter selection change from the host. */
+  setFilter?(filterId: string): void | Promise<void>;
   /** Item shown when the list is empty, or `null` for none. */
   emptyContent?: ICommandItem | null;
   /**
