@@ -16,6 +16,7 @@ public class IconPathParserTests
     [DataRow(@"C:\shortcut.lnk,0", @"C:\shortcut.lnk", 0)]
     [DataRow(@"C:\icons.dll,010", @"C:\icons.dll", 8)]
     [DataRow(@"C:\icons.dll,0x10", @"C:\icons.dll", 16)]
+    [DataRow(@"C:\icons.dll,268435454", @"C:\icons.dll", 268435454)]
     public void ParsesSupportedBinaryIconReferences(string input, string expectedPath, int expectedIndex)
     {
         Assert.IsTrue(IconPathParser.TryParseBinaryIconReference(input, out var result));
@@ -28,6 +29,9 @@ public class IconPathParserTests
     [DataRow(@"C:\APP.EXE,0")]
     [DataRow(@"C:\icons.dll,not-an-index")]
     [DataRow(@"C:\folder,with-comma\icons.dll,1")]
+    [DataRow(@"C:\icons.dll,2147483647")]
+    [DataRow(@"C:\icons.dll,2147483648")]
+    [DataRow(@"C:\icons.dll,-2147483648")]
     public void RejectsInputsTheNativeConverterDidNotTreatAsBinaryIcons(string input)
     {
         Assert.IsFalse(IconPathParser.TryParseBinaryIconReference(input, out _));
