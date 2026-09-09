@@ -52,7 +52,7 @@ namespace LaserPointerCore
             return;
         }
 
-        const Sample& last = m_points.back();
+        Sample& last = m_points.back();
 
         // Streamline: pull the incoming sample back towards the previous one. This is
         // the smoothing excalidraw applies on every added point.
@@ -64,6 +64,7 @@ namespace LaserPointerCore
         const float dy = sy - last.y;
         if ((dx * dx + dy * dy) < (m_options.minDistance * m_options.minDistance))
         {
+            last.t = timestampMs;
             return;
         }
 

@@ -157,6 +157,7 @@ namespace
 struct LaserPointerOverlay
 {
     static LaserPointerOverlay* instance;
+    static SRWLOCK instanceLock;
 
     bool MyRegisterClass(HINSTANCE hInstance);
     void Terminate();
@@ -391,7 +392,10 @@ private:
         USAGE usagePage = 0;
         USAGE usage = 0;
         LONG minX = 0, maxX = 0, minY = 0, maxY = 0;
+        RECT deviceRect{};
+        RECT displayRect{};
         bool haveX = false, haveY = false;
+        bool haveDisplayMapping = false;
         bool usable = false;
     };
     std::unordered_map<HANDLE, PenDevice> m_penDevices;
@@ -405,6 +409,7 @@ private:
 };
 
 LaserPointerOverlay* LaserPointerOverlay::instance = nullptr;
+SRWLOCK LaserPointerOverlay::instanceLock = SRWLOCK_INIT;
 
 #pragma region Graphics
 
@@ -1541,6 +1546,7 @@ void LaserPointerOverlay::ApplyShareTarget(HWND target)
     if (!m_presenter.Retarget(target))
     {
         Logger::warn("Laser Pointer presenter could not change target.");
+        PublishPresenterState();
         return;
     }
 
@@ -1558,15 +1564,20 @@ void LaserPointerOverlay::ApplyShareTarget(HWND target)
 // overwrite the answer with itself.
 void CALLBACK LaserPointerOverlay::ForegroundEventProc(HWINEVENTHOOK, DWORD, HWND hWnd, LONG idObject, LONG idChild, DWORD, DWORD) noexcept
 {
-    if (idObject != OBJID_WINDOW || idChild != CHILDID_SELF || instance == nullptr)
+    if (idObject != OBJID_WINDOW || idChild != CHILDID_SELF)
     {
         return;
     }
 
+    AcquireSRWLockShared(&instanceLock);
     if (PresenterWindow::IsPresentableWindow(hWnd))
     {
-        instance->m_lastPresentableForeground = hWnd;
+        if (instance != nullptr)
+        {
+            instance->m_lastPresentableForeground = hWnd;
+        }
     }
+    ReleaseSRWLockShared(&instanceLock);
 }
 
 // Waits briefly for the window that opened the flyout to come back to the front, then
@@ -2063,6 +2074,7 @@ bool LaserPointerOverlay::ReadPenReport(RAWINPUT* input, POINT& screenPoint, boo
         }
 
         device.usable = device.haveX && device.haveY;
+        device.haveDisplayMapping = GetPointerDeviceRects(input->header.hDevice, &device.deviceRect, &device.displayRect) != FALSE;
         Logger::info("Laser Pointer pen device: usable={} x=[{},{}] y=[{},{}]",
                      device.usable,
                      device.minX,
@@ -2108,24 +2120,24 @@ bool LaserPointerOverlay::ReadPenReport(RAWINPUT* input, POINT& screenPoint, boo
         }
     }
 
-    // Digitizer coordinates are logical units spanning the whole tablet surface; map
-    // them onto the virtual desktop.
-    const int virtualLeft = GetSystemMetrics(SM_XVIRTUALSCREEN);
-    const int virtualTop = GetSystemMetrics(SM_YVIRTUALSCREEN);
-    const int virtualWidth = GetSystemMetrics(SM_CXVIRTUALSCREEN);
-    const int virtualHeight = GetSystemMetrics(SM_CYVIRTUALSCREEN);
-
-    const double spanX = static_cast<double>(device.maxX) - static_cast<double>(device.minX);
-    const double spanY = static_cast<double>(device.maxY) - static_cast<double>(device.minY);
-    if (spanX <= 0.0 || spanY <= 0.0)
+    if (!device.haveDisplayMapping)
     {
-        return false;
+        // Let the pointer stack apply the digitizer's monitor mapping and orientation.
+        // This is preferable to stretching a built-in digitizer across every monitor.
+        return GetCursorPos(&screenPoint) != FALSE;
     }
 
-    const double offsetX = static_cast<double>(x) - static_cast<double>(device.minX);
-    const double offsetY = static_cast<double>(y) - static_cast<double>(device.minY);
-    screenPoint.x = virtualLeft + static_cast<LONG>((offsetX / spanX) * virtualWidth);
-    screenPoint.y = virtualTop + static_cast<LONG>((offsetY / spanY) * virtualHeight);
+    const double spanX = static_cast<double>(device.deviceRect.right) - static_cast<double>(device.deviceRect.left);
+    const double spanY = static_cast<double>(device.deviceRect.bottom) - static_cast<double>(device.deviceRect.top);
+    if (spanX == 0.0 || spanY == 0.0)
+    {
+        return GetCursorPos(&screenPoint) != FALSE;
+    }
+
+    const double normalizedX = (static_cast<double>(x) - device.deviceRect.left) / spanX;
+    const double normalizedY = (static_cast<double>(y) - device.deviceRect.top) / spanY;
+    screenPoint.x = device.displayRect.left + static_cast<LONG>(normalizedX * (device.displayRect.right - device.displayRect.left));
+    screenPoint.y = device.displayRect.top + static_cast<LONG>(normalizedY * (device.displayRect.bottom - device.displayRect.top));
     return true;
 }
 
@@ -2240,10 +2252,13 @@ void LaserPointerOverlay::HandleRawInput(HRAWINPUT handle) noexcept
 
 LRESULT CALLBACK LaserPointerOverlay::MouseHookProc(int nCode, WPARAM wParam, LPARAM lParam) noexcept
 {
-    if (nCode == HC_ACTION && instance != nullptr)
+    if (nCode == HC_ACTION)
     {
+        AcquireSRWLockShared(&instanceLock);
         const auto* data = reinterpret_cast<const MSLLHOOKSTRUCT*>(lParam);
-        if (instance->HandleMouseInput(wParam, data) != 0)
+        const bool handled = instance != nullptr && instance->HandleMouseInput(wParam, data) != 0;
+        ReleaseSRWLockShared(&instanceLock);
+        if (handled)
         {
             return 1;
         }
@@ -2721,88 +2736,110 @@ void LaserPointerOverlay::Terminate()
 
 void LaserPointerApplySettings(LaserPointerSettings settings)
 {
+    AcquireSRWLockShared(&LaserPointerOverlay::instanceLock);
     if (LaserPointerOverlay::instance != nullptr)
     {
         LaserPointerOverlay::instance->QueueSettings(settings);
     }
+    ReleaseSRWLockShared(&LaserPointerOverlay::instanceLock);
 }
 
 void LaserPointerSwitch()
 {
+    AcquireSRWLockShared(&LaserPointerOverlay::instanceLock);
     if (LaserPointerOverlay::instance != nullptr)
     {
         Logger::info("Switching Laser Pointer mouse activation mode.");
         LaserPointerOverlay::instance->SwitchActivationMode();
     }
+    ReleaseSRWLockShared(&LaserPointerOverlay::instanceLock);
 }
 
 void LaserPointerSwitchPen()
 {
+    AcquireSRWLockShared(&LaserPointerOverlay::instanceLock);
     if (LaserPointerOverlay::instance != nullptr)
     {
         Logger::info("Switching Laser Pointer pen activation mode.");
         LaserPointerOverlay::instance->SwitchPenActivationMode();
     }
+    ReleaseSRWLockShared(&LaserPointerOverlay::instanceLock);
 }
 
 void LaserPointerShareWindow()
 {
+    AcquireSRWLockShared(&LaserPointerOverlay::instanceLock);
     if (LaserPointerOverlay::instance != nullptr)
     {
         Logger::info("Sharing a Laser Pointer window.");
         LaserPointerOverlay::instance->ShareWindow();
     }
+    ReleaseSRWLockShared(&LaserPointerOverlay::instanceLock);
 }
 
 void LaserPointerStopSharing()
 {
+    AcquireSRWLockShared(&LaserPointerOverlay::instanceLock);
     if (LaserPointerOverlay::instance != nullptr)
     {
         Logger::info("Stopping Laser Pointer sharing.");
         LaserPointerOverlay::instance->StopSharing();
     }
+    ReleaseSRWLockShared(&LaserPointerOverlay::instanceLock);
 }
 
 void LaserPointerShareWindowExternal()
 {
+    AcquireSRWLockShared(&LaserPointerOverlay::instanceLock);
     if (LaserPointerOverlay::instance != nullptr)
     {
         Logger::info("Sharing a Laser Pointer window (external trigger).");
         LaserPointerOverlay::instance->ShareWindowDeferred();
     }
+    ReleaseSRWLockShared(&LaserPointerOverlay::instanceLock);
 }
 
 void LaserPointerDisable()
 {
+    AcquireSRWLockShared(&LaserPointerOverlay::instanceLock);
     if (LaserPointerOverlay::instance != nullptr)
     {
         Logger::info("Terminating the Laser Pointer instance.");
         LaserPointerOverlay::instance->Terminate();
     }
+    ReleaseSRWLockShared(&LaserPointerOverlay::instanceLock);
 }
 
 bool LaserPointerIsEnabled()
 {
-    return LaserPointerOverlay::instance != nullptr;
+    AcquireSRWLockShared(&LaserPointerOverlay::instanceLock);
+    const bool enabled = LaserPointerOverlay::instance != nullptr;
+    ReleaseSRWLockShared(&LaserPointerOverlay::instanceLock);
+    return enabled;
 }
 
 int LaserPointerMain(HINSTANCE hInstance, LaserPointerSettings settings)
 {
     Logger::info("Starting a Laser Pointer instance.");
+    AcquireSRWLockExclusive(&LaserPointerOverlay::instanceLock);
     if (LaserPointerOverlay::instance != nullptr)
     {
+        ReleaseSRWLockExclusive(&LaserPointerOverlay::instanceLock);
         Logger::error("A Laser Pointer instance was still working when trying to start a new one.");
         return 0;
     }
 
     LaserPointerOverlay overlay;
     LaserPointerOverlay::instance = &overlay;
+    ReleaseSRWLockExclusive(&LaserPointerOverlay::instanceLock);
     overlay.ApplySettings(settings);
 
     if (!overlay.MyRegisterClass(hInstance))
     {
         Logger::error("Couldn't initialize a Laser Pointer instance.");
+        AcquireSRWLockExclusive(&LaserPointerOverlay::instanceLock);
         LaserPointerOverlay::instance = nullptr;
+        ReleaseSRWLockExclusive(&LaserPointerOverlay::instanceLock);
         return FALSE;
     }
 
@@ -2825,7 +2862,9 @@ int LaserPointerMain(HINSTANCE hInstance, LaserPointerSettings settings)
     }
 
     Logger::info("Laser Pointer message loop ended.");
+    AcquireSRWLockExclusive(&LaserPointerOverlay::instanceLock);
     LaserPointerOverlay::instance = nullptr;
+    ReleaseSRWLockExclusive(&LaserPointerOverlay::instanceLock);
 
     return static_cast<int>(msg.wParam);
 }

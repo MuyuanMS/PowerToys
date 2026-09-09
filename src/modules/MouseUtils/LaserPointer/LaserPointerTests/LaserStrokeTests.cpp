@@ -178,6 +178,8 @@ namespace LaserPointerUnitTests
             }
 
             Assert::AreEqual(static_cast<size_t>(1), s.PointCount(), L"a stationary pointer does not pile up samples");
+            Assert::IsTrue(s.Prune(1500), L"the retained stationary point uses the latest sample timestamp");
+            Assert::IsFalse(s.Prune(2500), L"the stationary point expires after input stops");
         }
 
         TEST_METHOD(FinishStopsAcceptingPointsAndClearResets)

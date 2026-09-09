@@ -104,7 +104,7 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
                 Tag = moduleType,
                 CommandParameter = action,
                 Visible = GetItemVisibility(moduleType, action),
-                Description = GetModuleToolTip(moduleType),
+                Description = GetModuleToolTip(moduleType, action),
                 Icon = GetItemIcon(moduleType, action),
                 Command = new RelayCommand(() => _launcher.Launch(moduleType, action)),
             });
@@ -227,7 +227,7 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
             RefreshItemsVisibility();
         }
 
-        private string GetModuleToolTip(ModuleType moduleType)
+        private string GetModuleToolTip(ModuleType moduleType, string? action)
         {
             return moduleType switch
             {
@@ -235,6 +235,7 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
                 ModuleType.FancyZones => SettingsRepository<FancyZonesSettings>.GetInstance(SettingsUtils.Default).SettingsConfig.Properties.FancyzonesEditorHotkey.Value.ToString(),
                 ModuleType.PowerDisplay => SettingsRepository<PowerDisplaySettings>.GetInstance(SettingsUtils.Default).SettingsConfig.Properties.ActivationShortcut.ToString(),
                 ModuleType.KeyboardManager => SettingsRepository<KeyboardManagerSettings>.GetInstance(SettingsUtils.Default).SettingsConfig.Properties.DefaultEditorShortcut.ToString(),
+                ModuleType.LaserPointer when action == LaserPointerActions.StopSharing => SettingsRepository<LaserPointerSettings>.GetInstance(SettingsUtils.Default).SettingsConfig.Properties.PresenterStopShortcut.ToString(),
                 ModuleType.LaserPointer => SettingsRepository<LaserPointerSettings>.GetInstance(SettingsUtils.Default).SettingsConfig.Properties.PresenterActivationShortcut.ToString(),
                 ModuleType.LightSwitch => SettingsRepository<LightSwitchSettings>.GetInstance(SettingsUtils.Default).SettingsConfig.Properties.ToggleThemeHotkey.Value.ToString(),
                 ModuleType.PowerLauncher => SettingsRepository<PowerLauncherSettings>.GetInstance(SettingsUtils.Default).SettingsConfig.Properties.OpenPowerLauncher.ToString(),

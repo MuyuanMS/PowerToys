@@ -8,6 +8,7 @@
 #include <common/interop/shared_constants.h>
 
 #include <algorithm>
+#include <atomic>
 
 namespace
 {
@@ -90,6 +91,8 @@ private:
     // Quick Access drives sharing through events of its own, one per button.
     EventWaiter m_presenterEventWaiter;
     EventWaiter m_presenterStopEventWaiter;
+    std::thread m_overlayThread;
+    std::atomic_bool m_overlayFinished{ true };
 
 public:
     LaserPointer()
@@ -152,7 +155,12 @@ public:
     {
         m_enabled = true;
         Trace::EnableLaserPointer(true);
-        std::thread([=]() { LaserPointerMain(m_hModule, m_laserPointerSettings); }).detach();
+        m_overlayFinished = false;
+        const LaserPointerSettings settings = m_laserPointerSettings;
+        m_overlayThread = std::thread([this, settings]() {
+            LaserPointerMain(m_hModule, settings);
+            m_overlayFinished = true;
+        });
 
         // Start listening for external trigger event so we can invoke the same logic as the hotkey.
         m_triggerEventWaiter.start(CommonSharedConstants::LASER_POINTER_TRIGGER_EVENT, [this](DWORD) {
@@ -172,11 +180,25 @@ public:
     {
         m_enabled = false;
         Trace::EnableLaserPointer(false);
-        LaserPointerDisable();
 
         m_triggerEventWaiter.stop();
         m_presenterEventWaiter.stop();
         m_presenterStopEventWaiter.stop();
+
+        while (!m_overlayFinished && !LaserPointerIsEnabled())
+        {
+            Sleep(10);
+        }
+
+        if (!m_overlayFinished)
+        {
+            LaserPointerDisable();
+        }
+
+        if (m_overlayThread.joinable())
+        {
+            m_overlayThread.join();
+        }
     }
 
     virtual bool is_enabled() override
