@@ -143,15 +143,9 @@ internal static class InitialsTextRenderer
         {
             var mappings = analyzer.GetFonts(format);
             Span<bool> covered = stackalloc bool[text.Length];
-            covered.Clear();
 
             foreach (var mapping in mappings)
             {
-                if (mapping.Value is null)
-                {
-                    return false;
-                }
-
                 var range = mapping.Key;
                 if (range.CharacterIndex < 0
                     || range.CharacterCount <= 0

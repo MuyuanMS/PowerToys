@@ -39,38 +39,18 @@ internal sealed class SvgIconProtocolProcessor : IIconProtocolProcessor
         ElementTheme theme,
         out IconPathConverter.PreparedIcon preparedIcon)
     {
-        var kind = SvgIconProtocol.Classify(value);
-        if (kind is SvgIconProtocol.Kind.PlainFile or SvgIconProtocol.Kind.ThemedFile)
-        {
-            preparedIcon = null!;
-            return false;
-        }
-
         preparedIcon = SvgIconProtocol.TryCreateSvg(value, theme, out var svg)
             ? IconPathConverter.PreparedIcon.FromSvgData(svg, targetSize)
             : IconPathConverter.PreparedIcon.Empty();
         return true;
     }
 
-    public async ValueTask<IconProtocolProcessingResult> PrepareAsync(
+    public ValueTask<IconProtocolProcessingResult> PrepareAsync(
         string value,
         int targetSize,
         ElementTheme theme)
     {
-        var kind = SvgIconProtocol.Classify(value);
-        IconPathConverter.PreparedIcon preparedIcon;
-        if (kind is SvgIconProtocol.Kind.PlainFile or SvgIconProtocol.Kind.ThemedFile)
-        {
-            preparedIcon = await Task.Run(() =>
-                SvgIconProtocol.TryCreateSvg(value, theme, out var svg)
-                    ? IconPathConverter.PreparedIcon.FromSvgData(svg, targetSize)
-                    : IconPathConverter.PreparedIcon.Empty()).ConfigureAwait(false);
-        }
-        else
-        {
-            _ = TryPrepareSynchronously(value, targetSize, theme, out preparedIcon);
-        }
-
-        return IconProtocolProcessingResult.FromPreparedIcon(preparedIcon);
+        _ = TryPrepareSynchronously(value, targetSize, theme, out var preparedIcon);
+        return ValueTask.FromResult(IconProtocolProcessingResult.FromPreparedIcon(preparedIcon));
     }
 }

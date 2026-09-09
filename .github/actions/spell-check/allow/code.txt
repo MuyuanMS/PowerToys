@@ -349,7 +349,6 @@ NVI
 Storyboards
 
 # Misc Win32 APIs and PInvokes
-rasterizes
 DEFAULTTONEAREST
 INVOKEIDLIST
 LCMAP

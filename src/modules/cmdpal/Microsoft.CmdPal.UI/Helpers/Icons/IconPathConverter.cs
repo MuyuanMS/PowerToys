@@ -70,6 +70,47 @@ internal static partial class IconPathConverter
         return PreparedIcon.FromGlyph(glyph, family, targetSize > 0 ? targetSize : 8);
     }
 
+    public static PreparedIcon PrepareFirstAvailable(
+        ReadOnlySpan<string> candidates,
+        string? fontFamily,
+        int targetSize,
+        ElementTheme theme = ElementTheme.Default)
+    {
+        foreach (var candidate in candidates)
+        {
+            PreparedIcon prepared;
+            try
+            {
+                prepared = Prepare(candidate, fontFamily, targetSize, theme);
+            }
+            catch
+            {
+                // Failed candidate must not prevent later candidates from being tried.
+                continue;
+            }
+
+            // Ordinary conversion can produce an empty source or a placeholder glyph.
+            // Neither should stop an ordered fallback search.
+            var isAvailable = prepared.Kind switch
+            {
+                PreparedIconKind.Empty => false,
+                PreparedIconKind.Binary => prepared.SoftwareBitmap is not null,
+                PreparedIconKind.Glyph => FontIconGlyphClassifier.IsGlyphCandidate(candidate),
+                PreparedIconKind.BitmapUri or PreparedIconKind.SvgUri => !prepared.Uri!.IsFile || File.Exists(prepared.Uri.LocalPath),
+                _ => false,
+            };
+
+            if (isAvailable)
+            {
+                return prepared;
+            }
+
+            prepared.Dispose();
+        }
+
+        return PreparedIcon.Empty();
+    }
+
     public static Task<IconSource> CreateIconSourceAsync(PreparedIcon icon)
     {
         try
@@ -159,10 +200,6 @@ internal static partial class IconPathConverter
             return true;
         }
     }
-
-    internal static bool RequiresAsynchronousMaterialization(PreparedIcon icon) =>
-        icon.Kind == PreparedIconKind.SvgData ||
-        (icon.Kind == PreparedIconKind.Binary && icon.SoftwareBitmap is not null);
 
     /// <summary>
     /// Completes icon-source creation after <see cref="TryCreateIconSourceSynchronously"/>

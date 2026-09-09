@@ -15,6 +15,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="Assets\Images\**\*" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\SplashScreen.scale-200.png" />
     <Content Include="Assets\LockScreenLogo.scale-200.png" />
     <Content Include="Assets\Square150x150Logo.scale-200.png" />
@@ -25,10 +26,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Assets\Images\PlainSampleIcon.svg">
+    <Content Update="Assets\Images\PlainSampleIcon.svg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Assets\Images\ThemedSampleIcon.svg">
+    <Content Update="Assets\Images\ThemedSampleIcon.svg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

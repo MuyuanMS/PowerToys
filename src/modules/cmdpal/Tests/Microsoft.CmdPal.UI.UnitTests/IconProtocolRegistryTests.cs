@@ -2,7 +2,6 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System.Text;
 using Microsoft.CmdPal.UI.Helpers;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.UI.Xaml;
@@ -122,47 +121,6 @@ public class IconProtocolRegistryTests
         using (preparedIcon)
         {
             Assert.AreEqual(IconPathConverter.PreparedIconKind.SvgData, preparedIcon.Kind);
-        }
-    }
-
-    [TestMethod]
-    public void SvgFileProtocolDefersFileIoToAsyncPath()
-    {
-        const string Value = "|ThemedSvg|warning|C:\\Icons\\sample.svg";
-        var processor = IconProtocolRegistry.Find(Value);
-
-        Assert.IsNotNull(processor);
-        Assert.IsFalse(processor.TryPrepareSynchronously(
-            Value,
-            20,
-            ElementTheme.Light,
-            out var preparedIcon));
-        Assert.IsNull(preparedIcon);
-    }
-
-    [TestMethod]
-    public async Task SvgFileProtocolPreparesFileOnAsyncPath()
-    {
-        var path = Path.Combine(Environment.CurrentDirectory, $"CmdPal-{Guid.NewGuid():N}.svg");
-        try
-        {
-            const string Svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" />";
-            File.WriteAllText(path, Svg, Encoding.UTF8);
-            var value = $"|ThemedSvg|warning|{path}";
-            var processor = IconProtocolRegistry.Find(value);
-
-            Assert.IsNotNull(processor);
-            var result = await processor.PrepareAsync(value, 20, ElementTheme.Light);
-            using var preparedIcon = result.TakePreparedIcon();
-
-            Assert.IsNotNull(preparedIcon);
-            Assert.AreEqual(IconPathConverter.PreparedIconKind.SvgData, preparedIcon.Kind);
-            Assert.AreEqual(20, preparedIcon.TargetSize);
-            CollectionAssert.AreEqual(Encoding.UTF8.GetBytes(Svg), preparedIcon.SvgData);
-        }
-        finally
-        {
-            File.Delete(path);
         }
     }
 

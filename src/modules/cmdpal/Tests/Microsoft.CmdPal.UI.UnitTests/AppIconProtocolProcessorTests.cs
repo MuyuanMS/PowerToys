@@ -40,81 +40,55 @@ public class AppIconProtocolProcessorTests
         Assert.AreSame(stream, result.BitmapStream);
     }
 
-    [TestMethod]
-    public async Task FallsBackToPrimaryAfterEveryThumbnailMisses()
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task PreservesFallbackCandidatesAfterEveryThumbnailMisses(bool jumbo)
     {
         const string primary = "C:\\Icons\\primary.ico";
-        const string fallback = "C:\\Program Files\\Example\\app.exe";
+        const string finalFallback = "steam://run/123|variant";
+        var fallback = $"{GetShell32DllPath()},1";
         var processor = new AppIconProtocolProcessor(
-            (_, _) => Task.FromResult<IRandomAccessStream?>(null));
+            static (_, _) => Task.FromResult<IRandomAccessStream?>(null));
 
-        using var result = await processor.PrepareAsync(
-            AppIconProtocol.Create(primary, fallback),
-            20,
-            ElementTheme.Default);
+        var iconDescription = jumbo
+            ? AppIconProtocol.CreateJumbo(primary, fallback, finalFallback)
+            : AppIconProtocol.Create(primary, fallback);
+        using var result = await processor.PrepareAsync(iconDescription, 20, ElementTheme.Default);
 
-        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.FallbackIconString, result.Kind);
-        Assert.AreEqual(primary, result.FallbackIconString);
+        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.FallbackIconStrings, result.Kind);
+        CollectionAssert.AreEqual(
+            jumbo ? new[] { primary, fallback, finalFallback } : new[] { primary, fallback },
+            result.FallbackIconStrings);
     }
 
-    [TestMethod]
-    public async Task FallsBackToLaterOrdinaryIconCandidateAfterThumbnailMisses()
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    [Timeout(5_000)]
+    public async Task MissingExecutableUsesIndexedFallbackAfterThumbnailMisses(bool jumbo)
     {
-        const string primary = "C:\\Icons\\primary.ico";
-        const string fallback = "ms-appx:///Assets/icon.svg";
+        var primary = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.exe");
+        var fallback = $"{GetShell32DllPath()},1";
         var processor = new AppIconProtocolProcessor(
-            (_, _) => Task.FromResult<IRandomAccessStream?>(null));
+            static (_, _) => Task.FromResult<IRandomAccessStream?>(null));
 
         using var result = await processor.PrepareAsync(
-            AppIconProtocol.Create(primary, fallback),
-            20,
+            jumbo ? AppIconProtocol.CreateJumbo(primary, fallback) : AppIconProtocol.Create(primary, fallback),
+            32,
             ElementTheme.Default);
 
-        using var prepared = result.TakePreparedIcon();
+        Assert.IsNotNull(result.FallbackIconStrings);
+        using var prepared = IconPathConverter.PrepareFirstAvailable(result.FallbackIconStrings, null, 32);
 
-        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.PreparedIcon, result.Kind);
-        Assert.IsNotNull(prepared);
-        Assert.AreEqual(IconPathConverter.PreparedIconKind.SvgUri, prepared.Kind);
-        Assert.AreEqual(fallback, prepared.Uri?.OriginalString);
+        Assert.AreEqual(IconPathConverter.PreparedIconKind.Binary, prepared.Kind);
+        Assert.IsNotNull(prepared.SoftwareBitmap);
+        Assert.IsTrue(prepared.SoftwareBitmap.PixelWidth > 0);
+        Assert.IsTrue(prepared.SoftwareBitmap.PixelHeight > 0);
     }
 
-    [TestMethod]
-    public async Task SkipsUnsupportedUriFallbackCandidateAfterThumbnailMisses()
+    private static string GetShell32DllPath()
     {
-        const string primary = "C:\\Icons\\primary.ico";
-        const string unsupportedFallback = "steam://run/123|variant";
-        const string supportedFallback = "ms-appx:///Assets/icon.svg";
-        var processor = new AppIconProtocolProcessor(
-            (_, _) => Task.FromResult<IRandomAccessStream?>(null));
-
-        using var result = await processor.PrepareAsync(
-            AppIconProtocol.Create(primary, unsupportedFallback, supportedFallback),
-            20,
-            ElementTheme.Default);
-
-        using var prepared = result.TakePreparedIcon();
-
-        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.PreparedIcon, result.Kind);
-        Assert.IsNotNull(prepared);
-        Assert.AreEqual(IconPathConverter.PreparedIconKind.SvgUri, prepared.Kind);
-        Assert.AreEqual(supportedFallback, prepared.Uri?.OriginalString);
-    }
-
-    [TestMethod]
-    public async Task SkipsInvalidGlyphFallbackCandidateAfterThumbnailMisses()
-    {
-        const string primary = "C:\\Icons\\primary.ico";
-        const string invalidGlyph = "not a glyph";
-        const string validGlyph = "\uE700";
-        var processor = new AppIconProtocolProcessor(
-            (_, _) => Task.FromResult<IRandomAccessStream?>(null));
-
-        using var result = await processor.PrepareAsync(
-            AppIconProtocol.Create(primary, invalidGlyph, validGlyph),
-            20,
-            ElementTheme.Default);
-
-        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.FallbackIconString, result.Kind);
-        Assert.AreEqual(validGlyph, result.FallbackIconString);
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "shell32.dll");
     }
 }

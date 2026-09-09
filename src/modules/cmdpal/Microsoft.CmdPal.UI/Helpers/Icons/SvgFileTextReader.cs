@@ -8,7 +8,6 @@ namespace Microsoft.CmdPal.UI.Helpers;
 
 internal static class SvgFileTextReader
 {
-    internal const int MaximumSvgFileSize = 1024 * 1024;
     private const int MaximumXmlDeclarationByteCount = 1024;
     private const int ReaderBufferSize = 1024;
 
@@ -24,12 +23,7 @@ internal static class SvgFileTextReader
     {
         text = string.Empty;
 
-        if (!TryReadBytes(path, out var bytes))
-        {
-            return false;
-        }
-
-        using var stream = new MemoryStream(bytes, writable: false);
+        using var stream = File.OpenRead(path);
 
         // An XML declaration contains only version, encoding, and standalone.
         // Bound the probe so a malformed file cannot grow stack or parsing work.
@@ -53,32 +47,12 @@ internal static class SvgFileTextReader
         return true;
     }
 
-    public static bool TryReadBytes(string path, out byte[] bytes)
-    {
-        bytes = [];
-
-        using var stream = File.OpenRead(path);
-        if (stream.Length is <= 0 or > MaximumSvgFileSize)
-        {
-            return false;
-        }
-
-        bytes = new byte[(int)stream.Length];
-        stream.ReadExactly(bytes);
-        return true;
-    }
-
     private static bool TryGetEncoding(ReadOnlySpan<byte> prefix, out Encoding encoding)
     {
         encoding = Encoding.UTF8;
 
-        // StreamReader handles byte-order marks. These signatures cover BOM-less UTF-16 and
+        // StreamReader handles BOMs. These signatures cover BOM-less UTF-16 and
         // UTF-32, whose zero bytes prevent reading the declaration as ASCII.
-        if (TryGetBomlessUnicodeEncoding(prefix, out encoding))
-        {
-            return true;
-        }
-
         if (prefix.Length >= 4)
         {
             if (prefix[0] == 0x00 && prefix[1] == 0x00 && prefix[2] == 0x00 && prefix[3] == 0x3C)
@@ -113,79 +87,6 @@ internal static class SvgFileTextReader
 
         return encodingName is null || TryResolveEncoding(encodingName, out encoding);
     }
-
-    private static bool TryGetBomlessUnicodeEncoding(ReadOnlySpan<byte> prefix, out Encoding encoding)
-    {
-        if (StartsWithEncodedXml(prefix, bytesPerCharacter: 4, bigEndian: true))
-        {
-            encoding = Utf32BigEndian;
-            return true;
-        }
-
-        if (StartsWithEncodedXml(prefix, bytesPerCharacter: 4, bigEndian: false))
-        {
-            encoding = Utf32LittleEndian;
-            return true;
-        }
-
-        if (StartsWithEncodedXml(prefix, bytesPerCharacter: 2, bigEndian: true))
-        {
-            encoding = Encoding.BigEndianUnicode;
-            return true;
-        }
-
-        if (StartsWithEncodedXml(prefix, bytesPerCharacter: 2, bigEndian: false))
-        {
-            encoding = Encoding.Unicode;
-            return true;
-        }
-
-        encoding = Encoding.UTF8;
-        return false;
-    }
-
-    private static bool StartsWithEncodedXml(
-        ReadOnlySpan<byte> prefix,
-        int bytesPerCharacter,
-        bool bigEndian)
-    {
-        for (var offset = 0; offset + bytesPerCharacter <= prefix.Length; offset += bytesPerCharacter)
-        {
-            var codePoint = ReadCodePoint(prefix.Slice(offset, bytesPerCharacter), bigEndian);
-            if (IsXmlWhitespace(codePoint))
-            {
-                continue;
-            }
-
-            return codePoint == '<';
-        }
-
-        return false;
-    }
-
-    private static int ReadCodePoint(ReadOnlySpan<byte> bytes, bool bigEndian)
-    {
-        var codePoint = 0;
-        if (bigEndian)
-        {
-            foreach (var value in bytes)
-            {
-                codePoint = (codePoint << 8) | value;
-            }
-        }
-        else
-        {
-            for (var index = bytes.Length - 1; index >= 0; index--)
-            {
-                codePoint = (codePoint << 8) | bytes[index];
-            }
-        }
-
-        return codePoint;
-    }
-
-    private static bool IsXmlWhitespace(int codePoint) =>
-        codePoint is 0x09 or 0x0A or 0x0D or 0x20;
 
     private static bool TryGetDeclaredEncodingName(
         ReadOnlySpan<byte> prefix,

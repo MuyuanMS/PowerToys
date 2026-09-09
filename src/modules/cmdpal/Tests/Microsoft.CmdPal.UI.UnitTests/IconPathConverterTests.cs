@@ -68,43 +68,66 @@ public class IconPathConverterTests
     }
 
     [TestMethod]
-    public void IconSourceMaterializationContractSeparatesSynchronousKindsFromBinaryTransfer()
+    public void FallbackPreparationPreservesCandidateOrderAndFontSettings()
     {
-        using var empty = IconPathConverter.PreparedIcon.Empty();
-        Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(empty));
+        using var prepared = IconPathConverter.PrepareFirstAvailable(
+            ["\uE700", "\uE701"],
+            "Custom Font",
+            24);
 
-        using var bitmapUri = IconPathConverter.PreparedIcon.FromUri(new Uri("ms-appx:///Assets/icon.png"), isSvg: false, targetSize: 20);
-        Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(bitmapUri));
+        Assert.AreEqual(IconPathConverter.PreparedIconKind.Glyph, prepared.Kind);
+        Assert.AreEqual("\uE700", prepared.Glyph);
+        Assert.AreEqual("Custom Font", prepared.FontFamily);
+        Assert.AreEqual(24, prepared.TargetSize);
+    }
 
-        using var svgUri = IconPathConverter.PreparedIcon.FromUri(new Uri("ms-appx:///Assets/icon.svg"), isSvg: true, targetSize: 20);
-        Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(svgUri));
+    [DataTestMethod]
+    [DataRow(".ico")]
+    [DataRow(".png")]
+    [DataRow(".svg")]
+    public void MissingImageFileDoesNotHideFallback(string extension)
+    {
+        var missingPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}{extension}");
+        using var prepared = IconPathConverter.PrepareFirstAvailable([missingPath, "\uE700"], null, 20);
 
-        using var glyph = IconPathConverter.PreparedIcon.FromGlyph("\uE700", "Segoe Fluent Icons", targetSize: 20);
-        Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(glyph));
+        Assert.AreEqual(IconPathConverter.PreparedIconKind.Glyph, prepared.Kind);
+        Assert.AreEqual("\uE700", prepared.Glyph);
+    }
 
-        using var svgData = IconPathConverter.PreparedIcon.FromSvgData([], targetSize: 20);
-        Assert.IsTrue(IconPathConverter.RequiresAsynchronousMaterialization(svgData));
+    [TestMethod]
+    public void EmptyAndPlaceholderPreparationsDoNotHideFallback()
+    {
+        using var prepared = IconPathConverter.PrepareFirstAvailable(
+            [string.Empty, "|AppIcon|", "not a glyph", "\u25CC"],
+            "Custom Font",
+            20);
 
-        using var emptyBinary = IconPathConverter.PreparedIcon.FromBinary(null);
-        Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(emptyBinary));
+        Assert.AreEqual(IconPathConverter.PreparedIconKind.Glyph, prepared.Kind);
+        Assert.AreEqual("\u25CC", prepared.Glyph);
+        Assert.AreEqual("Custom Font", prepared.FontFamily);
+    }
 
-        using var bitmap = new SoftwareBitmap(
-            BitmapPixelFormat.Bgra8,
-            1,
-            1,
-            BitmapAlphaMode.Premultiplied);
-        using var binary = IconPathConverter.PreparedIcon.FromBinary(bitmap);
+    [TestMethod]
+    public void FallbackPreparationPreservesNonFileUris()
+    {
+        const string uri = "ms-appx:///Assets/icon.svg";
+        using var prepared = IconPathConverter.PrepareFirstAvailable(["not a glyph", uri, "\uE700"], null, 24);
 
-        Assert.IsFalse(IconPathConverter.TryCreateIconSourceSynchronously(binary, out var binarySource));
-        Assert.IsNull(binarySource);
-        Assert.IsTrue(IconPathConverter.RequiresAsynchronousMaterialization(binary));
+        Assert.AreEqual(IconPathConverter.PreparedIconKind.SvgUri, prepared.Kind);
+        Assert.AreEqual(uri, prepared.Uri!.AbsoluteUri);
+        Assert.AreEqual(24, prepared.TargetSize);
+    }
 
-        var transferred = binary.TakeSoftwareBitmap();
+    [TestMethod]
+    public void FallbackPreparationReturnsEmptyWhenEveryCandidateFails()
+    {
+        var missingExecutable = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.exe");
+        using var prepared = IconPathConverter.PrepareFirstAvailable(
+            [missingExecutable, "|AppIcon|", "not a glyph"],
+            null,
+            20);
 
-        Assert.AreSame(bitmap, transferred);
-        Assert.IsNull(binary.SoftwareBitmap);
-        Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(binary));
-        Assert.IsNull(binary.TakeSoftwareBitmap());
+        Assert.AreEqual(IconPathConverter.PreparedIconKind.Empty, prepared.Kind);
     }
 
     [TestMethod]
@@ -115,6 +138,7 @@ public class IconPathConverterTests
             null,
             20,
             ElementTheme.Dark);
+
         Assert.AreEqual(IconPathConverter.PreparedIconKind.Empty, prepared.Kind);
     }
 
