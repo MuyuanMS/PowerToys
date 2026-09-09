@@ -1523,6 +1523,44 @@ void GetAnimatedZoomSourceCoordinates( float zoomLevel, const POINT* cursorPos, 
         *y = min(static_cast<float>(cursorPos->y) + verticalBoundary - scaledHeight, static_cast<float>(height) - scaledHeight);
 }
 
+struct AnimatedZoomViewport
+{
+    float sourceX;
+    float sourceY;
+    int sourceLeft;
+    int sourceTop;
+    int sourceWidth;
+    int sourceHeight;
+    int destX;
+    int destY;
+    int destWidth;
+    int destHeight;
+};
+
+AnimatedZoomViewport GetAnimatedZoomViewport( float zoomLevel, const POINT* cursorPos, int width, int height,
+                                              int targetX, int targetY, int targetWidth, int targetHeight )
+{
+    AnimatedZoomViewport viewport{};
+    GetAnimatedZoomSourceCoordinates( zoomLevel, cursorPos, width, height, &viewport.sourceX, &viewport.sourceY );
+
+    viewport.sourceX += static_cast<float>( targetX ) / zoomLevel;
+    viewport.sourceY += static_cast<float>( targetY ) / zoomLevel;
+
+    const auto scaledTargetWidth = static_cast<float>( targetWidth ) / zoomLevel;
+    const auto scaledTargetHeight = static_cast<float>( targetHeight ) / zoomLevel;
+    viewport.sourceLeft = static_cast<int>( std::floor( viewport.sourceX ) );
+    viewport.sourceTop = static_cast<int>( std::floor( viewport.sourceY ) );
+    const int sourceRight = min( width, static_cast<int>( std::ceil( viewport.sourceX + scaledTargetWidth ) ) );
+    const int sourceBottom = min( height, static_cast<int>( std::ceil( viewport.sourceY + scaledTargetHeight ) ) );
+    viewport.sourceWidth = sourceRight - viewport.sourceLeft;
+    viewport.sourceHeight = sourceBottom - viewport.sourceTop;
+    viewport.destX = static_cast<int>( std::lround( ( static_cast<float>( viewport.sourceLeft ) - viewport.sourceX ) * zoomLevel ) );
+    viewport.destY = static_cast<int>( std::lround( ( static_cast<float>( viewport.sourceTop ) - viewport.sourceY ) * zoomLevel ) );
+    viewport.destWidth = static_cast<int>( std::lround( static_cast<float>( viewport.sourceWidth ) * zoomLevel ) );
+    viewport.destHeight = static_cast<int>( std::lround( static_cast<float>( viewport.sourceHeight ) * zoomLevel ) );
+    return viewport;
+}
+
 
 //----------------------------------------------------------------------------
 //
@@ -10909,20 +10947,13 @@ LRESULT APIENTRY MainWndProc(
             GetClipCursor( &oldClipRect );
             ClipCursor( NULL );
 
-            // Translate the viewport selection into coordinates for the 1:1 source
-            // bitmap hdcScreenCompat.
-            float viewportX, viewportY;
-            GetAnimatedZoomSourceCoordinates( zoomLevel, &cursorPos, width, height, &viewportX, &viewportY );
-
-            int saveX = static_cast<int>( std::floor( viewportX + static_cast<float>( copyX ) / zoomLevel ) );
-            int saveY = static_cast<int>( std::floor( viewportY + static_cast<float>( copyY ) / zoomLevel ) );
-            int saveWidth = static_cast<int>( std::ceil( static_cast<float>( copyWidth ) / zoomLevel ) );
-            int saveHeight = static_cast<int>( std::ceil( static_cast<float>( copyHeight ) / zoomLevel ) );
+            const auto saveViewport = GetAnimatedZoomViewport( zoomLevel, &cursorPos, width, height,
+                                                               copyX, copyY, copyWidth, copyHeight );
 
             // Create a pixel-accurate copy of the desired area from the source bitmap.
             wil::unique_hdc hdcActualSize( CreateCompatibleDC( hdcScreen ) );
             wil::unique_hbitmap hbmActualSize(
-                CreateCompatibleBitmap( hdcScreen, saveWidth, saveHeight ) );
+                CreateCompatibleBitmap( hdcScreen, saveViewport.sourceWidth, saveViewport.sourceHeight ) );
             // Note: we do not need to restore the existing context later. The objects
             // are transient and not reused.
             SelectObject( hdcActualSize.get(), hbmActualSize.get() );
@@ -10930,9 +10961,9 @@ LRESULT APIENTRY MainWndProc(
             // Perform a direct 1:1 copy from the backing bitmap.
             BitBlt( hdcActualSize.get(),
                     0, 0,
-                    saveWidth, saveHeight,
+                    saveViewport.sourceWidth, saveViewport.sourceHeight,
                     hdcScreenCompat,
-                    saveX, saveY,
+                    saveViewport.sourceLeft, saveViewport.sourceTop,
                     SRCCOPY | CAPTUREBLT );
 
             // Open the Save As dialog and capture the desired file path and whether to
@@ -11079,11 +11110,11 @@ LRESULT APIENTRY MainWndProc(
                     SetStretchBltMode( hdcZoomed.get(), bltMode );
 
                     StretchBlt( hdcZoomed.get(),
-                                0, 0,
-                                copyWidth, copyHeight,
+                                saveViewport.destX, saveViewport.destY,
+                                saveViewport.destWidth, saveViewport.destHeight,
                                 hdcActualSize.get(),
                                 0, 0,
-                                saveWidth, saveHeight,
+                                saveViewport.sourceWidth, saveViewport.sourceHeight,
                                 SRCCOPY | CAPTUREBLT );
 
                     SaveImage( targetFilePath.c_str(), hbmZoomed.get(), imageFormat );
@@ -11101,13 +11132,13 @@ LRESULT APIENTRY MainWndProc(
                 {
                     wil::unique_hdc hdcClipboard( CreateCompatibleDC( hdcScreen ) );
                     HBITMAP hbmClipboard =
-                        CreateCompatibleBitmap( hdcScreen, saveWidth, saveHeight );
+                        CreateCompatibleBitmap( hdcScreen, saveViewport.sourceWidth, saveViewport.sourceHeight );
                     if( hdcClipboard && hbmClipboard )
                     {
                         HGDIOBJ hOldClip = SelectObject( hdcClipboard.get(), hbmClipboard );
                         BitBlt( hdcClipboard.get(),
                                 0, 0,
-                                saveWidth, saveHeight,
+                                saveViewport.sourceWidth, saveViewport.sourceHeight,
                                 hdcActualSize.get(),
                                 0, 0,
                                 SRCCOPY );
@@ -11635,26 +11666,12 @@ LRESULT APIENTRY MainWndProc(
 #endif
             // Keep the same fractional viewport while drawing and typing so entering annotation cannot shift the
             // magnified content by up to one source pixel.
-            float sourceX;
-            float sourceY;
-            GetAnimatedZoomSourceCoordinates( zoomLevel, &cursorPos, width, height, &sourceX, &sourceY );
-
-            const int sourceLeft = static_cast<int>( std::floor( sourceX ) );
-            const int sourceTop = static_cast<int>( std::floor( sourceY ) );
-            const int sourceRight = min( width, static_cast<int>( std::ceil( sourceX + static_cast<float>( width ) / zoomLevel ) ) );
-            const int sourceBottom = min( height, static_cast<int>( std::ceil( sourceY + static_cast<float>( height ) / zoomLevel ) ) );
-            const int srcW = sourceRight - sourceLeft;
-            const int srcH = sourceBottom - sourceTop;
-            // Enlarge with StretchBlt (so HALFTONE interpolates) and offset the destination to compensate the
-            // sub-pixel origin, giving smooth device-pixel-granular motion instead of source-pixel snapping.
-            const int destX = static_cast<int>( std::lround( ( static_cast<float>( sourceLeft ) - sourceX ) * zoomLevel ) );
-            const int destY = static_cast<int>( std::lround( ( static_cast<float>( sourceTop ) - sourceY ) * zoomLevel ) );
-            const int destW = static_cast<int>( std::lround( static_cast<float>( srcW ) * zoomLevel ) );
-            const int destH = static_cast<int>( std::lround( static_cast<float>( srcH ) * zoomLevel ) );
+            const auto renderViewport = GetAnimatedZoomViewport( zoomLevel, &cursorPos, width, height,
+                                                                 0, 0, width, height );
             StretchBlt( ps.hdc,
-                    destX, destY, destW, destH,
+                    renderViewport.destX, renderViewport.destY, renderViewport.destWidth, renderViewport.destHeight,
                     hdcScreenCompat,
-                    sourceLeft, sourceTop, srcW, srcH,
+                    renderViewport.sourceLeft, renderViewport.sourceTop, renderViewport.sourceWidth, renderViewport.sourceHeight,
                     SRCCOPY|CAPTUREBLT );
 #endif
         } else if( g_TimerActive ) {
@@ -12248,6 +12265,7 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 
             zoomLevel = newZoomLevel;
             zoomAnimation.Stop( zoomLevel );
+            transformDirty = TRUE;
         } else {
 
             zoomLevel = zoomAnimation.Retarget( zoomTelescopeTarget, GetTickCount64(),
@@ -12266,6 +12284,7 @@ LRESULT CALLBACK LiveZoomWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 
                 zoomLevel = zoomTelescopeTarget;
                 zoomAnimation.Stop( zoomLevel );
+                transformDirty = TRUE;
             } else {
 
                 zoomLevel = zoomAnimation.Retarget( zoomTelescopeTarget, GetTickCount64(),
