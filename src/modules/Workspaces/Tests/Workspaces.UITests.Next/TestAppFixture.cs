@@ -17,6 +17,7 @@ namespace Microsoft.Workspaces.UITests
         internal const string DefaultTitle = "Workspaces UI test app";
         private const string PackageName = "Microsoft.PowerToys.Workspaces.TestApp";
         private const string Publisher = "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US";
+        private const string ProcessName = "Workspaces.TestApp";
         private readonly PackageManager packageManager = new();
         private Package? package;
         private bool ownsRegistration;
@@ -96,7 +97,7 @@ namespace Microsoft.Workspaces.UITests
         internal IReadOnlyList<int> ProcessIds()
         {
             var ids = new List<int>();
-            foreach (var process in Process.GetProcessesByName("Workspaces.TestApp"))
+            foreach (var process in Process.GetProcessesByName(ProcessName))
             {
                 using (process)
                 {
@@ -181,15 +182,13 @@ namespace Microsoft.Workspaces.UITests
 
                 if (ownsRegistration)
                 {
-                    foreach (var registered in RegisteredPackages())
+                    var registrations = RegisteredPackages();
+                    foreach (var registered in registrations)
                     {
                         Assert.AreEqual(Publisher, registered.Id.Publisher, "Refusing to remove an unrelated package.");
-                        var removed = packageManager.RemovePackageAsync(registered.Id.FullName)
-                            .AsTask().WaitAsync(TimeSpan.FromSeconds(90)).GetAwaiter().GetResult();
-                        Assert.IsNull(removed.ExtendedErrorCode, $"Could not remove the fixture package: {removed.ErrorText}");
                     }
 
-                    Assert.HasCount(0, RegisteredPackages(), "The fixture package remained registered after cleanup.");
+                    RemoveRegistrations(registrations.Select(registered => registered.Id.FullName));
                     ownsRegistration = false;
                     package = null;
                 }
@@ -205,7 +204,7 @@ namespace Microsoft.Workspaces.UITests
 
             var packagePath = Path.Combine(AppContext.BaseDirectory, "Workspaces.TestApp.msix");
             PackagedFixturePrerequisites.RequireSignature(packagePath, EnvironmentConfig.IsInPipeline);
-            Assert.HasCount(0, RegisteredPackages(), "A previous fixture package is still registered; remove it before starting a new suite.");
+            ReclaimPreviousRun(context);
             context.WriteLine($"[{DateTime.UtcNow:HH:mm:ss.fff}] Installing the signed fixture for the current user: {packagePath}");
             ownsRegistration = true;
             DeploymentResult deployment;
@@ -236,6 +235,81 @@ namespace Microsoft.Workspaces.UITests
                 RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant(),
                 package.Id.Architecture.ToString().ToLowerInvariant(),
                 "Fixture architecture must match the test host.");
+        }
+
+        private void ReclaimPreviousRun(TestContext context)
+        {
+            var registrations = RegisteredPackages();
+            foreach (var registered in registrations)
+            {
+                Assert.AreEqual(Publisher, registered.Id.Publisher, $"Refusing to reclaim an unrelated package: {registered.Id.FullName}.");
+            }
+
+            var packageNames = registrations.Select(registered => registered.Id.FullName).ToHashSet(StringComparer.Ordinal);
+            if (packageNames.Count == 0)
+            {
+                return;
+            }
+
+            context.WriteLine($"[{DateTime.UtcNow:HH:mm:ss.fff}] Reclaiming previous fixture registration(s): {string.Join(", ", packageNames)}");
+            ClosePackagedProcesses(packageNames);
+            RemoveRegistrations(packageNames);
+        }
+
+        private static void ClosePackagedProcesses(IReadOnlySet<string> packageNames)
+        {
+            foreach (var candidate in Process.GetProcessesByName(ProcessName))
+            {
+                using (candidate)
+                {
+                    if (candidate.HasExited)
+                    {
+                        continue;
+                    }
+
+                    string? identity;
+                    try
+                    {
+                        identity = NativeMethods.PackageFullName(candidate.Id);
+                    }
+                    catch (ArgumentException)
+                    {
+                        continue;
+                    }
+                    catch (Win32Exception) when (candidate.HasExited)
+                    {
+                        continue;
+                    }
+
+                    if (identity is null || !packageNames.Contains(identity))
+                    {
+                        continue;
+                    }
+
+                    foreach (var window in WindowControl.EnumerateProcessWindows([candidate.Id]))
+                    {
+                        WindowControl.TryCloseWindow(window.Hwnd.ToInt64());
+                    }
+
+                    if (!candidate.WaitForExit(5_000))
+                    {
+                        candidate.Kill(entireProcessTree: true);
+                        Assert.IsTrue(candidate.WaitForExit(10_000), $"The stale packaged fixture PID {candidate.Id} did not exit.");
+                    }
+                }
+            }
+        }
+
+        private void RemoveRegistrations(IEnumerable<string> packageNames)
+        {
+            foreach (var packageName in packageNames.ToArray())
+            {
+                var removed = packageManager.RemovePackageAsync(packageName)
+                    .AsTask().WaitAsync(TimeSpan.FromSeconds(90)).GetAwaiter().GetResult();
+                Assert.IsNull(removed.ExtendedErrorCode, $"Could not remove the fixture package: {removed.ErrorText}");
+            }
+
+            Assert.HasCount(0, RegisteredPackages(), "The fixture package remained registered after cleanup.");
         }
 
         private Package[] RegisteredPackages() =>

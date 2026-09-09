@@ -71,17 +71,61 @@ namespace Microsoft.Workspaces.UITests
         }
 
         [TestInitialize]
-        public void PrepareWorkspace()
+        public async Task PrepareWorkspace()
         {
-            Assert.IsFalse(ElevationHelper.IsProcessElevated(Environment.ProcessId), "Run the Workspaces suite in a standard-user desktop.");
+            try
+            {
+                Assert.IsFalse(ElevationHelper.IsProcessElevated(Environment.ProcessId), "Run the Workspaces suite in a standard-user desktop.");
 
-            // Refresh the topology between cases; the class preflight runs before base initialization.
-            State.ResolveTarget();
-            StopModuleProcesses();
-            State.Fixture.CloseAll();
-            State.Reset();
-            settingsUi = null;
-            NavigateToSettings();
+                // Refresh the topology between cases; the class preflight runs before base initialization.
+                State.ResolveTarget();
+                StopModuleProcesses();
+                State.Fixture.CloseAll();
+                State.Reset();
+                settingsUi = null;
+                NavigateToSettings();
+            }
+            catch
+            {
+                try
+                {
+                    await CaptureFailureArtifactsBeforeCleanupAsync();
+                    AttachDiagnostics();
+                }
+                catch (Exception error)
+                {
+                    TestContext.WriteLine($"Could not capture initialization failure diagnostics: {error.Message}");
+                }
+
+                try
+                {
+                    StopModuleProcesses();
+                }
+                catch (Exception error)
+                {
+                    TestContext.WriteLine($"Could not stop module processes after initialization failed: {error.Message}");
+                }
+
+                try
+                {
+                    State.Fixture.CloseAll();
+                }
+                catch (Exception error)
+                {
+                    TestContext.WriteLine($"Could not stop fixture processes after initialization failed: {error.Message}");
+                }
+
+                try
+                {
+                    Dispose();
+                }
+                catch (Exception error)
+                {
+                    TestContext.WriteLine($"Could not dispose test capture after initialization failed: {error.Message}");
+                }
+
+                throw;
+            }
         }
 
         [TestCleanup]
