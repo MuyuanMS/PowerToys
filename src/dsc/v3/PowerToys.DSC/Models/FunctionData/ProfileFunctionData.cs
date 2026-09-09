@@ -1,0 +1,533 @@
+// Copyright (c) Microsoft Corporation
+// The Microsoft Corporation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Security.Principal;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
+using System.Threading;
+using Microsoft.PowerToys.Settings.UI.Library;
+using Microsoft.PowerToys.Settings.UI.Library.Interfaces;
+using PowerToys.DSC.Models.KeyboardManager;
+using PowerToys.DSC.Models.ResourceObjects;
+
+namespace PowerToys.DSC.Models.FunctionData;
+
+/// <summary>
+/// Function data for the Keyboard Manager profile DSC resource. Reads and
+/// writes the remapping profile file selected by the module's active
+/// configuration and signals the Keyboard Manager engine to reload after a
+/// change.
+/// </summary>
+public sealed class ProfileFunctionData : BaseFunctionData
+{
+    // Named event the Keyboard Manager engine listens on to reload its
+    // configuration; see SettingsEventName in KeyboardManagerConstants.h.
+    public const string SettingsEventName = "PowerToys_KeyboardManager_Event_Settings";
+
+    private static readonly SettingsUtils _settingsUtils = SettingsUtils.Default;
+    private readonly Func<bool> _isProcessElevated;
+    private readonly Func<bool> _isKeyboardManagerEditorOpen;
+
+    // Structural problems with the input JSON (missing or null required
+    // members) detected before the model is materialized.
+    private readonly IList<string> _inputErrors;
+
+    // The stored profile is serialized without null properties to match the
+    // shape written by the C++ editor; the engine's JSON reader throws on
+    // null-valued properties, which would make it skip the entry.
+    private static readonly JsonSerializerOptions _profileSerializerOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
+
+    private static readonly JsonSerializerOptions _inputSerializerOptions = new()
+    {
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+    };
+
+    /// <summary>
+    /// Gets the desired state provided as input, if any.
+    /// </summary>
+    public ProfileResourceObject Input { get; }
+
+    /// <summary>
+    /// Gets the current state read from the profile file.
+    /// </summary>
+    public ProfileResourceObject Output { get; }
+
+    /// <summary>
+    /// Gets the warnings collected while reading the current profile.
+    /// </summary>
+    public IList<string> Warnings { get; } = [];
+
+    /// <summary>
+    /// Gets or sets the check used to decide whether the current process is
+    /// elevated when no check is supplied to the constructor. Tests that drive
+    /// the commands end to end replace it, because CI agents run elevated.
+    /// </summary>
+    public static Func<bool> IsProcessElevated { get; set; } = IsCurrentProcessElevated;
+
+    /// <summary>
+    /// Gets or sets the check used to decide whether the Keyboard Manager
+    /// editor is currently open. Tests replace it to cover the guarded path.
+    /// </summary>
+    public static Func<bool> IsKeyboardManagerEditorOpen { get; set; } = IsKeyboardManagerEditorCurrentlyOpen;
+
+    public ProfileFunctionData(
+        string? input = null,
+        Func<bool>? isProcessElevated = null,
+        Func<bool>? isKeyboardManagerEditorOpen = null)
+    {
+        _isProcessElevated = isProcessElevated ?? IsProcessElevated;
+        _isKeyboardManagerEditorOpen = isKeyboardManagerEditorOpen ?? IsKeyboardManagerEditorOpen;
+        Output = new();
+        Input = new();
+        _inputErrors = [];
+
+        if (string.IsNullOrEmpty(input))
+        {
+            return;
+        }
+
+        // Deserialization does not enforce [Required] or non-nullable
+        // annotations: "{}" would leave the empty default profile (and erase
+        // every remapping on Set) and null members would dereference later.
+        // Check the shape of the JSON before materializing the model.
+        var node = JsonNode.Parse(input);
+        _inputErrors = ValidateInputStructure(node);
+        if (_inputErrors.Count == 0)
+        {
+            Input = node.Deserialize<ProfileResourceObject>(_inputSerializerOptions) ?? new();
+        }
+    }
+
+    /// <summary>
+    /// Validates the input profile.
+    /// </summary>
+    /// <returns>The list of validation errors; empty when the input is valid.</returns>
+    public IList<string> ValidateInput()
+    {
+        return _inputErrors.Count > 0 ? _inputErrors : KbmProfileConverter.Validate(Input.Profile);
+    }
+
+    /// <summary>
+    /// Reads the current profile file into the output state.
+    /// </summary>
+    public void GetState()
+    {
+        using var transactionLock = AcquireTransactionLock();
+        var profileFileName = GetProfileFileName();
+        AddStoredProfileWarnings(profileFileName);
+        var profile = ReadSettings<KeyboardManagerProfile>(
+            KeyboardManagerSettings.ModuleName, profileFileName);
+        Output.Profile = KbmProfileConverter.FromProfile(profile, Warnings);
+    }
+
+    /// <summary>
+    /// Writes the desired profile to the profile file and signals the
+    /// Keyboard Manager engine to reload. Failing to signal is not an error;
+    /// the profile is loaded on the next PowerToys start.
+    /// </summary>
+    /// <returns>True when the running engine was signaled; otherwise false.</returns>
+    public bool SetState()
+    {
+        if (_isProcessElevated())
+        {
+            throw new UnauthorizedAccessException("Keyboard Manager profiles must be applied from a non-elevated process.");
+        }
+
+        using var transactionLock = AcquireTransactionLock();
+
+        if (_isKeyboardManagerEditorOpen())
+        {
+            throw new IOException("Keyboard Manager profiles cannot be applied while the Keyboard Manager editor is open.");
+        }
+
+        // Ensure the module settings exist so the engine can resolve the
+        // active configuration; without it LoadSettings() bails out early.
+        if (!_settingsUtils.SettingsExists(KeyboardManagerSettings.ModuleName))
+        {
+            var settings = new KeyboardManagerSettings();
+            _settingsUtils.SaveSettings(settings.ToJsonString(), KeyboardManagerSettings.ModuleName);
+            if (!_settingsUtils.SettingsExists(KeyboardManagerSettings.ModuleName))
+            {
+                throw new IOException("Keyboard Manager settings could not be created.");
+            }
+        }
+
+        var profile = KbmProfileConverter.ToProfile(Input.Profile);
+        var profileJson = JsonSerializer.Serialize(profile, _profileSerializerOptions);
+        SaveProfileAtomically(profileJson, GetProfileFileName());
+        VerifySavedProfile();
+
+        return SignalSettingsChangedEvent();
+    }
+
+    /// <summary>
+    /// Tests whether the desired state matches the current state, comparing
+    /// the canonical form of both profiles.
+    /// </summary>
+    /// <returns>True if the states match; otherwise false.</returns>
+    public bool TestState()
+    {
+        var input = JsonSerializer.SerializeToNode(KbmProfileConverter.Canonicalize(Input.Profile));
+        var output = JsonSerializer.SerializeToNode(Output.Profile);
+        return Warnings.Count == 0 && JsonNode.DeepEquals(input, output);
+    }
+
+    /// <summary>
+    /// Gets the difference between the desired and the current state.
+    /// </summary>
+    /// <returns>A JSON array with the differing property names.</returns>
+    public JsonArray GetDiffJson()
+    {
+        var diff = new JsonArray();
+        if (!TestState())
+        {
+            diff.Add(ProfileResourceObject.ProfileJsonPropertyName);
+        }
+
+        return diff;
+    }
+
+    /// <summary>
+    /// Gets the schema for the profile resource object.
+    /// </summary>
+    /// <returns>The JSON schema string.</returns>
+    public string Schema()
+    {
+        return GenerateSchema<ProfileResourceObject>();
+    }
+
+    /// <summary>
+    /// Checks whether the current process runs with administrator privileges.
+    /// </summary>
+    /// <returns>True if the process is elevated; otherwise false.</returns>
+    private static bool IsCurrentProcessElevated()
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
+    }
+
+    private static bool IsKeyboardManagerEditorCurrentlyOpen()
+    {
+        foreach (var processName in new[] { "PowerToys.KeyboardManagerEditorUI", "PowerToys.KeyboardManagerEditor" })
+        {
+            Process[] processes = [];
+            try
+            {
+                processes = Process.GetProcessesByName(processName);
+                if (processes.Length > 0)
+                {
+                    return true;
+                }
+            }
+            catch (Exception)
+            {
+            }
+            finally
+            {
+                foreach (var process in processes)
+                {
+                    process.Dispose();
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Gets the profile file name selected by the module's active
+    /// configuration, e.g. "default.json".
+    /// </summary>
+    /// <returns>The profile file name.</returns>
+    private static string GetProfileFileName()
+    {
+        var settingsPath = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName);
+        if (!File.Exists(settingsPath))
+        {
+            return "default.json";
+        }
+
+        JsonNode? settingsNode = JsonNode.Parse(File.ReadAllText(settingsPath));
+        if (settingsNode is not JsonObject root ||
+            !root.TryGetPropertyValue("properties", out var propertiesNode) || propertiesNode is not JsonObject properties ||
+            !properties.TryGetPropertyValue("activeConfiguration", out var activeConfigurationNode) || activeConfigurationNode is not JsonObject activeConfigurationObject ||
+            !activeConfigurationObject.TryGetPropertyValue("value", out var activeConfigurationValueNode) || activeConfigurationValueNode is not JsonValue activeConfigurationValue ||
+            !activeConfigurationValue.TryGetValue<string>(out var activeConfiguration) ||
+            string.IsNullOrWhiteSpace(activeConfiguration) ||
+            activeConfiguration.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+            !string.Equals(Path.GetFileName(activeConfiguration), activeConfiguration, StringComparison.Ordinal) ||
+            activeConfiguration is "." or "..")
+        {
+            throw new JsonException("The Keyboard Manager settings file does not define a valid active configuration.");
+        }
+
+        return $"{activeConfiguration}.json";
+    }
+
+    private void AddStoredProfileWarnings(string fileName)
+    {
+        var path = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName, fileName);
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        JsonNode? profileNode = JsonNode.Parse(File.ReadAllText(path));
+        if (profileNode is not JsonObject root)
+        {
+            Warnings.Add("Stored profile root is not a JSON object");
+            return;
+        }
+
+        ValidateRequiredObjectSection(root, "remapKeys", Warnings, "inProcess");
+        ValidateRequiredObjectSection(root, "remapKeysToText", Warnings, "inProcess");
+        ValidateRequiredObjectSection(root, "remapShortcuts", Warnings, "global", "appSpecific");
+        ValidateRequiredObjectSection(root, "remapShortcutsToText", Warnings, "global", "appSpecific");
+        AddNullValueWarnings(root, string.Empty, Warnings);
+    }
+
+    private static void ValidateRequiredObjectSection(JsonObject root, string sectionName, IList<string> warnings, params string[] requiredArrayNames)
+    {
+        if (!root.TryGetPropertyValue(sectionName, out var sectionNode))
+        {
+            warnings.Add($"Stored profile section '{sectionName}' is missing");
+            return;
+        }
+
+        if (sectionNode is not JsonObject sectionObject)
+        {
+            warnings.Add($"Stored profile section '{sectionName}' must be an object");
+            return;
+        }
+
+        foreach (var arrayName in requiredArrayNames)
+        {
+            if (!sectionObject.TryGetPropertyValue(arrayName, out var arrayNode))
+            {
+                warnings.Add($"Stored profile section '{sectionName}.{arrayName}' is missing");
+            }
+            else if (arrayNode is not JsonArray)
+            {
+                warnings.Add($"Stored profile section '{sectionName}.{arrayName}' must be an array");
+            }
+        }
+    }
+
+    private static void AddNullValueWarnings(JsonNode? node, string path, IList<string> warnings)
+    {
+        if (node is JsonObject obj)
+        {
+            foreach (var property in obj)
+            {
+                var childPath = string.IsNullOrEmpty(path) ? property.Key : $"{path}.{property.Key}";
+                if (property.Value == null)
+                {
+                    warnings.Add($"Stored profile member '{childPath}' has a null value");
+                }
+                else
+                {
+                    AddNullValueWarnings(property.Value, childPath, warnings);
+                }
+            }
+
+            return;
+        }
+
+        if (node is JsonArray array)
+        {
+            for (var i = 0; i < array.Count; i++)
+            {
+                var childPath = $"{path}[{i.ToString(CultureInfo.InvariantCulture)}]";
+                if (array[i] == null)
+                {
+                    warnings.Add($"Stored profile member '{childPath}' has a null value");
+                }
+                else
+                {
+                    AddNullValueWarnings(array[i], childPath, warnings);
+                }
+            }
+        }
+    }
+
+    private static T ReadSettings<T>(string moduleName, string fileName = SettingsUtils.DefaultFileName)
+        where T : ISettingsConfig, new()
+    {
+        try
+        {
+            var settings = _settingsUtils.GetSettings<T>(moduleName, fileName);
+            return settings ?? throw new JsonException($"The settings file '{fileName}' contains a null JSON value.");
+        }
+        catch (FileNotFoundException)
+        {
+            return new T();
+        }
+        catch (NullReferenceException ex)
+        {
+            throw new JsonException($"The settings file '{fileName}' contains a null JSON value.", ex);
+        }
+    }
+
+    private void VerifySavedProfile()
+    {
+        var saved = ReadSettings<KeyboardManagerProfile>(
+            KeyboardManagerSettings.ModuleName, GetProfileFileName());
+        var expectedModel = JsonSerializer.SerializeToNode(KbmProfileConverter.Canonicalize(Input.Profile));
+        var warnings = new List<string>();
+        var savedModel = JsonSerializer.SerializeToNode(KbmProfileConverter.FromProfile(saved, warnings));
+        if (warnings.Count > 0)
+        {
+            throw new IOException("The persisted Keyboard Manager profile contains malformed remappings.");
+        }
+
+        if (!JsonNode.DeepEquals(expectedModel, savedModel))
+        {
+            throw new IOException("The Keyboard Manager profile could not be persisted.");
+        }
+    }
+
+    private static void SaveProfileAtomically(string profileJson, string fileName)
+    {
+        var path = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName, fileName);
+        var directory = Path.GetDirectoryName(path)
+            ?? throw new IOException("Could not determine the Keyboard Manager settings directory.");
+        Directory.CreateDirectory(directory);
+        var temporaryPath = Path.Combine(directory, $"{Path.GetFileName(path)}.{Guid.NewGuid():N}.tmp");
+
+        try
+        {
+            File.WriteAllText(temporaryPath, profileJson);
+            File.Move(temporaryPath, path, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
+        }
+    }
+
+    private static FileStream AcquireTransactionLock()
+    {
+        var settingsPath = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName);
+        var settingsDirectory = Path.GetDirectoryName(settingsPath)
+            ?? throw new IOException("Could not determine the Keyboard Manager settings directory.");
+        var lockPath = Path.Combine(settingsDirectory, "editorTransaction.lock");
+        Directory.CreateDirectory(settingsDirectory);
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+
+        do
+        {
+            try
+            {
+                return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch (IOException) when (DateTime.UtcNow < deadline)
+            {
+                Thread.Sleep(50);
+            }
+        }
+        while (DateTime.UtcNow < deadline);
+
+        throw new IOException("Could not acquire the Keyboard Manager editor transaction lock.");
+    }
+
+    /// <summary>
+    /// Checks that the input JSON has the required shape: a "profile" object
+    /// whose optional "keys" and "shortcuts" members are arrays of objects.
+    /// Type mismatches inside the entries are left to the deserializer.
+    /// </summary>
+    /// <param name="node">The parsed input JSON.</param>
+    /// <returns>The list of structural errors; empty when the shape is valid.</returns>
+    private static IList<string> ValidateInputStructure(JsonNode? node)
+    {
+        var errors = new List<string>();
+        if (node is not JsonObject root)
+        {
+            errors.Add("input must be a JSON object");
+            return errors;
+        }
+
+        if (!root.TryGetPropertyValue(ProfileResourceObject.ProfileJsonPropertyName, out var profileNode) || profileNode == null)
+        {
+            errors.Add($"'{ProfileResourceObject.ProfileJsonPropertyName}' is required");
+            return errors;
+        }
+
+        if (profileNode is not JsonObject profile)
+        {
+            errors.Add($"'{ProfileResourceObject.ProfileJsonPropertyName}' must be an object");
+            return errors;
+        }
+
+        foreach (var listName in new[] { "keys", "shortcuts" })
+        {
+            if (!profile.TryGetPropertyValue(listName, out var listNode))
+            {
+                continue;
+            }
+
+            var context = $"{ProfileResourceObject.ProfileJsonPropertyName}.{listName}";
+            if (listNode is not JsonArray list)
+            {
+                errors.Add($"'{context}' must be an array");
+                continue;
+            }
+
+            for (var i = 0; i < list.Count; i++)
+            {
+                if (list[i] is not JsonObject item)
+                {
+                    errors.Add($"'{context}[{i.ToString(CultureInfo.InvariantCulture)}]' must be an object");
+                    continue;
+                }
+
+                if (listName == "shortcuts" && item.ContainsKey("condition"))
+                {
+                    errors.Add($"'{context}[{i.ToString(CultureInfo.InvariantCulture)}].condition' is not supported for shortcut remaps");
+                }
+            }
+        }
+
+        return errors;
+    }
+
+    /// <summary>
+    /// Signals the named event the Keyboard Manager engine listens on so a
+    /// running instance reloads the profile immediately. Mirrors the signal
+    /// in MappingConfiguration::SaveSettingsToFile. The event is only opened,
+    /// never created: when no engine is running there is nothing to signal,
+    /// and creating it here would make the signal look successful.
+    /// </summary>
+    /// <returns>True if a running engine was signaled; otherwise false.</returns>
+    private static bool SignalSettingsChangedEvent()
+    {
+        try
+        {
+            if (!EventWaitHandle.TryOpenExisting(SettingsEventName, out var settingsEvent))
+            {
+                return false;
+            }
+
+            using (settingsEvent)
+            {
+                return settingsEvent.Set();
+            }
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+}

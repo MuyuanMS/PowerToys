@@ -1,0 +1,848 @@
+// Copyright (c) Microsoft Corporation
+// The Microsoft Corporation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using Microsoft.PowerToys.Settings.UI.Library;
+
+namespace PowerToys.DSC.Models.KeyboardManager;
+
+/// <summary>
+/// Converts between the friendly <see cref="KbmProfileModel"/> used by the DSC
+/// profile resource and the <see cref="KeyboardManagerProfile"/> stored in the
+/// Keyboard Manager profile file. The conversion mirrors the exact JSON shape
+/// written by the C++ editor (MappingConfiguration::SaveSettingsToFile) so
+/// that DSC-written profiles are indistinguishable from editor-written ones.
+/// </summary>
+public static class KbmProfileConverter
+{
+    // Dummy text written on run-program/open-URI entries for backwards
+    // compatibility; see MappingConfiguration::SaveSettingsToFile.
+    private const string UnsupportedText = "*Unsupported*";
+
+    private const int OperationTypeRemapShortcut = 0;
+    private const int OperationTypeRunProgram = 1;
+    private const int OperationTypeOpenUri = 2;
+
+    // Friendly names for the Shortcut.h enums, indexed by their numeric value.
+    private static readonly string[] _elevationNames = ["normal", "elevated", "differentUser"];
+    private static readonly string[] _ifRunningNames = ["showWindow", "startAnother", "doNothing", "close", "endTask", "closeAndEndTask"];
+    private static readonly string[] _windowStyleNames = ["normal", "hidden", "minimized", "maximized"];
+
+    /// <summary>
+    /// Validates the friendly model and returns the list of validation
+    /// errors; an empty list means the model is valid. The messages are
+    /// intentionally not localized: they quote JSON property paths and key
+    /// names that must match the configuration document verbatim, and are
+    /// presented inside the localized InvalidProfileError message frame.
+    /// </summary>
+    /// <param name="model">The friendly model to validate.</param>
+    /// <returns>The list of validation errors.</returns>
+    public static IList<string> Validate(KbmProfileModel model)
+    {
+        var errors = new List<string>();
+        var seenKeys = new HashSet<(uint Code, string Condition)>();
+        var seenShortcuts = new List<(string App, string From, KbmShortcutParser.ParsedKeys ParsedKeys)>();
+
+        for (var i = 0; i < model.Keys.Count; i++)
+        {
+            var entry = model.Keys[i];
+            var context = $"keys[{i.ToString(CultureInfo.InvariantCulture)}]";
+            KbmShortcutParser.ParsedKeys parsedFrom = new([], 0);
+            KbmShortcutParser.ParsedKeys parsedTarget = new([], 0);
+            var hasParsedFrom = false;
+            var hasParsedTarget = false;
+
+            var targetCount = (entry.To != null ? 1 : 0) + (entry.ToText != null ? 1 : 0);
+            if (targetCount != 1)
+            {
+                errors.Add($"{context} must set exactly one of 'to' or 'toText'");
+            }
+
+            if (!KbmShortcutParser.TryParseKey(entry.From, out parsedFrom, out var error))
+            {
+                errors.Add($"{context}.from: {error}");
+            }
+            else if (parsedFrom.Keys[0] == KbmKeyNames.VkDisabled)
+            {
+                errors.Add($"{context}.from: 'Disable' cannot be remapped");
+            }
+            else if (parsedFrom.Keys[0] is 16 or 17 or 18 or KbmKeyNames.VkWinBoth)
+            {
+                errors.Add($"{context}.from: generic modifiers must use a left or right variant");
+            }
+            else
+            {
+                hasParsedFrom = true;
+            }
+
+            if (entry.To != null && !TryParseTarget(entry.To, out parsedTarget, out error))
+            {
+                errors.Add($"{context}.to: {error}");
+            }
+            else if (entry.To != null)
+            {
+                hasParsedTarget = true;
+            }
+
+            if (hasParsedFrom && hasParsedTarget && parsedTarget.IsSingleKey && parsedFrom.Keys[0] == parsedTarget.Keys[0])
+            {
+                errors.Add($"{context}.to: key '{KbmKeyNames.GetName(parsedFrom.Keys[0])}' cannot be remapped to itself");
+            }
+
+            if (entry.ToText != null && entry.ToText.Length == 0)
+            {
+                errors.Add($"{context}.toText must not be empty");
+            }
+
+            var condition = NormalizeCondition(entry.Condition);
+            if (condition == null)
+            {
+                errors.Add($"{context}.condition must be 'always' or 'alone'");
+            }
+            else if (entry.ToText != null && condition == "alone")
+            {
+                errors.Add($"{context}.condition 'alone' requires a key remap target");
+            }
+            else if (hasParsedFrom && !seenKeys.Add((parsedFrom.Keys[0], condition)))
+            {
+                errors.Add($"{context}.from: key '{KbmKeyNames.GetName(parsedFrom.Keys[0])}' is remapped more than once with condition '{condition}'");
+            }
+        }
+
+        for (var i = 0; i < model.Shortcuts.Count; i++)
+        {
+            var entry = model.Shortcuts[i];
+            var context = $"shortcuts[{i.ToString(CultureInfo.InvariantCulture)}]";
+            KbmShortcutParser.ParsedKeys parsedFrom = new([], 0);
+            KbmShortcutParser.ParsedKeys parsedTarget = new([], 0);
+            var hasParsedFrom = false;
+            var hasParsedTarget = false;
+
+            var targetCount = (entry.To != null ? 1 : 0) + (entry.ToText != null ? 1 : 0) +
+                (entry.RunProgram != null ? 1 : 0) + (entry.OpenUri != null ? 1 : 0);
+            if (targetCount != 1)
+            {
+                errors.Add($"{context} must set exactly one of 'to', 'toText', 'runProgram', or 'openUri'");
+            }
+
+            if (!KbmShortcutParser.TryParseKeyOrShortcut(entry.From, out parsedFrom, out var error))
+            {
+                errors.Add($"{context}.from: {error}");
+            }
+            else if (parsedFrom.Keys.Count < 2)
+            {
+                errors.Add($"{context}.from: a shortcut requires at least one modifier and an action key");
+            }
+            else if (parsedFrom.Keys.Contains(KbmKeyNames.VkDisabled))
+            {
+                errors.Add($"{context}.from: 'Disable' cannot be part of a shortcut");
+            }
+            else if (GetIllegalShortcutName(parsedFrom) is { } illegalFrom)
+            {
+                errors.Add($"{context}.from: '{illegalFrom}' is reserved by Windows and cannot be remapped");
+            }
+            else if (entry.TargetApp != null && string.IsNullOrWhiteSpace(entry.TargetApp))
+            {
+                errors.Add($"{context}.targetApp must not be empty when provided");
+            }
+            else
+            {
+                hasParsedFrom = true;
+                var app = NormalizeTargetApp(entry.TargetApp) ?? string.Empty;
+                var formattedFrom = KbmShortcutParser.Format(parsedFrom);
+                var conflict = seenShortcuts
+                    .Where(existing => existing.App == app)
+                    .Select(existing => new
+                    {
+                        Existing = existing,
+                        ConflictKind = GetShortcutConflictKind(existing.ParsedKeys, parsedFrom),
+                    })
+                    .FirstOrDefault(existing => existing.ConflictKind != ShortcutConflictKind.None);
+
+                if (conflict is { ConflictKind: ShortcutConflictKind.ExactDuplicate })
+                {
+                    var scope = app.Length == 0 ? "globally" : $"for app '{app}'";
+                    errors.Add($"{context}.from: shortcut '{formattedFrom}' is remapped more than once {scope}");
+                }
+                else if (conflict is { ConflictKind: ShortcutConflictKind.ConflictingModifier })
+                {
+                    var scope = app.Length == 0 ? "globally" : $"for app '{app}'";
+                    errors.Add($"{context}.from: shortcut '{formattedFrom}' overlaps with shortcut '{conflict.Existing.From}' {scope}");
+                }
+                else
+                {
+                    seenShortcuts.Add((app, formattedFrom, parsedFrom));
+                }
+            }
+
+            if (entry.To != null && !TryParseTarget(entry.To, out parsedTarget, out error))
+            {
+                errors.Add($"{context}.to: {error}");
+            }
+            else if (entry.To != null)
+            {
+                hasParsedTarget = true;
+            }
+
+            if (hasParsedFrom && hasParsedTarget && parsedTarget.Keys.SequenceEqual(parsedFrom.Keys))
+            {
+                errors.Add($"{context}.to: shortcut '{KbmShortcutParser.Format(parsedFrom)}' cannot be remapped to itself");
+            }
+
+            if (entry.ToText != null && entry.ToText.Length == 0)
+            {
+                errors.Add($"{context}.toText must not be empty");
+            }
+
+            if (entry.OpenUri != null && string.IsNullOrWhiteSpace(entry.OpenUri))
+            {
+                errors.Add($"{context}.openUri must not be empty");
+            }
+
+            if (entry.RunProgram != null)
+            {
+                if (string.IsNullOrWhiteSpace(entry.RunProgram.FilePath))
+                {
+                    errors.Add($"{context}.runProgram.filePath must not be empty");
+                }
+
+                ValidateEnumName(entry.RunProgram.Elevation, _elevationNames, $"{context}.runProgram.elevation", errors);
+                ValidateEnumName(entry.RunProgram.IfRunning, _ifRunningNames, $"{context}.runProgram.ifRunning", errors);
+                ValidateEnumName(entry.RunProgram.WindowStyle, _windowStyleNames, $"{context}.runProgram.windowStyle", errors);
+            }
+        }
+
+        return errors;
+    }
+
+    /// <summary>
+    /// Converts a validated friendly model to the stored profile shape.
+    /// </summary>
+    /// <param name="model">The friendly model; must have passed <see cref="Validate"/>.</param>
+    /// <returns>The stored profile.</returns>
+    public static KeyboardManagerProfile ToProfile(KbmProfileModel model)
+    {
+        var profile = new KeyboardManagerProfile();
+
+        foreach (var entry in model.Keys)
+        {
+            if (!KbmShortcutParser.TryParseKey(entry.From, out var from, out var error))
+            {
+                throw new InvalidOperationException(error);
+            }
+
+            var stored = new KeysDataModel
+            {
+                OriginalKeys = from.ToVkString(),
+                Condition = NormalizeCondition(entry.Condition) == "alone" ? "alone" : null,
+            };
+
+            if (entry.ToText != null)
+            {
+                stored.NewRemapString = entry.ToText;
+                profile.RemapKeysToText.InProcessRemapKeys.Add(stored);
+            }
+            else
+            {
+                stored.NewRemapKeys = ParseTargetOrThrow(entry.To!).ToVkString();
+                profile.RemapKeys.InProcessRemapKeys.Add(stored);
+            }
+        }
+
+        foreach (var entry in model.Shortcuts)
+        {
+            if (!KbmShortcutParser.TryParseKeyOrShortcut(entry.From, out var from, out var error))
+            {
+                throw new InvalidOperationException(error);
+            }
+
+            var app = NormalizeTargetApp(entry.TargetApp);
+            var stored = app != null ? new AppSpecificKeysDataModel { TargetApp = app } : new KeysDataModel();
+            stored.OriginalKeys = from.ToVkString();
+            stored.SecondKeyOfChord = from.SecondKeyOfChord;
+            stored.ExactMatch = entry.ExactMatch ?? false;
+
+            var isText = false;
+            if (entry.ToText != null)
+            {
+                stored.NewRemapString = entry.ToText;
+                isText = true;
+            }
+            else if (entry.RunProgram != null)
+            {
+                stored.OperationType = OperationTypeRunProgram;
+                stored.RunProgramFilePath = entry.RunProgram.FilePath;
+                stored.RunProgramArgs = entry.RunProgram.Args ?? string.Empty;
+                stored.RunProgramStartInDir = entry.RunProgram.StartInDir ?? string.Empty;
+                stored.RunProgramElevationLevel = ParseEnumName(entry.RunProgram.Elevation, _elevationNames);
+                stored.RunProgramAlreadyRunningAction = ParseEnumName(entry.RunProgram.IfRunning, _ifRunningNames);
+                stored.RunProgramStartWindowType = ParseEnumName(entry.RunProgram.WindowStyle, _windowStyleNames);
+                stored.NewRemapString = UnsupportedText;
+            }
+            else if (entry.OpenUri != null)
+            {
+                stored.OperationType = OperationTypeOpenUri;
+                stored.OpenUri = entry.OpenUri;
+                stored.RunProgramElevationLevel = 0;
+                stored.NewRemapString = UnsupportedText;
+            }
+            else
+            {
+                var target = ParseTargetOrThrow(entry.To!);
+                stored.NewRemapKeys = target.ToVkString();
+                if (!target.IsSingleKey)
+                {
+                    stored.OperationType = OperationTypeRemapShortcut;
+                }
+            }
+
+            var section = isText ? profile.RemapShortcutsToText : profile.RemapShortcuts;
+            if (stored is AppSpecificKeysDataModel appStored)
+            {
+                section.AppSpecificRemapShortcuts.Add(appStored);
+            }
+            else
+            {
+                section.GlobalRemapShortcuts.Add(stored);
+            }
+        }
+
+        return profile;
+    }
+
+    /// <summary>
+    /// Converts a stored profile to the canonical friendly model. Entries
+    /// that cannot be parsed are skipped with a warning, mirroring the
+    /// engine's tolerance for malformed entries.
+    /// </summary>
+    /// <param name="profile">The stored profile.</param>
+    /// <param name="warnings">Optional collector for warnings about skipped entries.</param>
+    /// <returns>The canonical friendly model.</returns>
+    public static KbmProfileModel FromProfile(KeyboardManagerProfile profile, IList<string>? warnings = null)
+    {
+        var keys = new List<(uint Code, KbmKeyRemapEntry Entry)>();
+        var shortcuts = new List<KbmShortcutRemapEntry>();
+
+        AddNullSectionWarning(profile.RemapKeys, "remapKeys", warnings);
+        AddNullSectionWarning(profile.RemapKeysToText, "remapKeysToText", warnings);
+        AddNullSectionWarning(profile.RemapShortcuts, "remapShortcuts", warnings);
+        AddNullSectionWarning(profile.RemapShortcutsToText, "remapShortcutsToText", warnings);
+        if (profile.RemapKeys != null)
+        {
+            AddNullCollectionWarning(profile.RemapKeys.InProcessRemapKeys, "remapKeys.inProcess", warnings);
+        }
+
+        if (profile.RemapKeysToText != null)
+        {
+            AddNullCollectionWarning(profile.RemapKeysToText.InProcessRemapKeys, "remapKeysToText.inProcess", warnings);
+        }
+
+        if (profile.RemapShortcuts != null)
+        {
+            AddNullCollectionWarning(profile.RemapShortcuts.GlobalRemapShortcuts, "remapShortcuts.global", warnings);
+            AddNullCollectionWarning(profile.RemapShortcuts.AppSpecificRemapShortcuts, "remapShortcuts.appSpecific", warnings);
+        }
+
+        if (profile.RemapShortcutsToText != null)
+        {
+            AddNullCollectionWarning(profile.RemapShortcutsToText.GlobalRemapShortcuts, "remapShortcutsToText.global", warnings);
+            AddNullCollectionWarning(profile.RemapShortcutsToText.AppSpecificRemapShortcuts, "remapShortcutsToText.appSpecific", warnings);
+        }
+
+        foreach (var stored in profile.RemapKeys?.InProcessRemapKeys ?? [])
+        {
+            if (stored == null ||
+                !KbmShortcutParser.TryParseVkString(stored.OriginalKeys, 0, out var from) || !from.IsSingleKey ||
+                !KbmShortcutParser.TryParseVkString(stored.NewRemapKeys, 0, out var to))
+            {
+                warnings?.Add($"Skipping unparsable key remap entry '{stored?.OriginalKeys}'");
+                continue;
+            }
+
+            var entry = new KbmKeyRemapEntry
+            {
+                From = KbmKeyNames.GetName(from.Keys[0]),
+                To = KbmShortcutParser.Format(KbmShortcutParser.Canonicalize(to)),
+                Condition = stored.Condition == "alone" ? "alone" : null,
+            };
+
+            TryAddValidatedKeyEntry(keys, from.Keys[0], entry, stored.OriginalKeys, "key remap", warnings);
+        }
+
+        foreach (var stored in profile.RemapKeysToText?.InProcessRemapKeys ?? [])
+        {
+            if (stored == null ||
+                !KbmShortcutParser.TryParseVkString(stored.OriginalKeys, 0, out var from) || !from.IsSingleKey ||
+                string.IsNullOrEmpty(stored.NewRemapString))
+            {
+                warnings?.Add($"Skipping unparsable key-to-text remap entry '{stored?.OriginalKeys}'");
+                continue;
+            }
+
+            var entry = new KbmKeyRemapEntry
+            {
+                From = KbmKeyNames.GetName(from.Keys[0]),
+                ToText = stored.NewRemapString,
+            };
+
+            TryAddValidatedKeyEntry(keys, from.Keys[0], entry, stored.OriginalKeys, "key-to-text remap", warnings);
+        }
+
+        foreach (var (stored, app, isAppSpecific) in EnumerateShortcuts(profile.RemapShortcuts))
+        {
+            var entry = CreateShortcutEntry(stored, app, isAppSpecific, warnings);
+            if (entry == null || stored == null)
+            {
+                continue;
+            }
+
+            if (stored.OperationType == OperationTypeRunProgram)
+            {
+                if (string.IsNullOrWhiteSpace(stored.RunProgramFilePath))
+                {
+                    warnings?.Add($"Skipping run-program remap entry '{stored.OriginalKeys}' without a program path");
+                    continue;
+                }
+
+                entry.RunProgram = new KbmRunProgramAction
+                {
+                    FilePath = stored.RunProgramFilePath,
+                    Args = NullIfEmpty(stored.RunProgramArgs),
+                    StartInDir = NullIfEmpty(stored.RunProgramStartInDir),
+                    Elevation = FormatEnumValue(stored.RunProgramElevationLevel, _elevationNames, warnings, "elevation"),
+                    IfRunning = FormatEnumValue(stored.RunProgramAlreadyRunningAction, _ifRunningNames, warnings, "ifRunning"),
+                    WindowStyle = FormatEnumValue(stored.RunProgramStartWindowType, _windowStyleNames, warnings, "windowStyle"),
+                };
+            }
+            else if (stored.OperationType == OperationTypeOpenUri)
+            {
+                if (string.IsNullOrEmpty(stored.OpenUri))
+                {
+                    warnings?.Add($"Skipping open-URI remap entry '{stored.OriginalKeys}' without a URI");
+                    continue;
+                }
+
+                entry.OpenUri = stored.OpenUri;
+            }
+            else
+            {
+                if (!KbmShortcutParser.TryParseVkString(stored.NewRemapKeys, 0, out var to))
+                {
+                    warnings?.Add($"Skipping unparsable shortcut remap entry '{stored.OriginalKeys}'");
+                    continue;
+                }
+
+                var target = KbmShortcutParser.Format(KbmShortcutParser.Canonicalize(to));
+                if (!TryParseTarget(target, out _, out _))
+                {
+                    warnings?.Add($"Skipping unparsable shortcut remap target '{stored.NewRemapKeys}'");
+                    continue;
+                }
+
+                entry.To = target;
+            }
+
+            TryAddValidatedShortcutEntry(shortcuts, entry, stored.OriginalKeys, "shortcut remap", warnings);
+        }
+
+        foreach (var (stored, app, isAppSpecific) in EnumerateShortcuts(profile.RemapShortcutsToText))
+        {
+            var entry = CreateShortcutEntry(stored, app, isAppSpecific, warnings);
+            if (entry == null || stored == null)
+            {
+                continue;
+            }
+
+            if (string.IsNullOrEmpty(stored.NewRemapString))
+            {
+                warnings?.Add($"Skipping shortcut-to-text remap entry '{stored.OriginalKeys}' without text");
+                continue;
+            }
+
+            entry.ToText = stored.NewRemapString;
+            TryAddValidatedShortcutEntry(shortcuts, entry, stored.OriginalKeys, "shortcut-to-text remap", warnings);
+        }
+
+        return new KbmProfileModel
+        {
+            Keys = keys
+                .OrderBy(k => k.Code)
+                .ThenBy(k => k.Entry.Condition == "alone" ? 1 : 0)
+                .Select(k => k.Entry)
+                .ToList(),
+            Shortcuts = shortcuts
+                .OrderBy(s => s.TargetApp ?? string.Empty, StringComparer.Ordinal)
+                .ThenBy(s => s.From, StringComparer.Ordinal)
+                .ToList(),
+        };
+    }
+
+    private static void AddNullSectionWarning(object? section, string sectionName, IList<string>? warnings)
+    {
+        if (section == null)
+        {
+            warnings?.Add($"Stored profile section '{sectionName}' is null");
+        }
+    }
+
+    private static void AddNullCollectionWarning(object? section, string sectionName, IList<string>? warnings)
+    {
+        if (section == null)
+        {
+            warnings?.Add($"Stored profile section '{sectionName}' is null");
+        }
+    }
+
+    /// <summary>
+    /// Normalizes a friendly model into its canonical form: canonical key
+    /// spellings and ordering, default-valued fields omitted, and entries
+    /// sorted. Used to compare desired and current state.
+    /// </summary>
+    /// <param name="model">The friendly model; must have passed <see cref="Validate"/>.</param>
+    /// <returns>The canonical friendly model.</returns>
+    public static KbmProfileModel Canonicalize(KbmProfileModel model)
+    {
+        // Round-tripping through the stored shape guarantees that the desired
+        // state and the state read back from disk normalize identically.
+        return FromProfile(ToProfile(model));
+    }
+
+    private static IEnumerable<(KeysDataModel? Stored, string? App, bool IsAppSpecific)> EnumerateShortcuts(ShortcutsKeyDataModel? section)
+    {
+        foreach (var stored in section?.GlobalRemapShortcuts ?? [])
+        {
+            yield return (stored, null, false);
+        }
+
+        foreach (var stored in section?.AppSpecificRemapShortcuts ?? [])
+        {
+            yield return (stored, stored?.TargetApp, true);
+        }
+    }
+
+    private static KbmShortcutRemapEntry? CreateShortcutEntry(KeysDataModel? stored, string? app, bool isAppSpecific, IList<string>? warnings)
+    {
+        if (stored == null ||
+            !KbmShortcutParser.TryParseVkString(stored.OriginalKeys, stored.SecondKeyOfChord, out var from) || from.Keys.Count < 2)
+        {
+            warnings?.Add($"Skipping unparsable shortcut remap entry '{stored?.OriginalKeys}'");
+            return null;
+        }
+
+        // The chord second key is embedded as the trailing element of the
+        // stored key string; detect it even when the secondKeyOfChord
+        // property is absent (it is not written by the C++ editor).
+        if (from.SecondKeyOfChord == 0 && from.Keys.Count >= 3 &&
+            !KbmKeyNames.IsModifier(from.Keys[^1]) && !KbmKeyNames.IsModifier(from.Keys[^2]))
+        {
+            from = new KbmShortcutParser.ParsedKeys(from.Keys, from.Keys[^1]);
+        }
+
+        if (isAppSpecific && string.IsNullOrWhiteSpace(app))
+        {
+            warnings?.Add($"Skipping app-specific shortcut remap entry '{stored.OriginalKeys}' without a target application");
+            return null;
+        }
+
+        // Preserve the engine's exact process scope. It lower-cases stored app
+        // names but does not trim them, so exporting a whitespace-padded name
+        // as a trimmed name would activate the remap for a different process.
+        if (app != null && app != app.Trim())
+        {
+            warnings?.Add($"Skipping app-specific shortcut remap entry '{stored.OriginalKeys}' with surrounding whitespace in its target application");
+            return null;
+        }
+
+        var canonicalFrom = KbmShortcutParser.Format(KbmShortcutParser.Canonicalize(from));
+        if (!KbmShortcutParser.TryParseKeyOrShortcut(canonicalFrom, out _, out _))
+        {
+            warnings?.Add($"Skipping unparsable shortcut remap entry '{stored.OriginalKeys}'");
+            return null;
+        }
+
+        return new KbmShortcutRemapEntry
+        {
+            From = canonicalFrom,
+            TargetApp = app?.ToLowerInvariant(),
+            ExactMatch = stored.ExactMatch == true ? true : null,
+        };
+    }
+
+    private static bool TryParseTarget(string input, out KbmShortcutParser.ParsedKeys result, out string error)
+    {
+        // A remap target may be a single key (including a lone modifier, e.g.
+        // remapping CapsLock to LCtrl) or a shortcut; chords are origin-only.
+        if (!input.Contains('+', StringComparison.Ordinal) && !input.Contains(',', StringComparison.Ordinal))
+        {
+            return KbmShortcutParser.TryParseKey(input, out result, out error);
+        }
+
+        if (!KbmShortcutParser.TryParseKeyOrShortcut(input, out result, out error))
+        {
+            return false;
+        }
+
+        if (result.SecondKeyOfChord != 0)
+        {
+            error = $"Chords are not supported in remap targets ('{input.Trim()}')";
+            return false;
+        }
+
+        if (result.Keys.Count > 1 && result.Keys.Contains(KbmKeyNames.VkDisabled))
+        {
+            error = $"'{input.Trim()}' cannot use 'Disable' with modifiers";
+            return false;
+        }
+
+        if (GetIllegalShortcutName(result) is { } illegal)
+        {
+            error = $"'{illegal}' is reserved by Windows and cannot be used as a remap target";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static string? NormalizeCondition(string? condition)
+    {
+        return string.IsNullOrEmpty(condition) || condition.Equals("always", StringComparison.OrdinalIgnoreCase)
+            ? "always"
+            : condition.Equals("alone", StringComparison.OrdinalIgnoreCase) ? "alone" : null;
+    }
+
+    /// <summary>
+    /// Detects the shortcuts the Keyboard Manager editor refuses
+    /// (EditorHelpers::IsShortcutIllegal): Win+L and Ctrl+Alt+Delete are
+    /// handled by Windows before any application, so remapping them can never
+    /// take effect. The chord second key, if any, is ignored because the
+    /// primary shortcut is intercepted before the chord completes.
+    /// </summary>
+    /// <param name="keys">The parsed shortcut.</param>
+    /// <returns>The friendly name of the illegal shortcut, or null when the shortcut is legal.</returns>
+    private static string? GetIllegalShortcutName(KbmShortcutParser.ParsedKeys keys)
+    {
+        var modifiers = new HashSet<KbmKeyNames.ModifierClass>();
+        uint actionKey = 0;
+        foreach (var key in keys.Keys)
+        {
+            var modifierClass = KbmKeyNames.GetModifierClass(key);
+            if (modifierClass != KbmKeyNames.ModifierClass.None)
+            {
+                modifiers.Add(modifierClass);
+            }
+            else if (actionKey == 0)
+            {
+                actionKey = key;
+            }
+        }
+
+        // Win+L (any Win key, no other modifiers)
+        if (actionKey == 0x4C && modifiers.SetEquals([KbmKeyNames.ModifierClass.Win]))
+        {
+            return "Win+L";
+        }
+
+        // Ctrl+Alt+Del (any Ctrl and Alt keys, no Win or Shift)
+        if (actionKey == 0x2E && modifiers.SetEquals([KbmKeyNames.ModifierClass.Ctrl, KbmKeyNames.ModifierClass.Alt]))
+        {
+            return "Ctrl+Alt+Delete";
+        }
+
+        return null;
+    }
+
+    private static KbmShortcutParser.ParsedKeys ParseTargetOrThrow(string input)
+    {
+        if (!TryParseTarget(input, out var result, out var error))
+        {
+            throw new InvalidOperationException(error);
+        }
+
+        return result;
+    }
+
+    private static void ValidateEnumName(string? name, string[] names, string context, IList<string> errors)
+    {
+        if (name != null && !names.Contains(name, StringComparer.OrdinalIgnoreCase))
+        {
+            errors.Add($"{context}: invalid value '{name}'; allowed values are: {string.Join(", ", names)}");
+        }
+    }
+
+    private static int ParseEnumName(string? name, string[] names)
+    {
+        if (name == null)
+        {
+            return 0;
+        }
+
+        var index = Array.FindIndex(names, n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase));
+        return index >= 0 ? index : throw new InvalidOperationException($"Invalid value '{name}'");
+    }
+
+    private static string? FormatEnumValue(int? value, string[] names, IList<string>? warnings, string propertyName)
+    {
+        // Default (0) values are omitted from the canonical form
+        if (value is null or 0)
+        {
+            return null;
+        }
+
+        if (value > 0 && value < names.Length)
+        {
+            return names[value.Value];
+        }
+
+        warnings?.Add($"Skipping invalid {propertyName} value '{value}' in remap entry");
+        return null;
+    }
+
+    private static bool TryAddValidatedKeyEntry(
+        List<(uint Code, KbmKeyRemapEntry Entry)> keys,
+        uint code,
+        KbmKeyRemapEntry entry,
+        string originalKeys,
+        string entryKind,
+        IList<string>? warnings)
+    {
+        var candidateIndex = keys.Count;
+        var model = new KbmProfileModel
+        {
+            Keys = keys.Select(existing => existing.Entry).Append(entry).ToList(),
+        };
+
+        var error = Validate(model)
+            .FirstOrDefault(message => message.StartsWith($"keys[{candidateIndex.ToString(CultureInfo.InvariantCulture)}]", StringComparison.Ordinal));
+        if (error != null)
+        {
+            warnings?.Add($"Skipping invalid {entryKind} entry '{originalKeys}': {error}");
+            return false;
+        }
+
+        keys.Add((code, entry));
+        return true;
+    }
+
+    private static bool TryAddValidatedShortcutEntry(
+        List<KbmShortcutRemapEntry> shortcuts,
+        KbmShortcutRemapEntry entry,
+        string originalKeys,
+        string entryKind,
+        IList<string>? warnings)
+    {
+        var candidateIndex = shortcuts.Count;
+        var model = new KbmProfileModel
+        {
+            Shortcuts = shortcuts.Append(entry).ToList(),
+        };
+
+        var error = Validate(model)
+            .FirstOrDefault(message => message.StartsWith($"shortcuts[{candidateIndex.ToString(CultureInfo.InvariantCulture)}]", StringComparison.Ordinal));
+        if (error != null)
+        {
+            warnings?.Add($"Skipping invalid {entryKind} entry '{originalKeys}': {error}");
+            return false;
+        }
+
+        shortcuts.Add(entry);
+        return true;
+    }
+
+    private static ShortcutConflictKind GetShortcutConflictKind(KbmShortcutParser.ParsedKeys first, KbmShortcutParser.ParsedKeys second)
+    {
+        if (first.Keys.SequenceEqual(second.Keys))
+        {
+            return ShortcutConflictKind.ExactDuplicate;
+        }
+
+        var firstActionKey = GetPrimaryActionKey(first);
+        var secondActionKey = GetPrimaryActionKey(second);
+        if (firstActionKey == 0 || secondActionKey == 0 || firstActionKey != secondActionKey)
+        {
+            return ShortcutConflictKind.None;
+        }
+
+        var hasConflictingModifier = false;
+        foreach (var modifierClass in new[]
+        {
+            KbmKeyNames.ModifierClass.Win,
+            KbmKeyNames.ModifierClass.Ctrl,
+            KbmKeyNames.ModifierClass.Alt,
+            KbmKeyNames.ModifierClass.Shift,
+        })
+        {
+            var firstModifier = GetModifierCode(first, modifierClass);
+            var secondModifier = GetModifierCode(second, modifierClass);
+            if ((firstModifier == 0) != (secondModifier == 0))
+            {
+                return ShortcutConflictKind.None;
+            }
+
+            if (firstModifier != 0 &&
+                (IsGenericModifier(firstModifier) || IsGenericModifier(secondModifier)))
+            {
+                hasConflictingModifier = true;
+            }
+        }
+
+        return hasConflictingModifier ? ShortcutConflictKind.ConflictingModifier : ShortcutConflictKind.None;
+    }
+
+    private static uint GetPrimaryActionKey(KbmShortcutParser.ParsedKeys keys)
+    {
+        foreach (var key in keys.Keys)
+        {
+            if (KbmKeyNames.GetModifierClass(key) == KbmKeyNames.ModifierClass.None)
+            {
+                return key;
+            }
+        }
+
+        return 0;
+    }
+
+    private static uint GetModifierCode(KbmShortcutParser.ParsedKeys keys, KbmKeyNames.ModifierClass modifierClass)
+    {
+        foreach (var key in keys.Keys)
+        {
+            if (KbmKeyNames.GetModifierClass(key) == modifierClass)
+            {
+                return key;
+            }
+        }
+
+        return 0;
+    }
+
+    private static bool IsGenericModifier(uint keyCode)
+    {
+        return keyCode is KbmKeyNames.VkWinBoth or 17 or 18 or 16;
+    }
+
+    private enum ShortcutConflictKind
+    {
+        None = 0,
+        ExactDuplicate,
+        ConflictingModifier,
+    }
+
+    private static string? NormalizeTargetApp(string? app)
+    {
+        if (string.IsNullOrWhiteSpace(app))
+        {
+            return null;
+        }
+
+        // The engine lower-cases the target app on load; mirror that here
+        return app.Trim().ToLowerInvariant();
+    }
+
+    private static string? NullIfEmpty(string? value)
+    {
+        return string.IsNullOrEmpty(value) ? null : value;
+    }
+}
