@@ -517,6 +517,8 @@ namespace Microsoft.PowerToys.Settings.UI.UnitTests
         private static X509Certificate2 CreateCodeSigningLeafCertificate(X509Certificate2 intermediate)
         {
             using var leafKey = RSA.Create(2048);
+            var notBefore = DateTimeOffset.UtcNow.AddDays(-1);
+            var notAfter = intermediate.NotAfter.ToUniversalTime().AddMinutes(-1);
             var request = new CertificateRequest(
                 "CN=Microsoft Corporation Unit Test",
                 leafKey,
@@ -532,7 +534,7 @@ namespace Microsoft.PowerToys.Settings.UI.UnitTests
             };
             request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(enhancedKeyUsage, true));
 
-            return request.Create(intermediate, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(7), RandomNumberGenerator.GetBytes(16));
+            return request.Create(intermediate, notBefore, notAfter, RandomNumberGenerator.GetBytes(16));
         }
 
         private static X509Certificate2 CreateSubjectCertificate(string subject, RSA key)

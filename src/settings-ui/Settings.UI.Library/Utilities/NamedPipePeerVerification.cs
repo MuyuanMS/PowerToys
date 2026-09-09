@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.IO.Pipes;
@@ -18,6 +19,9 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Utilities
 {
     public static class NamedPipePeerVerification
     {
+        private static readonly object VerificationCacheGate = new();
+        private static readonly Dictionary<ProcessVerificationCacheKey, ProcessVerificationResult> VerificationCache = [];
+
         public static bool TryVerifyClient(
             NamedPipeServerStream stream,
             string expectedExeName,
@@ -122,19 +126,31 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Utilities
                     return false;
                 }
 
+                var ownImagePath = Environment.ProcessPath ?? throw new InvalidOperationException("The current process has no executable path.");
+                var cacheKey = new ProcessVerificationCacheKey(
+                    processId,
+                    creationTime.ToLong(),
+                    Path.GetFullPath(ownImagePath),
+                    expectedExeName,
+                    intendedUserSid,
+                    intendedSessionId,
+                    allowLocalSystem);
+                if (TryGetCachedVerificationResult(cacheKey, out var cachedResult))
+                {
+                    rejectionReason = cachedResult.RejectionReason;
+                    return cachedResult.Accepted;
+                }
+
                 if (!NativeMethods.ProcessIdToSessionId(processId, out var actualSessionId))
                 {
-                    rejectionReason = "identity-unavailable";
-                    return false;
+                    return CacheVerificationResult(cacheKey, false, "identity-unavailable", out rejectionReason);
                 }
 
                 var actualImagePath = NativeMethods.GetProcessImagePath(processHandle);
-                var ownImagePath = Environment.ProcessPath ?? throw new InvalidOperationException("The current process has no executable path.");
 
                 if (!NativeMethods.OpenProcessToken(processHandle, NativeMethods.TokenQuery, out var tokenHandle))
                 {
-                    rejectionReason = "identity-unavailable";
-                    return false;
+                    return CacheVerificationResult(cacheKey, false, "identity-unavailable", out rejectionReason);
                 }
 
                 string actualUserSid;
@@ -146,8 +162,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Utilities
 
                 if (unchecked((int)actualSessionId) != intendedSessionId)
                 {
-                    rejectionReason = "wrong-session";
-                    return false;
+                    return CacheVerificationResult(cacheKey, false, "wrong-session", out rejectionReason);
                 }
 
                 var isLocalSystem = string.Equals(
@@ -157,8 +172,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Utilities
                 if (!string.Equals(actualUserSid, intendedUserSid, StringComparison.OrdinalIgnoreCase) &&
                     !(allowLocalSystem && isLocalSystem))
                 {
-                    rejectionReason = "wrong-user";
-                    return false;
+                    return CacheVerificationResult(cacheKey, false, "wrong-user", out rejectionReason);
                 }
 
                 if (!TryVerifyPeerExecutableIdentity(
@@ -167,17 +181,15 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Utilities
                         out var actualFullPath,
                         out rejectionReason))
                 {
-                    return false;
+                    return CacheVerificationResult(cacheKey, false, rejectionReason, out rejectionReason);
                 }
 
                 if (!MeetsSigningPolicy(ownImagePath, actualFullPath))
                 {
-                    rejectionReason = "untrusted-signature";
-                    return false;
+                    return CacheVerificationResult(cacheKey, false, "untrusted-signature", out rejectionReason);
                 }
 
-                rejectionReason = string.Empty;
-                return true;
+                return CacheVerificationResult(cacheKey, true, string.Empty, out rejectionReason);
             }
             catch (Win32Exception)
             {
@@ -229,6 +241,32 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Utilities
             resolvedPeerImagePath = normalizedPeerImagePath;
             rejectionReason = string.Empty;
             return true;
+        }
+
+        private static bool TryGetCachedVerificationResult(
+            ProcessVerificationCacheKey cacheKey,
+            out ProcessVerificationResult result)
+        {
+            lock (VerificationCacheGate)
+            {
+                return VerificationCache.TryGetValue(cacheKey, out result);
+            }
+        }
+
+        private static bool CacheVerificationResult(
+            ProcessVerificationCacheKey cacheKey,
+            bool accepted,
+            string rejectionReason,
+            out string finalRejectionReason)
+        {
+            finalRejectionReason = rejectionReason;
+
+            lock (VerificationCacheGate)
+            {
+                VerificationCache[cacheKey] = new ProcessVerificationResult(accepted, rejectionReason);
+            }
+
+            return accepted;
         }
 
         private static bool HaveEqualOrNestedDirectories(string firstDirectory, string secondDirectory)
@@ -366,12 +404,16 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Utilities
                 roots.Open(OpenFlags.ReadOnly);
 
                 using var chain = new X509Chain();
-                chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+                chain.ChainPolicy.RevocationMode = X509RevocationMode.Offline;
                 chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
 
                 // Check lifetime at the same current time or validated timestamp that Windows used.
                 chain.ChainPolicy.VerificationTime = verificationTime;
                 chain.ChainPolicy.ApplicationPolicy.Add(new Oid("1.3.6.1.5.5.7.3.3"));
+                chain.ChainPolicy.VerificationFlags =
+                    X509VerificationFlags.IgnoreEndRevocationUnknown |
+                    X509VerificationFlags.IgnoreCertificateAuthorityRevocationUnknown |
+                    X509VerificationFlags.IgnoreRootRevocationUnknown;
 
                 var rootCertificates = roots.Certificates;
                 try
@@ -388,7 +430,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Utilities
                             try
                             {
                                 chain.ChainPolicy.ExtraStore.AddRange(extraCertificates);
-                                if (!chain.Build(imageSigner))
+                                if (!chain.Build(imageSigner) && !HasOnlyAllowedRevocationStatuses(chain.ChainStatus))
                                 {
                                     return false;
                                 }
@@ -403,7 +445,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Utilities
                         }
                     }
 
-                    if (!chain.Build(imageSigner))
+                    if (!chain.Build(imageSigner) && !HasOnlyAllowedRevocationStatuses(chain.ChainStatus))
                     {
                         return false;
                     }
@@ -430,6 +472,20 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Utilities
             {
                 certificate.Dispose();
             }
+        }
+
+        private static bool HasOnlyAllowedRevocationStatuses(X509ChainStatus[] statuses)
+        {
+            foreach (var status in statuses)
+            {
+                var disallowedFlags = status.Status & ~(X509ChainStatusFlags.NoError | X509ChainStatusFlags.RevocationStatusUnknown | X509ChainStatusFlags.OfflineRevocation);
+                if (disallowedFlags != X509ChainStatusFlags.NoError)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static bool HasIntactAuthenticodeSignature(string imagePath)
@@ -604,6 +660,17 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Utilities
                 return NativeMethods.CryptMsgClose(handle);
             }
         }
+
+        private readonly record struct ProcessVerificationCacheKey(
+            uint ProcessId,
+            long CreationTime,
+            string OwnImagePath,
+            string ExpectedExeName,
+            string IntendedUserSid,
+            int IntendedSessionId,
+            bool AllowLocalSystem);
+
+        private readonly record struct ProcessVerificationResult(bool Accepted, string RejectionReason);
 
         private static class NativeMethods
         {
