@@ -5,6 +5,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Tracing;
+using System.Threading.Tasks;
 using Microsoft.CmdPal.UI.Controls;
 using Microsoft.CmdPal.UI.Helpers;
 using Microsoft.UI.Dispatching;
@@ -767,6 +768,27 @@ public class IconLoadDiagnosticsTests
         Assert.IsNotNull(report);
         StringAssert.Contains(report.Text, "Active at stop: 0");
         StringAssert.Contains(report.Text, "Enqueue to completion: no samples");
+    }
+
+    [TestMethod]
+    public async Task CreateReportWaitsForInFlightMutationsAndRejectsLateOnes()
+    {
+        var session = new IconLoadDiagnosticsSession(1);
+        var mutation = session.TryEnterMutationScope();
+        Assert.IsTrue(mutation.IsActive);
+
+        var reportTask = Task.Run(() => session.CreateReport());
+        await Task.Delay(100);
+        Assert.IsFalse(reportTask.IsCompleted);
+
+        mutation.Dispose();
+
+        var report = await reportTask;
+        Assert.IsNotNull(report);
+        Assert.IsTrue(report.EndedUtc >= report.StartedUtc);
+
+        using var lateMutation = session.TryEnterMutationScope();
+        Assert.IsFalse(lateMutation.IsActive);
     }
 
     [TestMethod]

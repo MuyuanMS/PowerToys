@@ -82,6 +82,7 @@ internal sealed class IconLoadDiagnosticsSession
     private int _gen1CollectionsStopped;
     private int _gen2CollectionsStopped;
     private long _workingSetStoppedBytes;
+    private long _activeMutations;
 
     private bool IsStopped => Volatile.Read(ref _stoppedAt) != 0;
 
@@ -153,17 +154,71 @@ internal sealed class IconLoadDiagnosticsSession
         }
     }
 
+    internal MutationScope TryEnterMutationScope()
+    {
+        if (Volatile.Read(ref _stoppedAt) != 0)
+        {
+            return MutationScope.Inactive;
+        }
+
+        Interlocked.Increment(ref _activeMutations);
+        if (Volatile.Read(ref _stoppedAt) == 0)
+        {
+            return new MutationScope(this);
+        }
+
+        ExitMutationScope();
+        return MutationScope.Inactive;
+    }
+
+    private void ExitMutationScope()
+    {
+        Interlocked.Decrement(ref _activeMutations);
+    }
+
+    private void WaitForActiveMutations()
+    {
+        SpinWait spinWait = default;
+        while (Volatile.Read(ref _activeMutations) != 0)
+        {
+            spinWait.SpinOnce();
+        }
+    }
+
+    internal readonly struct MutationScope : IDisposable
+    {
+        private readonly IconLoadDiagnosticsSession? _session;
+
+        internal static MutationScope Inactive => new(null);
+
+        internal MutationScope(IconLoadDiagnosticsSession? session)
+        {
+            _session = session;
+        }
+
+        internal bool IsActive => _session is not null;
+
+        public void Dispose()
+        {
+            _session?.ExitMutationScope();
+        }
+    }
+
     internal void RecordUiProbeEnqueued()
     {
-        if (!IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
-            Interlocked.Increment(ref _uiProbeEnqueued);
+            return;
         }
+
+        Interlocked.Increment(ref _uiProbeEnqueued);
     }
 
     internal void RecordUiProbeCompleted(long elapsedTicks)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -175,23 +230,30 @@ internal sealed class IconLoadDiagnosticsSession
 
     internal void RecordUiProbeSkipped()
     {
-        if (!IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
-            Interlocked.Increment(ref _uiProbeSkipped);
+            return;
         }
+
+        Interlocked.Increment(ref _uiProbeSkipped);
     }
 
     internal void RecordUiProbeRejected()
     {
-        if (!IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
-            Interlocked.Increment(ref _uiProbeRejected);
+            return;
         }
+
+        Interlocked.Increment(ref _uiProbeRejected);
     }
 
     internal void RecordCacheLookup(Size iconSize, int capacity, bool hit, int entryCount)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -201,7 +263,8 @@ internal sealed class IconLoadDiagnosticsSession
 
     internal void RecordCacheEntryAdded(Size iconSize, int capacity, int entryCount)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -215,7 +278,8 @@ internal sealed class IconLoadDiagnosticsSession
         int entryCount,
         AdaptiveCacheRemovalReason reason)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -235,7 +299,8 @@ internal sealed class IconLoadDiagnosticsSession
 
     public IconRequestMeasurement BeginRequest(IconRequestReason reason, double scale, IconRequestOrigin origin)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return default;
         }
@@ -259,7 +324,8 @@ internal sealed class IconLoadDiagnosticsSession
 
     public IconLoadMeasurement? CreateLoad(IconLoadInputKind inputKind, double width, double height, double scale)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return null;
         }
@@ -274,7 +340,8 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void RecordProviderResolution(long requestId, long loadId, IconProviderResolution resolution)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -319,7 +386,8 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void InvalidateRequest(long requestId)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -337,7 +405,8 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void RegisterLoad(Task<IconSource?> task, IconLoadMeasurement load)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -352,7 +421,8 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void CompleteRequest(long requestId, IconRequestStatus status, IconLoadResultKind resultKind, long elapsedTicks)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -451,7 +521,8 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void RecordLoadEnqueued(long loadId, IconLoadPriority priority)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -609,7 +680,8 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void RecordLoadRejected(long loadId)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -634,7 +706,8 @@ internal sealed class IconLoadDiagnosticsSession
         long queueTicks,
         int workerCount)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -673,7 +746,8 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void RecordBackgroundPreparation(long loadId, IconLoadInputKind inputKind, long elapsedTicks)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -689,7 +763,8 @@ internal sealed class IconLoadDiagnosticsSession
         IconDispatcherMaterializationKind materializationKind,
         bool isDemanded)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -713,7 +788,8 @@ internal sealed class IconLoadDiagnosticsSession
         long startedAt,
         long elapsedTicks)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -748,7 +824,8 @@ internal sealed class IconLoadDiagnosticsSession
         long startedAt,
         long elapsedTicks)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -779,7 +856,8 @@ internal sealed class IconLoadDiagnosticsSession
         long startedAt,
         long elapsedTicks)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -817,7 +895,8 @@ internal sealed class IconLoadDiagnosticsSession
         long startedAt,
         long elapsedTicks)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -850,7 +929,8 @@ internal sealed class IconLoadDiagnosticsSession
         long startedAt,
         long elapsedTicks)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -877,7 +957,8 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void RecordLoadCompleted(long loadId, IconLoadInputKind inputKind, IconLoadResultKind resultKind, long elapsedTicks)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -892,7 +973,8 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void RecordDirectGlyphCompleted(long loadId, IconLoadInputKind inputKind, IconLoadResultKind resultKind, long elapsedTicks)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -929,7 +1011,8 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void RecordElementUpdate(bool reused, IconLoadResultKind resultKind, long elapsedTicks)
     {
-        if (IsStopped)
+        using var mutation = TryEnterMutationScope();
+        if (!mutation.IsActive)
         {
             return;
         }
@@ -965,6 +1048,7 @@ internal sealed class IconLoadDiagnosticsSession
                 var stoppedAt = Stopwatch.GetTimestamp();
                 Volatile.Write(ref _stoppedAt, stoppedAt);
                 _uiResponsivenessProbe?.Stop();
+                WaitForActiveMutations();
                 _processCpuStoppedTicks = GetProcessCpuTicks();
                 _managedAllocatedBytesStopped = GC.GetTotalAllocatedBytes(precise: false);
                 _gcPauseStoppedTicks = GC.GetTotalPauseDuration().Ticks;
