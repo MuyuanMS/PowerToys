@@ -147,8 +147,8 @@ public class AllAppsPageTests : AppsTestBase
 
         var item = new AppListItem(app, useThumbnails: true);
 
-        Assert.AreSame(Icons.GenericAppIcon, item.Icon);
         Assert.AreSame(Icons.GenericAppIcon, item.Command.Icon);
+        Assert.AreSame(Icons.GenericAppIcon, item.Icon);
 
         await WaitForIconAsync(item);
 
