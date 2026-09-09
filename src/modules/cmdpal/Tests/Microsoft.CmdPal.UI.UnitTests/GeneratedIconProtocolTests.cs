@@ -290,6 +290,14 @@ public class GeneratedIconProtocolTests
                 out _));
     }
 
+    [TestMethod]
+    public async Task MalformedUtf16InitialsAreRejected()
+    {
+        var (success, svg) = await TryCreateSvgAsync("|Initials|\uD800|#0067C0|circle|", ElementTheme.Light);
+        Assert.IsFalse(success);
+        Assert.AreEqual(0, svg.Length);
+    }
+
     [DataTestMethod]
     [DataRow(null)]
     [DataRow("")]

@@ -428,10 +428,19 @@ internal static class GeneratedIconProtocol
 
         // Preserve the original ASCII behavior while making canonically equivalent
         // Unicode spellings share rendering and cache identity.
-        var normalized = decoded
-            .Normalize(NormalizationForm.FormC)
-            .ToUpperInvariant()
-            .Normalize(NormalizationForm.FormC);
+        string normalized;
+        try
+        {
+            normalized = decoded
+                .Normalize(NormalizationForm.FormC)
+                .ToUpperInvariant()
+                .Normalize(NormalizationForm.FormC);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+
         if (normalized.Length is < 1 or > MaxInitialsLength)
         {
             return false;

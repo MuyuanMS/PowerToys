@@ -101,12 +101,17 @@ internal static class InitialsTextRenderer
 
             if (Interlocked.Exchange(ref _outlineFailureLogged, 1) == 0)
             {
-                Logger.LogError("Initials outline extraction failed; falling back to background tile", failure);
+                Logger.LogError("Initials outline extraction failed; allowing a later retry", failure);
             }
 
             pathData = string.Empty;
             useEvenOddFill = false;
-            return false;
+            if (!ReferenceEquals(failure, ex))
+            {
+                throw failure;
+            }
+
+            throw;
         }
     }
 
