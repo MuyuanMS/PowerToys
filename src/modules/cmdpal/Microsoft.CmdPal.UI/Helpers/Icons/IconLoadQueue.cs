@@ -479,7 +479,7 @@ internal sealed class IconLoadQueue
         // Speculative work uses at most workerCount - 1 consumers. Because a
         // consumer publishes WorkerReady only after its previous load completes,
         // retaining this slot also bounds the number of active speculative loads.
-        return _availableWorkerSlots > _workerSlotsReservedForDemand;
+        return _completionRequested || _availableWorkerSlots > _workerSlotsReservedForDemand;
     }
 
     private void UpdateDemandedIdleCapacityMeasurement()
@@ -516,7 +516,8 @@ internal sealed class IconLoadQueue
     private void UpdateSpeculativeDispatchDeferralMeasurement()
     {
         var speculativeQueueDepth = _speculativeHigh.Count + _speculativeLow.Count;
-        var reserveIsDeferringWork = _workerSlotsReservedForDemand > 0
+        var reserveIsDeferringWork = !_completionRequested
+            && _workerSlotsReservedForDemand > 0
             && _availableWorkerSlots > 0
             && _availableWorkerSlots <= _workerSlotsReservedForDemand
             && _demandedHigh.Count == 0
