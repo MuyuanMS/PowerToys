@@ -58,6 +58,19 @@ public class BasicTests : CommandPaletteTestBase
     }
 
     [TestMethod]
+    public void NumberedShortcutLatchedInvocationTest()
+    {
+        SetSearchBox("calculator");
+
+        this.Session.PressKey(Key.Alt);
+        this.Session.ReleaseKey(Key.Alt);
+        this.Session.SendKey(Key.Num1);
+
+        SetCalculatorExtensionSearchBox("1+2");
+        Assert.IsNotNull(this.Find<NavigationViewItem>("3"));
+    }
+
+    [TestMethod]
     public void NumberedShortcutSelectionTest()
     {
         SetSearchBox("calculator");
