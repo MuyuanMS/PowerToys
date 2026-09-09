@@ -34,6 +34,13 @@ import { WireSerializer, type FormCollector, type FormSubmitHandler } from './se
 
 type MessageSender = (message: JsonRpcMessage) => void;
 
+interface LiveCommandCollisionOptions {
+  excludeProviderScope?: boolean;
+  excludeFallbackScope?: boolean;
+  excludeResolvedScope?: boolean;
+  excludePageScopeId?: string;
+}
+
 /** Default bound, in milliseconds, for awaiting provider disposal on shutdown. */
 export const DEFAULT_DISPOSE_TIMEOUT_MS = 5000;
 
@@ -461,6 +468,7 @@ export class ExtensionRuntime {
     const items = await provider.topLevelCommands();
     const scope = new Map<string, ICommand>();
     const serialized = await this.withMapSink(scope, () => this.serializer.commandItems(items));
+    this.assertNoLiveCommandCollisions(scope.values(), { excludeProviderScope: true });
     // Replace the previous generation, releasing commands that are gone and
     // recursively retiring the descendant scopes they owned.
     const previous = this.providerScope;
@@ -492,6 +500,7 @@ export class ExtensionRuntime {
       fallbacks.set(item.id ?? item.command.id, item);
     }
     const serialized = await this.withMapSink(scope, () => this.serializer.commandItems(items));
+    this.assertNoLiveCommandCollisions(scope.values(), { excludeFallbackScope: true });
     // Replace the previous fallback generation, releasing commands that are gone
     // and recursively retiring the descendant scopes they owned.
     const previous = this.fallbackScope;
@@ -511,6 +520,7 @@ export class ExtensionRuntime {
     if (command) {
       const resolved = new Map<string, ICommand>();
       serialized = await this.withMapSink(resolved, () => this.serializer.command(command));
+      this.assertNoLiveCommandCollisions(resolved.values());
       for (const [registeredId, registeredCommand] of resolved) {
         this.resolved.set(registeredId, registeredCommand);
       }
@@ -524,6 +534,7 @@ export class ExtensionRuntime {
     if (item) {
       const resolved = new Map<string, ICommand>();
       serialized = await this.withMapSink(resolved, () => this.serializer.commandItem(item));
+      this.assertNoLiveCommandCollisions(resolved.values());
       for (const [registeredId, registeredCommand] of resolved) {
         this.resolved.set(registeredId, registeredCommand);
       }
@@ -569,6 +580,7 @@ export class ExtensionRuntime {
     const items = await page.getItems();
     const scope = this.createPageScope(pageId);
     const serialized = await this.withScopeSink(scope, () => this.serializer.listItems(items));
+    this.assertNoLiveCommandCollisions(scope.commands.values(), { excludePageScopeId: pageId });
     this.commitPageScope(pageId, scope);
     this.respond(id, { items: serialized, hasMoreItems: page.hasMoreItems ?? false });
   }
@@ -610,6 +622,7 @@ export class ExtensionRuntime {
     const items = await page.getItems();
     const scope = this.createPageScope(pageId);
     const serialized = await this.withScopeSink(scope, () => this.serializer.listItems(items));
+    this.assertNoLiveCommandCollisions(scope.commands.values(), { excludePageScopeId: pageId });
     this.commitPageScope(pageId, scope);
     this.respond(id, { items: serialized, hasMoreItems: page.hasMoreItems ?? false });
   }
@@ -682,6 +695,7 @@ export class ExtensionRuntime {
       }
       return result;
     });
+    this.assertNoLiveCommandCollisions(scope.commands.values(), { excludePageScopeId: pageId });
     this.commitPageScope(pageId, scope);
     return serialized;
   }
@@ -711,6 +725,7 @@ export class ExtensionRuntime {
       const commands = await provider.topLevelCommands();
       const scope = new Map<string, ICommand>();
       await this.withMapSink(scope, () => this.serializer.commandItems(commands));
+      this.assertNoLiveCommandCollisions(scope.values(), { excludeProviderScope: true });
       const previous = this.providerScope;
       this.providerScope = scope;
       this.retireMissing(previous.keys(), scope);
@@ -725,6 +740,7 @@ export class ExtensionRuntime {
           fallbacks.set(item.id ?? item.command.id, item);
         }
         await this.withMapSink(scope, () => this.serializer.commandItems(items));
+        this.assertNoLiveCommandCollisions(scope.values(), { excludeFallbackScope: true });
       }
       const previous = this.fallbackScope;
       this.fallbackScope = scope;
@@ -867,6 +883,16 @@ export class ExtensionRuntime {
 
   private hasLiveReference(commandId: string, ignoreResolvedReference: boolean): boolean {
     if (
+      this.hasRegistryReference(commandId, ignoreResolvedReference) ||
+      this.hasLiveResultOwnerReference(commandId)
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  private hasRegistryReference(commandId: string, ignoreResolvedReference: boolean): boolean {
+    if (
       this.providerScope.has(commandId) ||
       this.fallbackScope.has(commandId) ||
       (!ignoreResolvedReference && this.resolved.has(commandId))
@@ -879,6 +905,63 @@ export class ExtensionRuntime {
       }
     }
     return false;
+  }
+
+  private hasLiveResultOwnerReference(commandId: string): boolean {
+    for (const [ownerId, children] of this.resultChildren) {
+      if (children.has(commandId) && this.hasRegistryReference(ownerId, false)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private assertNoLiveCommandCollisions(
+    commands: Iterable<ICommand>,
+    options: LiveCommandCollisionOptions = {},
+  ): void {
+    for (const command of commands) {
+      if (this.hasLiveCommandCollision(command, options)) {
+        throw new Error(`Duplicate command id across live scopes: ${command.id}`);
+      }
+    }
+  }
+
+  private hasLiveCommandCollision(
+    command: ICommand,
+    options: LiveCommandCollisionOptions,
+  ): boolean {
+    if (
+      !options.excludeProviderScope &&
+      this.commandConflict(this.providerScope.get(command.id), command)
+    ) {
+      return true;
+    }
+    if (
+      !options.excludeFallbackScope &&
+      this.commandConflict(this.fallbackScope.get(command.id), command)
+    ) {
+      return true;
+    }
+    if (
+      !options.excludeResolvedScope &&
+      this.commandConflict(this.resolved.get(command.id), command)
+    ) {
+      return true;
+    }
+    for (const [pageId, scope] of this.pageScopes) {
+      if (pageId === options.excludePageScopeId) {
+        continue;
+      }
+      if (this.commandConflict(scope.commands.get(command.id), command)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private commandConflict(existing: ICommand | undefined, command: ICommand): boolean {
+    return existing !== undefined && existing !== command;
   }
 
   /** Retires every id in `ids` that is absent from the surviving `keep` map. */
@@ -946,14 +1029,16 @@ export class ExtensionRuntime {
     ownerId: string,
     result: CommandResult,
   ): Promise<ReturnType<WireSerializer['commandResult']>> {
+    const resolved = new Map<string, ICommand>();
     const children = new Set<string>();
-    const serialized = await this.withSink(
-      (command) => {
-        this.resolved.set(command.id, command);
-        children.add(command.id);
-      },
-      () => this.serializer.commandResult(result),
+    const serialized = await this.withMapSink(resolved, () =>
+      this.serializer.commandResult(result),
     );
+    this.assertNoLiveCommandCollisions(resolved.values());
+    for (const [commandId, command] of resolved) {
+      this.resolved.set(commandId, command);
+      children.add(commandId);
+    }
     if (children.size > 0) {
       const existing = this.resultChildren.get(ownerId);
       if (existing) {

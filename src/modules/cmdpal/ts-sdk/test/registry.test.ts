@@ -388,6 +388,48 @@ describe('bounded command registry eviction', () => {
     expect(responseFor(sent, 4)?.result).toEqual({ Kind: 4 });
   });
 
+  it('rejects a new scope when a different live scope already owns the command id', async () => {
+    const topLevel = item('shared').command;
+    const fallback = {
+      ...item('shared').command,
+      invoke(): CommandResult {
+        return { kind: 'goBack' };
+      },
+    };
+    const provider: ICommandProvider = {
+      id: 'ext',
+      displayName: 'Ext',
+      topLevelCommands() {
+        return [{ command: topLevel, title: 'Top level' }];
+      },
+      fallbackCommands() {
+        return [{ command: fallback, title: 'Fallback' }];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(provider);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'provider/getTopLevelCommands',
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'provider/getFallbackCommands',
+    });
+    expect(responseFor(sent, 2)?.error?.code).toBe(JsonRpcErrorCode.InternalError);
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 3,
+      method: 'command/invoke',
+      params: { commandId: 'shared' },
+    });
+    expect(responseFor(sent, 3)?.result).toEqual({ Kind: 4 });
+  });
+
   it('preserves a shared page scope while another provider scope still references it', async () => {
     const sharedPage: IListPage = {
       id: 'shared',
@@ -580,5 +622,87 @@ describe('recursive scope retirement', () => {
     // Retiring the opener across a refresh must retire the nested command too.
     await getTopLevel();
     expect((await invoke('nested-primary'))?.error?.code).toBe(JsonRpcErrorCode.MethodNotFound);
+  });
+
+  it('keeps a shared nested result command while another live owner still references it', async () => {
+    const shared: IInvokableCommand = {
+      id: 'shared-primary',
+      name: 'Shared primary',
+      invoke(): CommandResult {
+        return { kind: 'keepOpen' };
+      },
+    };
+    const ownerA: IInvokableCommand = {
+      id: 'owner-a',
+      name: 'Owner A',
+      invoke(): CommandResult {
+        return {
+          kind: 'confirm',
+          args: { title: 'A', description: 'A', primaryCommand: shared },
+        };
+      },
+    };
+    const ownerB: IInvokableCommand = {
+      id: 'owner-b',
+      name: 'Owner B',
+      invoke(): CommandResult {
+        return {
+          kind: 'confirm',
+          args: { title: 'B', description: 'B', primaryCommand: shared },
+        };
+      },
+    };
+    let generation = 0;
+    const provider: ICommandProvider = {
+      id: 'ext',
+      displayName: 'Ext',
+      topLevelCommands() {
+        generation += 1;
+        if (generation === 1) {
+          return [
+            { command: ownerA, title: 'Owner A' },
+            { command: ownerB, title: 'Owner B' },
+          ];
+        }
+        if (generation === 2) {
+          return [{ command: ownerB, title: 'Owner B' }];
+        }
+        return [];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(provider);
+
+    let messageId = 0;
+    const getTopLevel = async (): Promise<void> => {
+      messageId += 1;
+      await runtime.handleRequest({
+        jsonrpc: JSONRPC_VERSION,
+        id: messageId,
+        method: 'provider/getTopLevelCommands',
+      });
+    };
+    const invoke = async (commandId: string): Promise<JsonRpcResponse | undefined> => {
+      messageId += 1;
+      const thisId = messageId;
+      await runtime.handleRequest({
+        jsonrpc: JSONRPC_VERSION,
+        id: thisId,
+        method: 'command/invoke',
+        params: { commandId },
+      });
+      return responseFor(sent, thisId);
+    };
+
+    await getTopLevel();
+    await invoke('owner-a');
+    await invoke('owner-b');
+    expect((await invoke('shared-primary'))?.result).toEqual({ Kind: 4 });
+
+    await getTopLevel();
+    expect((await invoke('shared-primary'))?.result).toEqual({ Kind: 4 });
+
+    await getTopLevel();
+    expect((await invoke('shared-primary'))?.error?.code).toBe(JsonRpcErrorCode.MethodNotFound);
   });
 });
