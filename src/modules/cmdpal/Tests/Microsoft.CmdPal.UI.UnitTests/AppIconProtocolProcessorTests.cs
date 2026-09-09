@@ -43,23 +43,30 @@ public class AppIconProtocolProcessorTests
     [DataTestMethod]
     [DataRow(false)]
     [DataRow(true)]
-    public async Task PreservesFallbackCandidatesAfterEveryThumbnailMisses(bool jumbo)
+    public async Task UsesPreparedPrimaryBeforeLaterThumbnailFallback(bool jumbo)
     {
-        const string primary = "C:\\Icons\\primary.ico";
-        const string finalFallback = "steam://run/123|variant";
-        var fallback = $"{GetShell32DllPath()},1";
-        var processor = new AppIconProtocolProcessor(
-            static (_, _) => Task.FromResult<IRandomAccessStream?>(null));
+        var primary = $"{GetShell32DllPath()},1";
+        var fallback = "C:\\Program Files\\Example\\app.exe";
+        var attempts = new List<(string Candidate, bool Jumbo)>();
+        var processor = new AppIconProtocolProcessor((candidate, requestedJumbo) =>
+        {
+            attempts.Add((candidate, requestedJumbo));
+            return candidate == fallback
+                ? Task.FromResult<IRandomAccessStream?>(new InMemoryRandomAccessStream())
+                : Task.FromResult<IRandomAccessStream?>(null);
+        });
 
         var iconDescription = jumbo
-            ? AppIconProtocol.CreateJumbo(primary, fallback, finalFallback)
+            ? AppIconProtocol.CreateJumbo(primary, fallback)
             : AppIconProtocol.Create(primary, fallback);
         using var result = await processor.PrepareAsync(iconDescription, 20, ElementTheme.Default);
 
-        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.FallbackIconStrings, result.Kind);
-        CollectionAssert.AreEqual(
-            jumbo ? new[] { primary, fallback, finalFallback } : new[] { primary, fallback },
-            result.FallbackIconStrings);
+        CollectionAssert.AreEqual(new[] { (primary, jumbo) }, attempts);
+        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.PreparedIcon, result.Kind);
+        using var prepared = result.TakePreparedIcon();
+        Assert.IsNotNull(prepared);
+        Assert.AreEqual(IconPathConverter.PreparedIconKind.Binary, prepared.Kind);
+        Assert.IsNotNull(prepared.SoftwareBitmap);
     }
 
     [DataTestMethod]
@@ -70,17 +77,23 @@ public class AppIconProtocolProcessorTests
     {
         var primary = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.exe");
         var fallback = $"{GetShell32DllPath()},1";
+        var attempts = new List<(string Candidate, bool Jumbo)>();
         var processor = new AppIconProtocolProcessor(
-            static (_, _) => Task.FromResult<IRandomAccessStream?>(null));
+            (candidate, requestedJumbo) =>
+            {
+                attempts.Add((candidate, requestedJumbo));
+                return Task.FromResult<IRandomAccessStream?>(null);
+            });
 
         using var result = await processor.PrepareAsync(
             jumbo ? AppIconProtocol.CreateJumbo(primary, fallback) : AppIconProtocol.Create(primary, fallback),
             32,
             ElementTheme.Default);
 
-        Assert.IsNotNull(result.FallbackIconStrings);
-        using var prepared = IconPathConverter.PrepareFirstAvailable(result.FallbackIconStrings, null, 32);
-
+        CollectionAssert.AreEqual(new[] { (primary, jumbo), (fallback, jumbo) }, attempts);
+        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.PreparedIcon, result.Kind);
+        using var prepared = result.TakePreparedIcon();
+        Assert.IsNotNull(prepared);
         Assert.AreEqual(IconPathConverter.PreparedIconKind.Binary, prepared.Kind);
         Assert.IsNotNull(prepared.SoftwareBitmap);
         Assert.IsTrue(prepared.SoftwareBitmap.PixelWidth > 0);

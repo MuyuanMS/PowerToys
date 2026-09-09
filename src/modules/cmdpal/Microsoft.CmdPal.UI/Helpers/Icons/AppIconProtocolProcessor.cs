@@ -47,9 +47,6 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
         int targetSize,
         ElementTheme theme)
     {
-        _ = targetSize;
-        _ = theme;
-
         if (!AppIconProtocol.TryParse(value, out var candidates, out var jumbo))
         {
             return IconProtocolProcessingResult.Empty();
@@ -66,10 +63,18 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
             }
             catch
             {
-                // Continue with the next candidate before using the ordinary converter.
+                // Continue with ordinary conversion for this same candidate.
             }
+
+            var preparedIcon = IconPathConverter.PrepareFirstAvailable([candidate], null, targetSize, theme);
+            if (preparedIcon.Kind != IconPathConverter.PreparedIconKind.Empty)
+            {
+                return IconProtocolProcessingResult.FromPreparedIcon(preparedIcon);
+            }
+
+            preparedIcon.Dispose();
         }
 
-        return IconProtocolProcessingResult.FromFallbackIconStrings(candidates);
+        return IconProtocolProcessingResult.Empty();
     }
 }

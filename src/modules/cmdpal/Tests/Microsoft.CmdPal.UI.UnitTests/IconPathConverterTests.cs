@@ -117,6 +117,18 @@ public class IconPathConverterTests
     }
 
     [TestMethod]
+    public void FallbackPreparationSkipsNonDecodableUris()
+    {
+        using var prepared = IconPathConverter.PrepareFirstAvailable(
+            ["steam://run/12345", "\uE700"],
+            null,
+            24);
+
+        Assert.AreEqual(IconPathConverter.PreparedIconKind.Glyph, prepared.Kind);
+        Assert.AreEqual("\uE700", prepared.Glyph);
+    }
+
+    [TestMethod]
     public void FallbackPreparationReturnsEmptyWhenEveryCandidateFails()
     {
         var missingExecutable = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.exe");

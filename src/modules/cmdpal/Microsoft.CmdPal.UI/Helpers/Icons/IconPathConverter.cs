@@ -95,7 +95,7 @@ internal static partial class IconPathConverter
                 PreparedIconKind.Empty => false,
                 PreparedIconKind.Binary => prepared.SoftwareBitmap is not null,
                 PreparedIconKind.Glyph => FontIconGlyphClassifier.IsGlyphCandidate(candidate),
-                PreparedIconKind.BitmapUri or PreparedIconKind.SvgUri => !prepared.Uri!.IsFile || File.Exists(prepared.Uri.LocalPath),
+                PreparedIconKind.BitmapUri or PreparedIconKind.SvgUri => prepared.Uri is { } uri && IsSupportedFallbackUri(uri),
                 _ => false,
             };
 
@@ -252,6 +252,19 @@ internal static partial class IconPathConverter
     // a BitmapIconSource with a null URI remains visually empty without crossing
     // that unstable boundary.
     private static BitmapIconSource CreateEmptyIconSource() => new() { UriSource = null };
+
+    private static bool IsSupportedFallbackUri(Uri uri)
+    {
+        var scheme = uri.Scheme;
+        var isSupportedScheme =
+            string.Equals(scheme, Uri.UriSchemeFile, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(scheme, "ms-appx", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(scheme, "ms-appdata", StringComparison.OrdinalIgnoreCase);
+
+        return isSupportedScheme && (!uri.IsFile || File.Exists(uri.LocalPath));
+    }
 
     private static SoftwareBitmap? ExtractBinaryIcon(BinaryIconReference iconReference, int targetSize)
     {

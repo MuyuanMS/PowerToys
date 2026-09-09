@@ -41,6 +41,22 @@ public class AppIconProtocolTests
         CollectionAssert.AreEqual(new[] { primary, fallback, finalFallback }, candidates);
     }
 
+    [TestMethod]
+    public void JumboRequestPreservesTerminalFallbackCandidate()
+    {
+        const string primary = "C:\\Icons\\🪄.ico";
+        const string fallback = "C:\\Program Files\\Example\\app.exe";
+        const string finalFallback = "https://example.test/icon|large";
+        const string terminalFallback = "\uE737";
+
+        var value = AppIconProtocol.CreateJumbo(primary, fallback, finalFallback, terminalFallback);
+        var parsed = AppIconProtocol.TryParse(value, out var candidates, out var jumbo);
+
+        Assert.IsTrue(parsed);
+        Assert.IsTrue(jumbo);
+        CollectionAssert.AreEqual(new[] { primary, fallback, finalFallback, terminalFallback }, candidates);
+    }
+
     [DataTestMethod]
     [DataRow("😀", "|AppIcon|v1;2:😀")]
     [DataRow("👩‍💻", "|AppIcon|v1;5:👩‍💻")]
