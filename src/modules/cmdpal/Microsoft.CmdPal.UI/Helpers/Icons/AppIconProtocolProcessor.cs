@@ -55,10 +55,15 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
 
         foreach (var candidate in candidates)
         {
-            var preparedIcon = IconPathConverter.PrepareFirstAvailable([candidate], fontFamily, targetSize, theme);
-            if (ShouldPreferPreparedIcon(preparedIcon))
+            if (ShouldPreferOrdinaryConversion(candidate))
             {
-                return IconProtocolProcessingResult.FromPreparedIcon(preparedIcon);
+                var preferredIcon = IconPathConverter.PrepareFirstAvailable([candidate], fontFamily, targetSize, theme);
+                if (preferredIcon.Kind != IconPathConverter.PreparedIconKind.Empty)
+                {
+                    return IconProtocolProcessingResult.FromPreparedIcon(preferredIcon);
+                }
+
+                preferredIcon.Dispose();
             }
 
             if (!ShouldSkipThumbnailLookup(candidate))
@@ -67,7 +72,6 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
                 {
                     if (await _getThumbnail(candidate, jumbo).ConfigureAwait(false) is { } stream)
                     {
-                        preparedIcon.Dispose();
                         return IconProtocolProcessingResult.FromBitmapStream(stream);
                     }
                 }
@@ -77,6 +81,7 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
                 }
             }
 
+            var preparedIcon = IconPathConverter.PrepareFirstAvailable([candidate], fontFamily, targetSize, theme);
             if (preparedIcon.Kind != IconPathConverter.PreparedIconKind.Empty)
             {
                 return IconProtocolProcessingResult.FromPreparedIcon(preparedIcon);
@@ -99,8 +104,35 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
             || (Path.IsPathRooted(candidate) && !File.Exists(candidate));
     }
 
-    private static bool ShouldPreferPreparedIcon(IconPathConverter.PreparedIcon preparedIcon) =>
-        preparedIcon.Kind is IconPathConverter.PreparedIconKind.BitmapUri
-            or IconPathConverter.PreparedIconKind.SvgUri
-            or IconPathConverter.PreparedIconKind.Glyph;
+    private static bool ShouldPreferOrdinaryConversion(string candidate)
+    {
+        if (FontIconGlyphClassifier.IsGlyphCandidate(candidate))
+        {
+            return true;
+        }
+
+        if (Uri.TryCreate(candidate, UriKind.Absolute, out var uri))
+        {
+            return string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(uri.Scheme, Uri.UriSchemeFile, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(uri.Scheme, "ms-appx", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(uri.Scheme, "ms-appdata", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (!Path.IsPathRooted(candidate))
+        {
+            return false;
+        }
+
+        var extension = Path.GetExtension(candidate);
+        return string.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".jpg", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".jpeg", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".gif", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".bmp", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".tiff", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".ico", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".svg", StringComparison.OrdinalIgnoreCase);
+    }
 }
