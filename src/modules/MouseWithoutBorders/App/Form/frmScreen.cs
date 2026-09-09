@@ -632,7 +632,6 @@ namespace MouseWithoutBorders
                 Graphics g;
                 Pen p;
                 Bitmap bm = Images.notify_default;
-                var disposeBitmap = false;
 
                 if (themeAdaptive)
                 {
@@ -643,7 +642,6 @@ namespace MouseWithoutBorders
                     {
                         using Icon icon = new(iconPath);
                         bm = icon.ToBitmap();
-                        disposeBitmap = true;
                     }
                 }
 
