@@ -210,7 +210,7 @@ public partial class IconBox : ContentControl
         // instance has already been rebound, loaded, and arranged for a new item.
         // No matching Loaded event follows that stale notification, so invalidating
         // the new request here would leave the previous icon in the visible row.
-        if (_activeRequestDemand is not null && IsLoaded && IsWithinXamlRootBounds())
+        if (IsLoaded && IsWithinXamlRootBounds())
         {
             return;
         }
