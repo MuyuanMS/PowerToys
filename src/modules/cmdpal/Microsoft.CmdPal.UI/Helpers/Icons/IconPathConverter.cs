@@ -8,10 +8,6 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Graphics.Imaging;
-using DrawingIcon = System.Drawing.Icon;
-using DrawingImageLockMode = System.Drawing.Imaging.ImageLockMode;
-using DrawingPixelFormat = System.Drawing.Imaging.PixelFormat;
-using DrawingRectangle = System.Drawing.Rectangle;
 
 namespace Microsoft.CmdPal.UI.Helpers;
 
@@ -152,36 +148,7 @@ internal static partial class IconPathConverter
                 return null;
             }
 
-            using var icon = DrawingIcon.FromHandle(iconHandle);
-            using var sourceBitmap = icon.ToBitmap();
-            using var bitmap = sourceBitmap.Clone(
-                new DrawingRectangle(0, 0, sourceBitmap.Width, sourceBitmap.Height),
-                DrawingPixelFormat.Format32bppPArgb);
-
-            var rectangle = new DrawingRectangle(0, 0, bitmap.Width, bitmap.Height);
-            var bitmapData = bitmap.LockBits(rectangle, DrawingImageLockMode.ReadOnly, DrawingPixelFormat.Format32bppPArgb);
-            try
-            {
-                var bytesPerRow = checked(bitmap.Width * 4);
-                var pixels = GC.AllocateUninitializedArray<byte>(checked(bytesPerRow * bitmap.Height));
-                for (var row = 0; row < bitmap.Height; row++)
-                {
-                    var source = nint.Add(bitmapData.Scan0, row * bitmapData.Stride);
-                    Marshal.Copy(source, pixels, row * bytesPerRow, bytesPerRow);
-                }
-
-                var softwareBitmap = new SoftwareBitmap(
-                    BitmapPixelFormat.Bgra8,
-                    bitmap.Width,
-                    bitmap.Height,
-                    BitmapAlphaMode.Premultiplied);
-                softwareBitmap.CopyFromBuffer(pixels.AsBuffer());
-                return softwareBitmap;
-            }
-            finally
-            {
-                bitmap.UnlockBits(bitmapData);
-            }
+            return CreateSoftwareBitmapFromIcon(iconHandle, targetSize);
         }
         catch
         {
@@ -195,6 +162,182 @@ internal static partial class IconPathConverter
             }
         }
     }
+
+    private static SoftwareBitmap? CreateSoftwareBitmapFromIcon(nint iconHandle, int targetSize)
+    {
+        const uint DibRgbColors = 0;
+        const uint DiNormal = 0x0003;
+        const int SystemIconWidth = 11;
+
+        var bitmapSize = targetSize > 0 ? targetSize : NativeMethods.GetSystemMetrics(SystemIconWidth);
+        if (bitmapSize <= 0)
+        {
+            return null;
+        }
+
+        var screenDc = NativeMethods.GetDC(0);
+        if (screenDc == 0)
+        {
+            return null;
+        }
+
+        nint iconDc = 0;
+        nint blackBitmap = 0;
+        nint whiteBitmap = 0;
+        nint originalBitmap = 0;
+        try
+        {
+            iconDc = NativeMethods.CreateCompatibleDC(screenDc);
+            if (iconDc == 0)
+            {
+                return null;
+            }
+
+            var bitmapInfo = new BitmapInfo
+            {
+                Header = new BitmapInfoHeader
+                {
+                    Size = (uint)Marshal.SizeOf<BitmapInfoHeader>(),
+                    Width = bitmapSize,
+                    Height = -bitmapSize,
+                    Planes = 1,
+                    BitCount = 32,
+                },
+            };
+            var byteCount = checked(bitmapSize * bitmapSize * 4);
+
+            blackBitmap = NativeMethods.CreateDIBSection(
+                screenDc,
+                in bitmapInfo,
+                DibRgbColors,
+                out var blackBits,
+                0,
+                0);
+            if (blackBitmap == 0 || blackBits == 0)
+            {
+                return null;
+            }
+
+            originalBitmap = NativeMethods.SelectObject(iconDc, blackBitmap);
+            var blackPixels = new byte[byteCount];
+            Marshal.Copy(blackPixels, 0, blackBits, byteCount);
+            if (!NativeMethods.DrawIconEx(iconDc, 0, 0, iconHandle, bitmapSize, bitmapSize, 0, 0, DiNormal))
+            {
+                return null;
+            }
+
+            Marshal.Copy(blackBits, blackPixels, 0, byteCount);
+            var hasAlpha = false;
+            for (var offset = 3; offset < byteCount; offset += 4)
+            {
+                if (blackPixels[offset] != 0)
+                {
+                    hasAlpha = true;
+                    break;
+                }
+            }
+
+            if (hasAlpha)
+            {
+                for (var offset = 0; offset < byteCount; offset += 4)
+                {
+                    var alpha = blackPixels[offset + 3];
+                    if (alpha == 0)
+                    {
+                        blackPixels[offset] = 0;
+                        blackPixels[offset + 1] = 0;
+                        blackPixels[offset + 2] = 0;
+                    }
+                    else if (blackPixels[offset] > alpha
+                        || blackPixels[offset + 1] > alpha
+                        || blackPixels[offset + 2] > alpha)
+                    {
+                        blackPixels[offset] = Premultiply(blackPixels[offset], alpha);
+                        blackPixels[offset + 1] = Premultiply(blackPixels[offset + 1], alpha);
+                        blackPixels[offset + 2] = Premultiply(blackPixels[offset + 2], alpha);
+                    }
+                }
+            }
+            else
+            {
+                whiteBitmap = NativeMethods.CreateDIBSection(
+                    screenDc,
+                    in bitmapInfo,
+                    DibRgbColors,
+                    out var whiteBits,
+                    0,
+                    0);
+                if (whiteBitmap == 0 || whiteBits == 0)
+                {
+                    return null;
+                }
+
+                _ = NativeMethods.SelectObject(iconDc, whiteBitmap);
+                var whitePixels = new byte[byteCount];
+                Array.Fill(whitePixels, byte.MaxValue);
+                Marshal.Copy(whitePixels, 0, whiteBits, byteCount);
+                if (!NativeMethods.DrawIconEx(iconDc, 0, 0, iconHandle, bitmapSize, bitmapSize, 0, 0, DiNormal))
+                {
+                    return null;
+                }
+
+                Marshal.Copy(whiteBits, whitePixels, 0, byteCount);
+                for (var offset = 0; offset < byteCount; offset += 4)
+                {
+                    var backgroundDifference =
+                        whitePixels[offset] - blackPixels[offset]
+                        + whitePixels[offset + 1] - blackPixels[offset + 1]
+                        + whitePixels[offset + 2] - blackPixels[offset + 2];
+                    if (backgroundDifference < 384)
+                    {
+                        blackPixels[offset + 3] = byte.MaxValue;
+                    }
+                    else
+                    {
+                        blackPixels[offset] = 0;
+                        blackPixels[offset + 1] = 0;
+                        blackPixels[offset + 2] = 0;
+                        blackPixels[offset + 3] = 0;
+                    }
+                }
+            }
+
+            var softwareBitmap = new SoftwareBitmap(
+                BitmapPixelFormat.Bgra8,
+                bitmapSize,
+                bitmapSize,
+                BitmapAlphaMode.Premultiplied);
+            softwareBitmap.CopyFromBuffer(blackPixels.AsBuffer());
+            return softwareBitmap;
+        }
+        finally
+        {
+            if (iconDc != 0 && originalBitmap != 0)
+            {
+                _ = NativeMethods.SelectObject(iconDc, originalBitmap);
+            }
+
+            if (whiteBitmap != 0)
+            {
+                _ = NativeMethods.DeleteObject(whiteBitmap);
+            }
+
+            if (blackBitmap != 0)
+            {
+                _ = NativeMethods.DeleteObject(blackBitmap);
+            }
+
+            if (iconDc != 0)
+            {
+                _ = NativeMethods.DeleteDC(iconDc);
+            }
+
+            _ = NativeMethods.ReleaseDC(0, screenDc);
+        }
+    }
+
+    private static byte Premultiply(byte color, byte alpha) =>
+        (byte)(((color * alpha) + 127) / byte.MaxValue);
 
     internal sealed partial class PreparedIcon : IDisposable
     {
@@ -274,5 +417,82 @@ internal static partial class IconPathConverter
         [LibraryImport("user32.dll")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         internal static partial int DestroyIcon(nint icon);
+
+        [LibraryImport("user32.dll")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        internal static partial nint GetDC(nint window);
+
+        [LibraryImport("user32.dll")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        internal static partial int ReleaseDC(nint window, nint deviceContext);
+
+        [LibraryImport("user32.dll")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        internal static partial int GetSystemMetrics(int index);
+
+        [LibraryImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        internal static partial bool DrawIconEx(
+            nint deviceContext,
+            int x,
+            int y,
+            nint icon,
+            int width,
+            int height,
+            uint animationStep,
+            nint flickerFreeBrush,
+            uint flags);
+
+        [LibraryImport("gdi32.dll")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        internal static partial nint CreateCompatibleDC(nint deviceContext);
+
+        [LibraryImport("gdi32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        internal static partial bool DeleteDC(nint deviceContext);
+
+        [LibraryImport("gdi32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        internal static partial bool DeleteObject(nint graphicsObject);
+
+        [LibraryImport("gdi32.dll")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        internal static partial nint SelectObject(nint deviceContext, nint graphicsObject);
+
+        [LibraryImport("gdi32.dll")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        internal static partial nint CreateDIBSection(
+            nint deviceContext,
+            in BitmapInfo bitmapInfo,
+            uint usage,
+            out nint bits,
+            nint section,
+            uint offset);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BitmapInfoHeader
+    {
+        public uint Size;
+        public int Width;
+        public int Height;
+        public ushort Planes;
+        public ushort BitCount;
+        public uint Compression;
+        public uint ImageSize;
+        public int XPixelsPerMeter;
+        public int YPixelsPerMeter;
+        public uint ColorsUsed;
+        public uint ColorsImportant;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BitmapInfo
+    {
+        public BitmapInfoHeader Header;
+        public uint Colors;
     }
 }
