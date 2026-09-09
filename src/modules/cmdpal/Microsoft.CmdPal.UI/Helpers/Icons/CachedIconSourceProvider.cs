@@ -322,9 +322,21 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
         // cache this key: once resolved, the canonical Shell identity owns the entry.
         var rawKey = new IconCacheKey(icon, request.CacheIdentity, scale, ElementTheme.Default);
         var candidate = new InFlightIconLoad();
-        var pending = _inFlight.GetOrAdd(rawKey, candidate);
-        if (!ReferenceEquals(pending, candidate))
+        InFlightIconLoad pending;
+        while (true)
         {
+            pending = _inFlight.GetOrAdd(rawKey, candidate);
+            if (ReferenceEquals(pending, candidate))
+            {
+                break;
+            }
+
+            if (pending.Task.IsCompleted
+                && _inFlight.TryRemove(new KeyValuePair<IconCacheKey, InFlightIconLoad>(rawKey, pending)))
+            {
+                continue;
+            }
+
             shellDiagnostics.RawInFlightJoin();
             pending.Demand.Attach(demand);
             diagnostics.RecordProviderResolution(IconProviderResolution.InFlight, pending.Task);
@@ -554,7 +566,7 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
         _ = pending.Task.ContinueWith(
             _ => _inFlight.TryRemove(new KeyValuePair<IconCacheKey, InFlightIconLoad>(key, pending)),
             CancellationToken.None,
-            TaskContinuationOptions.None,
+            TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
     }
 

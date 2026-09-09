@@ -68,8 +68,12 @@ internal sealed class ShellIconLocationCache
         return false;
     }
 
-    public bool IsCurrent(LocatedShellIcon locatedIcon) =>
-        locatedIcon.Identity.CacheGeneration == Generation;
+    public bool IsCurrent(LocatedShellIcon locatedIcon)
+    {
+        var generation = Generation;
+        return locatedIcon.Identity.CacheGeneration == generation
+            && generation == Generation;
+    }
 
     public void Clear()
     {
