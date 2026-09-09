@@ -13,6 +13,7 @@ namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
 public class NumberedItemShortcutsTests
 {
     private static readonly int[] ExpectedTargetIndexes = [1, 2, 4, 5, 6, 7, 8, 9, 10];
+    private static readonly int[] ExpectedVisibleTargetIndexes = [4, 5, 6, 7, 9, 10, 11];
 
     [DataTestMethod]
     [DataRow((int)VirtualKey.Number1, (int)VirtualKeyModifiers.Menu, (int)NumberedItemShortcuts.ShortcutAction.Invoke, 0, (int)NumberedItemShortcuts.ShortcutAction.Invoke)]
@@ -90,8 +91,25 @@ public class NumberedItemShortcutsTests
             targets.Select(item => item.Index).ToArray());
     }
 
+    [TestMethod]
+    public void GetTargets_WithVisibilityFilter_UsesOnlyVisibleEligibleItems()
+    {
+        var items = Enumerable.Range(0, 12)
+            .Select(index => new TestItem(index, index is not 0 and not 3, index is >= 4 and not 8))
+            .ToArray();
+
+        var targets = NumberedItemShortcuts.GetTargets(
+            items,
+            static item => item.IsEligible,
+            static item => item.IsVisible);
+
+        CollectionAssert.AreEqual(
+            ExpectedVisibleTargetIndexes,
+            targets.Select(item => item.Index).ToArray());
+    }
+
     private static KeyChord Chord(VirtualKey key, VirtualKeyModifiers modifiers) =>
         new(modifiers, (int)key, 0);
 
-    private sealed record TestItem(int Index, bool IsEligible);
+    private sealed record TestItem(int Index, bool IsEligible, bool IsVisible = true);
 }

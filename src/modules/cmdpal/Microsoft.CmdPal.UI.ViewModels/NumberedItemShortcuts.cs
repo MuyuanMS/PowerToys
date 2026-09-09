@@ -45,12 +45,15 @@ public static class NumberedItemShortcuts
         return index is >= 0 and < ShortcutCount ? index : -1;
     }
 
-    public static IReadOnlyList<T> GetTargets<T>(IEnumerable<T> items, Func<T, bool> isEligible)
+    public static IReadOnlyList<T> GetTargets<T>(
+        IEnumerable<T> items,
+        Func<T, bool> isEligible,
+        Func<T, bool>? isVisible = null)
     {
         var targets = new List<T>(ShortcutCount);
         foreach (var item in items)
         {
-            if (!isEligible(item))
+            if (!isEligible(item) || (isVisible is not null && !isVisible(item)))
             {
                 continue;
             }
