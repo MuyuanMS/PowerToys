@@ -166,6 +166,7 @@ public class IconProtocolRegistryTests
 
         public ValueTask<IconProtocolProcessingResult> PrepareAsync(
             string value,
+            string? fontFamily,
             int targetSize,
             ElementTheme theme) =>
             ValueTask.FromResult(IconProtocolProcessingResult.Empty());

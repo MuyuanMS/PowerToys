@@ -25,6 +25,7 @@ internal interface IIconProtocolProcessor
 
     ValueTask<IconProtocolProcessingResult> PrepareAsync(
         string value,
+        string? fontFamily,
         int targetSize,
         ElementTheme theme);
 }

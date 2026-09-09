@@ -44,6 +44,7 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
 
     public async ValueTask<IconProtocolProcessingResult> PrepareAsync(
         string value,
+        string? fontFamily,
         int targetSize,
         ElementTheme theme)
     {
@@ -54,7 +55,7 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
 
         foreach (var candidate in candidates)
         {
-            if (!IconPathParser.TryParseBinaryIconReference(candidate, out _))
+            if (!ShouldSkipThumbnailLookup(candidate))
             {
                 try
                 {
@@ -69,7 +70,7 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
                 }
             }
 
-            var preparedIcon = IconPathConverter.PrepareFirstAvailable([candidate], null, targetSize, theme);
+            var preparedIcon = IconPathConverter.PrepareFirstAvailable([candidate], fontFamily, targetSize, theme);
             if (preparedIcon.Kind != IconPathConverter.PreparedIconKind.Empty)
             {
                 return IconProtocolProcessingResult.FromPreparedIcon(preparedIcon);
@@ -79,5 +80,16 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
         }
 
         return IconProtocolProcessingResult.Empty();
+    }
+
+    private static bool ShouldSkipThumbnailLookup(string candidate)
+    {
+        if (candidate.Contains("://", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return (IconPathParser.TryParseBinaryIconReference(candidate, out _) && candidate.Contains(',', StringComparison.Ordinal))
+            || (Path.IsPathRooted(candidate) && !File.Exists(candidate));
     }
 }

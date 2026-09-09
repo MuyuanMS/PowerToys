@@ -236,7 +236,7 @@ internal sealed partial class IconLoaderService : IIconLoaderService
                 }
                 else if (!protocolProcessor.TryPrepareSynchronously(iconString, targetSize, theme, out preparedIcon))
                 {
-                    protocolResult = await protocolProcessor.PrepareAsync(iconString, targetSize, theme).ConfigureAwait(false);
+                    protocolResult = await protocolProcessor.PrepareAsync(iconString, fontFamily, targetSize, theme).ConfigureAwait(false);
                     if (protocolResult.BitmapStream is { } bitmapStream)
                     {
                         diagnostics?.CompleteBackgroundPreparation(preparationStartedAt);
