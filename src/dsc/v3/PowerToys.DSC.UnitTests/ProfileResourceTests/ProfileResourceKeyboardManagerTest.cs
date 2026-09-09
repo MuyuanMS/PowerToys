@@ -302,6 +302,23 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
     }
 
     [TestMethod]
+    public void Get_MissingActiveConfigurationProperty_FailsWithJsonError()
+    {
+        // Arrange
+        _settingsUtils.SaveSettings(/*lang=json,strict*/ """{"properties":{}}""", KeyboardManagerSettings.ModuleName);
+
+        // Act
+        var result = ExecuteDscCommand<GetCommand>("--resource", ProfileResource.ResourceName, "--module", Module);
+        var messages = result.Messages();
+
+        // Assert
+        Assert.IsFalse(result.Success);
+        Assert.AreEqual(1, messages.Count);
+        Assert.AreEqual(DscMessageLevel.Error, messages[0].Level);
+        StringAssert.Contains(messages[0].Message, "valid active configuration");
+    }
+
+    [TestMethod]
     public void Get_EmptyActiveConfiguration_FailsWithJsonError()
     {
         // Arrange
@@ -335,6 +352,37 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
         Assert.AreEqual(1, messages.Count);
         Assert.AreEqual(DscMessageLevel.Error, messages[0].Level);
         StringAssert.Contains(messages[0].Message, "contains a null JSON value");
+    }
+
+    [TestMethod]
+    public void Export_RawProfileShapeProblems_EmitWarnings()
+    {
+        // Arrange
+        _settingsUtils.SaveSettings(
+            /*lang=json,strict*/ """
+            {
+                "remapKeysToText": { "inProcess": [] },
+                "remapShortcuts": {
+                    "global": [
+                        { "originalKeys": "17;65", "newRemapKeys": "27", "exactMatch": null }
+                    ],
+                    "appSpecific": []
+                },
+                "remapShortcutsToText": { "global": [], "appSpecific": [] }
+            }
+            """,
+            KeyboardManagerSettings.ModuleName,
+            DefaultProfileFileName);
+
+        // Act
+        var result = ExecuteDscCommand<ExportCommand>("--resource", ProfileResource.ResourceName, "--module", Module);
+        var messages = result.Messages();
+
+        // Assert
+        Assert.IsTrue(result.Success);
+        Assert.AreEqual(2, messages.Count);
+        StringAssert.Contains(messages[0].Message, "Stored profile section 'remapKeys' is missing");
+        StringAssert.Contains(messages[1].Message, "Stored profile member 'remapShortcuts.global[0].exactMatch' has a null value");
     }
 
     [TestMethod]

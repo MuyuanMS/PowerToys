@@ -123,8 +123,10 @@ public sealed class ProfileFunctionData : BaseFunctionData
     public void GetState()
     {
         using var transactionLock = AcquireTransactionLock();
+        var profileFileName = GetProfileFileName();
+        AddStoredProfileWarnings(profileFileName);
         var profile = ReadSettings<KeyboardManagerProfile>(
-            KeyboardManagerSettings.ModuleName, GetProfileFileName());
+            KeyboardManagerSettings.ModuleName, profileFileName);
         Output.Profile = KbmProfileConverter.FromProfile(profile, Warnings);
     }
 
@@ -249,9 +251,19 @@ public sealed class ProfileFunctionData : BaseFunctionData
     /// <returns>The profile file name.</returns>
     private static string GetProfileFileName()
     {
-        var settings = ReadSettings<KeyboardManagerSettings>(KeyboardManagerSettings.ModuleName);
-        var activeConfiguration = settings.Properties?.ActiveConfiguration?.Value;
-        if (string.IsNullOrWhiteSpace(activeConfiguration) ||
+        var settingsPath = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName);
+        if (!File.Exists(settingsPath))
+        {
+            return "default.json";
+        }
+
+        JsonNode? settingsNode = JsonNode.Parse(File.ReadAllText(settingsPath));
+        if (settingsNode is not JsonObject root ||
+            !root.TryGetPropertyValue("properties", out var propertiesNode) || propertiesNode is not JsonObject properties ||
+            !properties.TryGetPropertyValue("activeConfiguration", out var activeConfigurationNode) || activeConfigurationNode is not JsonObject activeConfigurationObject ||
+            !activeConfigurationObject.TryGetPropertyValue("value", out var activeConfigurationValueNode) || activeConfigurationValueNode is not JsonValue activeConfigurationValue ||
+            !activeConfigurationValue.TryGetValue<string>(out var activeConfiguration) ||
+            string.IsNullOrWhiteSpace(activeConfiguration) ||
             activeConfiguration.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
             !string.Equals(Path.GetFileName(activeConfiguration), activeConfiguration, StringComparison.Ordinal) ||
             activeConfiguration is "." or "..")
@@ -260,6 +272,92 @@ public sealed class ProfileFunctionData : BaseFunctionData
         }
 
         return $"{activeConfiguration}.json";
+    }
+
+    private void AddStoredProfileWarnings(string fileName)
+    {
+        var path = _settingsUtils.GetSettingsFilePath(KeyboardManagerSettings.ModuleName, fileName);
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        JsonNode? profileNode = JsonNode.Parse(File.ReadAllText(path));
+        if (profileNode is not JsonObject root)
+        {
+            Warnings.Add("Stored profile root is not a JSON object");
+            return;
+        }
+
+        ValidateRequiredObjectSection(root, "remapKeys", Warnings, "inProcess");
+        ValidateRequiredObjectSection(root, "remapKeysToText", Warnings, "inProcess");
+        ValidateRequiredObjectSection(root, "remapShortcuts", Warnings, "global", "appSpecific");
+        ValidateRequiredObjectSection(root, "remapShortcutsToText", Warnings, "global", "appSpecific");
+        AddNullValueWarnings(root, string.Empty, Warnings);
+    }
+
+    private static void ValidateRequiredObjectSection(JsonObject root, string sectionName, IList<string> warnings, params string[] requiredArrayNames)
+    {
+        if (!root.TryGetPropertyValue(sectionName, out var sectionNode))
+        {
+            warnings.Add($"Stored profile section '{sectionName}' is missing");
+            return;
+        }
+
+        if (sectionNode is not JsonObject sectionObject)
+        {
+            warnings.Add($"Stored profile section '{sectionName}' must be an object");
+            return;
+        }
+
+        foreach (var arrayName in requiredArrayNames)
+        {
+            if (!sectionObject.TryGetPropertyValue(arrayName, out var arrayNode))
+            {
+                warnings.Add($"Stored profile section '{sectionName}.{arrayName}' is missing");
+            }
+            else if (arrayNode is not JsonArray)
+            {
+                warnings.Add($"Stored profile section '{sectionName}.{arrayName}' must be an array");
+            }
+        }
+    }
+
+    private static void AddNullValueWarnings(JsonNode? node, string path, IList<string> warnings)
+    {
+        if (node is JsonObject obj)
+        {
+            foreach (var property in obj)
+            {
+                var childPath = string.IsNullOrEmpty(path) ? property.Key : $"{path}.{property.Key}";
+                if (property.Value == null)
+                {
+                    warnings.Add($"Stored profile member '{childPath}' has a null value");
+                }
+                else
+                {
+                    AddNullValueWarnings(property.Value, childPath, warnings);
+                }
+            }
+
+            return;
+        }
+
+        if (node is JsonArray array)
+        {
+            for (var i = 0; i < array.Count; i++)
+            {
+                var childPath = $"{path}[{i.ToString(CultureInfo.InvariantCulture)}]";
+                if (array[i] == null)
+                {
+                    warnings.Add($"Stored profile member '{childPath}' has a null value");
+                }
+                else
+                {
+                    AddNullValueWarnings(array[i], childPath, warnings);
+                }
+            }
+        }
     }
 
     private static T ReadSettings<T>(string moduleName, string fileName = SettingsUtils.DefaultFileName)
