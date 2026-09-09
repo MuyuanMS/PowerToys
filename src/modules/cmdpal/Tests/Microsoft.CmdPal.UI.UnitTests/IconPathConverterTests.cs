@@ -35,6 +35,9 @@ public class IconPathConverterTests
         Assert.IsTrue(
             Enumerable.Range(0, pixels.Length / 4).Any(pixel => pixels[(pixel * 4) + 3] == 0),
             "Extracted icons should preserve transparent pixels.");
+        Assert.IsTrue(
+            Enumerable.Range(0, pixels.Length / 4).Any(pixel => pixels[(pixel * 4) + 3] != 0),
+            "Extracted icons should preserve visible pixels.");
     }
 
     [TestMethod]
