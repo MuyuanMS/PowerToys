@@ -113,12 +113,12 @@ sequenceDiagram
     Browser->>Idp: User authenticates and consents
     Idp-->>Browser: Redirect to redirect_uri?code=...&state=...
     Browser-->>Host: Redirect captured
-    Host->>Host: Validate state, strip it
-    Host-->>Ext: IAuthorizationResult (RedirectUri, code)
+    Host->>Host: Validate state, force code-only response, strip state
+    Host-->>Ext: IAuthorizationResult (SessionId, RedirectUri, code)
     Ext->>Idp: POST token endpoint<br/>(code, code_verifier, redirect_uri, client_id)
     Idp-->>Ext: access_token (+ optional refresh_token, id_token)
     Ext->>Ext: Optionally store the token
-    Ext->>Host: Sign-in succeeded
+    Ext->>Host: CompleteAuthorizationAsync(SessionId, true)
     Host->>Host: Foreground palette, navigate to the signed-in page
 ```
 
@@ -128,6 +128,9 @@ A few things worth calling out:
   your authorize parameters (`client_id`, `scope`, `code_challenge`, and so on).
 - The host hands back the exact `redirect_uri` it used. RFC 6749 says you replay that
   same value at the token endpoint, and the Toolkit does it for you.
+- The host also hands back a flow-scoped `SessionId`. The Toolkit completes that
+  session only after the token exchange succeeds, so the host knows when it is safe to
+  navigate to the signed-in page.
 - The token exchange happens in your process. The host is already out of the picture
   by the time a token exists.
 
@@ -199,9 +202,10 @@ interface IAuthorizationRequest
 {
     String DisplayName { get; };            // shown in the "waiting to sign in" status
     String AuthorizationEndpoint { get; };  // the provider authorize URL
-    // Parameters appended to the authorize URL. Do not include redirect_uri or state.
-    // The host injects both.
-    IReadOnlyDictionary<String, String> Parameters { get; };
+    // Parameters appended to the authorize URL. Do not include redirect_uri, state,
+    // response_type, or response_mode. The host injects redirect_uri/state, forces an
+    // authorization-code response, and rejects token-bearing redirects.
+    Windows.Foundation.Collections.IMapView<String, String> Parameters { get; };
     AuthorizationRedirectKind RedirectKind { get; };
     UInt32 TimeoutSeconds { get; };         // 0 means the host default (60s); host caps at 300s
     ICommand SignedInPage { get; };         // where the host navigates on success; may be null
@@ -210,8 +214,9 @@ interface IAuthorizationRequest
 interface IAuthorizationResult
 {
     Boolean IsSuccessful { get; };
+    String SessionId { get; };              // identifies the pending brokered flow
     String RedirectUri { get; };            // the exact redirect_uri the host used
-    IReadOnlyDictionary<String, String> ResponseParameters { get; };  // e.g. code; state is stripped
+    Windows.Foundation.Collections.IMapView<String, String> ResponseParameters { get; };  // e.g. code; state is stripped
     String Error { get; };                  // set when IsSuccessful is false
 };
 
@@ -219,6 +224,11 @@ interface IExtensionHost2 requires IExtensionHost
 {
     // Run the interactive redirect flow. Cancelable.
     Windows.Foundation.IAsyncOperation<IAuthorizationResult> RequestAuthorizationAsync(IAuthorizationRequest request);
+
+    // Complete a previously brokered authorization flow after the extension finishes
+    // its own token exchange. A successful completion lets the host foreground the
+    // palette and navigate to SignedInPage.
+    Windows.Foundation.IAsyncAction CompleteAuthorizationAsync(String sessionId, Boolean isSuccessful);
 
     // Thin facilitation for device-code: open a URL in the system browser.
     Windows.Foundation.IAsyncAction OpenUrlAsync(String url);
@@ -230,8 +240,10 @@ interface IExtensionHost2 requires IExtensionHost
 The host navigates to your signed-in page for you, and only for you. You name that
 page in `IAuthorizationRequest.SignedInPage` when you start the flow. The host checks
 that the page belongs to your extension and holds onto it. After your token exchange
-succeeds, the Toolkit tells the host the sign-in worked, and the host foregrounds the
-palette and navigates to the page you already named.
+succeeds, the Toolkit calls `CompleteAuthorizationAsync(sessionId, true)`, and the
+host foregrounds the palette and navigates to the page you already named. If the
+exchange fails or the extension abandons the flow, it completes the session with
+`false`, and the host clears the pending navigation without ever seeing a token.
 
 ### Toolkit
 
@@ -296,8 +308,14 @@ and so the redirect is hard to spoof.
   client, because that's what it is.
 - **`state` is host-owned, random, and single use.** The host generates it, matches it
   on the redirect, and strips it before handing anything back. You never touch it.
+- **Only code-bearing redirects are allowed.** The host forces `response_type=code`,
+  rejects token-bearing or `form_post` responses, and never forwards `access_token` or
+  `id_token` through the broker channel.
 - **`redirect_uri` binding.** The host returns the exact `redirect_uri` it used, and
   the Toolkit replays that same value at the token endpoint per RFC 6749.
+- **Provider endpoints must use HTTPS.** Authorization, token, and device-code
+  endpoints must be `https://`. The only allowed `http://` endpoint is the
+  host-owned loopback redirect on `127.0.0.1`.
 - **Loopback is bound to `127.0.0.1` only,** on an ephemeral port, per RFC 8252.
 - **No token storage in the host.** Tokens are exchanged and stored entirely in your
   process.
