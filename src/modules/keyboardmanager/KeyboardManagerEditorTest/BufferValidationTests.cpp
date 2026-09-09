@@ -970,6 +970,30 @@ namespace RemappingUITests
                 });
             }
 
+            // Test if the ValidateShortcutBufferElement method returns WinL error when the second key of a chord is L
+            TEST_METHOD (ValidateShortcutBufferElement_ShouldReturnWinLError_OnSettingDropDownResultingInChordWithSecondKeyL)
+            {
+                std::vector<ValidateShortcutBufferElementArgs> testCases;
+                // Case 1: Validate the element when selecting L (0x4C) as the second key on first column of LWin + K + Empty chord
+                testCases.push_back({ 0, 0, 2, std::vector<int32_t>{ VK_LWIN, 0x4B, 0x4C }, std::wstring(), false, RemapBufferRow{ RemapBufferItem{ std::vector<int32_t>{ VK_LWIN, 0x4B }, Shortcut() }, std::wstring() } });
+                // Case 2: Validate the element when selecting L (0x4C) as the second key on second column of LWin + K + Empty chord
+                testCases.push_back({ 0, 1, 2, std::vector<int32_t>{ VK_LWIN, 0x4B, 0x4C }, std::wstring(), false, RemapBufferRow{ RemapBufferItem{ Shortcut(), std::vector<int32_t>{ VK_LWIN, 0x4B } }, std::wstring() } });
+                // Case 3: Validate the element when selecting L (0x4C) as the second key on second column of hybrid Win + K + Empty chord
+                testCases.push_back({ 0, 1, 2, std::vector<int32_t>{ CommonSharedConstants::VK_WIN_BOTH, 0x4B, 0x4C }, std::wstring(), true, RemapBufferRow{ RemapBufferItem{ Shortcut(), std::vector<int32_t>{ CommonSharedConstants::VK_WIN_BOTH, 0x4B } }, std::wstring() } });
+
+                RunTestCases(testCases, [this](const ValidateShortcutBufferElementArgs& testCase) {
+                    // Arrange
+                    RemapBuffer remapBuffer;
+                    remapBuffer.push_back(testCase.bufferRow);
+
+                    // Act
+                    std::pair<ShortcutErrorType, BufferValidationHelpers::DropDownAction> result = BufferValidationHelpers::ValidateShortcutBufferElement(testCase.elementRowIndex, testCase.elementColIndex, testCase.indexOfDropDownLastModified, testCase.selectedCodesOnDropDowns, testCase.targetAppNameInTextBox, testCase.isHybridColumn, remapBuffer, true);
+
+                    // Assert that the element is invalid
+                    Assert::AreEqual(true, result.first == ShortcutErrorType::WinL);
+                });
+            }
+
             // Test if the ValidateShortcutBufferElement method returns CtrlAltDel error on setting a drop down to Ctrl, Alt or Del on a column resulting in Ctrl+Alt+Del
             TEST_METHOD (ValidateShortcutBufferElement_ShouldReturnCtrlAltDelError_OnSettingDropDownToCtrlAltOrDelOnColumnResultingInCtrlAltDel)
             {
