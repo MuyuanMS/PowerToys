@@ -24,6 +24,7 @@
             <KeyboardAccelerator Key="Up" Invoked="PreviousNavigationInvoked" />
             <KeyboardAccelerator Key="Right" Invoked="NextNavigationInvoked" />
             <KeyboardAccelerator Key="Down" Invoked="NextNavigationInvoked" />
+            <!-- Keep these in sync with the low-level hook, which also handles focus hosted outside the XAML tree. -->
             <KeyboardAccelerator
                 Key="Left"
                 Invoked="PreviousNavigationInvoked"
