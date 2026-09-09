@@ -667,7 +667,8 @@ namespace MouseWithoutBorders
                 }
                 */
 
-                var darkShell = ManagedCommon.ThemeHelpers.GetSystemTheme() == ManagedCommon.AppTheme.Dark;
+                var darkShell = themeAdaptive &&
+                    ManagedCommon.ThemeHelpers.GetSystemTheme() == ManagedCommon.AppTheme.Dark;
 
                 if (CurIcon != Common.ICON_ONE)
                 {
