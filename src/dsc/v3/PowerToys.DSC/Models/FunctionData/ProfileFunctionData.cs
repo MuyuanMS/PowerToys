@@ -154,6 +154,10 @@ public sealed class ProfileFunctionData : BaseFunctionData
         {
             var settings = new KeyboardManagerSettings();
             _settingsUtils.SaveSettings(settings.ToJsonString(), KeyboardManagerSettings.ModuleName);
+            if (!_settingsUtils.SettingsExists(KeyboardManagerSettings.ModuleName))
+            {
+                throw new IOException("Keyboard Manager settings could not be created.");
+            }
         }
 
         var profile = KbmProfileConverter.ToProfile(Input.Profile);
@@ -247,7 +251,12 @@ public sealed class ProfileFunctionData : BaseFunctionData
     {
         var settings = ReadSettings<KeyboardManagerSettings>(KeyboardManagerSettings.ModuleName);
         var activeConfiguration = settings.Properties?.ActiveConfiguration?.Value;
-        return $"{(string.IsNullOrEmpty(activeConfiguration) ? "default" : activeConfiguration)}.json";
+        if (string.IsNullOrWhiteSpace(activeConfiguration))
+        {
+            throw new JsonException("The Keyboard Manager settings file does not define a valid active configuration.");
+        }
+
+        return $"{activeConfiguration}.json";
     }
 
     private static T ReadSettings<T>(string moduleName, string fileName = SettingsUtils.DefaultFileName)

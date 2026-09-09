@@ -291,6 +291,34 @@ public sealed class KbmProfileConverterTests
     }
 
     [TestMethod]
+    public void Validate_SelfMappings_ReportErrors()
+    {
+        var model = new KbmProfileModel
+        {
+            Keys = [new() { From = "CapsLock", To = "CapsLock" }],
+            Shortcuts = [new() { From = "Ctrl+A", To = "Ctrl+A" }],
+        };
+
+        var errors = KbmProfileConverter.Validate(model);
+
+        AssertHasError(errors, "keys[0].to: key 'CapsLock' cannot be remapped to itself");
+        AssertHasError(errors, "shortcuts[0].to: shortcut 'Ctrl+A' cannot be remapped to itself");
+    }
+
+    [TestMethod]
+    public void Validate_BlankShortcutTargetApp_ReportsError()
+    {
+        var model = new KbmProfileModel
+        {
+            Shortcuts = [new() { From = "Ctrl+A", To = "Esc", TargetApp = "   " }],
+        };
+
+        var errors = KbmProfileConverter.Validate(model);
+
+        AssertHasError(errors, "shortcuts[0].targetApp must not be empty when provided");
+    }
+
+    [TestMethod]
     public void Validate_OverlappingShortcutSources_ReportsError()
     {
         var model = new KbmProfileModel
@@ -389,6 +417,31 @@ public sealed class KbmProfileConverterTests
     }
 
     [TestMethod]
+    public void FromProfile_NullNestedCollectionsEmitWarnings()
+    {
+        var profile = new KeyboardManagerProfile
+        {
+            RemapKeys = new RemapKeysDataModel { InProcessRemapKeys = null },
+            RemapKeysToText = new RemapKeysDataModel { InProcessRemapKeys = null },
+            RemapShortcuts = new ShortcutsKeyDataModel { GlobalRemapShortcuts = null, AppSpecificRemapShortcuts = null },
+            RemapShortcutsToText = new ShortcutsKeyDataModel { GlobalRemapShortcuts = null, AppSpecificRemapShortcuts = null },
+        };
+        var warnings = new System.Collections.Generic.List<string>();
+
+        var model = KbmProfileConverter.FromProfile(profile, warnings);
+
+        Assert.AreEqual(0, model.Keys.Count);
+        Assert.AreEqual(0, model.Shortcuts.Count);
+        Assert.AreEqual(6, warnings.Count, string.Join(" | ", warnings));
+        AssertHasWarning(warnings, "'remapKeys.inProcess'");
+        AssertHasWarning(warnings, "'remapKeysToText.inProcess'");
+        AssertHasWarning(warnings, "'remapShortcuts.global'");
+        AssertHasWarning(warnings, "'remapShortcuts.appSpecific'");
+        AssertHasWarning(warnings, "'remapShortcutsToText.global'");
+        AssertHasWarning(warnings, "'remapShortcutsToText.appSpecific'");
+    }
+
+    [TestMethod]
     public void FromProfile_NullSectionsEmitWarnings()
     {
         var profile = new KeyboardManagerProfile
@@ -414,5 +467,10 @@ public sealed class KbmProfileConverterTests
     private static void AssertHasError(System.Collections.Generic.IList<string> errors, string expectedFragment)
     {
         Assert.IsTrue(errors.Any(e => e.Contains(expectedFragment, System.StringComparison.Ordinal)), $"Expected an error containing '{expectedFragment}'; got: {string.Join(" | ", errors)}");
+    }
+
+    private static void AssertHasWarning(System.Collections.Generic.IList<string> warnings, string expectedFragment)
+    {
+        Assert.IsTrue(warnings.Any(w => w.Contains(expectedFragment, System.StringComparison.Ordinal)), $"Expected a warning containing '{expectedFragment}'; got: {string.Join(" | ", warnings)}");
     }
 }

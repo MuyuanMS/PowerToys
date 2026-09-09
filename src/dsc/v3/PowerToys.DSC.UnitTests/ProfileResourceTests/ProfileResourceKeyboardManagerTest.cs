@@ -283,6 +283,25 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
     }
 
     [TestMethod]
+    public void Get_EmptyActiveConfiguration_FailsWithJsonError()
+    {
+        // Arrange
+        var settings = new KeyboardManagerSettings();
+        settings.Properties.ActiveConfiguration.Value = string.Empty;
+        _settingsUtils.SaveSettings(settings.ToJsonString(), KeyboardManagerSettings.ModuleName);
+
+        // Act
+        var result = ExecuteDscCommand<GetCommand>("--resource", ProfileResource.ResourceName, "--module", Module);
+        var messages = result.Messages();
+
+        // Assert
+        Assert.IsFalse(result.Success);
+        Assert.AreEqual(1, messages.Count);
+        Assert.AreEqual(DscMessageLevel.Error, messages[0].Level);
+        StringAssert.Contains(messages[0].Message, "valid active configuration");
+    }
+
+    [TestMethod]
     public void Get_NullProfileRoot_FailsWithJsonError()
     {
         // Arrange

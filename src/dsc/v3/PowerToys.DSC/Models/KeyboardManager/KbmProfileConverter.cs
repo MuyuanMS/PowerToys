@@ -51,6 +51,10 @@ public static class KbmProfileConverter
         {
             var entry = model.Keys[i];
             var context = $"keys[{i.ToString(CultureInfo.InvariantCulture)}]";
+            KbmShortcutParser.ParsedKeys parsedFrom = new([], 0);
+            KbmShortcutParser.ParsedKeys parsedTarget = new([], 0);
+            var hasParsedFrom = false;
+            var hasParsedTarget = false;
 
             var targetCount = (entry.To != null ? 1 : 0) + (entry.ToText != null ? 1 : 0);
             if (targetCount != 1)
@@ -58,22 +62,35 @@ public static class KbmProfileConverter
                 errors.Add($"{context} must set exactly one of 'to' or 'toText'");
             }
 
-            if (!KbmShortcutParser.TryParseKey(entry.From, out var from, out var error))
+            if (!KbmShortcutParser.TryParseKey(entry.From, out parsedFrom, out var error))
             {
                 errors.Add($"{context}.from: {error}");
             }
-            else if (from.Keys[0] == KbmKeyNames.VkDisabled)
+            else if (parsedFrom.Keys[0] == KbmKeyNames.VkDisabled)
             {
                 errors.Add($"{context}.from: 'Disable' cannot be remapped");
             }
-            else if (from.Keys[0] is 16 or 17 or 18 or KbmKeyNames.VkWinBoth)
+            else if (parsedFrom.Keys[0] is 16 or 17 or 18 or KbmKeyNames.VkWinBoth)
             {
                 errors.Add($"{context}.from: generic modifiers must use a left or right variant");
             }
+            else
+            {
+                hasParsedFrom = true;
+            }
 
-            if (entry.To != null && !TryParseTarget(entry.To, out _, out error))
+            if (entry.To != null && !TryParseTarget(entry.To, out parsedTarget, out error))
             {
                 errors.Add($"{context}.to: {error}");
+            }
+            else if (entry.To != null)
+            {
+                hasParsedTarget = true;
+            }
+
+            if (hasParsedFrom && hasParsedTarget && parsedTarget.IsSingleKey && parsedFrom.Keys[0] == parsedTarget.Keys[0])
+            {
+                errors.Add($"{context}.to: key '{KbmKeyNames.GetName(parsedFrom.Keys[0])}' cannot be remapped to itself");
             }
 
             if (entry.ToText != null && entry.ToText.Length == 0)
@@ -90,8 +107,7 @@ public static class KbmProfileConverter
             {
                 errors.Add($"{context}.condition 'alone' requires a key remap target");
             }
-            else if (KbmShortcutParser.TryParseKey(entry.From, out var parsedFrom, out _)
-                && !seenKeys.Add((parsedFrom.Keys[0], condition)))
+            else if (hasParsedFrom && !seenKeys.Add((parsedFrom.Keys[0], condition)))
             {
                 errors.Add($"{context}.from: key '{KbmKeyNames.GetName(parsedFrom.Keys[0])}' is remapped more than once with condition '{condition}'");
             }
@@ -101,6 +117,10 @@ public static class KbmProfileConverter
         {
             var entry = model.Shortcuts[i];
             var context = $"shortcuts[{i.ToString(CultureInfo.InvariantCulture)}]";
+            KbmShortcutParser.ParsedKeys parsedFrom = new([], 0);
+            KbmShortcutParser.ParsedKeys parsedTarget = new([], 0);
+            var hasParsedFrom = false;
+            var hasParsedTarget = false;
 
             var targetCount = (entry.To != null ? 1 : 0) + (entry.ToText != null ? 1 : 0) +
                 (entry.RunProgram != null ? 1 : 0) + (entry.OpenUri != null ? 1 : 0);
@@ -109,32 +129,37 @@ public static class KbmProfileConverter
                 errors.Add($"{context} must set exactly one of 'to', 'toText', 'runProgram', or 'openUri'");
             }
 
-            if (!KbmShortcutParser.TryParseKeyOrShortcut(entry.From, out var from, out var error))
+            if (!KbmShortcutParser.TryParseKeyOrShortcut(entry.From, out parsedFrom, out var error))
             {
                 errors.Add($"{context}.from: {error}");
             }
-            else if (from.Keys.Count < 2)
+            else if (parsedFrom.Keys.Count < 2)
             {
                 errors.Add($"{context}.from: a shortcut requires at least one modifier and an action key");
             }
-            else if (from.Keys.Contains(KbmKeyNames.VkDisabled))
+            else if (parsedFrom.Keys.Contains(KbmKeyNames.VkDisabled))
             {
                 errors.Add($"{context}.from: 'Disable' cannot be part of a shortcut");
             }
-            else if (GetIllegalShortcutName(from) is { } illegalFrom)
+            else if (GetIllegalShortcutName(parsedFrom) is { } illegalFrom)
             {
                 errors.Add($"{context}.from: '{illegalFrom}' is reserved by Windows and cannot be remapped");
             }
+            else if (entry.TargetApp != null && string.IsNullOrWhiteSpace(entry.TargetApp))
+            {
+                errors.Add($"{context}.targetApp must not be empty when provided");
+            }
             else
             {
+                hasParsedFrom = true;
                 var app = NormalizeTargetApp(entry.TargetApp) ?? string.Empty;
-                var formattedFrom = KbmShortcutParser.Format(from);
+                var formattedFrom = KbmShortcutParser.Format(parsedFrom);
                 var conflict = seenShortcuts
                     .Where(existing => existing.App == app)
                     .Select(existing => new
                     {
                         Existing = existing,
-                        ConflictKind = GetShortcutConflictKind(existing.ParsedKeys, from),
+                        ConflictKind = GetShortcutConflictKind(existing.ParsedKeys, parsedFrom),
                     })
                     .FirstOrDefault(existing => existing.ConflictKind != ShortcutConflictKind.None);
 
@@ -150,13 +175,22 @@ public static class KbmProfileConverter
                 }
                 else
                 {
-                    seenShortcuts.Add((app, formattedFrom, from));
+                    seenShortcuts.Add((app, formattedFrom, parsedFrom));
                 }
             }
 
-            if (entry.To != null && !TryParseTarget(entry.To, out _, out error))
+            if (entry.To != null && !TryParseTarget(entry.To, out parsedTarget, out error))
             {
                 errors.Add($"{context}.to: {error}");
+            }
+            else if (entry.To != null)
+            {
+                hasParsedTarget = true;
+            }
+
+            if (hasParsedFrom && hasParsedTarget && parsedTarget.Keys.SequenceEqual(parsedFrom.Keys))
+            {
+                errors.Add($"{context}.to: shortcut '{KbmShortcutParser.Format(parsedFrom)}' cannot be remapped to itself");
             }
 
             if (entry.ToText != null && entry.ToText.Length == 0)
@@ -297,6 +331,27 @@ public static class KbmProfileConverter
         AddNullSectionWarning(profile.RemapKeysToText, "remapKeysToText", warnings);
         AddNullSectionWarning(profile.RemapShortcuts, "remapShortcuts", warnings);
         AddNullSectionWarning(profile.RemapShortcutsToText, "remapShortcutsToText", warnings);
+        if (profile.RemapKeys != null)
+        {
+            AddNullCollectionWarning(profile.RemapKeys.InProcessRemapKeys, "remapKeys.inProcess", warnings);
+        }
+
+        if (profile.RemapKeysToText != null)
+        {
+            AddNullCollectionWarning(profile.RemapKeysToText.InProcessRemapKeys, "remapKeysToText.inProcess", warnings);
+        }
+
+        if (profile.RemapShortcuts != null)
+        {
+            AddNullCollectionWarning(profile.RemapShortcuts.GlobalRemapShortcuts, "remapShortcuts.global", warnings);
+            AddNullCollectionWarning(profile.RemapShortcuts.AppSpecificRemapShortcuts, "remapShortcuts.appSpecific", warnings);
+        }
+
+        if (profile.RemapShortcutsToText != null)
+        {
+            AddNullCollectionWarning(profile.RemapShortcutsToText.GlobalRemapShortcuts, "remapShortcutsToText.global", warnings);
+            AddNullCollectionWarning(profile.RemapShortcutsToText.AppSpecificRemapShortcuts, "remapShortcutsToText.appSpecific", warnings);
+        }
 
         foreach (var stored in profile.RemapKeys?.InProcessRemapKeys ?? [])
         {
@@ -427,6 +482,14 @@ public static class KbmProfileConverter
     }
 
     private static void AddNullSectionWarning(object? section, string sectionName, IList<string>? warnings)
+    {
+        if (section == null)
+        {
+            warnings?.Add($"Stored profile section '{sectionName}' is null");
+        }
+    }
+
+    private static void AddNullCollectionWarning(object? section, string sectionName, IList<string>? warnings)
     {
         if (section == null)
         {
