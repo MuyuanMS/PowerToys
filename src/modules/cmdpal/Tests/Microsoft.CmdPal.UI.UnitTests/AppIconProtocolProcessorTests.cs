@@ -61,7 +61,7 @@ public class AppIconProtocolProcessorTests
             : AppIconProtocol.Create(primary, fallback);
         using var result = await processor.PrepareAsync(iconDescription, 20, ElementTheme.Default);
 
-        CollectionAssert.AreEqual(new[] { (primary, jumbo) }, attempts);
+        CollectionAssert.AreEqual(Array.Empty<(string Candidate, bool Jumbo)>(), attempts);
         Assert.AreEqual(IconProtocolProcessingResult.ResultKind.PreparedIcon, result.Kind);
         using var prepared = result.TakePreparedIcon();
         Assert.IsNotNull(prepared);
@@ -90,7 +90,7 @@ public class AppIconProtocolProcessorTests
             32,
             ElementTheme.Default);
 
-        CollectionAssert.AreEqual(new[] { (primary, jumbo), (fallback, jumbo) }, attempts);
+        CollectionAssert.AreEqual(Array.Empty<(string Candidate, bool Jumbo)>(), attempts);
         Assert.AreEqual(IconProtocolProcessingResult.ResultKind.PreparedIcon, result.Kind);
         using var prepared = result.TakePreparedIcon();
         Assert.IsNotNull(prepared);

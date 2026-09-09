@@ -54,16 +54,19 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
 
         foreach (var candidate in candidates)
         {
-            try
+            if (!IconPathParser.TryParseBinaryIconReference(candidate, out _))
             {
-                if (await _getThumbnail(candidate, jumbo).ConfigureAwait(false) is { } stream)
+                try
                 {
-                    return IconProtocolProcessingResult.FromBitmapStream(stream);
+                    if (await _getThumbnail(candidate, jumbo).ConfigureAwait(false) is { } stream)
+                    {
+                        return IconProtocolProcessingResult.FromBitmapStream(stream);
+                    }
                 }
-            }
-            catch
-            {
-                // Continue with ordinary conversion for this same candidate.
+                catch
+                {
+                    // Continue with ordinary conversion for this same candidate.
+                }
             }
 
             var preparedIcon = IconPathConverter.PrepareFirstAvailable([candidate], null, targetSize, theme);

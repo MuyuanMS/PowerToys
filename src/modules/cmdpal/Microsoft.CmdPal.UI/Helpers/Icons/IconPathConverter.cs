@@ -263,7 +263,21 @@ internal static partial class IconPathConverter
             || string.Equals(scheme, "ms-appx", StringComparison.OrdinalIgnoreCase)
             || string.Equals(scheme, "ms-appdata", StringComparison.OrdinalIgnoreCase);
 
-        return isSupportedScheme && (!uri.IsFile || File.Exists(uri.LocalPath));
+        return isSupportedScheme
+            && (!uri.IsFile || (File.Exists(uri.LocalPath) && IsDecodableFileExtension(uri.LocalPath)));
+    }
+
+    private static bool IsDecodableFileExtension(string path)
+    {
+        var extension = Path.GetExtension(path);
+        return string.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".jpg", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".jpeg", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".gif", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".bmp", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".tiff", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".ico", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".svg", StringComparison.OrdinalIgnoreCase);
     }
 
     private static SoftwareBitmap? ExtractBinaryIcon(BinaryIconReference iconReference, int targetSize)

@@ -129,6 +129,24 @@ public class IconPathConverterTests
     }
 
     [TestMethod]
+    public void FallbackPreparationSkipsExistingNonImageFiles()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.txt");
+        File.WriteAllText(path, "not an icon");
+        try
+        {
+            using var prepared = IconPathConverter.PrepareFirstAvailable([path, "\uE700"], null, 24);
+
+            Assert.AreEqual(IconPathConverter.PreparedIconKind.Glyph, prepared.Kind);
+            Assert.AreEqual("\uE700", prepared.Glyph);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [TestMethod]
     public void FallbackPreparationReturnsEmptyWhenEveryCandidateFails()
     {
         var missingExecutable = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.exe");

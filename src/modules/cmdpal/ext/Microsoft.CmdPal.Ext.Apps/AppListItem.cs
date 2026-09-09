@@ -71,12 +71,13 @@ public sealed partial class AppListItem : ListItem, IPrecomputedListItem
     {
         get
         {
+            var icon = base.Icon;
             if (_isLoadingIcon.Set())
             {
                 _ = LoadIconAsync();
             }
 
-            return base.Icon;
+            return icon;
         }
         set => base.Icon = value;
     }
