@@ -123,6 +123,32 @@ public class AppIconProtocolProcessorTests
         Assert.AreEqual(fallback, prepared.Glyph);
     }
 
+    [TestMethod]
+    public async Task PrefersDirectSvgCandidateBeforeThumbnailFallback()
+    {
+        const string primary = "ms-appx:///Assets/icon.svg";
+        const string fallback = "relative-fallback.png";
+        var attempts = new List<(string Candidate, bool Jumbo)>();
+        var processor = new AppIconProtocolProcessor((candidate, jumbo) =>
+        {
+            attempts.Add((candidate, jumbo));
+            return Task.FromResult<IRandomAccessStream?>(new InMemoryRandomAccessStream());
+        });
+
+        using var result = await processor.PrepareAsync(
+            AppIconProtocol.Create(primary, fallback),
+            null,
+            24,
+            ElementTheme.Default);
+
+        CollectionAssert.AreEqual(Array.Empty<(string Candidate, bool Jumbo)>(), attempts);
+        Assert.AreEqual(IconProtocolProcessingResult.ResultKind.PreparedIcon, result.Kind);
+        using var prepared = result.TakePreparedIcon();
+        Assert.IsNotNull(prepared);
+        Assert.AreEqual(IconPathConverter.PreparedIconKind.SvgUri, prepared.Kind);
+        Assert.AreEqual(primary, prepared.Uri!.AbsoluteUri);
+    }
+
     private static string GetShell32DllPath()
     {
         return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "shell32.dll");

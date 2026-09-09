@@ -55,12 +55,19 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
 
         foreach (var candidate in candidates)
         {
+            var preparedIcon = IconPathConverter.PrepareFirstAvailable([candidate], fontFamily, targetSize, theme);
+            if (ShouldPreferPreparedIcon(preparedIcon))
+            {
+                return IconProtocolProcessingResult.FromPreparedIcon(preparedIcon);
+            }
+
             if (!ShouldSkipThumbnailLookup(candidate))
             {
                 try
                 {
                     if (await _getThumbnail(candidate, jumbo).ConfigureAwait(false) is { } stream)
                     {
+                        preparedIcon.Dispose();
                         return IconProtocolProcessingResult.FromBitmapStream(stream);
                     }
                 }
@@ -70,7 +77,6 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
                 }
             }
 
-            var preparedIcon = IconPathConverter.PrepareFirstAvailable([candidate], fontFamily, targetSize, theme);
             if (preparedIcon.Kind != IconPathConverter.PreparedIconKind.Empty)
             {
                 return IconProtocolProcessingResult.FromPreparedIcon(preparedIcon);
@@ -92,4 +98,9 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
         return (IconPathParser.TryParseBinaryIconReference(candidate, out _) && candidate.Contains(',', StringComparison.Ordinal))
             || (Path.IsPathRooted(candidate) && !File.Exists(candidate));
     }
+
+    private static bool ShouldPreferPreparedIcon(IconPathConverter.PreparedIcon preparedIcon) =>
+        preparedIcon.Kind is IconPathConverter.PreparedIconKind.BitmapUri
+            or IconPathConverter.PreparedIconKind.SvgUri
+            or IconPathConverter.PreparedIconKind.Glyph;
 }
