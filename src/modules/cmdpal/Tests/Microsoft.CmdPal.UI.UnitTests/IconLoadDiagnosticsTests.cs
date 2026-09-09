@@ -414,14 +414,23 @@ public class IconLoadDiagnosticsTests
     {
         IconLoadDiagnostics.Start();
         var size = new global::Windows.Foundation.Size(20, 20);
-        IconLoadDiagnostics.RecordCacheLookup(size, capacity: 16, hit: false);
-        IconLoadDiagnostics.RecordCacheEntryAdded(size, capacity: 16, entryCount: 1);
-        IconLoadDiagnostics.RecordCacheLookup(size, capacity: 16, hit: true);
+        IconLoadDiagnostics.RecordCacheLookup(size, IconCachePartition.Glyph, capacity: 16, hit: false);
+        IconLoadDiagnostics.RecordCacheEntryAdded(size, IconCachePartition.Glyph, capacity: 16, entryCount: 1);
+        IconLoadDiagnostics.RecordCacheLookup(size, IconCachePartition.Glyph, capacity: 16, hit: true);
         IconLoadDiagnostics.RecordCacheEntryRemoved(
             size,
+            IconCachePartition.Glyph,
             capacity: 16,
             entryCount: 0,
             AdaptiveCacheRemovalReason.Explicit);
+        IconLoadDiagnostics.RecordCacheLookup(size, IconCachePartition.Other, capacity: 16, hit: false);
+        IconLoadDiagnostics.RecordCacheEntryAdded(size, IconCachePartition.Other, capacity: 16, entryCount: 2);
+        IconLoadDiagnostics.RecordCacheEntryRemoved(
+            size,
+            IconCachePartition.Other,
+            capacity: 16,
+            entryCount: 1,
+            AdaptiveCacheRemovalReason.LowScore);
 
         var report = IconLoadDiagnostics.StopAndCreateReport();
 
@@ -431,17 +440,26 @@ public class IconLoadDiagnosticsTests
             $"  Definition: each entry is a cached IconSource task; counts are approximate concurrent observations. Eviction only drops the cache reference.{Environment.NewLine}" +
             $"  A request coalesced with an in-flight load is a cache miss; see Provider resolution for in-flight reuse.{Environment.NewLine}" +
             $"  Capacity means the cache was over its limit when removal was attempted and takes precedence over LowScore; LowScore means score alone caused removal.{Environment.NewLine}" +
-            "  20x20, capacity 16";
+            "  20x20 Glyph cache, capacity 16";
         StringAssert.Contains(report.Text, expectedHeader);
-        StringAssert.Contains(report.Text, "    Lookups: 2");
-        StringAssert.Contains(report.Text, "    Hits: 1");
-        StringAssert.Contains(report.Text, "    Misses: 1");
-        StringAssert.Contains(report.Text, "    Hit rate: 50 %");
-        StringAssert.Contains(report.Text, "    Maximum observed entries: 1");
+        var glyphSection = GetTextBetween(report.Text, "  20x20 Glyph cache, capacity 16", "  20x20 Other cache, capacity 16");
+        StringAssert.Contains(glyphSection, "    Lookups: 2");
+        StringAssert.Contains(glyphSection, "    Hits: 1");
+        StringAssert.Contains(glyphSection, "    Misses: 1");
+        StringAssert.Contains(glyphSection, "    Hit rate: 50 %");
+        StringAssert.Contains(glyphSection, "    Maximum observed entries: 1");
         var expectedRemovalReason =
             $"    Removal reasons{Environment.NewLine}" +
             "      Explicit: 1";
-        StringAssert.Contains(report.Text, expectedRemovalReason);
+        StringAssert.Contains(glyphSection, expectedRemovalReason);
+
+        var otherSection = GetTextBetween(report.Text, "  20x20 Other cache, capacity 16", "Request origins");
+        StringAssert.Contains(otherSection, "    Lookups: 1");
+        StringAssert.Contains(otherSection, "    Hits: 0");
+        StringAssert.Contains(otherSection, "    Misses: 1");
+        StringAssert.Contains(otherSection, "    Maximum observed entries: 2");
+        StringAssert.Contains(otherSection, "    Removal reasons");
+        StringAssert.Contains(otherSection, "      LowScore: 1");
     }
 
     [TestMethod]
