@@ -23,6 +23,11 @@ namespace
     const wchar_t JSON_KEY_CODE[] = L"code";
     const wchar_t JSON_KEY_TOGGLE_THEME_HOTKEY[] = L"toggle-theme-hotkey";
     const wchar_t JSON_KEY_VALUE[] = L"value";
+
+    constexpr int ClampBrightnessThreshold(int value)
+    {
+        return value < 1 ? 1 : (value > 100 ? 100 : value);
+    }
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
@@ -53,6 +58,7 @@ enum class ScheduleMode
     FixedHours,
     SunsetToSunrise,
     FollowNightLight,
+    FollowBrightness,
     // add more later
 };
 
@@ -66,6 +72,8 @@ inline std::wstring ToString(ScheduleMode mode)
         return L"FixedHours";
     case ScheduleMode::FollowNightLight:
         return L"FollowNightLight";
+    case ScheduleMode::FollowBrightness:
+        return L"FollowBrightness";
     default:
         return L"Off";
     }
@@ -79,6 +87,8 @@ inline ScheduleMode FromString(const std::wstring& str)
         return ScheduleMode::FixedHours;
     if (str == L"FollowNightLight")
         return ScheduleMode::FollowNightLight;
+    if (str == L"FollowBrightness")
+        return ScheduleMode::FollowBrightness;
     return ScheduleMode::Off;
 }
 
@@ -94,6 +104,7 @@ struct ModuleSettings
     int m_sunset_offset = 0;
     std::wstring m_latitude = L"0.0";
     std::wstring m_longitude = L"0.0";
+    int m_brightnessThreshold = 90;
 } g_settings;
 
 class LightSwitchInterface : public PowertoyModuleIface
@@ -184,7 +195,8 @@ public:
             { { L"Off", L"Disable the schedule" },
               { L"FixedHours", L"Set hours manually" },
               { L"SunsetToSunrise", L"Use sunrise/sunset times" },
-              { L"FollowNightLight", L"Follow Windows Night Light state" }
+              { L"FollowNightLight", L"Follow Windows Night Light state" },
+              { L"FollowBrightness", L"Follow display brightness" }
             });
 
         // Integer spinners
@@ -218,6 +230,14 @@ public:
             g_settings.m_sunset_offset,
             0,
             1439,
+            1);
+
+        settings.add_int_spinner(
+            L"brightnessThreshold",
+            L"Brightness threshold for switching to light theme.",
+            g_settings.m_brightnessThreshold,
+            1,
+            100,
             1);
 
         // Strings for latitude and longitude
@@ -341,6 +361,11 @@ public:
             if (auto v = values.get_int_value(L"sunset_offset"))
             {
                 g_settings.m_sunset_offset = *v;
+            }
+
+            if (auto v = values.get_int_value(L"brightnessThreshold"))
+            {
+                g_settings.m_brightnessThreshold = ClampBrightnessThreshold(*v);
             }
 
             if (auto v = values.get_string_value(L"latitude"))
@@ -689,6 +714,8 @@ void LightSwitchInterface::init_settings()
             g_settings.m_sunrise_offset = *v;
         if (auto v = settings.get_int_value(L"sunset_offset"))
             g_settings.m_sunset_offset = *v;
+        if (auto v = settings.get_int_value(L"brightnessThreshold"))
+            g_settings.m_brightnessThreshold = ClampBrightnessThreshold(*v);
         if (auto v = settings.get_string_value(L"latitude"))
             g_settings.m_latitude = *v;
         if (auto v = settings.get_string_value(L"longitude"))

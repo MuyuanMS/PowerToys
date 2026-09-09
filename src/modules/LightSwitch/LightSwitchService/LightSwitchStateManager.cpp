@@ -5,6 +5,7 @@
 #include "ThemeScheduler.h"
 #include <ThemeHelper.h>
 #include <common/interop/shared_constants.h>
+#include "LightSwitchBrightnessLogic.h"
 
 void ApplyTheme(bool shouldBeLight);
 
@@ -32,7 +33,8 @@ void LightSwitchStateManager::OnSettingsChanged()
 void LightSwitchStateManager::OnTick()
 {
     std::lock_guard<std::mutex> lock(_stateMutex);
-    if (_state.lastAppliedMode != ScheduleMode::FollowNightLight)
+    if (_state.lastAppliedMode != ScheduleMode::FollowNightLight &&
+        _state.lastAppliedMode != ScheduleMode::FollowBrightness)
     {
         EvaluateAndApplyIfNeeded();
     }
@@ -55,7 +57,7 @@ void LightSwitchStateManager::OnManualOverride()
                   (_state.isSystemLightActive ? L"light" : L"dark"),
                   (_state.isAppsLightActive ? L"light" : L"dark"));
 
-    const auto& settings = LightSwitchSettings::settings();
+    const auto settings = LightSwitchSettings::settings_snapshot();
     if (settings.changeSystem)
     {
         NotifyPowerDisplayThemeChanged(_state.isSystemLightActive);
@@ -66,6 +68,56 @@ void LightSwitchStateManager::OnManualOverride()
     }
 
     EvaluateAndApplyIfNeeded();
+}
+
+void LightSwitchStateManager::OnExternalThemeChange(std::optional<bool> expectedTheme)
+{
+    std::lock_guard<std::mutex> lock(_stateMutex);
+    OnExternalThemeChangeLocked(expectedTheme);
+}
+
+void LightSwitchStateManager::OnExternalThemeChangeLocked(std::optional<bool> expectedTheme)
+{
+    const auto settings = LightSwitchSettings::settings_snapshot();
+
+    bool shouldBeLight = false;
+    if (expectedTheme)
+    {
+        shouldBeLight = *expectedTheme;
+    }
+    else
+    {
+        if (settings.scheduleMode != ScheduleMode::FollowBrightness || _state.lastBrightness < 0)
+        {
+            return;
+        }
+
+        shouldBeLight = _state.lastBrightness >= settings.brightnessThreshold;
+    }
+
+    const bool currentSystemLight = GetCurrentSystemTheme();
+    const bool currentAppsLight = GetCurrentAppsTheme();
+    const bool systemMismatch = settings.changeSystem && currentSystemLight != shouldBeLight;
+    const bool appsMismatch = settings.changeApps && currentAppsLight != shouldBeLight;
+
+    if (!(systemMismatch || appsMismatch) || _state.isManualOverride)
+    {
+        return;
+    }
+
+    Logger::info(L"[LightSwitchStateManager] External theme change detected. Entering manual override mode.");
+    _state.isManualOverride = true;
+    _state.isSystemLightActive = currentSystemLight;
+    _state.isAppsLightActive = currentAppsLight;
+
+    if (settings.changeSystem)
+    {
+        NotifyPowerDisplayThemeChanged(currentSystemLight);
+    }
+    else if (settings.changeApps)
+    {
+        NotifyPowerDisplayThemeChanged(currentAppsLight);
+    }
 }
 
 // Runs with the registry observer detects a change in Night Light settings.
@@ -96,6 +148,51 @@ void LightSwitchStateManager::OnNightLightChange()
     }
 
     EvaluateAndApplyIfNeeded();
+}
+
+// Called when display brightness changes (from BrightnessObserver)
+void LightSwitchStateManager::OnBrightnessChange(int brightness)
+{
+    std::lock_guard<std::mutex> lock(_stateMutex);
+
+    const auto settings = LightSwitchSettings::settings_snapshot();
+    if (settings.scheduleMode == ScheduleMode::FollowBrightness &&
+        !_state.isManualOverride &&
+        LightSwitchBrightnessLogic::IsKnown(_state.lastBrightness))
+    {
+        // Register a manual theme change before evaluating a new sample. This
+        // prevents same-side brightness updates from overwriting the user's
+        // theme while the periodic external-change check is pending.
+        OnExternalThemeChangeLocked(
+            LightSwitchBrightnessLogic::ShouldBeLight(_state.lastBrightness, settings.brightnessThreshold));
+    }
+
+    if (brightness < 0)
+    {
+        _state.lastBrightness = -1;
+        return;
+    }
+
+    if (_state.lastAppliedMode == ScheduleMode::FollowBrightness && _state.isManualOverride)
+    {
+        int threshold = settings.brightnessThreshold;
+        if (LightSwitchBrightnessLogic::CrossedThreshold(_state.lastBrightness, brightness, threshold))
+        {
+            Logger::info(L"[LightSwitchStateManager] Brightness crossed threshold while manual override active; "
+                         L"treating as a boundary and clearing manual override.");
+            _state.isManualOverride = false;
+        }
+    }
+
+    _state.lastBrightness = brightness;
+    EvaluateAndApplyIfNeeded();
+}
+
+// Called when the BrightnessObserver is stopped so the cached sample is not reused later.
+void LightSwitchStateManager::InvalidateBrightness()
+{
+    std::lock_guard<std::mutex> lock(_stateMutex);
+    _state.lastBrightness = -1;
 }
 
 // Helpers
@@ -164,7 +261,7 @@ static std::pair<int, int> update_sun_times(auto& settings)
 void LightSwitchStateManager::EvaluateAndApplyIfNeeded()
 {
     LightSwitchSettings::instance().LoadSettings();
-    const auto& _currentSettings = LightSwitchSettings::settings();
+    const auto _currentSettings = LightSwitchSettings::settings_snapshot();
     auto now = GetNowMinutes();
 
     // Early exit: OFF mode just pauses activity
@@ -205,7 +302,8 @@ void LightSwitchStateManager::EvaluateAndApplyIfNeeded()
     }
 
     // Handle manual override logic
-    if (_state.isManualOverride)
+    // In FollowBrightness mode, the brightness change itself clears the override (in OnBrightnessChange).
+    if (_state.isManualOverride && _currentSettings.scheduleMode != ScheduleMode::FollowBrightness)
     {
         bool crossedBoundary = false;
         if (_state.lastTickMinutes != -1)
@@ -244,6 +342,18 @@ void LightSwitchStateManager::EvaluateAndApplyIfNeeded()
     if (_currentSettings.scheduleMode == ScheduleMode::FollowNightLight)
     {
         shouldBeLight = !_state.isNightLightActive;
+    }
+    else if (_currentSettings.scheduleMode == ScheduleMode::FollowBrightness)
+    {
+        // Light mode when brightness >= threshold, dark mode when below threshold.
+        // If brightness is unknown (-1), leave the theme unchanged.
+        if (!LightSwitchBrightnessLogic::IsKnown(_state.lastBrightness))
+        {
+            Logger::debug(L"[LightSwitchStateManager] Brightness unknown, skipping theme evaluation.");
+            _state.lastTickMinutes = now;
+            return;
+        }
+        shouldBeLight = LightSwitchBrightnessLogic::ShouldBeLight(_state.lastBrightness, _currentSettings.brightnessThreshold);
     }
     else
     {
