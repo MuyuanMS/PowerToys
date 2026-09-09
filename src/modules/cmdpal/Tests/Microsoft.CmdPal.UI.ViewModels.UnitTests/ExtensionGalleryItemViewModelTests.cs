@@ -696,7 +696,7 @@ public class ExtensionGalleryItemViewModelTests
                     {
                         Package = "@contoso/sample",
                         Version = "1.2.3",
-                        Integrity = "sha512-abc123==",
+                        Integrity = "sha512-xwtd2ev7b1HQnUEytxcMnSB1CnhS8AaA9lZY8DEOgQBW5nY8NMmgCw6UAHb1RJXBafwjAszrMSA5JxxDRpUH3A==",
                         Registry = "https://registry.example.com",
                     },
                 },
@@ -708,7 +708,7 @@ public class ExtensionGalleryItemViewModelTests
         Assert.IsTrue(viewModel.HasJsonRpcSource);
         Assert.AreEqual("@contoso/sample", viewModel.JsonRpcPackageId);
         Assert.AreEqual("1.2.3", viewModel.JsonRpcVersion);
-        Assert.AreEqual("sha512-abc123==", viewModel.JsonRpcIntegrity);
+        Assert.AreEqual("sha512-xwtd2ev7b1HQnUEytxcMnSB1CnhS8AaA9lZY8DEOgQBW5nY8NMmgCw6UAHb1RJXBafwjAszrMSA5JxxDRpUH3A==", viewModel.JsonRpcIntegrity);
         Assert.AreEqual("https://registry.example.com", viewModel.JsonRpcRegistry);
         Assert.IsTrue(viewModel.Sources.Any(s => s.Kind == "jsonrpc"));
     }
@@ -742,9 +742,12 @@ public class ExtensionGalleryItemViewModelTests
     {
         var viewModel = CreateJsonRpcViewModel(out _);
 
+        Assert.IsFalse(viewModel.HasLegacyInstallSource);
+        Assert.IsFalse(viewModel.ShowInstallButton);
         Assert.IsTrue(viewModel.ShowInstallViaNpmButton);
         Assert.IsTrue(viewModel.CanInstallViaNpm);
         Assert.IsFalse(viewModel.ShowUninstallJsonRpcButton);
+        Assert.IsFalse(viewModel.ShowLegacyInstalledAppsLink);
     }
 
     [TestMethod]
@@ -762,13 +765,13 @@ public class ExtensionGalleryItemViewModelTests
     {
         var viewModel = CreateJsonRpcViewModel(out var installer);
         installer
-            .Setup(x => x.InstallAsync("sample-js-extension", "@contoso/sample", "1.2.3", "sha512-abc123==", "https://registry.example.com", It.IsAny<CancellationToken>()))
+            .Setup(x => x.InstallAsync("sample-js-extension", "@contoso/sample", "1.2.3", "sha512-xwtd2ev7b1HQnUEytxcMnSB1CnhS8AaA9lZY8DEOgQBW5nY8NMmgCw6UAHb1RJXBafwjAszrMSA5JxxDRpUH3A==", "https://registry.example.com", It.IsAny<CancellationToken>()))
             .ReturnsAsync(JsExtensionInstallResult.Ok());
 
         await viewModel.InstallViaNpmCommand.ExecuteAsync(null);
 
         installer.Verify(
-            x => x.InstallAsync("sample-js-extension", "@contoso/sample", "1.2.3", "sha512-abc123==", "https://registry.example.com", It.IsAny<CancellationToken>()),
+            x => x.InstallAsync("sample-js-extension", "@contoso/sample", "1.2.3", "sha512-xwtd2ev7b1HQnUEytxcMnSB1CnhS8AaA9lZY8DEOgQBW5nY8NMmgCw6UAHb1RJXBafwjAszrMSA5JxxDRpUH3A==", "https://registry.example.com", It.IsAny<CancellationToken>()),
             Times.Once);
         Assert.IsTrue(viewModel.IsInstalled);
         Assert.IsTrue(viewModel.ShowUninstallJsonRpcButton);
@@ -958,8 +961,35 @@ public class ExtensionGalleryItemViewModelTests
                 Details: null));
 
         Assert.IsTrue(viewModel.IsInstalled);
+        Assert.IsFalse(viewModel.ShowInstallButton);
+        Assert.IsTrue(viewModel.ShowLegacyInstalledAppsLink);
         Assert.IsTrue(viewModel.ShowInstallViaNpmButton);
         Assert.IsFalse(viewModel.ShowUninstallJsonRpcButton);
+    }
+
+    [TestMethod]
+    public void WinGetInstall_WhenJsonRpcAlreadyInstalled_ShowsLegacyInstalledAppsLink()
+    {
+        var installer = new Mock<IJsExtensionInstaller>();
+        installer.Setup(x => x.IsInstalled("sample-js-extension")).Returns(true);
+        var entry = CreateJsonRpcEntry();
+        entry.InstallSources.Add(new GalleryInstallSource { Type = "winget", Id = "Contoso.Sample" });
+        var viewModel = CreateViewModel(entry, jsExtensionInstaller: installer.Object);
+
+        viewModel.ApplyWinGetPackageInfo(
+            new WinGetPackageInfo(
+                new WinGetPackageStatus(
+                    IsInstalled: true,
+                    IsInstalledStateKnown: true,
+                    IsUpdateAvailable: false,
+                    IsUpdateStateKnown: true),
+                Details: null));
+
+        Assert.IsTrue(viewModel.IsInstalled);
+        Assert.IsFalse(viewModel.ShowInstallButton);
+        Assert.IsTrue(viewModel.ShowLegacyInstalledAppsLink);
+        Assert.IsFalse(viewModel.ShowInstallViaWinGetButton);
+        Assert.IsTrue(viewModel.ShowUninstallJsonRpcButton);
     }
 
     [TestMethod]
@@ -989,10 +1019,23 @@ public class ExtensionGalleryItemViewModelTests
                 Details: null));
 
         Assert.IsTrue(viewModel.IsInstalled);
+        Assert.IsTrue(viewModel.ShowInstallButton);
         Assert.IsTrue(viewModel.ShowInstallViaWinGetButton);
         Assert.IsTrue(viewModel.ShowWinGetStatusDetails);
+        Assert.IsFalse(viewModel.ShowLegacyInstalledAppsLink);
         CollectionAssert.Contains(propertyNames, nameof(viewModel.ShowInstallViaWinGetButton));
         CollectionAssert.Contains(propertyNames, nameof(viewModel.WinGetStatusText));
+    }
+
+    [TestMethod]
+    public void JsonRpcOnlyInstall_DoesNotShowLegacyInstalledAppsLink()
+    {
+        var viewModel = CreateJsonRpcViewModel(out _, isInstalled: true);
+
+        Assert.IsTrue(viewModel.ShowInstalledBadge);
+        Assert.IsFalse(viewModel.ShowInstallButton);
+        Assert.IsFalse(viewModel.ShowLegacyInstalledAppsLink);
+        Assert.IsTrue(viewModel.ShowUninstallJsonRpcButton);
     }
 
     [TestMethod]
@@ -1085,7 +1128,7 @@ public class ExtensionGalleryItemViewModelTests
                     {
                         Package = "@contoso/sample",
                         Version = "1.2.3",
-                        Integrity = "sha512-abc123==",
+                        Integrity = "sha512-xwtd2ev7b1HQnUEytxcMnSB1CnhS8AaA9lZY8DEOgQBW5nY8NMmgCw6UAHb1RJXBafwjAszrMSA5JxxDRpUH3A==",
                         Registry = "https://registry.example.com",
                     },
                 },

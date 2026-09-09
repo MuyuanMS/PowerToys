@@ -268,6 +268,7 @@
                         HorizontalContentAlignment="Left"
                         FontWeight="SemiBold"
                         IsEnabled="{x:Bind ViewModel.ShowInstallButton, Mode=OneWay}"
+                        Visibility="{x:Bind help:BindTransformers.BoolToVisibility(ViewModel.HasLegacyInstallSource), Mode=OneWay, FallbackValue=Collapsed}"
                         Style="{StaticResource AccentDropDownButtonStyle}">
                         <DropDownButton.Flyout>
                             <MenuFlyout Placement="Bottom">
@@ -318,7 +319,7 @@
                         AutomationProperties.AutomationId="CmdPal_GalleryItemPage_OpenInstalledApps"
                         Command="{x:Bind ViewModel.OpenInstalledAppsCommand}"
                         FontSize="12"
-                        Visibility="{x:Bind help:BindTransformers.BoolToVisibility(ViewModel.ShowInstalledBadge), Mode=OneWay, FallbackValue=Collapsed}" />
+                        Visibility="{x:Bind help:BindTransformers.BoolToVisibility(ViewModel.ShowLegacyInstalledAppsLink), Mode=OneWay, FallbackValue=Collapsed}" />
 
                     <Button
                         MinWidth="172"

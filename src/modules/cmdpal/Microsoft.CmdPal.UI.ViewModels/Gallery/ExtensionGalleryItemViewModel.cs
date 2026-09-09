@@ -314,7 +314,11 @@ public sealed partial class ExtensionGalleryItemViewModel : ObservableObject
 
     public bool ShowInstalledBadge => IsInstalled && !IsUpdateAvailable;
 
-    public bool ShowInstallButton => !ShowInstalledBadge;
+    public bool HasLegacyInstallSource => HasStoreSource || HasWinGetSource || HasUrlSource;
+
+    public bool ShowInstallButton => HasLegacyInstallSource && !ShowLegacyInstalledAppsLink;
+
+    public bool ShowLegacyInstalledAppsLink => HasLegacyInstallSource && (_isDetectedInstalled || _isWinGetInstalled) && !IsUpdateAvailable;
 
     public bool ShowUpdateBadge => IsUpdateAvailable;
 
@@ -401,6 +405,8 @@ public sealed partial class ExtensionGalleryItemViewModel : ObservableObject
         _isDetectedInstalled = isInstalled;
         UpdateAggregateInstalledState();
         IsInstalledStateKnown = true;
+        OnPropertyChanged(nameof(ShowLegacyInstalledAppsLink));
+        OnPropertyChanged(nameof(ShowInstallButton));
     }
 
     [RelayCommand(CanExecute = nameof(HasHomepage))]
@@ -1158,6 +1164,7 @@ public sealed partial class ExtensionGalleryItemViewModel : ObservableObject
     partial void OnIsInstalledChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowInstalledBadge));
+        OnPropertyChanged(nameof(ShowLegacyInstalledAppsLink));
         OnPropertyChanged(nameof(ShowInstallButton));
         OnPropertyChanged(nameof(InstallStatusText));
         OnPropertyChanged(nameof(WinGetStatusText));
@@ -1186,6 +1193,8 @@ public sealed partial class ExtensionGalleryItemViewModel : ObservableObject
 
     private void NotifyWinGetInstallStateChanged()
     {
+        OnPropertyChanged(nameof(ShowLegacyInstalledAppsLink));
+        OnPropertyChanged(nameof(ShowInstallButton));
         OnPropertyChanged(nameof(ShowInstallViaWinGetButton));
         OnPropertyChanged(nameof(CanInstallViaWinGet));
         OnPropertyChanged(nameof(WinGetStatusText));
@@ -1225,6 +1234,7 @@ public sealed partial class ExtensionGalleryItemViewModel : ObservableObject
     partial void OnIsUpdateAvailableChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowInstalledBadge));
+        OnPropertyChanged(nameof(ShowLegacyInstalledAppsLink));
         OnPropertyChanged(nameof(ShowInstallButton));
         OnPropertyChanged(nameof(ShowUpdateBadge));
         OnPropertyChanged(nameof(InstallStatusText));

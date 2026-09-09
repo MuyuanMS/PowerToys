@@ -107,6 +107,17 @@ public class JSExtensionWrapperTests
     }
 
     [TestMethod]
+    public void Version_IgnoresSemVerSuffix_WhenParsingManifestVersion()
+    {
+        var wrapper = CreateWrapper("4.5.6-beta.1+build7");
+        var version = wrapper.Version;
+
+        Assert.AreEqual(4, version.Major);
+        Assert.AreEqual(5, version.Minor);
+        Assert.AreEqual(6, version.Build);
+    }
+
+    [TestMethod]
     public void Version_MissingVersion_DefaultsToOneZeroZero()
     {
         var wrapper = CreateWrapper(version: null);

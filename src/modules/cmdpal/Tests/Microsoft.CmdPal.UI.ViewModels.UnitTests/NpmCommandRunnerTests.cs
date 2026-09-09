@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Formats.Tar;
@@ -20,7 +21,17 @@ namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
 [TestClass]
 public class NpmCommandRunnerTests
 {
-    private const string ValidIntegrity = "sha512-abc123==";
+    private const string ValidIntegrity = "sha512-xwtd2ev7b1HQnUEytxcMnSB1CnhS8AaA9lZY8DEOgQBW5nY8NMmgCw6UAHb1RJXBafwjAszrMSA5JxxDRpUH3A==";
+    private readonly List<string> _tempRoots = [];
+
+    [TestCleanup]
+    public void Cleanup()
+    {
+        foreach (var root in _tempRoots)
+        {
+            TryDeleteTree(root);
+        }
+    }
 
     [TestMethod]
     public void BuildPackArguments_UsesExactSpec_DisablesScripts_AndWritesToDestination()
@@ -75,6 +86,7 @@ public class NpmCommandRunnerTests
         var args = NpmCommandRunner.BuildCiArguments(artifact!).ToArray();
 
         Assert.AreEqual("ci", args[0]);
+        CollectionAssert.Contains(args, "--omit=dev");
         CollectionAssert.Contains(args, "--ignore-scripts");
         CollectionAssert.Contains(args, "--no-audit");
         CollectionAssert.Contains(args, "--no-fund");
@@ -263,7 +275,7 @@ public class NpmCommandRunnerTests
             "": { "name": "root" },
             "node_modules/left-pad": {
               "resolved": "https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz",
-              "integrity": "sha512-abc123=="
+              "integrity": "sha512-xwtd2ev7b1HQnUEytxcMnSB1CnhS8AaA9lZY8DEOgQBW5nY8NMmgCw6UAHb1RJXBafwjAszrMSA5JxxDRpUH3A=="
             }
           }
         }
@@ -381,7 +393,7 @@ public class NpmCommandRunnerTests
             "": { "name": "root" },
             "node_modules/left-pad": {
               "resolved": "https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz",
-              "integrity": "sha512-abc123=="
+              "integrity": "sha512-xwtd2ev7b1HQnUEytxcMnSB1CnhS8AaA9lZY8DEOgQBW5nY8NMmgCw6UAHb1RJXBafwjAszrMSA5JxxDRpUH3A=="
             }
           }
         }
@@ -402,7 +414,7 @@ public class NpmCommandRunnerTests
             "": { "name": "root" },
             "node_modules/evil": {
               "resolved": "https://evil.example.com/evil/-/evil-1.0.0.tgz",
-              "integrity": "sha512-abc123=="
+              "integrity": "sha512-xwtd2ev7b1HQnUEytxcMnSB1CnhS8AaA9lZY8DEOgQBW5nY8NMmgCw6UAHb1RJXBafwjAszrMSA5JxxDRpUH3A=="
             }
           }
         }
@@ -460,11 +472,54 @@ public class NpmCommandRunnerTests
         Assert.IsNotNull(NpmCommandRunner.VerifyLockfileIntegrity(dir));
     }
 
-    private static string CreateTempDirectory()
+    private string CreateTempDirectory()
     {
         var dir = Path.Combine(Path.GetTempPath(), "cmdpal-runner-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
+        _tempRoots.Add(dir);
         return dir;
+    }
+
+    private static void TryDeleteTree(string root)
+    {
+        try
+        {
+            DeleteDirectoryWithoutFollowingJunctions(root);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private static void DeleteDirectoryWithoutFollowingJunctions(string path)
+    {
+        if (!Directory.Exists(path))
+        {
+            return;
+        }
+
+        var attributes = File.GetAttributes(path);
+        if ((attributes & FileAttributes.ReparsePoint) != 0)
+        {
+            Directory.Delete(path);
+            return;
+        }
+
+        foreach (var directory in Directory.EnumerateDirectories(path))
+        {
+            DeleteDirectoryWithoutFollowingJunctions(directory);
+        }
+
+        foreach (var file in Directory.EnumerateFiles(path))
+        {
+            File.SetAttributes(file, FileAttributes.Normal);
+            File.Delete(file);
+        }
+
+        Directory.Delete(path);
     }
 
     /// <summary>

@@ -131,7 +131,7 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
                 await _host.StopExtensionAsync(targetDirectory, cancellationToken).ConfigureAwait(false);
 
                 // Delete on a worker thread since process handles can take a moment to close.
-                if (!await RemoveDirectoryAsync(targetDirectory).ConfigureAwait(false))
+                if (!await RemoveDirectoryAsync(targetDirectory, cancellationToken).ConfigureAwait(false))
                 {
                     await _host.RefreshAndAwaitProviderAsync(targetDirectory, RegistrationTimeout, CancellationToken.None).ConfigureAwait(false);
                     Logger.LogError($"Uninstall of JS extension '{extensionName}' failed: could not delete {targetDirectory}.");
@@ -271,7 +271,7 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
         {
             // Clean the staging tree on every path, even after cancel. Do not observe the caller token
             // here, because cleanup still needs to run.
-            if (!await RemoveDirectoryAsync(stagingDirectory).ConfigureAwait(false))
+            if (!await RemoveDirectoryAsync(stagingDirectory, CancellationToken.None).ConfigureAwait(false))
             {
                 Logger.LogWarning($"Failed to clean up staging directory {stagingDirectory}.");
             }
@@ -287,7 +287,7 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
     private async Task<bool> RollbackPromotedInstallAsync(string targetDirectory)
     {
         await _host.StopExtensionAsync(targetDirectory, CancellationToken.None).ConfigureAwait(false);
-        var removed = await RemoveDirectoryAsync(targetDirectory).ConfigureAwait(false);
+        var removed = await RemoveDirectoryAsync(targetDirectory, CancellationToken.None).ConfigureAwait(false);
         if (!removed)
         {
             TryRemoveInstallMarker(targetDirectory);
@@ -296,8 +296,8 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
         return removed;
     }
 
-    private Task<bool> RemoveDirectoryAsync(string targetDirectory) =>
-        Task.Run(() => _npmCommandRunner.RemoveDirectory(targetDirectory, CancellationToken.None));
+    private Task<bool> RemoveDirectoryAsync(string targetDirectory, CancellationToken cancellationToken) =>
+        Task.Run(() => _npmCommandRunner.RemoveDirectory(targetDirectory, cancellationToken), CancellationToken.None);
 
     private static void TryRemoveInstallMarker(string targetDirectory)
     {

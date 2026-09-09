@@ -215,6 +215,7 @@ public sealed class NpmCommandRunner : INpmCommandRunner
         var arguments = new List<string>
         {
             "ci",
+            "--omit=dev",
             "--ignore-scripts",
             "--no-audit",
             "--no-fund",

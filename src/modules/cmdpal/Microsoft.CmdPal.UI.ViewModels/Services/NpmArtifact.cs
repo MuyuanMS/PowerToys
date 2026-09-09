@@ -76,6 +76,7 @@ public sealed class NpmArtifact
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private const int MaxPackageNameLength = 214;
+    private const int Sha512DigestLengthBytes = 64;
 
     private NpmArtifact(string package, string version, string integrity, string? registry)
     {
@@ -159,7 +160,7 @@ public sealed class NpmArtifact
             return false;
         }
 
-        if (!IntegrityRegex.IsMatch(trimmedIntegrity))
+        if (!IsSupportedIntegrity(trimmedIntegrity))
         {
             error = NpmArtifactValidationError.IntegrityInvalid;
             return false;
@@ -241,6 +242,22 @@ public sealed class NpmArtifact
     /// Determines whether <paramref name="integrity"/> is a supported sha512 Subresource Integrity
     /// value. The lockfile check uses it to reject dependencies without an integrity hash.
     /// </summary>
-    internal static bool IsSupportedIntegrity(string? integrity) =>
-        !string.IsNullOrWhiteSpace(integrity) && IntegrityRegex.IsMatch(integrity.Trim());
+    internal static bool IsSupportedIntegrity(string? integrity)
+    {
+        if (string.IsNullOrWhiteSpace(integrity))
+        {
+            return false;
+        }
+
+        var trimmed = integrity.Trim();
+        if (!IntegrityRegex.IsMatch(trimmed))
+        {
+            return false;
+        }
+
+        var encodedDigest = trimmed["sha512-".Length..];
+        Span<byte> digest = stackalloc byte[Sha512DigestLengthBytes];
+        return Convert.TryFromBase64String(encodedDigest, digest, out var bytesWritten)
+            && bytesWritten == Sha512DigestLengthBytes;
+    }
 }

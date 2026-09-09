@@ -130,7 +130,14 @@ public sealed partial class JSExtensionWrapper : IExtensionWrapper, IDisposable
                 return new PackageVersion { Major = 1, Minor = 0, Build = 0, Revision = 0 };
             }
 
-            var parts = _manifest.Version.Split('.');
+            var versionCore = _manifest.Version;
+            var suffixIndex = versionCore.IndexOfAny(['-', '+']);
+            if (suffixIndex >= 0)
+            {
+                versionCore = versionCore[..suffixIndex];
+            }
+
+            var parts = versionCore.Split('.', StringSplitOptions.TrimEntries);
             return new PackageVersion
             {
                 Major = parts.Length > 0 && ushort.TryParse(parts[0], out var major) ? major : (ushort)1,

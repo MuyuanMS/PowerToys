@@ -10,7 +10,7 @@ namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
 [TestClass]
 public class NpmArtifactTests
 {
-    private const string ValidIntegrity = "sha512-abc123==";
+    private const string ValidIntegrity = "sha512-xwtd2ev7b1HQnUEytxcMnSB1CnhS8AaA9lZY8DEOgQBW5nY8NMmgCw6UAHb1RJXBafwjAszrMSA5JxxDRpUH3A==";
 
     [TestMethod]
     public void TryCreate_UnscopedPackage_Succeeds()
@@ -124,6 +124,7 @@ public class NpmArtifactTests
     [DataRow("sha256-abc123==")]
     [DataRow("abc123")]
     [DataRow("sha512-")]
+    [DataRow("sha512-abc123==")]
     public void TryCreate_UnsupportedIntegrity_FailsClosed(string integrity)
     {
         var ok = NpmArtifact.TryCreate("left-pad", "1.3.0", integrity, null, out _, out var error);
@@ -176,8 +177,9 @@ public class NpmArtifactTests
         Assert.AreEqual(expected, NpmArtifact.IsRegistrySourcedHttps(url));
 
     [DataTestMethod]
-    [DataRow("sha512-abc123==", true)]
+    [DataRow("sha512-xwtd2ev7b1HQnUEytxcMnSB1CnhS8AaA9lZY8DEOgQBW5nY8NMmgCw6UAHb1RJXBafwjAszrMSA5JxxDRpUH3A==", true)]
     [DataRow("sha1-abc123=", false)]
+    [DataRow("sha512-abc123==", false)]
     [DataRow("abc123", false)]
     [DataRow("", false)]
     public void IsSupportedIntegrity_AcceptsOnlySha512(string integrity, bool expected) =>

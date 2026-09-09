@@ -18,7 +18,7 @@ namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
 [TestClass]
 public class NpmJsExtensionInstallerTests
 {
-    private const string ValidIntegrity = "sha512-abc123==";
+    private const string ValidIntegrity = "sha512-xwtd2ev7b1HQnUEytxcMnSB1CnhS8AaA9lZY8DEOgQBW5nY8NMmgCw6UAHb1RJXBafwjAszrMSA5JxxDRpUH3A==";
     private const string Package = "@contoso/sample";
     private const string Version = "1.2.3";
     private const string ExtensionName = "sample-ext";
@@ -219,7 +219,7 @@ public class NpmJsExtensionInstallerTests
     public async Task InstallAsync_Fails_AndDoesNotPromote_OnIntegrityMismatch()
     {
         var host = CreateHost();
-        var runner = new FakeRunner { ResolvedIntegrityOverride = "sha512-different==" };
+        var runner = new FakeRunner { ResolvedIntegrityOverride = "sha512-SdW4eZVY4i04kNA7VqbHpG+qGn0hbC3yJQc5YkKrNUDiMXuHCIKyOE1wclQzOoQ5/Tyhkekyk/dFeG/3jvBp+A==" };
         var installer = new NpmJsExtensionInstaller(host, runner);
 
         var result = await installer.InstallAsync(ExtensionName, Package, Version, ValidIntegrity, null, CancellationToken.None);
@@ -451,6 +451,38 @@ public class NpmJsExtensionInstallerTests
         Assert.IsFalse(result.Succeeded);
         Assert.AreEqual(0, runner.RemoveCallCount, "Cancel during stop must not proceed to delete.");
         Assert.IsTrue(Directory.Exists(target), "The extension directory must remain when uninstall is canceled.");
+    }
+
+    [TestMethod]
+    public async Task UninstallAsync_CancelDuringDelete_ReturnsCanceled_AndLeavesDirectory()
+    {
+        var host = CreateHost();
+        var target = Path.Combine(host.ExtensionsRootPath, ExtensionName);
+        Directory.CreateDirectory(target);
+        File.WriteAllText(Path.Combine(target, "package.json"), "{}");
+
+        using var removeStarted = new ManualResetEventSlim(false);
+        var runner = new FakeRunner
+        {
+            RemoveHook = token =>
+            {
+                removeStarted.Set();
+                Assert.IsTrue(token.WaitHandle.WaitOne(TimeSpan.FromSeconds(5)), "Delete did not observe cancellation.");
+            },
+        };
+        var installer = new NpmJsExtensionInstaller(host, runner);
+
+        using var cts = new CancellationTokenSource();
+        var task = installer.UninstallAsync(ExtensionName, cts.Token);
+
+        Assert.IsTrue(removeStarted.Wait(TimeSpan.FromSeconds(5)), "Uninstall did not reach the delete step.");
+        cts.Cancel();
+
+        var result = await task;
+
+        Assert.IsFalse(result.Succeeded);
+        Assert.AreEqual(1, runner.RemoveCallCount);
+        Assert.IsTrue(Directory.Exists(target), "The extension directory must remain when delete is canceled.");
     }
 
     [TestMethod]
@@ -863,6 +895,8 @@ public class NpmJsExtensionInstallerTests
 
         public ConcurrentQueue<string>? OrderLog { get; set; }
 
+        public Action<CancellationToken>? RemoveHook { get; set; }
+
         public int InstallCallCount { get; private set; }
 
         public int RemoveCallCount { get; private set; }
@@ -919,6 +953,8 @@ public class NpmJsExtensionInstallerTests
         {
             OrderLog?.Enqueue("remove");
             RemoveCallCount++;
+
+            RemoveHook?.Invoke(cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 
