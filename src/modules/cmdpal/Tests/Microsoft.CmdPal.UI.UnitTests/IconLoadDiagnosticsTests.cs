@@ -638,6 +638,24 @@ public class IconLoadDiagnosticsTests
         StringAssert.Contains(report.Text, "Enqueue to completion: no samples");
     }
 
+    [TestMethod]
+    public void CreatingLoadAfterStopDoesNotThrow()
+    {
+        IconLoadDiagnostics.Start();
+        var request = IconLoadDiagnostics.BeginRequest(IconRequestReason.SourceChanged, 1.0);
+        IconLoadDiagnostics.StopAndCreateReport();
+
+        var load = IconLoadDiagnostics.CreateLoad(
+            request,
+            "bitmap.png",
+            hasStream: false,
+            width: 20,
+            height: 20,
+            scale: 1.0);
+
+        Assert.IsNull(load);
+    }
+
     private static int CountOccurrences(string value, string text)
     {
         var count = 0;

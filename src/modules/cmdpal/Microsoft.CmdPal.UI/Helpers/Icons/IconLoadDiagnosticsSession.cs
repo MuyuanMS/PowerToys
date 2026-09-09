@@ -183,19 +183,22 @@ internal sealed class IconLoadDiagnosticsSession
         return new IconRequestMeasurement(this, requestId, Stopwatch.GetTimestamp());
     }
 
-    public IconLoadMeasurement CreateLoad(IconLoadInputKind inputKind, double width, double height, double scale)
+    public IconLoadMeasurement? CreateLoad(IconLoadInputKind inputKind, double width, double height, double scale)
     {
-        if (IsStopped)
+        lock (_stopLock)
         {
-            throw new InvalidOperationException("Cannot create an icon-load measurement after the diagnostics session has stopped.");
-        }
+            if (IsStopped)
+            {
+                return null;
+            }
 
-        var loadId = Interlocked.Increment(ref _nextLoadId);
-        Interlocked.Increment(ref _loadsCreated);
-        Interlocked.Increment(ref _inputKinds[(int)inputKind]);
-        _loadDemandStates.TryAdd(loadId, new LoadDemandState(this, loadId, inputKind));
-        IconLoadEventSource.Log.LoadCreated(Id, loadId, (int)inputKind, width, height, scale);
-        return new IconLoadMeasurement(this, loadId, inputKind);
+            var loadId = Interlocked.Increment(ref _nextLoadId);
+            Interlocked.Increment(ref _loadsCreated);
+            Interlocked.Increment(ref _inputKinds[(int)inputKind]);
+            _loadDemandStates.TryAdd(loadId, new LoadDemandState(this, loadId, inputKind));
+            IconLoadEventSource.Log.LoadCreated(Id, loadId, (int)inputKind, width, height, scale);
+            return new IconLoadMeasurement(this, loadId, inputKind);
+        }
     }
 
     public void RecordProviderResolution(long requestId, long loadId, IconProviderResolution resolution)
@@ -647,6 +650,7 @@ internal sealed class IconLoadDiagnosticsSession
             {
                 _stoppedUtc = DateTimeOffset.UtcNow;
                 var stoppedAt = Stopwatch.GetTimestamp();
+                Volatile.Write(ref _stoppedAt, stoppedAt);
                 _uiResponsivenessProbe?.Stop();
                 _processCpuStoppedTicks = GetProcessCpuTicks();
                 _managedAllocatedBytesStopped = GC.GetTotalAllocatedBytes(precise: false);
@@ -655,7 +659,6 @@ internal sealed class IconLoadDiagnosticsSession
                 _gen1CollectionsStopped = GC.CollectionCount(1);
                 _gen2CollectionsStopped = GC.CollectionCount(2);
                 _workingSetStoppedBytes = GetWorkingSetBytes();
-                Volatile.Write(ref _stoppedAt, stoppedAt);
             }
         }
     }
