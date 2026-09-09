@@ -416,8 +416,6 @@ function Test-CoreFiles {
         'Wox.Plugin.dll',
         
         # Mouse utilities
-        'PowerToys.AutoHideCursor.dll',
-        'PowerToys.AutoHideCursor.exe',
         'PowerToys.FindMyMouse.dll',
         'PowerToys.MouseHighlighter.dll',
         'PowerToys.MouseJump.dll',

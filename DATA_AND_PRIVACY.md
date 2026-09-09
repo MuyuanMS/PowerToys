@@ -173,12 +173,6 @@ Thank you for using PowerToys!
 | --- | --- |
 | Microsoft.PowerToys.CursorWrap_EnableCursorWrap | Triggered when Cursor Wrap is enabled or disabled. |
 
-### Auto Hide Cursor
-
-| Event Name | Description |
-| --- | --- |
-| Microsoft.PowerToys.AutoHideCursor_EnableAutoHideCursor | Triggered when Auto Hide Cursor is enabled or disabled. Includes the `Enabled` state. |
-
 ### Environment Variables
 
 | Event Name | Description |
