@@ -89,14 +89,17 @@ public class IconLoadDiagnosticsTests
         Assert.AreSame(report, reports[0]);
     }
 
-    [TestMethod]
-    public void UppercaseShellExtensionRemainsStringInput()
+    [DataTestMethod]
+    [DataRow(@"C:\Windows\APP.EXE,0")]
+    [DataRow(@"C:\Windows\TOOL.DLL,0")]
+    [DataRow(@"C:\Windows\SHORTCUT.LNK,0")]
+    public void UppercaseShellExtensionIsRecognizedAsShellBinary(string iconPath)
     {
         IconLoadDiagnostics.Start();
         var request = IconLoadDiagnostics.BeginRequest(IconRequestReason.SourceChanged, 1.0);
         var load = IconLoadDiagnostics.CreateLoad(
             request,
-            @"C:\Windows\APP.EXE,0",
+            iconPath,
             hasStream: false,
             width: 20,
             height: 20,
@@ -114,8 +117,8 @@ public class IconLoadDiagnosticsTests
         Assert.IsTrue(inputKindsStart >= 0);
         Assert.IsTrue(inputKindsEnd > inputKindsStart);
         var inputKinds = report.Text[inputKindsStart..inputKindsEnd];
-        StringAssert.Contains(inputKinds, "  String: 1");
-        StringAssert.Contains(inputKinds, "  ShellBinary: 0");
+        StringAssert.Contains(inputKinds, "  String: 0");
+        StringAssert.Contains(inputKinds, "  ShellBinary: 1");
     }
 
     [TestMethod]
