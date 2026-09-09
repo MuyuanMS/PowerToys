@@ -715,10 +715,7 @@ namespace MouseWithoutBorders
                 }
 
                 NotifyIcon.Icon = Icon.FromHandle(bm.GetHicon());
-                if (disposeBitmap)
-                {
-                    bm.Dispose();
-                }
+                bm.Dispose();
             }
             catch (Exception e)
             {
