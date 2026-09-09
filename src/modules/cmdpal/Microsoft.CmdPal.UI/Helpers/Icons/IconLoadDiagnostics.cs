@@ -130,9 +130,9 @@ internal static class IconLoadDiagnostics
                 path = path[..comma];
             }
 
-            if (path.EndsWith(".exe", StringComparison.Ordinal)
-                || path.EndsWith(".dll", StringComparison.Ordinal)
-                || path.EndsWith(".lnk", StringComparison.Ordinal))
+            if (path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
             {
                 return IconLoadInputKind.ShellBinary;
             }
