@@ -256,6 +256,7 @@ internal sealed partial class SampleIconPage : ListPage
             icon,
             title,
             description,
+            "Copy icon protocol",
             new DetailsElement
             {
                 Key = "Icon Protocol",
@@ -270,6 +271,7 @@ internal sealed partial class SampleIconPage : ListPage
             icon,
             title,
             description,
+            "Action with " + icon,
             new DetailsElement
             {
                 Key = "Unicode Code Points",
@@ -286,11 +288,12 @@ internal sealed partial class SampleIconPage : ListPage
         string icon,
         string title,
         string description,
+        string commandName,
         DetailsElement metadata)
     {
         var iconInfo = new IconInfo(icon);
 
-        return new ListItem(new CopyTextCommand(icon) { Name = "Action with " + icon })
+        return new ListItem(new CopyTextCommand(icon) { Name = commandName })
         {
             Title = title,
             Subtitle = description,

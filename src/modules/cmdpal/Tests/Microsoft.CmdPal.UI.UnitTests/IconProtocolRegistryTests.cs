@@ -124,6 +124,21 @@ public class IconProtocolRegistryTests
         }
     }
 
+    [TestMethod]
+    public void SvgFileProtocolDefersFileIoToAsyncPath()
+    {
+        const string Value = "|ThemedSvg|warning|C:\\Icons\\sample.svg";
+        var processor = IconProtocolRegistry.Find(Value);
+
+        Assert.IsNotNull(processor);
+        Assert.IsFalse(processor.TryPrepareSynchronously(
+            Value,
+            20,
+            ElementTheme.Light,
+            out var preparedIcon));
+        Assert.IsNull(preparedIcon);
+    }
+
     [DataTestMethod]
     [DataRow(null)]
     [DataRow("")]
