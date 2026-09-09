@@ -49,7 +49,10 @@ export async function bootstrap(entry: string): Promise<unknown> {
  *
  * @returns The resolved entry specifier, or `null` when none was provided.
  */
-export function resolveCliEntry(argv: readonly string[], env: NodeJS.ProcessEnv): string | null {
+export function resolveCliEntry(
+  argv: readonly string[],
+  env: Readonly<Record<string, string | undefined>>,
+): string | null {
   const raw = argv[2] ?? env.CMDPAL_EXTENSION_ENTRY;
   if (raw === undefined || raw.length === 0) {
     return null;

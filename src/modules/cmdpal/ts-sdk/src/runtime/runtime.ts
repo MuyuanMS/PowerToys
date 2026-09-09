@@ -507,17 +507,27 @@ export class ExtensionRuntime {
 
   private async getCommand(id: number | string, commandId: string): Promise<void> {
     const command = await this.resolveCommand(commandId);
-    const serialized = command
-      ? await this.withMapSink(this.resolved, () => this.serializer.command(command))
-      : null;
+    let serialized: Record<string, unknown> | null = null;
+    if (command) {
+      const resolved = new Map<string, ICommand>();
+      serialized = await this.withMapSink(resolved, () => this.serializer.command(command));
+      for (const [registeredId, registeredCommand] of resolved) {
+        this.resolved.set(registeredId, registeredCommand);
+      }
+    }
     this.respond(id, serialized);
   }
 
   private async getCommandItem(id: number | string, commandId: string): Promise<void> {
     const item = (await this.provider?.getCommandItem?.(commandId)) ?? null;
-    const serialized = item
-      ? await this.withMapSink(this.resolved, () => this.serializer.commandItem(item))
-      : null;
+    let serialized: Record<string, unknown> | null = null;
+    if (item) {
+      const resolved = new Map<string, ICommand>();
+      serialized = await this.withMapSink(resolved, () => this.serializer.commandItem(item));
+      for (const [registeredId, registeredCommand] of resolved) {
+        this.resolved.set(registeredId, registeredCommand);
+      }
+    }
     this.respond(id, serialized);
   }
 
@@ -749,8 +759,9 @@ export class ExtensionRuntime {
     target: Map<string, ICommand>,
     produce: () => T | Promise<T>,
   ): Promise<T> {
+    const seen = new Set<string>();
     return this.withSink((command) => {
-      target.set(command.id, command);
+      this.registerUnique(target, seen, command);
     }, produce);
   }
 
@@ -779,12 +790,10 @@ export class ExtensionRuntime {
     seen: Set<string>,
     command: ICommand,
   ): void {
+    const existing = target.get(command.id);
     if (seen.has(command.id)) {
-      const existing = target.get(command.id);
       if (existing && existing !== command) {
-        process.stderr.write(
-          `cmdpal-sdk: duplicate command id "${command.id}" in one response; keeping the first.\n`,
-        );
+        throw new Error(`Duplicate command id: ${command.id}`);
       }
       return;
     }
