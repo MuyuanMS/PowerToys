@@ -483,6 +483,7 @@ public class NpmJsExtensionInstallerTests
         Assert.IsFalse(result.Succeeded);
         Assert.AreEqual(1, runner.RemoveCallCount);
         Assert.IsTrue(Directory.Exists(target), "The extension directory must remain when delete is canceled.");
+        Assert.IsTrue(host.IsExtensionInstalled(ExtensionName), "A canceled delete must reload the surviving extension.");
     }
 
     [TestMethod]

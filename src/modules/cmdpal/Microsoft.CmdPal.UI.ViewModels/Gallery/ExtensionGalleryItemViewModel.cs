@@ -495,10 +495,14 @@ public sealed partial class ExtensionGalleryItemViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
+            IsJsonRpcInstalled = _jsExtensionInstaller.IsInstalled(Id);
+            IsInstalledStateKnown = true;
             JsonRpcActionMessage = Resources.npm_installer_canceled;
         }
         catch (Exception ex)
         {
+            IsJsonRpcInstalled = _jsExtensionInstaller.IsInstalled(Id);
+            IsInstalledStateKnown = true;
             LogJsonRpcInstallFailed(_logger, ex);
             JsonRpcActionMessage = Resources.gallery_item_jsonrpc_action_install_failed;
         }
@@ -542,10 +546,14 @@ public sealed partial class ExtensionGalleryItemViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
+            IsJsonRpcInstalled = _jsExtensionInstaller.IsInstalled(Id);
+            IsInstalledStateKnown = true;
             JsonRpcActionMessage = Resources.npm_installer_canceled;
         }
         catch (Exception ex)
         {
+            IsJsonRpcInstalled = _jsExtensionInstaller.IsInstalled(Id);
+            IsInstalledStateKnown = true;
             LogJsonRpcUninstallFailed(_logger, ex);
             JsonRpcActionMessage = Resources.gallery_item_jsonrpc_action_uninstall_failed;
         }
@@ -657,7 +665,7 @@ public sealed partial class ExtensionGalleryItemViewModel : ObservableObject
 
         CanCancelWinGetAction = operation.CanCancel && !operation.IsCompleted;
 
-        var treatAsUpdate = IsInstalled || IsUpdateAvailable;
+        var treatAsUpdate = _isWinGetInstalled || IsUpdateAvailable;
         switch (operation.State)
         {
             case WinGetPackageOperationState.Queued:

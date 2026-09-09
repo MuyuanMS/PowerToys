@@ -124,11 +124,13 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
         try
         {
             await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            var stoppedExtension = false;
             try
             {
                 // Stop the Node.js process before delete so file handles are released. The token lets
                 // Cancel stop waiting on a busy lifecycle gate without blocking the UI thread.
                 await _host.StopExtensionAsync(targetDirectory, cancellationToken).ConfigureAwait(false);
+                stoppedExtension = true;
 
                 // Delete on a worker thread since process handles can take a moment to close.
                 if (!await RemoveDirectoryAsync(targetDirectory, cancellationToken).ConfigureAwait(false))
@@ -140,6 +142,15 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
 
                 Logger.LogInfo($"Uninstalled JS extension '{extensionName}'.");
                 return JsExtensionInstallResult.Ok();
+            }
+            catch (OperationCanceledException)
+            {
+                if (stoppedExtension && Directory.Exists(targetDirectory))
+                {
+                    await _host.RefreshAndAwaitProviderAsync(targetDirectory, RegistrationTimeout, CancellationToken.None).ConfigureAwait(false);
+                }
+
+                throw;
             }
             finally
             {

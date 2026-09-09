@@ -836,6 +836,25 @@ public class ExtensionGalleryItemViewModelTests
     }
 
     [TestMethod]
+    public async Task InstallViaNpmCommand_UnexpectedFailure_RefreshesInstalledState()
+    {
+        var installer = new Mock<IJsExtensionInstaller>();
+        installer
+            .SetupSequence(x => x.IsInstalled("sample-js-extension"))
+            .Returns(false)
+            .Returns(true);
+        installer
+            .Setup(x => x.InstallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("unexpected"));
+        var viewModel = CreateViewModel(CreateJsonRpcEntry(), jsExtensionInstaller: installer.Object);
+
+        await viewModel.InstallViaNpmCommand.ExecuteAsync(null);
+
+        Assert.IsTrue(viewModel.IsJsonRpcInstalled);
+        Assert.IsTrue(viewModel.ShowUninstallJsonRpcButton);
+    }
+
+    [TestMethod]
     public async Task InstallViaNpmCommand_Cancellation_ShowsLocalizedStatusAndReenablesButton()
     {
         var viewModel = CreateJsonRpcViewModel(out var installer);
@@ -1025,6 +1044,36 @@ public class ExtensionGalleryItemViewModelTests
         Assert.IsFalse(viewModel.ShowLegacyInstalledAppsLink);
         CollectionAssert.Contains(propertyNames, nameof(viewModel.ShowInstallViaWinGetButton));
         CollectionAssert.Contains(propertyNames, nameof(viewModel.WinGetStatusText));
+    }
+
+    [TestMethod]
+    public void ApplyTrackedOperation_UsesWinGetStateForUpdateMessaging()
+    {
+        var installer = new Mock<IJsExtensionInstaller>();
+        installer.Setup(x => x.IsInstalled("sample-js-extension")).Returns(true);
+        var entry = CreateJsonRpcEntry();
+        entry.InstallSources.Add(new GalleryInstallSource { Type = "winget", Id = "Contoso.Sample" });
+        var viewModel = CreateViewModel(entry, jsExtensionInstaller: installer.Object);
+
+        viewModel.ApplyTrackedOperation(new WinGetPackageOperation(
+            OperationId: Guid.NewGuid(),
+            PackageId: "Contoso.Sample",
+            PackageName: "Contoso Sample",
+            Kind: WinGetPackageOperationKind.Install,
+            State: WinGetPackageOperationState.Installing,
+            CanCancel: true,
+            IsIndeterminate: true,
+            ProgressPercent: null,
+            BytesDownloaded: null,
+            BytesRequired: null,
+            ErrorMessage: null,
+            StartedAt: DateTimeOffset.UtcNow,
+            UpdatedAt: DateTimeOffset.UtcNow,
+            CompletedAt: null));
+
+        Assert.AreEqual(
+            Microsoft.CmdPal.UI.ViewModels.Properties.Resources.gallery_item_winget_action_installing,
+            viewModel.WinGetActionMessage);
     }
 
     [TestMethod]
