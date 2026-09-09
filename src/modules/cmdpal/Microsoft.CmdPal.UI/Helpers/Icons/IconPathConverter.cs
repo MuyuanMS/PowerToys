@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Buffers;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.UI.Xaml.Controls;
@@ -185,6 +186,8 @@ internal static partial class IconPathConverter
         nint blackBitmap = 0;
         nint whiteBitmap = 0;
         nint originalBitmap = 0;
+        byte[]? blackPixels = null;
+        byte[]? whitePixels = null;
         try
         {
             iconDc = NativeMethods.CreateCompatibleDC(screenDc);
@@ -219,7 +222,8 @@ internal static partial class IconPathConverter
             }
 
             originalBitmap = NativeMethods.SelectObject(iconDc, blackBitmap);
-            var blackPixels = new byte[byteCount];
+            blackPixels = ArrayPool<byte>.Shared.Rent(byteCount);
+            Array.Clear(blackPixels, 0, byteCount);
             Marshal.Copy(blackPixels, 0, blackBits, byteCount);
             if (!NativeMethods.DrawIconEx(iconDc, 0, 0, iconHandle, bitmapSize, bitmapSize, 0, 0, DiNormal))
             {
@@ -273,8 +277,8 @@ internal static partial class IconPathConverter
                 }
 
                 _ = NativeMethods.SelectObject(iconDc, whiteBitmap);
-                var whitePixels = new byte[byteCount];
-                Array.Fill(whitePixels, byte.MaxValue);
+                whitePixels = ArrayPool<byte>.Shared.Rent(byteCount);
+                Array.Fill(whitePixels, byte.MaxValue, 0, byteCount);
                 Marshal.Copy(whitePixels, 0, whiteBits, byteCount);
                 if (!NativeMethods.DrawIconEx(iconDc, 0, 0, iconHandle, bitmapSize, bitmapSize, 0, 0, DiNormal))
                 {
@@ -307,11 +311,21 @@ internal static partial class IconPathConverter
                 bitmapSize,
                 bitmapSize,
                 BitmapAlphaMode.Premultiplied);
-            softwareBitmap.CopyFromBuffer(blackPixels.AsBuffer());
+            softwareBitmap.CopyFromBuffer(blackPixels.AsBuffer(0, byteCount));
             return softwareBitmap;
         }
         finally
         {
+            if (whitePixels is not null)
+            {
+                ArrayPool<byte>.Shared.Return(whitePixels);
+            }
+
+            if (blackPixels is not null)
+            {
+                ArrayPool<byte>.Shared.Return(blackPixels);
+            }
+
             if (iconDc != 0 && originalBitmap != 0)
             {
                 _ = NativeMethods.SelectObject(iconDc, originalBitmap);
