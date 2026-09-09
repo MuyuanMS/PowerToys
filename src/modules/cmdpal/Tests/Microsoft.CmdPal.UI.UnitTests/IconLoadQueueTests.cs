@@ -133,6 +133,32 @@ public class IconLoadQueueTests
 
     [TestMethod]
     [Timeout(5_000)]
+    public async Task CompletionReleasesDemandReserveToDrainSpeculativeWork()
+    {
+        var queue = new IconLoadQueue(workerCount: 2);
+        var speculativeWork = new TestOperation();
+        var speculativeDemand = IconLoadDemand.CreateDemanded();
+        speculativeDemand.RemoveRequester();
+
+        Assert.IsTrue(queue.TryEnqueue(
+            speculativeWork,
+            IconLoadPriority.Low,
+            speculativeDemand,
+            out _));
+
+        var dequeue = queue.DequeueAsync().AsTask();
+        await Task.Delay(100);
+        Assert.IsFalse(dequeue.IsCompleted, "Speculative work should initially retain one worker slot for live demand.");
+
+        queue.Complete();
+
+        Assert.AreSame(speculativeWork, await dequeue);
+        Assert.IsNull(await queue.DequeueAsync());
+        await queue.Completion;
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
     public async Task DequeueRejectsMoreConcurrentConsumersThanConfigured()
     {
         var queue = new IconLoadQueue(workerCount: 1);
