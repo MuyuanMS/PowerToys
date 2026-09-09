@@ -590,6 +590,7 @@ bool PresenterWindow::Retarget(HWND target)
     const UINT height = static_cast<UINT>(bounds.bottom - bounds.top);
     if (!ResizeSwapChain(width, height))
     {
+        Stop();
         return false;
     }
 
@@ -599,6 +600,7 @@ bool PresenterWindow::Retarget(HWND target)
 
     if (!StartCapture())
     {
+        Stop();
         return false;
     }
 
