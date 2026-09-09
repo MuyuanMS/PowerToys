@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Security.Principal;
@@ -32,6 +33,7 @@ public sealed class ProfileFunctionData : BaseFunctionData
 
     private static readonly SettingsUtils _settingsUtils = SettingsUtils.Default;
     private readonly Func<bool> _isProcessElevated;
+    private readonly Func<bool> _isKeyboardManagerEditorOpen;
 
     // Structural problems with the input JSON (missing or null required
     // members) detected before the model is materialized.
@@ -43,6 +45,11 @@ public sealed class ProfileFunctionData : BaseFunctionData
     private static readonly JsonSerializerOptions _profileSerializerOptions = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
+
+    private static readonly JsonSerializerOptions _inputSerializerOptions = new()
+    {
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
     };
 
     /// <summary>
@@ -67,9 +74,19 @@ public sealed class ProfileFunctionData : BaseFunctionData
     /// </summary>
     public static Func<bool> IsProcessElevated { get; set; } = IsCurrentProcessElevated;
 
-    public ProfileFunctionData(string? input = null, Func<bool>? isProcessElevated = null)
+    /// <summary>
+    /// Gets or sets the check used to decide whether the Keyboard Manager
+    /// editor is currently open. Tests replace it to cover the guarded path.
+    /// </summary>
+    public static Func<bool> IsKeyboardManagerEditorOpen { get; set; } = IsKeyboardManagerEditorCurrentlyOpen;
+
+    public ProfileFunctionData(
+        string? input = null,
+        Func<bool>? isProcessElevated = null,
+        Func<bool>? isKeyboardManagerEditorOpen = null)
     {
         _isProcessElevated = isProcessElevated ?? IsProcessElevated;
+        _isKeyboardManagerEditorOpen = isKeyboardManagerEditorOpen ?? IsKeyboardManagerEditorOpen;
         Output = new();
         Input = new();
         _inputErrors = [];
@@ -87,7 +104,7 @@ public sealed class ProfileFunctionData : BaseFunctionData
         _inputErrors = ValidateInputStructure(node);
         if (_inputErrors.Count == 0)
         {
-            Input = node.Deserialize<ProfileResourceObject>() ?? new();
+            Input = node.Deserialize<ProfileResourceObject>(_inputSerializerOptions) ?? new();
         }
     }
 
@@ -122,6 +139,11 @@ public sealed class ProfileFunctionData : BaseFunctionData
         if (_isProcessElevated())
         {
             throw new UnauthorizedAccessException("Keyboard Manager profiles must be applied from a non-elevated process.");
+        }
+
+        if (_isKeyboardManagerEditorOpen())
+        {
+            throw new IOException("Keyboard Manager profiles cannot be applied while the Keyboard Manager editor is open.");
         }
 
         using var transactionLock = AcquireTransactionLock();
@@ -188,6 +210,34 @@ public sealed class ProfileFunctionData : BaseFunctionData
         return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
     }
 
+    private static bool IsKeyboardManagerEditorCurrentlyOpen()
+    {
+        foreach (var processName in new[] { "PowerToys.KeyboardManagerEditorUI", "PowerToys.KeyboardManagerEditor" })
+        {
+            Process[] processes = [];
+            try
+            {
+                processes = Process.GetProcessesByName(processName);
+                if (processes.Length > 0)
+                {
+                    return true;
+                }
+            }
+            catch (Exception)
+            {
+            }
+            finally
+            {
+                foreach (var process in processes)
+                {
+                    process.Dispose();
+                }
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>
     /// Gets the profile file name selected by the module's active
     /// configuration, e.g. "default.json".
@@ -205,7 +255,8 @@ public sealed class ProfileFunctionData : BaseFunctionData
     {
         try
         {
-            return _settingsUtils.GetSettings<T>(moduleName, fileName);
+            var settings = _settingsUtils.GetSettings<T>(moduleName, fileName);
+            return settings ?? throw new JsonException($"The settings file '{fileName}' contains a null JSON value.");
         }
         catch (FileNotFoundException)
         {
@@ -219,7 +270,7 @@ public sealed class ProfileFunctionData : BaseFunctionData
 
     private void VerifySavedProfile()
     {
-        var saved = _settingsUtils.GetSettings<KeyboardManagerProfile>(
+        var saved = ReadSettings<KeyboardManagerProfile>(
             KeyboardManagerSettings.ModuleName, GetProfileFileName());
         var expectedModel = JsonSerializer.SerializeToNode(KbmProfileConverter.Canonicalize(Input.Profile));
         var warnings = new List<string>();

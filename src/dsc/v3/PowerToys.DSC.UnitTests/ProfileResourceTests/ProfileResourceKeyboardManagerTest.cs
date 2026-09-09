@@ -35,6 +35,7 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
 
     private readonly Dictionary<string, string> _originalFiles = [];
     private Func<bool> _originalIsProcessElevated;
+    private Func<bool> _originalIsKeyboardManagerEditorOpen;
 
     private static string Module => nameof(ModuleType.KeyboardManager);
 
@@ -44,7 +45,9 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
         // Set rejects elevated writes and the CI agent runs elevated, so
         // treat the test process as non-elevated while the tests run
         _originalIsProcessElevated = ProfileFunctionData.IsProcessElevated;
+        _originalIsKeyboardManagerEditorOpen = ProfileFunctionData.IsKeyboardManagerEditorOpen;
         ProfileFunctionData.IsProcessElevated = () => false;
+        ProfileFunctionData.IsKeyboardManagerEditorOpen = () => false;
 
         // Save the actual settings and profile files, then reset to defaults
         foreach (var fileName in new[] { "settings.json", DefaultProfileFileName, WorkProfileFileName })
@@ -61,6 +64,7 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
     public void TestCleanup()
     {
         ProfileFunctionData.IsProcessElevated = _originalIsProcessElevated;
+        ProfileFunctionData.IsKeyboardManagerEditorOpen = _originalIsKeyboardManagerEditorOpen;
 
         foreach (var (fileName, content) in _originalFiles)
         {
@@ -74,6 +78,8 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
                 File.Delete(path);
             }
         }
+
+        SignalSettingsChangedEventIfPresent();
     }
 
     [TestMethod]
@@ -211,6 +217,7 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
     [DataRow(/*lang=json,strict*/ """{"profile":[]}""", "'profile' must be an object")]
     [DataRow(/*lang=json,strict*/ """{"profile":{"keys":null}}""", "'profile.keys' must be an array")]
     [DataRow(/*lang=json,strict*/ """{"profile":{"shortcuts":[null]}}""", "'profile.shortcuts[0]' must be an object")]
+    [DataRow(/*lang=json,strict*/ """{"profile":{"shortcut":[]}}""", "could not be mapped")]
     public void Set_MalformedInput_FailsAndLeavesFileUntouched(string input, string expectedError)
     {
         // Arrange: a stored remapping that a bad input must not erase
@@ -226,6 +233,46 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
         Assert.AreEqual(DscMessageLevel.Error, messages[0].Level);
         StringAssert.Contains(messages[0].Message, expectedError);
         Assert.AreEqual(1, GetProfile(DefaultProfileFileName).RemapKeys.InProcessRemapKeys.Count);
+    }
+
+    [TestMethod]
+    public void Set_WhenKeyboardManagerEditorIsOpen_FailsWithoutChangingProfile()
+    {
+        // Arrange
+        SaveProfile(KbmProfileConverter.ToProfile(CreateSampleProfileModel()), DefaultProfileFileName);
+        ProfileFunctionData.IsKeyboardManagerEditorOpen = () => true;
+        var input = CreateInputResourceObject(new KbmProfileModel
+        {
+            Keys = [new() { From = "CapsLock", To = "Tab" }],
+        });
+
+        // Act
+        var result = ExecuteDscCommand<SetCommand>("--resource", ProfileResource.ResourceName, "--module", Module, "--input", input);
+        var messages = result.Messages();
+
+        // Assert
+        Assert.IsFalse(result.Success);
+        Assert.AreEqual(1, messages.Count);
+        Assert.AreEqual(DscMessageLevel.Error, messages[0].Level);
+        StringAssert.Contains(messages[0].Message, "Keyboard Manager editor is open");
+        Assert.AreEqual("27", GetProfile(DefaultProfileFileName).RemapKeys.InProcessRemapKeys[0].NewRemapKeys);
+    }
+
+    [TestMethod]
+    public void Get_NullProfileRoot_FailsWithJsonError()
+    {
+        // Arrange
+        _settingsUtils.SaveSettings("null", KeyboardManagerSettings.ModuleName, DefaultProfileFileName);
+
+        // Act
+        var result = ExecuteDscCommand<GetCommand>("--resource", ProfileResource.ResourceName, "--module", Module);
+        var messages = result.Messages();
+
+        // Assert
+        Assert.IsFalse(result.Success);
+        Assert.AreEqual(1, messages.Count);
+        Assert.AreEqual(DscMessageLevel.Error, messages[0].Level);
+        StringAssert.Contains(messages[0].Message, "contains a null JSON value");
     }
 
     [TestMethod]
@@ -314,6 +361,19 @@ public sealed class ProfileResourceKeyboardManagerTest : BaseDscTest
     private static void SaveProfile(KeyboardManagerProfile profile, string fileName)
     {
         _settingsUtils.SaveSettings(JsonSerializer.Serialize(profile, _profileSerializerOptions), KeyboardManagerSettings.ModuleName, fileName);
+    }
+
+    private static void SignalSettingsChangedEventIfPresent()
+    {
+        if (!EventWaitHandle.TryOpenExisting(ProfileFunctionData.SettingsEventName, out var settingsEvent))
+        {
+            return;
+        }
+
+        using (settingsEvent)
+        {
+            settingsEvent.Set();
+        }
     }
 
     private static void AssertProfilesAreEqual(KbmProfileModel expected, KbmProfileModel actual)

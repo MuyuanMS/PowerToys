@@ -45,7 +45,7 @@ public static class KbmProfileConverter
     {
         var errors = new List<string>();
         var seenKeys = new HashSet<(uint Code, string Condition)>();
-        var seenShortcuts = new HashSet<(string App, string From)>();
+        var seenShortcuts = new List<(string App, string From, KbmShortcutParser.ParsedKeys ParsedKeys)>();
 
         for (var i = 0; i < model.Keys.Count; i++)
         {
@@ -128,10 +128,29 @@ public static class KbmProfileConverter
             else
             {
                 var app = NormalizeTargetApp(entry.TargetApp) ?? string.Empty;
-                if (!seenShortcuts.Add((app, KbmShortcutParser.Format(from))))
+                var formattedFrom = KbmShortcutParser.Format(from);
+                var conflict = seenShortcuts
+                    .Where(existing => existing.App == app)
+                    .Select(existing => new
+                    {
+                        Existing = existing,
+                        ConflictKind = GetShortcutConflictKind(existing.ParsedKeys, from),
+                    })
+                    .FirstOrDefault(existing => existing.ConflictKind != ShortcutConflictKind.None);
+
+                if (conflict is { ConflictKind: ShortcutConflictKind.ExactDuplicate })
                 {
                     var scope = app.Length == 0 ? "globally" : $"for app '{app}'";
-                    errors.Add($"{context}.from: shortcut '{KbmShortcutParser.Format(from)}' is remapped more than once {scope}");
+                    errors.Add($"{context}.from: shortcut '{formattedFrom}' is remapped more than once {scope}");
+                }
+                else if (conflict is { ConflictKind: ShortcutConflictKind.ConflictingModifier })
+                {
+                    var scope = app.Length == 0 ? "globally" : $"for app '{app}'";
+                    errors.Add($"{context}.from: shortcut '{formattedFrom}' overlaps with shortcut '{conflict.Existing.From}' {scope}");
+                }
+                else
+                {
+                    seenShortcuts.Add((app, formattedFrom, from));
                 }
             }
 
@@ -289,12 +308,14 @@ public static class KbmProfileConverter
                 continue;
             }
 
-            keys.Add((from.Keys[0], new KbmKeyRemapEntry
+            var entry = new KbmKeyRemapEntry
             {
                 From = KbmKeyNames.GetName(from.Keys[0]),
                 To = KbmShortcutParser.Format(KbmShortcutParser.Canonicalize(to)),
                 Condition = stored.Condition == "alone" ? "alone" : null,
-            }));
+            };
+
+            TryAddValidatedKeyEntry(keys, from.Keys[0], entry, stored.OriginalKeys, "key remap", warnings);
         }
 
         foreach (var stored in profile.RemapKeysToText?.InProcessRemapKeys ?? [])
@@ -307,16 +328,18 @@ public static class KbmProfileConverter
                 continue;
             }
 
-            keys.Add((from.Keys[0], new KbmKeyRemapEntry
+            var entry = new KbmKeyRemapEntry
             {
                 From = KbmKeyNames.GetName(from.Keys[0]),
                 ToText = stored.NewRemapString,
-            }));
+            };
+
+            TryAddValidatedKeyEntry(keys, from.Keys[0], entry, stored.OriginalKeys, "key-to-text remap", warnings);
         }
 
-        foreach (var (stored, app) in EnumerateShortcuts(profile.RemapShortcuts))
+        foreach (var (stored, app, isAppSpecific) in EnumerateShortcuts(profile.RemapShortcuts))
         {
-            var entry = CreateShortcutEntry(stored, app, warnings);
+            var entry = CreateShortcutEntry(stored, app, isAppSpecific, warnings);
             if (entry == null || stored == null)
             {
                 continue;
@@ -368,12 +391,12 @@ public static class KbmProfileConverter
                 entry.To = target;
             }
 
-            shortcuts.Add(entry);
+            TryAddValidatedShortcutEntry(shortcuts, entry, stored.OriginalKeys, "shortcut remap", warnings);
         }
 
-        foreach (var (stored, app) in EnumerateShortcuts(profile.RemapShortcutsToText))
+        foreach (var (stored, app, isAppSpecific) in EnumerateShortcuts(profile.RemapShortcutsToText))
         {
-            var entry = CreateShortcutEntry(stored, app, warnings);
+            var entry = CreateShortcutEntry(stored, app, isAppSpecific, warnings);
             if (entry == null || stored == null)
             {
                 continue;
@@ -386,7 +409,7 @@ public static class KbmProfileConverter
             }
 
             entry.ToText = stored.NewRemapString;
-            shortcuts.Add(entry);
+            TryAddValidatedShortcutEntry(shortcuts, entry, stored.OriginalKeys, "shortcut-to-text remap", warnings);
         }
 
         return new KbmProfileModel
@@ -425,20 +448,20 @@ public static class KbmProfileConverter
         return FromProfile(ToProfile(model));
     }
 
-    private static IEnumerable<(KeysDataModel? Stored, string? App)> EnumerateShortcuts(ShortcutsKeyDataModel? section)
+    private static IEnumerable<(KeysDataModel? Stored, string? App, bool IsAppSpecific)> EnumerateShortcuts(ShortcutsKeyDataModel? section)
     {
         foreach (var stored in section?.GlobalRemapShortcuts ?? [])
         {
-            yield return (stored, null);
+            yield return (stored, null, false);
         }
 
         foreach (var stored in section?.AppSpecificRemapShortcuts ?? [])
         {
-            yield return (stored, stored?.TargetApp);
+            yield return (stored, stored?.TargetApp, true);
         }
     }
 
-    private static KbmShortcutRemapEntry? CreateShortcutEntry(KeysDataModel? stored, string? app, IList<string>? warnings)
+    private static KbmShortcutRemapEntry? CreateShortcutEntry(KeysDataModel? stored, string? app, bool isAppSpecific, IList<string>? warnings)
     {
         if (stored == null ||
             !KbmShortcutParser.TryParseVkString(stored.OriginalKeys, stored.SecondKeyOfChord, out var from) || from.Keys.Count < 2)
@@ -454,6 +477,12 @@ public static class KbmProfileConverter
             !KbmKeyNames.IsModifier(from.Keys[^1]) && !KbmKeyNames.IsModifier(from.Keys[^2]))
         {
             from = new KbmShortcutParser.ParsedKeys(from.Keys, from.Keys[^1]);
+        }
+
+        if (isAppSpecific && string.IsNullOrWhiteSpace(app))
+        {
+            warnings?.Add($"Skipping app-specific shortcut remap entry '{stored.OriginalKeys}' without a target application");
+            return null;
         }
 
         // Preserve the engine's exact process scope. It lower-cases stored app
@@ -607,6 +636,135 @@ public static class KbmProfileConverter
 
         warnings?.Add($"Skipping invalid {propertyName} value '{value}' in remap entry");
         return null;
+    }
+
+    private static bool TryAddValidatedKeyEntry(
+        List<(uint Code, KbmKeyRemapEntry Entry)> keys,
+        uint code,
+        KbmKeyRemapEntry entry,
+        string originalKeys,
+        string entryKind,
+        IList<string>? warnings)
+    {
+        var candidateIndex = keys.Count;
+        var model = new KbmProfileModel
+        {
+            Keys = keys.Select(existing => existing.Entry).Append(entry).ToList(),
+        };
+
+        var error = Validate(model)
+            .FirstOrDefault(message => message.StartsWith($"keys[{candidateIndex.ToString(CultureInfo.InvariantCulture)}]", StringComparison.Ordinal));
+        if (error != null)
+        {
+            warnings?.Add($"Skipping invalid {entryKind} entry '{originalKeys}': {error}");
+            return false;
+        }
+
+        keys.Add((code, entry));
+        return true;
+    }
+
+    private static bool TryAddValidatedShortcutEntry(
+        List<KbmShortcutRemapEntry> shortcuts,
+        KbmShortcutRemapEntry entry,
+        string originalKeys,
+        string entryKind,
+        IList<string>? warnings)
+    {
+        var candidateIndex = shortcuts.Count;
+        var model = new KbmProfileModel
+        {
+            Shortcuts = shortcuts.Append(entry).ToList(),
+        };
+
+        var error = Validate(model)
+            .FirstOrDefault(message => message.StartsWith($"shortcuts[{candidateIndex.ToString(CultureInfo.InvariantCulture)}]", StringComparison.Ordinal));
+        if (error != null)
+        {
+            warnings?.Add($"Skipping invalid {entryKind} entry '{originalKeys}': {error}");
+            return false;
+        }
+
+        shortcuts.Add(entry);
+        return true;
+    }
+
+    private static ShortcutConflictKind GetShortcutConflictKind(KbmShortcutParser.ParsedKeys first, KbmShortcutParser.ParsedKeys second)
+    {
+        if (first.Keys.SequenceEqual(second.Keys))
+        {
+            return ShortcutConflictKind.ExactDuplicate;
+        }
+
+        var firstActionKey = GetPrimaryActionKey(first);
+        var secondActionKey = GetPrimaryActionKey(second);
+        if (firstActionKey == 0 || secondActionKey == 0 || firstActionKey != secondActionKey)
+        {
+            return ShortcutConflictKind.None;
+        }
+
+        var hasConflictingModifier = false;
+        foreach (var modifierClass in new[]
+        {
+            KbmKeyNames.ModifierClass.Win,
+            KbmKeyNames.ModifierClass.Ctrl,
+            KbmKeyNames.ModifierClass.Alt,
+            KbmKeyNames.ModifierClass.Shift,
+        })
+        {
+            var firstModifier = GetModifierCode(first, modifierClass);
+            var secondModifier = GetModifierCode(second, modifierClass);
+            if ((firstModifier == 0) != (secondModifier == 0))
+            {
+                return ShortcutConflictKind.None;
+            }
+
+            if (firstModifier != 0 &&
+                (IsGenericModifier(firstModifier) || IsGenericModifier(secondModifier)))
+            {
+                hasConflictingModifier = true;
+            }
+        }
+
+        return hasConflictingModifier ? ShortcutConflictKind.ConflictingModifier : ShortcutConflictKind.None;
+    }
+
+    private static uint GetPrimaryActionKey(KbmShortcutParser.ParsedKeys keys)
+    {
+        foreach (var key in keys.Keys)
+        {
+            if (KbmKeyNames.GetModifierClass(key) == KbmKeyNames.ModifierClass.None)
+            {
+                return key;
+            }
+        }
+
+        return 0;
+    }
+
+    private static uint GetModifierCode(KbmShortcutParser.ParsedKeys keys, KbmKeyNames.ModifierClass modifierClass)
+    {
+        foreach (var key in keys.Keys)
+        {
+            if (KbmKeyNames.GetModifierClass(key) == modifierClass)
+            {
+                return key;
+            }
+        }
+
+        return 0;
+    }
+
+    private static bool IsGenericModifier(uint keyCode)
+    {
+        return keyCode is KbmKeyNames.VkWinBoth or 17 or 18 or 16;
+    }
+
+    private enum ShortcutConflictKind
+    {
+        None = 0,
+        ExactDuplicate,
+        ConflictingModifier,
     }
 
     private static string? NormalizeTargetApp(string? app)

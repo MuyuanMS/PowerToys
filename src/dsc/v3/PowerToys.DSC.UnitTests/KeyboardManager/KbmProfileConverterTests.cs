@@ -291,6 +291,23 @@ public sealed class KbmProfileConverterTests
     }
 
     [TestMethod]
+    public void Validate_OverlappingShortcutSources_ReportsError()
+    {
+        var model = new KbmProfileModel
+        {
+            Shortcuts =
+            [
+                new() { From = "Ctrl+A", To = "Esc" },
+                new() { From = "LCtrl+A", To = "Tab" },
+            ],
+        };
+
+        var errors = KbmProfileConverter.Validate(model);
+
+        AssertHasError(errors, "shortcuts[1].from: shortcut 'LCtrl+A' overlaps with shortcut 'Ctrl+A' globally");
+    }
+
+    [TestMethod]
     public void Validate_ShortcutsResemblingIllegalOnes_NoErrors()
     {
         // Adding any other modifier makes Win+L and Ctrl+Alt+Del legal, as in
@@ -332,6 +349,43 @@ public sealed class KbmProfileConverterTests
         Assert.AreEqual(2, warnings.Count, string.Join(" | ", warnings));
         StringAssert.Contains(warnings[0], "'abc'");
         StringAssert.Contains(warnings[1], "without a program path");
+    }
+
+    [TestMethod]
+    public void FromProfile_SkipsEntriesThatCannotRoundTrip()
+    {
+        var profile = JsonSerializer.Deserialize<KeyboardManagerProfile>(/*lang=json,strict*/ """
+            {
+                "remapKeys": {
+                    "inProcess": [
+                        { "originalKeys": "256", "newRemapKeys": "27" }
+                    ]
+                },
+                "remapShortcuts": {
+                    "global": [
+                        { "originalKeys": "17;65", "newRemapKeys": "27" },
+                        { "originalKeys": "162;65", "newRemapKeys": "9" },
+                        { "originalKeys": "17;18;66", "operationType": 2, "openUri": "   ", "unicodeText": "*Unsupported*" }
+                    ],
+                    "appSpecific": [
+                        { "originalKeys": "17;18;78", "newRemapKeys": "17;83", "operationType": 0, "targetApp": "" }
+                    ]
+                }
+            }
+            """);
+        var warnings = new System.Collections.Generic.List<string>();
+
+        var model = KbmProfileConverter.FromProfile(profile, warnings);
+
+        Assert.AreEqual(0, model.Keys.Count);
+        Assert.AreEqual(1, model.Shortcuts.Count);
+        Assert.AreEqual("Ctrl+A", model.Shortcuts[0].From);
+        Assert.AreEqual("Esc", model.Shortcuts[0].To);
+        Assert.AreEqual(4, warnings.Count, string.Join(" | ", warnings));
+        StringAssert.Contains(warnings[0], "invalid key remap entry '256'");
+        StringAssert.Contains(warnings[1], "invalid shortcut remap entry '162;65'");
+        StringAssert.Contains(warnings[2], "invalid shortcut remap entry '17;18;66'");
+        StringAssert.Contains(warnings[3], "app-specific shortcut remap entry '17;18;78' without a target application");
     }
 
     [TestMethod]

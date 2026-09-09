@@ -117,6 +117,7 @@ public sealed class KbmKeyNamesTests
         Assert.IsFalse(KbmKeyNames.TryGetCode("0x", out _));
         Assert.IsFalse(KbmKeyNames.TryGetCode("0x101", out _));
         Assert.IsFalse(KbmKeyNames.TryGetCode("0xFFFFFFFF", out _));
+        Assert.IsFalse(KbmKeyNames.TryGetCode("0x80000041", out _));
     }
 
     [TestMethod]

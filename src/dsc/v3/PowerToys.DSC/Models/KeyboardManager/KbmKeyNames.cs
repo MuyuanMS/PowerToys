@@ -88,9 +88,17 @@ public static class KbmKeyNames
 
     internal static bool IsStorableCode(uint code)
     {
-        return code <= byte.MaxValue ||
-            code is VkDisabled or VkWinBoth ||
-            ((code & NumpadOriginBit) != 0 && (code & ~NumpadOriginBit) <= byte.MaxValue);
+        if (code <= byte.MaxValue || code is VkDisabled or VkWinBoth)
+        {
+            return true;
+        }
+
+        if ((code & NumpadOriginBit) == 0)
+        {
+            return false;
+        }
+
+        return (code & ~NumpadOriginBit) is 13 or 33 or 34 or 35 or 36 or 37 or 38 or 39 or 40 or 45 or 46 or 111;
     }
 
     /// <summary>

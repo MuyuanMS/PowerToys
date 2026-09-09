@@ -110,6 +110,12 @@ a comma.
 | Media/browser  | `VolumeMute`, `VolumeDown`, `VolumeUp`, `MediaNext`, `MediaPrev`, `MediaStop`, `MediaPlayPause`, `BrowserBack`, `BrowserForward`, `BrowserRefresh`, `BrowserStop`, `BrowserSearch`, `BrowserFavorites`, `BrowserHome`, `LaunchMail`, `LaunchMediaSelect`, `LaunchApp1`, `LaunchApp2`                                         |
 | Special        | `Disable` (disables the key or shortcut), `VK<decimal>` or `0x<hex>` for any other byte-sized Windows virtual-key code                                                                                                                                                                                                       |
 
+For single-key remap sources (`profile.keys[].from`), generic modifier names
+(`Ctrl`, `Alt`, `Shift`, `Win`) are ambiguous and must use an explicit left or
+right variant (`LCtrl`, `RCtrl`, `LAlt`, `RAlt`, `LShift`, `RShift`, `LWin`,
+`RWin`). Generic modifier names remain valid in shortcut sources and remap
+targets.
+
 > **Note:** Punctuation names refer to the key's physical position on a US
 > layout (`Semicolon` is the `VK_OEM_1` key), so profiles behave identically
 > regardless of the machine's keyboard layout.
