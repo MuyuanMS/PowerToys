@@ -134,6 +134,33 @@ public class ShellItemIconLocatorTests
     }
 
     [TestMethod]
+    public void ImageThumbnailIdentityTracksLastWriteTime()
+    {
+        var tempPath = Path.GetTempFileName();
+        var path = Path.ChangeExtension(tempPath, ".png");
+        File.Move(tempPath, path);
+        try
+        {
+            var request = new ShellItemIconRequest(path, jumbo: false);
+            var firstWriteTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var secondWriteTime = firstWriteTime.AddMinutes(1);
+
+            File.SetLastWriteTimeUtc(path, firstWriteTime);
+            Assert.IsTrue(ShellItemIconLocator.Instance.TryLocate(request, out var first));
+            File.SetLastWriteTimeUtc(path, secondWriteTime);
+            Assert.IsTrue(ShellItemIconLocator.Instance.TryLocate(request, out var second));
+
+            Assert.AreEqual(ShellIconIdentityKind.ItemThumbnail, first.Identity.Kind);
+            Assert.AreEqual(path, first.Identity.ItemPath);
+            Assert.AreNotEqual(first.Identity, second.Identity);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [TestMethod]
     public void CaseDistinctRawAliasesCanConvergeToSameShellIdentity()
     {
         var path = Path.GetTempFileName();

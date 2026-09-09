@@ -46,7 +46,10 @@ internal sealed partial class ShellItemIconLocator : IShellItemIconLocator
         {
             locatedIcon = new LocatedShellIcon(
                 request,
-                ShellIconIdentity.FromItemThumbnail(request.ItemPath, request.Jumbo));
+                ShellIconIdentity.FromItemThumbnail(
+                    request.ItemPath,
+                    request.Jumbo,
+                    GetItemVersion(request.ItemPath)));
             return true;
         }
 
@@ -100,6 +103,18 @@ internal sealed partial class ShellItemIconLocator : IShellItemIconLocator
             flags);
         iconIndex = fileInfo.IconIndex;
         return result != 0 && iconIndex >= 0;
+    }
+
+    private static long GetItemVersion(string itemPath)
+    {
+        try
+        {
+            return File.GetLastWriteTimeUtc(itemPath).Ticks;
+        }
+        catch
+        {
+            return 0;
+        }
     }
 
     [StructLayout(LayoutKind.Sequential)]

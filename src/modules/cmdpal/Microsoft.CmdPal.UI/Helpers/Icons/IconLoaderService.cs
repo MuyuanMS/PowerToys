@@ -22,6 +22,7 @@ internal sealed partial class IconLoaderService : IIconLoaderService
 
     private const DispatcherQueuePriority LoadingPriorityOnDispatcher = DispatcherQueuePriority.Low;
     private const int DefaultIconSize = 256;
+    private const int MaximumLocationGenerationRetries = 3;
     private const int MaxWorkerCount = 4;
 
     private static readonly int WorkerCount = Math.Clamp(Environment.ProcessorCount / 2, 1, MaxWorkerCount);
@@ -290,80 +291,103 @@ internal sealed partial class IconLoaderService : IIconLoaderService
                 diagnostics = null;
             }
 
-            var preparationStartedAt = diagnostics?.BeginBackgroundPreparation() ?? 0;
-            var locatedIcon = _shellItemIconLocationResolver.GetCurrentOrCached(
-                request,
-                knownLocation);
-            if (locatedIcon is null)
-            {
-                var identityStartedAt = shellDiagnostics.BeginIdentityResolution();
-                locatedIcon = _shellItemIconLocationResolver.Resolve(request);
-                shellDiagnostics.IdentityResolved(locatedIcon.Value.Identity.Kind, identityStartedAt);
-            }
-
-            if (coordinator?.TryJoinExistingLoad(locatedIcon.Value, out var sharedTask) == true)
-            {
-                diagnostics?.CompleteBackgroundPreparation(preparationStartedAt);
-                ForwardSharedLoad(sharedTask, tcs, diagnostics);
-                return;
-            }
-
             var scaledSize = iconSize.IsEmpty
                 ? iconSize
                 : new Size(iconSize.Width * scale, iconSize.Height * scale);
             var targetPixelSize = scaledSize.IsEmpty
                 ? DefaultIconSize
                 : (int)Math.Max(scaledSize.Width, scaledSize.Height);
-            var extractionStartedAt = shellDiagnostics.BeginExtraction();
-            ShellIconExtractionResult extractionResult;
-            try
+            var preparationStartedAt = diagnostics?.BeginBackgroundPreparation() ?? 0;
+            for (var attempt = 0; attempt < MaximumLocationGenerationRetries; attempt++)
             {
-                extractionResult = await _shellItemIconExtractor
-                    .ExtractAsync(locatedIcon.Value, targetPixelSize)
-                    .ConfigureAwait(false);
-                shellDiagnostics.ExtractionCompleted(
-                    extractionStartedAt,
-                    locatedIcon.Value.Identity.Kind,
-                    extractionResult.HasContent);
-            }
-            catch
-            {
-                shellDiagnostics.ExtractionFailed(
-                    extractionStartedAt,
-                    locatedIcon.Value.Identity.Kind);
-                throw;
-            }
-
-            using (extractionResult)
-            {
-                if (extractionResult.ImageListSize is { } imageListSize)
+                var locatedIcon = _shellItemIconLocationResolver.GetCurrentOrCached(
+                    request,
+                    knownLocation);
+                if (locatedIcon is null)
                 {
-                    shellDiagnostics.SystemImageListExtracted(
-                        imageListSize,
-                        extractionResult.RequestedPixelSize,
-                        extractionResult.SourceWidth,
-                        extractionResult.SourceHeight,
-                        extractionResult.HIconConversionTicks);
+                    var identityStartedAt = shellDiagnostics.BeginIdentityResolution();
+                    locatedIcon = _shellItemIconLocationResolver.Resolve(request);
+                    shellDiagnostics.IdentityResolved(locatedIcon.Value.Identity.Kind, identityStartedAt);
                 }
 
-                diagnostics?.CompleteBackgroundPreparation(preparationStartedAt);
-                IconSource? result;
-                if (extractionResult.TakeSoftwareBitmap() is { } softwareBitmap)
+                if (RequiresCurrentLocationGeneration(locatedIcon.Value)
+                    && !ShellIconLocations.IsCurrent(locatedIcon.Value))
                 {
-                    result = await CreateSoftwareBitmapIconSourceAsync(softwareBitmap, diagnostics).ConfigureAwait(false);
-                }
-                else if (extractionResult.BitmapStream is { } bitmapStream)
-                {
-                    result = await CreateImageIconSourceAsync(bitmapStream, scaledSize, diagnostics).ConfigureAwait(false);
-                }
-                else
-                {
-                    result = await GetShellItemFallbackSourceAsync(diagnostics).ConfigureAwait(false);
+                    knownLocation = null;
+                    continue;
                 }
 
-                diagnostics?.Complete();
-                tcs.TrySetResult(result);
+                if (coordinator?.TryJoinExistingLoad(locatedIcon.Value, out var sharedTask) == true)
+                {
+                    diagnostics?.CompleteBackgroundPreparation(preparationStartedAt);
+                    ForwardSharedLoad(sharedTask, tcs, diagnostics);
+                    return;
+                }
+
+                var extractionStartedAt = shellDiagnostics.BeginExtraction();
+                ShellIconExtractionResult extractionResult;
+                try
+                {
+                    extractionResult = await _shellItemIconExtractor
+                        .ExtractAsync(locatedIcon.Value, targetPixelSize)
+                        .ConfigureAwait(false);
+                    shellDiagnostics.ExtractionCompleted(
+                        extractionStartedAt,
+                        locatedIcon.Value.Identity.Kind,
+                        extractionResult.HasContent);
+                }
+                catch
+                {
+                    shellDiagnostics.ExtractionFailed(
+                        extractionStartedAt,
+                        locatedIcon.Value.Identity.Kind);
+                    throw;
+                }
+
+                using (extractionResult)
+                {
+                    if (RequiresCurrentLocationGeneration(locatedIcon.Value)
+                        && !ShellIconLocations.IsCurrent(locatedIcon.Value))
+                    {
+                        knownLocation = null;
+                        continue;
+                    }
+
+                    if (extractionResult.ImageListSize is { } imageListSize)
+                    {
+                        shellDiagnostics.SystemImageListExtracted(
+                            imageListSize,
+                            extractionResult.RequestedPixelSize,
+                            extractionResult.SourceWidth,
+                            extractionResult.SourceHeight,
+                            extractionResult.HIconConversionTicks);
+                    }
+
+                    diagnostics?.CompleteBackgroundPreparation(preparationStartedAt);
+                    IconSource? result;
+                    if (extractionResult.TakeSoftwareBitmap() is { } softwareBitmap)
+                    {
+                        result = await CreateSoftwareBitmapIconSourceAsync(softwareBitmap, diagnostics).ConfigureAwait(false);
+                    }
+                    else if (extractionResult.BitmapStream is { } bitmapStream)
+                    {
+                        result = await CreateImageIconSourceAsync(bitmapStream, scaledSize, diagnostics).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        result = await GetShellItemFallbackSourceAsync(diagnostics).ConfigureAwait(false);
+                    }
+
+                    diagnostics?.Complete();
+                    tcs.TrySetResult(result);
+                    return;
+                }
             }
+
+            diagnostics?.CompleteBackgroundPreparation(preparationStartedAt);
+            var fallbackResult = await GetShellItemFallbackSourceAsync(diagnostics).ConfigureAwait(false);
+            diagnostics?.Complete();
+            tcs.TrySetResult(fallbackResult);
         }
         catch (Exception ex)
         {
@@ -375,6 +399,9 @@ internal sealed partial class IconLoaderService : IIconLoaderService
             workerDiagnostics?.WorkerReleased();
         }
     }
+
+    private bool RequiresCurrentLocationGeneration(LocatedShellIcon locatedIcon) =>
+        locatedIcon.Identity.Kind == ShellIconIdentityKind.SystemImageList;
 
     private async Task<IconSource?> GetShellItemFallbackSourceAsync(IconLoadMeasurement? diagnostics)
     {
