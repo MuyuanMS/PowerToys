@@ -6504,8 +6504,17 @@ Text uses the current drawing color.</value>
   <data name="ZoomIt_Break_BackgroundImage_None.Content" xml:space="preserve">
     <value>None</value>
   </data>
-  <data name="ShowThemeAdaptiveTrayIcon.Content" xml:space="preserve">
-    <value>Show a monochrome icon that matches the Windows theme</value>
+  <data name="ShowThemeAdaptiveTrayIcon.Header" xml:space="preserve">
+    <value>Show a monochrome PowerToys tray icon that matches the Windows theme</value>
+  </data>
+  <data name="ShowThemeAdaptiveTrayIcon.Description" xml:space="preserve">
+    <value>Applies only to the main PowerToys system tray icon.</value>
+  </data>
+  <data name="MouseWithoutBorders_ShowThemeAdaptiveTrayIcon.Header" xml:space="preserve">
+    <value>Show a monochrome Mouse Without Borders tray icon that matches the Windows theme</value>
+  </data>
+  <data name="MouseWithoutBorders_ShowThemeAdaptiveTrayIcon.Description" xml:space="preserve">
+    <value>Applies only to the Mouse Without Borders system tray icon.</value>
   </data>
   <data name="GeneralPage_EnableQuickAccess.Header" xml:space="preserve">
     <value>Quick Access flyout</value>

@@ -26,6 +26,7 @@ using Microsoft.PowerToys.Settings.UI.Library.ViewModels.Commands;
 using Microsoft.PowerToys.Settings.UI.SerializationContext;
 using Microsoft.PowerToys.Telemetry;
 using Microsoft.Win32;
+
 using Windows.System.Profile;
 
 namespace Microsoft.PowerToys.Settings.UI.ViewModels
