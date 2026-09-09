@@ -48,9 +48,7 @@ export async function iconFromFile(filePath: string): Promise<IconInfo> {
 export async function iconFromUrl(url: string): Promise<IconInfo> {
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(
-      `Failed to fetch icon from ${url}: ${String(response.status)} ${response.statusText}`,
-    );
+    throw new Error(`Failed to fetch icon: ${String(response.status)} ${response.statusText}`);
   }
   const bytes = new Uint8Array(await response.arrayBuffer());
   return iconFromBase64(Buffer.from(bytes).toString('base64'));

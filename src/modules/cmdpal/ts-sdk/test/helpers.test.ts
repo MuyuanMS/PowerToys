@@ -66,6 +66,8 @@ describe('iconFromUrl', () => {
       ),
     );
 
-    await expect(iconFromUrl('https://example.com/missing.png')).rejects.toThrow(/404/);
+    const url = 'https://example.com/missing.png?token=secret';
+    await expect(iconFromUrl(url)).rejects.toThrow('Failed to fetch icon: 404 Not Found');
+    await expect(iconFromUrl(url)).rejects.not.toThrow(url);
   });
 });
