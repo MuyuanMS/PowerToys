@@ -263,7 +263,14 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Utilities
 
             lock (VerificationCacheGate)
             {
-                VerificationCache[cacheKey] = new ProcessVerificationResult(accepted, rejectionReason);
+                if (accepted)
+                {
+                    VerificationCache[cacheKey] = new ProcessVerificationResult(true, rejectionReason);
+                }
+                else
+                {
+                    VerificationCache.Remove(cacheKey);
+                }
             }
 
             return accepted;

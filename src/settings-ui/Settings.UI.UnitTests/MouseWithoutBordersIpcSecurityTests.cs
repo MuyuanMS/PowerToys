@@ -501,6 +501,8 @@ namespace Microsoft.PowerToys.Settings.UI.UnitTests
 
         private static X509Certificate2 CreateIntermediateCertificate(X509Certificate2 root, RSA intermediateKey)
         {
+            var notBefore = DateTimeOffset.UtcNow.AddDays(-1);
+            var notAfter = root.NotAfter.ToUniversalTime().AddMinutes(-1);
             var request = new CertificateRequest(
                 "CN=MWB IPC Test Intermediate",
                 intermediateKey,
@@ -510,7 +512,7 @@ namespace Microsoft.PowerToys.Settings.UI.UnitTests
             request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.KeyCertSign | X509KeyUsageFlags.CrlSign, true));
             request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(request.PublicKey, false));
 
-            using var intermediate = request.Create(root, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(7), RandomNumberGenerator.GetBytes(16));
+            using var intermediate = request.Create(root, notBefore, notAfter, RandomNumberGenerator.GetBytes(16));
             return intermediate.CopyWithPrivateKey(intermediateKey);
         }
 

@@ -233,8 +233,8 @@ WellKnownSidType.AuthenticatedUserSid, null);
             _ = Task.Run(
                 async () =>
                 {
-                    string lastRejectedConnectionReason = null;
                     DateTime lastRejectedConnectionLogAt = DateTime.MinValue;
+                    DateTime lastServerErrorLogAt = DateTime.MinValue;
 
                     while (!cancellationToken.IsCancellationRequested)
                     {
@@ -248,11 +248,9 @@ WellKnownSidType.AuthenticatedUserSid, null);
                             {
 #if !MM_HELPER
                                 var utcNow = DateTime.UtcNow;
-                                if (!string.Equals(lastRejectedConnectionReason, rejectionReason, StringComparison.Ordinal) ||
-                                    utcNow - lastRejectedConnectionLogAt >= TimeSpan.FromSeconds(30))
+                                if (utcNow - lastRejectedConnectionLogAt >= TimeSpan.FromSeconds(30))
                                 {
                                     Logger.Log($"Rejected Settings IPC client: {rejectionReason}");
-                                    lastRejectedConnectionReason = rejectionReason;
                                     lastRejectedConnectionLogAt = utcNow;
                                 }
 #endif
@@ -278,7 +276,12 @@ WellKnownSidType.AuthenticatedUserSid, null);
 #if MM_HELPER
                             _ = e;
 #else
-                            Logger.Log(e);
+                            var utcNow = DateTime.UtcNow;
+                            if (utcNow - lastServerErrorLogAt >= TimeSpan.FromSeconds(30))
+                            {
+                                Logger.Log(e);
+                                lastServerErrorLogAt = utcNow;
+                            }
 #endif
                             if (!cancellationToken.IsCancellationRequested)
                             {
