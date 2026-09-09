@@ -41,6 +41,8 @@ They are omitted here, or approximated with a clear code comment, rather than
 inventing protocol methods:
 
 - Dock bands (`SampleDockBand`, `SampleButtonsDockBand`). No protocol surface.
+- List settings page (`SampleListSettingsPage`). The JS SDK does not yet expose
+  file-path, string-list, file-path-list, or key/value-list setting types.
 - Parameter pages (`SimpleParameterTest`, `ButtonParameterTest`,
   `MixedParamTestPage`) and the create-note list-parameter page. No parameter
   run protocol.

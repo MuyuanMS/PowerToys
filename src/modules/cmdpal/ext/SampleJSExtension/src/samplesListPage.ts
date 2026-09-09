@@ -38,10 +38,12 @@ import { SampleDataTransferPage } from './pages/dataTransferPage.js';
  *
  * The following C# entries are intentionally not mirrored because they rely on
  * capabilities the JS protocol does not yet expose (see README.md):
- *  1. Parameter pages (SimpleParameterTest, ButtonParameterTest, MixedParamTestPage).
- *  2. Create note sample (CreateNoteParametersPage), which needs list parameters.
- *  3. Evil samples (EvilSamplesPage) and issue specific samples, which reproduce
- *    host ABI edge cases from inside the C# process.
+ *  1. List settings sample (SampleListSettingsPage), which needs file-path,
+ *     string-list, file-path-list, and key/value-list setting types.
+ *  2. Parameter pages (SimpleParameterTest, ButtonParameterTest, MixedParamTestPage).
+ *  3. Create note sample (CreateNoteParametersPage), which needs list parameters.
+ *  4. Evil samples (EvilSamplesPage) and issue specific samples, which reproduce
+ *     host ABI edge cases from inside the C# process.
  */
 export class SamplesListPage extends ListPageBase {
   readonly id = 'js-samples-list-page';
