@@ -44,6 +44,7 @@ namespace Peek.UI
         /// </summary>
         private bool _isDeleteInProgress;
         private bool _exitAfterClose;
+        private bool _needsInitialFocusClear;
 
         private IntPtr _keyboardHookHandle;
         private NativeMethods.LowLevelKeyboardProc? _keyboardHookProc;
@@ -214,6 +215,7 @@ namespace Peek.UI
         {
             var bootTime = new System.Diagnostics.Stopwatch();
             bootTime.Start();
+            _needsInitialFocusClear = false;
 
             FilePreviewer.ShowFilePreviewTooltip = Application.Current.GetService<IUserSettings>().ShowFilePreviewTooltip;
 
@@ -232,6 +234,7 @@ namespace Peek.UI
 
             _cachedWindowHandle = new Windows.Win32.Foundation.HWND(this.GetWindowHandle());
             InstallKeyboardHook();
+            _needsInitialFocusClear = true;
 
             bootTime.Stop();
 
@@ -242,6 +245,8 @@ namespace Peek.UI
         {
             try
             {
+                _needsInitialFocusClear = false;
+
                 // Keep teardown best-effort: one failure must not skip later cleanup
                 // or prevent the CLI/-FilePath exit-after-close contract.
                 TryRunUninitializeStep(UninstallKeyboardHook, nameof(UninstallKeyboardHook));
@@ -306,7 +311,11 @@ namespace Peek.UI
 
             this.Show();
             WindowHelpers.BringToForeground(this.GetWindowHandle());
-            TitleBarControl.ClearInitialFocus();
+            if (_needsInitialFocusClear)
+            {
+                _needsInitialFocusClear = false;
+                TitleBarControl.ClearInitialFocus();
+            }
         }
 
         private Size GetMonitorMaxContentSize(Size monitorSize, double scaling)
