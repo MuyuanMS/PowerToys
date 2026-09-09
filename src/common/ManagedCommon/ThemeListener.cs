@@ -34,19 +34,35 @@ namespace ManagedCommon
             var appThemeQuery = new WqlEventQuery(
                 $"SELECT * FROM RegistryValueChangeEvent WHERE Hive='HKEY_USERS' AND " +
                 $"KeyPath='{keyPath}' AND ValueName='{ThemeHelpers.HValueAppTheme}'");
-            appThemeWatcher = new ManagementEventWatcher(appThemeQuery);
-            appThemeWatcher.EventArrived += OnAppThemeRegistryChanged;
-            appThemeWatcher.Start();
+            var newAppThemeWatcher = new ManagementEventWatcher(appThemeQuery);
 
             var systemThemeQuery = new WqlEventQuery(
                 $"SELECT * FROM RegistryValueChangeEvent WHERE Hive='HKEY_USERS' AND " +
                 $"KeyPath='{keyPath}' AND ValueName='{ThemeHelpers.HValueSystemTheme}'");
-            systemThemeWatcher = new ManagementEventWatcher(systemThemeQuery);
-            systemThemeWatcher.EventArrived += OnSystemThemeRegistryChanged;
-            systemThemeWatcher.Start();
+            var newSystemThemeWatcher = new ManagementEventWatcher(systemThemeQuery);
 
-            AppTheme = ThemeHelpers.GetAppTheme();
-            SystemTheme = ThemeHelpers.GetSystemTheme();
+            try
+            {
+                newAppThemeWatcher.EventArrived += OnAppThemeRegistryChanged;
+                newSystemThemeWatcher.EventArrived += OnSystemThemeRegistryChanged;
+
+                newAppThemeWatcher.Start();
+                newSystemThemeWatcher.Start();
+
+                AppTheme = ThemeHelpers.GetAppTheme();
+                SystemTheme = ThemeHelpers.GetSystemTheme();
+
+                appThemeWatcher = newAppThemeWatcher;
+                systemThemeWatcher = newSystemThemeWatcher;
+            }
+            catch
+            {
+                newAppThemeWatcher.EventArrived -= OnAppThemeRegistryChanged;
+                newSystemThemeWatcher.EventArrived -= OnSystemThemeRegistryChanged;
+                newAppThemeWatcher.Dispose();
+                newSystemThemeWatcher.Dispose();
+                throw;
+            }
         }
 
         private void OnAppThemeRegistryChanged(object sender, EventArrivedEventArgs e)

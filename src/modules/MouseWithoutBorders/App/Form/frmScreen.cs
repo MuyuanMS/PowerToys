@@ -730,8 +730,17 @@ namespace MouseWithoutBorders
                 return;
             }
 
-            themeListener = new ManagedCommon.ThemeListener();
-            themeListener.SystemThemeChanged += OnTraySystemThemeChanged;
+            try
+            {
+                ManagedCommon.ThemeListener listener = new();
+                listener.SystemThemeChanged += OnTraySystemThemeChanged;
+                themeListener = listener;
+            }
+            catch (Exception e)
+            {
+                Logger.Log("Theme-adaptive tray icon listener unavailable.");
+                Logger.Log(e);
+            }
         }
 
         internal void RefreshTrayIcon()
