@@ -19,6 +19,28 @@ public sealed class AdaptiveCardSemanticFingerprintTests
     }
 
     [TestMethod]
+    public void DeepMetadataDoesNotExceedFingerprintParseDepth()
+    {
+        var builder = new System.Text.StringBuilder("""{"type":"AdaptiveCard","body":[],"metadata":""");
+        for (var i = 0; i < 80; i++)
+        {
+            builder.Append("""{"nested":""");
+        }
+
+        builder.Append("""{"leaf":"value"}""");
+        for (var i = 0; i < 80; i++)
+        {
+            builder.Append('}');
+        }
+
+        builder.Append('}');
+
+        var fingerprint = AdaptiveCardSemanticFingerprint.Create(builder.ToString());
+
+        Assert.IsFalse(string.IsNullOrWhiteSpace(fingerprint));
+    }
+
+    [TestMethod]
     public void AuthoredTextBlockTextIsPatchable()
     {
         var left = """{"type":"AdaptiveCard","body":[{"type":"TextBlock","text":"old"}]}""";

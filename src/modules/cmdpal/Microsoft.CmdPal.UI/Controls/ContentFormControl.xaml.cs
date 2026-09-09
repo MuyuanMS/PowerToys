@@ -134,6 +134,7 @@ public sealed partial class ContentFormControl : UserControl
         {
             await _cardUpdater.UpdateAsync(card);
             AttachRenderedCard(_cardUpdater.RenderedCard);
+            RefreshAccessibilityNames(_cardUpdater.RenderedCard);
         }
         catch (OperationCanceledException)
         {
@@ -177,6 +178,14 @@ public sealed partial class ContentFormControl : UserControl
     {
         AttachRenderedCard(null);
         _cardUpdater.Reset();
+    }
+
+    private static void RefreshAccessibilityNames(RenderedAdaptiveCard? renderedCard)
+    {
+        if (renderedCard?.FrameworkElement is FrameworkElement root)
+        {
+            FixToggleAccessibilityNames(root);
+        }
     }
 
     private void OnFrameworkElementLayoutUpdated(object? sender, object e)

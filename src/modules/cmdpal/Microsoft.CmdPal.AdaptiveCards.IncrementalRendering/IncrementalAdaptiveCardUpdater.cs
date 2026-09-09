@@ -118,9 +118,22 @@ public sealed partial class IncrementalAdaptiveCardUpdater
         }
 
         var candidateJson = card.ToJson().Stringify();
-        var candidateSnapshot = IncrementalAdaptiveCardVisualTree.Build(
-            candidateRoot,
-            candidateJson);
+        IncrementalTreeSnapshot? candidateSnapshot;
+        try
+        {
+            candidateSnapshot = IncrementalAdaptiveCardVisualTree.Build(
+                candidateRoot,
+                candidateJson);
+        }
+        catch
+        {
+            ReplaceRenderedCard(
+                card,
+                candidate,
+                candidateRoot,
+                snapshot: null);
+            return;
+        }
 
         if (RenderedCard?.FrameworkElement is FrameworkElement currentRoot
             && _snapshot is not null)
@@ -139,10 +152,11 @@ public sealed partial class IncrementalAdaptiveCardUpdater
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        RenderedCard = candidate;
-        Card = card;
-        _snapshot = candidateSnapshot;
-        _host.Child = candidateRoot;
+        ReplaceRenderedCard(
+            card,
+            candidate,
+            candidateRoot,
+            candidateSnapshot);
     }
 
     private void ResetCore()
@@ -153,6 +167,18 @@ public sealed partial class IncrementalAdaptiveCardUpdater
         RenderedCard = null;
         Card = null;
         _snapshot = null;
+    }
+
+    private void ReplaceRenderedCard(
+        AdaptiveCard card,
+        RenderedAdaptiveCard renderedCard,
+        FrameworkElement renderedRoot,
+        IncrementalTreeSnapshot? snapshot)
+    {
+        RenderedCard = renderedCard;
+        Card = card;
+        _snapshot = snapshot;
+        _host.Child = renderedRoot;
     }
 
     private sealed record UpdateRequest(
