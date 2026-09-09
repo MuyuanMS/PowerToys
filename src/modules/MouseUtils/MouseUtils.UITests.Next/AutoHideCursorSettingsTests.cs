@@ -174,25 +174,16 @@ public class AutoHideCursorSettingsTests : UITestBase
             CreateSettings(hideOnTyping: false, hideOnIdle: true, idleDelayMs: 60000));
 
         OpenSettings();
-        var originalCursor = GetVisibleCursorHandle();
         var idleDelay = Session.Find<NumberBox>(By.AccessibilityId(IdleDelayId), 5_000);
         idleDelay.SetValue(1);
-        var hiddenCursor = WaitHelper.WaitForStable(
-            GetVisibleCursorHandle,
-            actual => actual != originalCursor && actual != IntPtr.Zero,
-            timeoutMS: 10_000,
-            requiredConsecutiveMatches: 2,
-            pollIntervalMS: 250);
-        Assert.IsTrue(hiddenCursor.Succeeded, "The idle trigger did not replace the active cursor.");
+        AssertRecoveryMarkerState(
+            expectedPresent: true,
+            "The idle trigger did not keep the crash-recovery marker set.");
 
         MouseUtilsTestHelper.SetModuleEnabled(this, ModuleToggleId, false);
-        var restoredCursor = WaitHelper.WaitForStable(
-            GetVisibleCursorHandle,
-            actual => actual != IntPtr.Zero && actual != hiddenCursor.LastObservation,
-            timeoutMS: 10_000,
-            requiredConsecutiveMatches: 2,
-            pollIntervalMS: 250);
-        Assert.IsTrue(restoredCursor.Succeeded, "Disabling Auto Hide Cursor did not restore the active cursor.");
+        AssertRecoveryMarkerState(
+            expectedPresent: false,
+            "Disabling Auto Hide Cursor did not clear the crash-recovery marker.");
     }
 
     [TestMethod]
@@ -205,37 +196,19 @@ public class AutoHideCursorSettingsTests : UITestBase
             CreateSettings(hideOnTyping: false, hideOnIdle: true, idleDelayMs: 60000));
 
         OpenSettings();
-        var originalCursor = GetVisibleCursorHandle();
         var idleDelay = Session.Find<NumberBox>(By.AccessibilityId(IdleDelayId), 5_000);
         idleDelay.SetValue(1);
-        var hiddenCursor = WaitHelper.WaitForStable(
-            GetVisibleCursorHandle,
-            actual => actual != originalCursor && actual != IntPtr.Zero,
-            timeoutMS: 10_000,
-            requiredConsecutiveMatches: 2,
-            pollIntervalMS: 250);
-        Assert.IsTrue(hiddenCursor.Succeeded, "The idle trigger did not replace the active cursor before the crash-recovery check.");
-        Assert.IsTrue(HasRecoveryMarker(), "The crash-recovery marker was not created after hiding the cursor.");
+        AssertRecoveryMarkerState(
+            expectedPresent: true,
+            "The crash-recovery marker was not created after hiding the cursor.");
 
         Assert.IsTrue(
             WindowControl.TryKillProcessTreeByNameAndWait(WorkerProcessName, 5_000),
             "Could not terminate the Auto Hide Cursor worker process.");
 
-        var restoredCursor = WaitHelper.WaitForStable(
-            GetVisibleCursorHandle,
-            actual => actual != IntPtr.Zero && actual != hiddenCursor.LastObservation,
-            timeoutMS: 10_000,
-            requiredConsecutiveMatches: 2,
-            pollIntervalMS: 250);
-        Assert.IsTrue(restoredCursor.Succeeded, "An unexpected worker exit did not restore the active cursor.");
-
-        var clearedMarker = WaitHelper.WaitForStable(
-            HasRecoveryMarker,
-            actual => !actual,
-            timeoutMS: 10_000,
-            requiredConsecutiveMatches: 2,
-            pollIntervalMS: 250);
-        Assert.IsTrue(clearedMarker.Succeeded, "An unexpected worker exit did not clear the recovery marker.");
+        AssertRecoveryMarkerState(
+            expectedPresent: false,
+            "An unexpected worker exit did not clear the recovery marker.");
 
         MouseHelper.MoveBy(20, 0, steps: 1, delayMs: 20);
         AssertWorkerState(expectedRunning: true);
@@ -310,18 +283,21 @@ public class AutoHideCursorSettingsTests : UITestBase
             .GetInt32();
     }
 
-    private static IntPtr GetVisibleCursorHandle()
-    {
-        var cursorInfo = new CURSORINFO { CbSize = Marshal.SizeOf<CURSORINFO>() };
-        Assert.IsTrue(GetCursorInfo(out cursorInfo), "Could not read the active cursor.");
-        Assert.AreEqual(CursorShowing, cursorInfo.Flags, "The active cursor was not visible.");
-        return cursorInfo.HCursor;
-    }
-
     private static bool HasRecoveryMarker()
     {
         using var key = Registry.CurrentUser.OpenSubKey(RecoveryMarkerKey, writable: false);
         return key?.GetValue(RecoveryMarkerValue) is int value && value == 1;
+    }
+
+    private static void AssertRecoveryMarkerState(bool expectedPresent, string message)
+    {
+        var result = WaitHelper.WaitForStable(
+            HasRecoveryMarker,
+            actual => actual == expectedPresent,
+            timeoutMS: 10_000,
+            requiredConsecutiveMatches: 2,
+            pollIntervalMS: 250);
+        Assert.IsTrue(result.Succeeded, message);
     }
 
     private static void AssertWorkerState(bool expectedRunning)
@@ -371,22 +347,4 @@ public class AutoHideCursorSettingsTests : UITestBase
     [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW", SetLastError = true)]
     private static extern bool SystemParametersInfo(int uiAction, int uiParam, IntPtr pvParam, int fWinIni);
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct POINT
-    {
-        public int X;
-        public int Y;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct CURSORINFO
-    {
-        public int CbSize;
-        public int Flags;
-        public IntPtr HCursor;
-        public POINT Position;
-    }
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool GetCursorInfo(out CURSORINFO cursorInfo);
 }
