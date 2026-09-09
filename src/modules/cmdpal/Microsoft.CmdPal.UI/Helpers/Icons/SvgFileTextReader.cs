@@ -149,18 +149,22 @@ internal static class SvgFileTextReader
         int bytesPerCharacter,
         bool bigEndian)
     {
+        var sawWhitespace = false;
         for (var offset = 0; offset + bytesPerCharacter <= prefix.Length; offset += bytesPerCharacter)
         {
             var codePoint = ReadCodePoint(prefix.Slice(offset, bytesPerCharacter), bigEndian);
             if (IsXmlWhitespace(codePoint))
             {
+                sawWhitespace = true;
                 continue;
             }
 
             return codePoint == '<';
         }
 
-        return false;
+        // A full probe consisting only of encoded XML whitespace still uniquely
+        // identifies the Unicode byte order, even when '<' is beyond the probe.
+        return sawWhitespace;
     }
 
     private static int ReadCodePoint(ReadOnlySpan<byte> bytes, bool bigEndian)

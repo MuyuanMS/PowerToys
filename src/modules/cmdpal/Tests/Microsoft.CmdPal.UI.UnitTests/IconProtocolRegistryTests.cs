@@ -125,18 +125,35 @@ public class IconProtocolRegistryTests
     }
 
     [TestMethod]
-    public void SvgFileProtocolDefersFileIoToAsyncPath()
+    public async Task SvgFileProtocolDefersFileIoToAsyncPath()
     {
-        const string Value = "|ThemedSvg|warning|C:\\Icons\\sample.svg";
-        var processor = IconProtocolRegistry.Find(Value);
+        var path = Path.Combine(Path.GetTempPath(), $"CmdPal-{Guid.NewGuid():N}.svg");
+        try
+        {
+            await File.WriteAllTextAsync(
+                path,
+                "<svg xmlns=\"http://www.w3.org/2000/svg\"><path fill=\"{{AccentColor}}\"/></svg>");
+            var value = $"|ThemedSvg|warning|{path}";
+            var processor = IconProtocolRegistry.Find(value);
 
-        Assert.IsNotNull(processor);
-        Assert.IsFalse(processor.TryPrepareSynchronously(
-            Value,
-            20,
-            ElementTheme.Light,
-            out var preparedIcon));
-        Assert.IsNull(preparedIcon);
+            Assert.IsNotNull(processor);
+            Assert.IsFalse(processor.TryPrepareSynchronously(
+                value,
+                20,
+                ElementTheme.Light,
+                out var synchronousIcon));
+            Assert.IsNull(synchronousIcon);
+
+            using var result = await processor.PrepareAsync(value, 20, ElementTheme.Light);
+            using var preparedIcon = result.TakePreparedIcon();
+            Assert.IsNotNull(preparedIcon);
+            Assert.AreEqual(IconPathConverter.PreparedIconKind.SvgData, preparedIcon.Kind);
+            Assert.AreEqual(20, preparedIcon.TargetSize);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [DataTestMethod]
