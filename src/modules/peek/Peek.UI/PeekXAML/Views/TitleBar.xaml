@@ -73,7 +73,7 @@
             Width="0"
             Height="0"
             AutomationProperties.AccessibilityView="Raw"
-            IsTabStop="True"
+            IsTabStop="False"
             UseSystemFocusVisuals="False" />
 
         <Button

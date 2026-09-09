@@ -306,6 +306,7 @@ namespace Peek.UI
 
             this.Show();
             WindowHelpers.BringToForeground(this.GetWindowHandle());
+            TitleBarControl.ClearInitialFocus();
         }
 
         private Size GetMonitorMaxContentSize(Size monitorSize, double scaling)
@@ -441,9 +442,15 @@ namespace Peek.UI
                         return NativeMethods.CallNextHookEx(_keyboardHookHandle, nCode, wParam, lParam);
                     }
 
-                    bool ctrlPressed = (NativeMethods.GetAsyncKeyState(VK_CONTROL) & KEY_PRESSED_MASK) != 0;
                     bool altPressed = (hookStruct.flags & LLKHF_ALTDOWN) != 0 ||
                                       (NativeMethods.GetAsyncKeyState(VK_ALT) & KEY_PRESSED_MASK) != 0;
+
+                    if (!altPressed && (hookStruct.vkCode == VK_LEFT || hookStruct.vkCode == VK_RIGHT))
+                    {
+                        return NativeMethods.CallNextHookEx(_keyboardHookHandle, nCode, wParam, lParam);
+                    }
+
+                    bool ctrlPressed = (NativeMethods.GetAsyncKeyState(VK_CONTROL) & KEY_PRESSED_MASK) != 0;
                     bool shiftPressed = (NativeMethods.GetAsyncKeyState(VK_SHIFT) & KEY_PRESSED_MASK) != 0;
                     bool winPressed = (NativeMethods.GetAsyncKeyState(VK_LWIN) & KEY_PRESSED_MASK) != 0 ||
                                       (NativeMethods.GetAsyncKeyState(VK_RWIN) & KEY_PRESSED_MASK) != 0;

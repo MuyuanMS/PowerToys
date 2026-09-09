@@ -128,6 +128,11 @@ namespace Peek.UI.Views
             }
         }
 
+        public void ClearInitialFocus()
+        {
+            FocusSink.Focus(FocusState.Programmatic);
+        }
+
         public Visibility IsLaunchDefaultAppButtonVisible(string appName)
         {
             return string.IsNullOrEmpty(appName) ? Visibility.Collapsed : Visibility.Visible;
