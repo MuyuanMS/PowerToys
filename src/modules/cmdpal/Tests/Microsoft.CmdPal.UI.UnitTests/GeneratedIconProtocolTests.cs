@@ -265,6 +265,20 @@ public class GeneratedIconProtocolTests
         Assert.IsNull(root.Element(SvgName("path")));
     }
 
+    [TestMethod]
+    public void ProductionInitialsRendererEmitsVectorPathForAsciiGlyph()
+    {
+        Assert.IsTrue(
+            GeneratedIconProtocol.TryCreateInitialsSvg(
+                "|Initials|A|#0067C0|circle|",
+                ElementTheme.Light,
+                out var svg));
+
+        var path = ParseSvg(svg).Element(SvgName("path"));
+        Assert.IsNotNull(path);
+        Assert.IsFalse(string.IsNullOrEmpty(path.Attribute("d")?.Value));
+    }
+
     [DataTestMethod]
     [DataRow(null)]
     [DataRow("")]

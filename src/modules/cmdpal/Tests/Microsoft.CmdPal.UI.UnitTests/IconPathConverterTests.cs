@@ -79,6 +79,11 @@ public class IconPathConverterTests
         using var svgUri = IconPathConverter.PreparedIcon.FromUri(new Uri("ms-appx:///Assets/icon.svg"), isSvg: true, targetSize: 20);
         Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(svgUri));
 
+        using var svgData = IconPathConverter.PreparedIcon.FromSvgData([0x3C], 20);
+        Assert.IsFalse(IconPathConverter.TryCreateIconSourceSynchronously(svgData, out var svgDataSource));
+        Assert.IsNull(svgDataSource);
+        Assert.IsTrue(IconPathConverter.RequiresAsynchronousMaterialization(svgData));
+
         using var glyph = IconPathConverter.PreparedIcon.FromGlyph("\uE700", "Segoe Fluent Icons", targetSize: 20);
         Assert.IsFalse(IconPathConverter.RequiresAsynchronousMaterialization(glyph));
 
