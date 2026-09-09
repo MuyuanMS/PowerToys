@@ -226,9 +226,12 @@ namespace Peek.FilePreviewer.Previewers
             }
         }
 
+        internal virtual Task<string> GetContentTypeAsync(IFileSystemItem item, CancellationToken cancellationToken) =>
+            Task.Run(item.GetContentTypeAsync, cancellationToken);
+
         private async Task LoadDisplayInfoAsync(IFileSystemItem item, IProgress<FolderScanProgress> sizeProgress, CancellationToken cancellationToken)
         {
-            string type = await Task.Run(item.GetContentTypeAsync, cancellationToken);
+            string type = await GetContentTypeAsync(item, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 

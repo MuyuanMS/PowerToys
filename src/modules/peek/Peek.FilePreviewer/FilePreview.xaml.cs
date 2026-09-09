@@ -634,35 +634,42 @@ namespace Peek.FilePreviewer
                 return;
             }
 
-            if (Item == null)
+            var currentItem = Item;
+            if (currentItem == null)
             {
                 return;
             }
 
             // Fetch and format available file properties
-            string fileNameFormatted = ResourceLoaderInstance.FormatString("PreviewTooltip_FileName", Item.Name);
+            string fileNameFormatted = ResourceLoaderInstance.FormatString("PreviewTooltip_FileName", currentItem.Name);
             var sb = new StringBuilder(fileNameFormatted, 256);
 
             cancellationToken.ThrowIfCancellationRequested();
-            string fileType = await Task.Run(Item.GetContentTypeAsync);
+            string fileType = await Task.Run(currentItem.GetContentTypeAsync);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!ReferenceEquals(currentItem, Item))
+            {
+                return;
+            }
+
             string fileTypeFormatted = string.IsNullOrEmpty(fileType)
                 ? string.Empty
                 : "\n" + ResourceLoaderInstance.FormatString("PreviewTooltip_FileType", fileType);
             sb.Append(fileTypeFormatted);
 
-            string dateModified = Item.DateModified?.ToString(CultureInfo.CurrentCulture) ?? string.Empty;
+            string dateModified = currentItem.DateModified?.ToString(CultureInfo.CurrentCulture) ?? string.Empty;
             string dateModifiedFormatted = string.IsNullOrEmpty(dateModified)
                 ? string.Empty
                 : "\n" + ResourceLoaderInstance.FormatString("PreviewTooltip_DateModified", dateModified);
             sb.Append(dateModifiedFormatted);
 
-            string fileSize = ReadableStringHelper.BytesToReadableString(Item.FileSizeBytes);
+            string fileSize = ReadableStringHelper.BytesToReadableString(currentItem.FileSizeBytes);
             string fileSizeFormatted = string.IsNullOrEmpty(fileSize)
                 ? string.Empty
                 : "\n" + ResourceLoaderInstance.FormatString("PreviewTooltip_FileSize", fileSize);
             sb.Append(fileSizeFormatted);
 
-            if (!ShowFilePreviewTooltip)
+            if (!ShowFilePreviewTooltip || !ReferenceEquals(currentItem, Item))
             {
                 return;
             }

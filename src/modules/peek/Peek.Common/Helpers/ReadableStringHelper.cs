@@ -92,7 +92,7 @@ namespace Peek.Common.Helpers
                     ResourceLoaderInstance.GetString("UnsupportedFile_FolderContains_Incomplete"));
             }
 
-            return ResourceLoaderInstance.FormatString("UnsupportedFile_FolderContains", contents);
+            return contents;
         }
 
         private static int GetPrecision(int index, double number)
