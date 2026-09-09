@@ -37,7 +37,7 @@ function detachLauncher(child: ChildProcess): void {
  */
 export const openUrlInDefaultBrowser: UrlOpener = (url) => {
   if (url.includes('"') || hasControlCharacters(url)) {
-    throw new Error(`Refusing to open a URL with quote or control characters: ${url}`);
+    throw new Error('Refusing to open a URL with quote or control characters.');
   }
 
   if (process.platform === 'win32') {

@@ -57,6 +57,8 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
   let finalized = false;
   let inputStopped = false;
   let disposeTimeoutMs = DEFAULT_DISPOSE_TIMEOUT_MS;
+  let seenIncomingMessage = false;
+  let pendingFatalCode: number | null = null;
 
   const writeMessage = (message: JsonRpcMessage): void => {
     stdout.writeRaw(encodeMessage(message));
@@ -96,7 +98,10 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
       void chain.then(() => finalize(0));
     },
     reportFatal: (code: number) => {
-      void chain.then(() => finalize(code));
+      pendingFatalCode = code;
+      if (seenIncomingMessage) {
+        void chain.then(() => finalize(code));
+      }
     },
   });
 
@@ -112,6 +117,7 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
   );
 
   const enqueue = (message: unknown): void => {
+    seenIncomingMessage = true;
     chain = chain
       .then(async () => {
         if (isRequest(message)) {
@@ -137,6 +143,13 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
       })
       .catch((error: unknown) => {
         process.stderr.write(`cmdpal-sdk: message handling failed: ${describeError(error)}\n`);
+      })
+      .finally(() => {
+        if (pendingFatalCode !== null && seenIncomingMessage && !finalized) {
+          const code = pendingFatalCode;
+          pendingFatalCode = null;
+          void finalize(code);
+        }
       });
   };
 
@@ -171,7 +184,9 @@ export function startJsonRpcServer(factory: ProviderFactory): void {
   });
 
   process.stdin.on('end', () => {
-    void chain.then(() => finalize(0));
+    const code = pendingFatalCode ?? 0;
+    pendingFatalCode = null;
+    void chain.then(() => finalize(code));
   });
 }
 

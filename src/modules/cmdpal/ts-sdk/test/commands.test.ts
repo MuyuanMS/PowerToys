@@ -5,6 +5,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { NoOpCommand, OpenUrlCommand, CopyTextCommand } from '../src/index.js';
 import { serializeCommandResult } from '../src/runtime/commandResult.js';
+import { openUrlInDefaultBrowser } from '../src/runtime/openUrl.js';
 
 describe('NoOpCommand', () => {
   it('keeps the palette open', () => {
@@ -52,6 +53,15 @@ describe('OpenUrlCommand', () => {
 
     expect(first.id).toBe(same.id);
     expect(first.id).not.toBe(different.id);
+  });
+
+  it('does not echo an unsafe URL back in the thrown error message', () => {
+    const url = 'https://example.com/?token=secret"';
+
+    expect(() => openUrlInDefaultBrowser(url)).toThrow(
+      'Refusing to open a URL with quote or control characters.',
+    );
+    expect(() => openUrlInDefaultBrowser(url)).not.toThrow(url);
   });
 });
 
