@@ -90,7 +90,11 @@ public partial class CommandItemViewModelLifecycleTests
 
         public Action? ReadCommand { get; set; }
 
+        public Action? ReadMoreCommands { get; set; }
+
         public ICommand? CommandValue { get; set; }
+
+        public IContextItem[] MoreCommandsValue { get; set; } = [];
 
         public ICommand? Command
         {
@@ -101,7 +105,14 @@ public partial class CommandItemViewModelLifecycleTests
             }
         }
 
-        public IContextItem[] MoreCommands => [];
+        public IContextItem[] MoreCommands
+        {
+            get
+            {
+                ReadMoreCommands?.Invoke();
+                return MoreCommandsValue;
+            }
+        }
 
         public IIconInfo? Icon
         {

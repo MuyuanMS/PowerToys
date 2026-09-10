@@ -120,16 +120,38 @@ public partial class ListItemViewModel : CommandItemViewModel
         }
 
         var extensionDetails = model.Details;
-        if (extensionDetails is not null)
+        var details = extensionDetails is not null ? new DetailsViewModel(extensionDetails, PageContext) : null;
+        details?.InitializeProperties();
+
+        DetailsViewModel? replacedDetails = null;
+        var detailsPublished = false;
+        lock (MoreCommandsLock)
         {
-            Details = new(extensionDetails, PageContext);
-            Details.InitializeProperties();
-            UpdateProperty(nameof(Details), nameof(HasDetails));
+            if (!IsCleanedUp)
+            {
+                replacedDetails = Details;
+                Details = details;
+                detailsPublished = true;
+            }
         }
 
+        if (!detailsPublished)
+        {
+            details?.SafeCleanup();
+            return;
+        }
+
+        replacedDetails?.SafeCleanup();
+        UpdateProperty(nameof(Details), nameof(HasDetails));
         AddShowDetailsCommands();
 
-        TextToSuggest = model.TextToSuggest;
+        var textToSuggest = model.TextToSuggest;
+        if (IsCleanedUp)
+        {
+            return;
+        }
+
+        TextToSuggest = textToSuggest;
         UpdateProperty(nameof(TextToSuggest));
     }
 
@@ -162,10 +184,28 @@ public partial class ListItemViewModel : CommandItemViewModel
                 UpdateProperty(nameof(Type), nameof(IsInteractive));
                 break;
             case nameof(Details):
-                var existingReference = Details;
                 var extensionDetails = model.Details;
-                Details = extensionDetails is not null ? new(extensionDetails, PageContext) : null;
-                Details?.InitializeProperties();
+                var details = extensionDetails is not null ? new DetailsViewModel(extensionDetails, PageContext) : null;
+                details?.InitializeProperties();
+
+                DetailsViewModel? existingReference = null;
+                var detailsPublished = false;
+                lock (MoreCommandsLock)
+                {
+                    if (!IsCleanedUp)
+                    {
+                        existingReference = Details;
+                        Details = details;
+                        detailsPublished = true;
+                    }
+                }
+
+                if (!detailsPublished)
+                {
+                    details?.SafeCleanup();
+                    return;
+                }
+
                 UpdateProperty(nameof(Details), nameof(HasDetails));
                 UpdateShowDetailsCommand();
                 existingReference?.SafeCleanup();
@@ -201,32 +241,40 @@ public partial class ListItemViewModel : CommandItemViewModel
     {
         // If the parent page has ShowDetails = false and we have details,
         // then we should add a show details action in the context menu.
-        if (HasDetails &&
+        var details = Details;
+        if (details is not null &&
             PageContext.TryGetTarget(out var pageContext) &&
             pageContext is ListViewModel listViewModel &&
             !listViewModel.ShowDetails)
         {
+            var showDetailsCommand = new ShowDetailsCommand(details);
+            var showDetailsContextItem = new CommandContextItem(showDetailsCommand)
+            {
+                Icon = showDetailsCommand.Icon,
+            };
+            var showDetailsContextItemViewModel = new CommandContextItemViewModel(showDetailsContextItem, PageContext);
+            showDetailsContextItemViewModel.SlowInitializeProperties();
+
             var addedCommand = false;
             lock (MoreCommandsLock)
             {
                 // Check if "Show Details" action already exists to prevent duplicates
-                if (!UnsafeMoreCommands.Any(cmd => cmd is CommandContextItemViewModel contextItemViewModel &&
-                                                  contextItemViewModel.Command.Id == ShowDetailsCommand.ShowDetailsCommandId))
+                if (!IsCleanedUp &&
+                    ReferenceEquals(details, Details) &&
+                    !UnsafeMoreCommands.Any(cmd => cmd is CommandContextItemViewModel contextItemViewModel &&
+                                                   contextItemViewModel.Command.Id == ShowDetailsCommand.ShowDetailsCommandId))
                 {
-                    var showDetailsCommand = new ShowDetailsCommand(Details);
-                    var showDetailsContextItem = new CommandContextItem(showDetailsCommand)
-                    {
-                        Icon = showDetailsCommand.Icon,
-                    };
-                    var showDetailsContextItemViewModel = new CommandContextItemViewModel(showDetailsContextItem, PageContext);
-                    showDetailsContextItemViewModel.SlowInitializeProperties();
                     UnsafeMoreCommands.Add(showDetailsContextItemViewModel);
                     RefreshMoreCommandStateUnsafe();
                     addedCommand = true;
                 }
             }
 
-            if (addedCommand)
+            if (!addedCommand)
+            {
+                showDetailsContextItemViewModel.SafeCleanup();
+            }
+            else
             {
                 UpdateProperty(nameof(MoreCommands), nameof(AllCommands));
                 UpdateProperty(nameof(SecondaryCommand), nameof(SecondaryCommandName), nameof(HasMoreCommands));
@@ -240,32 +288,45 @@ public partial class ListItemViewModel : CommandItemViewModel
     {
         // If the parent page has ShowDetails = false and we have details,
         // then we should add a show details action in the context menu.
-        if (HasDetails &&
+        var details = Details;
+        if (details is not null &&
             PageContext.TryGetTarget(out var pageContext) &&
             pageContext is ListViewModel listViewModel &&
             !listViewModel.ShowDetails)
         {
+            var showDetailsCommand = new ShowDetailsCommand(details);
+            var showDetailsContextItem = new CommandContextItem(showDetailsCommand)
+            {
+                Icon = showDetailsCommand.Icon,
+            };
+            var showDetailsContextItemViewModel = new CommandContextItemViewModel(showDetailsContextItem, PageContext);
+            showDetailsContextItemViewModel.SlowInitializeProperties();
+
             CommandContextItemViewModel? oldCommand = null;
+            var published = false;
             lock (MoreCommandsLock)
             {
-                oldCommand = UnsafeMoreCommands
-                    .OfType<CommandContextItemViewModel>()
-                    .FirstOrDefault(contextItemViewModel => contextItemViewModel.Command.Id == ShowDetailsCommand.ShowDetailsCommandId);
-
-                if (oldCommand is not null)
+                if (!IsCleanedUp && ReferenceEquals(details, Details))
                 {
-                    UnsafeMoreCommands.Remove(oldCommand);
+                    oldCommand = UnsafeMoreCommands
+                        .OfType<CommandContextItemViewModel>()
+                        .FirstOrDefault(contextItemViewModel => contextItemViewModel.Command.Id == ShowDetailsCommand.ShowDetailsCommandId);
+
+                    if (oldCommand is not null)
+                    {
+                        UnsafeMoreCommands.Remove(oldCommand);
+                    }
+
+                    UnsafeMoreCommands.Add(showDetailsContextItemViewModel);
+                    RefreshMoreCommandStateUnsafe();
+                    published = true;
                 }
+            }
 
-                var showDetailsCommand = new ShowDetailsCommand(Details);
-                var showDetailsContextItem = new CommandContextItem(showDetailsCommand)
-                {
-                    Icon = showDetailsCommand.Icon,
-                };
-                var showDetailsContextItemViewModel = new CommandContextItemViewModel(showDetailsContextItem, PageContext);
-                showDetailsContextItemViewModel.SlowInitializeProperties();
-                UnsafeMoreCommands.Add(showDetailsContextItemViewModel);
-                RefreshMoreCommandStateUnsafe();
+            if (!published)
+            {
+                showDetailsContextItemViewModel.SafeCleanup();
+                return;
             }
 
             oldCommand?.SafeCleanup();

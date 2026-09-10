@@ -674,7 +674,7 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
     private void BuildAndInitMoreCommands()
     {
         var model = _commandItemModel.Unsafe;
-        if (model is null)
+        if (model is null || IsCleanedUp)
         {
             return;
         }
@@ -686,8 +686,15 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
         List<IContextItemViewModel>? freedItems;
         lock (_moreCommandsLock)
         {
-            ListHelpers.InPlaceUpdateList(_moreCommands, results, out freedItems);
-            RefreshMoreCommandStateUnsafe();
+            if (IsCleanedUp)
+            {
+                freedItems = results;
+            }
+            else
+            {
+                ListHelpers.InPlaceUpdateList(_moreCommands, results, out freedItems);
+                RefreshMoreCommandStateUnsafe();
+            }
         }
 
         freedItems.OfType<CommandContextItemViewModel>()

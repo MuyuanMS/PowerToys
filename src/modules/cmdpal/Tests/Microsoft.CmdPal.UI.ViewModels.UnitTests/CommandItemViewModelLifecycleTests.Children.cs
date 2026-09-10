@@ -16,9 +16,22 @@ public partial class CommandItemViewModelLifecycleTests
     {
         public Action? ReadIcon { get; set; }
 
+        public Action? ReadName { get; set; }
+
+        private string _name = string.Empty;
+
         public string Id => "test.command";
 
-        public string Name { get; set; } = string.Empty;
+        public string Name
+        {
+            get
+            {
+                ReadName?.Invoke();
+                return _name;
+            }
+
+            set => _name = value;
+        }
 
         public IIconInfo? Icon
         {
@@ -34,6 +47,10 @@ public partial class CommandItemViewModelLifecycleTests
     {
         public Action? ReadDerivedProperty { get; set; }
 
+        public Action? ReadDetails { get; set; }
+
+        public IDetails? DetailsValue { get; set; }
+
         public ITag[] Tags
         {
             get
@@ -47,14 +64,25 @@ public partial class CommandItemViewModelLifecycleTests
         {
             get
             {
-                ReadDerivedProperty?.Invoke();
-                return null;
+                (ReadDetails ?? ReadDerivedProperty)?.Invoke();
+                return DetailsValue;
             }
         }
 
         public string Section => string.Empty;
 
         public string TextToSuggest => string.Empty;
+    }
+
+    private sealed partial class TestDetails : TestObservable, IDetails
+    {
+        public IIconInfo HeroImage => new IconInfo(string.Empty);
+
+        public string Title => "Details";
+
+        public string Body => string.Empty;
+
+        public IDetailsElement[] Metadata => [];
     }
 
     private sealed partial class TestContextItem : TestCommandItem, ICommandContextItem
@@ -235,10 +263,47 @@ public partial class CommandItemViewModelLifecycleTests
         var item = new TestCommandItem { CommandValue = command };
         var viewModel = new CommandItemViewModel(new(item), new(context), null);
 
-        await RunWithCleanup(viewModel, viewModel.FastInitializeProperties, block => command.BeforeSubscribe = block);
+        await RunWithCleanup(viewModel, viewModel.FastInitializeProperties, block => command.ReadName = block);
 
         Assert.AreEqual(0, viewModel.AllCommands.Count);
         Assert.AreEqual(0, command.CountSubscribers<CommandViewModel>());
+        GC.KeepAlive(context);
+    }
+
+    [TestMethod]
+    public async Task CleanupDuringMoreCommandsGetter_DoesNotPublishInitializedChildren()
+    {
+        var context = new TestPageContext();
+        var childCommand = new TestCommand { Name = "Child" };
+        var childItem = new TestContextItem { CommandValue = childCommand };
+        var item = new TestCommandItem
+        {
+            MoreCommandsValue = [childItem],
+        };
+        var viewModel = new CommandItemViewModel(new(item), new(context), null);
+        viewModel.InitializeProperties();
+
+        await RunWithCleanup(viewModel, viewModel.SlowInitializeProperties, block => item.ReadMoreCommands = block);
+
+        Assert.AreEqual(0, viewModel.AllCommands.Count);
+        Assert.AreEqual(0, childItem.SubscriberCount);
+        Assert.AreEqual(0, childCommand.SubscriberCount);
+        GC.KeepAlive(context);
+    }
+
+    [TestMethod]
+    public async Task CleanupDuringDetailsGetter_DoesNotPublishInitializedDetails()
+    {
+        var context = new TestPageContext();
+        var details = new TestDetails();
+        var item = new TestListItem { DetailsValue = details };
+        var viewModel = new ListItemViewModel(item, new(context), DefaultContextMenuFactory.Instance);
+        viewModel.InitializeProperties();
+
+        await RunWithCleanup(viewModel, viewModel.SlowInitializeProperties, block => item.ReadDetails = block);
+
+        Assert.IsNull(viewModel.Details);
+        Assert.AreEqual(0, details.SubscriberCount);
         GC.KeepAlive(context);
     }
 
