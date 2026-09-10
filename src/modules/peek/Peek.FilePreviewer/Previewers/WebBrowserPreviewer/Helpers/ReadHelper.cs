@@ -2,8 +2,10 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 using UtfUnknown;
@@ -12,19 +14,58 @@ namespace Peek.FilePreviewer.Previewers
 {
     public static class ReadHelper
     {
-        public static async Task<string> Read(string path)
-        {
-            DetectionResult result = CharsetDetector.DetectFromFile(path);
-            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        // Fallback cap used when the caller doesn't pass an explicit limit. Content read here is later
+        // base64-encoded, embedded in a temp HTML file, and decoded by WebView2, so an unbounded read
+        // can cause a large memory spike. The user-configurable limit lives in Peek preview settings.
+        public const long MaxReadableFileSizeBytes = 10 * 1024 * 1024; // 10 MB
 
-            // Check if the detected encoding is not null; otherwise, default to UTF-8
-            Encoding encodingToUse = result.Detected?.Encoding ?? Encoding.UTF8;
+        public static async Task<string> Read(string path, long maxReadableFileSizeBytes = MaxReadableFileSizeBytes, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
 
             using var fs = OpenReadOnly(path);
-            using var sr = new StreamReader(fs, encodingToUse);
+            if (fs.Length > maxReadableFileSizeBytes)
+            {
+                throw new InvalidOperationException($"File '{path}' exceeds the maximum previewable size of {maxReadableFileSizeBytes} bytes.");
+            }
 
-            string content = await sr.ReadToEndAsync();
-            return content;
+            int sampleSize = (int)Math.Min(fs.Length, TextFileHelper.SampleSize);
+            var sample = new byte[sampleSize];
+            int sampleRead = await fs.ReadAtLeastAsync(sample, sampleSize, throwOnEndOfStream: false, cancellationToken).ConfigureAwait(false);
+            Encoding? bomlessUnicodeEncoding = TextFileHelper.TryDetectBomlessUnicodeEncoding(sample, sampleRead);
+            fs.Position = 0;
+
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            Encoding encodingToUse;
+            if (bomlessUnicodeEncoding != null)
+            {
+                encodingToUse = bomlessUnicodeEncoding;
+            }
+            else
+            {
+                DetectionResult result = await CharsetDetector.DetectFromStreamAsync(fs, maxReadableFileSizeBytes, cancellationToken).ConfigureAwait(false);
+                encodingToUse = result.Detected?.Encoding ?? Encoding.UTF8;
+            }
+
+            // Rewind and decode in chunks to keep stream I/O bounded by the buffer size. The returned text is still
+            // accumulated in memory for Monaco, so the configured size cap limits the total allocation. StreamReader
+            // strips a byte order mark rather than surfacing it as a leading U+FEFF character.
+            fs.Position = 0;
+            using var sr = new StreamReader(fs, encodingToUse, detectEncodingFromByteOrderMarks: true, bufferSize: 1024, leaveOpen: true);
+            var buffer = new char[81920];
+            var content = new StringBuilder();
+            int charsRead;
+            while ((charsRead = await sr.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false)) > 0)
+            {
+                content.Append(buffer, 0, charsRead);
+
+                if (fs.Position > maxReadableFileSizeBytes)
+                {
+                    throw new InvalidOperationException($"File '{path}' exceeds the maximum previewable size of {maxReadableFileSizeBytes} bytes.");
+                }
+            }
+
+            return content.ToString();
         }
 
         public static FileStream OpenReadOnly(string path)

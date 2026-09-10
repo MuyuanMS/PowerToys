@@ -32,6 +32,8 @@ namespace Peek.FilePreviewer.Models
 
         public bool SourceCodeMinimap { get; private set; }
 
+        public long SourceCodeMaxFileSizeBytes { get; private set; }
+
         public PreviewSettings()
         {
             _settingsUtils = SettingsUtils.Default;
@@ -40,6 +42,7 @@ namespace Peek.FilePreviewer.Models
             SourceCodeFontSize = 14;
             SourceCodeStickyScroll = true;
             SourceCodeMinimap = false;
+            SourceCodeMaxFileSizeBytes = GetSourceCodeMaxFileSizeBytes(PeekPreviewSettings.DefaultSourceCodeMaxFileSize);
 
             LoadSettingsFromJson();
 
@@ -74,6 +77,7 @@ namespace Peek.FilePreviewer.Models
                             SourceCodeFontSize = settings.SourceCodeFontSize.Value;
                             SourceCodeStickyScroll = settings.SourceCodeStickyScroll.Value;
                             SourceCodeMinimap = settings.SourceCodeMinimap.Value;
+                            SourceCodeMaxFileSizeBytes = GetSourceCodeMaxFileSizeBytes(settings.SourceCodeMaxFileSize.Value);
                         }
 
                         retry = false;
@@ -97,6 +101,16 @@ namespace Peek.FilePreviewer.Models
                     }
                 }
             }
+        }
+
+        internal static long GetSourceCodeMaxFileSizeBytes(int sizeInKilobytes)
+        {
+            int clampedSize = Math.Clamp(
+                sizeInKilobytes,
+                PeekPreviewSettings.MinSourceCodeMaxFileSize,
+                PeekPreviewSettings.MaxSourceCodeMaxFileSize);
+
+            return (long)clampedSize * 1024;
         }
     }
 }
