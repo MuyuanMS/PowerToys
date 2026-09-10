@@ -20,6 +20,7 @@
 #include <windows.h>
 #include <dbt.h>
 #include <sstream>
+#include <winrt/Windows.Devices.Haptics.h>
 #include "resource.h"
 #include "CursorWrapCore.h"
 
@@ -56,6 +57,7 @@ namespace
     const wchar_t JSON_KEY_WRAP_MODE[] = L"wrap_mode";
     const wchar_t JSON_KEY_ACTIVATION_MODE[] = L"activation_mode";
     const wchar_t JSON_KEY_DISABLE_ON_SINGLE_MONITOR[] = L"disable_cursor_wrap_on_single_monitor";
+    const wchar_t HAPTIC_INPUT_WINDOW_CLASS[] = L"CursorWrapHapticInputWindow";
 }
 
 // The PowerToy name that will be shown in the settings.
@@ -106,7 +108,15 @@ private:
     HWND m_messageWindow = nullptr;
     HDEVNOTIFY m_deviceNotify = nullptr;
     static constexpr UINT_PTR TIMER_UPDATE_MONITORS = 1;
+    static constexpr UINT_PTR TIMER_HAPTIC_INPUT_TIMEOUT = 2;
     static constexpr UINT DEBOUNCE_DELAY_MS = 500;
+    static constexpr UINT HAPTIC_INPUT_TIMEOUT_MS = 100;
+
+    winrt::Windows::Devices::Haptics::InputHapticsManager m_inputHapticsManager{ nullptr };
+    bool m_hapticDevicePresent = false;
+    HWND m_hapticInputWindow = nullptr;
+    POINT m_pendingWrapDestination{};
+    bool m_hasPendingWrap = false;
 
 public:
     // Constructor
@@ -209,6 +219,18 @@ public:
             m_listening = true;
             m_eventThread = std::thread([this]() {
                 HANDLE handles[2] = { m_triggerEventHandle, m_terminateEventHandle };
+                bool apartmentInitialized = false;
+
+                try
+                {
+                    winrt::init_apartment(winrt::apartment_type::multi_threaded);
+                    apartmentInitialized = true;
+                    RefreshHaptics();
+                }
+                catch (const winrt::hresult_error& error)
+                {
+                    Logger::warn(L"CursorWrap haptics initialization failed: {}", error.message());
+                }
 
                 // WH_MOUSE_LL callbacks are delivered to the thread that installed the hook.
                 // Ensure this thread has a message queue and pumps messages while the hook is active.
@@ -259,6 +281,12 @@ public:
                 UnregisterDisplayChanges();
 
                 StopMouseHook();
+                m_inputHapticsManager = nullptr;
+                m_hapticDevicePresent = false;
+                if (apartmentInitialized)
+                {
+                    winrt::uninit_apartment();
+                }
                 Logger::info("CursorWrap event listener stopped");
             });
         }
@@ -336,10 +364,219 @@ public:
         OutputDebugStringW(L"[CursorWrap] Display configuration changed, updating monitor topology\n");
 #endif
         Logger::info("Display configuration changed, updating monitor topology");
+        CancelPendingHapticWrap();
         m_core.UpdateMonitorInfo();
+        RefreshHaptics();
     }
 
 private:
+    void RefreshHaptics()
+    {
+        using namespace winrt::Windows::Devices::Haptics;
+
+        m_inputHapticsManager = nullptr;
+        m_hapticDevicePresent = false;
+
+        try
+        {
+            auto statics = winrt::try_get_activation_factory<InputHapticsManager, IInputHapticsManagerStatics>();
+            if (!statics)
+            {
+                Logger::info("CursorWrap haptic feedback API is unavailable");
+                CancelPendingHapticWrap();
+                return;
+            }
+
+            const bool isSupported = statics.IsSupported();
+            const bool isHapticDevicePresent = isSupported && statics.IsHapticDevicePresent();
+            Logger::info(
+                "CursorWrap haptic feedback status: API supported={}, haptic device present={}",
+                isSupported,
+                isHapticDevicePresent);
+
+            if (!isSupported)
+            {
+                CancelPendingHapticWrap();
+                return;
+            }
+
+            m_inputHapticsManager = statics.GetForCurrentThread();
+            m_hapticDevicePresent = isHapticDevicePresent;
+        }
+        catch (const winrt::hresult_error& error)
+        {
+            Logger::warn(L"CursorWrap haptics initialization failed: {}", error.message());
+        }
+
+        if (!m_hapticDevicePresent)
+        {
+            CancelPendingHapticWrap();
+        }
+    }
+
+    void PlayWrapHaptic()
+    {
+        using namespace winrt::Windows::Devices::Haptics;
+
+        if (!m_inputHapticsManager)
+        {
+            return;
+        }
+
+        try
+        {
+#ifdef _DEBUG
+            const auto deviceType = m_inputHapticsManager.CurrentHapticsControllerDeviceType();
+            const bool hasController = m_inputHapticsManager.CurrentHapticsController() != nullptr;
+            Logger::info(
+                "CursorWrap current haptic input: device type={}, controller={}",
+                static_cast<int>(deviceType),
+                hasController);
+#endif
+            [[maybe_unused]] const bool feedbackSent = m_inputHapticsManager.TrySendHapticWaveform(
+                KnownSimpleHapticsControllerWaveforms::Grow(),
+                0);
+#ifdef _DEBUG
+            Logger::info("CursorWrap haptic feedback sent={}", feedbackSent);
+#endif
+        }
+        catch (const winrt::hresult_error& error)
+        {
+            Logger::warn(L"CursorWrap failed to play haptic feedback: {}", error.message());
+            m_inputHapticsManager = nullptr;
+            m_hapticDevicePresent = false;
+        }
+    }
+
+    bool TryDeferWrapToHapticEdgeWindow(const POINT& currentPos, const POINT& destination)
+    {
+        if (!m_hapticDevicePresent || !RegisterHapticInputWindow())
+        {
+            return false;
+        }
+
+        if (!SetWindowPos(
+                m_hapticInputWindow,
+                HWND_TOPMOST,
+                currentPos.x,
+                currentPos.y,
+                1,
+                1,
+                SWP_NOACTIVATE | SWP_SHOWWINDOW))
+        {
+            return false;
+        }
+
+        if (WindowFromPoint(currentPos) != m_hapticInputWindow)
+        {
+            ShowWindow(m_hapticInputWindow, SW_HIDE);
+            return false;
+        }
+
+        m_pendingWrapDestination = destination;
+        m_hasPendingWrap = true;
+        if (!SetTimer(m_hapticInputWindow, TIMER_HAPTIC_INPUT_TIMEOUT, HAPTIC_INPUT_TIMEOUT_MS, nullptr))
+        {
+            CancelPendingHapticWrap();
+            return false;
+        }
+
+        return true;
+    }
+
+    void CompletePendingHapticWrap()
+    {
+        if (!m_hasPendingWrap)
+        {
+            return;
+        }
+
+        const POINT destination = m_pendingWrapDestination;
+        CancelPendingHapticWrap();
+        if (SetCursorPos(destination.x, destination.y))
+        {
+            PlayWrapHaptic();
+        }
+    }
+
+    void CancelPendingHapticWrap()
+    {
+        m_hasPendingWrap = false;
+        if (m_hapticInputWindow)
+        {
+            KillTimer(m_hapticInputWindow, TIMER_HAPTIC_INPUT_TIMEOUT);
+            ShowWindow(m_hapticInputWindow, SW_HIDE);
+        }
+    }
+
+    bool RegisterHapticInputWindow()
+    {
+        if (m_hapticInputWindow)
+        {
+            return true;
+        }
+
+        WNDCLASSEXW wc{ sizeof(wc) };
+        wc.lpfnWndProc = HapticInputWindowProc;
+        wc.hInstance = GetModuleHandle(nullptr);
+        wc.lpszClassName = HAPTIC_INPUT_WINDOW_CLASS;
+        if (!RegisterClassExW(&wc) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
+        {
+            return false;
+        }
+
+        m_hapticInputWindow = CreateWindowExW(
+            WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TOPMOST | WS_EX_LAYERED,
+            HAPTIC_INPUT_WINDOW_CLASS,
+            nullptr,
+            WS_POPUP,
+            0,
+            0,
+            0,
+            0,
+            nullptr,
+            nullptr,
+            GetModuleHandle(nullptr),
+            nullptr);
+
+        if (!m_hapticInputWindow)
+        {
+            UnregisterClassW(HAPTIC_INPUT_WINDOW_CLASS, GetModuleHandle(nullptr));
+            return false;
+        }
+
+        SetLayeredWindowAttributes(m_hapticInputWindow, 0, 1, LWA_ALPHA);
+        return true;
+    }
+
+    void UnregisterHapticInputWindow()
+    {
+        CancelPendingHapticWrap();
+        if (m_hapticInputWindow)
+        {
+            DestroyWindow(m_hapticInputWindow);
+            m_hapticInputWindow = nullptr;
+        }
+
+        UnregisterClassW(HAPTIC_INPUT_WINDOW_CLASS, GetModuleHandle(nullptr));
+    }
+
+    static LRESULT CALLBACK HapticInputWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+    {
+        if (msg == WM_MOUSEMOVE && g_cursorWrapInstance)
+        {
+            g_cursorWrapInstance->CompletePendingHapticWrap();
+            return 0;
+        }
+        if (msg == WM_TIMER && wParam == TIMER_HAPTIC_INPUT_TIMEOUT && g_cursorWrapInstance)
+        {
+            g_cursorWrapInstance->CompletePendingHapticWrap();
+            return 0;
+        }
+
+        return DefWindowProcW(hwnd, msg, wParam, lParam);
+    }
+
     void ToggleMouseHook()
     {
         // Toggle cursor wrapping.
@@ -500,6 +737,7 @@ private:
         }
         else
         {
+            UnregisterHapticInputWindow();
             DWORD error = GetLastError();
             Logger::error(L"Failed to install CursorWrap mouse hook, error: {}", error);
         }
@@ -512,6 +750,7 @@ private:
             UnhookWindowsHookEx(m_mouseHook);
             m_mouseHook = nullptr;
             m_hookActive = false;
+            UnregisterHapticInputWindow();
             Logger::info("CursorWrap mouse hook stopped");
 #ifdef _DEBUG
             Logger::info("CursorWrap DEBUG: Mouse hook stopped");
@@ -721,7 +960,16 @@ private:
                     Logger::info(L"CursorWrap DEBUG: Wrapping cursor from ({}, {}) to ({}, {})", 
                                 currentPos.x, currentPos.y, newPos.x, newPos.y);
 #endif
-                    SetCursorPos(newPos.x, newPos.y);
+                    if (g_cursorWrapInstance->TryDeferWrapToHapticEdgeWindow(currentPos, newPos))
+                    {
+                        return CallNextHookEx(nullptr, nCode, wParam, lParam);
+                    }
+
+                    if (SetCursorPos(newPos.x, newPos.y))
+                    {
+                        g_cursorWrapInstance->PlayWrapHaptic();
+                    }
+
                     return 1; // Suppress the original message
                 }
             }
