@@ -353,7 +353,7 @@ public class AutoHideCursorSettingsTests : UITestBase
                 }
             }
         }
-        return true;
+
         return true;
     }
 
