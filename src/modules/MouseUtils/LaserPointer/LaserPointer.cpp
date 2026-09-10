@@ -183,7 +183,7 @@ private:
     void RegisterPenRawInput();
     void UnregisterPenRawInput();
     void HandleRawInput(HRAWINPUT handle) noexcept;
-    bool ReadPenReport(RAWINPUT* input, POINT& screenPoint, bool& tipDown) noexcept;
+    bool ReadPenReport(HANDLE deviceHandle, PCHAR report, ULONG reportLength, POINT& screenPoint, bool& tipDown) noexcept;
 
     // deferTargetPick: resolve the target from the foreground window once it settles,
     // rather than from the cursor, for toggles that arrive from another window.
@@ -2015,24 +2015,24 @@ void LaserPointerOverlay::UnregisterPenRawInput()
 
 // Pulls X, Y and the tip switch out of one HID report. Returns false when the device
 // does not describe itself in a way this can use.
-bool LaserPointerOverlay::ReadPenReport(RAWINPUT* input, POINT& screenPoint, bool& tipDown) noexcept
+bool LaserPointerOverlay::ReadPenReport(HANDLE deviceHandle, PCHAR report, ULONG reportLength, POINT& screenPoint, bool& tipDown) noexcept
 {
-    auto it = m_penDevices.find(input->header.hDevice);
+    auto it = m_penDevices.find(deviceHandle);
     if (it == m_penDevices.end())
     {
         PenDevice device;
 
         UINT size = 0;
-        if (GetRawInputDeviceInfo(input->header.hDevice, RIDI_PREPARSEDDATA, nullptr, &size) != 0 || size == 0)
+        if (GetRawInputDeviceInfo(deviceHandle, RIDI_PREPARSEDDATA, nullptr, &size) != 0 || size == 0)
         {
-            m_penDevices.emplace(input->header.hDevice, device);
+            m_penDevices.emplace(deviceHandle, device);
             return false;
         }
 
         device.preparsed.resize(size);
-        if (GetRawInputDeviceInfo(input->header.hDevice, RIDI_PREPARSEDDATA, device.preparsed.data(), &size) == static_cast<UINT>(-1))
+        if (GetRawInputDeviceInfo(deviceHandle, RIDI_PREPARSEDDATA, device.preparsed.data(), &size) == static_cast<UINT>(-1))
         {
-            m_penDevices.emplace(input->header.hDevice, device);
+            m_penDevices.emplace(deviceHandle, device);
             return false;
         }
 
@@ -2040,7 +2040,7 @@ bool LaserPointerOverlay::ReadPenReport(RAWINPUT* input, POINT& screenPoint, boo
         HIDP_CAPS caps{};
         if (HidP_GetCaps(preparsed, &caps) != HIDP_STATUS_SUCCESS)
         {
-            m_penDevices.emplace(input->header.hDevice, device);
+            m_penDevices.emplace(deviceHandle, device);
             return false;
         }
 
@@ -2074,7 +2074,7 @@ bool LaserPointerOverlay::ReadPenReport(RAWINPUT* input, POINT& screenPoint, boo
         }
 
         device.usable = device.haveX && device.haveY;
-        device.haveDisplayMapping = GetPointerDeviceRects(input->header.hDevice, &device.deviceRect, &device.displayRect) != FALSE;
+        device.haveDisplayMapping = GetPointerDeviceRects(deviceHandle, &device.deviceRect, &device.displayRect) != FALSE;
         Logger::info("Laser Pointer pen device: usable={} x=[{},{}] y=[{},{}]",
                      device.usable,
                      device.minX,
@@ -2082,7 +2082,7 @@ bool LaserPointerOverlay::ReadPenReport(RAWINPUT* input, POINT& screenPoint, boo
                      device.minY,
                      device.maxY);
 
-        it = m_penDevices.emplace(input->header.hDevice, std::move(device)).first;
+        it = m_penDevices.emplace(deviceHandle, std::move(device)).first;
     }
 
     PenDevice& device = it->second;
@@ -2092,9 +2092,6 @@ bool LaserPointerOverlay::ReadPenReport(RAWINPUT* input, POINT& screenPoint, boo
     }
 
     auto preparsed = reinterpret_cast<PHIDP_PREPARSED_DATA>(device.preparsed.data());
-    PCHAR report = reinterpret_cast<PCHAR>(input->data.hid.bRawData);
-    const ULONG reportLength = input->data.hid.dwSizeHid;
-
     ULONG x = 0;
     ULONG y = 0;
     if (HidP_GetUsageValue(HidP_Input, HID_USAGE_PAGE_GENERIC, 0, HID_USAGE_GENERIC_X, &x, preparsed, report, reportLength) != HIDP_STATUS_SUCCESS ||
@@ -2175,78 +2172,77 @@ void LaserPointerOverlay::HandleRawInput(HRAWINPUT handle) noexcept
         return;
     }
 
-    POINT screenPoint{};
-    bool tipDown = false;
-    if (!ReadPenReport(input, screenPoint, tipDown))
+    const ULONG reportLength = input->data.hid.dwSizeHid;
+    BYTE* reports = input->data.hid.bRawData;
+    for (DWORD reportIndex = 0; reportIndex < input->data.hid.dwCount; ++reportIndex)
     {
-        return;
-    }
-
-    const bool wantDraw = m_settings.penRenderWhenClose || tipDown;
-    const bool wasDrawing = m_drawing;
-    const uint64_t nowMs = GetTickCount64();
-
-    // Measured before the timestamp is updated: a gap this long means the pen left range
-    // and came back somewhere else, and the samples either side must not be joined.
-    const bool resumedAfterGap = m_lastPenInputMs != 0 && (nowMs - m_lastPenInputMs) > PEN_RANGE_TIMEOUT_MS;
-
-    m_latestPosition = screenPoint;
-    m_hasLatestPosition = true;
-    m_lastPenPoint = screenPoint;
-    m_lastPenInputMs = nowMs;
-
-    // Hover reports come in before the pen touches, and this is what turns that into a
-    // window ready to catch the contact. Waiting for the render tick would be too late:
-    // with nothing drawn the loop is parked, so nothing would be capturing yet.
-    UpdatePenCapture(nowMs);
-    if (!m_renderLoopRunning)
-    {
-        ShowOverlay();
-        StartRenderLoop();
-    }
-
-    if (wantDraw)
-    {
-        m_penContact = true;
-        m_penAwaitingFirstSample = false;
-        if (!wasDrawing)
+        POINT screenPoint{};
+        bool tipDown = false;
+        PCHAR report = reinterpret_cast<PCHAR>(reports + reportIndex * reportLength);
+        if (!ReadPenReport(input->header.hDevice, report, reportLength, screenPoint, tipDown))
         {
-            BeginDrawing();
+            continue;
         }
-        else if (!m_renderLoopRunning)
+
+        const bool wantDraw = m_settings.penRenderWhenClose || tipDown;
+        const bool wasDrawing = m_drawing;
+        const uint64_t nowMs = GetTickCount64();
+
+        // Measured before the timestamp is updated: a gap this long means the pen left range
+        // and came back somewhere else, and the samples either side must not be joined.
+        const bool resumedAfterGap = m_lastPenInputMs != 0 && (nowMs - m_lastPenInputMs) > PEN_RANGE_TIMEOUT_MS;
+
+        m_latestPosition = screenPoint;
+        m_hasLatestPosition = true;
+        m_lastPenPoint = screenPoint;
+        m_lastPenInputMs = nowMs;
+
+        // Hover reports come in before the pen touches, and this is what turns that into a
+        // window ready to catch the contact. Waiting for the render tick would be too late:
+        // with nothing drawn the loop is parked, so nothing would be capturing yet.
+        UpdatePenCapture(nowMs);
+        if (!m_renderLoopRunning)
         {
             ShowOverlay();
             StartRenderLoop();
         }
-    }
-    else if (m_penContact)
-    {
-        m_penContact = false;
-        if (wasDrawing)
-        {
-            EndDrawing();
-        }
-    }
 
-    // The digitizer reports far faster than the 16 ms render tick, so every report is
-    // kept rather than only the one that happens to be current when a frame is drawn.
-    // Sampling once per frame is what made pen lines look angular next to the mouse's,
-    // which feeds the hook every position it sees. BeginDrawing clears the buffer, so
-    // this has to come after it.
-    if (m_drawing && wantDraw)
-    {
-        if (resumedAfterGap)
+        if (wantDraw)
         {
-            // Don't bridge a hover gap: the straight run of points across it is exactly
-            // the ghosting that buffering pen input caused the first time round.
-            m_pendingPoints.clear();
+            m_penContact = true;
+            m_penAwaitingFirstSample = false;
+            if (!wasDrawing)
+            {
+                BeginDrawing();
+            }
+            else if (!m_renderLoopRunning)
+            {
+                ShowOverlay();
+                StartRenderLoop();
+            }
+        }
+        else if (m_penContact)
+        {
+            m_penContact = false;
+            if (wasDrawing)
+            {
+                EndDrawing();
+            }
         }
 
-        if (m_pendingPoints.size() >= MAX_PENDING_POINTS)
+        if (m_drawing && wantDraw)
         {
-            m_pendingPoints.erase(m_pendingPoints.begin());
+            if (resumedAfterGap)
+            {
+                m_pendingPoints.clear();
+            }
+
+            if (m_pendingPoints.size() >= MAX_PENDING_POINTS)
+            {
+                m_pendingPoints.erase(m_pendingPoints.begin());
+            }
+            m_pendingPoints.push_back({ screenPoint, nowMs });
         }
-        m_pendingPoints.push_back({ screenPoint, nowMs });
     }
 }
 

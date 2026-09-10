@@ -24,9 +24,6 @@ namespace
     // How often an unpainted target is asked to redraw while waiting for a first frame.
     constexpr uint64_t NUDGE_INTERVAL_MS = 200;
 
-    // How long to wait for a real captured frame before falling back to PrintWindow.
-    constexpr uint64_t SEED_AFTER_MS = 1000;
-
     // Two buffers is enough: frames are consumed on the render tick, and a deeper pool
     // only adds latency between the target updating and the mirror showing it.
     constexpr int CAPTURE_BUFFERS = 2;
@@ -232,6 +229,17 @@ bool PresenterWindow::IsPresentableWindow(HWND window) noexcept
 
 LRESULT CALLBACK PresenterWindow::WndProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) noexcept
 {
+    auto* self = reinterpret_cast<PresenterWindow*>(GetWindowLongPtrW(window, GWLP_USERDATA));
+
+    if (message == WM_DISPLAYCHANGE)
+    {
+        if (self != nullptr)
+        {
+            self->ParkOffscreen();
+        }
+        return 0;
+    }
+
     if (message == WM_CLOSE)
     {
         // The window is listed in the taskbar, so the shell offers to close it - from the
@@ -239,7 +247,6 @@ LRESULT CALLBACK PresenterWindow::WndProc(HWND window, UINT message, WPARAM wPar
         // not destroyed here though: the module owns the capture session and the overlay
         // state that go with it, so the request is handed back and it stops sharing in
         // order, exactly as the shortcut does.
-        auto* self = reinterpret_cast<PresenterWindow*>(GetWindowLongPtrW(window, GWLP_USERDATA));
         if (self != nullptr && self->m_closeNotifyWindow != nullptr)
         {
             PostMessageW(self->m_closeNotifyWindow, self->m_closeNotifyMessage, 0, 0);
@@ -267,10 +274,6 @@ bool PresenterWindow::CreateHostWindow(HINSTANCE instance)
         }
     }
 
-    const int virtualLeft = GetSystemMetrics(SM_XVIRTUALSCREEN);
-    const int virtualTop = GetSystemMetrics(SM_YVIRTUALSCREEN);
-    const int virtualWidth = GetSystemMetrics(SM_CXVIRTUALSCREEN);
-
     // GetWindowRect reports physical pixels, so the mirror has to be created in a
     // per-monitor-aware context or Windows scales the requested size by the monitor's
     // DPI and the capture ends up stretched into a smaller window.
@@ -292,8 +295,8 @@ bool PresenterWindow::CreateHostWindow(HINSTANCE instance)
                              m_className,
                              L"",
                              style,
-                             virtualLeft + virtualWidth + OFFSCREEN_MARGIN,
-                             virtualTop,
+                             0,
+                             0,
                              outerWidth,
                              outerHeight,
                              nullptr,
@@ -314,6 +317,7 @@ bool PresenterWindow::CreateHostWindow(HINSTANCE instance)
     // The window procedure is static, so this is how a message arriving for the window
     // finds the object that owns it.
     SetWindowLongPtrW(m_hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
+    ParkOffscreen();
 
     // Force the outer size, then check the client area is what the swap chain expects.
     SetWindowPos(m_hwnd, nullptr, 0, 0, outerWidth, outerHeight, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
@@ -347,6 +351,25 @@ bool PresenterWindow::CreateHostWindow(HINSTANCE instance)
 
     ShowWindow(m_hwnd, SW_SHOWNOACTIVATE);
     return true;
+}
+
+void PresenterWindow::ParkOffscreen() noexcept
+{
+    if (m_hwnd == nullptr)
+    {
+        return;
+    }
+
+    const int virtualLeft = GetSystemMetrics(SM_XVIRTUALSCREEN);
+    const int virtualTop = GetSystemMetrics(SM_YVIRTUALSCREEN);
+    const int virtualWidth = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+    SetWindowPos(m_hwnd,
+                 nullptr,
+                 virtualLeft + virtualWidth + OFFSCREEN_MARGIN,
+                 virtualTop,
+                 0,
+                 0,
+                 SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void PresenterWindow::RefreshTitle()
@@ -515,8 +538,6 @@ bool PresenterWindow::Start(HINSTANCE instance, HWND target, ID3D11Device* d3dDe
         return false;
     }
 
-    m_captureStartedMs = GetTickCount64();
-
     Logger::info("Laser Pointer presenter started for '{}' ({}x{}).",
                  winrt::to_string(m_targetTitle),
                  m_width,
@@ -558,8 +579,6 @@ void PresenterWindow::StopCapture()
     m_frameCopy = nullptr;
     m_haveFirstFrame = false;
     m_lastNudgeMs = 0;
-    m_captureStartedMs = 0;
-    m_seedAttempted = false;
 }
 
 bool PresenterWindow::Retarget(HWND target)
@@ -603,8 +622,6 @@ bool PresenterWindow::Retarget(HWND target)
         Stop();
         return false;
     }
-
-    m_captureStartedMs = GetTickCount64();
 
     Logger::info("Laser Pointer presenter retargeted to '{}' ({}x{}).",
                  winrt::to_string(m_targetTitle),
@@ -689,70 +706,6 @@ bool PresenterWindow::EnsureFrameCopy(UINT width, UINT height)
     }
 
     return true;
-}
-
-// Last resort for a window that never repaints: PrintWindow renders it on demand,
-// including windows drawn through DirectX, which plain invalidation cannot reach. Used
-// once, only to put something on screen until real capture frames start flowing.
-bool PresenterWindow::SeedFromPrintWindow()
-{
-    if (!EnsureFrameCopy(m_width, m_height))
-    {
-        return false;
-    }
-
-    BITMAPINFO info{};
-    info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    info.bmiHeader.biWidth = static_cast<LONG>(m_width);
-    // Negative height gives a top-down DIB, matching the texture's row order.
-    info.bmiHeader.biHeight = -static_cast<LONG>(m_height);
-    info.bmiHeader.biPlanes = 1;
-    info.bmiHeader.biBitCount = 32;
-    info.bmiHeader.biCompression = BI_RGB;
-
-    const HDC screenDc = GetDC(nullptr);
-    if (screenDc == nullptr)
-    {
-        return false;
-    }
-
-    void* bits = nullptr;
-    const HBITMAP bitmap = CreateDIBSection(screenDc, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
-    const HDC memoryDc = CreateCompatibleDC(screenDc);
-    ReleaseDC(nullptr, screenDc);
-
-    bool seeded = false;
-    if (bitmap != nullptr && memoryDc != nullptr && bits != nullptr)
-    {
-        const HGDIOBJ previous = SelectObject(memoryDc, bitmap);
-
-        // PW_RENDERFULLCONTENT is what makes this work for composited windows.
-        if (PrintWindow(m_target, memoryDc, PW_RENDERFULLCONTENT))
-        {
-            winrt::com_ptr<ID3D11DeviceContext> context;
-            m_d3dDevice->GetImmediateContext(context.put());
-            context->UpdateSubresource(m_frameCopy.get(), 0, nullptr, bits, m_width * 4, 0);
-            seeded = true;
-        }
-
-        SelectObject(memoryDc, previous);
-    }
-
-    if (memoryDc != nullptr)
-    {
-        DeleteDC(memoryDc);
-    }
-    if (bitmap != nullptr)
-    {
-        DeleteObject(bitmap);
-    }
-
-    if (seeded)
-    {
-        Logger::info("Laser Pointer presenter seeded its first image with PrintWindow.");
-    }
-
-    return seeded;
 }
 
 // Resizing while a capture is live also has to move the frame pool over; resizing while
@@ -905,14 +858,6 @@ bool PresenterWindow::Present(const std::function<void(ID2D1DeviceContext*)>& dr
         {
             m_lastNudgeMs = now;
             RedrawWindow(m_target, nullptr, nullptr, RDW_INVALIDATE | RDW_ALLCHILDREN);
-        }
-
-        // Invalidation does nothing for a window that renders through DirectX rather
-        // than WM_PAINT, so after a moment fall back to rendering it directly.
-        if (!m_seedAttempted && now - m_captureStartedMs >= SEED_AFTER_MS)
-        {
-            m_seedAttempted = true;
-            SeedFromPrintWindow();
         }
     }
 

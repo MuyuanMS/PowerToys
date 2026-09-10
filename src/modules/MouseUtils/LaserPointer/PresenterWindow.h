@@ -67,12 +67,12 @@ private:
     bool StartCapture();
     void StopCapture();
     bool ResizeSurfaces(UINT width, UINT height);
+    void ParkOffscreen() noexcept;
 
     // The swap chain and D2D target only. Split out because retargeting resizes while
     // the capture is torn down, and the frame pool must not be touched then.
     bool ResizeSwapChain(UINT width, UINT height);
     bool EnsureFrameCopy(UINT width, UINT height);
-    bool SeedFromPrintWindow();
     void RefreshTitle();
     static LRESULT CALLBACK WndProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) noexcept;
 
@@ -103,8 +103,6 @@ private:
     // frame when it does - so until the first one arrives the target gets nudged.
     bool m_haveFirstFrame = false;
     uint64_t m_lastNudgeMs = 0;
-    uint64_t m_captureStartedMs = 0;
-    bool m_seedAttempted = false;
 
     winrt::Windows::Graphics::Capture::GraphicsCaptureItem m_captureItem{ nullptr };
     winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool m_framePool{ nullptr };
