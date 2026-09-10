@@ -14,10 +14,10 @@ using Microsoft.CommandPalette.Extensions.Toolkit;
 namespace Microsoft.CmdPal.JsonRpc.Models;
 
 /// <summary>
-/// Exposes a Node.js extension form as <see cref="IFormContent"/>.
+/// Exposes a Node.js extension form as <see cref="IFormContent2"/>.
 /// Submit sends <c>form/submit</c> and maps the response to a toolkit command result.
 /// </summary>
-internal sealed partial class JSFormContentProxy : BaseObservable, IFormContent
+internal sealed partial class JSFormContentProxy : BaseObservable, IFormContent2
 {
     private readonly string _pageId;
     private readonly string _formId;
@@ -42,7 +42,11 @@ internal sealed partial class JSFormContentProxy : BaseObservable, IFormContent
 
     public string StateJson => GetJsonProperty("stateJson");
 
-    public ICommandResult SubmitForm(string inputs, string data)
+    public ICommandResult SubmitForm(string inputs, string data) => Submit(string.Empty, inputs, data);
+
+    public ICommandResult SubmitAction(string actionId, string inputs, string data) => Submit(actionId, inputs, data);
+
+    private ICommandResult Submit(string actionId, string inputs, string data)
     {
         try
         {
@@ -50,6 +54,11 @@ internal sealed partial class JSFormContentProxy : BaseObservable, IFormContent
             if (!string.IsNullOrEmpty(_formId))
             {
                 request["formId"] = _formId;
+            }
+
+            if (!string.IsNullOrEmpty(actionId))
+            {
+                request["actionId"] = actionId;
             }
 
             var response = _connection.SendRequestAsync(

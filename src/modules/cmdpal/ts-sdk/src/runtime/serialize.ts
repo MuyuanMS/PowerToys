@@ -23,7 +23,11 @@ import type {
 import { serializeCommandResult, type WireCommandResult } from './commandResult.js';
 
 /** Handler captured from a form at serialize time, keyed later by its id. */
-export type FormSubmitHandler = FormContent['submitForm'];
+export type FormSubmitHandler = (
+  actionId: string,
+  inputs: string,
+  data: string,
+) => ReturnType<FormContent['submitForm']>;
 type PropertyChildrenSink = (
   ownerId: string,
   propertyName: string,
@@ -255,7 +259,11 @@ export class WireSerializer {
           dataJson: content.dataJson,
         };
         assign(result, 'stateJson', content.stateJson);
-        forms?.register(formId, content.submitForm.bind(content));
+        forms?.register(formId, (actionId, inputs, data) =>
+          content.submitAction
+            ? content.submitAction(actionId, inputs, data)
+            : content.submitForm(inputs, data),
+        );
         return result;
       }
       case 'tree': {

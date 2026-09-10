@@ -292,6 +292,7 @@ export class ExtensionRuntime {
             id,
             stringField(params, 'pageId') ?? '',
             stringField(params, 'formId'),
+            stringField(params, 'actionId') ?? '',
             stringField(params, 'inputs') ?? '',
             stringField(params, 'data') ?? '',
           );
@@ -582,6 +583,7 @@ export class ExtensionRuntime {
     id: number | string,
     pageId: string,
     formId: string | undefined,
+    actionId: string,
     inputs: string,
     data: string,
   ): Promise<void> {
@@ -594,7 +596,7 @@ export class ExtensionRuntime {
         handler = this.pageScopes.get(pageId)?.forms.get(formId);
       }
       if (handler) {
-        const result = await handler(inputs, data);
+        const result = await handler(actionId, inputs, data);
         this.respond(id, await this.serializeOwnedResult(pageId, result));
         return;
       }
@@ -616,7 +618,9 @@ export class ExtensionRuntime {
       this.respondError(id, JsonRpcErrorCode.MethodNotFound, `Form content not found: ${pageId}`);
       return;
     }
-    const result = await form.submitForm(inputs, data);
+    const result = form.submitAction
+      ? await form.submitAction(actionId, inputs, data)
+      : await form.submitForm(inputs, data);
     this.respond(id, await this.serializeOwnedResult(pageId, result));
   }
 

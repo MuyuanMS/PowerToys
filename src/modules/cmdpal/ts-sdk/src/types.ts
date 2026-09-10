@@ -493,6 +493,20 @@ export interface FormContent {
    * @returns A {@link CommandResult} describing what the host does next.
    */
   submitForm(inputs: string, data: string): CommandResult | Promise<CommandResult>;
+  /**
+   * Handles a form submission while preserving the Adaptive Card action id.
+   * When omitted, the runtime falls back to {@link submitForm}.
+   *
+   * @param actionId Identifier of the submitted Adaptive Card action.
+   * @param inputs JSON string of the submitted input values.
+   * @param data JSON string of the form's bound data.
+   * @returns A {@link CommandResult} describing what the host does next.
+   */
+  submitAction?(
+    actionId: string,
+    inputs: string,
+    data: string,
+  ): CommandResult | Promise<CommandResult>;
 }
 
 /** Content that renders an image. */

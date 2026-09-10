@@ -3,7 +3,13 @@
 // See the LICENSE file in the project root for more information.
 
 import { describe, expect, it, vi } from 'vitest';
-import type { CommandResult, Content, IContentPage, ICommandProvider } from '../src/types.js';
+import type {
+  CommandResult,
+  Content,
+  FormContent,
+  IContentPage,
+  ICommandProvider,
+} from '../src/types.js';
 import { ExtensionRuntime } from '../src/runtime/runtime.js';
 import {
   JSONRPC_VERSION,
@@ -34,7 +40,10 @@ function providerWith(page: IContentPage): ICommandProvider {
   };
 }
 
-function formContent(formId: string | undefined, submitForm: () => CommandResult): Content {
+function formContent(
+  formId: string | undefined,
+  submitForm: () => CommandResult,
+): FormContent {
   return {
     type: 'form',
     formId,
@@ -78,6 +87,53 @@ describe('form identity and routing', () => {
 
     expect(second).toHaveBeenCalledTimes(1);
     expect(first).not.toHaveBeenCalled();
+    expect(responseFor(sent, 2)?.result).toEqual({ kind: 2 });
+  });
+
+  it('passes the submitted action id to action-aware forms', async () => {
+    const submitForm = vi.fn((): CommandResult => ({ kind: 'goHome' }));
+    const submitAction = vi.fn((): CommandResult => ({ kind: 'goBack' }));
+    const page: IContentPage = {
+      id: 'page',
+      name: 'Page',
+      title: 'Page',
+      getContent(): Content[] {
+        return [
+          {
+            ...formContent('form', submitForm),
+            submitAction,
+          },
+        ];
+      },
+    };
+    const { runtime, sent } = createHarness();
+    runtime.setProvider(providerWith(page));
+
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 1,
+      method: 'contentPage/getContent',
+      params: { pageId: 'page' },
+    });
+    await runtime.handleRequest({
+      jsonrpc: JSONRPC_VERSION,
+      id: 2,
+      method: 'form/submit',
+      params: {
+        pageId: 'page',
+        formId: 'form',
+        actionId: 'save',
+        inputs: '{"name":"Ada"}',
+        data: '{"mode":"edit"}',
+      },
+    });
+
+    expect(submitAction).toHaveBeenCalledWith(
+      'save',
+      '{"name":"Ada"}',
+      '{"mode":"edit"}',
+    );
+    expect(submitForm).not.toHaveBeenCalled();
     expect(responseFor(sent, 2)?.result).toEqual({ kind: 2 });
   });
 

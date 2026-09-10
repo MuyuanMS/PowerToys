@@ -74,6 +74,24 @@ public partial class JSAdapterTests
         Assert.AreEqual("child-form", formId);
     }
 
+    [TestMethod]
+    public void Form_SubmitActionPreservesActionId()
+    {
+        using var fake = new JSFakeExtension();
+        string? capturedActionId = null;
+        fake.OnRequest("form/submit", element =>
+        {
+            capturedActionId = element.GetProperty("actionId").GetString();
+            return JsonNode.Parse("""{ "kind": 4 }""");
+        });
+
+        var proxy = new JSFormContentProxy("page-1", Fixture("content-form.json"), fake.Connection);
+        var result = ((IFormContent2)proxy).SubmitAction("save", "{}", "{}");
+
+        Assert.AreEqual("save", capturedActionId);
+        Assert.AreEqual(CommandResultKind.KeepOpen, result.Kind);
+    }
+
     // A toast result preserves its nested continuation result.
     [TestMethod]
     public void Toast_PreservesNestedContinuationResult()

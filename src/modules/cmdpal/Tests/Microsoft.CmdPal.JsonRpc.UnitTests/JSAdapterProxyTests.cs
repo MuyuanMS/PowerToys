@@ -423,6 +423,7 @@ public class JSAdapterProxyTests
         Assert.AreEqual("plain", ((IPlainTextContent)content[1]).Text);
         Assert.IsInstanceOfType(content[2], typeof(IImageContent));
         Assert.IsInstanceOfType(content[3], typeof(IFormContent));
+        Assert.IsInstanceOfType(content[3], typeof(IFormContent2));
         Assert.IsInstanceOfType(content[4], typeof(ITreeContent));
 
         Assert.IsNotNull(page.Details);
