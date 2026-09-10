@@ -498,6 +498,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 ModuleType.KeyboardManager => GetModuleItemsKeyboardManager(),
                 ModuleType.LightSwitch => GetModuleItemsLightSwitch(),
                 ModuleType.MouseHighlighter => GetModuleItemsMouseHighlighter(),
+                ModuleType.LaserPointer => GetModuleItemsLaserPointer(),
                 ModuleType.MouseJump => GetModuleItemsMouseJump(),
                 ModuleType.MousePointerCrosshairs => GetModuleItemsMousePointerCrosshairs(),
                 ModuleType.MouseWithoutBorders => GetModuleItemsMouseWithoutBorders(),
@@ -668,6 +669,20 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             var list = new List<DashboardModuleItem>
             {
                 new DashboardModuleShortcutItem() { Label = resourceLoader.GetString("MouseHighlighter_ShortDescription"), Shortcut = moduleSettingsRepository.SettingsConfig.Properties.ActivationShortcut.GetKeysList() },
+            };
+            return new ObservableCollection<DashboardModuleItem>(list);
+        }
+
+        private ObservableCollection<DashboardModuleItem> GetModuleItemsLaserPointer()
+        {
+            ISettingsRepository<LaserPointerSettings> moduleSettingsRepository = SettingsRepository<LaserPointerSettings>.GetInstance(SettingsUtils.Default);
+            var settings = moduleSettingsRepository.SettingsConfig;
+            var list = new List<DashboardModuleItem>
+            {
+                new DashboardModuleShortcutItem() { Label = resourceLoader.GetString("MouseUtils_LaserPointer_ActivationShortcut/Header"), Shortcut = settings.Properties.ActivationShortcut.GetKeysList() },
+                new DashboardModuleShortcutItem() { Label = resourceLoader.GetString("MouseUtils_LaserPointer_PenActivationShortcut/Header"), Shortcut = settings.Properties.PenActivationShortcut.GetKeysList() },
+                new DashboardModuleShortcutItem() { Label = resourceLoader.GetString("MouseUtils_LaserPointer_PresenterActivationShortcut/Header"), Shortcut = settings.Properties.PresenterActivationShortcut.GetKeysList() },
+                new DashboardModuleShortcutItem() { Label = resourceLoader.GetString("MouseUtils_LaserPointer_PresenterStopShortcut/Header"), Shortcut = settings.Properties.PresenterStopShortcut.GetKeysList() },
             };
             return new ObservableCollection<DashboardModuleItem>(list);
         }
