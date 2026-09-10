@@ -56,6 +56,24 @@ public class EventNotificationTests
         VerifyItemNotifications(provider, provider.NotifyChanged);
     }
 
+    [TestMethod]
+    public void Raise_ContinuesWhenDisconnectedSubscriberCleanupFails()
+    {
+        var sender = new object();
+        var healthyCalls = 0;
+        TypedEventHandler<object, IItemsChangedEventArgs> handlers =
+            (_, _) => Marshal.ThrowExceptionForHR(unchecked((int)0x80010108));
+        handlers += (_, _) => healthyCalls++;
+
+        EventHelpers.Raise(
+            handlers,
+            sender,
+            new ItemsChangedEventArgs(),
+            _ => throw new InvalidOperationException("Cleanup failed."));
+
+        Assert.AreEqual(1, healthyCalls);
+    }
+
     private static void VerifyItemNotifications(INotifyItemsChanged source, Action<int> raise)
     {
         raise(0);
