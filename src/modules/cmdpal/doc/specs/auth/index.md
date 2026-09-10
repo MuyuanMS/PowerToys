@@ -20,8 +20,8 @@ piece you can't do safely from inside your extension: the browser redirect.
   Authorization Code with PKCE, refreshes tokens, and drives device-code sign-in.
 - A thin, shared redirect broker in the host so every extension gets the same tested
   path through the browser instead of each rolling its own.
-- Optional token storage backed by the Windows Credential Manager, all inside your
-  process.
+- Optional token storage backed by the package-isolated Windows Credential Locker,
+  all inside your process.
 
 ## When not to use this
 
@@ -148,14 +148,18 @@ Toolkit posts your refresh token to the token endpoint and hands back a fresh
 `OAuthToken`. Ask for the `offline_access` scope up front if your provider gates
 refresh tokens behind it.
 
+Providers are allowed to omit `refresh_token` from a successful refresh response.
+`RefreshAsync` preserves the refresh token supplied by the caller when that happens,
+and replaces it only when the provider returns a rotated refresh token.
+
 `OAuthToken.IsExpired(skew)` helps you decide when to refresh, so you can refresh a
 little early instead of waiting for a 401.
 
 ### Device-code
 
 Some sign-ins happen better on another device, or on a machine with no good browser.
-Device-code covers that, and it's pure Toolkit. The host doesn't broker anything here
-beyond opening a URL if you ask it to.
+Device-code covers that, and it's pure Toolkit. Extensions can open the verification
+URL with the Toolkit's existing `OpenUrlCommand` or `ShellHelpers.OpenInShell` APIs.
 
 ```mermaid
 sequenceDiagram
@@ -169,18 +173,29 @@ sequenceDiagram
     Idp-->>Ext: device_code, user_code, verification_uri, interval
     Ext->>Page: Show user_code and verification_uri
     User->>Idp: Open verification_uri, enter user_code, consent
-    loop Every interval seconds
-        Ext->>Idp: POST token endpoint (device_code, client_id)
-        Idp-->>Ext: authorization_pending, or a token
+    loop Every current interval
+        Ext->>Idp: POST token endpoint<br/>(grant_type=urn:ietf:params:oauth:grant-type:device_code,<br/>device_code, client_id)
+        alt authorization_pending
+            Idp-->>Ext: Keep polling at the current interval
+        else slow_down
+            Idp-->>Ext: Add 5 seconds to this and all later intervals
+        else network timeout
+            Ext->>Ext: Back off before retrying
+        else access_denied or expired_token
+            Idp-->>Ext: Stop with a terminal error
+        else success
+            Idp-->>Ext: access_token (+ optional refresh_token)
+            Ext->>Ext: Optionally store the token and stop polling
+        end
     end
-    Idp-->>Ext: access_token (+ optional refresh_token)
-    Ext->>Ext: Optionally store the token
 ```
 
 You render your own `ContentPage` with the `user_code` and the verification link. The
-Toolkit polls the token endpoint on the provider's interval until the user finishes or
-the code expires. If you want the palette to open the verification URL for the user,
-call the host's open-URL helper. That's the only host touchpoint device-code needs.
+Toolkit sends the RFC 8628 device-code grant type and polls on the provider's interval.
+`authorization_pending` keeps the current interval, `slow_down` adds five seconds to
+this and every later interval, and network timeouts back off before retrying.
+Authorization denial and code expiry stop the flow immediately. Device-code does not
+need a host ABI touchpoint.
 
 ## SDK surface
 
@@ -207,8 +222,8 @@ interface IAuthorizationRequest
     // authorization-code response, and rejects token-bearing redirects.
     Windows.Foundation.Collections.IMapView<String, String> Parameters { get; };
     AuthorizationRedirectKind RedirectKind { get; };
-    UInt32 TimeoutSeconds { get; };         // 0 means the host default (60s); host caps at 300s
-    ICommand SignedInPage { get; };         // where the host navigates on success; may be null
+    UInt32 TimeoutSeconds { get; };         // absolute session lifetime; 0 means the host default (60s), capped at 300s
+    IPage SignedInPage { get; };            // where the host navigates on success; may be null
 };
 
 interface IAuthorizationResult
@@ -229,9 +244,6 @@ interface IExtensionHost2 requires IExtensionHost
     // its own token exchange. A successful completion lets the host foreground the
     // palette and navigate to SignedInPage.
     Windows.Foundation.IAsyncAction CompleteAuthorizationAsync(String sessionId, Boolean isSuccessful);
-
-    // Thin facilitation for device-code: open a URL in the system browser.
-    Windows.Foundation.IAsyncAction OpenUrlAsync(String url);
 };
 ```
 
@@ -244,6 +256,12 @@ succeeds, the Toolkit calls `CompleteAuthorizationAsync(sessionId, true)`, and t
 host foregrounds the palette and navigates to the page you already named. If the
 exchange fails or the extension abandons the flow, it completes the session with
 `false`, and the host clears the pending navigation without ever seeing a token.
+
+The session deadline starts when the host accepts `RequestAuthorizationAsync` and
+continues after the redirect is delivered until completion. When the deadline expires,
+or when the extension disconnects or unloads, the host clears the retained page and
+all pending broker state. Late, duplicate, or unknown completion calls fail without
+navigating.
 
 ### Toolkit
 
@@ -277,7 +295,7 @@ The pieces the Toolkit gives you:
 - `OAuthToken`: access token, optional refresh and id tokens, token type, scope,
   expiry, and `IsExpired(skew)`.
 - `OAuthException`: thrown with a provider error when the exchange fails.
-- `ITokenStore` and `CredentialManagerTokenStore`: optional storage, covered below.
+- `ITokenStore` and `CredentialLockerTokenStore`: optional storage, covered below.
 
 ### Capability detection
 
@@ -320,7 +338,8 @@ and so the redirect is hard to spoof.
 - **No token storage in the host.** Tokens are exchanged and stored entirely in your
   process.
 - **Timeouts are capped.** `TimeoutSeconds` defaults to 60 and the host caps it at
-  300, so a stuck flow can't wait forever.
+  300. The absolute deadline spans redirect capture through extension completion;
+  expiry or extension disconnect clears the session, and late completion is rejected.
 
 One more, and it matters: don't log or display the authorization code, the access or
 refresh token, or the PKCE verifier. Show generic status on failure and move on.
@@ -330,14 +349,19 @@ refresh token, or the PKCE verifier. Show generic status on failure and move on.
 Storing a token is optional, and it happens in your process. The Toolkit gives you:
 
 - `ITokenStore`: a small `Retrieve` / `Save` / `Remove` abstraction keyed by a string.
-- `CredentialManagerTokenStore`: an `ITokenStore` backed by the Windows Credential
-  Manager. Tokens are encrypted at rest per user. Use a distinct key per provider or
-  account so they don't collide.
+- `CredentialLockerTokenStore`: an `ITokenStore` backed by
+  `Windows.Security.Credentials.PasswordVault`. The package identity isolates these
+  credentials from other extensions and same-user desktop processes. It is available
+  only to packaged extensions; when package identity is unavailable, use a caller-
+  supplied `ITokenStore` or keep the token in memory. Do not fall back to Win32 generic
+  credentials, which are user-scoped and do not provide extension isolation. Use a
+  distinct key per provider or account so entries do not collide.
 
-There's an important thing to note though: the Credential Manager caps a stored secret at a few
-kilobytes. That's plenty for typical access and refresh tokens, but a very large JWT
-can blow past it. Guard `Save` in a try/catch and treat storage as best effort. If you
-routinely carry large tokens, a DPAPI-backed store is a reasonable future addition.
+There's an important thing to note though: the Credential Locker caps a stored secret
+at a few kilobytes. That's plenty for typical access and refresh tokens, but a very
+large JWT can blow past it. Guard `Save` in a try/catch and treat storage as best
+effort. If you routinely carry large tokens, a package-isolated alternative is a
+reasonable future addition.
 
 ## Durability
 
@@ -345,7 +369,8 @@ A sign-in lives in memory. The host stays resident (it's a tray process), so the
 pending flow and the PKCE verifier survive the browser round trip just fine. If the
 host or your extension is fully terminated in the middle of a sign-in, the flow is
 gone and the user starts over. We don't persist pending-auth state, because the payoff
-is small and the risk of leaving half-finished secrets on disk is not.
+is small and the risk of leaving half-finished secrets on disk is not. Extension
+disconnect or unload also clears its pending broker sessions immediately.
 
 ## Bring your own provider
 
