@@ -168,17 +168,7 @@ namespace Microsoft.Workspaces.UITests
             }
             finally
             {
-                if (installation is { IsCompleted: false })
-                {
-                    installationOperation!.Cancel();
-                    try
-                    {
-                        installation.WaitAsync(TimeSpan.FromSeconds(30)).GetAwaiter().GetResult();
-                    }
-                    catch (OperationCanceledException)
-                    {
-                    }
-                }
+                CancelPendingInstallation();
 
                 if (ownsRegistration)
                 {
@@ -216,7 +206,13 @@ namespace Microsoft.Workspaces.UITests
             }
             catch (COMException error) when (PackagedFixturePrerequisites.IsMissingSigning(error.HResult))
             {
+                CleanUpFailedInstallation(context);
                 throw PackagedFixturePrerequisites.MissingSigningException(packagePath, error.HResult, EnvironmentConfig.IsInPipeline);
+            }
+            catch
+            {
+                CleanUpFailedInstallation(context);
+                throw;
             }
 
             if (deployment.ExtendedErrorCode is { } deploymentError &&
@@ -235,6 +231,42 @@ namespace Microsoft.Workspaces.UITests
                 RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant(),
                 package.Id.Architecture.ToString().ToLowerInvariant(),
                 "Fixture architecture must match the test host.");
+        }
+
+        private void CleanUpFailedInstallation(TestContext context)
+        {
+            CancelPendingInstallation();
+            var registrations = RegisteredPackages();
+            foreach (var registered in registrations)
+            {
+                Assert.AreEqual(Publisher, registered.Id.Publisher, $"Refusing to clean up an unrelated package: {registered.Id.FullName}.");
+            }
+
+            var packageNames = registrations.Select(registered => registered.Id.FullName).ToHashSet(StringComparer.Ordinal);
+            if (packageNames.Count > 0)
+            {
+                context.WriteLine($"[{DateTime.UtcNow:HH:mm:ss.fff}] Cleaning up fixture registration(s) after a failed installation: {string.Join(", ", packageNames)}");
+                ClosePackagedProcesses(packageNames);
+                RemoveRegistrations(packageNames);
+            }
+
+            ownsRegistration = false;
+            package = null;
+        }
+
+        private void CancelPendingInstallation()
+        {
+            if (installation is { IsCompleted: false })
+            {
+                installationOperation!.Cancel();
+                try
+                {
+                    installation.WaitAsync(TimeSpan.FromSeconds(30)).GetAwaiter().GetResult();
+                }
+                catch (OperationCanceledException)
+                {
+                }
+            }
         }
 
         private void ReclaimPreviousRun(TestContext context)

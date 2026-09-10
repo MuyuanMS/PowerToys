@@ -256,7 +256,7 @@ namespace Microsoft.Workspaces.UITests
             progress.Find<Button>(By.AccessibilityId("CancelButton"), 15_000).Invoke(msPostAction: 0);
             Assert.IsTrue(WaitForProcess(LauncherUiProcess, false), "Cancel launch did not close the progress UI.");
             Assert.IsTrue(WaitForProcess(LauncherProcess, false, 45_000), "Cancel launch did not stop the launch engine.");
-            Assert.IsFalse(tailStarted.WaitOne(0), "Cancel launch still started an application that was pending.");
+            Assert.IsFalse(tailStarted.WaitOne(5_000), "Cancel launch still started an application that was pending.");
             var remaining = State.Fixture.FindWindow(firstTitle);
             Assert.IsNotNull(remaining, "Cancel launch closed an already-open application.");
             Assert.AreEqual(opened.WindowHandle, remaining.Hwnd, "Cancel launch replaced an already-open application.");
