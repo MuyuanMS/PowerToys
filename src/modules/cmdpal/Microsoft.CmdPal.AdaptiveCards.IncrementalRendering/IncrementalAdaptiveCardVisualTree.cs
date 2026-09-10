@@ -189,7 +189,7 @@ internal static class IncrementalAdaptiveCardVisualTree
         {
             properties.Add(new IncrementalPropertySnapshot(
                 TextProperty,
-                textBlock.Text,
+                GetPlainText(textBlock),
                 IncrementalPropertyBehavior.PatchInPlace));
         }
         else if (TryMapInlineSvg(node, mappedImageTargets, out _, out var imageResource))
@@ -244,7 +244,7 @@ internal static class IncrementalAdaptiveCardVisualTree
         if (string.Equals(propertyName, TextProperty, StringComparison.Ordinal)
             && TryGetPlainTextTarget(node, out var textBlock))
         {
-            return string.Equals(textBlock.Text, expectedValue, StringComparison.Ordinal);
+            return string.Equals(GetPlainText(textBlock), expectedValue, StringComparison.Ordinal);
         }
 
         return string.Equals(propertyName, ImageSourceProperty, StringComparison.Ordinal)
@@ -297,18 +297,28 @@ internal static class IncrementalAdaptiveCardVisualTree
             && run.TextDecorations == textBlock.TextDecorations;
     }
 
+    private static string GetPlainText(TextBlock textBlock)
+    {
+        var singleRunText = textBlock.Inlines.Count == 1 && textBlock.Inlines[0] is Run run
+            ? run.Text
+            : null;
+        return GetPlainText(textBlock.Text, singleRunText);
+    }
+
+    internal static string GetPlainText(string text, string? singleRunText) =>
+        singleRunText ?? text;
+
     private static void ApplyPlainText(TextBlock current, TextBlock candidate)
     {
+        var candidateText = GetPlainText(candidate);
         if (current.Inlines.Count == 1
-            && candidate.Inlines.Count == 1
-            && current.Inlines[0] is Run currentRun
-            && candidate.Inlines[0] is Run candidateRun)
+            && current.Inlines[0] is Run currentRun)
         {
-            currentRun.Text = candidateRun.Text;
+            currentRun.Text = candidateText;
             return;
         }
 
-        current.Text = candidate.Text;
+        current.Text = candidateText;
     }
 
     private static async Task<PreparedImage?> PrepareImageAsync(

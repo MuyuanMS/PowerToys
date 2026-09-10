@@ -3,7 +3,7 @@
 > [!WARNING] 
 > Here be basilisks!
 >
-> This entire library is maintained by LLMs. Humans didn't write the code, and no human actually owns this code. 
+> This entire library is maintained by language models. Humans didn't write the code, and no human actually owns this code.
 >
 > This library was generated to experiment with the big picture problem "can we update the content of a rendered Adaptive Card without replacing the entire card?"
 >

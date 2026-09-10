@@ -127,6 +127,7 @@ public sealed partial class IncrementalAdaptiveCardUpdater
         }
         catch
         {
+            cancellationToken.ThrowIfCancellationRequested();
             ReplaceRenderedCard(
                 card,
                 candidate,
