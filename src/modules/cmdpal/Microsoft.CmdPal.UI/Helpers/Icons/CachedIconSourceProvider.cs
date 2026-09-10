@@ -59,7 +59,6 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
             return inFlight.Task;
         }
 
-        diagnostics.RecordProviderResolution(IconProviderResolution.NewLoad, inFlight.Diagnostics);
         return inFlight.Task;
     }
 
@@ -103,6 +102,7 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
                 _iconSize.Height,
                 scale);
             loadDiagnostics?.RegisterTask(task);
+            diagnostics.RecordProviderResolution(IconProviderResolution.NewLoad, loadDiagnostics);
 
             if (!_loader.TryEnqueueLoad(
                     icon.Icon,

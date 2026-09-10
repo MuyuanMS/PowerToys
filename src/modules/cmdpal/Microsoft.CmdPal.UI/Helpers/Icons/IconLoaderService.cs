@@ -251,6 +251,7 @@ internal sealed partial class IconLoaderService : IIconLoaderService
 #if DEBUG
                 Logger.LogDebug($"Failed to open icon stream: {ex}");
 #endif
+                diagnostics?.Fail();
                 return null;
             }
         }

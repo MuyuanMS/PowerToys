@@ -114,6 +114,7 @@
                             </CommandBar>
                             <TextBlock
                                 x:Name="IconDiagnosticsStatusTextBlock"
+                                AutomationProperties.LiveSetting="Polite"
                                 MaxWidth="440"
                                 HorizontalAlignment="Right"
                                 Text="Not recording."
