@@ -1295,7 +1295,7 @@ static void DrawOverlayText(BYTE* destBits, int destW, int destH, HFONT fontHand
     HGDIOBJ oldBmp = SelectObject(textDC, scratch);
     HGDIOBJ oldFont = SelectObject(textDC, fontHandle);
     RECT fill = { 0, 0, w, h };
-    FillRect(textDC, &fill, reinterpret_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
+    FillRect(textDC, &fill, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
 
     int oldBk = SetBkMode(textDC, TRANSPARENT);
     COLORREF oldColor = SetTextColor(textDC, RGB(255, 255, 255));
