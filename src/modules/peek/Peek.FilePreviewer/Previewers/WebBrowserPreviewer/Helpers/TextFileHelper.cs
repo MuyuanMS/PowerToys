@@ -3,6 +3,8 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -18,7 +20,7 @@ namespace Peek.FilePreviewer.Previewers
     public static class TextFileHelper
     {
         // Matches the sample size commonly used by tools like git to decide whether a file is text or binary.
-        private const int SampleSize = 8000;
+        internal const int SampleSize = 8000;
 
         /// <summary>
         /// Determines whether the file at the given path is likely to be a text file, based on its size and content.
@@ -56,6 +58,11 @@ namespace Peek.FilePreviewer.Previewers
 
                 // If the file starts with a Unicode BOM, we can assume it's a text file.
                 if (HasUnicodeBom(buffer, bytesRead))
+                {
+                    return true;
+                }
+
+                if (TryDetectBomlessUnicodeEncoding(buffer, bytesRead) != null)
                 {
                     return true;
                 }
@@ -104,6 +111,62 @@ namespace Peek.FilePreviewer.Previewers
                 ((buffer[0] == 0xFF && buffer[1] == 0xFE) ||
                  (buffer[0] == 0xFE && buffer[1] == 0xFF));
             return isUtf16;
+        }
+
+        internal static Encoding? TryDetectBomlessUnicodeEncoding(byte[] buffer, int bytesRead)
+        {
+            if (HasExpectedNullPattern(buffer, bytesRead, unitSize: 4, textByteIndex: 0, requiredNullByteIndexes: [2, 3]))
+            {
+                return new UTF32Encoding(bigEndian: false, byteOrderMark: false);
+            }
+
+            if (HasExpectedNullPattern(buffer, bytesRead, unitSize: 4, textByteIndex: 3, requiredNullByteIndexes: [0, 1]))
+            {
+                return new UTF32Encoding(bigEndian: true, byteOrderMark: false);
+            }
+
+            if (HasExpectedNullPattern(buffer, bytesRead, unitSize: 2, textByteIndex: 0, requiredNullByteIndexes: [1]))
+            {
+                return Encoding.Unicode;
+            }
+
+            if (HasExpectedNullPattern(buffer, bytesRead, unitSize: 2, textByteIndex: 1, requiredNullByteIndexes: [0]))
+            {
+                return Encoding.BigEndianUnicode;
+            }
+
+            return null;
+        }
+
+        private static bool HasExpectedNullPattern(byte[] buffer, int bytesRead, int unitSize, int textByteIndex, int[] requiredNullByteIndexes)
+        {
+            int unitCount = bytesRead / unitSize;
+            if (unitCount < 4)
+            {
+                return false;
+            }
+
+            int textNulls = 0;
+            var requiredNullCounts = new int[requiredNullByteIndexes.Length];
+            for (int unit = 0; unit < unitCount; unit++)
+            {
+                int offset = unit * unitSize;
+                if (buffer[offset + textByteIndex] == 0)
+                {
+                    textNulls++;
+                }
+
+                for (int index = 0; index < requiredNullByteIndexes.Length; index++)
+                {
+                    if (buffer[offset + requiredNullByteIndexes[index]] == 0)
+                    {
+                        requiredNullCounts[index]++;
+                    }
+                }
+            }
+
+            return requiredNullCounts.All(count => count >= unitCount * 0.8) &&
+                textNulls <= unitCount * 0.2;
         }
     }
 }

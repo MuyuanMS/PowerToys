@@ -29,11 +29,23 @@ namespace Peek.FilePreviewer.Previewers
                 throw new InvalidOperationException($"File '{path}' exceeds the maximum previewable size of {maxReadableFileSizeBytes} bytes.");
             }
 
-            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-            DetectionResult result = await CharsetDetector.DetectFromStreamAsync(fs, maxReadableFileSizeBytes, cancellationToken).ConfigureAwait(false);
+            int sampleSize = (int)Math.Min(fs.Length, TextFileHelper.SampleSize);
+            var sample = new byte[sampleSize];
+            int sampleRead = await fs.ReadAtLeastAsync(sample, sampleSize, throwOnEndOfStream: false, cancellationToken).ConfigureAwait(false);
+            Encoding? bomlessUnicodeEncoding = TextFileHelper.TryDetectBomlessUnicodeEncoding(sample, sampleRead);
+            fs.Position = 0;
 
-            // Check if the detected encoding is not null; otherwise, default to UTF-8
-            Encoding encodingToUse = result.Detected?.Encoding ?? Encoding.UTF8;
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            Encoding encodingToUse;
+            if (bomlessUnicodeEncoding != null)
+            {
+                encodingToUse = bomlessUnicodeEncoding;
+            }
+            else
+            {
+                DetectionResult result = await CharsetDetector.DetectFromStreamAsync(fs, maxReadableFileSizeBytes, cancellationToken).ConfigureAwait(false);
+                encodingToUse = result.Detected?.Encoding ?? Encoding.UTF8;
+            }
 
             // Rewind and decode in chunks to keep stream I/O bounded by the buffer size. The returned text is still
             // accumulated in memory for Monaco, so the configured size cap limits the total allocation. StreamReader
