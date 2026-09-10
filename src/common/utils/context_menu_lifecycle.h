@@ -37,6 +37,7 @@ namespace context_menu_lifecycle
             DWORD shutdown_grace_ms = 0;
             initialization_callback report_initialization = nullptr;
             std::atomic_uint64_t activity_state = 0;
+            std::atomic_bool cancel_initialization = false;
             HANDLE initialization_event = nullptr;
             HRESULT initialization_result = E_UNEXPECTED;
         };
@@ -193,6 +194,18 @@ namespace context_menu_lifecycle
                 return 0;
             }
 
+            if (state->cancel_initialization.load(std::memory_order_acquire))
+            {
+                DestroyWindow(window);
+                if (window_class_atom)
+                {
+                    UnregisterClassW(state->window_class_name, state->module);
+                }
+                state->initialization_result = HRESULT_FROM_WIN32(ERROR_CANCELLED);
+                SetEvent(state->initialization_event);
+                return 0;
+            }
+
             state->initialization_result = S_OK;
             SetEvent(state->initialization_event);
 
@@ -274,14 +287,27 @@ namespace context_menu_lifecycle
             if (wait_result != WAIT_OBJECT_0)
             {
                 const DWORD error = wait_result == WAIT_TIMEOUT ? ERROR_TIMEOUT : GetLastError();
-                set_initialization_result(HRESULT_FROM_WIN32(error));
-                report(monitor, get_initialization_result());
-                CloseHandle(thread);
-                SetLastError(error);
-                return FALSE;
-            }
+                monitor->cancel_initialization.store(true, std::memory_order_release);
 
-            set_initialization_result(monitor->initialization_result);
+                // Do not permit InitOnceExecuteOnce to retry while the first
+                // monitor thread can still create a competing window.
+                if (WaitForSingleObject(monitor->initialization_event, INFINITE) != WAIT_OBJECT_0)
+                {
+                    set_initialization_result(HRESULT_FROM_WIN32(GetLastError()));
+                }
+                else if (SUCCEEDED(monitor->initialization_result))
+                {
+                    set_initialization_result(monitor->initialization_result);
+                }
+                else
+                {
+                    set_initialization_result(HRESULT_FROM_WIN32(error));
+                }
+            }
+            else
+            {
+                set_initialization_result(monitor->initialization_result);
+            }
             CloseHandle(monitor->initialization_event);
             monitor->initialization_event = nullptr;
             if (FAILED(get_initialization_result()))
