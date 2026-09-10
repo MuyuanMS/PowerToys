@@ -570,7 +570,7 @@ private:
         }
         if (msg == WM_TIMER && wParam == TIMER_HAPTIC_INPUT_TIMEOUT && g_cursorWrapInstance)
         {
-            g_cursorWrapInstance->CancelPendingHapticWrap();
+            g_cursorWrapInstance->CompletePendingHapticWrap();
             return 0;
         }
 
