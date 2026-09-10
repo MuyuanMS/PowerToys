@@ -112,5 +112,6 @@ namespace Peek.FilePreviewer.Models
                 }
             }
         }
+
     }
 }
