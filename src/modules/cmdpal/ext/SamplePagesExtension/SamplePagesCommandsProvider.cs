@@ -34,7 +34,7 @@ public partial class SamplePagesCommandsProvider : CommandProvider
         return _commands;
     }
 
-    public override ICommandItem GetCommandItem(string id) =>
+    public override ICommandItem? GetCommandItem(string id) =>
         id == SampleCompactPinToDockPage.PinnableItem.Command.Id ? SampleCompactPinToDockPage.PinnableItem : null;
 
     public override ICommandItem[] GetDockBands()
