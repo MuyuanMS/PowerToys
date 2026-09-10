@@ -68,6 +68,7 @@ private:
 
     HANDLE m_process;
     HANDLE m_resizeEvent;
+    HBRUSH m_backgroundBrush;
 
     std::string m_loggerName;
     std::wstring m_logFilePath;

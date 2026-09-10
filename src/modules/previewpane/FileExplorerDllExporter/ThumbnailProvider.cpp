@@ -16,6 +16,8 @@
 extern HINSTANCE g_hInst;
 extern long g_cDllRef;
 extern std::mutex g_loggerMutex;
+extern std::string g_activeLoggerName;
+extern std::wstring g_activeLogFilePath;
 
 ThumbnailProvider::ThumbnailProvider(std::string name, std::wstring logFilePath, std::wstring exeName, std::wstring tempFolderName, std::wstring extension) :
     m_cRef(1), m_pStream(NULL), m_process(NULL), m_loggerName(name), m_logFilePath(logFilePath), m_exeName(exeName), m_tempFolderName(tempFolderName), m_extension(extension)
@@ -160,12 +162,26 @@ IFACEMETHODIMP ThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_ALPH
                 sei.lpFile = appPath.c_str();
                 sei.lpParameters = cmdLine.c_str();
                 sei.nShow = SW_SHOWDEFAULT;
-                ShellExecuteEx(&sei);
+                if (!ShellExecuteEx(&sei))
+                {
+                    const DWORD error = GetLastError();
+                    auto loggerLock = LockLogger();
+                    Logger::error(L"Failed to start {}. Error: {}", m_exeName, error);
+                    std::filesystem::remove(fileName);
+                    return HRESULT_FROM_WIN32(error);
+                }
                 m_process = sei.hProcess;
-                WaitForSingleObject(m_process, INFINITE);
+                const DWORD waitResult = WaitForSingleObject(m_process, INFINITE);
                 CloseHandle(m_process);
                 m_process = NULL;
                 std::filesystem::remove(fileName);
+                if (waitResult == WAIT_FAILED)
+                {
+                    const DWORD error = GetLastError();
+                    auto loggerLock = LockLogger();
+                    Logger::error(L"Failed to wait for {}. Error: {}", m_exeName, error);
+                    return HRESULT_FROM_WIN32(error);
+                }
 
 
                 std::wstring fileNameBmp = filePath + guid + L".bmp";
@@ -187,6 +203,7 @@ IFACEMETHODIMP ThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_ALPH
                 std::wstring errorMessage = std::wstring{ winrt::to_hstring(e.what()) };
                 auto loggerLock = LockLogger();
                 Logger::error(L"Failed to start {}. Error: {}", m_exeName, errorMessage);
+                return E_FAIL;
             }
         }
     }
@@ -204,6 +221,11 @@ IFACEMETHODIMP ThumbnailProvider::GetThumbnail(UINT cx, HBITMAP* phbmp, WTS_ALPH
 std::unique_lock<std::mutex> ThumbnailProvider::LockLogger() const
 {
     std::unique_lock lock(g_loggerMutex);
-    Logger::init(m_loggerName, m_logFilePath, PTSettingsHelper::get_log_settings_file_location());
+    if (g_activeLoggerName != m_loggerName || g_activeLogFilePath != m_logFilePath)
+    {
+        Logger::init(m_loggerName, m_logFilePath, PTSettingsHelper::get_log_settings_file_location());
+        g_activeLoggerName = m_loggerName;
+        g_activeLogFilePath = m_logFilePath;
+    }
     return lock;
 }

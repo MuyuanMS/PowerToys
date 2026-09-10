@@ -4,12 +4,15 @@
 #include <common/interop/shared_constants.h>
 #include <filesystem>
 #include <mutex>
+#include <string>
 #include <common/SettingsAPI/settings_helpers.h>
 #include <common/logger/logger_settings.h>
 
 HINSTANCE g_hInst = NULL;
 long g_cDllRef = 0;
 std::mutex g_loggerMutex;
+std::string g_activeLoggerName;
+std::wstring g_activeLogFilePath;
 
 // {0e6d5bdd-d5f8-4692-a089-8bb88cdd37f4}
 static const GUID CLSID_BgcodePreviewHandler = { 0x0e6d5bdd, 0xd5f8, 0x4692, { 0xa0, 0x89, 0x8b, 0xb8, 0x8c, 0xdd, 0x37, 0xf4 } };

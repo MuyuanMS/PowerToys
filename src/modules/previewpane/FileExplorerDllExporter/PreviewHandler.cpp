@@ -13,9 +13,11 @@
 extern HINSTANCE g_hInst;
 extern long g_cDllRef;
 extern std::mutex g_loggerMutex;
+extern std::string g_activeLoggerName;
+extern std::wstring g_activeLogFilePath;
 
 PreviewHandler::PreviewHandler(std::string name, std::wstring logFilePath, const wchar_t* resizeEvent, std::wstring exeName) :
-    m_cRef(1), m_hwndParent(NULL), m_rcParent(), m_punkSite(NULL), m_process(NULL), m_loggerName(name), m_logFilePath(logFilePath), m_exeName(exeName)
+    m_cRef(1), m_hwndParent(NULL), m_rcParent(), m_punkSite(NULL), m_process(NULL), m_backgroundBrush(NULL), m_loggerName(name), m_logFilePath(logFilePath), m_exeName(exeName)
 {
     m_resizeEvent = CreateEvent(nullptr, false, false, resizeEvent);
 
@@ -24,6 +26,14 @@ PreviewHandler::PreviewHandler(std::string name, std::wstring logFilePath, const
 
 PreviewHandler::~PreviewHandler()
 {
+    if (m_backgroundBrush)
+    {
+        if (m_hwndParent && reinterpret_cast<HBRUSH>(GetClassLongPtr(m_hwndParent, GCLP_HBRBACKGROUND)) == m_backgroundBrush)
+        {
+            SetClassLongPtr(m_hwndParent, GCLP_HBRBACKGROUND, reinterpret_cast<LONG_PTR>(GetSysColorBrush(COLOR_WINDOW)));
+        }
+        DeleteObject(m_backgroundBrush);
+    }
     Unload();
     if (m_resizeEvent)
     {
@@ -197,7 +207,13 @@ IFACEMETHODIMP PreviewHandler::DoPreview()
         sei.lpFile = appPath.c_str();
         sei.lpParameters = cmdLine.c_str();
         sei.nShow = SW_SHOWDEFAULT;
-        ShellExecuteEx(&sei);
+        if (!ShellExecuteEx(&sei))
+        {
+            const DWORD error = GetLastError();
+            auto loggerLock = LockLogger();
+            Logger::error(L"Failed to start {}. Error: {}", m_exeName, error);
+            return HRESULT_FROM_WIN32(error);
+        }
 
         // Prevent to leak processes: preview is called multiple times when minimizing and restoring Explorer window
         if (m_process)
@@ -242,7 +258,25 @@ IFACEMETHODIMP PreviewHandler::Unload()
 IFACEMETHODIMP PreviewHandler::SetBackgroundColor(COLORREF color)
 {
     HBRUSH brush = CreateSolidBrush(WindowsColors::is_dark_mode() ? RGB(0x1e, 0x1e, 0x1e) : RGB(0xff, 0xff, 0xff));
-    SetClassLongPtr(m_hwndParent, GCLP_HBRBACKGROUND, reinterpret_cast<LONG_PTR>(brush));
+    if (!brush)
+    {
+        return HRESULT_FROM_WIN32(GetLastError());
+    }
+
+    SetLastError(ERROR_SUCCESS);
+    const LONG_PTR previousBrush = SetClassLongPtr(m_hwndParent, GCLP_HBRBACKGROUND, reinterpret_cast<LONG_PTR>(brush));
+    if (!previousBrush && GetLastError() != ERROR_SUCCESS)
+    {
+        const HRESULT error = HRESULT_FROM_WIN32(GetLastError());
+        DeleteObject(brush);
+        return error;
+    }
+
+    if (m_backgroundBrush)
+    {
+        DeleteObject(m_backgroundBrush);
+    }
+    m_backgroundBrush = brush;
     return S_OK;
 }
 
@@ -303,7 +337,12 @@ IFACEMETHODIMP PreviewHandler::GetSite(REFIID riid, void** ppv)
 std::unique_lock<std::mutex> PreviewHandler::LockLogger() const
 {
     std::unique_lock lock(g_loggerMutex);
-    Logger::init(m_loggerName, m_logFilePath, PTSettingsHelper::get_log_settings_file_location());
+    if (g_activeLoggerName != m_loggerName || g_activeLogFilePath != m_logFilePath)
+    {
+        Logger::init(m_loggerName, m_logFilePath, PTSettingsHelper::get_log_settings_file_location());
+        g_activeLoggerName = m_loggerName;
+        g_activeLogFilePath = m_logFilePath;
+    }
     return lock;
 }
 
