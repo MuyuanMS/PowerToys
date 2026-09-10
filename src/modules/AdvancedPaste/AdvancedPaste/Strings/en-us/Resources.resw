@@ -308,6 +308,18 @@
   <data name="AIErrorMessage.Header" xml:space="preserve">
     <value>The AI assistant provided the following message:</value>
   </data>
+  <data name="AIProviderDisabledByPolicy" xml:space="preserve">
+    <value>AI provider is disabled by policy</value>
+  </data>
+  <data name="AIProviderDisabledByPolicyDetails" xml:space="preserve">
+    <value>This AI provider is disabled by your organization's policy.</value>
+  </data>
+  <data name="AnthropicResponseTruncated" xml:space="preserve">
+    <value>Anthropic response was truncated</value>
+  </data>
+  <data name="AnthropicResponseTruncatedDetails" xml:space="preserve">
+    <value>The Anthropic response was truncated. Try a shorter clipboard selection or prompt.</value>
+  </data>
   <data name="ThumbsDownFeedback.Text" xml:space="preserve">
     <value>Thumbs down feedback</value>
   </data>

@@ -75,7 +75,6 @@
         <decimal value="0" />
       </disabledValue>
     </policy>
-
     <policy name="ConfigureEnabledUtilityAdvancedPaste" class="Both" displayName="$(string.ConfigureEnabledUtilityAdvancedPaste)" explainText="$(string.ConfigureEnabledUtilityDescription)" key="Software\Policies\PowerToys" valueName="ConfigureEnabledUtilityAdvancedPaste">
       <parentCategory ref="PowerToys" />
       <supportedOn ref="SUPPORTED_POWERTOYS_0_81_0" />

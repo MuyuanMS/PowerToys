@@ -12,6 +12,7 @@ using AdvancedPaste.Helpers;
 using AdvancedPaste.Models;
 using AdvancedPaste.Settings;
 using AdvancedPaste.Telemetry;
+using Anthropic.Exceptions;
 using ManagedCommon;
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.PowerToys.Telemetry;
@@ -66,6 +67,14 @@ namespace AdvancedPaste.Services.CustomActions
             {
                 Logger.LogWarning("Clipboard has no usable data");
                 return new CustomActionTransformResult(string.Empty, AIServiceUsage.None);
+            }
+
+            if (!IsProviderAllowedByGPO(providerConfig.ProviderType))
+            {
+                throw new PasteActionException(
+                    ResourceLoaderInstance.ResourceLoader.GetString("AIProviderDisabledByPolicy"),
+                    new InvalidOperationException($"Advanced Paste AI provider '{providerConfig.ProviderType}' is disabled by policy."),
+                    aiServiceMessage: ResourceLoaderInstance.ResourceLoader.GetString("AIProviderDisabledByPolicyDetails"));
             }
 
             var systemPrompt = providerConfig.SystemPrompt ?? DefaultSystemPrompt;
@@ -145,6 +154,11 @@ namespace AdvancedPaste.Services.CustomActions
                 return (int)statusCode;
             }
 
+            if (exception is AnthropicApiException anthropicApiException)
+            {
+                return (int)anthropicApiException.StatusCode;
+            }
+
             return -1;
         }
 
@@ -209,6 +223,29 @@ namespace AdvancedPaste.Services.CustomActions
                 AIServiceType.Ollama => false,
                 AIServiceType.FoundryLocal => false,
                 AIServiceType.PhiSilica => false,
+                _ => true,
+            };
+        }
+
+        private static bool IsProviderAllowedByGPO(AIServiceType serviceType)
+        {
+            var metadata = AIServiceTypeRegistry.GetMetadata(serviceType);
+            if (metadata.IsOnlineService &&
+                PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOnlineAIModelsValue() == PowerToys.GPOWrapper.GpoRuleConfigured.Disabled)
+            {
+                return false;
+            }
+
+            return serviceType switch
+            {
+                AIServiceType.OpenAI => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOpenAIValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.AzureOpenAI => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteAzureOpenAIValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.AzureAIInference => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteAzureAIInferenceValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.Mistral => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteMistralValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.Google => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteGoogleValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.Ollama => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOllamaValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.FoundryLocal => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteFoundryLocalValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.Anthropic => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteAnthropicValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
                 _ => true,
             };
         }
