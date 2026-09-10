@@ -87,7 +87,7 @@ internal static class IncrementalAdaptiveCardVisualTree
                     currentNode,
                     update.PropertyName,
                     update.ExpectedOldValue,
-                    validateImageValue: false)
+                    validateImageValue: true)
                 || !HasExpectedValue(
                     candidateNode,
                     update.PropertyName,
@@ -165,13 +165,15 @@ internal static class IncrementalAdaptiveCardVisualTree
             else
             {
                 TryGetInlineSvgTarget(currentNode, out var currentImage, out _);
-                TryGetInlineSvgTarget(candidateNode, out var candidateImage, out _);
+                TryGetInlineSvgTarget(candidateNode, out var candidateImage, out var candidateResource);
                 currentImage.Source = preparedImages[update.NodeIndex];
                 currentImage.Width = candidateImage.Width;
                 currentImage.Height = candidateImage.Height;
                 currentImage.MaxWidth = candidateImage.MaxWidth;
                 currentImage.MaxHeight = candidateImage.MaxHeight;
                 currentImage.Visibility = candidateImage.Visibility;
+                ((AdaptiveImage)((ElementTagContent)((FrameworkElement)currentNode).Tag).CardElement).Url =
+                    candidateResource;
             }
         }
 
