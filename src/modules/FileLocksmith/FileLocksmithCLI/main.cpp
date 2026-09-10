@@ -112,6 +112,25 @@ namespace
         HANDLE value = nullptr;
     };
 
+    struct proc_thread_attribute_list_guard
+    {
+        explicit proc_thread_attribute_list_guard(LPPROC_THREAD_ATTRIBUTE_LIST value) :
+            value(value)
+        {
+        }
+
+        ~proc_thread_attribute_list_guard()
+        {
+            DeleteProcThreadAttributeList(value);
+        }
+
+        proc_thread_attribute_list_guard(const proc_thread_attribute_list_guard&) = delete;
+        proc_thread_attribute_list_guard& operator=(const proc_thread_attribute_list_guard&) = delete;
+
+    private:
+        LPPROC_THREAD_ATTRIBUTE_LIST value;
+    };
+
     std::string create_worker_request(const std::vector<std::wstring>& paths)
     {
         json::JsonArray json_paths;
@@ -203,12 +222,37 @@ namespace
         }
         executable_path.resize(executable_length);
 
+        SIZE_T attribute_list_size = 0;
+        InitializeProcThreadAttributeList(nullptr, 1, 0, &attribute_list_size);
+        std::vector<unsigned char> attribute_list_storage(attribute_list_size);
+        auto attribute_list = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attribute_list_storage.data());
+        if (!InitializeProcThreadAttributeList(attribute_list, 1, 0, &attribute_list_size))
+        {
+            return std::nullopt;
+        }
+
+        const proc_thread_attribute_list_guard delete_attribute_list{ attribute_list };
+        HANDLE inherited_handles[] = { child_stdin.get(), child_stdout.get(), child_stderr.get() };
+        if (!UpdateProcThreadAttribute(
+                attribute_list,
+                0,
+                PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+                inherited_handles,
+                sizeof(inherited_handles),
+                nullptr,
+                nullptr))
+        {
+            return std::nullopt;
+        }
+
         std::wstring command_line = L"\"" + executable_path + L"\" " + std::wstring(WorkerArgument);
-        STARTUPINFOW startup_info{ sizeof(startup_info) };
-        startup_info.dwFlags = STARTF_USESTDHANDLES;
-        startup_info.hStdInput = child_stdin.get();
-        startup_info.hStdOutput = child_stdout.get();
-        startup_info.hStdError = child_stderr.get();
+        STARTUPINFOEXW startup_info{};
+        startup_info.StartupInfo.cb = sizeof(startup_info);
+        startup_info.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+        startup_info.StartupInfo.hStdInput = child_stdin.get();
+        startup_info.StartupInfo.hStdOutput = child_stdout.get();
+        startup_info.StartupInfo.hStdError = child_stderr.get();
+        startup_info.lpAttributeList = attribute_list;
 
         PROCESS_INFORMATION process_info{};
         if (!CreateProcessW(
@@ -217,10 +261,10 @@ namespace
                 nullptr,
                 nullptr,
                 TRUE,
-                CREATE_NO_WINDOW | CREATE_SUSPENDED,
+                CREATE_NO_WINDOW | CREATE_SUSPENDED | EXTENDED_STARTUPINFO_PRESENT,
                 nullptr,
                 nullptr,
-                &startup_info,
+                &startup_info.StartupInfo,
                 &process_info))
         {
             return std::nullopt;
