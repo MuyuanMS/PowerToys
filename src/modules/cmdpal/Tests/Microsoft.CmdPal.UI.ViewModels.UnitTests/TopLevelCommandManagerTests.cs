@@ -45,6 +45,45 @@ public partial class TopLevelCommandManagerTests
     }
 
     [TestMethod]
+    public async Task LoadingState_OverlappingBeginDuringFinalEnd_RemainsLoading()
+    {
+        using var services = CreateServices();
+        using var manager = new TopLevelCommandManager(services, []);
+        await manager.LoadExternalProvidersAsync();
+        manager.BeginLoading();
+
+        using var endTransitionStarted = new ManualResetEventSlim();
+        using var releaseEndTransition = new ManualResetEventSlim();
+        var blockFirstTransition = 1;
+        manager.PropertyChanging += (_, args) =>
+        {
+            if (args.PropertyName == nameof(TopLevelCommandManager.IsLoading) &&
+                Interlocked.Exchange(ref blockFirstTransition, 0) == 1)
+            {
+                endTransitionStarted.Set();
+                releaseEndTransition.Wait();
+            }
+        };
+
+        var endTask = Task.Run(manager.EndLoading);
+        Assert.IsTrue(endTransitionStarted.Wait(TimeSpan.FromSeconds(2)));
+
+        using var beginStarted = new ManualResetEventSlim();
+        var beginTask = Task.Run(() =>
+        {
+            beginStarted.Set();
+            manager.BeginLoading();
+        });
+        Assert.IsTrue(beginStarted.Wait(TimeSpan.FromSeconds(2)));
+
+        releaseEndTransition.Set();
+        await Task.WhenAll(endTask, beginTask).WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.IsTrue(manager.IsLoading);
+        manager.EndLoading();
+    }
+
+    [TestMethod]
     public async Task ResolveCommandAsync_UsesProviderLookupForNestedCommand()
     {
         using var services = CreateServices();

@@ -134,6 +134,8 @@ internal sealed partial class ExternalCommandLinkCoordinator : IDisposable
         }
     }
 
+    internal Task HandleLinkForTestAsync(CmdPalProtocolRoute route) => HandleLinkAsync(route);
+
     private async Task HandleReloadAsync(CmdPalProtocolRoute route)
     {
         var consentRequest = new ExternalCommandConsentRequest(
