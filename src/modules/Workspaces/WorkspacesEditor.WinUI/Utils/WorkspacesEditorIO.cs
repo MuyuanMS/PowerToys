@@ -89,7 +89,7 @@ namespace WorkspacesEditor.Utils
                     MonitorConfiguration = [],
                 };
 
-                foreach (Application app in project.Applications)
+                foreach (Application app in GetIncludedApplications(project))
                 {
                     ApplicationWrapper appWrapper = new()
                     {
@@ -157,6 +157,11 @@ namespace WorkspacesEditor.Utils
             {
                 Logger.LogError($"Exception while writing storage file: {e.Message}");
             }
+        }
+
+        internal static IEnumerable<Application> GetIncludedApplications(Project project)
+        {
+            return project.Applications.Where(app => app.IsIncluded);
         }
 
         private static bool SetWorkspaces(MainViewModel mainViewModel, WorkspacesData.WorkspacesListWrapper workspaces)

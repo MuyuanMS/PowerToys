@@ -17,13 +17,15 @@ namespace WorkspacesLauncherUI.Models
     public class AppLaunching : BaseApplication, IDisposable
     {
         private BitmapImage _iconBitmapImage;
+        private bool _iconBitmapImageInitialized;
 
         public BitmapImage IconBitmapImage
         {
             get
             {
-                if (_iconBitmapImage == null)
+                if (!_iconBitmapImageInitialized)
                 {
+                    _iconBitmapImageInitialized = true;
                     try
                     {
                         using Bitmap previewBitmap = new(32, 32);
@@ -47,8 +49,9 @@ namespace WorkspacesLauncherUI.Models
                         bitmapImage.Freeze();
                         _iconBitmapImage = bitmapImage;
                     }
-                    catch (Exception)
+                    catch (Exception ex)
                     {
+                        Logger.LogWarning($"Failed to create the launch preview icon for {AppPath}. {ex}");
                     }
                 }
 
