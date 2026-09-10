@@ -37,6 +37,9 @@ export type FontFamily = 'userInterface' | 'monospace';
 /** Identifies the kind of page a command navigates to, if any. */
 export type PageType = 'listPage' | 'dynamicListPage' | 'contentPage';
 
+/** Which observable object raised a property-change notification. */
+export type ObservableTargetKind = 'command' | 'commandItem' | 'listItem';
+
 // === Icons ===
 
 /**
@@ -424,6 +427,12 @@ export interface IListPage extends IPage {
    * Called by the host as the user scrolls.
    */
   loadMore?(): void | Promise<void>;
+  /**
+   * Applies a filter selected by the host.
+   *
+   * @param filterId Identifier from {@link IListPage.filters}.
+   */
+  setFilter?(filterId: string): void | Promise<void>;
 }
 
 /** A list page that receives search input in real time. */
@@ -484,6 +493,20 @@ export interface FormContent {
    * @returns A {@link CommandResult} describing what the host does next.
    */
   submitForm(inputs: string, data: string): CommandResult | Promise<CommandResult>;
+  /**
+   * Handles a form submission while preserving the Adaptive Card action id.
+   * When omitted, the runtime falls back to {@link submitForm}.
+   *
+   * @param actionId Identifier of the submitted Adaptive Card action.
+   * @param inputs JSON string of the submitted input values.
+   * @param data JSON string of the form's bound data.
+   * @returns A {@link CommandResult} describing what the host does next.
+   */
+  submitAction?(
+    actionId: string,
+    inputs: string,
+    data: string,
+  ): CommandResult | Promise<CommandResult>;
 }
 
 /** Content that renders an image. */
@@ -638,9 +661,9 @@ export interface ICommandProvider {
   /**
    * Produces fallback commands that receive the search query as the user types.
    *
-   * @returns The fallback command items, synchronously or as a promise.
+   * @returns The fallback command items, or `null` when none are available.
    */
-  fallbackCommands?(): IFallbackCommandItem[] | Promise<IFallbackCommandItem[]>;
+  fallbackCommands?(): IFallbackCommandItem[] | null | Promise<IFallbackCommandItem[] | null>;
   /**
    * Resolves a command by id, for commands not returned up front.
    *
