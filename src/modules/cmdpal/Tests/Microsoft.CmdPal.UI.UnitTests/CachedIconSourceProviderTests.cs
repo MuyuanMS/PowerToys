@@ -40,6 +40,49 @@ public class CachedIconSourceProviderTests
     }
 
     [TestMethod]
+    [DoNotParallelize]
+    [Timeout(5_000)]
+    public async Task ConcurrentDiagnosticRequestsLinkToSharedInFlightLoad()
+    {
+        IconLoadDiagnostics.Start();
+        try
+        {
+            var loader = new ControllableIconLoader();
+            var provider = new CachedIconSourceProvider(loader, new Size(20, 20), cacheSize: 16);
+            var icon = new IconDataViewModel { Icon = "test" };
+            var requests = new ConcurrentBag<(Task<IconSource?> Task, IconRequestMeasurement Diagnostics)>();
+
+            Parallel.For(
+                0,
+                32,
+                _ =>
+                {
+                    var diagnostics = IconLoadDiagnostics.BeginRequest(IconRequestReason.SourceChanged, 1.0);
+                    requests.Add((provider.GetIconSource(icon, 1.0, diagnostics), diagnostics));
+                });
+
+            Assert.AreEqual(1, loader.EnqueueCount);
+            loader.CompleteNext(null);
+            foreach (var request in requests)
+            {
+                await request.Task;
+                request.Diagnostics.Complete(IconRequestStatus.Empty);
+            }
+
+            var report = IconLoadDiagnostics.StopAndCreateReport();
+
+            Assert.IsNotNull(report);
+            StringAssert.Contains(report.Text, "Requests linked to session loads: 32");
+            StringAssert.Contains(report.Text, "Loads with multiple simultaneous requesters: 1");
+            StringAssert.Contains(report.Text, "Maximum simultaneous requesters per load: 32");
+        }
+        finally
+        {
+            IconLoadDiagnostics.Reset();
+        }
+    }
+
+    [TestMethod]
     [Timeout(5_000)]
     public async Task SuccessfulLoadIsCachedBeforeInFlightEntryIsRemoved()
     {
