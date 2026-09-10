@@ -53,6 +53,7 @@ namespace
 {
     constexpr std::wstring_view WorkerArgument = L"--worker-json";
     constexpr DWORD DefaultWorkerTimeoutMilliseconds = 30000;
+    constexpr DWORD WorkerCleanupTimeoutMilliseconds = 2000;
 
     DWORD worker_timeout_milliseconds()
     {
@@ -230,7 +231,7 @@ namespace
         const auto terminate_worker = [&] {
             if (TerminateJobObject(job.get(), 2))
             {
-                WaitForSingleObject(process.get(), INFINITE);
+                WaitForSingleObject(process.get(), WorkerCleanupTimeoutMilliseconds);
             }
         };
         if (!AssignProcessToJobObject(job.get(), process.get()))
@@ -240,7 +241,7 @@ namespace
                 parent_stdin.reset();
                 ResumeThread(thread.get());
             }
-            WaitForSingleObject(process.get(), INFINITE);
+            WaitForSingleObject(process.get(), WorkerCleanupTimeoutMilliseconds);
             return std::nullopt;
         }
 

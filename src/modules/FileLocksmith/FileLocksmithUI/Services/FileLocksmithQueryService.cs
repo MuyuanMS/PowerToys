@@ -22,6 +22,7 @@ namespace PowerToys.FileLocksmithUI.Services
         internal static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
 
         private static readonly Encoding Utf8WithoutByteOrderMark = new UTF8Encoding(false);
+        private static readonly TimeSpan CleanupTimeout = TimeSpan.FromSeconds(2);
 
         private const string WorkerExecutableName = "FileLocksmithCLI.exe";
         private const string WorkerArgument = "--worker-json";
@@ -129,7 +130,6 @@ namespace PowerToys.FileLocksmithUI.Services
                 catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
                 {
                     await TerminateAsync(process);
-                    await Task.WhenAll(outputTask, errorTask);
                     return new FileLocksmithQueryResult(
                         FileLocksmithQueryStatus.TimedOut,
                         Array.Empty<FileLocksmithProcessInfo>());
@@ -193,6 +193,7 @@ namespace PowerToys.FileLocksmithUI.Services
                 if (!process.HasExited)
                 {
                     await TerminateAsync(process);
+                    workerJob.Dispose();
                 }
 
                 if (!inputClosed)
@@ -200,7 +201,7 @@ namespace PowerToys.FileLocksmithUI.Services
                     process.StandardInput.BaseStream.Dispose();
                 }
 
-                await Task.WhenAll(outputTask, errorTask);
+                await DrainPipesAsync(process, outputTask, errorTask);
             }
         }
 
@@ -247,7 +248,43 @@ namespace PowerToys.FileLocksmithUI.Services
             {
             }
 
-            await process.WaitForExitAsync(CancellationToken.None);
+            using var cleanupCancellation = new CancellationTokenSource(CleanupTimeout);
+            try
+            {
+                await process.WaitForExitAsync(cleanupCancellation.Token);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        private static async Task DrainPipesAsync(
+            Process process,
+            Task<string> outputTask,
+            Task<string> errorTask)
+        {
+            var drainTask = Task.WhenAll(outputTask, errorTask);
+            using var cleanupCancellation = new CancellationTokenSource(CleanupTimeout);
+            try
+            {
+                await drainTask.WaitAsync(cleanupCancellation.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                process.StandardOutput.Dispose();
+                process.StandardError.Dispose();
+                _ = drainTask.ContinueWith(
+                    static task => _ = task.Exception,
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted,
+                    TaskScheduler.Default);
+            }
+            catch (IOException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
         }
 
         private static FileLocksmithQueryResult FailedToStart() =>

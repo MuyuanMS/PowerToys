@@ -81,7 +81,8 @@ namespace PowerToys.FileLocksmithUI.UnitTests
                 TimeSpan.FromMilliseconds(500),
                 pid => workerPid = pid);
 
-            var result = await service.FindProcessesAsync(SelectedPaths, CancellationToken.None);
+            var result = await service.FindProcessesAsync(SelectedPaths, CancellationToken.None)
+                .WaitAsync(TimeSpan.FromSeconds(10));
 
             Assert.AreEqual(FileLocksmithQueryStatus.TimedOut, result.Status);
             Assert.AreNotEqual(0, workerPid);
@@ -100,7 +101,8 @@ namespace PowerToys.FileLocksmithUI.UnitTests
 
             try
             {
-                await service.FindProcessesAsync(SelectedPaths, cancellation.Token);
+                await service.FindProcessesAsync(SelectedPaths, cancellation.Token)
+                    .WaitAsync(TimeSpan.FromSeconds(10));
                 Assert.Fail("Caller cancellation was not propagated.");
             }
             catch (OperationCanceledException)
