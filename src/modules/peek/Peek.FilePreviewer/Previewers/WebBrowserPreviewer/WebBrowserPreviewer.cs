@@ -60,6 +60,13 @@ namespace Peek.FilePreviewer.Previewers
             Dispatcher = DispatcherQueue.GetForCurrentThread();
         }
 
+        internal WebBrowserPreviewer(IFileSystemItem file, IPreviewSettings previewSettings, DispatcherQueue? dispatcher)
+        {
+            _previewSettings = previewSettings;
+            File = file;
+            Dispatcher = dispatcher;
+        }
+
         ~WebBrowserPreviewer()
         {
             Dispose(false);
@@ -84,7 +91,7 @@ namespace Peek.FilePreviewer.Previewers
 
         public bool IsPreviewLoaded => Preview != null;
 
-        private DispatcherQueue Dispatcher { get; }
+        private DispatcherQueue? Dispatcher { get; }
 
         private Task<bool>? DisplayInfoTask { get; set; }
 
@@ -110,63 +117,58 @@ namespace Peek.FilePreviewer.Previewers
         {
             return TaskExtension.RunSafe(async () =>
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                if (Dispatcher == null)
+                {
+                    throw new InvalidOperationException("A dispatcher is required to load the preview.");
+                }
 
-                string extension = File.Extension;
-
-                // Default: non-dev file preview with standard context menu
-                bool isDevFilePreview = false;
-                bool customContextMenu = false;
-                Uri previewUri;
-
-                // Determine preview strategy based on file type priority
-                if (extension == ".md")
-                {
-                    // Markdown files use custom renderer
-                    var raw = await ReadHelper.Read(File.Path.ToString(), _previewSettings.SourceCodeMaxFileSizeBytes, cancellationToken).ConfigureAwait(false);
-                    previewUri = new Uri(MarkdownHelper.PreviewTempFile(raw, File.Path, TempFolderPath.Path));
-                }
-                else if (extension == ".svg")
-                {
-                    // SVG files are rendered directly by WebView2 for better compatibility
-                    // with complex SVGs from Adobe Illustrator, Inkscape, etc.
-                    previewUri = new Uri(File.Path);
-                }
-                else if (extension == ".html" || extension == ".htm")
-                {
-                    // Simple html file to preview. Shouldn't do things like enabling scripts or using a virtual mapped directory.
-                    previewUri = new Uri(File.Path);
-                }
-                else if (extension == ".pdf")
-                {
-                    previewUri = new Uri(File.Path);
-                }
-                else
-                {
-                    // Source code files use Monaco editor
-                    // Only extensions Monaco doesn't recognize are sniffed to check if they can be displayed as plain text.
-                    if (!IsItemSupported(File) && !await TextFileHelper.IsTextFileAsync(File.Path, _previewSettings.SourceCodeMaxFileSizeBytes, cancellationToken).ConfigureAwait(false))
-                    {
-                        throw new NotSupportedException($"'{File.Path}' has an unrecognized extension and its content was not sniffed as text.");
-                    }
-
-                    isDevFilePreview = true;
-                    customContextMenu = true;
-                    var raw = await ReadHelper.Read(File.Path.ToString(), _previewSettings.SourceCodeMaxFileSizeBytes, cancellationToken).ConfigureAwait(false);
-                    previewUri = new Uri(MonacoHelper.PreviewTempFile(raw, extension, TempFolderPath.Path, _previewSettings.SourceCodeTryFormat, _previewSettings.SourceCodeWrapText, _previewSettings.SourceCodeStickyScroll, _previewSettings.SourceCodeFontSize, _previewSettings.SourceCodeMinimap));
-                }
+                var previewContent = await CreatePreviewAsync(cancellationToken).ConfigureAwait(false);
 
                 await Dispatcher.RunOnUiThread(() =>
                 {
-                    IsDevFilePreview = isDevFilePreview;
-                    CustomContextMenu = customContextMenu;
-                    Preview = previewUri;
+                    IsDevFilePreview = previewContent.IsDevFilePreview;
+                    CustomContextMenu = previewContent.CustomContextMenu;
+                    Preview = previewContent.PreviewUri;
                 });
             });
         }
 
+        internal async Task<(Uri PreviewUri, bool IsDevFilePreview, bool CustomContextMenu)> CreatePreviewAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            string extension = File.Extension;
+
+            if (extension == ".md")
+            {
+                var raw = await ReadHelper.Read(File.Path.ToString(), _previewSettings.SourceCodeMaxFileSizeBytes, cancellationToken).ConfigureAwait(false);
+                return (new Uri(MarkdownHelper.PreviewTempFile(raw, File.Path, TempFolderPath.Path)), false, false);
+            }
+
+            if (extension == ".svg" || extension == ".html" || extension == ".htm" || extension == ".pdf")
+            {
+                return (new Uri(File.Path), false, false);
+            }
+
+            // Source code files use Monaco editor. Only extensions Monaco doesn't recognize are sniffed
+            // to check whether they can be displayed as plain text.
+            if (!IsItemSupported(File) && !await TextFileHelper.IsTextFileAsync(File.Path, _previewSettings.SourceCodeMaxFileSizeBytes, cancellationToken).ConfigureAwait(false))
+            {
+                throw new NotSupportedException($"'{File.Path}' has an unrecognized extension and its content was not sniffed as text.");
+            }
+
+            var content = await ReadHelper.Read(File.Path.ToString(), _previewSettings.SourceCodeMaxFileSizeBytes, cancellationToken).ConfigureAwait(false);
+            var previewUri = new Uri(MonacoHelper.PreviewTempFile(content, extension, TempFolderPath.Path, _previewSettings.SourceCodeTryFormat, _previewSettings.SourceCodeWrapText, _previewSettings.SourceCodeStickyScroll, _previewSettings.SourceCodeFontSize, _previewSettings.SourceCodeMinimap));
+            return (previewUri, true, true);
+        }
+
         public async Task CopyAsync()
         {
+            if (Dispatcher == null)
+            {
+                throw new InvalidOperationException("A dispatcher is required to copy the previewed file.");
+            }
+
             await Dispatcher.RunOnUiThread(async () =>
             {
                 var storageItem = await File.GetStorageItemAsync();

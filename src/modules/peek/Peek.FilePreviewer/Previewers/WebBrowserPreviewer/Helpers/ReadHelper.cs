@@ -46,9 +46,9 @@ namespace Peek.FilePreviewer.Previewers
             // Check if the detected encoding is not null; otherwise, default to UTF-8
             Encoding encodingToUse = result.Detected?.Encoding ?? Encoding.UTF8;
 
-            // Rewind and stream the decode so the whole file is never held in memory at once.
-            // StreamReader strips a byte order mark rather than surface it as a leading U+FEFF character; the per-chunk
-            // length check catches a file being appended to that would otherwise grow the preview past the limit.
+            // Rewind and decode in chunks to keep stream I/O bounded by the buffer size. The returned text is still
+            // accumulated in memory for Monaco, so the configured size cap limits the total allocation. StreamReader
+            // strips a byte order mark rather than surfacing it as a leading U+FEFF character.
             fs.Position = 0;
             using var sr = new StreamReader(fs, encodingToUse, detectEncodingFromByteOrderMarks: true, bufferSize: 1024, leaveOpen: true);
             var buffer = new char[81920];

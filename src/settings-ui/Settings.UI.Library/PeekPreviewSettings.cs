@@ -16,6 +16,10 @@ namespace Settings.UI.Library
         // Default cap for the source-code preview in kilobytes, files above the limit fall back to the info preview.
         public const int DefaultSourceCodeMaxFileSize = 10240;
 
+        public const int MinSourceCodeMaxFileSize = 1;
+
+        public const int MaxSourceCodeMaxFileSize = 102400;
+
         public BoolProperty SourceCodeWrapText { get; set; }
 
         public BoolProperty SourceCodeTryFormat { get; set; }
