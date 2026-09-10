@@ -198,11 +198,25 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
         Command.InitializeProperties();
 
-        var icon = model.Icon;
-        if (icon is not null)
+        IconInfoViewModel? icon = null;
+        var iconInfo = model.Icon;
+        if (iconInfo is not null)
         {
-            _icon = new(icon);
-            _icon.InitializeProperties();
+            icon = new(iconInfo);
+            icon.InitializeProperties();
+        }
+
+        lock (_moreCommandsLock)
+        {
+            if (IsCleanedUp)
+            {
+                return;
+            }
+
+            if (icon is not null)
+            {
+                _icon = icon;
+            }
         }
 
         // TODO: Do these need to go into FastInit?
@@ -427,15 +441,23 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
                 break;
 
             case nameof(Icon):
-                var oldIcon = _icon;
-                _icon = new(model.Icon);
-                _icon.InitializeProperties();
-                if (oldIcon.IsSet || _icon.IsSet)
+                var icon = new IconInfoViewModel(model.Icon);
+                icon.InitializeProperties();
+                var iconChanged = false;
+                lock (_moreCommandsLock)
+                {
+                    if (!IsCleanedUp)
+                    {
+                        iconChanged = _icon.IsSet || icon.IsSet;
+                        _icon = icon;
+                        UpdateDefaultContextItemIcon();
+                    }
+                }
+
+                if (!IsCleanedUp && iconChanged)
                 {
                     UpdateProperty(nameof(Icon));
                 }
-
-                UpdateDefaultContextItemIcon();
 
                 break;
 
@@ -743,6 +765,7 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
             // produces an _allCommandsSnapshot that excludes the default command.
             freedDefault = _defaultCommandContextItemViewModel;
             _defaultCommandContextItemViewModel = null;
+            _icon = new(null);
 
             RefreshMoreCommandStateUnsafe();
         }
@@ -752,9 +775,6 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
                   .ToList()
                   .ForEach(c => c.SafeCleanup());
         freedDefault?.SafeCleanup();
-
-        // _listItemIcon.SafeCleanup();
-        _icon = new(null); // necessary?
 
         // One read of the pair, so a replacement racing this teardown cannot
         // leave us cleaning up a command against the wrong ownership flag.

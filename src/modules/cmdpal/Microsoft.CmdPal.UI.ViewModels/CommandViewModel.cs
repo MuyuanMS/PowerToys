@@ -9,6 +9,7 @@ namespace Microsoft.CmdPal.UI.ViewModels;
 
 public partial class CommandViewModel : ExtensionObjectViewModel
 {
+    private readonly Lock _lifecycleLock = new();
     private ExtensionPropertySubscription _modelSubscription;
 
     public ExtensionObject<ICommand> Model { get; private set; } = new(null);
@@ -64,9 +65,19 @@ public partial class CommandViewModel : ExtensionObjectViewModel
             return;
         }
 
-        Id = model.Id ?? string.Empty;
-        Name = model.Name ?? string.Empty;
-        IsFastInitialized = true;
+        var id = model.Id ?? string.Empty;
+        var name = model.Name ?? string.Empty;
+        lock (_lifecycleLock)
+        {
+            if (IsFastInitialized || IsCleanedUp)
+            {
+                return;
+            }
+
+            Id = id;
+            Name = name;
+            IsFastInitialized = true;
+        }
     }
 
     public override void InitializeProperties()
@@ -87,22 +98,49 @@ public partial class CommandViewModel : ExtensionObjectViewModel
             return;
         }
 
-        var ico = model.Icon;
-        if (ico is not null)
+        IconInfoViewModel? icon = null;
+        var iconInfo = model.Icon;
+        if (iconInfo is not null)
         {
-            Icon = new(ico);
-            Icon.InitializeProperties();
-            UpdateProperty(nameof(Icon));
+            icon = new(iconInfo);
+            icon.InitializeProperties();
         }
 
+        Dictionary<string, ExtensionObject<object>>? properties = null;
         if (model is IExtendedAttributesProvider command2)
         {
-            UpdatePropertiesFromExtension(command2);
+            properties = GetPropertiesFromExtension(command2);
+        }
+
+        lock (_lifecycleLock)
+        {
+            if (IsCleanedUp)
+            {
+                return;
+            }
+
+            if (icon is not null)
+            {
+                Icon = icon;
+            }
+
+            _properties = properties;
+        }
+
+        if (icon is not null)
+        {
+            UpdateProperty(nameof(Icon));
         }
 
         if (_modelSubscription.TrySubscribe(model, Model_PropChanged))
         {
-            IsInitialized = true;
+            lock (_lifecycleLock)
+            {
+                if (!IsCleanedUp)
+                {
+                    IsInitialized = true;
+                }
+            }
         }
     }
 
@@ -131,23 +169,53 @@ public partial class CommandViewModel : ExtensionObjectViewModel
             return; // throw?
         }
 
+        var published = false;
         switch (propertyName)
         {
             case nameof(Name):
-                Name = model.Name;
+                var name = model.Name;
+                lock (_lifecycleLock)
+                {
+                    if (!IsCleanedUp)
+                    {
+                        Name = name;
+                        published = true;
+                    }
+                }
+
                 break;
             case nameof(Icon):
                 var iconInfo = model.Icon;
-                Icon = new(iconInfo);
-                Icon.InitializeProperties();
+                var icon = new IconInfoViewModel(iconInfo);
+                icon.InitializeProperties();
+                lock (_lifecycleLock)
+                {
+                    if (!IsCleanedUp)
+                    {
+                        Icon = icon;
+                        published = true;
+                    }
+                }
+
                 break;
             case nameof(Properties):
-                UpdatePropertiesFromExtension(model as IExtendedAttributesProvider);
+                var properties = GetPropertiesFromExtension(model as IExtendedAttributesProvider);
+                lock (_lifecycleLock)
+                {
+                    if (!IsCleanedUp)
+                    {
+                        _properties = properties;
+                        published = true;
+                    }
+                }
 
                 break;
         }
 
-        UpdateProperty(propertyName);
+        if (published)
+        {
+            UpdateProperty(propertyName);
+        }
     }
 
     protected override void UnsafeCleanup()
@@ -155,7 +223,11 @@ public partial class CommandViewModel : ExtensionObjectViewModel
         var wasSubscribed = _modelSubscription.Close();
         base.UnsafeCleanup();
 
-        Icon = new(null); // necessary?
+        lock (_lifecycleLock)
+        {
+            Icon = new(null);
+            _properties = null;
+        }
 
         var model = Model.Unsafe;
         if (wasSubscribed && model is not null)
@@ -164,16 +236,15 @@ public partial class CommandViewModel : ExtensionObjectViewModel
         }
     }
 
-    private void UpdatePropertiesFromExtension(IExtendedAttributesProvider? model)
+    private static Dictionary<string, ExtensionObject<object>>? GetPropertiesFromExtension(IExtendedAttributesProvider? model)
     {
         var propertiesFromExtension = model?.GetProperties();
         if (propertiesFromExtension == null)
         {
-            _properties = null;
-            return;
+            return null;
         }
 
-        _properties = [];
+        Dictionary<string, ExtensionObject<object>> properties = [];
 
         // COPY the properties into us.
         // The IDictionary that was passed to us may be marshalled by-ref or by-value, we _don't know_.
@@ -182,7 +253,9 @@ public partial class CommandViewModel : ExtensionObjectViewModel
         // If it's bu-value, then everything is in-proc, and we can't mutate the data.
         foreach (var property in propertiesFromExtension)
         {
-            _properties.Add(property.Key, new(property.Value));
+            properties.Add(property.Key, new(property.Value));
         }
+
+        return properties;
     }
 }

@@ -6,6 +6,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CommandPalette.Extensions;
+using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
@@ -17,6 +18,8 @@ public partial class CommandItemViewModelLifecycleTests
         public Action? ReadIcon { get; set; }
 
         public Action? ReadName { get; set; }
+
+        public IIconInfo? IconValue { get; set; }
 
         private string _name = string.Empty;
 
@@ -38,7 +41,7 @@ public partial class CommandItemViewModelLifecycleTests
             get
             {
                 ReadIcon?.Invoke();
-                return null;
+                return IconValue;
             }
         }
     }
@@ -137,7 +140,10 @@ public partial class CommandItemViewModelLifecycleTests
     public async Task CleanupDuringOwnedCommandInitialization_DoesNotLeaveSubscriptions(string blockAt)
     {
         var context = new TestPageContext();
-        var command = new TestCommand();
+        var command = new TestCommand
+        {
+            IconValue = blockAt == "Icon" ? new IconInfo(string.Empty) : null,
+        };
         var item = new TestCommandItem { CommandValue = command };
         var viewModel = new CommandItemViewModel(new(item), new(context), null);
 
@@ -159,6 +165,7 @@ public partial class CommandItemViewModelLifecycleTests
 
         Assert.AreEqual(0, command.SubscriberCount);
         Assert.IsFalse(command.RemovedDuringSubscribe);
+        Assert.IsFalse(viewModel.Command.Icon.IsSet);
         AssertNoSubscriptions(item, viewModel);
         GC.KeepAlive(context);
     }
@@ -192,6 +199,27 @@ public partial class CommandItemViewModelLifecycleTests
             viewModel.SafeCleanup();
             GC.KeepAlive(context);
         }
+    }
+
+    [TestMethod]
+    public async Task CleanupDuringOwnedCommandIconCallback_DoesNotRepopulateIcon()
+    {
+        var context = new TestPageContext();
+        var command = new TestCommand();
+        var item = new TestCommandItem { CommandValue = command };
+        var viewModel = new CommandItemViewModel(new(item), new(context), null);
+        viewModel.InitializeProperties();
+        command.IconValue = new IconInfo(string.Empty);
+
+        await RunWithCleanup(
+            viewModel,
+            () => command.RaisePropertyChanged(nameof(ICommand.Icon)),
+            block => command.ReadIcon = block);
+
+        Assert.IsFalse(viewModel.Command.Icon.IsSet);
+        Assert.AreEqual(0, command.SubscriberCount);
+        AssertNoSubscriptions(item, viewModel);
+        GC.KeepAlive(context);
     }
 
     [TestMethod]
@@ -287,7 +315,7 @@ public partial class CommandItemViewModelLifecycleTests
 
         Assert.AreEqual(0, viewModel.AllCommands.Count);
         Assert.AreEqual(0, childItem.SubscriberCount);
-        Assert.AreEqual(0, childCommand.SubscriberCount);
+        Assert.AreEqual(0, childCommand.CountSubscribers<CommandViewModel>());
         GC.KeepAlive(context);
     }
 

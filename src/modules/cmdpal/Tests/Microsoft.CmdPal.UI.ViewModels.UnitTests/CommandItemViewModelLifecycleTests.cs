@@ -96,6 +96,8 @@ public partial class CommandItemViewModelLifecycleTests
 
         public IContextItem[] MoreCommandsValue { get; set; } = [];
 
+        public IIconInfo? IconValue { get; set; }
+
         public ICommand? Command
         {
             get
@@ -119,7 +121,7 @@ public partial class CommandItemViewModelLifecycleTests
             get
             {
                 ReadIcon?.Invoke();
-                return null;
+                return IconValue;
             }
         }
 
@@ -133,8 +135,18 @@ public partial class CommandItemViewModelLifecycleTests
     }
 
     [TestMethod]
-    public Task CleanupDuringIconGetter_DoesNotLeaveSubscriptions() =>
-        VerifyCleanupDuringInitialization((item, block) => item.ReadIcon = block);
+    public async Task CleanupDuringIconGetter_DoesNotPublishIcon()
+    {
+        var context = new TestPageContext();
+        var item = new TestCommandItem { IconValue = new IconInfo(string.Empty) };
+        var viewModel = new CommandItemViewModel(new(item), new(context), null);
+
+        await RunWithCleanup(viewModel, viewModel.InitializeProperties, block => item.ReadIcon = block);
+
+        Assert.IsFalse(viewModel.Icon.IsSet);
+        AssertNoSubscriptions(item, viewModel);
+        GC.KeepAlive(context);
+    }
 
     [TestMethod]
     public Task CleanupBeforeEventAddCompletes_DoesNotLeaveSubscriptions() =>
@@ -317,6 +329,25 @@ public partial class CommandItemViewModelLifecycleTests
             viewModel.SafeCleanup();
             GC.KeepAlive(context);
         }
+    }
+
+    [TestMethod]
+    public async Task CleanupDuringIconCallback_DoesNotRepopulateIcon()
+    {
+        var context = new TestPageContext();
+        var item = new TestCommandItem();
+        var viewModel = new CommandItemViewModel(new(item), new(context), null);
+        viewModel.InitializeProperties();
+        item.IconValue = new IconInfo(string.Empty);
+
+        await RunWithCleanup(
+            viewModel,
+            () => item.RaisePropertyChanged(nameof(ICommandItem.Icon)),
+            block => item.ReadIcon = block);
+
+        Assert.IsFalse(viewModel.Icon.IsSet);
+        AssertNoSubscriptions(item, viewModel);
+        GC.KeepAlive(context);
     }
 
     [TestMethod]
