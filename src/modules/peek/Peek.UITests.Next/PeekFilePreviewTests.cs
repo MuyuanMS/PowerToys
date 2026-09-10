@@ -296,6 +296,23 @@ public class PeekFilePreviewTests : UITestBase
             "The default program did not open the ZIP archive after pressing Enter.");
     }
 
+    [TestMethod("Peek.Focus.TitleBarButtonsNotFocusedOnOpen")]
+    [TestCategory("Keyboard Focus")]
+    public void TestTitleBarButtonsNotFocusedOnOpen()
+    {
+        var zipPath = Path.GetFullPath(@".\TestAssets\7.zip");
+        var peekWindow = OpenPeekWindow(zipPath);
+        var launchAppButton = peekWindow.Find<Button>(By.AccessibilityId("LaunchAppButton"), 5_000);
+        var pinButton = peekWindow.Find<Button>(By.AccessibilityId("PinButton"), 5_000);
+
+        Assert.IsFalse(
+            bool.TryParse(launchAppButton.GetProperty("HasKeyboardFocus"), out var launchAppHasFocus) && launchAppHasFocus,
+            "The Open in default viewer button should not receive initial keyboard focus.");
+        Assert.IsFalse(
+            bool.TryParse(pinButton.GetProperty("HasKeyboardFocus"), out var pinHasFocus) && pinHasFocus,
+            "The Pin button should not receive initial keyboard focus.");
+    }
+
     [TestMethod("Peek.FileNavigation.SwitchFilesWithArrowKeys")]
     [TestCategory("File Navigation")]
     public void TestSwitchFilesWithArrowKeys()
@@ -312,6 +329,32 @@ public class PeekFilePreviewTests : UITestBase
         {
             peekWindow = NavigateToFileWithRetry(peekWindow, Key.Left, testFiles[index]);
         }
+    }
+
+    [TestMethod("Peek.FileNavigation.SwitchFilesWithAltArrowWhenPreviewFocused")]
+    [TestCategory("File Navigation")]
+    public void TestSwitchFilesWithAltArrowWhenPreviewFocused()
+    {
+        var testAssetsPath = Path.GetFullPath(@".\TestAssets");
+        var selectedFiles = new[]
+        {
+            Path.Combine(testAssetsPath, "6.md"),
+            Path.Combine(testAssetsPath, "7.zip"),
+            Path.Combine(testAssetsPath, "8.png"),
+        };
+        var explorerWindow = OpenExplorerAndSelect(selectedFiles[0]);
+        SetExplorerSelection(explorerWindow, selectedFiles, selectedFiles[1]);
+
+        var peekWindow = SendPeekHotkeyWithRetry(selectedFiles[1]);
+        EnsurePeekReady(peekWindow);
+        peekWindow.Find<Element>(By.AccessibilityId("ArchivePreview"), 5_000).Focus();
+        EnsurePeekWindowForeground(peekWindow);
+
+        KeyboardHelper.SendKeys(Key.Alt, Key.Right);
+
+        Assert.IsNotNull(
+            WaitForPeekWindow(selectedFiles[2], PeekWindowTimeoutMS),
+            "Alt+Right should navigate to the next selected file while the interactive preview has focus.");
     }
 
     [TestMethod("Peek.FileNavigation.SwitchBetweenSelectedFiles")]
