@@ -1988,7 +1988,7 @@ public sealed partial class MainWindow : WindowEx,
 
     public void Receive(GetHwndMessage message)
     {
-        message.Hwnd = _hwnd.Value;
+        message.Hwnd = (nint)_hwnd;
     }
 
     public void Receive(ExpandCompactModeMessage message)
