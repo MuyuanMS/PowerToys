@@ -306,6 +306,8 @@ private:
     SRWLOCK m_settingsLock = SRWLOCK_INIT;
     SRWLOCK m_hwndLock = SRWLOCK_INIT;
     bool m_settingsPending = false;
+    std::atomic_bool m_windowInitializationComplete = false;
+    std::atomic_bool m_terminationRequested = false;
 
     // Set by the hook thread (which is our own message thread) and read by the render
     // tick.
@@ -2690,11 +2692,20 @@ bool LaserPointerOverlay::MyRegisterClass(HINSTANCE hInstance)
     ReleaseSRWLockExclusive(&m_hwndLock);
 
     const DWORD exStyle = WS_EX_TRANSPARENT | WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE;
-    return CreateWindowExW(exStyle, m_className, m_windowTitle, WS_POPUP, CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, m_hwndOwner, nullptr, hInstance, nullptr) != nullptr;
+    const HWND window = CreateWindowExW(exStyle, m_className, m_windowTitle, WS_POPUP, CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, m_hwndOwner, nullptr, hInstance, nullptr);
+    m_windowInitializationComplete = true;
+    if (window != nullptr && m_terminationRequested)
+    {
+        PostMessage(window, WM_TERMINATE_OVERLAY, 0, 0);
+    }
+
+    return window != nullptr;
 }
 
 void LaserPointerOverlay::Terminate()
 {
+    m_terminationRequested = true;
+
     AcquireSRWLockShared(&m_hwndLock);
     const HWND window = m_hwnd;
     const HWND owner = m_hwndOwner;
@@ -2707,6 +2718,12 @@ void LaserPointerOverlay::Terminate()
     // which is the thread pumping this message.
     if (window != nullptr && PostMessage(window, WM_TERMINATE_OVERLAY, 0, 0))
     {
+        return;
+    }
+
+    if (!m_windowInitializationComplete)
+    {
+        Logger::info("Laser Pointer termination queued until the overlay window is ready.");
         return;
     }
 
