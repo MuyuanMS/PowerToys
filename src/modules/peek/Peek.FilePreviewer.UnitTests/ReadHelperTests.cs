@@ -140,5 +140,18 @@ namespace Peek.FilePreviewer.UnitTests
 
             Assert.AreEqual(expected, content);
         }
+
+        [TestMethod]
+        public async Task Read_Windows1252WithLateNonAsciiContent_ShouldDecodeCorrectly()
+        {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            Encoding windows1252 = Encoding.GetEncoding(1252);
+            string expected = new string('a', 70_000) + "café";
+            File.WriteAllText(_tempFilePath, expected, windows1252);
+
+            string content = await ReadHelper.Read(_tempFilePath);
+
+            Assert.AreEqual(expected, content);
+        }
     }
 }
