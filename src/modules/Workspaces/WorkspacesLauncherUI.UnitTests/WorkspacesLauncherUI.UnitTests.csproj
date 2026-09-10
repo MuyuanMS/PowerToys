@@ -15,8 +15,6 @@
     <Platforms>x64;ARM64</Platforms>
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-    <!-- The referenced launcher assembly supplies the app-local initializer. -->
-    <WindowsAppSdkUndockedRegFreeWinRTInitialize>false</WindowsAppSdkUndockedRegFreeWinRTInitialize>
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,7 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WorkspacesCsharpLibrary\WorkspacesCsharpLibrary.csproj" />
-    <ProjectReference Include="..\WorkspacesLauncherUI.WinUI\WorkspacesLauncherUI.WinUI.csproj" />
+    <ProjectReference Include="..\WorkspacesLauncherUI.Lib\WorkspacesLauncherUI.Lib.csproj" />
   </ItemGroup>
 
 </Project>

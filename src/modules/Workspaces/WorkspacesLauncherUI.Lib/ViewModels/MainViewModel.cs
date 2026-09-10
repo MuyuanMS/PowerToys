@@ -28,7 +28,7 @@ namespace WorkspacesLauncherUI.ViewModels
         private ObservableCollection<AppLaunching> _appsListed = new ObservableCollection<AppLaunching>();
 
         public MainViewModel()
-            : this(App.SendIPCMessage)
+            : this(LauncherIpc.SendMessage)
         {
         }
 
@@ -50,7 +50,7 @@ namespace WorkspacesLauncherUI.ViewModels
                     Logger.LogError(ex.Message);
                 }
             };
-            App.IPCMessageReceivedCallback = _ipcMessageReceivedCallback;
+            LauncherIpc.MessageReceivedCallback = _ipcMessageReceivedCallback;
         }
 
         private void HandleAppLaunchingState(AppLaunchData.AppLaunchDataWrapper appLaunchData)
@@ -83,9 +83,9 @@ namespace WorkspacesLauncherUI.ViewModels
         {
             if (!_isDisposed)
             {
-                if (ReferenceEquals(App.IPCMessageReceivedCallback, _ipcMessageReceivedCallback))
+                if (ReferenceEquals(LauncherIpc.MessageReceivedCallback, _ipcMessageReceivedCallback))
                 {
-                    App.IPCMessageReceivedCallback = null;
+                    LauncherIpc.MessageReceivedCallback = null;
                 }
 
                 _isDisposed = true;

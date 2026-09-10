@@ -270,12 +270,12 @@ namespace WorkspacesLauncherUI.UnitTests
             var vm = new MainViewModel();
             vm.Dispose();
 
-            Assert.IsNull(App.IPCMessageReceivedCallback);
+            Assert.IsNull(LauncherIpc.MessageReceivedCallback);
         }
 
         private static void SimulateIpcMessage(string message)
         {
-            App.IPCMessageReceivedCallback?.Invoke(message);
+            LauncherIpc.MessageReceivedCallback?.Invoke(message);
         }
 
         private static string CreateIpcMessage(params (string Name, string Path, LaunchingState State)[] apps)

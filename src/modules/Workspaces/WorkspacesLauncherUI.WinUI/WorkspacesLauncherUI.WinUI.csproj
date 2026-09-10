@@ -52,6 +52,7 @@
     <ProjectReference Include="..\..\..\common\interop\PowerToys.Interop.vcxproj" />
     <ProjectReference Include="..\..\..\settings-ui\Settings.UI.Library\Settings.UI.Library.csproj" />
     <ProjectReference Include="..\WorkspacesCsharpLibrary\WorkspacesCsharpLibrary.csproj" />
+    <ProjectReference Include="..\WorkspacesLauncherUI.Lib\WorkspacesLauncherUI.Lib.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -60,10 +61,7 @@
     <PackageReference Include="Microsoft.WindowsAppSDK" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
     <PackageReference Include="System.Drawing.Common" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <InternalsVisibleTo Include="PowerToys.WorkspacesLauncherUI.Tests" />
+    <PackageReference Include="WinUIEx" />
   </ItemGroup>
 
 </Project>

@@ -22,10 +22,6 @@ namespace WorkspacesLauncherUI
         private DispatcherQueueTimer _readyTimer;
         private bool _isDisposed;
 
-        public static Action<string> IPCMessageReceivedCallback { get; set; }
-
-        public static Action CancelAcknowledgedCallback { get; set; }
-
         public static DispatcherQueue DispatcherQueue { get; private set; }
 
         public App()
@@ -64,10 +60,11 @@ namespace WorkspacesLauncherUI
             _ipcManager = new TwoWayPipeMessageIPCManaged(
                 "\\\\.\\pipe\\powertoys_workspaces_ui_",
                 "\\\\.\\pipe\\powertoys_workspaces_launcher_ui_",
-                (string message) => ProcessIPCMessage(
+                (string message) => LauncherIpc.ProcessMessage(
                     message,
                     callback => DispatcherQueue.TryEnqueue(() => callback()),
                     () => _readyTimer?.Stop()));
+            LauncherIpc.SendMessageCallback = SendIPCMessage;
             _ipcManager.Start();
 
             _readyTimer = DispatcherQueue.CreateTimer();
@@ -77,25 +74,6 @@ namespace WorkspacesLauncherUI
             SendIPCMessage("ready");
 
             _mainWindow.Activate();
-        }
-
-        internal static void ProcessIPCMessage(string message, Action<Action> enqueue, Action stopReadyTimer)
-        {
-            if (message == "cancel_ack")
-            {
-                enqueue(() => CancelAcknowledgedCallback?.Invoke());
-                return;
-            }
-
-            Action<string> callback = IPCMessageReceivedCallback;
-            if (callback != null && message.Length > 0)
-            {
-                enqueue(() =>
-                {
-                    stopReadyTimer();
-                    callback(message);
-                });
-            }
         }
 
         private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
@@ -110,6 +88,7 @@ namespace WorkspacesLauncherUI
                 _readyTimer?.Stop();
                 _ipcManager?.End();
                 _ipcManager?.Dispose();
+                LauncherIpc.SendMessageCallback = null;
                 _isDisposed = true;
             }
 

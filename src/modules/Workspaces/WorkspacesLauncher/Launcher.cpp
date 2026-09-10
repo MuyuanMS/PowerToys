@@ -116,9 +116,19 @@ void Launcher::Launch() // Launching thread
         bool additionalWait = false;
         while (!m_launchingStatus.AllInstancesOfTheAppLaunchedAndMoved(app) && waitingTime < maxWaitTimeMs)
         {
+            if (isCancellationRequested())
+            {
+                break;
+            }
+
             std::this_thread::sleep_for(std::chrono::milliseconds(ms));
             waitingTime += ms;
             additionalWait = true;
+        }
+
+        if (isCancellationRequested())
+        {
+            break;
         }
 
         if (additionalWait)
@@ -127,7 +137,20 @@ void Launcher::Launch() // Launching thread
             // Launching Outlook instances right one after another causes error message.
             // Launching Outlook instances with less than 1-second delay causes the second window not to appear
             // even though there wasn't a launch error.
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            for (long additionalWaitTime = 0; additionalWaitTime < 1000; additionalWaitTime += ms)
+            {
+                if (isCancellationRequested())
+                {
+                    break;
+                }
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+            }
+        }
+
+        if (isCancellationRequested())
+        {
+            break;
         }
 
         if (waitingTime >= maxWaitTimeMs)
@@ -185,6 +208,12 @@ void Launcher::Launch() // Launching thread
             m_uiHelper->UpdateLaunchStatus(m_launchingStatus.Get());
         };
     }
+}
+
+bool Launcher::isCancellationRequested()
+{
+    std::lock_guard lock(m_launchStateMutex);
+    return m_cancelRequested;
 }
 
 void Launcher::handleWindowArrangerMessage(const std::wstring& msg) // WorkspacesArranger IPC thread
