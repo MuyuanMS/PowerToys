@@ -42,6 +42,12 @@
     <Content Include="$(RepoRoot)src\modules\previewpane\UnitTests-GcodePreviewHandler\HelperFiles\sample_JPG.gcode" Link="TestAssets\sample.gcode">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="$(RepoRoot)src\modules\previewpane\UnitTests-BgcodePreviewHandler\HelperFiles\sample.bgcode" Link="TestAssets\sample.bgcode">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="$(RepoRoot)src\modules\previewpane\UnitTests-QoiPreviewHandler\HelperFiles\sample.qoi" Link="TestAssets\sample.qoi">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="$(RepoRoot)src\modules\previewpane\UnitTests-StlThumbnailProvider\HelperFiles\sample.stl" Link="TestAssets\sample.stl">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
