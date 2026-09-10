@@ -147,6 +147,7 @@ public sealed partial class IncrementalAdaptiveCardUpdater
                     plan,
                     cancellationToken))
             {
+                Card = card;
                 _snapshot = candidateSnapshot;
                 return;
             }

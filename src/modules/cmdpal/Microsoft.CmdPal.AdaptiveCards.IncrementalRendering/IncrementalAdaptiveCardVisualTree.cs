@@ -340,7 +340,7 @@ internal static class IncrementalAdaptiveCardVisualTree
                 ? Convert.FromBase64String(payload)
                 : Encoding.UTF8.GetBytes(Uri.UnescapeDataString(payload));
         }
-        catch (FormatException)
+        catch (Exception ex) when (ex is FormatException or ArgumentException)
         {
             return null;
         }
