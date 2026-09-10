@@ -63,7 +63,7 @@ public partial class ShellViewModelTests
         var events = new List<string>();
         var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         TelemetryExtensionInvokedMessage? invocation = null;
-        WeakReferenceMessenger.Default.Register<TelemetryCommandStartedMessage>(recipient, (_, _) => events.Add("started"));
+        WeakReferenceMessenger.Default.Register<TelemetrySessionActionStartedMessage>(recipient, (_, _) => events.Add("started"));
         WeakReferenceMessenger.Default.Register<HideWindowMessage>(recipient, (_, _) => events.Add("hide"));
         WeakReferenceMessenger.Default.Register<TelemetryExtensionInvokedMessage>(recipient, (_, message) =>
         {
@@ -143,7 +143,7 @@ public partial class ShellViewModelTests
         var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var release = new ManualResetEventSlim();
         var started = 0;
-        WeakReferenceMessenger.Default.Register<TelemetryCommandStartedMessage>(recipient, (_, _) => Interlocked.Increment(ref started));
+        WeakReferenceMessenger.Default.Register<TelemetrySessionActionStartedMessage>(recipient, (_, _) => Interlocked.Increment(ref started));
         WeakReferenceMessenger.Default.Register<TelemetryExtensionInvokedMessage>(recipient, (_, _) => completed.TrySetResult());
 
         try
@@ -186,7 +186,7 @@ public partial class ShellViewModelTests
         var recipient = new object();
         var events = new List<string>();
         WeakReferenceMessenger.Default.Register<ShowWindowMessage>(recipient, (_, _) => events.Add("show"));
-        WeakReferenceMessenger.Default.Register<TelemetryCommandStartedMessage>(recipient, (_, _) => events.Add("started"));
+        WeakReferenceMessenger.Default.Register<TelemetrySessionActionStartedMessage>(recipient, (_, _) => events.Add("started"));
         WeakReferenceMessenger.Default.Register<TelemetryExtensionInvokedMessage>(recipient, (_, _) => events.Add("completed"));
         WeakReferenceMessenger.Default.Register<NavigateToPageMessage>(recipient, (_, _) => events.Add("navigate"));
 

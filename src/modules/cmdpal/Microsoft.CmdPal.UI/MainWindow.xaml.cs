@@ -52,7 +52,7 @@ public sealed partial class MainWindow : WindowEx,
     IRecipient<NavigationDepthMessage>,
     IRecipient<SearchQueryMessage>,
     IRecipient<ErrorOccurredMessage>,
-    IRecipient<TelemetryCommandStartedMessage>,
+    IRecipient<TelemetrySessionActionStartedMessage>,
     IRecipient<DragStartedMessage>,
     IRecipient<DragCompletedMessage>,
     IRecipient<ToggleDevRibbonMessage>,
@@ -196,7 +196,7 @@ public sealed partial class MainWindow : WindowEx,
         WeakReferenceMessenger.Default.Register<NavigationDepthMessage>(this);
         WeakReferenceMessenger.Default.Register<SearchQueryMessage>(this);
         WeakReferenceMessenger.Default.Register<ErrorOccurredMessage>(this);
-        WeakReferenceMessenger.Default.Register<TelemetryCommandStartedMessage>(this);
+        WeakReferenceMessenger.Default.Register<TelemetrySessionActionStartedMessage>(this);
         WeakReferenceMessenger.Default.Register<DragStartedMessage>(this);
         WeakReferenceMessenger.Default.Register<DragCompletedMessage>(this);
         WeakReferenceMessenger.Default.Register<ToggleDevRibbonMessage>(this);
@@ -1074,7 +1074,7 @@ public sealed partial class MainWindow : WindowEx,
         }
     }
 
-    public void Receive(TelemetryCommandStartedMessage message)
+    public void Receive(TelemetrySessionActionStartedMessage message)
     {
         RunOnUiThread(() => _sessionCommandsExecuted++);
     }

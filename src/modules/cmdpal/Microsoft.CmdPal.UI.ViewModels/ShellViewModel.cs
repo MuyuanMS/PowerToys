@@ -312,7 +312,7 @@ public partial class ShellViewModel : ObservableObject,
                     var extensionId = host.GetExtensionDisplayName() ?? "builtin";
                     var commandId = command?.Id ?? "unknown";
                     var commandName = command?.Name ?? "unknown";
-                    WeakReferenceMessenger.Default.Send<TelemetryCommandStartedMessage>();
+                    WeakReferenceMessenger.Default.Send<TelemetrySessionActionStartedMessage>();
                     WeakReferenceMessenger.Default.Send<TelemetryExtensionInvokedMessage>(
                         new(extensionId, commandId, commandName, true, 0));
                 }
@@ -381,7 +381,7 @@ public partial class ShellViewModel : ObservableObject,
             else
             {
                 // Count only accepted invocations, before Invoke can hide the palette and end the session.
-                WeakReferenceMessenger.Default.Send<TelemetryCommandStartedMessage>();
+                WeakReferenceMessenger.Default.Send<TelemetrySessionActionStartedMessage>();
                 _handleInvokeTask = Task.Run(() =>
                 {
                     SafeHandleInvokeCommandSynchronous(message, invokable, host);

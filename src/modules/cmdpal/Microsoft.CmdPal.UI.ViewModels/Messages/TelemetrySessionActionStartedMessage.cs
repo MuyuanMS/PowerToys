@@ -7,4 +7,4 @@ namespace Microsoft.CmdPal.UI.ViewModels.Messages;
 /// <summary>
 /// Counts a command or page navigation before it can hide the palette and end the session.
 /// </summary>
-public record TelemetryCommandStartedMessage;
+public record TelemetrySessionActionStartedMessage;
