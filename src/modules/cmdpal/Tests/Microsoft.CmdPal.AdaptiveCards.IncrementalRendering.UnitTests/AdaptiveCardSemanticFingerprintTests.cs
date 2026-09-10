@@ -140,7 +140,7 @@ public sealed class AdaptiveCardSemanticFingerprintTests
     }
 
     [TestMethod]
-    public void ActionTextCannotCompensateForUnmappedBodyText()
+    public void UnmappedBodyTextRemainsReplacementSensitiveWithActionText()
     {
         var left = """
             {
@@ -156,6 +156,27 @@ public sealed class AdaptiveCardSemanticFingerprintTests
         var right = left.Replace("https://old.example", "https://new.example", StringComparison.Ordinal);
 
         Assert.AreNotEqual(
+            AdaptiveCardSemanticFingerprint.Create(left, mappedTextBlockCount: 0, mappedInlineSvgImageCount: 0),
+            AdaptiveCardSemanticFingerprint.Create(right, mappedTextBlockCount: 0, mappedInlineSvgImageCount: 0));
+    }
+
+    [TestMethod]
+    public void ActionTextDoesNotDisableMappedBodyTextPatching()
+    {
+        var left = """
+            {
+              "type":"AdaptiveCard",
+              "body":[{"type":"TextBlock","text":"old"}],
+              "actions":[{
+                "type":"Action.ShowCard",
+                "title":"Details",
+                "card":{"type":"AdaptiveCard","body":[{"type":"TextBlock","text":"action text"}]}
+              }]
+            }
+            """;
+        var right = left.Replace("\"old\"", "\"new\"", StringComparison.Ordinal);
+
+        Assert.AreEqual(
             AdaptiveCardSemanticFingerprint.Create(left, mappedTextBlockCount: 1, mappedInlineSvgImageCount: 0),
             AdaptiveCardSemanticFingerprint.Create(right, mappedTextBlockCount: 1, mappedInlineSvgImageCount: 0));
     }

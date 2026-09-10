@@ -47,6 +47,7 @@ internal static class AdaptiveCardSemanticFingerprint
         var authoredInlineSvgImageCount = 0;
         CountPatchableElements(
             document.RootElement,
+            allowPatch: true,
             ref authoredTextBlockCount,
             ref authoredInlineSvgImageCount);
 
@@ -184,6 +185,7 @@ internal static class AdaptiveCardSemanticFingerprint
 
     private static void CountPatchableElements(
         JsonElement value,
+        bool allowPatch,
         ref int textBlockCount,
         ref int inlineSvgImageCount)
     {
@@ -194,12 +196,15 @@ internal static class AdaptiveCardSemanticFingerprint
                     && type.ValueKind == JsonValueKind.String
                         ? type.GetString()
                         : null;
-                if (string.Equals(typeName, "TextBlock", StringComparison.Ordinal)
+                var isAction = typeName?.StartsWith("Action.", StringComparison.Ordinal) == true;
+                if (allowPatch
+                    && string.Equals(typeName, "TextBlock", StringComparison.Ordinal)
                     && value.TryGetProperty("text", out _))
                 {
                     textBlockCount++;
                 }
-                else if (string.Equals(typeName, "Image", StringComparison.Ordinal)
+                else if (allowPatch
+                    && string.Equals(typeName, "Image", StringComparison.Ordinal)
                     && value.TryGetProperty("url", out var url)
                     && IsInlineSvg(url))
                 {
@@ -208,8 +213,12 @@ internal static class AdaptiveCardSemanticFingerprint
 
                 foreach (var property in value.EnumerateObject())
                 {
+                    var childAllowsPatch = allowPatch
+                        && !isAction
+                        && !IsActionProperty(property.Name);
                     CountPatchableElements(
                         property.Value,
+                        childAllowsPatch,
                         ref textBlockCount,
                         ref inlineSvgImageCount);
                 }
@@ -220,6 +229,7 @@ internal static class AdaptiveCardSemanticFingerprint
                 {
                     CountPatchableElements(
                         item,
+                        allowPatch,
                         ref textBlockCount,
                         ref inlineSvgImageCount);
                 }
