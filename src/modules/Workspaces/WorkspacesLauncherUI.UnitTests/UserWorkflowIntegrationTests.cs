@@ -110,14 +110,14 @@ namespace WorkspacesLauncherUI.UnitTests
             var sentMessages = new List<string>();
             using var vm = new MainViewModel(sentMessages.Add);
             bool closeRequested = false;
-            Action previousCallback = WorkspacesLauncherUI.App.CancelAcknowledgedCallback;
+            Action previousCallback = LauncherIpc.CancelAcknowledgedCallback;
 
             try
             {
-                WorkspacesLauncherUI.App.CancelAcknowledgedCallback = () => closeRequested = true;
+                LauncherIpc.CancelAcknowledgedCallback = () => closeRequested = true;
 
                 vm.CancelLaunchCommand.Execute(null);
-                WorkspacesLauncherUI.App.ProcessIPCMessage("cancel_ack", callback => callback(), () => Assert.Fail("The ready timer should not be stopped by a cancellation acknowledgment."));
+                LauncherIpc.ProcessMessage("cancel_ack", callback => callback(), () => Assert.Fail("The ready timer should not be stopped by a cancellation acknowledgment."));
 
                 Assert.AreEqual(1, sentMessages.Count);
                 Assert.AreEqual("cancel", sentMessages[0]);
@@ -125,7 +125,7 @@ namespace WorkspacesLauncherUI.UnitTests
             }
             finally
             {
-                WorkspacesLauncherUI.App.CancelAcknowledgedCallback = previousCallback;
+                LauncherIpc.CancelAcknowledgedCallback = previousCallback;
             }
         }
 
@@ -249,13 +249,13 @@ namespace WorkspacesLauncherUI.UnitTests
                 AppFull(
                     "Windows Settings",
                     @"C:\Program Files\WindowsApps\windows.immersivecontrolpanel\SystemSettings.exe",
-                    "windows.immersivecontrolpanel_10.0.0.0_neutral_cw5n1h2txyewy",
-                    "windows.immersivecontrolpanel_cw5n1h2txyewy!microsoft.windows.immersivecontrolpanel",
+                    "windows.immersivecontrolpanel_10.0.0.0_neutral_cw5n1h2txyewy", // #no-spell-check-line
+                    "windows.immersivecontrolpanel_cw5n1h2txyewy!microsoft.windows.immersivecontrolpanel", // #no-spell-check-line
                     string.Empty,
                     LaunchingState.LaunchedAndMoved)));
 
             Assert.AreEqual("Windows Settings", vm.AppsListed[0].Name);
-            Assert.AreEqual("windows.immersivecontrolpanel_10.0.0.0_neutral_cw5n1h2txyewy", vm.AppsListed[0].PackagedName);
+            Assert.AreEqual("windows.immersivecontrolpanel_10.0.0.0_neutral_cw5n1h2txyewy", vm.AppsListed[0].PackagedName); // #no-spell-check-line
         }
 
         [TestMethod]
@@ -331,7 +331,7 @@ namespace WorkspacesLauncherUI.UnitTests
 
         private static void SimulateIpcMessage(string message)
         {
-            WorkspacesLauncherUI.App.IPCMessageReceivedCallback?.Invoke(message);
+            LauncherIpc.MessageReceivedCallback?.Invoke(message);
         }
 
         private static string BuildMessage(

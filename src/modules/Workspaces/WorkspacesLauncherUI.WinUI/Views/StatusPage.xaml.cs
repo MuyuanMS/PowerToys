@@ -29,7 +29,7 @@ namespace WorkspacesLauncherUI.Views
         public StatusPage()
         {
             ViewModel = new MainViewModel();
-            App.CancelAcknowledgedCallback = () => CloseRequested?.Invoke(this, EventArgs.Empty);
+            LauncherIpc.CancelAcknowledgedCallback = () => CloseRequested?.Invoke(this, EventArgs.Empty);
             this.InitializeComponent();
         }
 

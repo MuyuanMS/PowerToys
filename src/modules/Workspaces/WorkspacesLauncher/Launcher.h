@@ -38,6 +38,7 @@ private:
     std::mutex m_launchErrorsMutex;
 
     void Launch();
+    bool isCancellationRequested();
     void handleWindowArrangerMessage(const std::wstring& msg);
     void handleUIMessage(const std::wstring& msg);
 };
