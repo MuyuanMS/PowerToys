@@ -769,9 +769,21 @@ void Switcher::ShowOverlayWindow()
     // peeking out past our rounded corner. Using only DWMWA_WINDOW_CORNER_PREFERENCE
     // keeps the corner shape and its shadow self-consistent.
     DWORD cornerPref = DWMWCP_ROUND;
-    DwmSetWindowAttribute(thumbHost, DWMWA_WINDOW_CORNER_PREFERENCE,
-                          &cornerPref, sizeof(cornerPref));
-    SetWindowRgn(thumbHost, nullptr, FALSE);
+    HRESULT cornerResult = DwmSetWindowAttribute(
+        thumbHost, DWMWA_WINDOW_CORNER_PREFERENCE, &cornerPref, sizeof(cornerPref));
+    if (SUCCEEDED(cornerResult))
+    {
+        SetWindowRgn(thumbHost, nullptr, FALSE);
+    }
+    else
+    {
+        HRGN region = CreateRoundRectRgn(
+            0, 0, panelW + 1, panelH + 1, 2 * Scaled(8), 2 * Scaled(8));
+        if (region != nullptr && SetWindowRgn(thumbHost, region, FALSE) == 0)
+        {
+            DeleteObject(region);
+        }
+    }
     // DWM doesn't always repaint non-client chrome immediately after
     // DwmSetWindowAttribute calls (backdrop type, corner preference, dark
     // mode) on a window whose size didn't change. A no-op SWP_FRAMECHANGED
