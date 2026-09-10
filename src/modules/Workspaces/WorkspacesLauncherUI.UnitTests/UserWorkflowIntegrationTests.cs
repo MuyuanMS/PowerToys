@@ -131,6 +131,66 @@ namespace WorkspacesLauncherUI.UnitTests
 
         [TestMethod]
         [TestCategory("Scenario")]
+        public void LauncherIpc_StatusMessage_DispatchesAndStopsReadyRetries()
+        {
+            string receivedMessage = null;
+            bool callbackEnqueued = false;
+            bool readyTimerStopped = false;
+            Action<string> previousCallback = LauncherIpc.MessageReceivedCallback;
+
+            try
+            {
+                LauncherIpc.MessageReceivedCallback = message => receivedMessage = message;
+
+                LauncherIpc.ProcessMessage(
+                    "status",
+                    callback =>
+                    {
+                        callbackEnqueued = true;
+                        callback();
+                    },
+                    () => readyTimerStopped = true);
+
+                Assert.IsTrue(callbackEnqueued);
+                Assert.IsTrue(readyTimerStopped);
+                Assert.AreEqual("status", receivedMessage);
+            }
+            finally
+            {
+                LauncherIpc.MessageReceivedCallback = previousCallback;
+            }
+        }
+
+        [TestMethod]
+        [TestCategory("Scenario")]
+        public void LauncherIpc_EmptyMessage_DoesNotDispatchOrStopReadyRetries()
+        {
+            bool callbackInvoked = false;
+            bool callbackEnqueued = false;
+            bool readyTimerStopped = false;
+            Action<string> previousCallback = LauncherIpc.MessageReceivedCallback;
+
+            try
+            {
+                LauncherIpc.MessageReceivedCallback = _ => callbackInvoked = true;
+
+                LauncherIpc.ProcessMessage(
+                    string.Empty,
+                    _ => callbackEnqueued = true,
+                    () => readyTimerStopped = true);
+
+                Assert.IsFalse(callbackEnqueued);
+                Assert.IsFalse(callbackInvoked);
+                Assert.IsFalse(readyTimerStopped);
+            }
+            finally
+            {
+                LauncherIpc.MessageReceivedCallback = previousCallback;
+            }
+        }
+
+        [TestMethod]
+        [TestCategory("Scenario")]
         public void UserLaunchesWorkspace_SingleApp_CompletesFullLifecycle()
         {
             using var vm = new MainViewModel();
