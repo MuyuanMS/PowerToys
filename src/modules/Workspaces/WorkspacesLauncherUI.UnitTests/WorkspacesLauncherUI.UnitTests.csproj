@@ -7,7 +7,7 @@
     <IsPackable>false</IsPackable>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-    <OutputPath>$(SolutionDir)$(Platform)\$(Configuration)\tests\WorkspacesLauncherUI.Tests\</OutputPath>
+    <OutputPath>$(RepoRoot)$(Platform)\$(Configuration)\tests\WorkspacesLauncherUI.Tests\</OutputPath>
     <RootNamespace>WorkspacesLauncherUI.UnitTests</RootNamespace>
     <AssemblyName>PowerToys.WorkspacesLauncherUI.Tests</AssemblyName>
     <OutputType>Exe</OutputType>

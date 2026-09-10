@@ -29,6 +29,11 @@ Launcher::Launcher(const WorkspacesData::WorkspacesProject& project,
     bool launchElevated = std::find_if(m_project.apps.begin(), m_project.apps.end(), [](const WorkspacesData::WorkspacesProject::Application& app) { return app.isElevated; }) != m_project.apps.end();
     m_windowArrangerHelper->Launch(m_project.id, launchElevated, [&]() -> bool
         {
+            if (isCancellationRequested())
+            {
+                return false;
+            }
+
             if (m_launchingStatus.AllLaunchedAndMoved())
             {
                 return false;
