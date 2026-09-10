@@ -305,12 +305,14 @@ public class PeekFilePreviewTests : UITestBase
         var launchAppButton = peekWindow.Find<Button>(By.AccessibilityId("LaunchAppButton"), 5_000);
         var pinButton = peekWindow.Find<Button>(By.AccessibilityId("PinButton"), 5_000);
 
-        Assert.IsFalse(
-            bool.TryParse(launchAppButton.GetProperty("HasKeyboardFocus"), out var launchAppHasFocus) && launchAppHasFocus,
-            "The Open in default viewer button should not receive initial keyboard focus.");
-        Assert.IsFalse(
-            bool.TryParse(pinButton.GetProperty("HasKeyboardFocus"), out var pinHasFocus) && pinHasFocus,
-            "The Pin button should not receive initial keyboard focus.");
+        Assert.IsTrue(
+            bool.TryParse(launchAppButton.GetProperty("HasKeyboardFocus"), out var launchAppHasFocus),
+            "The Open in default viewer button focus state should be readable.");
+        Assert.IsFalse(launchAppHasFocus, "The Open in default viewer button should not receive initial keyboard focus.");
+        Assert.IsTrue(
+            bool.TryParse(pinButton.GetProperty("HasKeyboardFocus"), out var pinHasFocus),
+            "The Pin button focus state should be readable.");
+        Assert.IsFalse(pinHasFocus, "The Pin button should not receive initial keyboard focus.");
     }
 
     [TestMethod("Peek.FileNavigation.SwitchFilesWithArrowKeys")]
