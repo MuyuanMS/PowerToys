@@ -2131,10 +2131,12 @@ bool LaserPointerOverlay::ReadPenReport(HANDLE deviceHandle, PCHAR report, ULONG
         return GetCursorPos(&screenPoint) != FALSE;
     }
 
+    const double displaySpanX = static_cast<double>(device.displayRect.right) - static_cast<double>(device.displayRect.left);
+    const double displaySpanY = static_cast<double>(device.displayRect.bottom) - static_cast<double>(device.displayRect.top);
     const double normalizedX = (static_cast<double>(x) - device.deviceRect.left) / spanX;
     const double normalizedY = (static_cast<double>(y) - device.deviceRect.top) / spanY;
-    screenPoint.x = device.displayRect.left + static_cast<LONG>(normalizedX * (device.displayRect.right - device.displayRect.left));
-    screenPoint.y = device.displayRect.top + static_cast<LONG>(normalizedY * (device.displayRect.bottom - device.displayRect.top));
+    screenPoint.x = device.displayRect.left + static_cast<LONG>(normalizedX * displaySpanX);
+    screenPoint.y = device.displayRect.top + static_cast<LONG>(normalizedY * displaySpanY);
     return true;
 }
 
@@ -2178,7 +2180,7 @@ void LaserPointerOverlay::HandleRawInput(HRAWINPUT handle) noexcept
     {
         POINT screenPoint{};
         bool tipDown = false;
-        PCHAR report = reinterpret_cast<PCHAR>(reports + reportIndex * reportLength);
+        PCHAR report = reinterpret_cast<PCHAR>(reports + static_cast<size_t>(reportIndex) * reportLength);
         if (!ReadPenReport(input->header.hDevice, report, reportLength, screenPoint, tipDown))
         {
             continue;
@@ -2224,7 +2226,7 @@ void LaserPointerOverlay::HandleRawInput(HRAWINPUT handle) noexcept
         else if (m_penContact)
         {
             m_penContact = false;
-            if (wasDrawing)
+            if (wasDrawing && !m_activationButtonHeld && !m_alwaysOnButtonHeld)
             {
                 EndDrawing();
             }
