@@ -352,14 +352,6 @@ namespace Peek.FilePreviewer
             }
         }
 
-        private void UpdatePreviewerItem()
-        {
-            if (Item is not null && Previewer is IReusablePreviewer reusablePreviewer)
-            {
-                reusablePreviewer.Rebind(Item, ScalingFactor);
-            }
-        }
-
         private void OnItemPropertyChanged()
         {
             // Cancel previous loading task
@@ -380,21 +372,11 @@ namespace Peek.FilePreviewer
                 return;
             }
 
-            var neededType = previewerFactory.GetCompatiblePreviewerType(Item);
-
-            // Reuse the existing previewer when the type matches and supports in-place
-            // item updates, avoiding control teardown which would cause a visible white
-            // flash between images.
-            bool canReuse = Previewer is IReusablePreviewer && Previewer.GetType() == neededType;
-
-            if (!canReuse)
+            var nextPreviewer = previewerFactory.ReuseOrCreate(Previewer, Item, ScalingFactor);
+            if (!ReferenceEquals(Previewer, nextPreviewer))
             {
-                // Clear up any unmanaged resources before creating a new previewer instance.
-                (Previewer as IDisposable)?.Dispose();
-                Previewer = previewerFactory.Create(Item);
+                Previewer = nextPreviewer;
             }
-
-            UpdatePreviewerItem();
 
             _ = SafeUpdatePreviewAsync(_cancellationTokenSource.Token);
         }

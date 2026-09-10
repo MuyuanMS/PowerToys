@@ -35,7 +35,7 @@ namespace Peek.Common.UnitTests
 
             public DateTime? DateModified { get; set; } = DateTime.Now;
 
-            public long FileSizeBytes { get; set; } = 1024;
+            public ulong FileSizeBytes { get; set; } = 1024;
 
             public string FileType { get; set; } = "JPEG Image";
 

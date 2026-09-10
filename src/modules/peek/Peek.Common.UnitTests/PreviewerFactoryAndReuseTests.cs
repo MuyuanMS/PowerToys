@@ -34,15 +34,44 @@ namespace Peek.Common.UnitTests
         }
 
         [TestMethod]
-        public void PreviewerFactory_GetCompatiblePreviewerType_SelectsNonReusablePreviewerType()
+        public void PreviewerFactory_GetCompatiblePreviewerType_SelectsFixedPreviewerType()
         {
-            var item = new TestFileSystemItem("sample.nonreuse");
+            var item = new TestFileSystemItem("sample.fixed");
             var factory = CreateTestFactory();
 
             var compatibleType = factory.GetCompatiblePreviewerType(item);
 
-            Assert.AreEqual(typeof(NonReusableTestPreviewer), compatibleType);
+            Assert.AreEqual(typeof(FixedTestPreviewer), compatibleType);
             Assert.IsFalse(typeof(IReusablePreviewer).IsAssignableFrom(compatibleType));
+        }
+
+        [TestMethod]
+        public void PreviewerFactory_ReuseOrCreate_RetainsCompatibleReusableInstance()
+        {
+            var originalItem = new TestFileSystemItem("first.reuse");
+            var nextItem = new TestFileSystemItem("second.reuse");
+            var previewer = new ReusableTestPreviewer(originalItem);
+            var factory = CreateTestFactory();
+
+            var result = factory.ReuseOrCreate(previewer, nextItem, 1.75);
+
+            Assert.AreSame(previewer, result);
+            Assert.AreSame(nextItem, previewer.BoundItem);
+            Assert.AreEqual(1.75, previewer.BoundScalingFactor, 0.0001);
+        }
+
+        [TestMethod]
+        public void PreviewerFactory_ReuseOrCreate_ReplacesIncompatibleInstance()
+        {
+            var originalItem = new TestFileSystemItem("first.reuse");
+            var nextItem = new TestFileSystemItem("second.fixed");
+            var previewer = new ReusableTestPreviewer(originalItem);
+            var factory = CreateTestFactory();
+
+            var result = factory.ReuseOrCreate(previewer, nextItem, 1.0);
+
+            Assert.AreNotSame(previewer, result);
+            Assert.IsInstanceOfType<FixedTestPreviewer>(result);
         }
 
         [TestMethod]
@@ -67,13 +96,13 @@ namespace Peek.Common.UnitTests
                     item => string.Equals(item.Extension, ".reuse", StringComparison.OrdinalIgnoreCase),
                     item => new ReusableTestPreviewer(item)),
                 new PreviewerFactory.PreviewerDefinition(
-                    typeof(NonReusableTestPreviewer),
-                    item => string.Equals(item.Extension, ".nonreuse", StringComparison.OrdinalIgnoreCase),
-                    item => new NonReusableTestPreviewer(item)),
+                    typeof(FixedTestPreviewer),
+                    item => string.Equals(item.Extension, ".fixed", StringComparison.OrdinalIgnoreCase),
+                    item => new FixedTestPreviewer(item)),
                 new PreviewerFactory.PreviewerDefinition(
-                    typeof(NonReusableTestPreviewer),
+                    typeof(FixedTestPreviewer),
                     _ => true,
-                    item => new NonReusableTestPreviewer(item)),
+                    item => new FixedTestPreviewer(item)),
             };
 
             return new PreviewerFactory(new TestPreviewSettings(), registrations);
@@ -112,9 +141,9 @@ namespace Peek.Common.UnitTests
             }
         }
 
-        private sealed class NonReusableTestPreviewer : IPreviewer
+        private sealed class FixedTestPreviewer : IPreviewer
         {
-            public NonReusableTestPreviewer(IFileSystemItem item)
+            public FixedTestPreviewer(IFileSystemItem item)
             {
                 _ = item;
             }

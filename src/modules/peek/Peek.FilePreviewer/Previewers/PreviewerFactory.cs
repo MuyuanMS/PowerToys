@@ -11,6 +11,7 @@ using Peek.Common.Models;
 using Peek.FilePreviewer.Models;
 using Peek.FilePreviewer.Previewers.Archives;
 using Peek.FilePreviewer.Previewers.Drive;
+using Peek.FilePreviewer.Previewers.Interfaces;
 using Peek.FilePreviewer.Previewers.MediaPreviewer;
 using Peek.UI.Telemetry.Events;
 using SQLitePreviewer = Peek.FilePreviewer.Previewers.SqlitePreviewer.SqlitePreviewer;
@@ -78,6 +79,23 @@ namespace Peek.FilePreviewer.Previewers
         /// <param name="item">The file system item to create a previewer for.</param>
         /// <returns>A new instance of a compatible previewer.</returns>
         public IPreviewer Create(IFileSystemItem item) => GetCompatiblePreviewerDefinition(item).Create(item);
+
+        internal IPreviewer ReuseOrCreate(
+            IPreviewer? currentPreviewer,
+            IFileSystemItem item,
+            double scalingFactor)
+        {
+            var definition = GetCompatiblePreviewerDefinition(item);
+            if (currentPreviewer is IReusablePreviewer reusablePreviewer &&
+                currentPreviewer.GetType() == definition.Type)
+            {
+                reusablePreviewer.Rebind(item, scalingFactor);
+                return currentPreviewer;
+            }
+
+            (currentPreviewer as IDisposable)?.Dispose();
+            return definition.Create(item);
+        }
 
         /// <summary>
         /// Returns a new instance of the default previewer for unsupported file types. This is
