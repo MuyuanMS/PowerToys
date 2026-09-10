@@ -150,7 +150,7 @@ public sealed partial class MainWindow : WindowEx,
         _themeService.ThemeChanged += ThemeServiceOnThemeChanged;
         _windowThemeSynchronizer = new WindowThemeSynchronizer(_themeService, this);
 
-        _hwnd = new HWND(WinRT.Interop.WindowNative.GetWindowHandle(this).ToInt32());
+        _hwnd = new HWND(WinRT.Interop.WindowNative.GetWindowHandle(this));
 
         unsafe
         {
