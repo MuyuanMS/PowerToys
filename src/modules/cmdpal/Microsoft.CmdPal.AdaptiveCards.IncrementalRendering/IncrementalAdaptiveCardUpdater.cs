@@ -88,11 +88,6 @@ public sealed partial class IncrementalAdaptiveCardUpdater
         {
             await UpdateCoreAsync(request.Card, cancellation.Token);
         }
-        catch (OperationCanceledException) when (
-            cancellation.IsCancellationRequested
-            && !request.CallerCancellation.IsCancellationRequested)
-        {
-        }
         finally
         {
             _cancelActiveUpdate = null;
