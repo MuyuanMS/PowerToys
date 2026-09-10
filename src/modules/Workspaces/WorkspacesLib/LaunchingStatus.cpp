@@ -60,7 +60,7 @@ bool LaunchingStatus::AllInstancesOfTheAppLaunchedAndMoved(const WorkspacesData:
     return true;
 }
 
-const WorkspacesData::LaunchingAppStateMap& LaunchingStatus::Get() noexcept
+WorkspacesData::LaunchingAppStateMap LaunchingStatus::Get()
 {
     std::shared_lock lock(m_mutex);
     return m_appsState;

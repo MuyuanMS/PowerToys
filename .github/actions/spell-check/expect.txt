@@ -218,6 +218,7 @@ chu
 CIBUILD
 cidl
 CIELCh
+cifhbcnohmdccbgoicgdjpfamggdegmo
 cim
 cla
 CLASSDC
@@ -592,6 +593,7 @@ FIXEDSYS
 flac
 flyouts
 fmtid
+fmgjjmmmlfnkbppncijlocphclkkleod
 FOF
 FOFX
 FOLDERID
@@ -817,6 +819,7 @@ imagingdevices
 ime
 IMEAceept
 imgflip
+immersivecontrolpanel
 inapp
 inbox
 INCONTACT
@@ -1962,6 +1965,7 @@ tstoi
 tsv
 tweakable
 TWF
+txyewy
 tymed
 TYPEKEYBOARD
 TYPEMOUSE

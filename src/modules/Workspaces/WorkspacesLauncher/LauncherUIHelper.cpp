@@ -46,7 +46,7 @@ void LauncherUIHelper::LaunchUI()
     GetModuleFileName(NULL, buffer, MAX_PATH);
     std::wstring path = std::filesystem::path(buffer).parent_path();
 
-    auto res = AppLauncher::LaunchApp(path + L"\\PowerToys.WorkspacesLauncherUI.exe", L"", false);
+    auto res = AppLauncher::LaunchApp(path + L"\\WinUI3Apps\\PowerToys.WorkspacesLauncherUI.exe", L"", false);
     if (res.isOk())
     {
         auto value = res.value();
@@ -60,6 +60,11 @@ void LauncherUIHelper::LaunchUI()
     }
 }
 
+void LauncherUIHelper::StopReceiving()
+{
+    m_ipcHelper.StopReceiving();
+}
+
 void LauncherUIHelper::UpdateLaunchStatus(WorkspacesData::LaunchingAppStateMap launchedApps) const
 {
     WorkspacesData::AppLaunchData appData;
@@ -70,4 +75,9 @@ void LauncherUIHelper::UpdateLaunchStatus(WorkspacesData::LaunchingAppStateMap l
     }
 
     m_ipcHelper.send(WorkspacesData::AppLaunchDataJSON::ToJson(appData).ToString().c_str());
+}
+
+void LauncherUIHelper::SendMessage(const std::wstring& message) const
+{
+    m_ipcHelper.send(message);
 }

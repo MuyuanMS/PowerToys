@@ -70,6 +70,11 @@ void WindowArrangerHelper::Launch(const std::wstring& projectId, bool elevated, 
     }
 }
 
+void WindowArrangerHelper::StopReceiving()
+{
+    m_ipcHelper.StopReceiving();
+}
+
 void WindowArrangerHelper::UpdateLaunchStatus(const WorkspacesData::LaunchingAppState& appState) const
 {
     m_ipcHelper.send(WorkspacesData::AppLaunchInfoJSON::ToJson({ appState.application, nullptr, appState.state }).ToString().c_str());

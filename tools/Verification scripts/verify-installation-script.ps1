@@ -439,8 +439,9 @@ function Test-CoreFiles {
         'PowerToys.WorkspacesWindowArranger.exe',
         'PowerToys.WorkspacesEditor.exe',
         'PowerToys.WorkspacesEditor.dll',
-        'PowerToys.WorkspacesLauncherUI.exe',
-        'PowerToys.WorkspacesLauncherUI.dll',
+        'WinUI3Apps\PowerToys.WorkspacesLauncherUI.exe',
+        'WinUI3Apps\PowerToys.WorkspacesLauncherUI.dll',
+        'WinUI3Apps\PowerToys.WorkspacesLauncherUI.Lib.dll',
         'PowerToys.WorkspacesModuleInterface.dll',
         'PowerToys.WorkspacesCsharpLibrary.dll',
         
