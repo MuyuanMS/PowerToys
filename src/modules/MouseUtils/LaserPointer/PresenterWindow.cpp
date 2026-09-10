@@ -889,11 +889,11 @@ bool PresenterWindow::Present(const std::function<void(ID2D1DeviceContext*)>& dr
     }
 
     const HRESULT endDraw = m_d2dContext->EndDraw();
-    if (endDraw == D2DERR_RECREATE_TARGET || endDraw == DXGI_ERROR_DEVICE_REMOVED || endDraw == DXGI_ERROR_DEVICE_RESET)
+    if (FAILED(endDraw))
     {
         return false;
     }
 
     const HRESULT present = m_swapChain->Present(0, 0);
-    return present != DXGI_ERROR_DEVICE_REMOVED && present != DXGI_ERROR_DEVICE_RESET;
+    return SUCCEEDED(present);
 }
