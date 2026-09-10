@@ -62,6 +62,9 @@ public class CachedIconSourceProviderTests
 
         Assert.IsNotNull(report);
         StringAssert.Contains(report.Text, "Requests linked to session loads: 2");
+        StringAssert.Contains(report.Text, "Maximum demanded queue depth: 1");
+        StringAssert.Contains(report.Text, "Maximum speculative queue depth: 0");
+        StringAssert.Contains(report.Text, "Queued promotions after demand returned: 0");
         IconLoadDiagnostics.Reset();
     }
 
@@ -183,6 +186,7 @@ public class CachedIconSourceProviderTests
             }
 
             _pending.Enqueue(tcs);
+            diagnostics?.Enqueued(priority);
             return true;
         }
 
