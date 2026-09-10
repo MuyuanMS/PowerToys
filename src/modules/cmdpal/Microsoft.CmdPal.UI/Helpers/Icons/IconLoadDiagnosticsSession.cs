@@ -1047,8 +1047,6 @@ internal sealed class IconLoadDiagnosticsSession
                 _stoppedUtc = DateTimeOffset.UtcNow;
                 var stoppedAt = Stopwatch.GetTimestamp();
                 Volatile.Write(ref _stoppedAt, stoppedAt);
-                _uiResponsivenessProbe?.Stop();
-                WaitForActiveMutations();
                 _processCpuStoppedTicks = GetProcessCpuTicks();
                 _managedAllocatedBytesStopped = GC.GetTotalAllocatedBytes(precise: false);
                 _gcPauseStoppedTicks = GC.GetTotalPauseDuration().Ticks;
@@ -1056,6 +1054,8 @@ internal sealed class IconLoadDiagnosticsSession
                 _gen1CollectionsStopped = GC.CollectionCount(1);
                 _gen2CollectionsStopped = GC.CollectionCount(2);
                 _workingSetStoppedBytes = GetWorkingSetBytes();
+                _uiResponsivenessProbe?.Stop();
+                WaitForActiveMutations();
             }
         }
     }

@@ -5,6 +5,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Tracing;
+using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.CmdPal.UI.Controls;
 using Microsoft.CmdPal.UI.Helpers;
@@ -780,6 +781,7 @@ public class IconLoadDiagnosticsTests
         var reportTask = Task.Run(() => session.CreateReport());
         await Task.Delay(100);
         Assert.IsFalse(reportTask.IsCompleted);
+        Assert.IsTrue(GetPrivateLong(session, "_managedAllocatedBytesStopped") > 0);
 
         mutation.Dispose();
 
@@ -789,6 +791,13 @@ public class IconLoadDiagnosticsTests
 
         using var lateMutation = session.TryEnterMutationScope();
         Assert.IsFalse(lateMutation.IsActive);
+    }
+
+    private static long GetPrivateLong(IconLoadDiagnosticsSession session, string fieldName)
+    {
+        var field = typeof(IconLoadDiagnosticsSession).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(field);
+        return (long)field.GetValue(session)!;
     }
 
     [TestMethod]
