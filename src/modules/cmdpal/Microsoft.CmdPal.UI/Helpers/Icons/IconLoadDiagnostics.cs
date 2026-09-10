@@ -150,7 +150,14 @@ internal static class IconLoadDiagnostics
 
     internal static void OnEtwDisabled()
     {
-        Interlocked.Exchange(ref _etwSession, null)?.Stop();
+        var session = Interlocked.Exchange(ref _etwSession, null);
+        if (session is not null)
+        {
+            ThreadPool.QueueUserWorkItem(
+                static state => ((IconLoadDiagnosticsSession)state!).Stop(),
+                session,
+                preferLocal: false);
+        }
     }
 
     private static IconLoadDiagnosticsSession? GetCurrentSession()

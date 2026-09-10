@@ -99,4 +99,39 @@ public sealed class IconLoadEventSourceTests
                 Events.Where(e => e.EventId == 0).Select(e => string.Join(", ", e.Payload ?? [])));
         }
     }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public void DisablingListenerFromEventCallbackDoesNotDeadlock()
+    {
+        using var listener = new DisableOnFirstEventListener();
+
+        var request = IconLoadDiagnostics.BeginRequest(IconRequestReason.SourceChanged, 1.0);
+
+        Assert.IsTrue(listener.Disabled);
+        request.Complete(IconRequestStatus.Empty);
+    }
+
+    private sealed class DisableOnFirstEventListener : EventListener
+    {
+        private int _disabled;
+
+        internal bool Disabled => Volatile.Read(ref _disabled) != 0;
+
+        protected override void OnEventSourceCreated(EventSource eventSource)
+        {
+            if (eventSource.Name == "Microsoft.PowerToys.CmdPal.IconLoading")
+            {
+                EnableEvents(eventSource, EventLevel.Verbose, EventKeywords.All);
+            }
+        }
+
+        protected override void OnEventWritten(EventWrittenEventArgs eventData)
+        {
+            if (eventData.EventId == 1 && Interlocked.Exchange(ref _disabled, 1) == 0)
+            {
+                DisableEvents(eventData.EventSource);
+            }
+        }
+    }
 }
