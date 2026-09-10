@@ -88,6 +88,8 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
     protected List<IContextItemViewModel> UnsafeContextItems => _contextItems;
 
+    protected List<IContextItemViewModel> UnsafeMoreCommands => _contextItems;
+
     /// <summary>
     /// Identifies child-entry rebuilds for SDK adapters. Synthetic-primary and visibility
     /// changes leave this value unchanged.
