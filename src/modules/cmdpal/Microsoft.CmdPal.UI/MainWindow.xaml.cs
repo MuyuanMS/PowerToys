@@ -1952,7 +1952,11 @@ public sealed partial class MainWindow : WindowEx,
         RunOnUiThread(() =>
         {
             _preventHideWhenDeactivated = false;
-            Task.Delay(200).ContinueWith(_ => RunOnUiThread(StealForeground));
+            _ = Task.Delay(200).ContinueWith(
+                _ => RunOnUiThread(StealForeground),
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.Default);
         });
     }
 
@@ -1984,7 +1988,7 @@ public sealed partial class MainWindow : WindowEx,
 
     public void Receive(GetHwndMessage message)
     {
-        message.Hwnd = (nint)_hwnd;
+        message.Hwnd = _hwnd.Value;
     }
 
     public void Receive(ExpandCompactModeMessage message)
