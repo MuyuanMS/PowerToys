@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Peek.Common.Constants;
 using Peek.Common.Models;
 using Peek.FilePreviewer.Models;
 using Peek.FilePreviewer.Previewers;
@@ -72,6 +73,7 @@ namespace Peek.FilePreviewer.UnitTests
         public async Task CreatePreviewAsync_UnknownTextFile_ShouldCreateMonacoPreview()
         {
             string path = CreateTempFile(Encoding.UTF8.GetBytes("plain text"), ".zzzzunknown");
+            Directory.CreateDirectory(TempFolderPath.Path);
 
             try
             {
