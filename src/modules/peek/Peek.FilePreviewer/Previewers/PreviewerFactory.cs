@@ -94,7 +94,13 @@ namespace Peek.FilePreviewer.Previewers
             }
 
             (currentPreviewer as IDisposable)?.Dispose();
-            return definition.Create(item);
+            var newPreviewer = definition.Create(item);
+            if (newPreviewer is IReusablePreviewer newReusablePreviewer)
+            {
+                newReusablePreviewer.Rebind(item, scalingFactor);
+            }
+
+            return newPreviewer;
         }
 
         /// <summary>

@@ -75,6 +75,20 @@ namespace Peek.Common.UnitTests
         }
 
         [TestMethod]
+        public void PreviewerFactory_ReuseOrCreate_AppliesScalingFactorToNewReusableInstance()
+        {
+            var item = new TestFileSystemItem("sample.reuse");
+            var factory = CreateTestFactory();
+
+            var result = factory.ReuseOrCreate(null, item, 1.75);
+
+            Assert.IsInstanceOfType<ReusableTestPreviewer>(result);
+            var previewer = (ReusableTestPreviewer)result;
+            Assert.AreSame(item, previewer.BoundItem);
+            Assert.AreEqual(1.75, previewer.BoundScalingFactor, 0.0001);
+        }
+
+        [TestMethod]
         public void ReusablePreviewer_RebindUpdatesContext()
         {
             var originalItem = new TestFileSystemItem("first.reuse");
