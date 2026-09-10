@@ -36,6 +36,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
 
     private readonly List<CommandProviderWrapper> _commandProviders = [];
     private readonly Lock _commandProvidersLock = new();
+    private readonly Lock _loadingStateLock = new();
 
     // watch out: if you add code that locks CommandProviders, be sure to always
     // lock CommandProviders before locking DockBands, or you will cause a
@@ -469,19 +470,25 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         }
     }
 
-    private void BeginLoading()
+    internal void BeginLoading()
     {
-        if (Interlocked.Increment(ref _activeLoadOperations) == 1)
+        lock (_loadingStateLock)
         {
-            IsLoading = true;
+            if (++_activeLoadOperations == 1)
+            {
+                IsLoading = true;
+            }
         }
     }
 
-    private void EndLoading()
+    internal void EndLoading()
     {
-        if (Interlocked.Decrement(ref _activeLoadOperations) == 0)
+        lock (_loadingStateLock)
         {
-            IsLoading = false;
+            if (--_activeLoadOperations == 0)
+            {
+                IsLoading = false;
+            }
         }
     }
 

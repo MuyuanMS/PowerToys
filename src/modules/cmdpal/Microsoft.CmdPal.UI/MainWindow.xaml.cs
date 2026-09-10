@@ -1720,10 +1720,6 @@ public sealed partial class MainWindow : WindowEx,
     {
         switch (uMsg)
         {
-            case PInvoke.WM_DISPLAYCHANGE:
-                _monitorService.NotifyMonitorsChanged();
-                break;
-
             // Prevent the window from maximizing when double-clicking the title bar area
             case PInvoke.WM_NCLBUTTONDBLCLK:
                 return (LRESULT)IntPtr.Zero;

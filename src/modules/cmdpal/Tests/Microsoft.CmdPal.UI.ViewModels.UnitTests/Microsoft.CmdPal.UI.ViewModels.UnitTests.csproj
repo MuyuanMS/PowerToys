@@ -9,6 +9,7 @@
     <OutputPath>$(RepoRoot)$(Platform)\$(Configuration)\WinUI3Apps\CmdPal\tests\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
@@ -22,6 +23,14 @@
     <ProjectReference Include="..\..\Microsoft.CmdPal.Common\Microsoft.CmdPal.Common.csproj" />
     <ProjectReference Include="..\..\Microsoft.CmdPal.UI.ViewModels\Microsoft.CmdPal.UI.ViewModels.csproj" />
     <ProjectReference Include="..\Microsoft.CmdPal.Ext.UnitTestsBase\Microsoft.CmdPal.Ext.UnitTestBase.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\Microsoft.CmdPal.UI\Services\ExternalCommandConsentRequest.cs" Link="Services\ExternalCommandConsentRequest.cs" />
+    <Compile Include="..\..\Microsoft.CmdPal.UI\Services\ExternalCommandConsentResult.cs" Link="Services\ExternalCommandConsentResult.cs" />
+    <Compile Include="..\..\Microsoft.CmdPal.UI\Services\ExternalCommandLinkCoordinator.cs" Link="Services\ExternalCommandLinkCoordinator.cs" />
+    <Compile Include="..\..\Microsoft.CmdPal.UI\Services\IExternalCommandLinkDialogSession.cs" Link="Services\IExternalCommandLinkDialogSession.cs" />
+    <Compile Include="..\..\Microsoft.CmdPal.UI\Services\IExternalCommandLinkPresenter.cs" Link="Services\IExternalCommandLinkPresenter.cs" />
   </ItemGroup>
 
   <ItemGroup>
