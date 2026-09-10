@@ -44,6 +44,7 @@ namespace Peek.UI
         /// </summary>
         private bool _isDeleteInProgress;
         private bool _exitAfterClose;
+        private bool _needsInitialFocusClear;
 
         private IntPtr _keyboardHookHandle;
         private NativeMethods.LowLevelKeyboardProc? _keyboardHookProc;
@@ -214,6 +215,7 @@ namespace Peek.UI
         {
             var bootTime = new System.Diagnostics.Stopwatch();
             bootTime.Start();
+            _needsInitialFocusClear = false;
 
             FilePreviewer.ShowFilePreviewTooltip = Application.Current.GetService<IUserSettings>().ShowFilePreviewTooltip;
 
@@ -232,6 +234,7 @@ namespace Peek.UI
 
             _cachedWindowHandle = new Windows.Win32.Foundation.HWND(this.GetWindowHandle());
             InstallKeyboardHook();
+            _needsInitialFocusClear = true;
 
             bootTime.Stop();
 
@@ -242,6 +245,8 @@ namespace Peek.UI
         {
             try
             {
+                _needsInitialFocusClear = false;
+
                 // Keep teardown best-effort: one failure must not skip later cleanup
                 // or prevent the CLI/-FilePath exit-after-close contract.
                 TryRunUninitializeStep(UninstallKeyboardHook, nameof(UninstallKeyboardHook));
@@ -306,6 +311,11 @@ namespace Peek.UI
 
             this.Show();
             WindowHelpers.BringToForeground(this.GetWindowHandle());
+            if (_needsInitialFocusClear)
+            {
+                _needsInitialFocusClear = false;
+                TitleBarControl.ClearInitialFocus();
+            }
         }
 
         private Size GetMonitorMaxContentSize(Size monitorSize, double scaling)
@@ -408,22 +418,22 @@ namespace Peek.UI
         private IntPtr LowLevelKeyboardHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
         {
             const int WM_KEYDOWN = 0x0100;
+            const int WM_SYSKEYDOWN = 0x0104;
             const uint VK_W = 0x57;
             const uint VK_ESCAPE = 0x1B;
             const uint VK_LEFT = 0x25;
-            const uint VK_UP = 0x26;
             const uint VK_RIGHT = 0x27;
-            const uint VK_DOWN = 0x28;
             const int VK_CONTROL = 0x11;
             const int VK_ALT = 0x12;
             const int VK_SHIFT = 0x10;
             const int VK_LWIN = 0x5B;
             const int VK_RWIN = 0x5C;
             const int KEY_PRESSED_MASK = 0x8000;
+            const uint LLKHF_ALTDOWN = 0x20;
 
             try
             {
-                if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN && lParam != IntPtr.Zero)
+                if (nCode >= 0 && (wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN) && lParam != IntPtr.Zero)
                 {
                     // Only handle when our window is in the foreground (cheap check before marshaling)
                     var foreground = Windows.Win32.PInvoke_PeekUI.GetForegroundWindow();
@@ -434,16 +444,22 @@ namespace Peek.UI
 
                     var hookStruct = Marshal.PtrToStructure<NativeMethods.KBDLLHOOKSTRUCT>(lParam);
 
-                    // Fast-path: skip keys we never handle
-                    if (hookStruct.vkCode != VK_W && hookStruct.vkCode != VK_ESCAPE &&
-                        hookStruct.vkCode != VK_LEFT && hookStruct.vkCode != VK_RIGHT &&
-                        hookStruct.vkCode != VK_UP && hookStruct.vkCode != VK_DOWN)
+                    // Fast-path: skip keys we never handle. Only intercept Ctrl+W, Escape, and Alt+Left/Right
+                    // so that normal arrow keys and other inputs reach focused preview controls (e.g. WebView2).
+                    if (hookStruct.vkCode is not VK_W and not VK_ESCAPE and not VK_LEFT and not VK_RIGHT)
+                    {
+                        return NativeMethods.CallNextHookEx(_keyboardHookHandle, nCode, wParam, lParam);
+                    }
+
+                    bool altPressed = (hookStruct.flags & LLKHF_ALTDOWN) != 0 ||
+                                      (NativeMethods.GetAsyncKeyState(VK_ALT) & KEY_PRESSED_MASK) != 0;
+
+                    if (!altPressed && (hookStruct.vkCode == VK_LEFT || hookStruct.vkCode == VK_RIGHT))
                     {
                         return NativeMethods.CallNextHookEx(_keyboardHookHandle, nCode, wParam, lParam);
                     }
 
                     bool ctrlPressed = (NativeMethods.GetAsyncKeyState(VK_CONTROL) & KEY_PRESSED_MASK) != 0;
-                    bool altPressed = (NativeMethods.GetAsyncKeyState(VK_ALT) & KEY_PRESSED_MASK) != 0;
                     bool shiftPressed = (NativeMethods.GetAsyncKeyState(VK_SHIFT) & KEY_PRESSED_MASK) != 0;
                     bool winPressed = (NativeMethods.GetAsyncKeyState(VK_LWIN) & KEY_PRESSED_MASK) != 0 ||
                                       (NativeMethods.GetAsyncKeyState(VK_RWIN) & KEY_PRESSED_MASK) != 0;
@@ -475,28 +491,14 @@ namespace Peek.UI
                             }
                         });
                     }
-                    else if (!ctrlPressed && !altPressed && !shiftPressed && !winPressed && hookStruct.vkCode == VK_LEFT)
+                    else if (!ctrlPressed && altPressed && !shiftPressed && !winPressed && hookStruct.vkCode == VK_LEFT)
                     {
                         if (ViewModel.DisplayItemCount > 1)
                         {
                             handled = DispatcherQueue.TryEnqueue(() => ViewModel.AttemptPreviousNavigation());
                         }
                     }
-                    else if (!ctrlPressed && !altPressed && !shiftPressed && !winPressed && hookStruct.vkCode == VK_RIGHT)
-                    {
-                        if (ViewModel.DisplayItemCount > 1)
-                        {
-                            handled = DispatcherQueue.TryEnqueue(() => ViewModel.AttemptNextNavigation());
-                        }
-                    }
-                    else if (!ctrlPressed && !altPressed && !shiftPressed && !winPressed && hookStruct.vkCode == VK_UP)
-                    {
-                        if (ViewModel.DisplayItemCount > 1)
-                        {
-                            handled = DispatcherQueue.TryEnqueue(() => ViewModel.AttemptPreviousNavigation());
-                        }
-                    }
-                    else if (!ctrlPressed && !altPressed && !shiftPressed && !winPressed && hookStruct.vkCode == VK_DOWN)
+                    else if (!ctrlPressed && altPressed && !shiftPressed && !winPressed && hookStruct.vkCode == VK_RIGHT)
                     {
                         if (ViewModel.DisplayItemCount > 1)
                         {
