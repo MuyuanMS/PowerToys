@@ -1501,6 +1501,8 @@ void LaserPointerOverlay::SharePresenter(bool deferTargetPick)
 
 void LaserPointerOverlay::StopPresenter()
 {
+    KillTimer(m_hwnd, PRESENTER_PICK_TIMER_ID);
+
     if (!m_presenter.Active())
     {
         // Deliberately inert rather than an error: the shortcut is registered for the
@@ -1842,15 +1844,19 @@ LRESULT LaserPointerOverlay::HandleMouseInput(WPARAM message, const MSLLHOOKSTRU
 {
     const bool fromPen = IsFromPen(data->dwExtraInfo);
 
-    m_latestPosition = data->pt;
-    m_hasLatestPosition = true;
+    const bool mouseSourceActive = m_activationButtonHeld || m_alwaysOnButtonHeld;
+    if (!fromPen && (!m_penContact || mouseSourceActive))
+    {
+        m_latestPosition = data->pt;
+        m_hasLatestPosition = true;
+    }
 
     // The mouse keeps every position the hook reports, so its trail follows the real
     // path rather than a ~62 Hz resampling of it. The pen deliberately does not: a
     // digitizer that drops in and out of range replays the gap as a straight line of
     // ghost points, and a laser pointer wants to look live far more than it wants an
     // accurate record of the stroke. One sample per render tick is plenty.
-    if (m_drawing && !fromPen)
+    if (m_drawing && !fromPen && mouseSourceActive)
     {
         if (m_pendingPoints.size() >= MAX_PENDING_POINTS)
         {
@@ -2306,13 +2312,7 @@ void LaserPointerOverlay::OnRenderTick()
         }
     }
 
-    if (m_drawing && m_penAwaitingFirstSample)
-    {
-        // Wait for a position reported after the stroke began.
-        return;
-    }
-
-    if (m_drawing && m_hasLatestPosition)
+    if (m_drawing && !m_penAwaitingFirstSample && m_hasLatestPosition)
     {
         const float scale = DpiScaleForPoint(m_latestPosition);
 
@@ -2479,14 +2479,25 @@ void LaserPointerOverlay::ProcessPendingSettings()
         return;
     }
 
+    const LaserPointerButton previousActivation = m_settings.activationButton;
     const LaserPointerButton previousAlwaysOn = m_settings.alwaysOnButton;
     ApplySettings(settings);
+
+    if (m_settings.activationButton != previousActivation)
+    {
+        m_activationButtonHeld = false;
+    }
 
     if (m_settings.alwaysOnButton != previousAlwaysOn)
     {
         // Re-binding mid-press would strand the flag: the button-up that clears it no
         // longer matches the setting.
         m_alwaysOnButtonHeld = false;
+    }
+
+    if (m_drawing && !m_activationButtonHeld && !m_alwaysOnButtonHeld && !m_penContact)
+    {
+        EndDrawing();
     }
 
     // The always-on button decides whether the hook runs while nothing is armed, so a
