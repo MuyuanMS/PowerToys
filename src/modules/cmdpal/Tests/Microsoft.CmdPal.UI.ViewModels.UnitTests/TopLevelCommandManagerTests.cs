@@ -84,6 +84,23 @@ public partial class TopLevelCommandManagerTests
     }
 
     [TestMethod]
+    public async Task WaitForCurrentLoadAsync_DoesNotWaitForLaterLoadingPhase()
+    {
+        using var services = CreateServices();
+        using var manager = new TopLevelCommandManager(services, []);
+
+        manager.BeginLoading();
+        var waitTask = manager.WaitForCurrentLoadAsync();
+        manager.EndLoading();
+
+        manager.BeginLoading();
+        await waitTask.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.IsTrue(manager.IsLoading);
+
+        manager.EndLoading();
+    }
+
+    [TestMethod]
     public async Task ResolveCommandAsync_UsesProviderLookupForNestedCommand()
     {
         using var services = CreateServices();
