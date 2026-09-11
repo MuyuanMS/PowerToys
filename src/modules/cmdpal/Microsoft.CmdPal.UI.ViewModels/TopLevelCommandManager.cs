@@ -46,6 +46,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     private CancellationTokenSource _extensionLoadCts = new();
     private CancellationToken _currentExtensionLoadCancellationToken;
     private int _activeLoadOperations;
+    private TaskCompletionSource? _currentLoadCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private HashSet<(string ProviderId, string CommandId)> _pinnedCommandSet = [];
 
@@ -476,6 +477,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         {
             if (++_activeLoadOperations == 1)
             {
+                _currentLoadCompletion ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
                 IsLoading = true;
             }
         }
@@ -488,6 +490,8 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             if (--_activeLoadOperations == 0)
             {
                 IsLoading = false;
+                _currentLoadCompletion!.TrySetResult();
+                _currentLoadCompletion = null;
             }
         }
     }
@@ -832,36 +836,18 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     /// <summary>Waits for the command load active at call time, excluding late provider continuations.</summary>
     public async Task WaitForCurrentLoadAsync(CancellationToken cancellationToken = default)
     {
-        if (!IsLoading)
+        Task loadCompletion;
+        lock (_loadingStateLock)
         {
-            return;
-        }
-
-        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        PropertyChangedEventHandler? handler = null;
-        handler = (_, args) =>
-        {
-            if (args.PropertyName == nameof(IsLoading) && !IsLoading)
-            {
-                completion.TrySetResult();
-            }
-        };
-
-        PropertyChanged += handler;
-        try
-        {
-            // IsLoading may have changed between the first check and subscribing.
             if (!IsLoading)
             {
                 return;
             }
 
-            await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            loadCompletion = _currentLoadCompletion!.Task;
         }
-        finally
-        {
-            PropertyChanged -= handler;
-        }
+
+        await loadCompletion.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public TopLevelViewModel? LookupDockBand(string id)
