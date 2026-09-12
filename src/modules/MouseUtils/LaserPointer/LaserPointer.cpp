@@ -249,6 +249,7 @@ struct LaserPointerOverlay
 
 private:
     static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) noexcept;
+    static LRESULT CALLBACK PenCaptureWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) noexcept;
     static LRESULT CALLBACK MouseHookProc(int nCode, WPARAM wParam, LPARAM lParam) noexcept;
     static void CALLBACK ForegroundEventProc(HWINEVENTHOOK hook, DWORD event, HWND hWnd, LONG idObject, LONG idChild, DWORD thread, DWORD time) noexcept;
 
@@ -320,12 +321,9 @@ private:
     // True while the digitizer is actively reporting and the pen is armed.
     bool PenPresent(uint64_t nowMs) const noexcept;
 
-    // Makes the overlay hit-testable while the pen is present, so pen input lands here
-    // instead of the window underneath.
+    // Positions a small input-only window around a present pen so contact is intercepted
+    // without making the full-screen render overlay hit-testable.
     void UpdatePenCapture(uint64_t nowMs);
-
-    // Whether a hit test at this screen point should be treated as the pen.
-    bool NearLastPenPoint(POINT screenPoint) const noexcept;
 
     // While only the border is showing the overlay sits directly above the mirrored
     // window rather than above everything, so other windows can cover it.
@@ -336,6 +334,7 @@ private:
     float DpiScaleForPoint(POINT screenPoint) const;
 
     static constexpr auto m_className = L"PowerToysLaserPointer";
+    static constexpr auto m_penCaptureClassName = L"PowerToysLaserPointerPenCapture";
     static constexpr auto m_windowTitle = L"PowerToys Laser Pointer";
     static constexpr DWORD WM_SWITCH_ACTIVATION_MODE = WM_APP;
     static constexpr DWORD WM_APPLY_SETTINGS = WM_APP + 1;
@@ -349,6 +348,7 @@ private:
     HINSTANCE m_hinstance = nullptr;
     HWND m_hwndOwner = nullptr;
     HWND m_hwnd = nullptr;
+    HWND m_penCaptureHwnd = nullptr;
     HHOOK m_mouseHook = nullptr;
 
     // Direct3D / Direct2D / DirectComposition. The overlay is a NOREDIRECTIONBITMAP
@@ -891,16 +891,6 @@ void LaserPointerOverlay::DrawTrails(ID2D1DeviceContext* context, uint64_t nowMs
     RenderStroke(context, m_stroke, nowMs);
 }
 
-// The pen is the only thing that can be at the pen's position, so the hit-test point is
-// what separates it from the mouse. Capturing the whole screen while the pen was in
-// range worked, but it also swallowed mouse clicks anywhere on it; confining that to a
-// small patch around the pen leaves the rest of the screen click-through as usual.
-bool LaserPointerOverlay::NearLastPenPoint(POINT screenPoint) const noexcept
-{
-    return std::abs(screenPoint.x - m_lastPenPoint.x) <= PEN_CAPTURE_RADIUS_PX &&
-           std::abs(screenPoint.y - m_lastPenPoint.y) <= PEN_CAPTURE_RADIUS_PX;
-}
-
 // Quick Access needs to know whether the presenter is up so its entry can read "turn
 // on" or "turn off", but it runs in its own process. A manual-reset event named in the
 // Local namespace is the cheapest channel that survives either side restarting: the
@@ -951,26 +941,36 @@ bool LaserPointerOverlay::PenPresent(uint64_t nowMs) const noexcept
 // app decided to take the gesture.
 //
 // Standing in front of it is the reliable answer: while the pen is armed and in range,
-// the overlay stops being click-through, so contact hit-tests to this window and the app
-// below never sees it. This needed a trustworthy "is that a pen?" signal, which is what
-// failed last time - GetCurrentInputMessageSource reports IMDT_UNAVAILABLE on real
-// hardware. The raw digitizer reports supply it directly, and they arrive during hover,
-// before the first contact. Outside that window the overlay is click-through as before,
-// so the mouse is untouched, and on a machine with no digitizer this never engages.
+// a small input-only window follows the pen and absorbs contact before the app below can
+// claim it. The full-screen rendering window remains WS_EX_TRANSPARENT, so mouse input
+// anywhere outside that patch continues to reach unrelated applications. Raw digitizer
+// reports provide the trustworthy hover signal needed to position the patch before the
+// first contact.
 void LaserPointerOverlay::UpdatePenCapture(uint64_t nowMs)
 {
     const bool capture = PenPresent(nowMs);
-    if (capture == m_penCapturing || m_hwnd == nullptr)
+    if (m_penCaptureHwnd == nullptr)
     {
         return;
     }
 
-    m_penCapturing = capture;
+    if (capture)
+    {
+        const int diameter = PEN_CAPTURE_RADIUS_PX * 2 + 1;
+        SetWindowPos(m_penCaptureHwnd,
+                     HWND_TOPMOST,
+                     m_lastPenPoint.x - PEN_CAPTURE_RADIUS_PX,
+                     m_lastPenPoint.y - PEN_CAPTURE_RADIUS_PX,
+                     diameter,
+                     diameter,
+                     SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    }
+    else if (m_penCapturing)
+    {
+        ShowWindow(m_penCaptureHwnd, SW_HIDE);
+    }
 
-    // WM_NCHITTEST alone is not enough: a WS_EX_TRANSPARENT window is passed over before
-    // it is ever asked, so the style has to come off for the duration.
-    const LONG_PTR exStyle = GetWindowLongPtr(m_hwnd, GWL_EXSTYLE);
-    SetWindowLongPtr(m_hwnd, GWL_EXSTYLE, capture ? (exStyle & ~WS_EX_TRANSPARENT) : (exStyle | WS_EX_TRANSPARENT));
+    m_penCapturing = capture;
 }
 
 // A window that actually shows on screen. The z-order is full of windows that do not:
@@ -2644,31 +2644,6 @@ LRESULT CALLBACK LaserPointerOverlay::WndProc(HWND hWnd, UINT message, WPARAM wP
         instance->HandleRawInput(reinterpret_cast<HRAWINPUT>(lParam));
         return DefWindowProc(hWnd, message, wParam, lParam);
 
-    case WM_NCHITTEST:
-    {
-        // Click-through except for a small patch around an armed pen that is in range,
-        // which is where its next contact will land. See UpdatePenCapture.
-        if (!instance->m_penCapturing)
-        {
-            return HTTRANSPARENT;
-        }
-
-        const POINT hit{ static_cast<LONG>(static_cast<short>(LOWORD(lParam))),
-                         static_cast<LONG>(static_cast<short>(HIWORD(lParam))) };
-        return instance->NearLastPenPoint(hit) ? HTCLIENT : HTTRANSPARENT;
-    }
-
-    // Whatever the pen does while captured is swallowed here. Not calling DefWindowProc
-    // also stops these being promoted to mouse messages, so the hook does not see the
-    // same contact a second time.
-    case WM_POINTERDOWN:
-    case WM_POINTERUPDATE:
-    case WM_POINTERUP:
-    case WM_POINTERENTER:
-    case WM_POINTERLEAVE:
-    case WM_POINTERCAPTURECHANGED:
-        return 0;
-
     case WM_SWITCH_ACTIVATION_MODE:
         if (instance->m_mouseArmed)
         {
@@ -2770,6 +2745,26 @@ LRESULT CALLBACK LaserPointerOverlay::WndProc(HWND hWnd, UINT message, WPARAM wP
     }
 }
 
+LRESULT CALLBACK LaserPointerOverlay::PenCaptureWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) noexcept
+{
+    switch (message)
+    {
+    case WM_NCHITTEST:
+        return HTCLIENT;
+    case WM_MOUSEACTIVATE:
+        return MA_NOACTIVATE;
+    case WM_POINTERDOWN:
+    case WM_POINTERUPDATE:
+    case WM_POINTERUP:
+    case WM_POINTERENTER:
+    case WM_POINTERLEAVE:
+    case WM_POINTERCAPTURECHANGED:
+        return 0;
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+}
+
 bool LaserPointerOverlay::MyRegisterClass(HINSTANCE hInstance)
 {
     WNDCLASS wc{};
@@ -2792,6 +2787,21 @@ bool LaserPointerOverlay::MyRegisterClass(HINSTANCE hInstance)
         }
     }
 
+    if (!GetClassInfoW(hInstance, m_penCaptureClassName, &wc))
+    {
+        wc = {};
+        wc.lpfnWndProc = PenCaptureWndProc;
+        wc.hInstance = hInstance;
+        wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+        wc.hbrBackground = static_cast<HBRUSH>(GetStockObject(NULL_BRUSH));
+        wc.lpszClassName = m_penCaptureClassName;
+
+        if (!RegisterClassW(&wc))
+        {
+            return false;
+        }
+    }
+
     // Owner window: destroying it tears the overlay down too, which is how the runner's
     // disable() unwinds this thread. Guarded because Terminate() reads it from the
     // runner's thread.
@@ -2801,7 +2811,28 @@ bool LaserPointerOverlay::MyRegisterClass(HINSTANCE hInstance)
     ReleaseSRWLockExclusive(&m_hwndLock);
 
     const DWORD exStyle = WS_EX_TRANSPARENT | WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE;
-    const HWND window = CreateWindowExW(exStyle, m_className, m_windowTitle, WS_POPUP, CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, m_hwndOwner, nullptr, hInstance, nullptr);
+    HWND window = CreateWindowExW(exStyle, m_className, m_windowTitle, WS_POPUP, CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, m_hwndOwner, nullptr, hInstance, nullptr);
+    if (window != nullptr)
+    {
+        m_penCaptureHwnd = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
+                                           m_penCaptureClassName,
+                                           L"",
+                                           WS_POPUP,
+                                           0,
+                                           0,
+                                           0,
+                                           0,
+                                           window,
+                                           nullptr,
+                                           hInstance,
+                                           nullptr);
+        if (m_penCaptureHwnd == nullptr)
+        {
+            DestroyWindow(window);
+            window = nullptr;
+        }
+    }
+
     m_windowInitializationComplete = true;
     if (window != nullptr && m_terminationRequested)
     {

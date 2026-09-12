@@ -64,7 +64,7 @@ public:
 private:
     bool CreateHostWindow(HINSTANCE instance);
     bool CreateGraphics(ID3D11Device* d3dDevice, ID2D1Device1* d2dDevice);
-    bool StartCapture();
+    bool StartCapture(HWND target);
     void StopCapture();
     bool ResizeSurfaces(UINT width, UINT height);
     void ParkOffscreen() noexcept;
