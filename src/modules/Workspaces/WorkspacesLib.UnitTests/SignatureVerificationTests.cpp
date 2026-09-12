@@ -177,6 +177,14 @@ namespace WorkspacesLibUnitTests
             Assert::IsFalse(SignatureVerification::IsCurrent(target));
         }
 
+        TEST_METHOD (UriTargetsWithoutAFileHandleRemainCurrent)
+        {
+            SignatureVerification::LaunchTarget target;
+            target.path = L"steam:launch/test";
+            target.result = { Status::UnableToVerify, HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED) };
+            Assert::IsTrue(SignatureVerification::IsCurrent(target));
+        }
+
         TEST_METHOD (MalformedImageIsNotReportedAsUnsigned)
         {
             TemporaryExecutable fixture;

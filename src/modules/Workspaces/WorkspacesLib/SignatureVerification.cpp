@@ -296,9 +296,15 @@ namespace SignatureVerification
 
     bool IsCurrent(const LaunchTarget& target, const std::function<bool()>& isCanceled)
     {
-        if (!target.package && !target.file)
+        if (!target.package)
         {
-            return false;
+            const auto pathView = std::filesystem::path(target.path);
+            const bool isDirectExecutable = !target.path.empty() && target.path.find(L'\0') == std::wstring::npos &&
+                pathView.is_absolute() && _wcsicmp(pathView.extension().c_str(), L".exe") == 0;
+            if (isDirectExecutable && !target.file)
+            {
+                return false;
+            }
         }
         return PackageVerification::IsCurrent(target, isCanceled);
     }
