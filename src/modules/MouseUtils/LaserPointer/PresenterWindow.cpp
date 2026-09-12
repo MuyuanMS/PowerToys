@@ -542,8 +542,7 @@ bool PresenterWindow::Start(HINSTANCE instance, HWND target, ID3D11Device* d3dDe
         return false;
     }
 
-    Logger::info("Laser Pointer presenter started for '{}' ({}x{}).",
-                 winrt::to_string(m_targetTitle),
+    Logger::info("Laser Pointer presenter started ({}x{}).",
                  m_width,
                  m_height);
     return true;
@@ -627,8 +626,7 @@ bool PresenterWindow::Retarget(HWND target)
     SetWindowPos(m_hwnd, nullptr, 0, 0, static_cast<int>(width), static_cast<int>(height), SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
     SetWindowTextW(m_hwnd, (GET_RESOURCE_STRING(IDS_PRESENTER_WINDOW_TITLE_PREFIX) + m_targetTitle).c_str());
 
-    Logger::info("Laser Pointer presenter retargeted to '{}' ({}x{}).",
-                 winrt::to_string(m_targetTitle),
+    Logger::info("Laser Pointer presenter retargeted ({}x{}).",
                  width,
                  height);
     return true;
