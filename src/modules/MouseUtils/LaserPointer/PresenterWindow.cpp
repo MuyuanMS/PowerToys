@@ -175,10 +175,6 @@ bool PresenterWindow::IsPresentableWindow(HWND window) noexcept
         return false;
     }
 
-    if (WindowTitle(window).empty())
-    {
-        return false;
-    }
 
     // The shell surfaces are not applications: pressing the shortcut over the taskbar or
     // the desktop should just draw on screen as usual.
