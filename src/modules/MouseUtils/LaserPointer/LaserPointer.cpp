@@ -1666,6 +1666,11 @@ void LaserPointerOverlay::DisarmMouse()
     m_mouseArmed = false;
     m_activationButtonHeld = false;
 
+    if (m_drawing && !m_alwaysOnButtonHeld && !m_penContact)
+    {
+        EndDrawing();
+    }
+
     // Done here rather than left to ReleaseIfIdle, which bows out early when the pen is
     // still armed and would leave the pen cursor behind.
     UpdateDrawingCursor();
@@ -1700,6 +1705,11 @@ void LaserPointerOverlay::DisarmPen()
     Logger::info("Laser Pointer pen disarmed.");
     m_penArmed = false;
     m_penContact = false;
+    if (m_drawing && !m_activationButtonHeld && !m_alwaysOnButtonHeld)
+    {
+        EndDrawing();
+    }
+
     UpdatePenCapture(GetTickCount64());
 
     UnregisterPenRawInput();
