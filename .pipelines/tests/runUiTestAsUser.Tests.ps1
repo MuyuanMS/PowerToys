@@ -447,6 +447,7 @@ Describe 'runUiTestAsUser controller contracts without desktop work' {
 
 Describe 'UI-test pipeline non-elevated dispatch' {
     It 'fails infrastructure instead of using the DLL when <Suite> is absent' -TestCases @(
+        @{ Suite = 'AdvancedPaste.UITests.Next' }
         @{ Suite = 'CropAndLock.UITests' }
         @{ Suite = 'Workspaces.UITests.Next' }
     ) {

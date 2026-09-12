@@ -349,7 +349,7 @@ jobs:
       $resultsDir = "$(Common.TestResultsDirectory)"
       New-Item -ItemType Directory -Path $resultsDir -Force | Out-Null
 
-      $nonElevatedSuites = @('CropAndLock.UITests', 'Workspaces.UITests.Next')
+      $nonElevatedSuites = @('AdvancedPaste.UITests.Next', 'CropAndLock.UITests', 'Workspaces.UITests.Next')
       $failed = 0
       foreach ($rc in ($entries | Sort-Object FullName -Unique)) {
         $base = $rc.Name -replace '\.runtimeconfig\.json$', ''
