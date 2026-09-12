@@ -296,6 +296,10 @@ namespace SignatureVerification
 
     bool IsCurrent(const LaunchTarget& target, const std::function<bool()>& isCanceled)
     {
+        if (!target.package && !target.file)
+        {
+            return false;
+        }
         return PackageVerification::IsCurrent(target, isCanceled);
     }
 

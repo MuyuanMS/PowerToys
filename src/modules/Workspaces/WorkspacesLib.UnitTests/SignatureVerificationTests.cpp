@@ -168,6 +168,15 @@ namespace WorkspacesLibUnitTests
             Assert::AreEqual(static_cast<LONG>(HRESULT_FROM_WIN32(ERROR_CANCELLED)), target.result.error);
         }
 
+        TEST_METHOD (DirectFileTargetsWithoutAHeldHandleAreNotCurrent)
+        {
+            TemporaryExecutable fixture;
+            SignatureVerification::LaunchTarget target;
+            target.path = fixture.path;
+            target.result = { Status::UnableToVerify, HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED) };
+            Assert::IsFalse(SignatureVerification::IsCurrent(target));
+        }
+
         TEST_METHOD (MalformedImageIsNotReportedAsUnsigned)
         {
             TemporaryExecutable fixture;
