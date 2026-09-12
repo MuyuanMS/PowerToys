@@ -203,6 +203,7 @@ public sealed class AdvancedPasteClipboardHistoryTests : AdvancedPasteTestBase
     private async Task RunHistoryScenarioAsync(int entryCount, bool requiresEmptyHistory, Func<Task> scenario)
     {
         var originalRegistry = ClipboardHistoryRegistrySnapshot.Capture();
+        var failures = new List<Exception>();
         try
         {
             Step("Preparing OS history as a fixture; the Advanced Paste checkbox cannot enable an OS-disabled history card");
@@ -217,24 +218,32 @@ public sealed class AdvancedPasteClipboardHistoryTests : AdvancedPasteTestBase
             Assert.IsTrue(HistoryCheckbox().IsChecked, "Settings did not reflect the enabled OS history fixture.");
             await scenario();
         }
-        catch
+        catch (Exception exception)
         {
-            await CaptureFailureArtifactsAsync();
-            throw;
-        }
-        finally
-        {
-            Step("Removing only this test's history IDs and restoring the original OS history preference");
+            failures.Add(exception);
             try
             {
-                DismissAdvancedPaste();
-                await RemoveOwnedHistoryAsync();
+                await CaptureFailureArtifactsAsync();
             }
-            finally
+            catch (Exception captureFailure)
             {
-                originalRegistry.Restore();
+                failures.Add(captureFailure);
             }
         }
+
+        Step("Removing only this test's history IDs and restoring the original OS history preference");
+        AttemptCleanup(DismissAdvancedPaste, failures);
+        try
+        {
+            await RemoveOwnedHistoryAsync();
+        }
+        catch (Exception cleanupFailure)
+        {
+            failures.Add(cleanupFailure);
+        }
+
+        AttemptCleanup(originalRegistry.Restore, failures);
+        ThrowCleanupFailures("The clipboard-history scenario and its state restoration did not complete successfully.", failures);
     }
 
     private async Task<ClipboardHistoryItem[]> EnsureHistorySpaceAsync(int entryCount, bool requiresEmptyHistory)

@@ -472,26 +472,37 @@ public sealed class AdvancedPasteSettingsTests : AdvancedPasteTestBase
 
     private async Task RunAndRestoreAsync(Func<Task> scenario, Action restore)
     {
+        var failures = new List<Exception>();
         try
         {
             await scenario();
         }
-        catch
+        catch (Exception exception)
         {
-            await CaptureFailureArtifactsAsync();
-            throw;
-        }
-        finally
-        {
-            Step("Restoring this scenario's Settings UI changes");
-            if (shortcutDialogOpened && Session.Has(By.AccessibilityId("ResetBtn"), 0))
+            failures.Add(exception);
+            try
             {
-                CloseShortcutDialog("CloseButton");
+                await CaptureFailureArtifactsAsync();
             }
-
-            DismissAdvancedPaste();
-            restore();
+            catch (Exception captureFailure)
+            {
+                failures.Add(captureFailure);
+            }
         }
+
+        Step("Restoring this scenario's Settings UI changes");
+        AttemptCleanup(
+            () =>
+            {
+                if (shortcutDialogOpened && Session.Has(By.AccessibilityId("ResetBtn"), 0))
+                {
+                    CloseShortcutDialog("CloseButton");
+                }
+            },
+            failures);
+        AttemptCleanup(DismissAdvancedPaste, failures);
+        AttemptCleanup(restore, failures);
+        ThrowCleanupFailures("The Settings scenario and its state restoration did not complete successfully.", failures);
     }
 
     private ToggleSwitch ModuleToggle() => AdvancedPasteUi.CardControl<ToggleSwitch>(Session, EnableCard, "Button", className: "ToggleSwitch");

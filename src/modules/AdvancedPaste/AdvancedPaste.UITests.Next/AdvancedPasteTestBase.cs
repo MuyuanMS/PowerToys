@@ -4,6 +4,7 @@
 
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -146,11 +147,15 @@ public abstract class AdvancedPasteTestBase : UITestBase
     [ClassCleanup(InheritanceBehavior.BeforeEachDerivedClass, ClassCleanupBehavior.EndOfClass)]
     public static void RestoreAdvancedPasteSettings()
     {
-        StopSharedScope();
-        Assert.IsTrue(WindowControl.TryKillProcessTreeByNameAndWait(ProcessName), "Advanced Paste did not stop before restoring settings.");
         var snapshot = settingsSnapshot;
         settingsSnapshot = null;
-        snapshot?.Dispose();
+        var failures = new List<Exception>();
+        AttemptCleanup(StopSharedScope, failures);
+        AttemptCleanup(
+            () => Assert.IsTrue(WindowControl.TryKillProcessTreeByNameAndWait(ProcessName), "Advanced Paste did not stop before restoring settings."),
+            failures);
+        AttemptCleanup(() => snapshot?.Dispose(), failures);
+        ThrowCleanupFailures("Advanced Paste test state could not be fully restored.", failures);
     }
 
     protected static string FixturePath(string name) => Path.Combine(AppContext.BaseDirectory, "TestFiles", name);
@@ -290,7 +295,9 @@ public abstract class AdvancedPasteTestBase : UITestBase
     {
         AccessClipboard(() =>
         {
-            WinClipboard.SetContent(package);
+            WinClipboard.SetContentWithOptions(
+                package,
+                new ClipboardContentOptions { IsAllowedInHistory = false, IsRoamable = false });
             WinClipboard.Flush();
             return true;
         });
@@ -399,6 +406,31 @@ public abstract class AdvancedPasteTestBase : UITestBase
             () => matches(ReadProperties()),
             description,
             shouldRetryException: exception => exception is IOException or JsonException);
+
+    protected static void AttemptCleanup(Action cleanup, List<Exception> failures)
+    {
+        try
+        {
+            cleanup();
+        }
+        catch (Exception exception)
+        {
+            failures.Add(exception);
+        }
+    }
+
+    protected static void ThrowCleanupFailures(string message, List<Exception> failures)
+    {
+        if (failures.Count == 1)
+        {
+            ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        }
+
+        if (failures.Count > 1)
+        {
+            throw new AggregateException(message, failures);
+        }
+    }
 
     protected static void WaitUntil(
         Func<bool> condition,
