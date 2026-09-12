@@ -48,7 +48,7 @@ namespace PackageVerification
                    (state.signatureKind == PackageSignatureKind::Store || state.signatureKind == PackageSignatureKind::System);
         }
 
-        std::optional<ResolvedPackage> Resolve(const ApplicationIdentity& identity, const std::function<bool()>& isCanceled)
+        std::optional<ResolvedPackage> Resolve(const ApplicationIdentity& identity, const std::function<bool()>& isCanceled, bool verifyIntegrity = false)
         {
             details::ThrowIfCanceled(isCanceled);
             winrt::Windows::Management::Deployment::PackageManager manager;
@@ -97,6 +97,11 @@ namespace PackageVerification
                         candidate.state.mutableContent = !candidate.identity.mutablePath.empty() ||
                                                          candidate.identity.effectivePath != candidate.identity.installedPath;
                         candidate.state.stub = candidate.state.stub || extended.IsStub();
+                    }
+                    if (verifyIntegrity && MetadataEligible(candidate.state))
+                    {
+                        candidate.state.integrityValid = details::Await(candidate.package.VerifyContentIntegrityAsync(), std::chrono::seconds(30), isCanceled);
+                        candidate.state.integrityChecked = true;
                     }
                     resolved = std::move(candidate);
                 }
@@ -189,17 +194,12 @@ namespace PackageVerification
         }
         try
         {
-            auto resolved = Resolve(application.value(), isCanceled);
+            auto resolved = Resolve(application.value(), isCanceled, true);
             if (!resolved)
             {
                 return target;
             }
             target.package = resolved->identity;
-            if (MetadataEligible(resolved->state))
-            {
-                resolved->state.integrityValid = details::Await(resolved->package.VerifyContentIntegrityAsync(), std::chrono::seconds(30), isCanceled);
-                resolved->state.integrityChecked = true;
-            }
             target.result = Evaluate(resolved->state);
             if (target.result.IsVerified())
             {
@@ -223,8 +223,8 @@ namespace PackageVerification
 
     bool IsCurrent(const SignatureVerification::LaunchTarget& target, const std::function<bool()>& isCanceled)
     {
-        return details::IsCurrent(target, isCanceled, [](const ApplicationIdentity& application, const std::function<bool()>& canceled) -> std::optional<details::Registration> {
-            auto current = Resolve(application, canceled);
+        return details::IsCurrent(target, isCanceled, [&target](const ApplicationIdentity& application, const std::function<bool()>& canceled) -> std::optional<details::Registration> {
+            auto current = Resolve(application, canceled, target.result.IsVerified());
             if (!current)
             {
                 return std::nullopt;
@@ -252,7 +252,7 @@ namespace PackageVerification
                 return !current;
             }
             return current && current->identity == target.package.value() &&
-                   (!target.result.IsVerified() || MetadataEligible(current->state));
+                   (!target.result.IsVerified() || Evaluate(current->state).IsVerified());
         }
         catch (const winrt::hresult_error& error)
         {

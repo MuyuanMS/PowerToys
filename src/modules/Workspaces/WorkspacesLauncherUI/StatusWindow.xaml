@@ -67,7 +67,7 @@
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
                                     AutomationProperties.AutomationId="{Binding Name, StringFormat='LaunchProgress_{0}'}"
-                                    AutomationProperties.Name="{Binding StateDescription}
+                                    AutomationProperties.Name="{Binding StateDescription}"
                                     IsIndeterminate="True"
                                     ToolTip="{Binding StateDescription}"
                                     Visibility="{Binding Loading, Mode=OneWay, Converter={StaticResource BoolToVis}, UpdateSourceTrigger=PropertyChanged}" />
@@ -79,7 +79,7 @@
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
                                     AutomationProperties.AutomationId="{Binding Name, StringFormat='LaunchState_{0}'}"
-                                    AutomationProperties.Name="{Binding StateDescription}
+                                    AutomationProperties.Name="{Binding StateDescription}"
                                     FontFamily="{DynamicResource SymbolThemeFontFamily}"
                                     FontSize="20"
                                     Foreground="{Binding StateColor}"

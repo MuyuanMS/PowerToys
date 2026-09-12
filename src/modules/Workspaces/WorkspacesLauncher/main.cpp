@@ -162,7 +162,8 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
         output.SetNamedValue(L"applicationUserModelId", json::value(executable.package ? executable.package->applicationUserModelId : L""));
         const std::string text = winrt::to_string(output.Stringify()) + "\n";
         DWORD written = 0;
-        if (!WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), text.data(), static_cast<DWORD>(text.size()), &written, nullptr))
+        if (!WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), text.data(), static_cast<DWORD>(text.size()), &written, nullptr) ||
+            written != text.size())
         {
             Logger::error(L"Unable to write signature diagnostics: {}", get_last_error_or_default(GetLastError()));
             return 1;

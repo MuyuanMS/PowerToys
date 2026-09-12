@@ -434,6 +434,12 @@ namespace WorkspacesLibUnitTests
             target.package = current.identity;
             target.result = { Status::Verified, ERROR_SUCCESS };
             Assert::IsTrue(PackageVerification::details::IsCurrent(target, {}, [&](const auto&, const auto&) { return std::optional{ current }; }));
+            current.state.integrityValid = false;
+            Assert::IsFalse(PackageVerification::details::IsCurrent(target, {}, [&](const auto&, const auto&) { return std::optional{ current }; }));
+            current.state.integrityValid = true;
+            current.state.integrityChecked = false;
+            Assert::IsFalse(PackageVerification::details::IsCurrent(target, {}, [&](const auto&, const auto&) { return std::optional{ current }; }));
+            current.state.integrityChecked = true;
             current.state.statusOk = false;
             Assert::IsFalse(PackageVerification::details::IsCurrent(target, {}, [&](const auto&, const auto&) { return std::optional{ current }; }));
         }
