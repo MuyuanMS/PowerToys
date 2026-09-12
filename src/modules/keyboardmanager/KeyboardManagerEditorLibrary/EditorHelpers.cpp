@@ -137,10 +137,10 @@ namespace EditorHelpers
     // Function to check if the shortcut is illegal (i.e. Win+L or Ctrl+Alt+Del)
     ShortcutErrorType IsShortcutIllegal(Shortcut shortcut)
     {
-        // Win+L
-        if (shortcut.winKey != ModifierKey::Disabled && shortcut.ctrlKey == ModifierKey::Disabled && shortcut.altKey == ModifierKey::Disabled && shortcut.shiftKey == ModifierKey::Disabled && shortcut.actionKey == 0x4C)
+        // Win+L (and any chords involving it like Win+Ctrl+L or Win+K, L)
+        if (shortcut.winKey != ModifierKey::Disabled && (shortcut.actionKey == 0x4C || shortcut.secondKey == 0x4C))
         {
-            Logger::info(L"Illegal shortcut detected: Win+L");
+            Logger::info(L"Illegal shortcut detected: Win+L or a chord containing Win+L");
             return ShortcutErrorType::WinL;
         }
 
