@@ -1764,6 +1764,8 @@ void LaserPointerOverlay::ArmPen()
     m_penAwaitingFirstSample = false;
     m_penStrokeOpen = false;
 
+    Trace::StartLaserPointerSession();
+
     UpdateHook();
     RegisterPenRawInput();
 
