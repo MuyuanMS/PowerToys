@@ -33,7 +33,7 @@
             <cmdpalUI:QuickAccessShortcutTextConverter x:Key="QuickAccessShortcutTextConverter" />
 
             <Style
-                x:Name="QuickAccessShelfContextMenuFlyoutStyle"
+                x:Key="QuickAccessShelfContextMenuFlyoutStyle"
                 BasedOn="{StaticResource DefaultFlyoutPresenterStyle}"
                 TargetType="FlyoutPresenter">
                 <Style.Setters>
