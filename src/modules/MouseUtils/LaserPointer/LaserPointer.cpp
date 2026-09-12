@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -151,6 +152,81 @@ namespace
         return button == LaserPointerButton::Middle ||
                button == LaserPointerButton::X1 ||
                button == LaserPointerButton::X2;
+    }
+
+    std::wstring RawInputProductString(HANDLE rawDevice) noexcept
+    {
+        UINT pathLength = 0;
+        if (GetRawInputDeviceInfoW(rawDevice, RIDI_DEVICENAME, nullptr, &pathLength) == static_cast<UINT>(-1) || pathLength == 0)
+        {
+            return {};
+        }
+
+        std::vector<wchar_t> devicePath(static_cast<size_t>(pathLength) + 1);
+        if (GetRawInputDeviceInfoW(rawDevice, RIDI_DEVICENAME, devicePath.data(), &pathLength) == static_cast<UINT>(-1))
+        {
+            return {};
+        }
+
+        HANDLE hidDevice = CreateFileW(devicePath.data(),
+                                       0,
+                                       FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                       nullptr,
+                                       OPEN_EXISTING,
+                                       FILE_ATTRIBUTE_NORMAL,
+                                       nullptr);
+        if (hidDevice == INVALID_HANDLE_VALUE)
+        {
+            return {};
+        }
+
+        wchar_t product[POINTER_DEVICE_PRODUCT_STRING_MAX]{};
+        const bool found = HidD_GetProductString(hidDevice, product, sizeof(product)) != FALSE;
+        CloseHandle(hidDevice);
+        return found ? std::wstring{ product } : std::wstring{};
+    }
+
+    bool TryGetPenDisplayRect(HANDLE rawDevice, RECT& displayRect) noexcept
+    {
+        UINT32 deviceCount = 0;
+        if (!GetPointerDevices(&deviceCount, nullptr) || deviceCount == 0)
+        {
+            return false;
+        }
+
+        std::vector<POINTER_DEVICE_INFO> pointerDevices(deviceCount);
+        if (!GetPointerDevices(&deviceCount, pointerDevices.data()))
+        {
+            return false;
+        }
+
+        const std::wstring rawProduct = RawInputProductString(rawDevice);
+        HANDLE onlyPenDevice = nullptr;
+        UINT32 penDeviceCount = 0;
+        for (const auto& pointerDevice : pointerDevices)
+        {
+            if (pointerDevice.pointerDeviceType != POINTER_DEVICE_TYPE_INTEGRATED_PEN &&
+                pointerDevice.pointerDeviceType != POINTER_DEVICE_TYPE_EXTERNAL_PEN)
+            {
+                continue;
+            }
+
+            onlyPenDevice = pointerDevice.device;
+            ++penDeviceCount;
+            if (!rawProduct.empty() && _wcsicmp(pointerDevice.productString, rawProduct.c_str()) == 0)
+            {
+                RECT pointerDeviceRect{};
+                return GetPointerDeviceRects(pointerDevice.device, &pointerDeviceRect, &displayRect) != FALSE;
+            }
+        }
+
+        if (penDeviceCount != 1)
+        {
+            return false;
+        }
+
+        RECT pointerDeviceRect{};
+        return GetPointerDeviceRects(onlyPenDevice, &pointerDeviceRect, &displayRect) != FALSE;
     }
 }
 
@@ -394,7 +470,6 @@ private:
         USAGE usagePage = 0;
         USAGE usage = 0;
         LONG minX = 0, maxX = 0, minY = 0, maxY = 0;
-        RECT deviceRect{};
         RECT displayRect{};
         bool haveX = false, haveY = false;
         bool haveDisplayMapping = false;
@@ -2092,7 +2167,14 @@ bool LaserPointerOverlay::ReadPenReport(HANDLE deviceHandle, PCHAR report, ULONG
         }
 
         device.usable = device.haveX && device.haveY;
-        device.haveDisplayMapping = GetPointerDeviceRects(deviceHandle, &device.deviceRect, &device.displayRect) != FALSE;
+        device.haveDisplayMapping = TryGetPenDisplayRect(deviceHandle, device.displayRect);
+        if (!device.haveDisplayMapping)
+        {
+            device.displayRect.left = GetSystemMetrics(SM_XVIRTUALSCREEN);
+            device.displayRect.top = GetSystemMetrics(SM_YVIRTUALSCREEN);
+            device.displayRect.right = device.displayRect.left + GetSystemMetrics(SM_CXVIRTUALSCREEN);
+            device.displayRect.bottom = device.displayRect.top + GetSystemMetrics(SM_CYVIRTUALSCREEN);
+        }
         Logger::info("Laser Pointer pen device: usable={} x=[{},{}] y=[{},{}]",
                      device.usable,
                      device.minX,
@@ -2135,24 +2217,17 @@ bool LaserPointerOverlay::ReadPenReport(HANDLE deviceHandle, PCHAR report, ULONG
         }
     }
 
-    if (!device.haveDisplayMapping)
-    {
-        // Let the pointer stack apply the digitizer's monitor mapping and orientation.
-        // This is preferable to stretching a built-in digitizer across every monitor.
-        return GetCursorPos(&screenPoint) != FALSE;
-    }
-
-    const double spanX = static_cast<double>(device.deviceRect.right) - static_cast<double>(device.deviceRect.left);
-    const double spanY = static_cast<double>(device.deviceRect.bottom) - static_cast<double>(device.deviceRect.top);
+    const double spanX = static_cast<double>(device.maxX) - static_cast<double>(device.minX);
+    const double spanY = static_cast<double>(device.maxY) - static_cast<double>(device.minY);
     if (spanX == 0.0 || spanY == 0.0)
     {
-        return GetCursorPos(&screenPoint) != FALSE;
+        return false;
     }
 
     const double displaySpanX = static_cast<double>(device.displayRect.right) - static_cast<double>(device.displayRect.left);
     const double displaySpanY = static_cast<double>(device.displayRect.bottom) - static_cast<double>(device.displayRect.top);
-    const double normalizedX = (static_cast<double>(x) - device.deviceRect.left) / spanX;
-    const double normalizedY = (static_cast<double>(y) - device.deviceRect.top) / spanY;
+    const double normalizedX = std::clamp((static_cast<double>(x) - device.minX) / spanX, 0.0, 1.0);
+    const double normalizedY = std::clamp((static_cast<double>(y) - device.minY) / spanY, 0.0, 1.0);
     screenPoint.x = device.displayRect.left + static_cast<LONG>(normalizedX * displaySpanX);
     screenPoint.y = device.displayRect.top + static_cast<LONG>(normalizedY * displaySpanY);
     return true;
