@@ -70,10 +70,11 @@ namespace LaserPointerCore
 
         m_points.push_back({ sx, sy, timestampMs });
 
-        // A sample can never outlive decayTimeMs, so the deque is naturally bounded;
-        // this only guards against a pathological render stall.
-        constexpr size_t MAX_SAMPLES = 4096;
-        while (m_points.size() > MAX_SAMPLES)
+        // Samples older than the configured taper have zero width and cannot contribute
+        // to the outline. Keep one zero-width endpoint so the visible tail tapers fully,
+        // while still supporting high-rate input when decayLength is scaled above 4096.
+        const size_t visibleSampleLimit = static_cast<size_t>(m_options.decayLength) + 1;
+        while (m_points.size() > visibleSampleLimit)
         {
             m_points.pop_front();
         }

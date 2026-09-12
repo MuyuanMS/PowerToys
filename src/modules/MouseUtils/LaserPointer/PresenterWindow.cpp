@@ -453,7 +453,7 @@ bool PresenterWindow::CreateGraphics(ID3D11Device* d3dDevice, ID2D1Device1* d2dD
     return true;
 }
 
-bool PresenterWindow::StartCapture()
+bool PresenterWindow::StartCapture(HWND target)
 {
     try
     {
@@ -468,23 +468,24 @@ bool PresenterWindow::StartCapture()
         {
             return false;
         }
-        m_captureDevice = inspectable.as<directx::Direct3D11::IDirect3DDevice>();
+        auto captureDevice = inspectable.as<directx::Direct3D11::IDirect3DDevice>();
 
+        capture::GraphicsCaptureItem captureItem{ nullptr };
         auto interop = winrt::get_activation_factory<capture::GraphicsCaptureItem, ::IGraphicsCaptureItemInterop>();
-        if (FAILED(interop->CreateForWindow(m_target,
+        if (FAILED(interop->CreateForWindow(target,
                                             winrt::guid_of<capture::GraphicsCaptureItem>(),
-                                            winrt::put_abi(m_captureItem))))
+                                            winrt::put_abi(captureItem))))
         {
             return false;
         }
 
-        m_framePool = capture::Direct3D11CaptureFramePool::CreateFreeThreaded(
-            m_captureDevice,
+        auto framePool = capture::Direct3D11CaptureFramePool::CreateFreeThreaded(
+            captureDevice,
             directx::DirectXPixelFormat::B8G8R8A8UIntNormalized,
             CAPTURE_BUFFERS,
-            m_captureItem.Size());
+            captureItem.Size());
 
-        m_session = m_framePool.CreateCaptureSession(m_captureItem);
+        auto session = framePool.CreateCaptureSession(captureItem);
 
         // Windows 11 draws a yellow border around a captured window by default, which
         // would follow the presenter around for the whole session. Turning it off is
@@ -494,14 +495,21 @@ bool PresenterWindow::StartCapture()
             if (winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
                     L"Windows.Graphics.Capture.GraphicsCaptureSession", L"IsBorderRequired"))
             {
-                m_session.IsBorderRequired(false);
+                session.IsBorderRequired(false);
             }
         }
         catch (...)
         {
         }
 
-        m_session.StartCapture();
+        session.StartCapture();
+
+        // Do not tear down a working share until the replacement is fully started.
+        StopCapture();
+        m_captureDevice = std::move(captureDevice);
+        m_captureItem = std::move(captureItem);
+        m_framePool = std::move(framePool);
+        m_session = std::move(session);
         return true;
     }
     catch (...)
@@ -532,7 +540,7 @@ bool PresenterWindow::Start(HINSTANCE instance, HWND target, ID3D11Device* d3dDe
     m_width = static_cast<UINT>((std::max)(1L, m_targetRect.right - m_targetRect.left));
     m_height = static_cast<UINT>((std::max)(1L, m_targetRect.bottom - m_targetRect.top));
 
-    if (!CreateHostWindow(instance) || !CreateGraphics(d3dDevice, d2dDevice) || !StartCapture())
+    if (!CreateHostWindow(instance) || !CreateGraphics(d3dDevice, d2dDevice) || !StartCapture(target))
     {
         Stop();
         return false;
@@ -599,29 +607,29 @@ bool PresenterWindow::Retarget(HWND target)
         return false;
     }
 
-    StopCapture();
+    const UINT previousWidth = m_width;
+    const UINT previousHeight = m_height;
+    const UINT width = static_cast<UINT>(bounds.right - bounds.left);
+    const UINT height = static_cast<UINT>(bounds.bottom - bounds.top);
+    if (!ResizeSwapChain(width, height))
+    {
+        ResizeSwapChain(previousWidth, previousHeight);
+        return false;
+    }
+
+    if (!StartCapture(target))
+    {
+        ResizeSwapChain(previousWidth, previousHeight);
+        return false;
+    }
 
     m_target = target;
     m_targetTitle = WindowTitle(target);
     m_targetRect = bounds;
 
-    const UINT width = static_cast<UINT>(bounds.right - bounds.left);
-    const UINT height = static_cast<UINT>(bounds.bottom - bounds.top);
-    if (!ResizeSwapChain(width, height))
-    {
-        Stop();
-        return false;
-    }
-
     // The host window has no caption, so its outer size is its client size.
     SetWindowPos(m_hwnd, nullptr, 0, 0, static_cast<int>(width), static_cast<int>(height), SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
     SetWindowTextW(m_hwnd, (GET_RESOURCE_STRING(IDS_PRESENTER_WINDOW_TITLE_PREFIX) + m_targetTitle).c_str());
-
-    if (!StartCapture())
-    {
-        Stop();
-        return false;
-    }
 
     Logger::info("Laser Pointer presenter retargeted to '{}' ({}x{}).",
                  winrt::to_string(m_targetTitle),

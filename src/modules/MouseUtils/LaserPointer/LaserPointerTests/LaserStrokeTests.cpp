@@ -182,6 +182,16 @@ namespace LaserPointerUnitTests
             Assert::IsFalse(s.Prune(2500), L"the stationary point expires after input stops");
         }
 
+        TEST_METHOD(SampleLimitTracksConfiguredDecayLength)
+        {
+            StrokeOptions options = DefaultOptions();
+            options.decayLength = 5000;
+
+            LaserStroke s = MakeHorizontalStroke(1000, 6000, 1.0f, options);
+
+            Assert::AreEqual(static_cast<size_t>(5001), s.PointCount(), L"the configured taper is not truncated by a fixed cap");
+        }
+
         TEST_METHOD(FinishStopsAcceptingPointsAndClearResets)
         {
             LaserStroke s = MakeHorizontalStroke(1000, 10, 3.0f, DefaultOptions());
