@@ -72,8 +72,8 @@ private:
     {
         HotkeyMouse = 0,
         HotkeyPen = 1,
-        // S shares: it starts sharing, or moves the share to the next window. X stops.
-        // Two one-way shortcuts rather than a toggle, so neither ever does the opposite
+        // Separate shortcuts start or move sharing and stop sharing. Two one-way
+        // shortcuts rather than a toggle ensure neither does the opposite
         // of what was intended.
         HotkeyPresenterShare = 2,
         HotkeyPresenterStop = 3,
@@ -158,7 +158,22 @@ public:
         m_overlayFinished = false;
         const LaserPointerSettings settings = m_laserPointerSettings;
         m_overlayThread = std::thread([this, settings]() {
-            LaserPointerMain(m_hModule, settings);
+            bool apartmentInitialized = false;
+            try
+            {
+                winrt::init_apartment(winrt::apartment_type::multi_threaded);
+                apartmentInitialized = true;
+                LaserPointerMain(m_hModule, settings);
+            }
+            catch (const winrt::hresult_error& error)
+            {
+                Logger::error("Laser Pointer overlay thread failed: {}", winrt::to_string(error.message()));
+            }
+
+            if (apartmentInitialized)
+            {
+                winrt::uninit_apartment();
+            }
             m_overlayFinished = true;
         });
 
