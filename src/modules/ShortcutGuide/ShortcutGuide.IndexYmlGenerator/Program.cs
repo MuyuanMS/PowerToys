@@ -17,6 +17,7 @@ namespace ShortcutGuide.IndexYmlGenerator
             try
             {
                 ManifestIndexGenerator.CreateIndexYmlFile();
+                Logger.LogInfo("Shortcut Guide index file generation completed.");
             }
             catch (Exception ex)
             {
@@ -24,9 +25,8 @@ namespace ShortcutGuide.IndexYmlGenerator
 
                 // Informs the Shortcut Guide UI that the index generation failed.
                 Environment.ExitCode = 1;
+                return;
             }
-
-            Logger.LogInfo("Shortcut Guide index file generation completed.");
         }
     }
 }

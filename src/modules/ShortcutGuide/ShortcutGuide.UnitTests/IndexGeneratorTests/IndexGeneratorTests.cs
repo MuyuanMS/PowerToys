@@ -158,6 +158,7 @@ Index:
         string updatedIndexContent = File.ReadAllText(indexPath);
         StringAssert.Contains(updatedIndexContent, "Valid.App");
         Assert.IsFalse(updatedIndexContent.Contains("Stale.App", StringComparison.Ordinal));
+        Assert.AreEqual(0, Directory.GetFiles(_tempDirectory, "index.yml.*.tmp").Length, "Temporary index files should not be left behind.");
     }
 
     [TestMethod]

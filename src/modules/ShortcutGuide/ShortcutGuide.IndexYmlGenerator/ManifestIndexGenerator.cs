@@ -100,7 +100,29 @@ namespace ShortcutGuide.IndexYmlGenerator
 
             Serializer serializer = new();
             string yamlContent = serializer.Serialize(indexFile);
-            File.WriteAllText(Path.Combine(path, IndexFileName), yamlContent);
+            string indexFilePath = Path.Combine(path, IndexFileName);
+            string tempIndexFilePath = $"{indexFilePath}.{Guid.NewGuid():N}.tmp";
+
+            try
+            {
+                File.WriteAllText(tempIndexFilePath, yamlContent);
+
+                if (File.Exists(indexFilePath))
+                {
+                    File.Replace(tempIndexFilePath, indexFilePath, null);
+                }
+                else
+                {
+                    File.Move(tempIndexFilePath, indexFilePath);
+                }
+            }
+            finally
+            {
+                if (File.Exists(tempIndexFilePath))
+                {
+                    File.Delete(tempIndexFilePath);
+                }
+            }
         }
     }
 }
