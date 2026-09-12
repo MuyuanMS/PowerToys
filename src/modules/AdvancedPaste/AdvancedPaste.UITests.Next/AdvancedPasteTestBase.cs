@@ -117,31 +117,54 @@ public abstract class AdvancedPasteTestBase : UITestBase
         }
 
         cleanedUp = true;
-        await CaptureFailureArtifactsBeforeCleanupAsync();
+        var testFailed = TestContext.CurrentTestOutcome != UnitTestOutcome.Passed;
+        var failures = new List<Exception>();
         try
         {
-            DismissAdvancedPaste();
-            if (clipboardSnapshot is not null && target is not null)
-            {
-                SetClipboard(clipboardSnapshot);
-            }
+            await CaptureFailureArtifactsBeforeCleanupAsync();
         }
-        finally
+        catch (Exception captureFailure)
         {
-            try
-            {
-                target?.Dispose();
-            }
-            finally
-            {
-                TestFileCleanup.Run(
-                    generatedFiles,
-                    testDirectory,
-                    TestContext.CurrentTestOutcome != UnitTestOutcome.Passed,
-                    StopSharedScope,
-                    message => TestContext.WriteLine(message));
-            }
+            failures.Add(captureFailure);
         }
+
+        AttemptCleanup(DismissAdvancedPaste, failures);
+        if (clipboardSnapshot is not null && target is not null)
+        {
+            AttemptCleanup(() => SetClipboard(clipboardSnapshot), failures);
+        }
+
+        AttemptCleanup(() => target?.Dispose(), failures);
+        try
+        {
+            TestFileCleanup.Run(
+                generatedFiles,
+                testDirectory,
+                testFailed,
+                StopSharedScope,
+                message => TestContext.WriteLine(message));
+        }
+        catch (Exception cleanupFailure)
+        {
+            failures.Add(cleanupFailure);
+        }
+
+        if (testFailed)
+        {
+            foreach (var failure in failures)
+            {
+                TestContext.WriteLine($"Cleanup failure: {failure}");
+            }
+
+            return;
+        }
+
+        if (failures.Count > 0)
+        {
+            AttemptCleanup(StopSharedScope, failures);
+        }
+
+        ThrowCleanupFailures("Advanced Paste test cleanup did not complete successfully.", failures);
     }
 
     [ClassCleanup(InheritanceBehavior.BeforeEachDerivedClass, ClassCleanupBehavior.EndOfClass)]
