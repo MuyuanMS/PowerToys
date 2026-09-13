@@ -205,6 +205,12 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 const int settingsCardContentHeight = // 283
                     settingsCardHeight - settingsCardTopBorder - settingsCardTopMargin - settingsCardBottomBorder - settingsCardBottomMargin;
 
+                // TODO: we only calculate settingsCardContentHeight and assume the
+                // preview image is constrained by height, not by width. That's true
+                // today but if the fake displayInfo above or the Settings UI form's
+                // MinWidth are changed in future this might create an image that is
+                // too wide for the control, and we might need to calculate
+                // settingsCardContentWidth as well.
                 var canvasSize = new SizeInfo(desktopSize.Width, settingsCardContentHeight).Clamp(desktopSize);
 
                 var previewType = Enum.TryParse<PreviewType>(this.MouseJumpPreviewType, true, out var previewTypeResult)
@@ -262,8 +268,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 var previewLayout = LayoutHelper.GetFormLayout(
                     previewStyle: previewStyle,
                     displayInfo: displayInfo,
-                    activatedScreen: activatedScreen,
-                    activatedLocation: new(0, 0));
+                    maximumSize: canvasSize);
 
                 var desktopImage = MouseUtilsViewModel.MouseJumpDesktopImage.Value;
                 var imageCopyService = new StaticImageRegionCopyService(desktopImage);
