@@ -191,7 +191,7 @@ public sealed class LayoutsFunctionData : BaseFunctionData
 
     /// <summary>
     /// Gets the custom layouts a default layout may reference: the desired
-    /// custom layouts when they are part of the input, otherwise the current
+    /// custom layouts when they are part of the input; otherwise, the current
     /// ones.
     /// </summary>
     private IReadOnlyList<FzCustomLayout> KnownCustomLayouts => Input.Layouts.Custom ?? Output.Layouts.Custom ?? [];

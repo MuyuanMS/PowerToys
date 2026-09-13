@@ -153,7 +153,7 @@ built-in templates have no identifier and are referred to by `type`.
 Where the GUID comes from depends on what you are doing:
 
 - **Declaring new layouts in the configuration:** choose any new GUID, for
-  example with `New-Guid` in PowerShell or `uuidgen`, use it as the `uuid` of
+  example with `New-Guid` in PowerShell, use it as the `uuid` of
   the custom layout, and use the same value wherever the layout is referenced.
   FancyZones does not generate identifiers for layouts deployed this way.
 - **Referencing layouts that already exist on the machine** (created in the

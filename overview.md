@@ -26,7 +26,7 @@ system matches that state.
 
 PowerToys offers two distinct DSC implementations:
 
-1. **PowerShell DSC (PSDSC)** - A legacy PowerShell-based module using DSC v2
+1. **PowerShell DSC** - A legacy PowerShell-based module using DSC v2
 2. **Microsoft DSC** - A modern, cross-platform implementation using DSC v3
 
 > [!NOTE]
@@ -71,7 +71,7 @@ PowerToys offers two distinct DSC implementations:
 
 ## Configuration scope
 
-Both approaches manage the settings that you can change in the PowerToys Settings app, such as whether a utility is enabled, its activation shortcuts, and its behavior and appearance options. The approaches differ in which utilities they cover and in whether they can manage the data a utility stores outside of its settings.
+Both approaches manage the settings that you can change in the PowerToys Settings app, such as whether a utility is enabled, its activation shortcuts, and its behavior and appearance options. The approaches differ in which utilities they cover and whether they can manage utility data stored outside of settings.
 
 ### Utility settings
 

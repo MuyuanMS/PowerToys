@@ -516,7 +516,7 @@ public static class FzLayoutsConverter
             return;
         }
 
-        var seenUuids = new HashSet<string>(StringComparer.Ordinal);
+        var seenIds = new HashSet<string>(StringComparer.Ordinal);
         for (var i = 0; i < layouts.Count; i++)
         {
             var entry = layouts[i];
@@ -528,7 +528,7 @@ public static class FzLayoutsConverter
             }
 
             ValidateGuid(entry.Uuid, $"{context}.uuid", errors, out var uuid);
-            if (uuid != null && !seenUuids.Add(uuid))
+            if (uuid != null && !seenIds.Add(uuid))
             {
                 errors.Add($"{context}.uuid: layout '{uuid}' is defined more than once");
             }

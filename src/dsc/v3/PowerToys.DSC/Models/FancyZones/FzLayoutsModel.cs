@@ -9,7 +9,7 @@ using System.Text.Json.Serialization;
 namespace PowerToys.DSC.Models.FancyZones;
 
 /// <summary>
-/// Friendly, hand-authorable representation of the FancyZones layout data
+/// Friendly, hand-editable representation of the FancyZones layout data
 /// managed by the DSC layouts resource.
 /// </summary>
 public sealed class FzLayoutsModel

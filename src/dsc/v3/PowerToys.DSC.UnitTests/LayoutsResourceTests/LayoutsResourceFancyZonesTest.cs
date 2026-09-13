@@ -580,7 +580,7 @@ public sealed class LayoutsResourceFancyZonesTest : BaseDscTest
     [TestMethod]
     public void Get_CustomLayoutWithoutInfo_SkippedWithWarning()
     {
-        // Arrange: an entry the engine would skip, next to a valid one
+        // Arrange: an invalid entry that the engine would skip, next to a valid one
         var json = /*lang=json,strict*/ """
             {
               "custom-layouts": [
