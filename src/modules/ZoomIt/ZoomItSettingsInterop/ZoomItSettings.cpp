@@ -240,7 +240,20 @@ namespace winrt::PowerToys::ZoomItSettingsInterop::implementation
                         if (possibleValue.has_value())
                         {
                             RecordingFormat oldFormat = g_RecordingFormat;
-                            DWORD formatValue = (possibleValue.value() == L"GIF") ? 0 : 1;
+                            DWORD formatValue;
+                            if (possibleValue.value() == L"GIF")
+                            {
+                                formatValue = 0;
+                            }
+                            else if (possibleValue.value() == L"MP4")
+                            {
+                                formatValue = 1;
+                            }
+                            else
+                            {
+                                throw winrt::hresult_invalid_argument(L"RecordFormat must be GIF or MP4.");
+                            }
+
                             RecordingFormat newFormat = static_cast<RecordingFormat>(formatValue);
 
                             *static_cast<PDWORD>(curSetting->Setting) = formatValue;

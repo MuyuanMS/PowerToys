@@ -39,6 +39,8 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
     private readonly SettingsResourceObject<ZoomItSettings> _input;
     private readonly SettingsResourceObject<ZoomItSettings> _output;
     private readonly bool _hasInput;
+    private readonly bool _recordScalingSpecified;
+    private string? _currentRecordFormat;
 
     /// <summary>
     /// Gets or sets the reader of the ZoomIt settings JSON. Defaults to the
@@ -68,6 +70,8 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
     {
         _output = new();
         _hasInput = !string.IsNullOrEmpty(input);
+        _recordScalingSpecified = _hasInput &&
+            JsonNode.Parse(input!)?[SettingsResourceObject<ZoomItSettings>.SettingsJsonPropertyName]?[PropertiesJsonPropertyName]?["RecordScaling"] != null;
         _input = _hasInput ? JsonSerializer.Deserialize<SettingsResourceObject<ZoomItSettings>>(input!, _serializerOptions) ?? new() : new();
     }
 
@@ -80,6 +84,7 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
     public void GetState()
     {
         _output.Settings = JsonSerializer.Deserialize<ZoomItSettings>(LoadSettingsJson(), _serializerOptions) ?? new();
+        _currentRecordFormat = _output.Settings.Properties.RecordFormat?.Value;
         if (_hasInput)
         {
             _input.Settings = MergeWithCurrent(_input.Settings, _output.Settings);
@@ -94,7 +99,18 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
     public void SetState()
     {
         Debug.Assert(_output.Settings != null, "Output settings should not be null");
-        SaveSettingsJson(JsonSerializer.Serialize(_output.Settings, _serializerOptions));
+        var settings = JsonSerializer.SerializeToNode(_output.Settings, _serializerOptions);
+        if (_recordScalingSpecified &&
+            !string.Equals(_currentRecordFormat, _output.Settings.Properties.RecordFormat?.Value, StringComparison.Ordinal) &&
+            settings?[PropertiesJsonPropertyName] is JsonObject properties &&
+            properties["RecordScaling"]?.DeepClone() is JsonNode recordScaling)
+        {
+            properties.Remove("RecordScaling");
+            SaveSettingsJson(settings.ToJsonString(_serializerOptions));
+            properties["RecordScaling"] = recordScaling;
+        }
+
+        SaveSettingsJson(settings?.ToJsonString(_serializerOptions) ?? JsonSerializer.Serialize(_output.Settings, _serializerOptions));
         SignalRefreshSettings();
     }
 
