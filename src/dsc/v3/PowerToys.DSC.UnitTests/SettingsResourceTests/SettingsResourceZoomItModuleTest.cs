@@ -18,8 +18,8 @@ namespace PowerToys.DSC.UnitTests.SettingsResourceTests;
 
 /// <summary>
 /// ZoomIt stores its settings in the registry, read and written through the
-/// ZoomIt settings interop. The tests replace the interop with an in-memory
-/// store so they never touch the registry of the machine running them.
+/// ZoomIt settings interop. Behavior tests replace the interop with an
+/// in-memory store; a separate read-only smoke test exercises the real loader.
 /// </summary>
 [TestClass]
 public sealed class SettingsResourceZoomItModuleTest : BaseDscTest
@@ -167,6 +167,27 @@ public sealed class SettingsResourceZoomItModuleTest : BaseDscTest
         CollectionAssert.AreEqual(new List<string> { SettingsResourceObject<ZoomItSettings>.SettingsJsonPropertyName }, firstDiff);
         CollectionAssert.AreEqual(new List<string>(), secondDiff);
         Assert.AreEqual(1, _saved.Count);
+    }
+
+    [TestMethod]
+    public void SetWithFormatAndScaling_StagesTheScaleAfterTheFormatChange()
+    {
+        // Arrange
+        var input = CreateInput(properties =>
+        {
+            properties.RecordFormat = new StringProperty("MP4");
+            properties.RecordScaling = new IntProperty(50);
+        });
+
+        // Act
+        var result = ExecuteDscCommand<SetCommand>("--resource", SettingsResource.ResourceName, "--module", Module, "--input", input);
+
+        // Assert
+        Assert.IsTrue(result.Success);
+        Assert.AreEqual(2, _saved.Count);
+        Assert.IsNull(JsonNode.Parse(_saved[0])["properties"]["RecordScaling"]);
+        Assert.AreEqual("MP4", JsonNode.Parse(_saved[0])["properties"]["RecordFormat"]["value"].GetValue<string>());
+        Assert.AreEqual(50, JsonNode.Parse(_saved[1])["properties"]["RecordScaling"]["value"].GetValue<int>());
     }
 
     [TestMethod]
