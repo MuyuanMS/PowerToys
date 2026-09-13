@@ -26,7 +26,7 @@ namespace AdvancedPaste.Services.CustomActions
         };
 
         private static readonly object ClientLock = new();
-        private static AnthropicClient client;
+        private static ClientEntry clientEntry;
         private static string clientFingerprint;
 
         public static PasteAIProviderRegistration Registration { get; } = new(SupportedTypes, config => new AnthropicPasteProvider(config));
@@ -74,9 +74,9 @@ namespace AdvancedPaste.Services.CustomActions
 
             var endpoint = string.IsNullOrWhiteSpace(_config.Endpoint) ? null : _config.Endpoint.Trim();
 
-            var client = GetClient(apiKey, endpoint);
+            using var clientLease = GetClient(apiKey, endpoint);
 
-            using var chatClient = client.AsIChatClient(modelId, DefaultMaxOutputTokens);
+            using var chatClient = clientLease.Client.AsIChatClient(modelId, DefaultMaxOutputTokens);
             var messages = new List<ChatMessage>();
 
             messages.Add(new ChatMessage(ChatRole.System, systemPrompt));
@@ -123,22 +123,79 @@ namespace AdvancedPaste.Services.CustomActions
             return response.Text ?? string.Empty;
         }
 
-        private static AnthropicClient GetClient(string apiKey, string endpoint)
+        private static ClientLease GetClient(string apiKey, string endpoint)
         {
             var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{endpoint ?? string.Empty}\n{apiKey}")));
 
             lock (ClientLock)
             {
-                if (client is null || !string.Equals(clientFingerprint, fingerprint, StringComparison.Ordinal))
+                if (clientEntry is null || !string.Equals(clientFingerprint, fingerprint, StringComparison.Ordinal))
                 {
-                    client?.Dispose();
-                    client = !string.IsNullOrWhiteSpace(endpoint)
+                    if (clientEntry is not null)
+                    {
+                        clientEntry.Retired = true;
+                        if (clientEntry.ActiveLeaseCount == 0)
+                        {
+                            clientEntry.Client.Dispose();
+                        }
+                    }
+
+                    var client = !string.IsNullOrWhiteSpace(endpoint)
                         ? new AnthropicClient { ApiKey = apiKey, BaseUrl = endpoint }
                         : new AnthropicClient { ApiKey = apiKey };
+                    clientEntry = new ClientEntry(client);
                     clientFingerprint = fingerprint;
                 }
 
-                return client;
+                clientEntry.ActiveLeaseCount++;
+                return new ClientLease(clientEntry);
+            }
+        }
+
+        private static void ReleaseClient(ClientEntry entry)
+        {
+            lock (ClientLock)
+            {
+                entry.ActiveLeaseCount--;
+                if (entry.Retired && entry.ActiveLeaseCount == 0)
+                {
+                    entry.Client.Dispose();
+                }
+            }
+        }
+
+        private sealed class ClientEntry
+        {
+            public ClientEntry(AnthropicClient client)
+            {
+                Client = client;
+            }
+
+            public AnthropicClient Client { get; }
+
+            public int ActiveLeaseCount { get; set; }
+
+            public bool Retired { get; set; }
+        }
+
+        private sealed class ClientLease : IDisposable
+        {
+            private readonly ClientEntry _entry;
+            private int _disposed;
+
+            public ClientLease(ClientEntry entry)
+            {
+                _entry = entry;
+            }
+
+            public AnthropicClient Client => _entry.Client;
+
+            public void Dispose()
+            {
+                if (Interlocked.Exchange(ref _disposed, 1) == 0)
+                {
+                    ReleaseClient(_entry);
+                }
             }
         }
     }
