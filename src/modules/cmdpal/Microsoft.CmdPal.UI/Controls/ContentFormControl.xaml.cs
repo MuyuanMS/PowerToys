@@ -31,6 +31,7 @@ public sealed partial class ContentFormControl : UserControl
     private bool _themeRefreshDeferred;
     private bool _focusFirstElementOnLoad = true;
     private IReadOnlyDictionary<string, InputValue>? _inputValuesToRestore;
+    private FocusedElementState? _focusedElementToRestore;
 
     public ContentFormViewModel? ViewModel { get => _viewModel; set => AttachViewModel(value); }
 
@@ -141,7 +142,14 @@ public sealed partial class ContentFormControl : UserControl
                 var inputValues = _renderedCard?.FrameworkElement is FrameworkElement element
                     ? CaptureInputValues(element)
                     : null;
-                RenderCard(cardAtThemeChange, focusFirstElement: false, inputValues: inputValues);
+                var focusedElement = _renderedCard?.FrameworkElement is FrameworkElement focusedRoot
+                    ? CaptureFocusedElement(focusedRoot)
+                    : null;
+                RenderCard(
+                    cardAtThemeChange,
+                    focusFirstElement: false,
+                    inputValues: inputValues,
+                    focusedElement: focusedElement);
             }
         }))
         {
@@ -197,14 +205,17 @@ public sealed partial class ContentFormControl : UserControl
     private void RenderCard(
         AdaptiveCard card,
         bool focusFirstElement = true,
-        IReadOnlyDictionary<string, InputValue>? inputValues = null)
+        IReadOnlyDictionary<string, InputValue>? inputValues = null,
+        FocusedElementState? focusedElement = null)
     {
+        _themeRefreshPending = false;
         _themeRefreshDeferred = false;
         DetachRenderedCard();
 
         _adaptiveCard = card;
         _focusFirstElementOnLoad = focusFirstElement;
         _inputValuesToRestore = inputValues;
+        _focusedElementToRestore = focusedElement;
         _renderedCard = _renderer.RenderAdaptiveCard(card);
 
         ContentGrid.Children.Clear();
@@ -267,8 +278,9 @@ public sealed partial class ContentFormControl : UserControl
             element.Loaded -= OnFrameworkElementLoaded;
 
             RestoreInputValues(element);
+            var restoredFocus = RestoreFocusedElement(element);
 
-            if (!_focusFirstElementOnLoad || (!ViewModel?.OnlyControlOnPage ?? true))
+            if (restoredFocus || !_focusFirstElementOnLoad || (!ViewModel?.OnlyControlOnPage ?? true))
             {
                 return;
             }
@@ -469,16 +481,6 @@ public sealed partial class ContentFormControl : UserControl
                         radioButton.IsChecked = (bool?)inputValue.Value;
                         break;
                 }
-
-                if (inputValue.HasFocus)
-                {
-                    var focusTarget = ResolveVisualPath(element, inputValue.FocusPath) as Control ?? element as Control;
-                    focusTarget?.Focus(FocusState.Programmatic);
-                    if (focusTarget is TextBox focusedTextBox)
-                    {
-                        focusedTextBox.Select(inputValue.SelectionStart, inputValue.SelectionLength);
-                    }
-                }
             }
         }
 
@@ -493,6 +495,44 @@ public sealed partial class ContentFormControl : UserControl
     {
         var automationId = AutomationProperties.GetAutomationId(element);
         return string.IsNullOrEmpty(automationId) ? null : automationId;
+    }
+
+    private static FocusedElementState? CaptureFocusedElement(FrameworkElement root)
+    {
+        if (FocusManager.GetFocusedElement(root.XamlRoot) is not DependencyObject focusedElement)
+        {
+            return null;
+        }
+
+        var path = GetVisualPath(root, focusedElement);
+        if (path is null)
+        {
+            return null;
+        }
+
+        var focusedTextBox = focusedElement as TextBox;
+        return new FocusedElementState(
+            path,
+            focusedTextBox?.SelectionStart ?? 0,
+            focusedTextBox?.SelectionLength ?? 0);
+    }
+
+    private bool RestoreFocusedElement(FrameworkElement root)
+    {
+        var state = _focusedElementToRestore;
+        _focusedElementToRestore = null;
+        if (state is null || ResolveVisualPath(root, state.Value.Path) is not Control control)
+        {
+            return false;
+        }
+
+        var focused = control.Focus(FocusState.Programmatic);
+        if (focused && control is TextBox textBox)
+        {
+            textBox.Select(state.Value.SelectionStart, state.Value.SelectionLength);
+        }
+
+        return focused;
     }
 
     private static IReadOnlyList<int>? GetVisualPath(DependencyObject root, DependencyObject target)
@@ -623,6 +663,11 @@ public sealed partial class ContentFormControl : UserControl
         int SelectionStart = 0,
         int SelectionLength = 0,
         IReadOnlyList<int>? FocusPath = null);
+
+    private readonly record struct FocusedElementState(
+        IReadOnlyList<int> Path,
+        int SelectionStart,
+        int SelectionLength);
 
     /// <summary>
     /// Fixes missing AutomationProperties.Name on CheckBox and ToggleSwitch controls
