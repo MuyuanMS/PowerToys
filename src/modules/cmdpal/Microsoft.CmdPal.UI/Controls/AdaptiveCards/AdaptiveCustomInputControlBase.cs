@@ -72,6 +72,12 @@ internal abstract partial class AdaptiveCustomInputControlBase : Grid, IAdaptive
 
     public abstract void RestoreState(AdaptiveCustomInputState state);
 
+    public abstract void RestoreFocus(AdaptiveCustomInputState state);
+
+    public virtual bool IsOperationPending => false;
+
+    public event EventHandler? OperationCompleted;
+
     public bool ValidateInput()
     {
         ValidationWasRequested = true;
@@ -95,6 +101,8 @@ internal abstract partial class AdaptiveCustomInputControlBase : Grid, IAdaptive
             UpdateValidation();
         }
     }
+
+    protected void NotifyOperationCompleted() => OperationCompleted?.Invoke(this, EventArgs.Empty);
 
     protected void ShowValidationError(string message)
     {

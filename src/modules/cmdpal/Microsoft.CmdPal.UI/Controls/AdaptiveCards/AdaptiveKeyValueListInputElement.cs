@@ -189,25 +189,49 @@ internal sealed partial class AdaptiveKeyValueListInputControl : AdaptiveListInp
             ? _unreadableValue
             : AdaptiveListValueCodec.ToPairsValue(_items);
 
-    public override AdaptiveCustomInputState CaptureState() =>
-        new(CurrentValue, _keyTextBox.Text, _valueTextBox.Text);
+    public override AdaptiveCustomInputState CaptureState()
+    {
+        var focusedElement = FocusManager.GetFocusedElement(XamlRoot);
+        var focusedTextBox = ReferenceEquals(focusedElement, _keyTextBox)
+            ? _keyTextBox
+            : ReferenceEquals(focusedElement, _valueTextBox)
+                ? _valueTextBox
+                : null;
+        return new(
+            CurrentValue,
+            _keyTextBox.Text,
+            _valueTextBox.Text,
+            ReferenceEquals(focusedTextBox, _valueTextBox) ? nameof(_valueTextBox) : nameof(_keyTextBox),
+            focusedTextBox?.SelectionStart ?? 0,
+            focusedTextBox?.SelectionLength ?? 0,
+            _wasEdited);
+    }
 
     public override void RestoreState(AdaptiveCustomInputState state)
     {
+        _keyTextBox.Text = state.PendingKey ?? string.Empty;
+        _valueTextBox.Text = state.PendingValue ?? string.Empty;
         if (!AdaptiveListValueCodec.TryParsePairs(state.Value, out var parsedPairs))
         {
+            UpdateValidationIfRequested();
             return;
         }
 
         _items.Clear();
         _items.AddRange(parsedPairs);
-        _keyTextBox.Text = state.PendingKey ?? string.Empty;
-        _valueTextBox.Text = state.PendingValue ?? string.Empty;
+        _wasEdited = state.WasEdited;
         RefreshItems();
         UpdateValidationIfRequested();
     }
 
     public override void FocusInput() => _keyTextBox.Focus(FocusState.Programmatic);
+
+    public override void RestoreFocus(AdaptiveCustomInputState state)
+    {
+        var textBox = state.FocusedField == nameof(_valueTextBox) ? _valueTextBox : _keyTextBox;
+        textBox.Focus(FocusState.Programmatic);
+        textBox.Select(state.SelectionStart, state.SelectionLength);
+    }
 
     private void AddTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
     {
