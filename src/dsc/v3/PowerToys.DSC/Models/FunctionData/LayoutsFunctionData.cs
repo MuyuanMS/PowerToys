@@ -18,8 +18,8 @@ namespace PowerToys.DSC.Models.FunctionData;
 
 /// <summary>
 /// Function data for the FancyZones layouts DSC resource. Reads and writes
-/// the FancyZones layout data files. A running FancyZones instance watches
-/// these files and reloads them when they change, so no signal is needed.
+/// the FancyZones layout data files and explicitly notifies a running
+/// FancyZones instance after each changed file is written.
 /// </summary>
 public sealed class LayoutsFunctionData : BaseFunctionData
 {

@@ -196,6 +196,12 @@ public static class FzLayoutsConverter
 
             try
             {
+                if (layout.Name == null)
+                {
+                    warnings?.Add($"Skipping custom layout '{uuid}' without a name");
+                    continue;
+                }
+
                 if (string.Equals(layout.Type, _gridType, StringComparison.Ordinal))
                 {
                     var info = serializer.GridFromJsonElement(layout.Info.GetRawText());
@@ -213,6 +219,12 @@ public static class FzLayoutsConverter
                 }
                 else if (string.Equals(layout.Type, _canvasType, StringComparison.Ordinal))
                 {
+                    if (!HasRequiredCanvasCoordinates(layout.Info))
+                    {
+                        warnings?.Add($"Skipping custom layout '{uuid}' with a canvas zone missing X or Y");
+                        continue;
+                    }
+
                     var info = serializer.CanvasFromJsonElement(layout.Info.GetRawText());
                     entry.Canvas = new FzCanvasInfo
                     {
@@ -305,10 +317,10 @@ public static class FzLayoutsConverter
             result.Add(new FzTemplateLayout
             {
                 Type = template.Type,
-                ZoneCount = template.ZoneCount,
-                ShowSpacing = template.ShowSpacing,
-                Spacing = template.Spacing,
-                SensitivityRadius = template.SensitivityRadius,
+                ZoneCount = template.ZoneCount ?? DefaultZoneCount(template.Type),
+                ShowSpacing = IsGridTemplateType(template.Type) && (template.ShowSpacing ?? LayoutDefaultSettings.DefaultShowSpacing),
+                Spacing = IsGridTemplateType(template.Type) ? template.Spacing ?? LayoutDefaultSettings.DefaultSpacing : 0,
+                SensitivityRadius = template.SensitivityRadius ?? LayoutDefaultSettings.DefaultSensitivityRadius,
             });
         }
 
@@ -346,15 +358,21 @@ public static class FzLayoutsConverter
 
         foreach (var hotkey in stored.LayoutHotkeys ?? [])
         {
+            if (hotkey.Key == null)
+            {
+                warnings?.Add("Skipping layout hotkey without a key");
+                continue;
+            }
+
             if (!TryNormalizeGuid(hotkey.LayoutId, out var uuid))
             {
-                warnings?.Add($"Skipping layout hotkey {Invariant(hotkey.Key)} with invalid layout id '{hotkey.LayoutId}'");
+                warnings?.Add($"Skipping layout hotkey {Invariant(hotkey.Key.Value)} with invalid layout id '{hotkey.LayoutId}'");
                 continue;
             }
 
             result.Add(new FzLayoutHotkey
             {
-                Key = hotkey.Key,
+                Key = hotkey.Key.Value,
                 LayoutId = uuid,
             });
         }
@@ -392,7 +410,7 @@ public static class FzLayoutsConverter
             var layout = defaultLayout.Layout;
             var context = $"default layout for '{defaultLayout.MonitorConfiguration}' monitors";
 
-            if (string.IsNullOrEmpty(defaultLayout.MonitorConfiguration))
+            if (defaultLayout.MonitorConfiguration == null)
             {
                 warnings?.Add("Skipping default layout without a monitor configuration");
                 continue;
@@ -407,10 +425,6 @@ public static class FzLayoutsConverter
             var entry = new FzDefaultLayout
             {
                 Type = layout.Type,
-                ZoneCount = layout.ZoneCount,
-                ShowSpacing = layout.ShowSpacing,
-                Spacing = layout.Spacing,
-                SensitivityRadius = layout.SensitivityRadius,
             };
 
             if (IsCustomType(layout.Type))
@@ -422,6 +436,13 @@ public static class FzLayoutsConverter
                 }
 
                 entry.Uuid = uuid;
+            }
+            else
+            {
+                entry.ZoneCount = layout.ZoneCount ?? DefaultZoneCount(layout.Type);
+                entry.ShowSpacing = IsGridTemplateType(layout.Type) && (layout.ShowSpacing ?? LayoutDefaultSettings.DefaultShowSpacing);
+                entry.Spacing = IsGridTemplateType(layout.Type) ? layout.Spacing ?? LayoutDefaultSettings.DefaultSpacing : 0;
+                entry.SensitivityRadius = layout.SensitivityRadius ?? LayoutDefaultSettings.DefaultSensitivityRadius;
             }
 
             // The engine treats every non-empty monitor configuration other
@@ -671,6 +692,10 @@ public static class FzLayoutsConverter
             {
                 errors.Add($"{mapContext} zone indices must be contiguous from 0 through {Invariant(highestIndex)}");
             }
+            else
+            {
+                ValidateRectangularZones(cellChildMap, zoneIndices, mapContext, errors);
+            }
         }
     }
 
@@ -917,6 +942,45 @@ public static class FzLayoutsConverter
         return string.Equals(type, Constants.TemplateLayoutJsonTags[Constants.TemplateLayout.Empty], StringComparison.Ordinal)
             ? 0
             : LayoutDefaultSettings.DefaultZoneCount;
+    }
+
+    private static bool HasRequiredCanvasCoordinates(JsonElement info)
+    {
+        if (!info.TryGetProperty("zones", out var zones) || zones.ValueKind != JsonValueKind.Array)
+        {
+            return true;
+        }
+
+        return zones.EnumerateArray().All(zone =>
+            zone.ValueKind != JsonValueKind.Object ||
+            (zone.TryGetProperty("X", out _) && zone.TryGetProperty("Y", out _)));
+    }
+
+    private static void ValidateRectangularZones(List<List<int>> cellChildMap, HashSet<int> zoneIndices, string context, IList<string> errors)
+    {
+        foreach (var zoneIndex in zoneIndices)
+        {
+            var cells = cellChildMap
+                .SelectMany((row, rowIndex) => row.Select((value, columnIndex) => (value, rowIndex, columnIndex)))
+                .Where(cell => cell.value == zoneIndex)
+                .ToList();
+            var minRow = cells.Min(cell => cell.rowIndex);
+            var maxRow = cells.Max(cell => cell.rowIndex);
+            var minColumn = cells.Min(cell => cell.columnIndex);
+            var maxColumn = cells.Max(cell => cell.columnIndex);
+
+            for (var row = minRow; row <= maxRow; row++)
+            {
+                for (var column = minColumn; column <= maxColumn; column++)
+                {
+                    if (cellChildMap[row][column] != zoneIndex)
+                    {
+                        errors.Add($"{context}: zone index {Invariant(zoneIndex)} must form a single rectangle");
+                        return;
+                    }
+                }
+            }
+        }
     }
 
     private static void ValidateNotNegative(int? value, string context, IList<string> errors)

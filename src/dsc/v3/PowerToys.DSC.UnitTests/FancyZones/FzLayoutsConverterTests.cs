@@ -207,10 +207,10 @@ public sealed class FzLayoutsConverterTests
 
         var horizontal = canonical.Defaults.Horizontal;
         Assert.AreEqual(GridGuid, horizontal.Uuid);
-        Assert.IsTrue(horizontal.ShowSpacing);
-        Assert.AreEqual(16, horizontal.Spacing);
-        Assert.AreEqual(0, horizontal.ZoneCount);
-        Assert.AreEqual(0, horizontal.SensitivityRadius);
+        Assert.IsNull(horizontal.ShowSpacing);
+        Assert.IsNull(horizontal.Spacing);
+        Assert.IsNull(horizontal.ZoneCount);
+        Assert.IsNull(horizontal.SensitivityRadius);
     }
 
     [TestMethod]
@@ -307,8 +307,8 @@ public sealed class FzLayoutsConverterTests
         var canonical = FzLayoutsConverter.Canonicalize(model, current);
 
         // Assert
-        Assert.IsFalse(canonical.Defaults.Horizontal.ShowSpacing);
-        Assert.AreEqual(8, canonical.Defaults.Horizontal.Spacing);
+        Assert.IsNull(canonical.Defaults.Horizontal.ShowSpacing);
+        Assert.IsNull(canonical.Defaults.Horizontal.Spacing);
     }
 
     [DataTestMethod]

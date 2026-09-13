@@ -20,7 +20,7 @@ namespace FancyZonesEditorCommon.Data
 
         public struct LayoutHotkeyWrapper
         {
-            public int Key { get; set; }
+            public int? Key { get; set; }
 
             public string LayoutId { get; set; }
         }

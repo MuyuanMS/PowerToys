@@ -363,10 +363,10 @@ public sealed class LayoutsResourceFancyZonesTest : BaseDscTest
         var horizontal = state.Layouts.Defaults.Horizontal;
         Assert.AreEqual("custom", horizontal.Type);
         Assert.AreEqual(GridGuid, horizontal.Uuid);
-        Assert.IsTrue(horizontal.ShowSpacing);
-        Assert.AreEqual(24, horizontal.Spacing);
-        Assert.AreEqual(0, horizontal.ZoneCount);
-        Assert.AreEqual(0, horizontal.SensitivityRadius);
+        Assert.IsNull(horizontal.ShowSpacing);
+        Assert.IsNull(horizontal.Spacing);
+        Assert.IsNull(horizontal.ZoneCount);
+        Assert.IsNull(horizontal.SensitivityRadius);
         Assert.IsNull(state.Layouts.Defaults.Vertical);
     }
 
@@ -487,6 +487,7 @@ public sealed class LayoutsResourceFancyZonesTest : BaseDscTest
     [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","grid":{"rows":1,"columns":2,"rowsPercentage":[10000],"columnsPercentage":[7000,3000],"cellChildMap":[[0]]}}]}}""", "custom[0].grid.cellChildMap[0] must contain 2 values")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","grid":{"rows":1,"columns":2,"rowsPercentage":[10000],"columnsPercentage":[7000,3000],"cellChildMap":[[0,2]]}}]}}""", "custom[0].grid.cellChildMap[0][1]: zone index 2 is out of range (0-1)")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","grid":{"rows":1,"columns":3,"rowsPercentage":[10000],"columnsPercentage":[3000,3000,4000],"cellChildMap":[[0,2,2]]}}]}}""", "custom[0].grid.cellChildMap zone indices must be contiguous from 0 through 2")]
+    [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","grid":{"rows":2,"columns":2,"rowsPercentage":[5000,5000],"columnsPercentage":[5000,5000],"cellChildMap":[[0,1],[1,0]]}}]}}""", "custom[0].grid.cellChildMap: zone index 0 must form a single rectangle")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","grid":{"rows":3,"columns":1,"rowsPercentage":[2147483647,2147483647,10002],"columnsPercentage":[10000],"cellChildMap":[[0],[0],[0]]}}]}}""", "custom[0].grid.rowsPercentage must sum to 10000 (100.00%) but sums to 4294977296")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","canvas":{"refWidth":1920,"refHeight":1080,"zones":[]}}]}}""", "custom[0].canvas.zones must contain at least one zone")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","canvas":{"refWidth":1920,"refHeight":1080,"zones":[{"x":0,"y":0,"width":0,"height":100}]}}]}}""", "custom[0].canvas.zones[0].width must be greater than 0")]
