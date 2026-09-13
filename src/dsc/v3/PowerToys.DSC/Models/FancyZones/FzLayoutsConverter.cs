@@ -240,6 +240,22 @@ public static class FzLayoutsConverter
                 continue;
             }
 
+            var validationErrors = new List<string>();
+            if (entry.Grid != null)
+            {
+                ValidateGrid(entry.Grid, "grid", validationErrors);
+            }
+            else if (entry.Canvas != null)
+            {
+                ValidateCanvas(entry.Canvas, "canvas", validationErrors);
+            }
+
+            if (validationErrors.Count > 0)
+            {
+                warnings?.Add($"Skipping custom layout '{uuid}' with invalid layout info: {string.Join("; ", validationErrors)}");
+                continue;
+            }
+
             result.Add(entry);
         }
 
@@ -257,7 +273,7 @@ public static class FzLayoutsConverter
             .Select(template => new LayoutTemplates.TemplateLayoutWrapper
             {
                 Type = template.Type,
-                ZoneCount = template.ZoneCount ?? LayoutDefaultSettings.DefaultZoneCount,
+                ZoneCount = template.ZoneCount ?? DefaultZoneCount(template.Type),
                 SensitivityRadius = template.SensitivityRadius ?? LayoutDefaultSettings.DefaultSensitivityRadius,
                 ShowSpacing = IsGridTemplateType(template.Type) && (template.ShowSpacing ?? LayoutDefaultSettings.DefaultShowSpacing),
                 Spacing = IsGridTemplateType(template.Type) ? template.Spacing ?? LayoutDefaultSettings.DefaultSpacing : 0,
@@ -376,6 +392,12 @@ public static class FzLayoutsConverter
             var layout = defaultLayout.Layout;
             var context = $"default layout for '{defaultLayout.MonitorConfiguration}' monitors";
 
+            if (string.IsNullOrEmpty(defaultLayout.MonitorConfiguration))
+            {
+                warnings?.Add("Skipping default layout without a monitor configuration");
+                continue;
+            }
+
             if (!_defaultLayoutTypes.Contains(layout.Type, StringComparer.Ordinal))
             {
                 warnings?.Add($"Skipping {context} with unknown type '{layout.Type}'");
@@ -402,8 +424,8 @@ public static class FzLayoutsConverter
                 entry.Uuid = uuid;
             }
 
-            // The engine treats every monitor configuration other than
-            // "vertical" as horizontal (DefaultLayoutsJsonUtils::TypeFromString).
+            // The engine treats every non-empty monitor configuration other
+            // than "vertical" as horizontal (DefaultLayoutsJsonUtils::TypeFromString).
             if (string.Equals(defaultLayout.MonitorConfiguration, VerticalMonitorConfiguration, StringComparison.Ordinal))
             {
                 result.Vertical = entry;
@@ -473,7 +495,7 @@ public static class FzLayoutsConverter
             {
                 Uuid = string.Empty,
                 Type = layout.Type,
-                ZoneCount = layout.ZoneCount ?? LayoutDefaultSettings.DefaultZoneCount,
+                ZoneCount = layout.ZoneCount ?? DefaultZoneCount(layout.Type),
                 SensitivityRadius = layout.SensitivityRadius ?? LayoutDefaultSettings.DefaultSensitivityRadius,
                 ShowSpacing = isGrid && (layout.ShowSpacing ?? LayoutDefaultSettings.DefaultShowSpacing),
                 Spacing = isGrid ? layout.Spacing ?? LayoutDefaultSettings.DefaultSpacing : 0,
@@ -614,7 +636,9 @@ public static class FzLayoutsConverter
             return;
         }
 
-        var maxZoneIndex = (grid.Rows * grid.Columns) - 1;
+        var maxZoneIndex = (int)Math.Min(((long)grid.Rows * grid.Columns) - 1, LayoutDefaultSettings.MaxZones - 1);
+        var zoneIndices = new HashSet<int>();
+        var mapShapeValid = true;
         for (var row = 0; row < cellChildMap.Count; row++)
         {
             var cells = cellChildMap[row];
@@ -622,6 +646,7 @@ public static class FzLayoutsConverter
             if (cells == null || cells.Count != grid.Columns)
             {
                 errors.Add($"{rowContext} must contain {Invariant(grid.Columns)} values");
+                mapShapeValid = false;
                 continue;
             }
 
@@ -630,7 +655,21 @@ public static class FzLayoutsConverter
                 if (cells[column] < 0 || cells[column] > maxZoneIndex)
                 {
                     errors.Add($"{rowContext}[{Invariant(column)}]: zone index {Invariant(cells[column])} is out of range (0-{Invariant(maxZoneIndex)})");
+                    mapShapeValid = false;
                 }
+                else
+                {
+                    zoneIndices.Add(cells[column]);
+                }
+            }
+        }
+
+        if (mapShapeValid && zoneIndices.Count > 0)
+        {
+            var highestIndex = zoneIndices.Max();
+            if (zoneIndices.Count != highestIndex + 1)
+            {
+                errors.Add($"{mapContext} zone indices must be contiguous from 0 through {Invariant(highestIndex)}");
             }
         }
     }
@@ -644,7 +683,7 @@ public static class FzLayoutsConverter
             return;
         }
 
-        var sum = 0;
+        long sum = 0;
         for (var i = 0; i < values.Count; i++)
         {
             if (values[i] <= 0)
@@ -657,7 +696,7 @@ public static class FzLayoutsConverter
 
         if (sum != PercentageTotal)
         {
-            errors.Add($"{context} must sum to {Invariant(PercentageTotal)} (100.00%) but sums to {Invariant(sum)}");
+            errors.Add($"{context} must sum to {Invariant(PercentageTotal)} (100.00%) but sums to {sum.ToString(CultureInfo.InvariantCulture)}");
         }
     }
 
@@ -767,6 +806,11 @@ public static class FzLayoutsConverter
                         ValidateLayoutReference(uuid, $"{context}.uuid", model, current, errors, warnings);
                     }
                 }
+
+                if (layout.ZoneCount != null || layout.ShowSpacing != null || layout.Spacing != null || layout.SensitivityRadius != null)
+                {
+                    errors.Add($"{context}: zoneCount, showSpacing, spacing, and sensitivityRadius must not be set when type is '{CustomLayoutType}'");
+                }
             }
             else if (!string.IsNullOrEmpty(layout.Uuid))
             {
@@ -848,18 +892,31 @@ public static class FzLayoutsConverter
             return;
         }
 
-        // The engine rejects a zone count of 0 for the grid-based templates (Layout::Init)
-        if (IsGridTemplateType(type))
+        if (string.Equals(type, Constants.TemplateLayoutJsonTags[Constants.TemplateLayout.Empty], StringComparison.Ordinal))
+        {
+            if (zoneCount != 0)
+            {
+                errors.Add($"{context} must be 0 when type is 'blank'");
+            }
+        }
+        else if (!IsCustomType(type))
         {
             if (zoneCount <= 0)
             {
                 errors.Add($"{context} must be greater than 0");
             }
+            else if (zoneCount > LayoutDefaultSettings.MaxZones)
+            {
+                errors.Add($"{context} must not be greater than {Invariant(LayoutDefaultSettings.MaxZones)}");
+            }
         }
-        else if (zoneCount < 0)
-        {
-            errors.Add($"{context} must not be negative");
-        }
+    }
+
+    private static int DefaultZoneCount(string? type)
+    {
+        return string.Equals(type, Constants.TemplateLayoutJsonTags[Constants.TemplateLayout.Empty], StringComparison.Ordinal)
+            ? 0
+            : LayoutDefaultSettings.DefaultZoneCount;
     }
 
     private static void ValidateNotNegative(int? value, string context, IList<string> errors)

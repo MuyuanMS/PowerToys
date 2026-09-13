@@ -114,7 +114,7 @@ For example, a 70/30 two-column layout has `rows: 1`, `columns: 2`,
 | Property            | Type    | Required | Description                                                                                     |
 |---------------------|---------|----------|-------------------------------------------------------------------------------------------------|
 | `type`              | string  | yes      | `blank`, `focus`, `rows`, `columns`, `grid`, or `priority-grid`. One entry per type.            |
-| `zoneCount`         | integer | no       | Number of zones. Default `3`.                                                                   |
+| `zoneCount`         | integer | no       | Number of zones. Default `0` for `blank`, `3` otherwise; maximum `128`.                          |
 | `showSpacing`       | boolean | no       | Whether space is left between the zones. Default `true`. Not applicable to `blank` and `focus`. |
 | `spacing`           | integer | no       | Space between the zones, in pixels. Default `16`. Not applicable to `blank` and `focus`.        |
 | `sensitivityRadius` | integer | no       | Distance from a zone edge at which the zone is highlighted. Default `20`.                       |
@@ -139,10 +139,10 @@ monitor orientation. Each member is a layout:
 |---------------------|---------|----------|--------------------------------------------------------------------------------------------------------------------------------------------|
 | `type`              | string  | yes      | A template type (`blank`, `focus`, `rows`, `columns`, `grid`, `priority-grid`) or `custom`.                                                |
 | `uuid`              | string  | custom   | The identifier of the custom layout. Required when `type` is `custom`, not allowed otherwise.                                              |
-| `zoneCount`         | integer | no       | Number of zones of a template layout. Default `3`.                                                                                         |
-| `showSpacing`       | boolean | no       | Whether space is left between the zones. Default `true` for grid templates; for a custom layout the setting of the referenced grid layout. |
-| `spacing`           | integer | no       | Space between the zones, in pixels. Default `16` for grid templates; for a custom layout the setting of the referenced grid layout.        |
-| `sensitivityRadius` | integer | no       | Distance from a zone edge at which the zone is highlighted. Default `20` for template layouts.                                             |
+| `zoneCount`         | integer | no       | Number of zones of a template layout. Default `0` for `blank`, `3` otherwise; maximum `128`. Not allowed for `custom`. |
+| `showSpacing`       | boolean | no       | Whether space is left between the zones. Default `true` for grid templates. Not allowed for `custom`.                |
+| `spacing`           | integer | no       | Space between the zones, in pixels. Default `16` for grid templates. Not allowed for `custom`.                         |
+| `sensitivityRadius` | integer | no       | Distance from a zone edge at which the zone is highlighted. Default `20` for template layouts. Not allowed for `custom`. |
 
 ### Layout identifiers
 

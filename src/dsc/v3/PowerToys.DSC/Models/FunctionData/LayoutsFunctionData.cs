@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FancyZonesEditorCommon.Data;
@@ -22,6 +23,11 @@ namespace PowerToys.DSC.Models.FunctionData;
 /// </summary>
 public sealed class LayoutsFunctionData : BaseFunctionData
 {
+    private const string CustomLayoutsFileUpdateMessage = "{0972787e-cdab-4e16-b228-91acdc38f40f}";
+    private const string LayoutTemplatesFileUpdateMessage = "{4686f019-5d3d-4c5c-9051-b7cbbccca77d}";
+    private const string LayoutHotkeysFileUpdateMessage = "{07229b7e-4f22-4357-b136-33c289be2295}";
+    private const string DefaultLayoutsFileUpdateMessage = "{61fd2afb-e909-41b2-b6f3-b9f546f2ae3f}";
+
     public const string CustomLayoutsFileName = "custom-layouts.json";
     public const string LayoutTemplatesFileName = "layout-templates.json";
     public const string LayoutHotkeysFileName = "layout-hotkeys.json";
@@ -200,6 +206,28 @@ public sealed class LayoutsFunctionData : BaseFunctionData
         var folder = DataFolder();
         Directory.CreateDirectory(folder);
         File.WriteAllText(Path.Combine(folder, fileName), data.Serialize(value));
+        NotifyFancyZones(fileName);
+    }
+
+    private static void NotifyFancyZones(string fileName)
+    {
+        var messageName = fileName switch
+        {
+            CustomLayoutsFileName => CustomLayoutsFileUpdateMessage,
+            LayoutTemplatesFileName => LayoutTemplatesFileUpdateMessage,
+            LayoutHotkeysFileName => LayoutHotkeysFileUpdateMessage,
+            DefaultLayoutsFileName => DefaultLayoutsFileUpdateMessage,
+            _ => null,
+        };
+
+        if (messageName != null)
+        {
+            var message = RegisterWindowMessageW(messageName);
+            if (message != 0)
+            {
+                _ = PostMessageW(new IntPtr(0xFFFF), message, UIntPtr.Zero, IntPtr.Zero);
+            }
+        }
     }
 
     private static bool AreEqual<T>(T expected, T actual)
@@ -251,7 +279,7 @@ public sealed class LayoutsFunctionData : BaseFunctionData
                 case FzLayoutsModel.CustomJsonPropertyName:
                 case FzLayoutsModel.TemplatesJsonPropertyName:
                 case FzLayoutsModel.HotkeysJsonPropertyName:
-                    ValidateArrayOfObjects(value, context, errors);
+                    ValidateArrayOfObjects(value, context, name, errors);
                     break;
                 case FzLayoutsModel.DefaultsJsonPropertyName:
                     ValidateDefaultsStructure(value, context, errors);
@@ -265,7 +293,7 @@ public sealed class LayoutsFunctionData : BaseFunctionData
         return errors;
     }
 
-    private static void ValidateArrayOfObjects(JsonNode? value, string context, IList<string> errors)
+    private static void ValidateArrayOfObjects(JsonNode? value, string context, string sectionName, IList<string> errors)
     {
         if (value is not JsonArray array)
         {
@@ -275,10 +303,46 @@ public sealed class LayoutsFunctionData : BaseFunctionData
 
         for (var i = 0; i < array.Count; i++)
         {
-            if (array[i] is not JsonObject)
+            var itemContext = $"{context}[{i.ToString(CultureInfo.InvariantCulture)}]";
+            if (array[i] is not JsonObject item)
             {
-                errors.Add($"'{context}[{i.ToString(CultureInfo.InvariantCulture)}]' must be an object");
+                errors.Add($"'{itemContext}' must be an object");
+                continue;
             }
+
+            if (sectionName == FzLayoutsModel.HotkeysJsonPropertyName)
+            {
+                RequireProperty(item, "key", itemContext, errors);
+                RequireProperty(item, "layoutId", itemContext, errors);
+            }
+            else if (sectionName == FzLayoutsModel.CustomJsonPropertyName &&
+                     item.TryGetPropertyValue("canvas", out var canvasNode) &&
+                     canvasNode is JsonObject canvas &&
+                     canvas.TryGetPropertyValue("zones", out var zonesNode) &&
+                     zonesNode is JsonArray zones)
+            {
+                for (var zoneIndex = 0; zoneIndex < zones.Count; zoneIndex++)
+                {
+                    if (zones[zoneIndex] is not JsonObject zone)
+                    {
+                        continue;
+                    }
+
+                    var zoneContext = $"{itemContext}.canvas.zones[{zoneIndex.ToString(CultureInfo.InvariantCulture)}]";
+                    RequireProperty(zone, "x", zoneContext, errors);
+                    RequireProperty(zone, "y", zoneContext, errors);
+                    RequireProperty(zone, "width", zoneContext, errors);
+                    RequireProperty(zone, "height", zoneContext, errors);
+                }
+            }
+        }
+    }
+
+    private static void RequireProperty(JsonObject value, string propertyName, string context, IList<string> errors)
+    {
+        if (!value.TryGetPropertyValue(propertyName, out var propertyValue) || propertyValue == null)
+        {
+            errors.Add($"'{context}.{propertyName}' is required");
         }
     }
 
@@ -363,4 +427,10 @@ public sealed class LayoutsFunctionData : BaseFunctionData
 
         return sections;
     }
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern uint RegisterWindowMessageW(string lpString);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool PostMessageW(IntPtr hWnd, uint msg, UIntPtr wParam, IntPtr lParam);
 }

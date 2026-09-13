@@ -35,7 +35,7 @@ public sealed class FzDefaultLayout
     /// </summary>
     [JsonPropertyName("zoneCount")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [Description("The number of zones of a template layout. Default 3.")]
+    [Description("The number of zones of a template layout. Default 0 for blank; 3 for all other template types. Maximum 128. Not allowed for custom layouts.")]
     public int? ZoneCount { get; set; }
 
     /// <summary>
@@ -43,7 +43,7 @@ public sealed class FzDefaultLayout
     /// </summary>
     [JsonPropertyName("showSpacing")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [Description("Whether space is left between the zones. Default true for grid templates; for a custom layout the setting of the referenced grid layout.")]
+    [Description("Whether space is left between the zones. Default true for grid templates. Not allowed for custom layouts.")]
     public bool? ShowSpacing { get; set; }
 
     /// <summary>
@@ -51,7 +51,7 @@ public sealed class FzDefaultLayout
     /// </summary>
     [JsonPropertyName("spacing")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [Description("The space between the zones, in pixels. Default 16 for grid templates; for a custom layout the setting of the referenced grid layout.")]
+    [Description("The space between the zones, in pixels. Default 16 for grid templates. Not allowed for custom layouts.")]
     public int? Spacing { get; set; }
 
     /// <summary>
@@ -59,6 +59,6 @@ public sealed class FzDefaultLayout
     /// </summary>
     [JsonPropertyName("sensitivityRadius")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [Description("The distance, in pixels, from a zone edge at which the zone is highlighted while dragging. Default 20 for template layouts.")]
+    [Description("The distance, in pixels, from a zone edge at which the zone is highlighted while dragging. Default 20 for template layouts. Not allowed for custom layouts.")]
     public int? SensitivityRadius { get; set; }
 }

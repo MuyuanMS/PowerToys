@@ -214,6 +214,43 @@ public sealed class FzLayoutsConverterTests
     }
 
     [TestMethod]
+    public void Canonicalize_BlankTemplateUsesZeroZones()
+    {
+        var model = new FzLayoutsModel
+        {
+            Templates = [new() { Type = "blank" }],
+            Defaults = new() { Horizontal = new() { Type = "blank" } },
+        };
+
+        var canonical = FzLayoutsConverter.Canonicalize(model);
+
+        Assert.AreEqual(0, canonical.Templates[0].ZoneCount);
+        Assert.AreEqual(0, canonical.Defaults.Horizontal.ZoneCount);
+    }
+
+    [TestMethod]
+    public void FromLayoutTemplates_AppliesNativeDefaultsForMissingProperties()
+    {
+        const string json = /*lang=json,strict*/ """
+            {
+              "layout-templates": [
+                { "type": "grid" },
+                { "type": "blank", "zone-count": 0 }
+              ]
+            }
+            """;
+        var stored = JsonSerializer.Deserialize(json, FancyZonesJsonContext.Default.TemplateLayoutsListWrapper);
+
+        var templates = FzLayoutsConverter.FromLayoutTemplates(stored);
+
+        Assert.AreEqual(3, templates[1].ZoneCount);
+        Assert.IsTrue(templates[1].ShowSpacing);
+        Assert.AreEqual(16, templates[1].Spacing);
+        Assert.AreEqual(20, templates[1].SensitivityRadius);
+        Assert.AreEqual(0, templates[0].ZoneCount);
+    }
+
+    [TestMethod]
     public void Canonicalize_SortsHotkeysAndTemplates_PreservesCustomOrder()
     {
         // Arrange
@@ -411,7 +448,7 @@ public sealed class FzLayoutsConverterTests
             {
                 "custom[0].grid.spacing must not be negative",
                 "custom[0].grid.sensitivityRadius must not be negative",
-                "templates[0].zoneCount must not be negative",
+                "templates[0].zoneCount must be greater than 0",
                 "defaults.vertical.spacing must not be negative",
             },
             errors.ToList());
@@ -445,6 +482,36 @@ public sealed class FzLayoutsConverterTests
     }
 
     [TestMethod]
+    public void FromCustomLayouts_SkipsInvalidGridShape()
+    {
+        const string json = /*lang=json,strict*/ """
+            {
+              "custom-layouts": [
+                {
+                  "uuid": "{5C4F1A20-9B3E-4C7D-8E2F-1A2B3C4D5E6F}",
+                  "name": "Missing map",
+                  "type": "grid",
+                  "info": {
+                    "rows": 1,
+                    "columns": 1,
+                    "rows-percentage": [ 10000 ],
+                    "columns-percentage": [ 10000 ]
+                  }
+                }
+              ]
+            }
+            """;
+        var stored = JsonSerializer.Deserialize(json, FancyZonesJsonContext.Default.CustomLayoutListWrapper);
+        var warnings = new List<string>();
+
+        var layouts = FzLayoutsConverter.FromCustomLayouts(stored, warnings);
+
+        Assert.AreEqual(0, layouts.Count);
+        Assert.AreEqual(1, warnings.Count);
+        StringAssert.Contains(warnings[0], "cellChildMap must contain 1 rows");
+    }
+
+    [TestMethod]
     public void FromDefaultLayouts_UnknownMonitorConfiguration_TreatedAsHorizontal()
     {
         // Arrange: mirrors DefaultLayoutsJsonUtils::TypeFromString in the engine
@@ -465,6 +532,27 @@ public sealed class FzLayoutsConverterTests
         Assert.IsNotNull(defaults.Horizontal);
         Assert.AreEqual("columns", defaults.Horizontal.Type);
         Assert.IsNull(defaults.Horizontal.Uuid);
+    }
+
+    [TestMethod]
+    public void FromDefaultLayouts_MissingMonitorConfiguration_IsSkipped()
+    {
+        const string json = /*lang=json,strict*/ """
+            {
+              "default-layouts": [
+                { "layout": { "type": "columns" } }
+              ]
+            }
+            """;
+        var stored = JsonSerializer.Deserialize(json, FancyZonesJsonContext.Default.DefaultLayoutsListWrapper);
+        var warnings = new List<string>();
+
+        var defaults = FzLayoutsConverter.FromDefaultLayouts(stored, warnings);
+
+        Assert.IsNull(defaults.Horizontal);
+        Assert.IsNull(defaults.Vertical);
+        Assert.AreEqual(1, warnings.Count);
+        StringAssert.Contains(warnings[0], "without a monitor configuration");
     }
 
     private static FzLayoutsModel CreateSampleModel()

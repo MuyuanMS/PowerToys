@@ -26,7 +26,7 @@ public sealed class FzTemplateLayout
     /// </summary>
     [JsonPropertyName("zoneCount")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [Description("The number of zones. Default 3.")]
+    [Description("The number of zones. Default 0 for blank; 3 for all other template types. Maximum 128.")]
     public int? ZoneCount { get; set; }
 
     /// <summary>

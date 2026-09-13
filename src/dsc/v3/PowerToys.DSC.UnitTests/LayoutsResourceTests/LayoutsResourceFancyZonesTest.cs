@@ -456,6 +456,8 @@ public sealed class LayoutsResourceFancyZonesTest : BaseDscTest
     [DataRow(/*lang=json,strict*/ """{"layouts":{"defaults":{"horizonal":{}}}}""", "'layouts.defaults.horizonal' is not a valid property")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"foo":1}}""", "'layouts.foo' is not a valid property")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"hotkeys":[{"key":"one","layoutId":"$GRID_GUID"}]}}""", "could not be converted")]
+    [DataRow(/*lang=json,strict*/ """{"layouts":{"hotkeys":[{"layoutId":"$GRID_GUID"}]}}""", "'layouts.hotkeys[0].key' is required")]
+    [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$CANVAS_GUID","name":"A","canvas":{"refWidth":1920,"refHeight":1080,"zones":[{"y":0,"width":100,"height":100}]}}]}}""", "'layouts.custom[0].canvas.zones[0].x' is required")]
     public void Set_MalformedInput_FailsAndLeavesFilesUntouched(string input, string expectedError)
     {
         // Arrange: a stored hotkey that a bad input must not erase
@@ -484,6 +486,8 @@ public sealed class LayoutsResourceFancyZonesTest : BaseDscTest
     [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","grid":{"rows":1,"columns":2,"rowsPercentage":[5000,5000],"columnsPercentage":[7000,3000],"cellChildMap":[[0,1]]}}]}}""", "custom[0].grid.rowsPercentage must contain 1 values, one per row")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","grid":{"rows":1,"columns":2,"rowsPercentage":[10000],"columnsPercentage":[7000,3000],"cellChildMap":[[0]]}}]}}""", "custom[0].grid.cellChildMap[0] must contain 2 values")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","grid":{"rows":1,"columns":2,"rowsPercentage":[10000],"columnsPercentage":[7000,3000],"cellChildMap":[[0,2]]}}]}}""", "custom[0].grid.cellChildMap[0][1]: zone index 2 is out of range (0-1)")]
+    [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","grid":{"rows":1,"columns":3,"rowsPercentage":[10000],"columnsPercentage":[3000,3000,4000],"cellChildMap":[[0,2,2]]}}]}}""", "custom[0].grid.cellChildMap zone indices must be contiguous from 0 through 2")]
+    [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","grid":{"rows":3,"columns":1,"rowsPercentage":[2147483647,2147483647,10002],"columnsPercentage":[10000],"cellChildMap":[[0],[0],[0]]}}]}}""", "custom[0].grid.rowsPercentage must sum to 10000 (100.00%) but sums to 4294977296")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","canvas":{"refWidth":1920,"refHeight":1080,"zones":[]}}]}}""", "custom[0].canvas.zones must contain at least one zone")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","canvas":{"refWidth":1920,"refHeight":1080,"zones":[{"x":0,"y":0,"width":0,"height":100}]}}]}}""", "custom[0].canvas.zones[0].width must be greater than 0")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"hotkeys":[{"key":10,"layoutId":"$GRID_GUID"}]}}""", "hotkeys[0].key must be between 0 and 9")]
@@ -492,7 +496,10 @@ public sealed class LayoutsResourceFancyZonesTest : BaseDscTest
     [DataRow(/*lang=json,strict*/ """{"layouts":{"templates":[{"type":"hexagons"}]}}""", "templates[0].type: invalid value 'hexagons'; allowed values are: blank, focus, rows, columns, grid, priority-grid")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"templates":[{"type":"focus"},{"type":"focus"}]}}""", "templates[1].type: template 'focus' is defined more than once")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"templates":[{"type":"grid","zoneCount":0}]}}""", "templates[0].zoneCount must be greater than 0")]
+    [DataRow(/*lang=json,strict*/ """{"layouts":{"templates":[{"type":"blank","zoneCount":1}]}}""", "templates[0].zoneCount must be 0 when type is 'blank'")]
+    [DataRow(/*lang=json,strict*/ """{"layouts":{"templates":[{"type":"grid","zoneCount":129}]}}""", "templates[0].zoneCount must not be greater than 128")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"defaults":{"horizontal":{"type":"custom"}}}}""", "defaults.horizontal.uuid is required when type is 'custom'")]
+    [DataRow(/*lang=json,strict*/ """{"layouts":{"defaults":{"horizontal":{"type":"custom","uuid":"$GRID_GUID","spacing":16}}}}""", "defaults.horizontal: zoneCount, showSpacing, spacing, and sensitivityRadius must not be set when type is 'custom'")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"defaults":{"vertical":{"type":"rows","uuid":"$GRID_GUID"}}}}""", "defaults.vertical.uuid must only be set when type is 'custom'")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"defaults":{"vertical":{"type":"hexagons"}}}}""", "defaults.vertical.type: invalid value 'hexagons'; allowed values are: blank, focus, rows, columns, grid, priority-grid, custom")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","grid":$VALID_GRID}],"hotkeys":[{"key":1,"layoutId":"$CANVAS_GUID"}]}}""", "hotkeys[0].layoutId: layout '$CANVAS_GUID' is not defined in 'custom'")]
