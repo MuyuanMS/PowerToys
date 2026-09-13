@@ -317,10 +317,10 @@ public static class FzLayoutsConverter
             result.Add(new FzTemplateLayout
             {
                 Type = template.Type,
-                ZoneCount = template.ZoneCount ?? DefaultZoneCount(template.Type),
-                ShowSpacing = IsGridTemplateType(template.Type) && (template.ShowSpacing ?? LayoutDefaultSettings.DefaultShowSpacing),
-                Spacing = IsGridTemplateType(template.Type) ? template.Spacing ?? LayoutDefaultSettings.DefaultSpacing : 0,
-                SensitivityRadius = template.SensitivityRadius ?? LayoutDefaultSettings.DefaultSensitivityRadius,
+                ZoneCount = template.ZoneCount,
+                ShowSpacing = template.ShowSpacing,
+                Spacing = template.Spacing,
+                SensitivityRadius = template.SensitivityRadius,
             });
         }
 
@@ -358,21 +358,15 @@ public static class FzLayoutsConverter
 
         foreach (var hotkey in stored.LayoutHotkeys ?? [])
         {
-            if (hotkey.Key == null)
-            {
-                warnings?.Add("Skipping layout hotkey without a key");
-                continue;
-            }
-
             if (!TryNormalizeGuid(hotkey.LayoutId, out var uuid))
             {
-                warnings?.Add($"Skipping layout hotkey {Invariant(hotkey.Key.Value)} with invalid layout id '{hotkey.LayoutId}'");
+                warnings?.Add($"Skipping layout hotkey {Invariant(hotkey.Key)} with invalid layout id '{hotkey.LayoutId}'");
                 continue;
             }
 
             result.Add(new FzLayoutHotkey
             {
-                Key = hotkey.Key.Value,
+                Key = hotkey.Key,
                 LayoutId = uuid,
             });
         }
@@ -410,7 +404,7 @@ public static class FzLayoutsConverter
             var layout = defaultLayout.Layout;
             var context = $"default layout for '{defaultLayout.MonitorConfiguration}' monitors";
 
-            if (defaultLayout.MonitorConfiguration == null)
+            if (string.IsNullOrEmpty(defaultLayout.MonitorConfiguration))
             {
                 warnings?.Add("Skipping default layout without a monitor configuration");
                 continue;
@@ -425,6 +419,10 @@ public static class FzLayoutsConverter
             var entry = new FzDefaultLayout
             {
                 Type = layout.Type,
+                ZoneCount = layout.ZoneCount,
+                ShowSpacing = layout.ShowSpacing,
+                Spacing = layout.Spacing,
+                SensitivityRadius = layout.SensitivityRadius,
             };
 
             if (IsCustomType(layout.Type))
@@ -437,14 +435,6 @@ public static class FzLayoutsConverter
 
                 entry.Uuid = uuid;
             }
-            else
-            {
-                entry.ZoneCount = layout.ZoneCount ?? DefaultZoneCount(layout.Type);
-                entry.ShowSpacing = IsGridTemplateType(layout.Type) && (layout.ShowSpacing ?? LayoutDefaultSettings.DefaultShowSpacing);
-                entry.Spacing = IsGridTemplateType(layout.Type) ? layout.Spacing ?? LayoutDefaultSettings.DefaultSpacing : 0;
-                entry.SensitivityRadius = layout.SensitivityRadius ?? LayoutDefaultSettings.DefaultSensitivityRadius;
-            }
-
             // The engine treats every non-empty monitor configuration other
             // than "vertical" as horizontal (DefaultLayoutsJsonUtils::TypeFromString).
             if (string.Equals(defaultLayout.MonitorConfiguration, VerticalMonitorConfiguration, StringComparison.Ordinal))

@@ -363,10 +363,10 @@ public sealed class LayoutsResourceFancyZonesTest : BaseDscTest
         var horizontal = state.Layouts.Defaults.Horizontal;
         Assert.AreEqual("custom", horizontal.Type);
         Assert.AreEqual(GridGuid, horizontal.Uuid);
-        Assert.IsNull(horizontal.ShowSpacing);
-        Assert.IsNull(horizontal.Spacing);
-        Assert.IsNull(horizontal.ZoneCount);
-        Assert.IsNull(horizontal.SensitivityRadius);
+        Assert.IsTrue(horizontal.ShowSpacing);
+        Assert.AreEqual(24, horizontal.Spacing);
+        Assert.AreEqual(0, horizontal.ZoneCount);
+        Assert.AreEqual(0, horizontal.SensitivityRadius);
         Assert.IsNull(state.Layouts.Defaults.Vertical);
     }
 
