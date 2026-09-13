@@ -262,48 +262,60 @@ public sealed partial class ContentFormControl : UserControl
     private static IReadOnlyDictionary<string, InputValue> CaptureInputValues(DependencyObject root)
     {
         var values = new Dictionary<string, InputValue>();
-        CaptureInputValues(root, values);
+        var focusedElement = root is FrameworkElement element
+            ? FocusManager.GetFocusedElement(element.XamlRoot) as DependencyObject
+            : null;
+        CaptureInputValues(root, values, focusedElement);
         return values;
     }
 
-    private static void CaptureInputValues(DependencyObject root, IDictionary<string, InputValue> values)
+    private static void CaptureInputValues(
+        DependencyObject root,
+        IDictionary<string, InputValue> values,
+        DependencyObject? focusedElement)
     {
         if (root is FrameworkElement element)
         {
             var key = GetInputKey(element);
             if (key is not null)
             {
+                var hasFocus = focusedElement is not null && ContainsElement(element, focusedElement);
                 switch (element)
                 {
                     case IAdaptiveCustomInputControl customInput:
-                        values[key] = new InputValue(nameof(IAdaptiveCustomInputControl), customInput.CurrentValue);
+                        values[key] = new InputValue(
+                            nameof(IAdaptiveCustomInputControl),
+                            customInput.CaptureState(),
+                            hasFocus);
                         break;
                     case TextBox textBox:
-                        values[key] = new InputValue(nameof(TextBox), textBox.Text);
-                        break;
-                    case PasswordBox passwordBox:
-                        values[key] = new InputValue(nameof(PasswordBox), passwordBox.Password);
+                        values[key] = new InputValue(
+                            nameof(TextBox),
+                            textBox.Text,
+                            hasFocus,
+                            textBox.SelectionStart,
+                            textBox.SelectionLength);
                         break;
                     case ComboBox comboBox:
-                        values[key] = new InputValue(nameof(ComboBox), comboBox.SelectedIndex);
+                        values[key] = new InputValue(nameof(ComboBox), comboBox.SelectedIndex, hasFocus);
                         break;
                     case ToggleSwitch toggleSwitch:
-                        values[key] = new InputValue(nameof(ToggleSwitch), toggleSwitch.IsOn);
+                        values[key] = new InputValue(nameof(ToggleSwitch), toggleSwitch.IsOn, hasFocus);
                         break;
                     case CheckBox checkBox:
-                        values[key] = new InputValue(nameof(CheckBox), checkBox.IsChecked);
+                        values[key] = new InputValue(nameof(CheckBox), checkBox.IsChecked, hasFocus);
                         break;
                     case NumberBox numberBox:
-                        values[key] = new InputValue(nameof(NumberBox), numberBox.Value);
+                        values[key] = new InputValue(nameof(NumberBox), numberBox.Value, hasFocus);
                         break;
                     case CalendarDatePicker datePicker:
-                        values[key] = new InputValue(nameof(CalendarDatePicker), datePicker.Date);
+                        values[key] = new InputValue(nameof(CalendarDatePicker), datePicker.Date, hasFocus);
                         break;
                     case TimePicker timePicker:
-                        values[key] = new InputValue(nameof(TimePicker), timePicker.Time);
+                        values[key] = new InputValue(nameof(TimePicker), timePicker.Time, hasFocus);
                         break;
                     case RadioButton radioButton:
-                        values[key] = new InputValue(nameof(RadioButton), radioButton.IsChecked);
+                        values[key] = new InputValue(nameof(RadioButton), radioButton.IsChecked, hasFocus);
                         break;
                 }
             }
@@ -312,7 +324,7 @@ public sealed partial class ContentFormControl : UserControl
         var childCount = VisualTreeHelper.GetChildrenCount(root);
         for (var i = 0; i < childCount; i++)
         {
-            CaptureInputValues(VisualTreeHelper.GetChild(root, i), values);
+            CaptureInputValues(VisualTreeHelper.GetChild(root, i), values, focusedElement);
         }
     }
 
@@ -337,13 +349,15 @@ public sealed partial class ContentFormControl : UserControl
                 switch (element)
                 {
                     case IAdaptiveCustomInputControl customInput when inputValue.Kind == nameof(IAdaptiveCustomInputControl):
-                        customInput.RestoreValue((string)inputValue.Value!);
+                        customInput.RestoreState((AdaptiveCustomInputState)inputValue.Value!);
                         break;
                     case TextBox textBox when inputValue.Kind == nameof(TextBox):
                         textBox.Text = (string)inputValue.Value!;
-                        break;
-                    case PasswordBox passwordBox when inputValue.Kind == nameof(PasswordBox):
-                        passwordBox.Password = (string)inputValue.Value!;
+                        if (inputValue.HasFocus)
+                        {
+                            textBox.Select(inputValue.SelectionStart, inputValue.SelectionLength);
+                        }
+
                         break;
                     case ComboBox comboBox when inputValue.Kind == nameof(ComboBox):
                         comboBox.SelectedIndex = (int)inputValue.Value!;
@@ -367,6 +381,18 @@ public sealed partial class ContentFormControl : UserControl
                         radioButton.IsChecked = (bool?)inputValue.Value;
                         break;
                 }
+
+                if (inputValue.HasFocus)
+                {
+                    if (element is IAdaptiveCustomInputControl customInput)
+                    {
+                        customInput.FocusInput();
+                    }
+                    else
+                    {
+                        element.Focus(FocusState.Programmatic);
+                    }
+                }
             }
         }
 
@@ -388,7 +414,31 @@ public sealed partial class ContentFormControl : UserControl
         return string.IsNullOrEmpty(element.Name) ? null : element.Name;
     }
 
-    private readonly record struct InputValue(string Kind, object? Value);
+    private static bool ContainsElement(DependencyObject root, DependencyObject target)
+    {
+        if (ReferenceEquals(root, target))
+        {
+            return true;
+        }
+
+        var childCount = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < childCount; i++)
+        {
+            if (ContainsElement(VisualTreeHelper.GetChild(root, i), target))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private readonly record struct InputValue(
+        string Kind,
+        object? Value,
+        bool HasFocus,
+        int SelectionStart = 0,
+        int SelectionLength = 0);
 
     /// <summary>
     /// Fixes missing AutomationProperties.Name on CheckBox and ToggleSwitch controls

@@ -189,16 +189,20 @@ internal sealed partial class AdaptiveKeyValueListInputControl : AdaptiveListInp
             ? _unreadableValue
             : AdaptiveListValueCodec.ToPairsValue(_items);
 
-    public override void RestoreValue(string value)
+    public override AdaptiveCustomInputState CaptureState() =>
+        new(CurrentValue, _keyTextBox.Text, _valueTextBox.Text);
+
+    public override void RestoreState(AdaptiveCustomInputState state)
     {
-        if (!AdaptiveListValueCodec.TryParsePairs(value, out var parsedPairs))
+        if (!AdaptiveListValueCodec.TryParsePairs(state.Value, out var parsedPairs))
         {
             return;
         }
 
         _items.Clear();
         _items.AddRange(parsedPairs);
-        _wasEdited = true;
+        _keyTextBox.Text = state.PendingKey ?? string.Empty;
+        _valueTextBox.Text = state.PendingValue ?? string.Empty;
         RefreshItems();
         UpdateValidationIfRequested();
     }
