@@ -101,6 +101,7 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
         Debug.Assert(_output.Settings != null, "Output settings should not be null");
         var settings = JsonSerializer.SerializeToNode(_output.Settings, _serializerOptions);
         ValidateUnsignedIntegerSettings(settings);
+        ValidateZoominSliderLevel(_output.Settings.Properties.ZoominSliderLevel?.Value);
         if (_recordScalingSpecified &&
             !string.Equals(_currentRecordFormat, _output.Settings.Properties.RecordFormat?.Value, StringComparison.Ordinal) &&
             settings?[PropertiesJsonPropertyName] is JsonObject properties &&
@@ -138,6 +139,14 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
             {
                 ValidateUnsignedIntegerSettings(child);
             }
+        }
+    }
+
+    private static void ValidateZoominSliderLevel(int? value)
+    {
+        if (value is < 0 or > 5)
+        {
+            throw new ArgumentOutOfRangeException(nameof(value), "ZoominSliderLevel must be between 0 and 5.");
         }
     }
 

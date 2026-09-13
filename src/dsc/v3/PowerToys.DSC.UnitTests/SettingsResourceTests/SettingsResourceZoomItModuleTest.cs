@@ -221,6 +221,20 @@ public sealed class SettingsResourceZoomItModuleTest : BaseDscTest
     }
 
     [TestMethod]
+    public void SetWithOutOfRangeZoominSliderLevel_RejectsBeforeWriting()
+    {
+        // Arrange
+        var input = CreateInput(properties => properties.ZoominSliderLevel = new IntProperty(6));
+        var data = new ZoomItSettingsFunctionData(input);
+        data.GetState();
+        data.Output.SettingsInternal = data.Input.SettingsInternal;
+
+        // Act and assert
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(data.SetState);
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    [TestMethod]
     public void TestWithDiff_Success()
     {
         // Arrange
