@@ -190,12 +190,32 @@ public partial class ListItemViewModel : CommandItemViewModel
                 UpdateTags(model.Tags);
                 break;
             case nameof(model.TextToSuggest):
-                TextToSuggest = model.TextToSuggest ?? string.Empty;
+                var textToSuggest = model.TextToSuggest ?? string.Empty;
+                lock (MoreCommandsLock)
+                {
+                    if (IsCleanedUp)
+                    {
+                        return;
+                    }
+
+                    TextToSuggest = textToSuggest;
+                }
+
                 UpdateProperty(nameof(TextToSuggest));
                 break;
             case nameof(model.Section):
-                Section = model.Section ?? string.Empty;
-                Type = EvaluateType();
+                var section = model.Section ?? string.Empty;
+                lock (MoreCommandsLock)
+                {
+                    if (IsCleanedUp)
+                    {
+                        return;
+                    }
+
+                    Section = section;
+                    Type = EvaluateType();
+                }
+
                 UpdateProperty(nameof(Section), nameof(Type), nameof(IsInteractive));
                 break;
             case nameof(model.Command):

@@ -38,6 +38,8 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
     private FuzzyTargetCache _subtitleCache;
 
     private ExtensionPropertySubscription _modelSubscription;
+    private CommandViewModel? _subscribedCommand;
+    private bool _commandSubscriptionInProgress;
 
     internal InitializedState Initialized { get; private set; } = InitializedState.Uninitialized;
 
@@ -361,15 +363,60 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
     private void SubscribeToCommand(CommandViewModel command)
     {
-        if (IsCleanedUp)
+        CommandViewModel? previousCommand;
+        lock (_moreCommandsLock)
         {
-            return;
+            if (IsCleanedUp || _commandSubscriptionInProgress || ReferenceEquals(_subscribedCommand, command))
+            {
+                return;
+            }
+
+            previousCommand = _subscribedCommand;
+            _subscribedCommand = command;
+            _commandSubscriptionInProgress = true;
         }
 
-        command.PropertyChanged += Command_PropertyChanged;
-        if (IsCleanedUp || !ReferenceEquals(command, Command))
+        previousCommand?.PropertyChanged -= Command_PropertyChanged;
+        try
+        {
+            command.PropertyChanged += Command_PropertyChanged;
+        }
+        catch
+        {
+            lock (_moreCommandsLock)
+            {
+                if (ReferenceEquals(_subscribedCommand, command))
+                {
+                    _subscribedCommand = null;
+                }
+
+                _commandSubscriptionInProgress = false;
+            }
+
+            throw;
+        }
+
+        var keepSubscription = false;
+        lock (_moreCommandsLock)
+        {
+            _commandSubscriptionInProgress = false;
+            if (!IsCleanedUp && ReferenceEquals(command, Command))
+            {
+                keepSubscription = true;
+            }
+            else if (ReferenceEquals(_subscribedCommand, command))
+            {
+                _subscribedCommand = null;
+            }
+        }
+
+        if (!keepSubscription)
         {
             command.PropertyChanged -= Command_PropertyChanged;
+            if (!IsCleanedUp)
+            {
+                SubscribeToCommand(Command);
+            }
         }
     }
 
@@ -675,7 +722,7 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
         UpdateProperty(nameof(Icon));
     }
 
-    protected virtual void UpdateExtendedAttributes(IDictionary<string, object?>? properties)
+    protected void UpdateExtendedAttributes(IDictionary<string, object?>? properties)
     {
         lock (_moreCommandsLock)
         {
@@ -687,7 +734,12 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
             PublishExtendedAttributesUnsafe(properties);
         }
 
+        UpdateDerivedExtendedAttributes(properties);
         UpdateProperty(nameof(DataPackage));
+    }
+
+    protected virtual void UpdateDerivedExtendedAttributes(IDictionary<string, object?>? properties)
+    {
     }
 
     private void PublishExtendedAttributesUnsafe(IDictionary<string, object?>? properties)
@@ -866,7 +918,14 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
         // One read of the pair, so a replacement racing this teardown cannot
         // leave us cleaning up a command against the wrong ownership flag.
         var commandState = _commandState;
-        commandState.Command.PropertyChanged -= Command_PropertyChanged;
+        CommandViewModel? subscribedCommand;
+        lock (_moreCommandsLock)
+        {
+            subscribedCommand = _subscribedCommand;
+            _subscribedCommand = null;
+        }
+
+        subscribedCommand?.PropertyChanged -= Command_PropertyChanged;
 
         // Only tear down a command this item built. The synthesized default
         // context item borrows its parent's, and cleaning that up from here
