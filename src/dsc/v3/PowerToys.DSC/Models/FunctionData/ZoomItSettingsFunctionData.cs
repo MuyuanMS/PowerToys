@@ -100,6 +100,7 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
     {
         Debug.Assert(_output.Settings != null, "Output settings should not be null");
         var settings = JsonSerializer.SerializeToNode(_output.Settings, _serializerOptions);
+        ValidateUnsignedIntegerSettings(settings);
         if (_recordScalingSpecified &&
             !string.Equals(_currentRecordFormat, _output.Settings.Properties.RecordFormat?.Value, StringComparison.Ordinal) &&
             settings?[PropertiesJsonPropertyName] is JsonObject properties &&
@@ -113,6 +114,31 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
         SaveSettingsJson(settings?.ToJsonString(_serializerOptions) ?? JsonSerializer.Serialize(_output.Settings, _serializerOptions));
         _output.Settings = JsonSerializer.Deserialize<ZoomItSettings>(LoadSettingsJson(), _serializerOptions) ?? new();
         SignalRefreshSettings();
+    }
+
+    private static void ValidateUnsignedIntegerSettings(JsonNode? node)
+    {
+        if (node is JsonObject jsonObject)
+        {
+            if (jsonObject["value"] is JsonValue value &&
+                value.TryGetValue<int>(out var integerValue) &&
+                integerValue < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(node), "ZoomIt numeric settings cannot be negative.");
+            }
+
+            foreach (var (_, child) in jsonObject)
+            {
+                ValidateUnsignedIntegerSettings(child);
+            }
+        }
+        else if (node is JsonArray jsonArray)
+        {
+            foreach (var child in jsonArray)
+            {
+                ValidateUnsignedIntegerSettings(child);
+            }
+        }
     }
 
     /// <inheritdoc/>
