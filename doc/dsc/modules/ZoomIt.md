@@ -31,7 +31,7 @@ Sets the keyboard shortcut that toggles zoom mode. Like every hotkey property, t
 - `alt` (boolean) - Alt key modifier
 - `shift` (boolean) - Shift key modifier
 - `code` (integer) - Virtual key code
-- `key` (string) - Key name
+- `key` (string) - Derived key name returned on read; `code` is authoritative when configuring a shortcut
 
 **Default:** `Ctrl+1` (VK code 49)
 
@@ -54,7 +54,6 @@ $config = @{
                     alt = $false
                     shift = $true
                     code = 90
-                    key = "Z"
                 }
             }
         }
@@ -90,7 +89,6 @@ resources:
               alt: false
               shift: false
               code: 49
-              key: "1"
         name: ZoomIt
         version: 1.0
 ```
@@ -128,7 +126,6 @@ resources:
               alt: false
               shift: true
               code: 90
-              key: Z
         name: ZoomIt
         version: 1.0
 ```
@@ -157,7 +154,6 @@ resources:
               alt: false
               shift: false
               code: 187
-              key: "="
         name: ZoomIt
         version: 1.0
 ```
@@ -182,7 +178,6 @@ resources:
               alt: false
               shift: false
               code: 49
-              key: "1"
         name: ZoomIt
         version: 1.0
 ```
@@ -205,7 +200,6 @@ resources:
               alt: false
               shift: true
               code: 90
-              key: Z
         name: ZoomIt
         version: 1.0
 ```
