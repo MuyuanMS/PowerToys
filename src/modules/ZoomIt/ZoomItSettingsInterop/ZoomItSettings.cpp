@@ -325,7 +325,11 @@ namespace winrt::PowerToys::ZoomItSettingsInterop::implementation
                 {
                     // Base64 encoding is likely the best way to serialize a byte array into JSON.
                     auto decodedValue = base64_decode(possibleValue.value());
-                    assert(curSetting->Size == decodedValue.size()); // Should right now only be used for LOGFONT, so let's hard check it to avoid any insecure overflows.
+                    if (curSetting->Size != decodedValue.size())
+                    {
+                        throw winrt::hresult_invalid_argument(L"Invalid binary setting size.");
+                    }
+
                     memcpy(static_cast<PBYTE>(curSetting->Setting), decodedValue.data(), decodedValue.size());
                 }
                 break;

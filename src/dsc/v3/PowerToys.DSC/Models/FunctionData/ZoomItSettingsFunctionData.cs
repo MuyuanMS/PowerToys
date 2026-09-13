@@ -52,6 +52,12 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
     /// </summary>
     public static Action<string> SaveSettingsJson { get; set; } = json => global::PowerToys.ZoomItSettingsInterop.ZoomItSettings.SaveSettingsJson(json);
 
+    /// <summary>
+    /// Gets or sets the operation that signals ZoomIt to reload its settings.
+    /// Tests replace it to avoid interacting with a running ZoomIt instance.
+    /// </summary>
+    public static Action SignalRefreshSettings { get; set; } = SignalRefreshSettingsEvent;
+
     /// <inheritdoc/>
     public ISettingsResourceObject Input => _input;
 
@@ -89,7 +95,7 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
     {
         Debug.Assert(_output.Settings != null, "Output settings should not be null");
         SaveSettingsJson(JsonSerializer.Serialize(_output.Settings, _serializerOptions));
-        SignalRefreshSettingsEvent();
+        SignalRefreshSettings();
     }
 
     /// <inheritdoc/>
@@ -97,6 +103,8 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
     {
         var input = JsonSerializer.SerializeToNode(_input.Settings, _serializerOptions);
         var output = JsonSerializer.SerializeToNode(_output.Settings, _serializerOptions);
+        RemoveDerivedHotkeyKeys(input);
+        RemoveDerivedHotkeyKeys(output);
         return JsonNode.DeepEquals(input, output);
     }
 
@@ -145,6 +153,33 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
         }
 
         return desiredNode.Deserialize<ZoomItSettings>(_serializerOptions) ?? desired;
+    }
+
+    private static void RemoveDerivedHotkeyKeys(JsonNode? node)
+    {
+        if (node is JsonObject jsonObject)
+        {
+            if (jsonObject.ContainsKey("win") &&
+                jsonObject.ContainsKey("ctrl") &&
+                jsonObject.ContainsKey("alt") &&
+                jsonObject.ContainsKey("shift") &&
+                jsonObject.ContainsKey("code"))
+            {
+                jsonObject.Remove("key");
+            }
+
+            foreach (var (_, value) in jsonObject)
+            {
+                RemoveDerivedHotkeyKeys(value);
+            }
+        }
+        else if (node is JsonArray jsonArray)
+        {
+            foreach (var value in jsonArray)
+            {
+                RemoveDerivedHotkeyKeys(value);
+            }
+        }
     }
 
     /// <summary>
