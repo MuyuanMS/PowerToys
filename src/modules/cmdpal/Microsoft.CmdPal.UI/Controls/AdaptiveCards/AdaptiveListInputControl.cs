@@ -63,15 +63,11 @@ internal sealed partial class AdaptiveListInputControl : AdaptiveListInputContro
 
     public override AdaptiveCustomInputState CaptureState()
     {
-        var hasTextFocus = _newItemTextBox is not null &&
-            ReferenceEquals(FocusManager.GetFocusedElement(XamlRoot), _newItemTextBox);
         return new(
             CurrentValue,
             PendingValue: _newItemTextBox?.Text,
-            FocusedField: hasTextFocus ? nameof(_newItemTextBox) : null,
-            SelectionStart: hasTextFocus ? _newItemTextBox!.SelectionStart : 0,
-            SelectionLength: hasTextFocus ? _newItemTextBox!.SelectionLength : 0,
             WasEdited: _wasEdited,
+            ValidationWasRequested: ValidationWasRequested,
             ListItems: _items
                 .Select(static item => new AdaptiveCustomListItemState(item.Source, item.PathKind))
                 .ToArray());
@@ -96,24 +92,18 @@ internal sealed partial class AdaptiveListInputControl : AdaptiveListInputContro
         }
         else
         {
-            UpdateValidationIfRequested();
+            RestoreValidationState(state.ValidationWasRequested);
             return;
         }
 
         _wasEdited = state.WasEdited;
         RefreshItems();
-        UpdateValidationIfRequested();
+        RestoreValidationState(state.ValidationWasRequested);
     }
 
     public override void FocusInput()
     {
         (_newItemTextBox as Control ?? _addButton)?.Focus(FocusState.Programmatic);
-    }
-
-    public override void RestoreFocus(AdaptiveCustomInputState state)
-    {
-        FocusInput();
-        _newItemTextBox?.Select(state.SelectionStart, state.SelectionLength);
     }
 
     public override bool IsOperationPending => _isPickerPending;

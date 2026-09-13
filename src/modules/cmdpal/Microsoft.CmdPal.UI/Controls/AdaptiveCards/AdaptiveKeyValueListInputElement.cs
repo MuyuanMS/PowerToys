@@ -189,23 +189,13 @@ internal sealed partial class AdaptiveKeyValueListInputControl : AdaptiveListInp
             ? _unreadableValue
             : AdaptiveListValueCodec.ToPairsValue(_items);
 
-    public override AdaptiveCustomInputState CaptureState()
-    {
-        var focusedElement = FocusManager.GetFocusedElement(XamlRoot);
-        var focusedTextBox = ReferenceEquals(focusedElement, _keyTextBox)
-            ? _keyTextBox
-            : ReferenceEquals(focusedElement, _valueTextBox)
-                ? _valueTextBox
-                : null;
-        return new(
+    public override AdaptiveCustomInputState CaptureState() =>
+        new(
             CurrentValue,
             _keyTextBox.Text,
             _valueTextBox.Text,
-            ReferenceEquals(focusedTextBox, _valueTextBox) ? nameof(_valueTextBox) : nameof(_keyTextBox),
-            focusedTextBox?.SelectionStart ?? 0,
-            focusedTextBox?.SelectionLength ?? 0,
-            _wasEdited);
-    }
+            WasEdited: _wasEdited,
+            ValidationWasRequested: ValidationWasRequested);
 
     public override void RestoreState(AdaptiveCustomInputState state)
     {
@@ -213,7 +203,7 @@ internal sealed partial class AdaptiveKeyValueListInputControl : AdaptiveListInp
         _valueTextBox.Text = state.PendingValue ?? string.Empty;
         if (!AdaptiveListValueCodec.TryParsePairs(state.Value, out var parsedPairs))
         {
-            UpdateValidationIfRequested();
+            RestoreValidationState(state.ValidationWasRequested);
             return;
         }
 
@@ -221,17 +211,10 @@ internal sealed partial class AdaptiveKeyValueListInputControl : AdaptiveListInp
         _items.AddRange(parsedPairs);
         _wasEdited = state.WasEdited;
         RefreshItems();
-        UpdateValidationIfRequested();
+        RestoreValidationState(state.ValidationWasRequested);
     }
 
     public override void FocusInput() => _keyTextBox.Focus(FocusState.Programmatic);
-
-    public override void RestoreFocus(AdaptiveCustomInputState state)
-    {
-        var textBox = state.FocusedField == nameof(_valueTextBox) ? _valueTextBox : _keyTextBox;
-        textBox.Focus(FocusState.Programmatic);
-        textBox.Select(state.SelectionStart, state.SelectionLength);
-    }
 
     private void AddTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
     {
