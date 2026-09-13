@@ -227,7 +227,9 @@ internal sealed partial class AdaptiveFilePathInputControl : AdaptiveCustomInput
 
     public override string CurrentValue => _pathTextBox.Text;
 
-    public override void RestoreValue(string value) => _pathTextBox.Text = value;
+    public override AdaptiveCustomInputState CaptureState() => new(CurrentValue);
+
+    public override void RestoreState(AdaptiveCustomInputState state) => _pathTextBox.Text = state.Value;
 
     public override void FocusInput() => _pathTextBox.Focus(FocusState.Programmatic);
 

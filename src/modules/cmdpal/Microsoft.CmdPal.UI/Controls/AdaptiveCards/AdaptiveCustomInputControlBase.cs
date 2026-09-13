@@ -68,7 +68,9 @@ internal abstract partial class AdaptiveCustomInputControlBase : Grid, IAdaptive
 
     public UIElement ValidationErrorElement => ValidationError;
 
-    public abstract void RestoreValue(string value);
+    public abstract AdaptiveCustomInputState CaptureState();
+
+    public abstract void RestoreState(AdaptiveCustomInputState state);
 
     public bool ValidateInput()
     {

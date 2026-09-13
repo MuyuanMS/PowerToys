@@ -38,11 +38,18 @@ internal interface IAdaptiveCustomInputControl
 
     UIElement ValidationErrorElement { get; }
 
-    void RestoreValue(string value);
+    AdaptiveCustomInputState CaptureState();
+
+    void RestoreState(AdaptiveCustomInputState state);
 
     bool ValidateInput();
 
     void FocusInput();
 }
+
+internal readonly record struct AdaptiveCustomInputState(
+    string Value,
+    string? PendingKey = null,
+    string? PendingValue = null);
 
 #pragma warning restore SA1402 // File may only contain a single type

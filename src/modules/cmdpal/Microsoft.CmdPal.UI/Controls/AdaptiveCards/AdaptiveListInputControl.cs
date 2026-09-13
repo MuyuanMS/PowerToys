@@ -60,16 +60,23 @@ internal sealed partial class AdaptiveListInputControl : AdaptiveListInputContro
             ? _unreadableValue
             : AdaptiveListValueCodec.ToItemsValue(_items.Select(static item => item.Source));
 
-    public override void RestoreValue(string value)
+    public override AdaptiveCustomInputState CaptureState() =>
+        new(CurrentValue, PendingValue: _newItemTextBox?.Text);
+
+    public override void RestoreState(AdaptiveCustomInputState state)
     {
-        if (!AdaptiveListValueCodec.TryParseItems(value, out var parsedItems))
+        if (!AdaptiveListValueCodec.TryParseItems(state.Value, out var parsedItems))
         {
             return;
         }
 
         _items.Clear();
         _items.AddRange(parsedItems.Select(static item => new AdaptiveListItem(item)));
-        _wasEdited = true;
+        if (_newItemTextBox is not null)
+        {
+            _newItemTextBox.Text = state.PendingValue ?? string.Empty;
+        }
+
         RefreshItems();
         UpdateValidationIfRequested();
     }
