@@ -30,6 +30,7 @@ public sealed partial class ContentFormControl : UserControl
     private bool _themeRefreshPending;
     private bool _themeRefreshDeferred;
     private bool _focusFirstElementOnLoad = true;
+    private bool _restoreStateOnLayout;
     private IReadOnlyDictionary<string, InputValue>? _inputValuesToRestore;
     private FocusedElementState? _focusedElementToRestore;
 
@@ -214,6 +215,7 @@ public sealed partial class ContentFormControl : UserControl
 
         _adaptiveCard = card;
         _focusFirstElementOnLoad = focusFirstElement;
+        _restoreStateOnLayout = inputValues is not null || focusedElement is not null;
         _inputValuesToRestore = inputValues;
         _focusedElementToRestore = focusedElement;
         _renderedCard = _renderer.RenderAdaptiveCard(card);
@@ -266,6 +268,13 @@ public sealed partial class ContentFormControl : UserControl
         if (sender is FrameworkElement element)
         {
             element.LayoutUpdated -= OnFrameworkElementLayoutUpdated;
+            if (_restoreStateOnLayout)
+            {
+                _restoreStateOnLayout = false;
+                RestoreInputValues(element);
+                RestoreFocusedElement(element);
+            }
+
             FixToggleAccessibilityNames(element);
         }
     }
@@ -277,10 +286,9 @@ public sealed partial class ContentFormControl : UserControl
         {
             element.Loaded -= OnFrameworkElementLoaded;
 
-            RestoreInputValues(element);
-            var restoredFocus = RestoreFocusedElement(element);
-
-            if (restoredFocus || !_focusFirstElementOnLoad || (!ViewModel?.OnlyControlOnPage ?? true))
+            if (_restoreStateOnLayout ||
+                !_focusFirstElementOnLoad ||
+                (!ViewModel?.OnlyControlOnPage ?? true))
             {
                 return;
             }
@@ -326,6 +334,16 @@ public sealed partial class ContentFormControl : UserControl
                         values[key] = new InputValue(
                             nameof(IAdaptiveCustomInputControl),
                             customInput.CaptureState(),
+                            hasFocus,
+                            selectionStart,
+                            selectionLength,
+                            focusPath);
+                        captured = true;
+                        break;
+                    case PasswordBox passwordBox:
+                        values[key] = new InputValue(
+                            nameof(PasswordBox),
+                            passwordBox.Password,
                             hasFocus,
                             selectionStart,
                             selectionLength,
@@ -450,6 +468,9 @@ public sealed partial class ContentFormControl : UserControl
                 {
                     case IAdaptiveCustomInputControl customInput when inputValue.Kind == nameof(IAdaptiveCustomInputControl):
                         customInput.RestoreState((AdaptiveCustomInputState)inputValue.Value!);
+                        break;
+                    case PasswordBox passwordBox when inputValue.Kind == nameof(PasswordBox):
+                        passwordBox.Password = (string)inputValue.Value!;
                         break;
                     case TextBox textBox when inputValue.Kind == nameof(TextBox):
                         textBox.Text = (string)inputValue.Value!;
