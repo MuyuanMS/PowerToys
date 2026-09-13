@@ -238,8 +238,17 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
         if (model is IExtendedAttributesProvider extendedAttributesProvider)
         {
-            ExtendedAttributesProvider = new ExtensionObject<IExtendedAttributesProvider>(extendedAttributesProvider);
-            UpdateExtendedAttributes(GetExtendedAttributes());
+            var extendedAttributes = extendedAttributesProvider.GetProperties();
+            lock (_moreCommandsLock)
+            {
+                if (IsCleanedUp)
+                {
+                    return;
+                }
+
+                ExtendedAttributesProvider = new ExtensionObject<IExtendedAttributesProvider>(extendedAttributesProvider);
+                UpdateExtendedAttributes(extendedAttributes);
+            }
         }
 
         Initialized |= InitializedState.Initialized;
@@ -406,15 +415,30 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
                 // Extensions based on Command Palette SDK < 0.3 CommandItem class won't notify when Title changes because Command
                 // or Command.Name change. This is a workaround to ensure that the Title is always up-to-date for extensions with old SDK.
-                _itemTitle = model.Title;
-
-                if (_defaultCommandContextItemViewModel is not null)
+                var itemTitle = model.Title;
+                var commandPublished = false;
+                lock (_moreCommandsLock)
                 {
-                    _defaultCommandContextItemViewModel.BorrowCommand(Command);
-                    _defaultCommandContextItemViewModel.UpdateTitle(_itemTitle);
-                    UpdateDefaultContextItemIcon();
+                    if (!IsCleanedUp)
+                    {
+                        _itemTitle = itemTitle;
+                        if (_defaultCommandContextItemViewModel is not null)
+                        {
+                            _defaultCommandContextItemViewModel.BorrowCommand(Command);
+                            _defaultCommandContextItemViewModel.UpdateTitle(_itemTitle);
+                            UpdateDefaultContextItemIcon();
+                        }
+
+                        commandPublished = true;
+                    }
                 }
-                else
+
+                if (!commandPublished)
+                {
+                    break;
+                }
+
+                if (_defaultCommandContextItemViewModel is null)
                 {
                     TryCreateDefaultCommandContextItem(command);
                 }
@@ -427,17 +451,44 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
                 break;
 
             case nameof(Title):
-                _itemTitle = model.Title;
-                _titleCache.Invalidate();
-                UpdateProperty(nameof(HasText));
+                var title = model.Title;
+                var titlePublished = false;
+                lock (_moreCommandsLock)
+                {
+                    if (!IsCleanedUp)
+                    {
+                        _itemTitle = title;
+                        _titleCache.Invalidate();
+                        titlePublished = true;
+                    }
+                }
+
+                if (titlePublished)
+                {
+                    UpdateProperty(nameof(HasText));
+                }
+
                 break;
 
             case nameof(Subtitle):
                 var modelSubtitle = model.Subtitle;
-                this.Subtitle = modelSubtitle;
-                _defaultCommandContextItemViewModel?.Subtitle = modelSubtitle;
-                _subtitleCache.Invalidate();
-                UpdateProperty(nameof(HasText));
+                var subtitlePublished = false;
+                lock (_moreCommandsLock)
+                {
+                    if (!IsCleanedUp)
+                    {
+                        Subtitle = modelSubtitle;
+                        _defaultCommandContextItemViewModel?.Subtitle = modelSubtitle;
+                        _subtitleCache.Invalidate();
+                        subtitlePublished = true;
+                    }
+                }
+
+                if (subtitlePublished)
+                {
+                    UpdateProperty(nameof(HasText));
+                }
+
                 break;
 
             case nameof(Icon):
@@ -467,7 +518,7 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
                 break;
             case nameof(DataPackage):
-                UpdateDataPackage(GetExtendedAttributes());
+                UpdateExtendedAttributes(GetExtendedAttributes());
                 break;
             case "Properties":
                 UpdateExtendedAttributes(GetExtendedAttributes());
@@ -496,24 +547,51 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
             case nameof(Command.Name):
                 // Extensions based on Command Palette SDK < 0.3 CommandItem class won't notify when Title changes because Command
                 // or Command.Name change. This is a workaround to ensure that the Title is always up-to-date for extensions with old SDK.
-                _itemTitle = model.Title;
-                _titleCache.Invalidate();
+                var title = model.Title;
+                var commandModel = model.Command;
+                var titlePublished = false;
+                lock (_moreCommandsLock)
+                {
+                    if (!IsCleanedUp)
+                    {
+                        _itemTitle = title;
+                        _titleCache.Invalidate();
+
+                        if (_defaultCommandContextItemViewModel is not null)
+                        {
+                            _defaultCommandContextItemViewModel.UpdateTitle(commandModel?.Name);
+                        }
+
+                        titlePublished = true;
+                    }
+                }
+
+                if (!titlePublished)
+                {
+                    break;
+                }
+
+                if (_defaultCommandContextItemViewModel is null)
+                {
+                    TryCreateDefaultCommandContextItem(commandModel);
+                }
+
                 UpdateProperty(nameof(Title), nameof(Name));
                 UpdateProperty(nameof(CanOpenContextMenu));
-
-                if (_defaultCommandContextItemViewModel is not null)
-                {
-                    _defaultCommandContextItemViewModel.UpdateTitle(model.Command.Name);
-                }
-                else
-                {
-                    TryCreateDefaultCommandContextItem(model.Command);
-                }
 
                 break;
 
             case nameof(Command.Icon):
-                UpdateDefaultContextItemIcon();
+                lock (_moreCommandsLock)
+                {
+                    if (IsCleanedUp)
+                    {
+                        break;
+                    }
+
+                    UpdateDefaultContextItemIcon();
+                }
+
                 UpdateProperty(nameof(Icon));
                 break;
         }
@@ -599,20 +677,29 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
     protected virtual void UpdateExtendedAttributes(IDictionary<string, object?>? properties)
     {
-        UpdateDataPackage(properties);
-        DockCommandId = properties?.TryGetValue(WellKnownExtensionAttributes.DockCommandId, out var dockCommandId) == true
-            ? dockCommandId as string
-            : null;
+        lock (_moreCommandsLock)
+        {
+            if (IsCleanedUp)
+            {
+                return;
+            }
+
+            PublishExtendedAttributesUnsafe(properties);
+        }
+
+        UpdateProperty(nameof(DataPackage));
     }
 
-    private void UpdateDataPackage(IDictionary<string, object?>? properties)
+    private void PublishExtendedAttributesUnsafe(IDictionary<string, object?>? properties)
     {
         DataPackage =
             properties?.TryGetValue(WellKnownExtensionAttributes.DataPackage, out var dataPackageView) == true &&
             dataPackageView is DataPackageView view
                 ? view
                 : null;
-        UpdateProperty(nameof(DataPackage));
+        DockCommandId = properties?.TryGetValue(WellKnownExtensionAttributes.DockCommandId, out var dockCommandId) == true
+            ? dockCommandId as string
+            : null;
     }
 
     public FuzzyTarget GetTitleTarget(IPrecomputedFuzzyMatcher matcher)

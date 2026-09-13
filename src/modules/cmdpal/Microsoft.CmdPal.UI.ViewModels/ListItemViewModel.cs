@@ -95,11 +95,24 @@ public partial class ListItemViewModel : CommandItemViewModel
             return; // throw?
         }
 
-        UpdateTags(li.Tags);
-        Section = li.Section ?? string.Empty;
-        Type = EvaluateType();
-        UpdateProperty(nameof(Section), nameof(Type), nameof(IsInteractive));
+        var tags = li.Tags;
+        var section = li.Section ?? string.Empty;
+        List<TagViewModel>? oldTags = null;
+        lock (MoreCommandsLock)
+        {
+            if (IsCleanedUp)
+            {
+                return;
+            }
 
+            oldTags = Tags;
+            Section = section;
+            Type = EvaluateType();
+        }
+
+        UpdateTags(tags);
+        oldTags?.ForEach(t => t.SafeCleanup());
+        UpdateProperty(nameof(Section), nameof(Type), nameof(IsInteractive));
         UpdateAccessibleName();
     }
 
@@ -146,12 +159,18 @@ public partial class ListItemViewModel : CommandItemViewModel
         AddShowDetailsCommands();
 
         var textToSuggest = model.TextToSuggest;
-        if (IsCleanedUp)
+        lock (MoreCommandsLock)
         {
-            return;
+            if (!IsCleanedUp)
+            {
+                TextToSuggest = textToSuggest;
+            }
+            else
+            {
+                return;
+            }
         }
 
-        TextToSuggest = textToSuggest;
         UpdateProperty(nameof(TextToSuggest));
     }
 
@@ -349,11 +368,29 @@ public partial class ListItemViewModel : CommandItemViewModel
         DoOnUiThread(
             () =>
             {
+                List<TagViewModel>? oldTags = null;
+                var published = false;
+                lock (MoreCommandsLock)
+                {
+                    if (!IsCleanedUp)
+                    {
+                        oldTags = Tags;
+                        Tags = [.. newTags];
+                        UpdateVisibleTags();
+                        published = true;
+                    }
+                }
+
+                if (!published)
+                {
+                    newTags.ForEach(t => t.SafeCleanup());
+                    return;
+                }
+
+                oldTags?.ForEach(t => t.SafeCleanup());
+
                 // Tags being an ObservableCollection instead of a List lead to
                 // many COM exception issues.
-                Tags = [.. newTags];
-                UpdateVisibleTags();
-
                 // We're already in UI thread, so just raise the events
                 OnPropertyChanged(nameof(Tags));
                 OnPropertyChanged(nameof(HasTags));
@@ -415,10 +452,23 @@ public partial class ListItemViewModel : CommandItemViewModel
     {
         base.UnsafeCleanup();
 
+        List<TagViewModel>? tags;
+        TagViewModel? overflowTag;
+        DetailsViewModel? details;
+        lock (MoreCommandsLock)
+        {
+            tags = Tags;
+            Tags = null;
+            overflowTag = _overflowTag;
+            _overflowTag = null;
+            details = Details;
+            Details = null;
+        }
+
         // Tags don't have event handlers or anything to cleanup
-        Tags?.ForEach(t => t.SafeCleanup());
-        _overflowTag?.SafeCleanup();
-        Details?.SafeCleanup();
+        tags?.ForEach(t => t.SafeCleanup());
+        overflowTag?.SafeCleanup();
+        details?.SafeCleanup();
 
         var model = Model.Unsafe;
         if (model is not null)
