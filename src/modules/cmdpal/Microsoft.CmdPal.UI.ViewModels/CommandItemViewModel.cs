@@ -317,14 +317,26 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
                 return false;
             }
 
-            ReplaceCommand(null);
-            _itemTitle = "Error";
-            Subtitle = "Item failed to load";
+            if (!ReplaceCommand(null))
+            {
+                return false;
+            }
+
             ClearMoreCommands();
-            _icon = _errorIcon;
-            _titleCache.Invalidate();
-            _subtitleCache.Invalidate();
-            Initialized |= InitializedState.Error;
+            lock (_moreCommandsLock)
+            {
+                if (IsCleanedUp)
+                {
+                    return false;
+                }
+
+                _itemTitle = "Error";
+                Subtitle = "Item failed to load";
+                _icon = _errorIcon;
+                _titleCache.Invalidate();
+                _subtitleCache.Invalidate();
+                Initialized |= InitializedState.Error;
+            }
         }
 
         return false;
@@ -361,14 +373,26 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
                 return false;
             }
 
-            ReplaceCommand(null);
-            _itemTitle = "Error";
-            Subtitle = "Item failed to load";
+            if (!ReplaceCommand(null))
+            {
+                return false;
+            }
+
             ClearMoreCommands();
-            _icon = _errorIcon;
-            _titleCache.Invalidate();
-            _subtitleCache.Invalidate();
-            Initialized |= InitializedState.Error;
+            lock (_moreCommandsLock)
+            {
+                if (IsCleanedUp)
+                {
+                    return false;
+                }
+
+                _itemTitle = "Error";
+                Subtitle = "Item failed to load";
+                _icon = _errorIcon;
+                _titleCache.Invalidate();
+                _subtitleCache.Invalidate();
+                Initialized |= InitializedState.Error;
+            }
         }
 
         return false;

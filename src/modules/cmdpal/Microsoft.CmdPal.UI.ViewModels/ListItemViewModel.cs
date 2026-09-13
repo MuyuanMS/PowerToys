@@ -483,9 +483,17 @@ public partial class ListItemViewModel : CommandItemViewModel
 
     private void UpdateShowsTitle()
     {
-        var oldShowTitle = ShowTitle;
-        ShowTitle = LayoutShowsTitle;
-        if (oldShowTitle != ShowTitle)
+        var changed = false;
+        lock (MoreCommandsLock)
+        {
+            if (!IsCleanedUp && ShowTitle != LayoutShowsTitle)
+            {
+                ShowTitle = LayoutShowsTitle;
+                changed = true;
+            }
+        }
+
+        if (changed)
         {
             UpdateProperty(nameof(ShowTitle));
         }
@@ -493,9 +501,18 @@ public partial class ListItemViewModel : CommandItemViewModel
 
     private void UpdateShowsSubtitle()
     {
-        var oldShowSubtitle = ShowSubtitle;
-        ShowSubtitle = LayoutShowsSubtitle && !string.IsNullOrWhiteSpace(Subtitle);
-        if (oldShowSubtitle != ShowSubtitle)
+        var showSubtitle = LayoutShowsSubtitle && !string.IsNullOrWhiteSpace(Subtitle);
+        var changed = false;
+        lock (MoreCommandsLock)
+        {
+            if (!IsCleanedUp && ShowSubtitle != showSubtitle)
+            {
+                ShowSubtitle = showSubtitle;
+                changed = true;
+            }
+        }
+
+        if (changed)
         {
             UpdateProperty(nameof(ShowSubtitle));
         }
