@@ -111,6 +111,7 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
         }
 
         SaveSettingsJson(settings?.ToJsonString(_serializerOptions) ?? JsonSerializer.Serialize(_output.Settings, _serializerOptions));
+        _output.Settings = JsonSerializer.Deserialize<ZoomItSettings>(LoadSettingsJson(), _serializerOptions) ?? new();
         SignalRefreshSettings();
     }
 

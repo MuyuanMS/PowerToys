@@ -181,6 +181,7 @@ namespace winrt::PowerToys::ZoomItSettingsInterop::implementation
     void ZoomItSettings::SaveSettingsJson(hstring json)
     {
         reg.ReadRegSettings(RegSettings);
+        g_RecordScaling = (g_RecordingFormat == static_cast<RecordingFormat>(0)) ? g_RecordScalingGIF : g_RecordScalingMP4;
 
         // Parse the input JSON string.
         PowerToysSettings::PowerToyValues valuesFromSettings =
@@ -322,6 +323,11 @@ namespace winrt::PowerToys::ZoomItSettingsInterop::implementation
                 if (possibleValue.has_value())
                 {
                     const TCHAR* value = possibleValue.value().c_str();
+                    if (possibleValue.value().size() >= curSetting->Size / sizeof(TCHAR))
+                    {
+                        throw winrt::hresult_invalid_argument(L"String setting exceeds the maximum supported length.");
+                    }
+
                     _tcscpy_s(static_cast<PTCHAR>(curSetting->Setting), curSetting->Size / sizeof(TCHAR), value);
                 }
                 break;
