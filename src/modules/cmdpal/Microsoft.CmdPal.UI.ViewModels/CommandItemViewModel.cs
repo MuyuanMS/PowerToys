@@ -170,10 +170,21 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
         Command.FastInitializeProperties();
 
-        _itemTitle = model.Title;
-        Subtitle = model.Subtitle;
-        _titleCache.Invalidate();
-        _subtitleCache.Invalidate();
+        var itemTitle = model.Title;
+        var subtitle = model.Subtitle;
+        lock (_moreCommandsLock)
+        {
+            if (IsCleanedUp)
+            {
+                return;
+            }
+
+            _itemTitle = itemTitle;
+            Subtitle = subtitle;
+            _titleCache.Invalidate();
+            _subtitleCache.Invalidate();
+        }
+
         TryCreateDefaultCommandContextItem(command);
 
         Initialized |= InitializedState.FastInitialized;
@@ -301,6 +312,11 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
         catch (Exception ex)
         {
             CoreLogger.LogError("error fast initializing CommandItemViewModel", ex);
+            if (IsCleanedUp)
+            {
+                return false;
+            }
+
             ReplaceCommand(null);
             _itemTitle = "Error";
             Subtitle = "Item failed to load";
@@ -340,6 +356,11 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
         catch (Exception ex)
         {
             CoreLogger.LogError("error initializing CommandItemViewModel", ex);
+            if (IsCleanedUp)
+            {
+                return false;
+            }
+
             ReplaceCommand(null);
             _itemTitle = "Error";
             Subtitle = "Item failed to load";
@@ -482,7 +503,7 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
                 if (!commandPublished)
                 {
-                    break;
+                    return;
                 }
 
                 if (_defaultCommandContextItemViewModel is null)
@@ -699,7 +720,18 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
             return;
         }
 
-        UpdateDefaultContextItemIcon();
+        lock (_moreCommandsLock)
+        {
+            if (ReferenceEquals(_defaultCommandContextItemViewModel, defaultContextItem) && !IsCleanedUp)
+            {
+                UpdateDefaultContextItemIcon();
+            }
+            else
+            {
+                return;
+            }
+        }
+
         UpdateProperty(nameof(AllCommands));
     }
 
@@ -917,10 +949,11 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
         // One read of the pair, so a replacement racing this teardown cannot
         // leave us cleaning up a command against the wrong ownership flag.
-        var commandState = _commandState;
+        CommandOwnership commandState;
         CommandViewModel? subscribedCommand;
         lock (_moreCommandsLock)
         {
+            commandState = _commandState;
             subscribedCommand = _subscribedCommand;
             _subscribedCommand = null;
         }

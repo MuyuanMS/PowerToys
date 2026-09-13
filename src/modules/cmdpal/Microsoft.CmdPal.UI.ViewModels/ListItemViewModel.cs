@@ -112,8 +112,16 @@ public partial class ListItemViewModel : CommandItemViewModel
 
         UpdateTags(tags);
         oldTags?.ForEach(t => t.SafeCleanup());
-        UpdateProperty(nameof(Section), nameof(Type), nameof(IsInteractive));
-        UpdateAccessibleName();
+        lock (MoreCommandsLock)
+        {
+            if (IsCleanedUp)
+            {
+                return;
+            }
+
+            UpdateProperty(nameof(Section), nameof(Type), nameof(IsInteractive));
+            UpdateAccessibleNameUnsafe();
+        }
     }
 
     private ListItemType EvaluateType()
@@ -134,7 +142,15 @@ public partial class ListItemViewModel : CommandItemViewModel
 
         var extensionDetails = model.Details;
         var details = extensionDetails is not null ? new DetailsViewModel(extensionDetails, PageContext) : null;
-        details?.InitializeProperties();
+        try
+        {
+            details?.InitializeProperties();
+        }
+        catch
+        {
+            details?.SafeCleanup();
+            throw;
+        }
 
         DetailsViewModel? replacedDetails = null;
         var detailsPublished = false;
@@ -219,13 +235,30 @@ public partial class ListItemViewModel : CommandItemViewModel
                 UpdateProperty(nameof(Section), nameof(Type), nameof(IsInteractive));
                 break;
             case nameof(model.Command):
-                Type = EvaluateType();
+                lock (MoreCommandsLock)
+                {
+                    if (IsCleanedUp)
+                    {
+                        return;
+                    }
+
+                    Type = EvaluateType();
+                }
+
                 UpdateProperty(nameof(Type), nameof(IsInteractive));
                 break;
             case nameof(Details):
                 var extensionDetails = model.Details;
                 var details = extensionDetails is not null ? new DetailsViewModel(extensionDetails, PageContext) : null;
-                details?.InitializeProperties();
+                try
+                {
+                    details?.InitializeProperties();
+                }
+                catch
+                {
+                    details?.SafeCleanup();
+                    throw;
+                }
 
                 DetailsViewModel? existingReference = null;
                 var detailsPublished = false;
@@ -500,6 +533,19 @@ public partial class ListItemViewModel : CommandItemViewModel
     }
 
     protected void UpdateAccessibleName()
+    {
+        lock (MoreCommandsLock)
+        {
+            if (IsCleanedUp)
+            {
+                return;
+            }
+
+            UpdateAccessibleNameUnsafe();
+        }
+    }
+
+    private void UpdateAccessibleNameUnsafe()
     {
         AccessibleName = Title + ", " + Subtitle;
         UpdateProperty(nameof(AccessibleName));
