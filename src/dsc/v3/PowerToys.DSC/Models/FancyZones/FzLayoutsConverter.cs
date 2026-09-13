@@ -435,6 +435,7 @@ public static class FzLayoutsConverter
 
                 entry.Uuid = uuid;
             }
+
             // The engine treats every non-empty monitor configuration other
             // than "vertical" as horizontal (DefaultLayoutsJsonUtils::TypeFromString).
             if (string.Equals(defaultLayout.MonitorConfiguration, VerticalMonitorConfiguration, StringComparison.Ordinal))
