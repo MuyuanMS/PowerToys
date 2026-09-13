@@ -123,9 +123,6 @@ public sealed partial class ContentFormControl : UserControl
         }
 
         var cardAtThemeChange = _adaptiveCard;
-        var inputValues = _renderedCard?.FrameworkElement is FrameworkElement element
-            ? CaptureInputValues(element)
-            : null;
 
         _themeRefreshPending = true;
         if (!DispatcherQueue.TryEnqueue(() =>
@@ -134,6 +131,16 @@ public sealed partial class ContentFormControl : UserControl
 
             if (cardAtThemeChange is not null && ReferenceEquals(cardAtThemeChange, _adaptiveCard))
             {
+                if (_renderedCard?.FrameworkElement is FrameworkElement currentElement &&
+                    HasPendingInputOperation(currentElement))
+                {
+                    _themeRefreshDeferred = true;
+                    return;
+                }
+
+                var inputValues = _renderedCard?.FrameworkElement is FrameworkElement element
+                    ? CaptureInputValues(element)
+                    : null;
                 RenderCard(cardAtThemeChange, focusFirstElement: false, inputValues: inputValues);
             }
         }))
@@ -192,6 +199,7 @@ public sealed partial class ContentFormControl : UserControl
         bool focusFirstElement = true,
         IReadOnlyDictionary<string, InputValue>? inputValues = null)
     {
+        _themeRefreshDeferred = false;
         DetachRenderedCard();
 
         _adaptiveCard = card;
@@ -296,13 +304,20 @@ public sealed partial class ContentFormControl : UserControl
             if (key is not null)
             {
                 var hasFocus = focusedElement is not null && ContainsElement(element, focusedElement);
+                var focusPath = hasFocus ? GetVisualPath(element, focusedElement!) : null;
+                var focusedTextBox = focusedElement as TextBox;
+                var selectionStart = focusedTextBox?.SelectionStart ?? 0;
+                var selectionLength = focusedTextBox?.SelectionLength ?? 0;
                 switch (element)
                 {
                     case IAdaptiveCustomInputControl customInput:
                         values[key] = new InputValue(
                             nameof(IAdaptiveCustomInputControl),
                             customInput.CaptureState(),
-                            hasFocus);
+                            hasFocus,
+                            selectionStart,
+                            selectionLength,
+                            focusPath);
                         captured = true;
                         break;
                     case TextBox textBox:
@@ -311,35 +326,78 @@ public sealed partial class ContentFormControl : UserControl
                             textBox.Text,
                             hasFocus,
                             textBox.SelectionStart,
-                            textBox.SelectionLength);
+                            textBox.SelectionLength,
+                            focusPath);
                         captured = true;
                         break;
                     case ComboBox comboBox:
-                        values[key] = new InputValue(nameof(ComboBox), comboBox.SelectedIndex, hasFocus);
+                        values[key] = new InputValue(
+                            nameof(ComboBox),
+                            comboBox.SelectedIndex,
+                            hasFocus,
+                            selectionStart,
+                            selectionLength,
+                            focusPath);
                         captured = true;
                         break;
                     case ToggleSwitch toggleSwitch:
-                        values[key] = new InputValue(nameof(ToggleSwitch), toggleSwitch.IsOn, hasFocus);
+                        values[key] = new InputValue(
+                            nameof(ToggleSwitch),
+                            toggleSwitch.IsOn,
+                            hasFocus,
+                            selectionStart,
+                            selectionLength,
+                            focusPath);
                         captured = true;
                         break;
                     case CheckBox checkBox:
-                        values[key] = new InputValue(nameof(CheckBox), checkBox.IsChecked, hasFocus);
+                        values[key] = new InputValue(
+                            nameof(CheckBox),
+                            checkBox.IsChecked,
+                            hasFocus,
+                            selectionStart,
+                            selectionLength,
+                            focusPath);
                         captured = true;
                         break;
                     case NumberBox numberBox:
-                        values[key] = new InputValue(nameof(NumberBox), numberBox.Value, hasFocus);
+                        values[key] = new InputValue(
+                            nameof(NumberBox),
+                            numberBox.Value,
+                            hasFocus,
+                            selectionStart,
+                            selectionLength,
+                            focusPath);
                         captured = true;
                         break;
                     case CalendarDatePicker datePicker:
-                        values[key] = new InputValue(nameof(CalendarDatePicker), datePicker.Date, hasFocus);
+                        values[key] = new InputValue(
+                            nameof(CalendarDatePicker),
+                            datePicker.Date,
+                            hasFocus,
+                            selectionStart,
+                            selectionLength,
+                            focusPath);
                         captured = true;
                         break;
                     case TimePicker timePicker:
-                        values[key] = new InputValue(nameof(TimePicker), timePicker.Time, hasFocus);
+                        values[key] = new InputValue(
+                            nameof(TimePicker),
+                            timePicker.Time,
+                            hasFocus,
+                            selectionStart,
+                            selectionLength,
+                            focusPath);
                         captured = true;
                         break;
                     case RadioButton radioButton:
-                        values[key] = new InputValue(nameof(RadioButton), radioButton.IsChecked, hasFocus);
+                        values[key] = new InputValue(
+                            nameof(RadioButton),
+                            radioButton.IsChecked,
+                            hasFocus,
+                            selectionStart,
+                            selectionLength,
+                            focusPath);
                         captured = true;
                         break;
                 }
@@ -414,13 +472,11 @@ public sealed partial class ContentFormControl : UserControl
 
                 if (inputValue.HasFocus)
                 {
-                    if (element is IAdaptiveCustomInputControl customInput)
+                    var focusTarget = ResolveVisualPath(element, inputValue.FocusPath) as Control ?? element as Control;
+                    focusTarget?.Focus(FocusState.Programmatic);
+                    if (focusTarget is TextBox focusedTextBox)
                     {
-                        customInput.RestoreFocus((AdaptiveCustomInputState)inputValue.Value!);
-                    }
-                    else
-                    {
-                        element.Focus(FocusState.Programmatic);
+                        focusedTextBox.Select(inputValue.SelectionStart, inputValue.SelectionLength);
                     }
                 }
             }
@@ -437,6 +493,55 @@ public sealed partial class ContentFormControl : UserControl
     {
         var automationId = AutomationProperties.GetAutomationId(element);
         return string.IsNullOrEmpty(automationId) ? null : automationId;
+    }
+
+    private static IReadOnlyList<int>? GetVisualPath(DependencyObject root, DependencyObject target)
+    {
+        var path = new List<int>();
+        return TryGetVisualPath(root, target, path) ? path : null;
+    }
+
+    private static bool TryGetVisualPath(DependencyObject root, DependencyObject target, IList<int> path)
+    {
+        if (ReferenceEquals(root, target))
+        {
+            return true;
+        }
+
+        var childCount = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < childCount; i++)
+        {
+            path.Add(i);
+            if (TryGetVisualPath(VisualTreeHelper.GetChild(root, i), target, path))
+            {
+                return true;
+            }
+
+            path.RemoveAt(path.Count - 1);
+        }
+
+        return false;
+    }
+
+    private static DependencyObject? ResolveVisualPath(DependencyObject root, IReadOnlyList<int>? path)
+    {
+        if (path is null)
+        {
+            return null;
+        }
+
+        var current = root;
+        foreach (var index in path)
+        {
+            if (index < 0 || index >= VisualTreeHelper.GetChildrenCount(current))
+            {
+                return null;
+            }
+
+            current = VisualTreeHelper.GetChild(current, index);
+        }
+
+        return current;
     }
 
     private void InputOperationCompleted(object? sender, EventArgs e)
@@ -516,7 +621,8 @@ public sealed partial class ContentFormControl : UserControl
         object? Value,
         bool HasFocus,
         int SelectionStart = 0,
-        int SelectionLength = 0);
+        int SelectionLength = 0,
+        IReadOnlyList<int>? FocusPath = null);
 
     /// <summary>
     /// Fixes missing AutomationProperties.Name on CheckBox and ToggleSwitch controls

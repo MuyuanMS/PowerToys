@@ -43,8 +43,6 @@ internal interface IAdaptiveCustomInputControl
 
     void RestoreState(AdaptiveCustomInputState state);
 
-    void RestoreFocus(AdaptiveCustomInputState state);
-
     bool IsOperationPending { get; }
 
     event EventHandler? OperationCompleted;
@@ -58,10 +56,8 @@ internal readonly record struct AdaptiveCustomInputState(
     string Value,
     string? PendingKey = null,
     string? PendingValue = null,
-    string? FocusedField = null,
-    int SelectionStart = 0,
-    int SelectionLength = 0,
     bool WasEdited = false,
+    bool ValidationWasRequested = false,
     IReadOnlyList<AdaptiveCustomListItemState>? ListItems = null);
 
 internal readonly record struct AdaptiveCustomListItemState(
