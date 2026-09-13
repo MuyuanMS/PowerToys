@@ -11,6 +11,7 @@ using ManagedCommon;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Windows.Data.Json;
 using RS_ = Microsoft.CmdPal.UI.Helpers.ResourceLoaderInstance;
 
@@ -176,6 +177,7 @@ internal sealed partial class AdaptiveFilePathInputControl : AdaptiveCustomInput
     private readonly Regex? _validationRegex;
     private readonly TextBox _pathTextBox;
     private readonly Button _browseButton;
+    private bool _isPickerPending;
 
     public AdaptiveFilePathInputControl(AdaptiveFilePathInputElement element)
         : base(element.Header, element.Description, element.IsRequired)
@@ -227,14 +229,31 @@ internal sealed partial class AdaptiveFilePathInputControl : AdaptiveCustomInput
 
     public override string CurrentValue => _pathTextBox.Text;
 
-    public override AdaptiveCustomInputState CaptureState() => new(CurrentValue);
+    public override AdaptiveCustomInputState CaptureState()
+    {
+        var hasFocus = ReferenceEquals(FocusManager.GetFocusedElement(XamlRoot), _pathTextBox);
+        return new(
+            CurrentValue,
+            FocusedField: hasFocus ? nameof(_pathTextBox) : null,
+            SelectionStart: hasFocus ? _pathTextBox.SelectionStart : 0,
+            SelectionLength: hasFocus ? _pathTextBox.SelectionLength : 0);
+    }
 
     public override void RestoreState(AdaptiveCustomInputState state) => _pathTextBox.Text = state.Value;
 
     public override void FocusInput() => _pathTextBox.Focus(FocusState.Programmatic);
 
+    public override void RestoreFocus(AdaptiveCustomInputState state)
+    {
+        FocusInput();
+        _pathTextBox.Select(state.SelectionStart, state.SelectionLength);
+    }
+
+    public override bool IsOperationPending => _isPickerPending;
+
     private async void BrowseButton_Click(object sender, RoutedEventArgs e)
     {
+        _isPickerPending = true;
         try
         {
             var path = _element.SelectionMode == AdaptiveFilePathSelectionMode.File
@@ -255,6 +274,11 @@ internal sealed partial class AdaptiveFilePathInputControl : AdaptiveCustomInput
         catch (Exception ex)
         {
             Logger.LogError("Failed to pick a path for an adaptive-card input", ex);
+        }
+        finally
+        {
+            _isPickerPending = false;
+            NotifyOperationCompleted();
         }
     }
 

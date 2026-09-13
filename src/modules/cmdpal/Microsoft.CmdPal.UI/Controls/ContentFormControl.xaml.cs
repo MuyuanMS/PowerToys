@@ -28,6 +28,7 @@ public sealed partial class ContentFormControl : UserControl
     private RenderedAdaptiveCard? _renderedCard;
     private AdaptiveCard? _adaptiveCard;
     private bool _themeRefreshPending;
+    private bool _themeRefreshDeferred;
     private bool _focusFirstElementOnLoad = true;
     private IReadOnlyDictionary<string, InputValue>? _inputValuesToRestore;
 
@@ -101,6 +102,18 @@ public sealed partial class ContentFormControl : UserControl
     {
         UpdateRendererTheme();
 
+        if (_renderedCard?.FrameworkElement is FrameworkElement renderedElement &&
+            HasPendingInputOperation(renderedElement))
+        {
+            _themeRefreshDeferred = true;
+            return;
+        }
+
+        ScheduleThemeRefresh();
+    }
+
+    private void ScheduleThemeRefresh()
+    {
         // WindowThemeSynchronizer changes RequestedTheme through two intermediate
         // values before applying the target theme. Wait for the final value so one
         // switch does not recreate the form several times.
@@ -191,6 +204,7 @@ public sealed partial class ContentFormControl : UserControl
         {
             _renderedCard.FrameworkElement.KeyDown += OnFormKeyDown;
             ContentGrid.Children.Add(_renderedCard.FrameworkElement);
+            TrackInputOperations(_renderedCard.FrameworkElement, subscribe: true);
 
             // Use the Loaded event to ensure we focus after the card is in the visual tree
             _renderedCard.FrameworkElement.Loaded += OnFrameworkElementLoaded;
@@ -220,6 +234,7 @@ public sealed partial class ContentFormControl : UserControl
             _renderedCard.FrameworkElement.KeyDown -= OnFormKeyDown;
             _renderedCard.FrameworkElement.Loaded -= OnFrameworkElementLoaded;
             _renderedCard.FrameworkElement.LayoutUpdated -= OnFrameworkElementLayoutUpdated;
+            TrackInputOperations(_renderedCard.FrameworkElement, subscribe: false);
         }
 
         _renderedCard.Action -= Rendered_Action;
@@ -277,6 +292,7 @@ public sealed partial class ContentFormControl : UserControl
         if (root is FrameworkElement element)
         {
             var key = GetInputKey(element);
+            var captured = false;
             if (key is not null)
             {
                 var hasFocus = focusedElement is not null && ContainsElement(element, focusedElement);
@@ -287,6 +303,7 @@ public sealed partial class ContentFormControl : UserControl
                             nameof(IAdaptiveCustomInputControl),
                             customInput.CaptureState(),
                             hasFocus);
+                        captured = true;
                         break;
                     case TextBox textBox:
                         values[key] = new InputValue(
@@ -295,29 +312,42 @@ public sealed partial class ContentFormControl : UserControl
                             hasFocus,
                             textBox.SelectionStart,
                             textBox.SelectionLength);
+                        captured = true;
                         break;
                     case ComboBox comboBox:
                         values[key] = new InputValue(nameof(ComboBox), comboBox.SelectedIndex, hasFocus);
+                        captured = true;
                         break;
                     case ToggleSwitch toggleSwitch:
                         values[key] = new InputValue(nameof(ToggleSwitch), toggleSwitch.IsOn, hasFocus);
+                        captured = true;
                         break;
                     case CheckBox checkBox:
                         values[key] = new InputValue(nameof(CheckBox), checkBox.IsChecked, hasFocus);
+                        captured = true;
                         break;
                     case NumberBox numberBox:
                         values[key] = new InputValue(nameof(NumberBox), numberBox.Value, hasFocus);
+                        captured = true;
                         break;
                     case CalendarDatePicker datePicker:
                         values[key] = new InputValue(nameof(CalendarDatePicker), datePicker.Date, hasFocus);
+                        captured = true;
                         break;
                     case TimePicker timePicker:
                         values[key] = new InputValue(nameof(TimePicker), timePicker.Time, hasFocus);
+                        captured = true;
                         break;
                     case RadioButton radioButton:
                         values[key] = new InputValue(nameof(RadioButton), radioButton.IsChecked, hasFocus);
+                        captured = true;
                         break;
                 }
+            }
+
+            if (captured)
+            {
+                return;
             }
         }
 
@@ -386,7 +416,7 @@ public sealed partial class ContentFormControl : UserControl
                 {
                     if (element is IAdaptiveCustomInputControl customInput)
                     {
-                        customInput.FocusInput();
+                        customInput.RestoreFocus((AdaptiveCustomInputState)inputValue.Value!);
                     }
                     else
                     {
@@ -406,12 +436,60 @@ public sealed partial class ContentFormControl : UserControl
     private static string? GetInputKey(FrameworkElement element)
     {
         var automationId = AutomationProperties.GetAutomationId(element);
-        if (!string.IsNullOrEmpty(automationId))
+        return string.IsNullOrEmpty(automationId) ? null : automationId;
+    }
+
+    private void InputOperationCompleted(object? sender, EventArgs e)
+    {
+        if (!_themeRefreshDeferred ||
+            _renderedCard?.FrameworkElement is not FrameworkElement element ||
+            HasPendingInputOperation(element))
         {
-            return automationId;
+            return;
         }
 
-        return string.IsNullOrEmpty(element.Name) ? null : element.Name;
+        _themeRefreshDeferred = false;
+        ScheduleThemeRefresh();
+    }
+
+    private void TrackInputOperations(DependencyObject root, bool subscribe)
+    {
+        if (root is IAdaptiveCustomInputControl customInput)
+        {
+            if (subscribe)
+            {
+                customInput.OperationCompleted += InputOperationCompleted;
+            }
+            else
+            {
+                customInput.OperationCompleted -= InputOperationCompleted;
+            }
+        }
+
+        var childCount = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < childCount; i++)
+        {
+            TrackInputOperations(VisualTreeHelper.GetChild(root, i), subscribe);
+        }
+    }
+
+    private static bool HasPendingInputOperation(DependencyObject root)
+    {
+        if (root is IAdaptiveCustomInputControl { IsOperationPending: true })
+        {
+            return true;
+        }
+
+        var childCount = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < childCount; i++)
+        {
+            if (HasPendingInputOperation(VisualTreeHelper.GetChild(root, i)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool ContainsElement(DependencyObject root, DependencyObject target)

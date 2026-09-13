@@ -4,6 +4,7 @@
 
 using AdaptiveCards.ObjectModel.WinUI3;
 using AdaptiveCards.Rendering.WinUI3;
+using Microsoft.CmdPal.UI.ViewModels.AdaptiveCards;
 using Microsoft.UI.Xaml;
 
 #pragma warning disable SA1402 // File may only contain a single type
@@ -42,6 +43,12 @@ internal interface IAdaptiveCustomInputControl
 
     void RestoreState(AdaptiveCustomInputState state);
 
+    void RestoreFocus(AdaptiveCustomInputState state);
+
+    bool IsOperationPending { get; }
+
+    event EventHandler? OperationCompleted;
+
     bool ValidateInput();
 
     void FocusInput();
@@ -50,6 +57,21 @@ internal interface IAdaptiveCustomInputControl
 internal readonly record struct AdaptiveCustomInputState(
     string Value,
     string? PendingKey = null,
-    string? PendingValue = null);
+    string? PendingValue = null,
+    string? FocusedField = null,
+    int SelectionStart = 0,
+    int SelectionLength = 0,
+    bool WasEdited = false,
+    IReadOnlyList<AdaptiveCustomListItemState>? ListItems = null);
+
+internal readonly record struct AdaptiveCustomListItemState(
+    AdaptiveListItemValue Source,
+    AdaptivePathItemKind? PathKind);
+
+internal enum AdaptivePathItemKind
+{
+    File,
+    Folder,
+}
 
 #pragma warning restore SA1402 // File may only contain a single type
