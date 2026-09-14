@@ -555,6 +555,25 @@ public sealed class FzLayoutsConverterTests
         StringAssert.Contains(warnings[0], "without a monitor configuration");
     }
 
+    [TestMethod]
+    public void FromDefaultLayouts_EmptyMonitorConfiguration_IsTreatedAsHorizontal()
+    {
+        const string json = /*lang=json,strict*/ """
+            {
+              "default-layouts": [
+                { "monitor-configuration": "", "layout": { "type": "columns" } }
+              ]
+            }
+            """;
+        var stored = JsonSerializer.Deserialize(json, FancyZonesJsonContext.Default.DefaultLayoutsListWrapper);
+
+        var defaults = FzLayoutsConverter.FromDefaultLayouts(stored);
+
+        Assert.IsNull(defaults.Vertical);
+        Assert.IsNotNull(defaults.Horizontal);
+        Assert.AreEqual("columns", defaults.Horizontal.Type);
+    }
+
     private static FzLayoutsModel CreateSampleModel()
     {
         return new FzLayoutsModel

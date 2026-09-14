@@ -404,7 +404,7 @@ public static class FzLayoutsConverter
             var layout = defaultLayout.Layout;
             var context = $"default layout for '{defaultLayout.MonitorConfiguration}' monitors";
 
-            if (string.IsNullOrEmpty(defaultLayout.MonitorConfiguration))
+            if (defaultLayout.MonitorConfiguration is null)
             {
                 warnings?.Add("Skipping default layout without a monitor configuration");
                 continue;
