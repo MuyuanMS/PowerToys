@@ -13,6 +13,7 @@ constexpr DWORD PipeClientAccess = FILE_READ_DATA |
                                    FILE_WRITE_ATTRIBUTES |
                                    SYNCHRONIZE;
 constexpr DWORD PipeWaitIntervalMs = 100;
+constexpr ULONGLONG PipeRetryTimeoutMs = 30000;
 
 namespace
 {
@@ -366,8 +367,9 @@ void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::send_pipe_message(std::wstr
     OwnedPipeHandle output_pipe;
 
     // Try to open a named pipe; wait for it, if necessary.
+    const ULONGLONG retry_deadline = GetTickCount64() + PipeRetryTimeoutMs;
 
-    while (!closed.load())
+    while (!closed.load() && GetTickCount64() < retry_deadline)
     {
         output_pipe.reset(CreateFile(
             lpszPipename, // pipe name
@@ -406,10 +408,18 @@ void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::send_pipe_message(std::wstr
 
         // Use short waits so end() can promptly join the output thread instead of waiting for a
         // long unavailable-pipe timeout.
-        if (!WaitNamedPipe(lpszPipename, PipeWaitIntervalMs) && GetLastError() != ERROR_SEM_TIMEOUT)
+        if (!WaitNamedPipe(lpszPipename, PipeWaitIntervalMs))
         {
-            return;
+            const DWORD wait_error = GetLastError();
+            if (wait_error != ERROR_SEM_TIMEOUT && wait_error != ERROR_FILE_NOT_FOUND)
+            {
+                return;
+            }
         }
+    }
+    if (!closed.load())
+    {
+        OutputDebugStringW(L"TwoWayPipeMessageIPC: timed out waiting for the output pipe.\n");
     }
     if (closed.load() || !output_pipe.valid())
     {

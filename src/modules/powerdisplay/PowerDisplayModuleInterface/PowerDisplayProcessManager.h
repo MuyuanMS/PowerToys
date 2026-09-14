@@ -54,9 +54,9 @@ private:
     void refresh();
     void send_named_pipe_message(const std::wstring& message_type, const std::wstring& message_arg = L"");
 
-    OnThreadExecutor m_thread_executor; // all internal operations are done on background thread with task queue
     std::atomic<bool> m_enabled = false; // written on main thread, read on background thread
     mutable std::mutex m_process_mutex;
     HANDLE m_hProcess = 0;
     std::unique_ptr<TwoWayPipeMessageIPC> m_write_pipe = nullptr;
+    OnThreadExecutor m_thread_executor; // all internal operations are done on background thread with task queue
 };
