@@ -196,6 +196,13 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
 
         ValidatePropertyRange(properties, "DemoTypeSpeedSlider", 10, 100);
         ValidatePropertyRange(properties, "BreakOpacity", 1, 100);
+        ValidatePropertyRange(properties, "BreakTimeout", 1, 99);
+        ValidatePropertyRange(properties, "BreakTimerPosition", 0, 8);
+        ValidatePropertyRange(properties, "WebcamPosition", 0, 3);
+        ValidatePropertyRange(properties, "WebcamSize", 0, 4);
+        ValidatePropertyRange(properties, "WebcamShape", 0, 3);
+        ValidatePropertyRange(properties, "WebcamBackgroundMode", 0, 2);
+        ValidatePropertyRange(properties, "WebcamBrightness", 0, 100);
     }
 
     private static void ValidatePropertyRange(JsonObject properties, string propertyName, int minimum, int maximum)

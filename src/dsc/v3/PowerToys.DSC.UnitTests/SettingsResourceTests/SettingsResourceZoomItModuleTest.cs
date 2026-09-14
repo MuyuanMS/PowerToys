@@ -277,6 +277,48 @@ public sealed class SettingsResourceZoomItModuleTest : BaseDscTest
     }
 
     [TestMethod]
+    public void SetWithOutOfRangeBreakTimeout_RejectsBeforeWriting()
+    {
+        AssertRejectsBeforeWriting(properties => properties.BreakTimeout = new IntProperty(0));
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeBreakTimerPosition_RejectsBeforeWriting()
+    {
+        AssertRejectsBeforeWriting(properties => properties.BreakTimerPosition = new IntProperty(9));
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeWebcamPosition_RejectsBeforeWriting()
+    {
+        AssertRejectsBeforeWriting(properties => properties.WebcamPosition = new IntProperty(4));
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeWebcamSize_RejectsBeforeWriting()
+    {
+        AssertRejectsBeforeWriting(properties => properties.WebcamSize = new IntProperty(5));
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeWebcamShape_RejectsBeforeWriting()
+    {
+        AssertRejectsBeforeWriting(properties => properties.WebcamShape = new IntProperty(4));
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeWebcamBackgroundMode_RejectsBeforeWriting()
+    {
+        AssertRejectsBeforeWriting(properties => properties.WebcamBackgroundMode = new IntProperty(3));
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeWebcamBrightness_RejectsBeforeWriting()
+    {
+        AssertRejectsBeforeWriting(properties => properties.WebcamBrightness = new IntProperty(101));
+    }
+
+    [TestMethod]
     public void SetWithOutOfRangeHotkeyCode_RejectsBeforeWriting()
     {
         // Arrange
@@ -381,6 +423,17 @@ public sealed class SettingsResourceZoomItModuleTest : BaseDscTest
         var settings = new ZoomItSettings();
         configure(settings.Properties);
         return JsonSerializer.Serialize(new SettingsResourceObject<ZoomItSettings> { Settings = settings }, _inputSerializerOptions);
+    }
+
+    private void AssertRejectsBeforeWriting(Action<ZoomItProperties> configure)
+    {
+        var input = CreateInput(configure);
+        var data = new ZoomItSettingsFunctionData(input);
+        data.GetState();
+        data.Output.SettingsInternal = data.Input.SettingsInternal;
+
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(data.SetState);
+        Assert.AreEqual(0, _saved.Count);
     }
 
     private void AssertInteropSaveRejectedWithoutChangingSettings(Action<JsonObject> mutate)
