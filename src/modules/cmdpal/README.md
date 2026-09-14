@@ -21,18 +21,15 @@ We've also got samples, so that you can see how the APIs in-action.
 
 ## Building CmdPal
 
-### Install prerequisites
+### Install & Build PowerToys
 
-1. Install the prerequisites from the [PowerToys build documentation](https://github.com/microsoft/PowerToys/tree/main/doc/devdocs#compiling-powertoys). You do not need to build the full PowerToys solution to build CmdPal.
+1. Follow the install and build instructions for [PowerToys](https://github.com/microsoft/PowerToys/tree/main/doc/devdocs#compiling-powertoys)
 
-### Load, build, and deploy
+### Load & Build
 
-1. Open `CommandPalette.slnf` in Visual Studio and select `Debug` with the platform matching the machine (`x64` or `ARM64`).
-1. In Solution Explorer, confirm the CmdPal projects and their required shared-library projects are loaded. If a required project is marked `(unloaded)`, right-click it and select `Reload Project`.
-1. Right-click `Microsoft.CmdPal.UI` and select `Build`, then `Deploy`.
-1. Launch Command Palette from its normal Start menu entry.
-
-For normal iteration, use `Build`, not `Rebuild`, and build the narrowest project needed instead of the whole solution filter. Visual Studio's `Deploy` registers the loose build output as a development package; it does not require generating a full MSIX, installing a signing certificate, or uninstalling the previous development package.
+1. In Visual Studio, in the Solution Explorer Pane, confirm that all of the files/projects in `src\modules\CommandPalette` and `src\common\CalculatorEngineCommon` do not have `(unloaded)` on the right side
+    1. If any file has `(unloaded)`, right click on file and select `Reload Project`
+1. Now you can right click on one of the project below to `Build` and then `Deploy`:
 
 Projects of interest are:
 
@@ -53,5 +50,4 @@ Projects of interest are:
 [generic samples]: ./ext/SamplePagesExtension 
 [real samples]: ./ext/ProcessMonitorExtension
 [real extensions that we've "shipped" already]: https://github.com/zadjii/CmdPalExtensions/blob/main/src/extensions
-
 

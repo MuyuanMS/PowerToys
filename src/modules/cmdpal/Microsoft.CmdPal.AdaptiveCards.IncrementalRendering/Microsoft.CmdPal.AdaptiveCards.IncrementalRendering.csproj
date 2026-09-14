@@ -8,6 +8,7 @@
     <Nullable>enable</Nullable>
     <UseWinUI>true</UseWinUI>
     <IsAotCompatible>true</IsAotCompatible>
+    <LangVersion>preview</LangVersion>
     <NoWarn>$(NoWarn);CA1720;SA1402;SA1518;SA1649</NoWarn>
     <OutputPath>..\..\..\$(Platform)\$(Configuration)\WinUI3Apps\CmdPal\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
