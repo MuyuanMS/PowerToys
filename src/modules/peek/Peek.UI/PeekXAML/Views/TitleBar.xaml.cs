@@ -131,7 +131,8 @@ namespace Peek.UI.Views
 
         public void ClearInitialFocus()
         {
-            if (FocusManager.GetFocusedElement(XamlRoot) is not Button focusedButton ||
+            if (XamlRoot is null ||
+                FocusManager.GetFocusedElement(XamlRoot) is not Button focusedButton ||
                 (focusedButton != LaunchAppButton && focusedButton != PinButton))
             {
                 return;
