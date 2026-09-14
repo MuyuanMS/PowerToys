@@ -460,6 +460,38 @@ namespace ViewModelTests
         [TestMethod]
         [DataRow(nameof(ProfileMonitorSetting.Contrast))]
         [DataRow(nameof(ProfileMonitorSetting.Volume))]
+        public void CanSave_NewOptionalSettingBecomingUnsupportedRequiresExplicitRemoval(string settingName)
+        {
+            var monitor = CreateMonitor();
+            monitor.SupportsContrast = true;
+            monitor.SupportsVolume = true;
+            using var viewModel = CreateViewModel(monitor);
+            var item = viewModel.Monitors.Single();
+            item.IsSelected = true;
+            item.Brightness = 25;
+
+            if (settingName == nameof(ProfileMonitorSetting.Contrast))
+            {
+                item.Contrast = 63;
+                monitor.SupportsContrast = false;
+            }
+            else
+            {
+                item.Volume = 41;
+                monitor.SupportsVolume = false;
+            }
+
+            Assert.IsFalse(item.HasValidSettings);
+            Assert.IsFalse(viewModel.CanSave);
+            var savedSettings = viewModel.CreateProfile().MonitorSettings.Single();
+            Assert.AreEqual((int?)25, savedSettings.Brightness);
+            Assert.IsNull(savedSettings.Contrast);
+            Assert.IsNull(savedSettings.Volume);
+        }
+
+        [TestMethod]
+        [DataRow(nameof(ProfileMonitorSetting.Contrast))]
+        [DataRow(nameof(ProfileMonitorSetting.Volume))]
         public void CreateProfile_OriginalUnsupportedOptionalSettingCanBeEditedOrExplicitlyRemoved(string settingName)
         {
             var monitor = CreateMonitor();

@@ -49,6 +49,8 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         public bool HasValidSettings =>
             (IncludeBrightness || ProfileContrast.HasValue || ProfileVolume.HasValue || ProfileColorTemperature.HasValue) &&
+            (!IncludeContrast || ProfileContrast.HasValue) &&
+            (!IncludeVolume || ProfileVolume.HasValue) &&
             (!IncludeColorTemperature || ProfileColorTemperature.HasValue || (!SupportsColorTemperature && !_isColorTemperatureEdited));
 
         public bool HasPreservedSettings =>
