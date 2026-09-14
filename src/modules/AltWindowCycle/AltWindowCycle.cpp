@@ -1024,8 +1024,16 @@ static std::unique_ptr<Gdiplus::Bitmap> CaptureWindowSnapshotForPreview(HWND hwn
         Gdiplus::Graphics tg(scaled.get());
         tg.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
         tg.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-        tg.DrawImage(full.get(), Gdiplus::RectF(0.0f, 0.0f, static_cast<Gdiplus::REAL>(dw), static_cast<Gdiplus::REAL>(dh)),
-                     srcLeft, srcTop, srcW, srcH, Gdiplus::UnitPixel);
+        if (tg.DrawImage(full.get(),
+                         Gdiplus::RectF(0.0f, 0.0f, static_cast<Gdiplus::REAL>(dw), static_cast<Gdiplus::REAL>(dh)),
+                         srcLeft,
+                         srcTop,
+                         srcW,
+                         srcH,
+                         Gdiplus::UnitPixel) != Gdiplus::Ok)
+        {
+            return nullptr;
+        }
     }
     // `full` (the native-resolution capture) is freed here; only the
     // downsampled `scaled` bitmap is retained by the caller.
