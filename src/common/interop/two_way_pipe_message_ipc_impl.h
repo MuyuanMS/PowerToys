@@ -15,6 +15,7 @@ class TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl
 {
 public:
     void send(std::wstring msg);
+    bool send_and_wait(std::wstring msg, std::chrono::milliseconds timeout);
     TwoWayPipeMessageIPCImpl(std::wstring _input_pipe_name, std::wstring _output_pipe_name, callback_function p_func);
     void start(HANDLE _restricted_pipe_token);
     void start(HANDLE _restricted_pipe_token, const interop_auth::CallerPolicy& _caller_policy);
@@ -126,6 +127,7 @@ private:
     std::thread output_queue_thread;
     std::thread input_pipe_thread;
     std::mutex lifecycle_mutex;
+    std::mutex output_send_mutex;
     std::condition_variable lifecycle_stopped;
     LifecycleState lifecycle_state = LifecycleState::NotStarted;
     std::mutex pipe_connect_handle_mutex; // For manipulating the current_connect_pipe

@@ -13,6 +13,7 @@ constexpr DWORD PipeClientAccess = FILE_READ_DATA |
                                    FILE_WRITE_ATTRIBUTES |
                                    SYNCHRONIZE;
 constexpr DWORD PipeWaitIntervalMs = 100;
+constexpr ULONGLONG PipeRetryTimeoutMs = 30000;
 
 namespace
 {
@@ -189,6 +190,11 @@ void TwoWayPipeMessageIPC::send(std::wstring msg)
     impl->send(msg);
 }
 
+bool TwoWayPipeMessageIPC::send_and_wait(std::wstring msg, std::chrono::milliseconds timeout)
+{
+    return impl->send_and_wait(std::move(msg), timeout);
+}
+
 void TwoWayPipeMessageIPC::start(HANDLE _restricted_pipe_token)
 {
     impl->start(_restricted_pipe_token);
@@ -217,6 +223,12 @@ TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::TwoWayPipeMessageIPCImpl(
 void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::send(std::wstring msg)
 {
     output_queue.queue_message(msg);
+}
+
+bool TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::send_and_wait(std::wstring msg, std::chrono::milliseconds timeout)
+{
+    output_queue.queue_message(std::move(msg));
+    return output_queue.wait_until_idle(timeout);
 }
 
 void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::start(HANDLE _restricted_pipe_token)
@@ -351,7 +363,7 @@ void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::stop_started_threads()
 
 void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::cancel_active_output_io()
 {
-    std::scoped_lock lock(output_pipe_mutex);
+    std::scoped_lock clear_lock(output_pipe_mutex);
     if (active_output_pipe_handle != INVALID_HANDLE_VALUE)
     {
         CancelIoEx(active_output_pipe_handle, nullptr);
@@ -360,14 +372,17 @@ void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::cancel_active_output_io()
 
 void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::send_pipe_message(std::wstring message)
 {
+    std::lock_guard send_lock(output_send_mutex);
+
     // Adapted from https://learn.microsoft.com/windows/win32/ipc/named-pipe-client
     const wchar_t* message_send = message.c_str();
     const wchar_t* lpszPipename = output_pipe_name.c_str();
     OwnedPipeHandle output_pipe;
 
     // Try to open a named pipe; wait for it, if necessary.
+    const ULONGLONG retry_deadline = GetTickCount64() + PipeRetryTimeoutMs;
 
-    while (!closed.load())
+    while (!closed.load() && GetTickCount64() < retry_deadline)
     {
         output_pipe.reset(CreateFile(
             lpszPipename, // pipe name
@@ -383,25 +398,41 @@ void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::send_pipe_message(std::wstr
         if (output_pipe.valid())
             break;
 
-        // Exit if an error other than ERROR_PIPE_BUSY occurs.
+        // The server may not have created its pipe yet during a child-process cold start.
+        // Keep the queued message until the server appears instead of dropping it.
         DWORD curr_error = 0;
-        if ((curr_error = GetLastError()) != ERROR_PIPE_BUSY)
-        {
-            return;
-        }
-
-        // Use short waits so end() can promptly join the output thread instead of waiting for a
-        // long unavailable-pipe timeout.
+        curr_error = GetLastError();
 #ifdef TWO_WAY_PIPE_MESSAGE_IPC_TESTS
         if (const HANDLE event = wait_named_pipe_entered_event.load())
         {
             SetEvent(event);
         }
 #endif
-        if (!WaitNamedPipe(lpszPipename, PipeWaitIntervalMs) && GetLastError() != ERROR_SEM_TIMEOUT)
+        if (curr_error == ERROR_FILE_NOT_FOUND)
+        {
+            Sleep(PipeWaitIntervalMs);
+            continue;
+        }
+
+        if (curr_error != ERROR_PIPE_BUSY)
         {
             return;
         }
+
+        // Use short waits so end() can promptly join the output thread instead of waiting for a
+        // long unavailable-pipe timeout.
+        if (!WaitNamedPipe(lpszPipename, PipeWaitIntervalMs))
+        {
+            const DWORD wait_error = GetLastError();
+            if (wait_error != ERROR_SEM_TIMEOUT && wait_error != ERROR_FILE_NOT_FOUND)
+            {
+                return;
+            }
+        }
+    }
+    if (!closed.load() && !output_pipe.valid())
+    {
+        OutputDebugStringW(L"TwoWayPipeMessageIPC: timed out waiting for the output pipe.\n");
     }
     if (closed.load() || !output_pipe.valid())
     {
@@ -410,7 +441,7 @@ void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::send_pipe_message(std::wstr
 
     const HANDLE output_pipe_handle = output_pipe.get();
     const auto clear_active_output_pipe = [&]() {
-        std::scoped_lock lock(output_pipe_mutex);
+        std::scoped_lock write_lock(output_pipe_mutex);
         if (active_output_pipe_handle == output_pipe_handle)
         {
             active_output_pipe_handle = INVALID_HANDLE_VALUE;
@@ -443,7 +474,7 @@ void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::send_pipe_message(std::wstr
         // Begin the overlapped write while holding the same mutex end() uses for
         // cancellation. This closes the check-to-write race where shutdown could
         // otherwise cancel before the write was issued.
-        std::scoped_lock lock(output_pipe_mutex);
+        std::scoped_lock write_lock(output_pipe_mutex);
         if (closed.load())
         {
             CloseHandle(write_complete_event);
@@ -487,6 +518,7 @@ void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::consume_output_queue_thread
             break;
         }
         send_pipe_message(message);
+        output_queue.mark_message_processed();
     }
 }
 
