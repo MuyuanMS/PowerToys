@@ -101,6 +101,8 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
         Debug.Assert(_output.Settings != null, "Output settings should not be null");
         var settings = JsonSerializer.SerializeToNode(_output.Settings, _serializerOptions);
         ValidateUnsignedIntegerSettings(settings);
+        ValidateHotkeyCodes(settings);
+        ValidateRecordScaling(settings);
         ValidateZoominSliderLevel(_output.Settings.Properties.ZoominSliderLevel?.Value);
         if (_recordScalingSpecified &&
             !string.Equals(_currentRecordFormat, _output.Settings.Properties.RecordFormat?.Value, StringComparison.Ordinal) &&
@@ -139,6 +141,47 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
             {
                 ValidateUnsignedIntegerSettings(child);
             }
+        }
+    }
+
+    private static void ValidateHotkeyCodes(JsonNode? node)
+    {
+        if (node is JsonObject jsonObject)
+        {
+            if (jsonObject["code"] is JsonValue code &&
+                code.TryGetValue<int>(out var codeValue) &&
+                codeValue is < 0 or > 255)
+            {
+                throw new ArgumentOutOfRangeException(nameof(node), "ZoomIt hotkey codes must be between 0 and 255.");
+            }
+
+            foreach (var (_, child) in jsonObject)
+            {
+                ValidateHotkeyCodes(child);
+            }
+        }
+        else if (node is JsonArray jsonArray)
+        {
+            foreach (var child in jsonArray)
+            {
+                ValidateHotkeyCodes(child);
+            }
+        }
+    }
+
+    private static void ValidateRecordScaling(JsonNode? node)
+    {
+        if (node is not JsonObject jsonObject ||
+            jsonObject[PropertiesJsonPropertyName] is not JsonObject properties ||
+            properties["RecordScaling"]?["value"] is not JsonValue value ||
+            !value.TryGetValue<int>(out var scaling))
+        {
+            return;
+        }
+
+        if (scaling is < 10 or > 100)
+        {
+            throw new ArgumentOutOfRangeException(nameof(node), "RecordScaling must be between 10 and 100.");
         }
     }
 

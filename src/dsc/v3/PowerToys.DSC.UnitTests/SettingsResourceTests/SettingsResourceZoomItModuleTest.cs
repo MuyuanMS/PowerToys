@@ -235,6 +235,34 @@ public sealed class SettingsResourceZoomItModuleTest : BaseDscTest
     }
 
     [TestMethod]
+    public void SetWithOutOfRangeRecordScaling_RejectsBeforeWriting()
+    {
+        // Arrange
+        var input = CreateInput(properties => properties.RecordScaling = new IntProperty(0));
+        var data = new ZoomItSettingsFunctionData(input);
+        data.GetState();
+        data.Output.SettingsInternal = data.Input.SettingsInternal;
+
+        // Act and assert
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(data.SetState);
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeHotkeyCode_RejectsBeforeWriting()
+    {
+        // Arrange
+        var input = CreateInput(properties => properties.ToggleKey = new KeyboardKeysProperty(new HotkeySettings(false, true, false, false, 256)));
+        var data = new ZoomItSettingsFunctionData(input);
+        data.GetState();
+        data.Output.SettingsInternal = data.Input.SettingsInternal;
+
+        // Act and assert
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(data.SetState);
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    [TestMethod]
     public void TestWithDiff_Success()
     {
         // Arrange
@@ -299,10 +327,41 @@ public sealed class SettingsResourceZoomItModuleTest : BaseDscTest
         Assert.IsNotNull(settings.Properties.RecordFormat);
     }
 
+    [TestMethod]
+    public void Interop_SaveSettingsJson_RejectsInvalidFormatWithoutChangingSettings()
+    {
+        AssertInteropSaveRejectedWithoutChangingSettings(settings =>
+            settings["properties"]["RecordFormat"]["value"] = "AVI");
+    }
+
+    [TestMethod]
+    public void Interop_SaveSettingsJson_RejectsOversizedStringWithoutChangingSettings()
+    {
+        AssertInteropSaveRejectedWithoutChangingSettings(settings =>
+            settings["properties"]["DemoTypeFile"] = new JsonObject { ["value"] = new string('x', 260) });
+    }
+
+    [TestMethod]
+    public void Interop_SaveSettingsJson_RejectsInvalidBinaryWithoutChangingSettings()
+    {
+        AssertInteropSaveRejectedWithoutChangingSettings(settings =>
+            settings["properties"]["Font"]["value"] = "AA==");
+    }
+
     private static string CreateInput(Action<ZoomItProperties> configure)
     {
         var settings = new ZoomItSettings();
         configure(settings.Properties);
         return JsonSerializer.Serialize(new SettingsResourceObject<ZoomItSettings> { Settings = settings }, _inputSerializerOptions);
+    }
+
+    private void AssertInteropSaveRejectedWithoutChangingSettings(Action<JsonObject> mutate)
+    {
+        var before = _originalLoadSettingsJson();
+        var settings = JsonNode.Parse(before)?.AsObject() ?? throw new InvalidOperationException("Interop returned invalid settings JSON.");
+        mutate(settings);
+
+        Assert.ThrowsExactly<ArgumentException>(() => _originalSaveSettingsJson(settings.ToJsonString()));
+        Assert.AreEqual(before, _originalLoadSettingsJson());
     }
 }
