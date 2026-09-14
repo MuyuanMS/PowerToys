@@ -214,10 +214,12 @@ void PowerDisplayProcessManager::refresh()
     {
         Logger::trace(L"Exiting PowerDisplay process");
 
+        bool terminate_message_sent = false;
         if (m_write_pipe)
         {
-            m_write_pipe->send_and_wait(CommonSharedConstants::POWER_DISPLAY_TERMINATE_APP_MESSAGE, std::chrono::seconds(5));
+            terminate_message_sent = m_write_pipe->send_and_wait(CommonSharedConstants::POWER_DISPLAY_TERMINATE_APP_MESSAGE, std::chrono::seconds(5));
         }
+        if (terminate_message_sent)
         {
             std::lock_guard lock(m_process_mutex);
             if (m_hProcess != 0)
