@@ -111,6 +111,11 @@ void TwoWayPipeMessageIPC::send(std::wstring msg)
     impl->send(msg);
 }
 
+bool TwoWayPipeMessageIPC::send_and_wait(std::wstring msg, std::chrono::milliseconds timeout)
+{
+    return impl->send_and_wait(std::move(msg), timeout);
+}
+
 void TwoWayPipeMessageIPC::start(HANDLE _restricted_pipe_token)
 {
     impl->start(_restricted_pipe_token);
@@ -134,6 +139,12 @@ TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::TwoWayPipeMessageIPCImpl(
 void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::send(std::wstring msg)
 {
     output_queue.queue_message(msg);
+}
+
+bool TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::send_and_wait(std::wstring msg, std::chrono::milliseconds timeout)
+{
+    output_queue.queue_message(std::move(msg));
+    return output_queue.wait_until_idle(timeout);
 }
 
 void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::start(HANDLE _restricted_pipe_token)
@@ -364,6 +375,7 @@ void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::consume_output_queue_thread
             break;
         }
         send_pipe_message(message);
+        output_queue.mark_message_processed();
     }
 }
 
