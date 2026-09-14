@@ -106,7 +106,7 @@ public sealed partial class SupersedingAsyncGate : IDisposable
             try
             {
                 currentCts.Token.ThrowIfCancellationRequested();
-                await _action(currentCts.Token);
+                await _action(currentCts.Token).ConfigureAwait(false);
                 currentCts.Token.ThrowIfCancellationRequested();
                 CompleteIfCurrent(currentTcs, currentCallId, static t => t.TrySetResult(true));
             }
