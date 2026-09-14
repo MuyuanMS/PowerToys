@@ -83,6 +83,25 @@ namespace ViewModelTests
         }
 
         [TestMethod]
+        public void CanSave_SelectingCurrentUnadvertisedColorTemperatureIsRejected()
+        {
+            var monitor = CreateMonitor();
+            monitor.ColorTemperatureVcp = 0x0B;
+            using var viewModel = CreateViewModel(monitor);
+            var item = viewModel.Monitors.Single();
+            item.IsSelected = true;
+            item.IncludeBrightness = true;
+
+            item.ColorTemperature = 0x0B;
+
+            Assert.IsNull(item.ColorTemperature);
+            Assert.IsTrue(item.IncludeColorTemperature);
+            Assert.IsFalse(item.HasValidColorTemperature);
+            Assert.IsFalse(viewModel.CanSave);
+            Assert.IsNull(viewModel.CreateProfile().MonitorSettings.Single().ColorTemperatureVcp);
+        }
+
+        [TestMethod]
         [DataRow(false)]
         [DataRow(true)]
         public void ColorPresets_RenamingPreservesSelectionAndInclusion(bool includeColorTemperature)

@@ -546,6 +546,11 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             }
         }
 
+        public bool IsColorPresetAvailable(int value)
+        {
+            return AvailableColorPresets.Any(preset => preset.VcpValue == value);
+        }
+
         /// <summary>
         /// Compute available color presets from VcpCodesFormatted (VCP code 0x14).
         /// Uses ColorTemperatureHelper from PowerDisplay.Lib for shared computation logic.

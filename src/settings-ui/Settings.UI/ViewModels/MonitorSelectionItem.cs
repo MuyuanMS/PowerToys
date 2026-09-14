@@ -310,7 +310,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         private bool IsColorTemperatureAvailable(int? value)
         {
-            return value.HasValue && ColorPresetsForDisplay.Any(preset => preset.VcpValue == value.Value);
+            return value.HasValue && Monitor.IsColorPresetAvailable(value.Value);
         }
 
         private void OnMonitorPropertyChanged(object? sender, PropertyChangedEventArgs e)
