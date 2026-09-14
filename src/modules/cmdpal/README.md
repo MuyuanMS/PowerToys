@@ -32,6 +32,7 @@ We've also got samples, so that you can see how the APIs in-action.
 1. Now you can right click on one of the project below to `Build` and then `Deploy`:
 
 Projects of interest are:
+
 * `Microsoft.CmdPal.UI`: This is the main project for CmdPal. Build and run this to get the CmdPal.
 * `Microsoft.CommandPalette.Extensions`: This is the official extension interface. 
   * This is designed to be language-agnostic. Any programming language which supports implementing WinRT interfaces should be able to implement the WinRT interface. 
@@ -49,5 +50,4 @@ Projects of interest are:
 [generic samples]: ./ext/SamplePagesExtension 
 [real samples]: ./ext/ProcessMonitorExtension
 [real extensions that we've "shipped" already]: https://github.com/zadjii/CmdPalExtensions/blob/main/src/extensions
-
 
