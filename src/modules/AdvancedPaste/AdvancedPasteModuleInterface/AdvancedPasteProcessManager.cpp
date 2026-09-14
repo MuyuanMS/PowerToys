@@ -47,6 +47,17 @@ void AdvancedPasteProcessManager::stop()
 void AdvancedPasteProcessManager::send_message(const std::wstring& message_type, const std::wstring& message_arg)
 {
     submit_task([this, message_type, message_arg] {
+        if (!is_process_running())
+        {
+            refresh();
+
+            if (!is_process_running())
+            {
+                Logger::warn(L"Advanced Paste process is not running; '{}' message was not delivered", message_type);
+                return;
+            }
+        }
+
         send_named_pipe_message(message_type, message_arg);
     });
 }
