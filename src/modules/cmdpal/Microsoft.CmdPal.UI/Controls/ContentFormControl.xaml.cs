@@ -506,6 +506,8 @@ public sealed partial class ContentFormControl : UserControl
                         radioButton.IsChecked = (bool?)inputValue.Value;
                         break;
                 }
+
+                return;
             }
         }
 
