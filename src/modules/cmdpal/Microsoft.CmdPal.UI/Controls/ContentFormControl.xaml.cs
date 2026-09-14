@@ -28,6 +28,7 @@ public sealed partial class ContentFormControl : UserControl
     // tree. If this gets GC'ed, then it'll revoke our Action handler, and the
     // form will do seemingly nothing.
     private RenderedAdaptiveCard? _attachedRenderedCard;
+    private AdaptiveCard? _attachedCard;
 
     public ContentFormViewModel? ViewModel { get => _viewModel; set => AttachViewModel(value); }
 
@@ -133,7 +134,7 @@ public sealed partial class ContentFormControl : UserControl
         try
         {
             await _cardUpdater.UpdateAsync(card);
-            AttachRenderedCard(_cardUpdater.RenderedCard);
+            AttachRenderedCard(_cardUpdater.RenderedCard, _cardUpdater.Card);
             RefreshAccessibilityNames(_cardUpdater.RenderedCard);
         }
         catch (OperationCanceledException)
@@ -145,7 +146,9 @@ public sealed partial class ContentFormControl : UserControl
         }
     }
 
-    private void AttachRenderedCard(RenderedAdaptiveCard? renderedCard)
+    private void AttachRenderedCard(
+        RenderedAdaptiveCard? renderedCard,
+        AdaptiveCard? card = null)
     {
         if (ReferenceEquals(_attachedRenderedCard, renderedCard))
         {
@@ -165,6 +168,7 @@ public sealed partial class ContentFormControl : UserControl
         }
 
         _attachedRenderedCard = renderedCard;
+        _attachedCard = card;
         if (renderedCard?.FrameworkElement is FrameworkElement root)
         {
             root.KeyDown += OnFormKeyDown;
@@ -359,7 +363,7 @@ public sealed partial class ContentFormControl : UserControl
         // rendered/parsed card out from under us mid-method. This keeps the
         // resolved submit action and the gathered inputs from the same card.
         var renderedCard = _cardUpdater.RenderedCard;
-        var adaptiveCard = _cardUpdater.Card;
+        var adaptiveCard = _attachedCard;
 
         if (e.Key != VirtualKey.Enter || renderedCard == null || adaptiveCard == null)
         {
