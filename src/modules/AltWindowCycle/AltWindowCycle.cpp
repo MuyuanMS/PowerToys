@@ -1602,6 +1602,7 @@ void Switcher::RenderLayered()
             const std::wstring pageText =
                 std::to_wstring(currentPage) + L" / " + std::to_wstring(totalPages);
             RECT pageRc = { pad, h - pad, w - pad, h };
+            g.Flush();
             DrawHeaderText(static_cast<BYTE*>(bits), w, h, font, pageRc, pageText,
                            AltTabStyle::HeaderTextRef(false), AltTabStyle::CardRef(false), DT_CENTER,
                            /*opaqueBackground=*/false);
