@@ -203,7 +203,14 @@ namespace PackageVerification
             target.result = Evaluate(resolved->state);
             if (target.result.IsVerified())
             {
-                target.result.publisher = resolved->package.Id().Publisher().c_str();
+                if (!PackageVerification::IsCurrent(target, isCanceled))
+                {
+                    target.result = Failure(L"package-changed", HRESULT_FROM_WIN32(ERROR_RETRY));
+                }
+                else
+                {
+                    target.result.publisher = resolved->package.Id().Publisher().c_str();
+                }
             }
         }
         catch (const winrt::hresult_error& error)
