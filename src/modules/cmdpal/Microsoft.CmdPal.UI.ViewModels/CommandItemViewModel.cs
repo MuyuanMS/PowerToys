@@ -730,7 +730,10 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
         var published = false;
         lock (_moreCommandsLock)
         {
-            if (!IsCleanedUp && _defaultCommandContextItemViewModel is null && ReferenceEquals(command, Command))
+            if (!IsCleanedUp &&
+                _defaultCommandContextItemViewModel is null &&
+                ReferenceEquals(command, Command) &&
+                ReferenceEquals(commandModel, command.Model.Unsafe))
             {
                 _defaultCommandContextItemViewModel = defaultContextItem;
                 RefreshMoreCommandStateUnsafe();
