@@ -496,7 +496,11 @@ public sealed partial class ContentFormControl : UserControl
                         datePicker.Date = (DateTimeOffset?)inputValue.Value;
                         break;
                     case TimePicker timePicker when inputValue.Kind == nameof(TimePicker):
-                        timePicker.Time = (TimeSpan)inputValue.Value!;
+                        if (inputValue.Value is TimeSpan time)
+                        {
+                            timePicker.Time = time;
+                        }
+
                         break;
                     case RadioButton radioButton when inputValue.Kind == nameof(RadioButton):
                         radioButton.IsChecked = (bool?)inputValue.Value;
