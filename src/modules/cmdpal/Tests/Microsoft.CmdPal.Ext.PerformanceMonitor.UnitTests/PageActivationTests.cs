@@ -119,7 +119,7 @@ public partial class PageActivationTests
     [DataRow(unchecked((int)0x800706BA))]
     [DataRow(unchecked((int)0x80010108))]
     [DataRow(unchecked((int)0x80004005))]
-    public void ItemsChanged_ContinuesAfterSubscriberFailureWithoutChangingPageLifetime(int hresult)
+    public void ItemsChanged_RemovesDisconnectedSubscriberWithoutChangingPageLifetime(int hresult)
     {
         var page = new TrackingPage();
         var failures = 0;
@@ -135,10 +135,9 @@ public partial class PageActivationTests
 
         page.TriggerItemsChanged(1);
         page.TriggerItemsChanged(2);
-        page.ItemsChanged -= broken;
         page.TriggerItemsChanged(3);
 
-        Assert.AreEqual(2, failures);
+        Assert.AreEqual(1, failures);
         CollectionAssert.AreEqual(_expectedItemCounts, notifications);
         Assert.AreEqual(1, page.LoadCount);
         Assert.AreEqual(0, page.UnloadCount);

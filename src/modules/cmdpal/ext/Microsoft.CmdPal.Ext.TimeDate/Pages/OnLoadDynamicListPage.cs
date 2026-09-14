@@ -88,7 +88,7 @@ internal abstract partial class OnLoadDynamicListPage : Page, IDynamicListPage
 
     protected void RaiseItemsChanged(int totalItems = -1)
     {
-        EventHelpers.Raise(InternalItemsChanged, this, new ItemsChangedEventArgs(totalItems));
+        EventHelpers.Raise(InternalItemsChanged, this, new ItemsChangedEventArgs(totalItems), handler => ItemsChanged -= handler);
     }
 
     protected abstract void Loaded();
