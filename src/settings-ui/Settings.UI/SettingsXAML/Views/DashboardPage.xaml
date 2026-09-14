@@ -56,6 +56,8 @@
             <!--  Derived from the Community Toolkit SettingsCard template, licensed by the .NET Foundation under the MIT license.  -->
             <!--  Home rows have no description or wrapping content, so they do not need the general-purpose layout triggers.  -->
             <Style x:Key="DashboardModuleListRowStyle" TargetType="tkcontrols:SettingsCard">
+                <Setter Property="UseSystemFocusVisuals" Value="True" />
+                <Setter Property="FocusVisualMargin" Value="-3" />
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="tkcontrols:SettingsCard">
