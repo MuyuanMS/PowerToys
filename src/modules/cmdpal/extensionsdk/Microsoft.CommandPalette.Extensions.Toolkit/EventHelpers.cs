@@ -43,14 +43,7 @@ public static class EventHelpers
                 // RPC_E_DISCONNECTED and RPC_S_SERVER_UNAVAILABLE identify dead recipients.
                 // Let the publisher decide whether to remove them.
                 // https://devblogs.microsoft.com/oldnewthing/20190521-00/?p=102505
-                try
-                {
-                    unsubscribe?.Invoke(handler);
-                }
-                catch
-                {
-                    // Cleanup must not prevent delivery to the remaining subscribers.
-                }
+                unsubscribe?.Invoke(handler);
             }
             catch
             {

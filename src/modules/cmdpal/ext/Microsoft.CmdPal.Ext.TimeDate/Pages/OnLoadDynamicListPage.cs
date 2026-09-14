@@ -18,6 +18,7 @@ namespace Microsoft.CmdPal.Ext.TimeDate.Pages;
 internal abstract partial class OnLoadDynamicListPage : Page, IDynamicListPage
 {
     private readonly Lock _loadLock = new();
+    private int _loadCount;
     private string _searchText = string.Empty;
 
 #pragma warning disable CS0067 // Invoked through RaiseItemsChanged.
@@ -51,11 +52,10 @@ internal abstract partial class OnLoadDynamicListPage : Page, IDynamicListPage
     {
         add
         {
+            InternalItemsChanged += value;
             lock (_loadLock)
             {
-                var wasEmpty = InternalItemsChanged is null;
-                InternalItemsChanged += value;
-                if (wasEmpty)
+                if (_loadCount++ == 0)
                 {
                     Loaded();
                 }
@@ -64,11 +64,11 @@ internal abstract partial class OnLoadDynamicListPage : Page, IDynamicListPage
 
         remove
         {
+            InternalItemsChanged -= value;
             lock (_loadLock)
             {
-                var hadSubscribers = InternalItemsChanged is not null;
-                InternalItemsChanged -= value;
-                if (hadSubscribers && InternalItemsChanged is null)
+                _loadCount = Math.Max(0, _loadCount - 1);
+                if (_loadCount == 0)
                 {
                     Unloaded();
                 }
@@ -88,13 +88,7 @@ internal abstract partial class OnLoadDynamicListPage : Page, IDynamicListPage
 
     protected void RaiseItemsChanged(int totalItems = -1)
     {
-        TypedEventHandler<object, IItemsChangedEventArgs>? handlers;
-        lock (_loadLock)
-        {
-            handlers = InternalItemsChanged;
-        }
-
-        EventHelpers.Raise(handlers, this, new ItemsChangedEventArgs(totalItems), handler => ItemsChanged -= handler);
+        EventHelpers.Raise(InternalItemsChanged, this, new ItemsChangedEventArgs(totalItems));
     }
 
     protected abstract void Loaded();

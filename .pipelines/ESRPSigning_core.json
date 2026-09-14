@@ -46,9 +46,8 @@
             "PowerToys.CropAndLock.exe",
 
             "PowerToys.PowerOCRModuleInterface.dll",
-            "WinUI3Apps\\PowerToys.PowerOCR.Core.dll",
-            "WinUI3Apps\\PowerToys.PowerOCR.dll",
-            "WinUI3Apps\\PowerToys.PowerOCR.exe",
+            "PowerToys.PowerOCR.dll",
+            "PowerToys.PowerOCR.exe",
 
             "PowerToys.AdvancedPasteModuleInterface.dll",
             "WinUI3Apps\\PowerToys.AdvancedPaste.exe",

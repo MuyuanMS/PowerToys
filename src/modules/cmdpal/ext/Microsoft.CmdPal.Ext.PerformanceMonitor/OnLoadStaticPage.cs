@@ -121,7 +121,7 @@ internal abstract partial class OnLoadBasePage : Page
             handlers = InternalItemsChanged;
         }
 
-        EventHelpers.Raise(handlers, this, new ItemsChangedEventArgs(totalItems), handler => ItemsChanged -= handler);
+        EventHelpers.Raise(handlers, this, new ItemsChangedEventArgs(totalItems));
     }
 
     private (Exception Exception, bool Loading)? ReconcileLoadState()

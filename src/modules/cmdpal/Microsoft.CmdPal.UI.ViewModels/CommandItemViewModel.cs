@@ -213,7 +213,11 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
         if (model is IExtendedAttributesProvider extendedAttributesProvider)
         {
             ExtendedAttributesProvider = new ExtensionObject<IExtendedAttributesProvider>(extendedAttributesProvider);
-            UpdateExtendedAttributes(GetExtendedAttributes());
+            var properties = extendedAttributesProvider.GetProperties();
+            UpdateDataPackage(properties);
+            DockCommandId = properties?.TryGetValue(WellKnownExtensionAttributes.DockCommandId, out var dockCommandId) == true
+                ? dockCommandId as string
+                : null;
         }
 
         Initialized |= InitializedState.Initialized;
@@ -403,10 +407,7 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
                 break;
             case nameof(DataPackage):
-                UpdateDataPackage(GetExtendedAttributes());
-                break;
-            case "Properties":
-                UpdateExtendedAttributes(GetExtendedAttributes());
+                UpdateDataPackage(ExtendedAttributesProvider?.Unsafe?.GetProperties());
                 break;
         }
 
@@ -516,14 +517,6 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
         _icon = new(iconInfo);
         _icon.InitializeProperties();
         UpdateProperty(nameof(Icon));
-    }
-
-    protected virtual void UpdateExtendedAttributes(IDictionary<string, object?>? properties)
-    {
-        UpdateDataPackage(properties);
-        DockCommandId = properties?.TryGetValue(WellKnownExtensionAttributes.DockCommandId, out var dockCommandId) == true
-            ? dockCommandId as string
-            : null;
     }
 
     private void UpdateDataPackage(IDictionary<string, object?>? properties)
@@ -729,11 +722,6 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
         freedItems.OfType<CommandContextItemViewModel>()
                   .ToList()
                   .ForEach(c => c.SafeCleanup());
-    }
-
-    internal IDictionary<string, object?>? GetExtendedAttributes()
-    {
-        return ExtendedAttributesProvider?.Unsafe?.GetProperties();
     }
 
     /// <summary>
