@@ -222,7 +222,7 @@ void AdvancedPasteProcessManager::refresh()
 
         if (m_write_pipe)
         {
-            m_write_pipe->send_and_wait(CommonSharedConstants::ADVANCED_PASTE_TERMINATE_APP_MESSAGE);
+            m_write_pipe->send_and_wait(CommonSharedConstants::ADVANCED_PASTE_TERMINATE_APP_MESSAGE, std::chrono::seconds(5));
         }
         WaitForSingleObject(m_hProcess, 5000);
 

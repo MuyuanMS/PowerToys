@@ -216,7 +216,7 @@ void PowerDisplayProcessManager::refresh()
 
         if (m_write_pipe)
         {
-            m_write_pipe->send_and_wait(CommonSharedConstants::POWER_DISPLAY_TERMINATE_APP_MESSAGE);
+            m_write_pipe->send_and_wait(CommonSharedConstants::POWER_DISPLAY_TERMINATE_APP_MESSAGE, std::chrono::seconds(5));
         }
         {
             std::lock_guard lock(m_process_mutex);
