@@ -86,11 +86,13 @@ void PowerDisplayProcessManager::submit_task(std::function<void()> task)
 
 bool PowerDisplayProcessManager::is_process_running() const
 {
+    std::lock_guard lock(m_process_mutex);
     return m_hProcess != 0 && WaitForSingleObject(m_hProcess, 0) == WAIT_TIMEOUT;
 }
 
 void PowerDisplayProcessManager::terminate_process()
 {
+    std::lock_guard lock(m_process_mutex);
     if (m_hProcess != 0)
     {
         if (m_write_pipe.get())
@@ -120,7 +122,10 @@ HRESULT PowerDisplayProcessManager::start_process(const std::wstring& pipe_name)
     {
         Logger::trace("Successfully started PowerDisplay process");
         terminate_process();
-        m_hProcess = sei.hProcess;
+        {
+            std::lock_guard lock(m_process_mutex);
+            m_hProcess = sei.hProcess;
+        }
         return S_OK;
     }
     else
@@ -164,6 +169,7 @@ void PowerDisplayProcessManager::refresh()
     const bool process_running = is_process_running();
     if (!m_enabled && !process_running)
     {
+        std::lock_guard lock(m_process_mutex);
         if (m_hProcess != 0)
         {
             CloseHandle(m_hProcess);
@@ -205,7 +211,13 @@ void PowerDisplayProcessManager::refresh()
         Logger::trace(L"Exiting PowerDisplay process");
 
         send_named_pipe_message(CommonSharedConstants::POWER_DISPLAY_TERMINATE_APP_MESSAGE);
-        WaitForSingleObject(m_hProcess, 5000);
+        {
+            std::lock_guard lock(m_process_mutex);
+            if (m_hProcess != 0)
+            {
+                WaitForSingleObject(m_hProcess, 5000);
+            }
+        }
 
         if (is_process_running())
         {
