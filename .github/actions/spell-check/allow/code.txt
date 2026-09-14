@@ -47,6 +47,7 @@ mkv
 msix
 nupkg
 petabyte
+psdsc
 resw
 resx
 srt
