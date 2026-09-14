@@ -15,6 +15,7 @@ using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Peek.Common.Helpers;
 using Peek.Common.Models;
 using Peek.UI.Extensions;
@@ -126,6 +127,21 @@ namespace Peek.UI.Views
                 ThemeHelpers.SetImmersiveDarkMode(hWnd, ThemeHelpers.GetAppTheme() == AppTheme.Dark);
                 Visibility = Visibility.Collapsed;
             }
+        }
+
+        public void ClearInitialFocus()
+        {
+            if (XamlRoot is null ||
+                FocusManager.GetFocusedElement(XamlRoot) is not Button focusedButton ||
+                (focusedButton != LaunchAppButton && focusedButton != PinButton))
+            {
+                return;
+            }
+
+            var wasTabStop = FocusSink.IsTabStop;
+            FocusSink.IsTabStop = true;
+            FocusSink.Focus(FocusState.Programmatic);
+            FocusSink.IsTabStop = wasTabStop;
         }
 
         public Visibility IsLaunchDefaultAppButtonVisible(string appName)
