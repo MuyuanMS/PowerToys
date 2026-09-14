@@ -95,12 +95,16 @@ void PowerDisplayProcessManager::terminate_process()
     std::lock_guard lock(m_process_mutex);
     if (m_hProcess != 0)
     {
-        if (m_write_pipe.get())
+        const bool process_running = WaitForSingleObject(m_hProcess, 0) == WAIT_TIMEOUT;
+        if (process_running && m_write_pipe)
         {
             m_write_pipe->end();
         }
 
-        TerminateProcess(m_hProcess, 1);
+        if (process_running)
+        {
+            TerminateProcess(m_hProcess, 1);
+        }
         CloseHandle(m_hProcess);
         m_hProcess = 0;
     }
@@ -157,7 +161,7 @@ HRESULT PowerDisplayProcessManager::start_named_pipe_server(const std::wstring& 
     }
     catch (...)
     {
-        Logger::error(L"Named pipe initialization failed; terminating PowerDisplay process");
+        Logger::error(L"Named pipe initialization failed; aborting PowerDisplay process launch");
         return clean_up_and_fail();
     }
 

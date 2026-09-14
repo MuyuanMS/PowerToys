@@ -90,12 +90,16 @@ void AdvancedPasteProcessManager::terminate_process()
 {
     if (m_hProcess != 0)
     {
-        if (m_write_pipe.get())
+        const bool process_running = WaitForSingleObject(m_hProcess, 0) == WAIT_TIMEOUT;
+        if (process_running && m_write_pipe)
         {
             m_write_pipe->end();
         }
 
-        TerminateProcess(m_hProcess, 1);
+        if (process_running)
+        {
+            TerminateProcess(m_hProcess, 1);
+        }
         CloseHandle(m_hProcess);
         m_hProcess = 0;
     }
@@ -153,7 +157,7 @@ HRESULT AdvancedPasteProcessManager::start_named_pipe_server(const std::wstring&
     }
     catch (...)
     {
-        Logger::error(L"Named pipe initialization failed; terminating Advanced Paste process");
+        Logger::error(L"Named pipe initialization failed; aborting Advanced Paste process launch");
         return clean_up_and_fail();
     }
 
