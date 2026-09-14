@@ -519,7 +519,26 @@ public sealed partial class ContentFormControl : UserControl
     private static string? GetInputKey(FrameworkElement element)
     {
         var automationId = AutomationProperties.GetAutomationId(element);
-        return string.IsNullOrEmpty(automationId) ? null : automationId;
+        if (!string.IsNullOrEmpty(automationId))
+        {
+            return automationId;
+        }
+
+        if (element is not (
+            TextBox or
+            PasswordBox or
+            ComboBox or
+            ToggleSwitch or
+            CheckBox or
+            NumberBox or
+            CalendarDatePicker or
+            TimePicker or
+            RadioButton))
+        {
+            return null;
+        }
+
+        return string.IsNullOrEmpty(element.Name) ? null : element.Name;
     }
 
     private static FocusedElementState? CaptureFocusedElement(FrameworkElement root)
