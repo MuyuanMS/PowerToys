@@ -103,6 +103,7 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
         ValidateUnsignedIntegerSettings(settings);
         ValidateHotkeyCodes(settings);
         ValidateRecordScaling(settings);
+        ValidateBoundedSettings(settings);
         ValidateZoominSliderLevel(_output.Settings.Properties.ZoominSliderLevel?.Value);
         if (_recordScalingSpecified &&
             !string.Equals(_currentRecordFormat, _output.Settings.Properties.RecordFormat?.Value, StringComparison.Ordinal) &&
@@ -182,6 +183,28 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
         if (scaling is < 10 or > 100)
         {
             throw new ArgumentOutOfRangeException(nameof(node), "RecordScaling must be between 10 and 100.");
+        }
+    }
+
+    private static void ValidateBoundedSettings(JsonNode? node)
+    {
+        if (node is not JsonObject jsonObject ||
+            jsonObject[PropertiesJsonPropertyName] is not JsonObject properties)
+        {
+            return;
+        }
+
+        ValidatePropertyRange(properties, "DemoTypeSpeedSlider", 10, 100);
+        ValidatePropertyRange(properties, "BreakOpacity", 1, 100);
+    }
+
+    private static void ValidatePropertyRange(JsonObject properties, string propertyName, int minimum, int maximum)
+    {
+        if (properties[propertyName]?["value"] is JsonValue value &&
+            value.TryGetValue<int>(out var propertyValue) &&
+            (propertyValue < minimum || propertyValue > maximum))
+        {
+            throw new ArgumentOutOfRangeException(nameof(properties), $"{propertyName} must be between {minimum} and {maximum}.");
         }
     }
 

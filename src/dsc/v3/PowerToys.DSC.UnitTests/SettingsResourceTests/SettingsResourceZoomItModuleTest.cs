@@ -249,6 +249,34 @@ public sealed class SettingsResourceZoomItModuleTest : BaseDscTest
     }
 
     [TestMethod]
+    public void SetWithOutOfRangeDemoTypeSpeedSlider_RejectsBeforeWriting()
+    {
+        // Arrange
+        var input = CreateInput(properties => properties.DemoTypeSpeedSlider = new IntProperty(101));
+        var data = new ZoomItSettingsFunctionData(input);
+        data.GetState();
+        data.Output.SettingsInternal = data.Input.SettingsInternal;
+
+        // Act and assert
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(data.SetState);
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeBreakOpacity_RejectsBeforeWriting()
+    {
+        // Arrange
+        var input = CreateInput(properties => properties.BreakOpacity = new IntProperty(0));
+        var data = new ZoomItSettingsFunctionData(input);
+        data.GetState();
+        data.Output.SettingsInternal = data.Input.SettingsInternal;
+
+        // Act and assert
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(data.SetState);
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    [TestMethod]
     public void SetWithOutOfRangeHotkeyCode_RejectsBeforeWriting()
     {
         // Arrange
