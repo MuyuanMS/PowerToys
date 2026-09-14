@@ -15,6 +15,7 @@ class TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl
 {
 public:
     void send(std::wstring msg);
+    void send_and_wait(std::wstring msg);
     TwoWayPipeMessageIPCImpl(std::wstring _input_pipe_name, std::wstring _output_pipe_name, callback_function p_func);
     void start(HANDLE _restricted_pipe_token);
     void start(HANDLE _restricted_pipe_token, const interop_auth::CallerPolicy& _caller_policy);

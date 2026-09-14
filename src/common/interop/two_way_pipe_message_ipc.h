@@ -33,6 +33,7 @@ public:
         callback_function p_func);
     ~TwoWayPipeMessageIPC();
     void send(std::wstring msg);
+    void send_and_wait(std::wstring msg);
     void start(HANDLE _restricted_pipe_token);
     // Overload that authenticates every connecting client before dispatch (fail-closed). Used by the
     // Runner for its privileged server pipes; the existing start(HANDLE) keeps the gate disabled.

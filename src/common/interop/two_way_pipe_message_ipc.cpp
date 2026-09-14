@@ -190,6 +190,11 @@ void TwoWayPipeMessageIPC::send(std::wstring msg)
     impl->send(msg);
 }
 
+void TwoWayPipeMessageIPC::send_and_wait(std::wstring msg)
+{
+    impl->send_and_wait(std::move(msg));
+}
+
 void TwoWayPipeMessageIPC::start(HANDLE _restricted_pipe_token)
 {
     impl->start(_restricted_pipe_token);
@@ -218,6 +223,11 @@ TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::TwoWayPipeMessageIPCImpl(
 void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::send(std::wstring msg)
 {
     output_queue.queue_message(msg);
+}
+
+void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::send_and_wait(std::wstring msg)
+{
+    send_pipe_message(std::move(msg));
 }
 
 void TwoWayPipeMessageIPC::TwoWayPipeMessageIPCImpl::start(HANDLE _restricted_pipe_token)

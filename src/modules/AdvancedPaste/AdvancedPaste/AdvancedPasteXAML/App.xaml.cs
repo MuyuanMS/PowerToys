@@ -134,12 +134,12 @@ namespace AdvancedPaste
 
             if (cmdArgs?.Length > 2)
             {
-                ipc = new TwoWayPipeMessageIPCManaged(@"\\.\pipe\" + cmdArgs[2], string.Empty, async (m) => await OnNamedPipeMessage(m));
+                ipc = new TwoWayPipeMessageIPCManaged(@"\\.\pipe\" + cmdArgs[2], string.Empty, (m) => OnNamedPipeMessage(m));
                 ipc.Start();
             }
         }
 
-        private async Task OnNamedPipeMessage(string message)
+        private void OnNamedPipeMessage(string message)
         {
             _dispatcherQueue.TryEnqueue(async () =>
             {

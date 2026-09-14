@@ -220,7 +220,10 @@ void AdvancedPasteProcessManager::refresh()
     {
         Logger::trace(L"Exiting Advanced Paste process");
 
-        send_named_pipe_message(CommonSharedConstants::ADVANCED_PASTE_TERMINATE_APP_MESSAGE);
+        if (m_write_pipe)
+        {
+            m_write_pipe->send_and_wait(CommonSharedConstants::ADVANCED_PASTE_TERMINATE_APP_MESSAGE);
+        }
         WaitForSingleObject(m_hProcess, 5000);
 
         if (is_process_running())
