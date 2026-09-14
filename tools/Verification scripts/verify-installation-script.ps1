@@ -374,7 +374,7 @@ function Test-CoreFiles {
         'PowerToys.PdfThumbnailProvider.dll',
         'PowerToys.PdfThumbnailProvider.exe',
         'PowerToys.powerpreview.dll',
-        'PowerToys.FileExplorerDLLExporter.dll',
+        'PowerToys.FileExplorerDllExporter.dll',
         'PowerToys.PreviewHandlerCommon.dll',
         'PowerToys.QoiPreviewHandler.dll',
         'PowerToys.QoiPreviewHandler.exe',
