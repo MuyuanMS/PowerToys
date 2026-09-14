@@ -107,14 +107,7 @@ namespace ShortcutGuide.IndexYmlGenerator
             {
                 File.WriteAllText(tempIndexFilePath, yamlContent);
 
-                if (File.Exists(indexFilePath))
-                {
-                    File.Replace(tempIndexFilePath, indexFilePath, null);
-                }
-                else
-                {
-                    File.Move(tempIndexFilePath, indexFilePath);
-                }
+                File.Move(tempIndexFilePath, indexFilePath, overwrite: true);
             }
             finally
             {
