@@ -1,0 +1,448 @@
+// Copyright (c) Microsoft Corporation
+// The Microsoft Corporation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using System;
+using System.Collections.Generic;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using ManagedCommon;
+using Microsoft.PowerToys.Settings.UI.Library;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using PowerToys.DSC.Commands;
+using PowerToys.DSC.DSCResources;
+using PowerToys.DSC.Models.FunctionData;
+using PowerToys.DSC.Models.ResourceObjects;
+
+namespace PowerToys.DSC.UnitTests.SettingsResourceTests;
+
+/// <summary>
+/// ZoomIt stores its settings in the registry, read and written through the
+/// ZoomIt settings interop. Behavior tests replace the interop with an
+/// in-memory store; a separate read-only smoke test exercises the real loader.
+/// </summary>
+[TestClass]
+public sealed class SettingsResourceZoomItModuleTest : BaseDscTest
+{
+    // The shape the interop produces: every property wrapped in a "value" object
+    private const string InteropSettingsJson = /*lang=json,strict*/ """
+        {
+          "name": "ZoomIt",
+          "version": "1.0",
+          "properties": {
+            "ToggleKey": { "value": { "win": false, "ctrl": true, "alt": false, "shift": false, "code": 49, "key": "1" } },
+            "DrawToggleKey": { "value": { "win": false, "ctrl": true, "alt": false, "shift": false, "code": 50, "key": "2" } },
+            "BreakTimeout": { "value": 10 },
+            "ShowTrayIcon": { "value": true },
+            "RecordFormat": { "value": "GIF" },
+            "RecordScaling": { "value": 100 },
+            "Font": { "value": "AAAAAAAAAAAAAAAAAAAAAA==" }
+          }
+        }
+        """;
+
+    private static readonly JsonSerializerOptions _serializerOptions = new()
+    {
+        MaxDepth = 0,
+        IncludeFields = true,
+    };
+
+    private static readonly JsonSerializerOptions _inputSerializerOptions = new()
+    {
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+    };
+
+    private Func<string> _originalLoadSettingsJson;
+    private Action<string> _originalSaveSettingsJson;
+    private Action _originalSignalRefreshSettings;
+    private string _store;
+    private List<string> _saved;
+
+    private static string Module => nameof(ModuleType.ZoomIt);
+
+    [TestInitialize]
+    public void TestInitialize()
+    {
+        _originalLoadSettingsJson = ZoomItSettingsFunctionData.LoadSettingsJson;
+        _originalSaveSettingsJson = ZoomItSettingsFunctionData.SaveSettingsJson;
+        _originalSignalRefreshSettings = ZoomItSettingsFunctionData.SignalRefreshSettings;
+        _store = InteropSettingsJson;
+        _saved = [];
+        ZoomItSettingsFunctionData.LoadSettingsJson = () => _store;
+        ZoomItSettingsFunctionData.SaveSettingsJson = json =>
+        {
+            _saved.Add(json);
+            _store = json;
+        };
+        ZoomItSettingsFunctionData.SignalRefreshSettings = () => { };
+    }
+
+    [TestCleanup]
+    public void TestCleanup()
+    {
+        ZoomItSettingsFunctionData.LoadSettingsJson = _originalLoadSettingsJson;
+        ZoomItSettingsFunctionData.SaveSettingsJson = _originalSaveSettingsJson;
+        ZoomItSettingsFunctionData.SignalRefreshSettings = _originalSignalRefreshSettings;
+    }
+
+    [TestMethod]
+    public void Get_ReturnsRegistryBackedSettings()
+    {
+        // Act
+        var result = ExecuteDscCommand<GetCommand>("--resource", SettingsResource.ResourceName, "--module", Module);
+        var state = result.OutputState<SettingsResourceObject<ZoomItSettings>>();
+
+        // Assert
+        Assert.IsTrue(result.Success);
+        Assert.AreEqual(49, state.Settings.Properties.ToggleKey.Value.Code);
+        Assert.IsTrue(state.Settings.Properties.ToggleKey.Value.Ctrl);
+        Assert.AreEqual(10, state.Settings.Properties.BreakTimeout.Value);
+        Assert.IsTrue(state.Settings.Properties.ShowTrayIcon.Value);
+        Assert.AreEqual("GIF", state.Settings.Properties.RecordFormat.Value);
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    [TestMethod]
+    public void Export_Success()
+    {
+        // Act
+        var result = ExecuteDscCommand<ExportCommand>("--resource", SettingsResource.ResourceName, "--module", Module);
+        var state = result.OutputState<SettingsResourceObject<ZoomItSettings>>();
+
+        // Assert
+        Assert.IsTrue(result.Success);
+        Assert.AreEqual(10, state.Settings.Properties.BreakTimeout.Value);
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    [TestMethod]
+    public void SetWithDiff_WritesDeclaredPropertiesAndKeepsTheOthers()
+    {
+        // Arrange
+        var input = CreateInput(properties =>
+        {
+            properties.BreakTimeout = new IntProperty(25);
+            properties.ShowTrayIcon = new BoolProperty(false);
+        });
+
+        // Act
+        var result = ExecuteDscCommand<SetCommand>("--resource", SettingsResource.ResourceName, "--module", Module, "--input", input);
+        var (state, diff) = result.OutputStateAndDiff<SettingsResourceObject<ZoomItSettings>>();
+
+        // Assert
+        Assert.IsTrue(result.Success);
+        CollectionAssert.AreEqual(new List<string> { SettingsResourceObject<ZoomItSettings>.SettingsJsonPropertyName }, diff);
+        Assert.AreEqual(25, state.Settings.Properties.BreakTimeout.Value);
+        Assert.IsFalse(state.Settings.Properties.ShowTrayIcon.Value);
+
+        // Properties the configuration does not declare keep their current value
+        Assert.AreEqual(49, state.Settings.Properties.ToggleKey.Value.Code);
+        Assert.AreEqual("GIF", state.Settings.Properties.RecordFormat.Value);
+
+        // The interop receives the complete settings in its own shape
+        Assert.AreEqual(1, _saved.Count);
+        var saved = JsonNode.Parse(_saved[0]);
+        Assert.AreEqual("ZoomIt", saved["name"].GetValue<string>());
+        Assert.AreEqual(25, saved["properties"]["BreakTimeout"]["value"].GetValue<int>());
+        Assert.IsFalse(saved["properties"]["ShowTrayIcon"]["value"].GetValue<bool>());
+        Assert.AreEqual(49, saved["properties"]["ToggleKey"]["value"]["code"].GetValue<int>());
+        Assert.AreEqual("AAAAAAAAAAAAAAAAAAAAAA==", saved["properties"]["Font"]["value"].GetValue<string>());
+    }
+
+    [TestMethod]
+    public void SetTwice_SecondSetHasNoDiffAndDoesNotWrite()
+    {
+        // Arrange
+        var input = CreateInput(properties => properties.BreakTimeout = new IntProperty(25));
+
+        // Act
+        var firstResult = ExecuteDscCommand<SetCommand>("--resource", SettingsResource.ResourceName, "--module", Module, "--input", input);
+        var secondResult = ExecuteDscCommand<SetCommand>("--resource", SettingsResource.ResourceName, "--module", Module, "--input", input);
+        var (_, firstDiff) = firstResult.OutputStateAndDiff<SettingsResourceObject<ZoomItSettings>>();
+        var (_, secondDiff) = secondResult.OutputStateAndDiff<SettingsResourceObject<ZoomItSettings>>();
+
+        // Assert
+        Assert.IsTrue(firstResult.Success);
+        Assert.IsTrue(secondResult.Success);
+        CollectionAssert.AreEqual(new List<string> { SettingsResourceObject<ZoomItSettings>.SettingsJsonPropertyName }, firstDiff);
+        CollectionAssert.AreEqual(new List<string>(), secondDiff);
+        Assert.AreEqual(1, _saved.Count);
+    }
+
+    [TestMethod]
+    public void SetWithFormatAndScaling_StagesTheScaleAfterTheFormatChange()
+    {
+        // Arrange
+        var input = CreateInput(properties =>
+        {
+            properties.RecordFormat = new StringProperty("MP4");
+            properties.RecordScaling = new IntProperty(50);
+        });
+
+        // Act
+        var result = ExecuteDscCommand<SetCommand>("--resource", SettingsResource.ResourceName, "--module", Module, "--input", input);
+
+        // Assert
+        Assert.IsTrue(result.Success);
+        Assert.AreEqual(2, _saved.Count);
+        Assert.IsNull(JsonNode.Parse(_saved[0])["properties"]["RecordScaling"]);
+        Assert.AreEqual("MP4", JsonNode.Parse(_saved[0])["properties"]["RecordFormat"]["value"].GetValue<string>());
+        Assert.AreEqual(50, JsonNode.Parse(_saved[1])["properties"]["RecordScaling"]["value"].GetValue<int>());
+    }
+
+    [TestMethod]
+    public void SetWithoutDiff_DoesNotWrite()
+    {
+        // Arrange: the desired value already matches the current one
+        var input = CreateInput(properties => properties.BreakTimeout = new IntProperty(10));
+
+        // Act
+        var result = ExecuteDscCommand<SetCommand>("--resource", SettingsResource.ResourceName, "--module", Module, "--input", input);
+        var (_, diff) = result.OutputStateAndDiff<SettingsResourceObject<ZoomItSettings>>();
+
+        // Assert
+        Assert.IsTrue(result.Success);
+        CollectionAssert.AreEqual(new List<string>(), diff);
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    [TestMethod]
+    public void SetWithNegativeNumericValue_RejectsBeforeWriting()
+    {
+        // Arrange
+        var input = CreateInput(properties => properties.BreakTimeout = new IntProperty(-1));
+        var data = new ZoomItSettingsFunctionData(input);
+        data.GetState();
+        data.Output.SettingsInternal = data.Input.SettingsInternal;
+
+        // Act and assert
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(data.SetState);
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeZoominSliderLevel_RejectsBeforeWriting()
+    {
+        // Arrange
+        var input = CreateInput(properties => properties.ZoominSliderLevel = new IntProperty(6));
+        var data = new ZoomItSettingsFunctionData(input);
+        data.GetState();
+        data.Output.SettingsInternal = data.Input.SettingsInternal;
+
+        // Act and assert
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(data.SetState);
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeRecordScaling_RejectsBeforeWriting()
+    {
+        // Arrange
+        var input = CreateInput(properties => properties.RecordScaling = new IntProperty(0));
+        var data = new ZoomItSettingsFunctionData(input);
+        data.GetState();
+        data.Output.SettingsInternal = data.Input.SettingsInternal;
+
+        // Act and assert
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(data.SetState);
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeDemoTypeSpeedSlider_RejectsBeforeWriting()
+    {
+        // Arrange
+        var input = CreateInput(properties => properties.DemoTypeSpeedSlider = new IntProperty(101));
+        var data = new ZoomItSettingsFunctionData(input);
+        data.GetState();
+        data.Output.SettingsInternal = data.Input.SettingsInternal;
+
+        // Act and assert
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(data.SetState);
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeBreakOpacity_RejectsBeforeWriting()
+    {
+        // Arrange
+        var input = CreateInput(properties => properties.BreakOpacity = new IntProperty(0));
+        var data = new ZoomItSettingsFunctionData(input);
+        data.GetState();
+        data.Output.SettingsInternal = data.Input.SettingsInternal;
+
+        // Act and assert
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(data.SetState);
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeBreakTimeout_RejectsBeforeWriting()
+    {
+        AssertRejectsBeforeWriting(properties => properties.BreakTimeout = new IntProperty(0));
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeBreakTimerPosition_RejectsBeforeWriting()
+    {
+        AssertRejectsBeforeWriting(properties => properties.BreakTimerPosition = new IntProperty(9));
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeWebcamPosition_RejectsBeforeWriting()
+    {
+        AssertRejectsBeforeWriting(properties => properties.WebcamPosition = new IntProperty(4));
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeWebcamSize_RejectsBeforeWriting()
+    {
+        AssertRejectsBeforeWriting(properties => properties.WebcamSize = new IntProperty(5));
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeWebcamShape_RejectsBeforeWriting()
+    {
+        AssertRejectsBeforeWriting(properties => properties.WebcamShape = new IntProperty(4));
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeWebcamBackgroundMode_RejectsBeforeWriting()
+    {
+        AssertRejectsBeforeWriting(properties => properties.WebcamBackgroundMode = new IntProperty(3));
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeWebcamBrightness_RejectsBeforeWriting()
+    {
+        AssertRejectsBeforeWriting(properties => properties.WebcamBrightness = new IntProperty(101));
+    }
+
+    [TestMethod]
+    public void SetWithOutOfRangeHotkeyCode_RejectsBeforeWriting()
+    {
+        // Arrange
+        var input = CreateInput(properties => properties.ToggleKey = new KeyboardKeysProperty(new HotkeySettings(false, true, false, false, 256)));
+        var data = new ZoomItSettingsFunctionData(input);
+        data.GetState();
+        data.Output.SettingsInternal = data.Input.SettingsInternal;
+
+        // Act and assert
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(data.SetState);
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    [TestMethod]
+    public void TestWithDiff_Success()
+    {
+        // Arrange
+        var input = CreateInput(properties => properties.ToggleKey = new KeyboardKeysProperty(new HotkeySettings(true, false, false, true, 90)));
+
+        // Act
+        var result = ExecuteDscCommand<TestCommand>("--resource", SettingsResource.ResourceName, "--module", Module, "--input", input);
+        var (state, diff) = result.OutputStateAndDiff<SettingsResourceObject<ZoomItSettings>>();
+
+        // Assert
+        Assert.IsTrue(result.Success);
+        Assert.IsFalse(state.InDesiredState);
+        CollectionAssert.AreEqual(new List<string> { SettingsResourceObject<ZoomItSettings>.SettingsJsonPropertyName }, diff);
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    [TestMethod]
+    public void TestWithoutDiff_Success()
+    {
+        // Arrange
+        var input = CreateInput(properties => properties.ToggleKey = new KeyboardKeysProperty(new HotkeySettings(false, true, false, false, 49)));
+
+        // Act
+        var result = ExecuteDscCommand<TestCommand>("--resource", SettingsResource.ResourceName, "--module", Module, "--input", input);
+        var (state, diff) = result.OutputStateAndDiff<SettingsResourceObject<ZoomItSettings>>();
+
+        // Assert
+        Assert.IsTrue(result.Success);
+        Assert.IsTrue(state.InDesiredState);
+        CollectionAssert.AreEqual(new List<string>(), diff);
+    }
+
+    [TestMethod]
+    public void Set_SignalsRefreshSettingsEvent()
+    {
+        // Arrange
+        var signalCount = 0;
+        ZoomItSettingsFunctionData.SignalRefreshSettings = () => signalCount++;
+        var input = CreateInput(properties => properties.BreakTimeout = new IntProperty(25));
+
+        // Act
+        var result = ExecuteDscCommand<SetCommand>("--resource", SettingsResource.ResourceName, "--module", Module, "--input", input);
+
+        // Assert
+        Assert.IsTrue(result.Success);
+        Assert.AreEqual(1, signalCount);
+    }
+
+    [TestMethod]
+    public void Interop_LoadSettingsJson_DeserializesIntoSettingsModel()
+    {
+        // Act: read the real registry-backed settings through the interop (read-only)
+        var json = _originalLoadSettingsJson();
+        var settings = JsonSerializer.Deserialize<ZoomItSettings>(json, _serializerOptions);
+
+        // Assert
+        Assert.IsNotNull(settings);
+        Assert.AreEqual(ZoomItSettings.ModuleName, settings.Name);
+        Assert.IsNotNull(settings.Properties.ToggleKey);
+        Assert.IsNotNull(settings.Properties.ToggleKey.Value);
+        Assert.IsNotNull(settings.Properties.BreakTimeout);
+        Assert.IsNotNull(settings.Properties.RecordFormat);
+    }
+
+    [TestMethod]
+    public void Interop_SaveSettingsJson_RejectsInvalidFormatWithoutChangingSettings()
+    {
+        AssertInteropSaveRejectedWithoutChangingSettings(settings =>
+            settings["properties"]["RecordFormat"]["value"] = "AVI");
+    }
+
+    [TestMethod]
+    public void Interop_SaveSettingsJson_RejectsOversizedStringWithoutChangingSettings()
+    {
+        AssertInteropSaveRejectedWithoutChangingSettings(settings =>
+            settings["properties"]["DemoTypeFile"] = new JsonObject { ["value"] = new string('x', 260) });
+    }
+
+    [TestMethod]
+    public void Interop_SaveSettingsJson_RejectsInvalidBinaryWithoutChangingSettings()
+    {
+        AssertInteropSaveRejectedWithoutChangingSettings(settings =>
+            settings["properties"]["Font"]["value"] = "AA==");
+    }
+
+    private static string CreateInput(Action<ZoomItProperties> configure)
+    {
+        var settings = new ZoomItSettings();
+        configure(settings.Properties);
+        return JsonSerializer.Serialize(new SettingsResourceObject<ZoomItSettings> { Settings = settings }, _inputSerializerOptions);
+    }
+
+    private void AssertRejectsBeforeWriting(Action<ZoomItProperties> configure)
+    {
+        var input = CreateInput(configure);
+        var data = new ZoomItSettingsFunctionData(input);
+        data.GetState();
+        data.Output.SettingsInternal = data.Input.SettingsInternal;
+
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(data.SetState);
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    private void AssertInteropSaveRejectedWithoutChangingSettings(Action<JsonObject> mutate)
+    {
+        var before = _originalLoadSettingsJson();
+        var settings = JsonNode.Parse(before)?.AsObject() ?? throw new InvalidOperationException("Interop returned invalid settings JSON.");
+        mutate(settings);
+
+        Assert.ThrowsExactly<ArgumentException>(() => _originalSaveSettingsJson(settings.ToJsonString()));
+        Assert.AreEqual(before, _originalLoadSettingsJson());
+    }
+}
