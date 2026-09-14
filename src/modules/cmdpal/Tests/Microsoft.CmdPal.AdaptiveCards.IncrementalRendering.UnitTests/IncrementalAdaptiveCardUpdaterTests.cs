@@ -6,7 +6,9 @@ using System.Runtime.InteropServices;
 using AdaptiveCards.ObjectModel.WinUI3;
 using AdaptiveCards.Rendering.WinUI3;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 
 namespace Microsoft.CmdPal.AdaptiveCards.IncrementalRendering.UnitTests;
 
@@ -29,6 +31,14 @@ public sealed class IncrementalAdaptiveCardUpdaterTests
             Assert.AreSame(card, updater.Card);
             Assert.IsNotNull(updater.RenderedCard);
             Assert.IsNotNull(host.Child);
+
+            var firstRoot = host.Child;
+            var updatedCard = ParseCard("""{"type":"AdaptiveCard","version":"1.5","body":[{"type":"TextBlock","text":"updated"}]}""");
+            await updater.UpdateAsync(updatedCard);
+
+            Assert.AreSame(firstRoot, host.Child);
+            Assert.AreSame(updatedCard, updater.Card);
+            Assert.AreEqual("updated", FindTextBlock(host.Child)?.Text);
         });
     }
 
@@ -55,6 +65,30 @@ public sealed class IncrementalAdaptiveCardUpdaterTests
     private static AdaptiveCard ParseCard(string json)
     {
         return AdaptiveCard.FromJsonString(json).AdaptiveCard;
+    }
+
+    private static TextBlock? FindTextBlock(DependencyObject? element)
+    {
+        if (element is TextBlock textBlock)
+        {
+            return textBlock;
+        }
+
+        if (element is null)
+        {
+            return null;
+        }
+
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(element); index++)
+        {
+            var match = FindTextBlock(VisualTreeHelper.GetChild(element, index));
+            if (match is not null)
+            {
+                return match;
+            }
+        }
+
+        return null;
     }
 
     private static async Task RunOnDedicatedDispatcherAsync(Func<Task> action)
