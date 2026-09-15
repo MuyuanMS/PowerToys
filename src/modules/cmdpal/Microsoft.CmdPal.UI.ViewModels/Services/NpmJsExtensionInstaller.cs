@@ -259,6 +259,12 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
             }
 
             Directory.CreateDirectory(_host.ExtensionsRootPath);
+            if (!RootResolvesToItself(Path.TrimEndingDirectorySeparator(Path.GetFullPath(_host.ExtensionsRootPath))))
+            {
+                Logger.LogError($"Refusing to promote '{extensionName}' because the extensions root became unsafe.");
+                return JsExtensionInstallResult.Fail(Resources.npm_installer_install_failed);
+            }
+
             Directory.Move(packageDirectory, targetDirectory);
             promoted = true;
 
@@ -539,20 +545,22 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
 
     private static bool DirectoryResolvesToItself(string directory)
     {
-        // A root that does not exist yet cannot redirect anywhere. Install creates it as a real
-        // directory before promoting into it.
-        if (!Directory.Exists(directory))
-        {
-            return true;
-        }
-
         try
         {
-            // ResolveLinkTarget returns null when the path is not a reparse point. Any reparse point on
-            // the root is treated as unsafe.
-            return Directory.ResolveLinkTarget(directory, returnFinalTarget: true) is null;
+            var current = new DirectoryInfo(directory);
+            while (current is not null)
+            {
+                if (current.Exists && (current.Attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    return false;
+                }
+
+                current = current.Parent;
+            }
+
+            return true;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or System.Security.SecurityException)
         {
             // If the root cannot be inspected, play it safe and refuse.
             Logger.LogError($"Failed to inspect extension directory '{directory}' for reparse points: {ex.Message}");
