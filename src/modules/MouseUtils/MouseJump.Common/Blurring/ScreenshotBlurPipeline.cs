@@ -126,7 +126,7 @@ public sealed class ScreenshotBlurPipeline
             }
 
             state.BlurInProgress = true;
-            _ = Task.Run(() => this.RunBlur(screenInfo, screenshotImage));
+            _ = Task.Run(() => this.RunBlur(screenInfo, state, screenshotImage));
         }
     }
 
@@ -227,7 +227,7 @@ public sealed class ScreenshotBlurPipeline
     /// Ownership of <paramref name="image"/> is transferred to RunBlur, and the image is disposed
     /// once it has been read from.
     /// </remarks>
-    private void RunBlur(ScreenInfo screenInfo, Bitmap image)
+    private void RunBlur(ScreenInfo screenInfo, ScreenshotBlurState expectedState, Bitmap image)
     {
         Bitmap? blurredImage = null;
         try
@@ -244,7 +244,8 @@ public sealed class ScreenshotBlurPipeline
 
             lock (this.sync)
             {
-                if (!this.screens.TryGetValue(screenInfo.Handle, out var state))
+                if (!this.screens.TryGetValue(screenInfo.Handle, out var state) ||
+                    !ReferenceEquals(state, expectedState))
                 {
                     blurredImage.Dispose();
                     blurredImage = null;
@@ -265,7 +266,8 @@ public sealed class ScreenshotBlurPipeline
             blurredImage?.Dispose();
             lock (this.sync)
             {
-                if (this.screens.TryGetValue(screenInfo.Handle, out var state))
+                if (this.screens.TryGetValue(screenInfo.Handle, out var state) &&
+                    ReferenceEquals(state, expectedState))
                 {
                     state.BlurInProgress = false;
                     this.StartNextBlurIfQueued(screenInfo, state);
@@ -291,7 +293,7 @@ public sealed class ScreenshotBlurPipeline
             var next = state.Todo;
             state.Todo = null;
             state.BlurInProgress = true;
-            _ = Task.Run(() => this.RunBlur(screenInfo, next));
+            _ = Task.Run(() => this.RunBlur(screenInfo, state, next));
         }
     }
 }
