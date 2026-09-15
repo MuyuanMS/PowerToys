@@ -88,6 +88,9 @@
 #define IDC_SHAPES                      1066
 #define IDC_SCREEN                      1067
 #define IDC_ERASER                      1124
+#define IDS_ERASER_PIXEL                1200
+#define IDS_ERASER_STROKE               1201
+#define IDS_ERASER_OFF                  1202
 #define IDC_DEMOTYPE_TEXT               1068
 #define IDC_DEMOTYPE_BROWSE             1069
 #define IDC_DEMOTYPE_FILE               1070

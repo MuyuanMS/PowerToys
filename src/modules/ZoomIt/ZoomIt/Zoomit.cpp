@@ -6462,12 +6462,17 @@ void DrawEraserCursor( HDC hDcTarget, POINT pt )
 //----------------------------------------------------------------------------
 void DrawEraserModePopup( HDC hdc, int width, int height )
 {
-    const WCHAR* label;
+    WCHAR label[64] = {};
+    UINT labelId;
     switch( g_EraserMode )
     {
-    case EraserModePixel:  label = L"Eraser: Pixel"; break;
-    case EraserModeStroke: label = L"Eraser: Stroke"; break;
-    default:               label = L"Eraser: Off"; break;
+    case EraserModePixel:  labelId = IDS_ERASER_PIXEL; break;
+    case EraserModeStroke: labelId = IDS_ERASER_STROKE; break;
+    default:               labelId = IDS_ERASER_OFF; break;
+    }
+    if( LoadStringW( g_hInstance, labelId, label, ARRAYSIZE( label ) ) == 0 )
+    {
+        return;
     }
 
     Gdiplus::Graphics g( hdc );
@@ -6662,11 +6667,11 @@ bool EraserIsInkPixel( HDC hdcDst, HDC hdcBase, int x, int y, int blankMode )
 // from the original background) that the eraser touched and restores it.
 //
 //----------------------------------------------------------------------------
-void EraseConnectedStroke( HDC hdcDst, HDC hdcBase, POINT pt,
+bool EraseConnectedStroke( HDC hdcDst, HDC hdcBase, POINT pt,
                            int width, int height, int blankMode )
 {
-    if( pt.x < 0 || pt.y < 0 || pt.x >= width || pt.y >= height ) return;
-    if( width <= 0 || height <= 0 ) return;
+    if( pt.x < 0 || pt.y < 0 || pt.x >= width || pt.y >= height ) return false;
+    if( width <= 0 || height <= 0 ) return false;
 
     BITMAPINFO bmi = {};
     bmi.bmiHeader.biSize = sizeof( BITMAPINFOHEADER );
@@ -6682,7 +6687,7 @@ void EraseConnectedStroke( HDC hdcDst, HDC hdcBase, POINT pt,
     {
         if( memCur ) DeleteDC( memCur );
         if( memBase ) DeleteDC( memBase );
-        return;
+        return false;
     }
 
     void* curBits = nullptr;
@@ -6695,7 +6700,7 @@ void EraseConnectedStroke( HDC hdcDst, HDC hdcBase, POINT pt,
         if( baseBmp ) DeleteObject( baseBmp );
         DeleteDC( memCur );
         DeleteDC( memBase );
-        return;
+        return false;
     }
 
     HGDIOBJ oldCur = SelectObject( memCur, curBmp );
@@ -6717,8 +6722,10 @@ void EraseConnectedStroke( HDC hdcDst, HDC hdcBase, POINT pt,
     size_t total = static_cast<size_t>( width ) * static_cast<size_t>( height );
     int start = pt.y * width + pt.x;
 
+    bool erased = false;
     if( EraserPixelDiffers( cur[start], base[start] ) )
     {
+        erased = true;
         std::vector<uint8_t> visited( total, 0 );
         std::vector<int> stack;
         stack.reserve( 1024 );
@@ -6773,6 +6780,33 @@ void EraseConnectedStroke( HDC hdcDst, HDC hdcBase, POINT pt,
     DeleteObject( baseBmp );
     DeleteDC( memCur );
     DeleteDC( memBase );
+    return erased;
+}
+
+bool EraseConnectedStrokeSegment( HDC hdcDst, HDC hdcBase, POINT p1, POINT p2,
+                                  int width, int height, int blankMode )
+{
+    const int dx = p2.x - p1.x;
+    const int dy = p2.y - p1.y;
+    const int distance = max( abs( dx ), abs( dy ) );
+    const int step = max( 1, g_PenWidth / 2 );
+    const int steps = max( 1, ( distance + step - 1 ) / step );
+    bool erased = false;
+
+    for( int i = 0; i <= steps; ++i )
+    {
+        POINT sample{
+            p1.x + ( dx * i ) / steps,
+            p1.y + ( dy * i ) / steps
+        };
+        if( EraserIsInkPixel( hdcDst, hdcBase, sample.x, sample.y, blankMode ) )
+        {
+            erased = EraseConnectedStroke( hdcDst, hdcBase, sample,
+                                            width, height, blankMode ) || erased;
+        }
+    }
+
+    return erased;
 }
 
 //----------------------------------------------------------------------------
@@ -9842,6 +9876,11 @@ LRESULT APIENTRY MainWndProc(
             break;
 
         case 'E':
+            if( ( GetKeyState( VK_SHIFT ) & 0x8000 ) &&
+                ( GetWindowLong( hWnd, GWL_EXSTYLE ) & WS_EX_LAYERED ) != 0 ) {
+                break;
+            }
+
             // Shift+E cycles the scrub eraser tool: off -> pixel -> stroke -> off.
             // The scrub eraser needs the pristine buffer, so it isn't offered in
             // LiveDraw (layered window). Plain E still clears the whole screen.
@@ -10032,12 +10071,10 @@ LRESULT APIENTRY MainWndProc(
                             EraseScrubSegment( hdcScreenCompat, hdcScreenSaveCompat,
                                 prevPt, currentPt, width, height, g_BlankedScreen );
 
-                        } else if( EraserIsInkPixel( hdcScreenCompat, hdcScreenSaveCompat,
-                                        currentPt.x, currentPt.y, g_BlankedScreen ) ) {
-
-                            EraseConnectedStroke( hdcScreenCompat, hdcScreenSaveCompat,
-                                currentPt, width, height, g_BlankedScreen );
-                            erasedStroke = TRUE;
+                        } else {
+                            erasedStroke = EraseConnectedStrokeSegment(
+                                hdcScreenCompat, hdcScreenSaveCompat,
+                                prevPt, currentPt, width, height, g_BlankedScreen );
                         }
                     }
 
@@ -10165,11 +10202,9 @@ LRESULT APIENTRY MainWndProc(
                             EraseScrubSegment( hdcScreenCompat, hdcScreenSaveCompat,
                                 prevPt, currentPt, width, height, g_BlankedScreen );
 
-                        } else if( EraserIsInkPixel( hdcScreenCompat, hdcScreenSaveCompat,
-                                        currentPt.x, currentPt.y, g_BlankedScreen ) ) {
-
-                            EraseConnectedStroke( hdcScreenCompat, hdcScreenSaveCompat,
-                                currentPt, width, height, g_BlankedScreen );
+                        } else if( EraseConnectedStrokeSegment(
+                                       hdcScreenCompat, hdcScreenSaveCompat,
+                                       prevPt, currentPt, width, height, g_BlankedScreen ) ) {
                             InvalidateRect( hWnd, NULL, FALSE );
                         }
 
@@ -10445,11 +10480,9 @@ LRESULT APIENTRY MainWndProc(
                         EraseScrubSegment( hdcScreenCompat, hdcScreenSaveCompat,
                             prevPt, prevPt, width, height, g_BlankedScreen );
 
-                    } else if( EraserIsInkPixel( hdcScreenCompat, hdcScreenSaveCompat,
-                                    prevPt.x, prevPt.y, g_BlankedScreen ) ) {
-
-                        EraseConnectedStroke( hdcScreenCompat, hdcScreenSaveCompat,
-                            prevPt, width, height, g_BlankedScreen );
+                    } else {
+                        EraseConnectedStrokeSegment( hdcScreenCompat, hdcScreenSaveCompat,
+                            prevPt, prevPt, width, height, g_BlankedScreen );
                     }
 
                     EnableDisableStickyKeys( FALSE );

@@ -207,6 +207,13 @@ BEGIN
     LTEXT           "Draw w/out Zoom:",IDC_STATIC,7,232,63,11
 END
 
+STRINGTABLE
+BEGIN
+    IDS_ERASER_PIXEL "Eraser: Pixel"
+    IDS_ERASER_STROKE "Eraser: Stroke"
+    IDS_ERASER_OFF "Eraser: Off"
+END
+
 TYPE DIALOGEX 0, 0, 260, 104
 STYLE DS_SETFONT | DS_CONTROL | WS_CHILD | WS_SYSMENU
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -571,4 +578,3 @@ END
 #include "binres.rc"
 /////////////////////////////////////////////////////////////////////////////
 #endif    // not APSTUDIO_INVOKED
-
