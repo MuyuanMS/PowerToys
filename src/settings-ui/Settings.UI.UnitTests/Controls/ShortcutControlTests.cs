@@ -38,6 +38,7 @@ namespace Microsoft.PowerToys.Settings.UI.UnitTests.Controls
         {
             // Reuse the helper's repository and replace only its settings for isolation.
             // No Settings app, settings files, IPC connection or visible window is needed.
+            RuntimeHelpers.RunClassConstructor(typeof(HotkeyConflictIgnoreHelper).TypeHandle);
             repository = (SettingsRepository<GeneralSettings>)RepositoryField.GetValue(null);
             previousSettingsConfig = repository.SettingsConfig;
             repository.SettingsConfig = new GeneralSettings();
