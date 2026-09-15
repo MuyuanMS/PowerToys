@@ -45,7 +45,11 @@ internal static class EnvironmentVariableComparisonHelper
         variables.GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
             .Where(g => g.Count() > 1);
 
-    internal static string RemoveDuplicatePathEntries(string value, IEnumerable<Variable> variables = null, Variable editedVariable = null)
+    internal static string RemoveDuplicatePathEntries(
+        string value,
+        IEnumerable<Variable> variables = null,
+        Variable editedVariable = null,
+        ISet<string> unavailableVariableNames = null)
     {
         var environment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var variable in variables ?? Enumerable.Empty<Variable>())
@@ -59,7 +63,7 @@ internal static class EnvironmentVariableComparisonHelper
         }
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        return string.Join(';', value.Split(';').Where(entry => seen.Add(NormalizePathEntry(entry, environment))));
+        return string.Join(';', value.Split(';').Where(entry => seen.Add(NormalizePathEntry(entry, environment, unavailableVariableNames))));
     }
 
     internal static IEnumerable<Variable> BuildVariablesForPathDeduplication(
@@ -67,7 +71,8 @@ internal static class EnvironmentVariableComparisonHelper
         IEnumerable<Variable> userVariables,
         ProfileVariablesSet appliedProfile,
         ProfileVariablesSet editingProfile,
-        Variable originalVariable = null)
+        Variable originalVariable = null,
+        ISet<string> unavailableVariableNames = null)
     {
         var systemVariableMap = (systemVariables ?? Enumerable.Empty<Variable>())
             .ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
@@ -78,12 +83,15 @@ internal static class EnvironmentVariableComparisonHelper
             variables[variable.Name] = variable;
         }
 
-        foreach (var variable in userVariables ?? Enumerable.Empty<Variable>())
+        if (originalVariable?.ParentType != VariablesSetType.System)
         {
-            variables[variable.Name] = variable;
+            foreach (var variable in userVariables ?? Enumerable.Empty<Variable>())
+            {
+                variables[variable.Name] = variable;
+            }
         }
 
-        if (appliedProfile != null)
+        if (appliedProfile != null && originalVariable?.ParentType != VariablesSetType.System)
         {
             foreach (var profileVariable in appliedProfile.Variables)
             {
@@ -99,7 +107,7 @@ internal static class EnvironmentVariableComparisonHelper
                     }
                     else
                     {
-                        RestoreLowerScopeVariable(variables, systemVariableMap, profileVariable.Name);
+                        RestoreLowerScopeVariable(variables, systemVariableMap, profileVariable.Name, unavailableVariableNames);
                     }
                 }
 
@@ -109,7 +117,7 @@ internal static class EnvironmentVariableComparisonHelper
 
         if (originalVariable != null)
         {
-            RestoreLowerScopeVariable(variables, systemVariableMap, originalVariable.Name);
+            RestoreLowerScopeVariable(variables, systemVariableMap, originalVariable.Name, unavailableVariableNames);
         }
 
         if (editingProfile != null)
@@ -119,6 +127,7 @@ internal static class EnvironmentVariableComparisonHelper
                 if (!ReferenceEquals(variable, originalVariable))
                 {
                     variables[variable.Name] = variable;
+                    unavailableVariableNames?.Remove(variable.Name);
                 }
             }
         }
@@ -129,7 +138,8 @@ internal static class EnvironmentVariableComparisonHelper
     private static void RestoreLowerScopeVariable(
         IDictionary<string, Variable> variables,
         IReadOnlyDictionary<string, Variable> systemVariables,
-        string name)
+        string name,
+        ISet<string> unavailableVariableNames)
     {
         if (systemVariables.TryGetValue(name, out var systemVariable))
         {
@@ -138,12 +148,20 @@ internal static class EnvironmentVariableComparisonHelper
         else
         {
             variables.Remove(name);
+            unavailableVariableNames?.Add(name);
         }
     }
 
-    private static string NormalizePathEntry(string entry, IReadOnlyDictionary<string, string> variables)
+    private static string NormalizePathEntry(
+        string entry,
+        IReadOnlyDictionary<string, string> variables,
+        ISet<string> unavailableVariableNames)
     {
-        var expanded = ExpandEnvironmentVariables(entry.Trim(), variables, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        var expanded = ExpandEnvironmentVariables(
+            entry.Trim(),
+            variables,
+            unavailableVariableNames,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
         var normalizedSeparators = expanded.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
         string previous;
         do
@@ -156,7 +174,11 @@ internal static class EnvironmentVariableComparisonHelper
         return normalizedSeparators;
     }
 
-    private static string ExpandEnvironmentVariables(string value, IReadOnlyDictionary<string, string> variables, HashSet<string> expansionStack)
+    private static string ExpandEnvironmentVariables(
+        string value,
+        IReadOnlyDictionary<string, string> variables,
+        ISet<string> unavailableVariableNames,
+        HashSet<string> expansionStack)
     {
         return Regex.Replace(value, "%([^%]+)%", match =>
         {
@@ -170,11 +192,13 @@ internal static class EnvironmentVariableComparisonHelper
             {
                 string replacement = variables.TryGetValue(name, out var definedValue)
                     ? definedValue
-                    : Environment.GetEnvironmentVariable(name);
+                    : unavailableVariableNames?.Contains(name) == true
+                        ? null
+                        : Environment.GetEnvironmentVariable(name);
 
                 return replacement == null
                     ? match.Value
-                    : ExpandEnvironmentVariables(replacement, variables, expansionStack);
+                    : ExpandEnvironmentVariables(replacement, variables, unavailableVariableNames, expansionStack);
             }
             finally
             {
