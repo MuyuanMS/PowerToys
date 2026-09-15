@@ -24,7 +24,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         /// <summary>
         /// Gets the tooltip text to display. This is the Unicode character name when
-        /// available (e.g. "Latin Small Letter E With Acute"), otherwise the character
+        /// available (e.g. "Latin Small Letter E With Acute"); otherwise, the character
         /// itself.
         /// </summary>
         public string Tooltip { get; init; }

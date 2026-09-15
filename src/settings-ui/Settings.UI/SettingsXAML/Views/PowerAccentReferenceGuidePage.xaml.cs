@@ -21,7 +21,7 @@ namespace Microsoft.PowerToys.Settings.UI.Views
         }
 
         /// <summary>
-        /// Reinitialises the ViewModel each time the page is navigated to, so that any
+        /// Reinitializes the ViewModel each time the page is navigated to, so that any
         /// change to the user's language selection since the last visit is reflected.
         /// The navigation parameter should be the set of selected language code strings
         /// passed from <see cref="PowerAccentPage"/>.

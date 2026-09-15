@@ -43,6 +43,7 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <Button
+                x:Uid="BackBtn"
                 Grid.Column="0"
                 Margin="0,0,12,0"
                 Click="BackButton_Click"
@@ -80,7 +81,7 @@
             Margin="24,24"
             Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
 
-        <!--  Main scrollable content - single virtualising ListView with GroupStyle  -->
+        <!--  Main scrollable content - single virtualizing ListView with GroupStyle  -->
         <ListView
             Grid.Row="2"
             Padding="24,0,24,24"
