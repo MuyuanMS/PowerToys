@@ -66,11 +66,14 @@ internal static class EnvironmentVariableComparisonHelper
         IEnumerable<Variable> systemVariables,
         IEnumerable<Variable> userVariables,
         ProfileVariablesSet appliedProfile,
-        ProfileVariablesSet editingProfile)
+        ProfileVariablesSet editingProfile,
+        Variable originalVariable = null)
     {
+        var systemVariableMap = (systemVariables ?? Enumerable.Empty<Variable>())
+            .ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
         var variables = new Dictionary<string, Variable>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var variable in systemVariables ?? Enumerable.Empty<Variable>())
+        foreach (var variable in systemVariableMap.Values)
         {
             variables[variable.Name] = variable;
         }
@@ -96,7 +99,7 @@ internal static class EnvironmentVariableComparisonHelper
                     }
                     else
                     {
-                        variables.Remove(profileVariable.Name);
+                        RestoreLowerScopeVariable(variables, systemVariableMap, profileVariable.Name);
                     }
                 }
 
@@ -104,15 +107,38 @@ internal static class EnvironmentVariableComparisonHelper
             }
         }
 
+        if (originalVariable != null)
+        {
+            RestoreLowerScopeVariable(variables, systemVariableMap, originalVariable.Name);
+        }
+
         if (editingProfile != null)
         {
             foreach (var variable in editingProfile.Variables)
             {
-                variables[variable.Name] = variable;
+                if (!ReferenceEquals(variable, originalVariable))
+                {
+                    variables[variable.Name] = variable;
+                }
             }
         }
 
         return variables.Values;
+    }
+
+    private static void RestoreLowerScopeVariable(
+        IDictionary<string, Variable> variables,
+        IReadOnlyDictionary<string, Variable> systemVariables,
+        string name)
+    {
+        if (systemVariables.TryGetValue(name, out var systemVariable))
+        {
+            variables[name] = systemVariable;
+        }
+        else
+        {
+            variables.Remove(name);
+        }
     }
 
     private static string NormalizePathEntry(string entry, IReadOnlyDictionary<string, string> variables)
