@@ -6275,15 +6275,18 @@ LPARAM ScalePenPosition( float zoomLevel, MONITORINFO *monInfo, RECT boundRc,
     LPARAM	extraInfo;
 
     extraInfo = GetMessageExtraInfo();
-    if( g_PenDown ) {
+    if( g_PenDown ||
+        ( g_EraserMode != EraserModeOff && extraInfo == MI_WP_SIGNATURE ) ) {
 
         // ignore messages we didn't tag as pen
         if (extraInfo == MI_WP_SIGNATURE) {
 
             OutputDebug( L"Tablet Pen message\n");
 
-            // tablet input: don't bound the cursor
-            ClipCursor(NULL);
+            // Tablet input should not be bounded while the pen is in contact.
+            if( g_PenDown ) {
+                ClipCursor(NULL);
+            }
 
             x = LOWORD(lParam);
             y = HIWORD(lParam);
