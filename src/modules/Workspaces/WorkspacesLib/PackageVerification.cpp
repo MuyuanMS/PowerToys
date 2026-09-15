@@ -246,7 +246,7 @@ namespace PackageVerification
         }
         try
         {
-            const auto current = resolve(application.value(), isCanceled);
+            auto current = resolve(application.value(), isCanceled);
             if (!target.package)
             {
                 return !current;
