@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cwctype>
 #include <chrono>
+#include <initializer_list>
 #include <thread>
 #include <vector>
 
@@ -234,19 +235,14 @@ private:
 
     void process_additional_action(const winrt::hstring& actionName, const winrt::Windows::Data::Json::IJsonValue& actionValue, bool actionsGroupIsShown = true)
     {
-        bool actionIsShown = true;
-
         if (actionValue.ValueType() != winrt::Windows::Data::Json::JsonValueType::Object)
         {
+            m_additional_actions.push_back({ actionName.c_str(), Hotkey{} });
             return;
         }
 
         const auto action = actionValue.GetObjectW();
-
-        if (!action.GetNamedBoolean(JSON_KEY_IS_SHOWN, false) || !actionsGroupIsShown)
-        {
-            actionIsShown = false;
-        }
+        bool actionIsShown = action.GetNamedBoolean(JSON_KEY_IS_SHOWN, false) && actionsGroupIsShown;
 
         if (action.HasKey(JSON_KEY_SHORTCUT))
         {
@@ -255,52 +251,54 @@ private:
                 actionName.c_str(),
                 parse_single_hotkey(action.GetNamedObject(JSON_KEY_SHORTCUT), actionIsShown)
             };
-
             m_additional_actions.push_back(additionalAction);
-
-            // Register coaching shortcut as a separate hotkey with a "-coaching" suffix ID
-            if (action.HasKey(JSON_KEY_COACHING_SHORTCUT) && action.GetNamedBoolean(JSON_KEY_COACHING_ENABLED, false))
-            {
-                auto coachingHotkey = parse_single_hotkey(action.GetNamedObject(JSON_KEY_COACHING_SHORTCUT), actionIsShown);
-                if (coachingHotkey.key != 0)
-                {
-                    const AdditionalAction coachingAction
-                    {
-                        std::wstring(actionName.c_str()) + L"-coaching",
-                        coachingHotkey
-                    };
-                    m_additional_actions.push_back(coachingAction);
-                }
-            }
-
+            m_additional_actions.push_back(additionalAction);
         }
         else
         {
-            for (const auto& [subActionName, subAction] : action)
+            m_additional_actions.push_back({ actionName.c_str(), Hotkey{} });
+        }
+
+        // Register coaching shortcut as a separate hotkey with a "-coaching" suffix ID
+        if (action.HasKey(JSON_KEY_COACHING_SHORTCUT) && action.GetNamedBoolean(JSON_KEY_COACHING_ENABLED, false))
+        {
+            auto coachingHotkey = parse_single_hotkey(action.GetNamedObject(JSON_KEY_COACHING_SHORTCUT), actionIsShown);
+            if (coachingHotkey.key != 0)
             {
-                process_additional_action(subActionName, subAction, actionIsShown);
+                const AdditionalAction coachingAction
+                {
+                    std::wstring(actionName.c_str()) + L"-coaching",
+                    coachingHotkey
+                };
+                m_additional_actions.push_back(coachingAction);
             }
         }
     }
 
-    void reserve_text_case_actions()
+    void process_additional_action_group(const json::JsonObject& additionalActions, LPCWSTR groupName, std::initializer_list<LPCWSTR> actionNames)
     {
-        static constexpr std::array textCaseActionIds{
-            L"lower-case",
-            L"upper-case",
-            L"title-case",
-            L"sentence-case",
-            L"toggle-case",
-            L"camel-case",
-            L"pascal-case",
-            L"snake-case",
-            L"screaming-snake-case",
-            L"kebab-case",
-        };
-
-        for (const auto actionId : textCaseActionIds)
+        json::JsonObject actionGroup;
+        bool groupIsShown = false;
+        if (additionalActions.HasKey(groupName))
         {
-            m_additional_actions.push_back({ actionId, Hotkey{} });
+            const auto groupValue = additionalActions.GetNamedValue(groupName);
+            if (groupValue.ValueType() == winrt::Windows::Data::Json::JsonValueType::Object)
+            {
+                actionGroup = groupValue.GetObjectW();
+                groupIsShown = actionGroup.GetNamedBoolean(JSON_KEY_IS_SHOWN, false);
+            }
+        }
+
+        for (const auto actionName : actionNames)
+        {
+            if (actionGroup && actionGroup.HasKey(actionName))
+            {
+                process_additional_action(actionName, actionGroup.GetNamedValue(actionName), groupIsShown);
+            }
+            else
+            {
+                m_additional_actions.push_back({ actionName, Hotkey{} });
+            }
         }
     }
 
@@ -443,27 +441,29 @@ private:
                     {
                         const auto additionalActions = propertiesObject.GetNamedObject(JSON_KEY_ADDITIONAL_ACTIONS);
 
-                        // Define the expected order to ensure consistent hotkey ID assignment
-                        const std::vector<winrt::hstring> expectedOrder = {
-                            L"image-to-text",
-                            L"fix-spelling-and-grammar",
-                            L"paste-as-file",
-                            L"transcode",
-                            L"text-case"
+                        const auto processExpectedAction = [&](LPCWSTR actionName)
+                        {
+                            if (additionalActions.HasKey(actionName))
+                            {
+                                process_additional_action(actionName, additionalActions.GetNamedValue(actionName));
+                            }
+                            else
+                            {
+                                m_additional_actions.push_back({ actionName, Hotkey{} });
+                            }
                         };
 
-                        // Process actions in the predefined order
-                        for (auto& actionKey : expectedOrder)
+                        processExpectedAction(L"image-to-text");
+                        processExpectedAction(L"fix-spelling-and-grammar");
+                        process_additional_action_group(additionalActions, L"paste-as-file", { L"paste-as-txt-file", L"paste-as-png-file", L"paste-as-html-file" });
+                        process_additional_action_group(additionalActions, L"transcode", { L"transcode-to-mp3", L"transcode-to-mp4" });
+                        process_additional_action_group(additionalActions, L"text-case", { L"lower-case", L"upper-case", L"title-case", L"sentence-case", L"toggle-case", L"camel-case", L"pascal-case", L"snake-case", L"screaming-snake-case", L"kebab-case" });
+                    }
+                    else
+                    {
+                        for (const auto actionName : { L"image-to-text", L"fix-spelling-and-grammar", L"paste-as-txt-file", L"paste-as-png-file", L"paste-as-html-file", L"transcode-to-mp3", L"transcode-to-mp4", L"lower-case", L"upper-case", L"title-case", L"sentence-case", L"toggle-case", L"camel-case", L"pascal-case", L"snake-case", L"screaming-snake-case", L"kebab-case" })
                         {
-                            if (additionalActions.HasKey(actionKey))
-                            {
-                                const auto actionValue = additionalActions.GetNamedValue(actionKey);
-                                process_additional_action(actionKey, actionValue);
-                            }
-                            else if (actionKey == L"text-case")
-                            {
-                                reserve_text_case_actions();
-                            }
+                            m_additional_actions.push_back({ actionName, Hotkey{} });
                         }
                     }
 

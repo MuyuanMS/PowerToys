@@ -68,6 +68,60 @@ namespace ShortcutGuide.Helpers
                     content.Append(HotkeySettingsToYaml(advancedPasteProperties.AdditionalActions.Transcode.TranscodeToMp4.Shortcut, SettingsResourceLoader.GetString("AdvancedPaste/ModuleTitle"), SettingsResourceLoader.GetString("TranscodeToMp4/Header")));
                 }
 
+                if (advancedPasteProperties.AdditionalActions.TextCase.IsShown)
+                {
+                    AdvancedPasteTextCaseAction textCase = advancedPasteProperties.AdditionalActions.TextCase;
+                    if (textCase.LowerCase.IsShown)
+                    {
+                        content.Append(HotkeySettingsToYaml(textCase.LowerCase.Shortcut, SettingsResourceLoader.GetString("AdvancedPaste/ModuleTitle"), SettingsResourceLoader.GetString("LowerCase/Header")));
+                    }
+
+                    if (textCase.UpperCase.IsShown)
+                    {
+                        content.Append(HotkeySettingsToYaml(textCase.UpperCase.Shortcut, SettingsResourceLoader.GetString("AdvancedPaste/ModuleTitle"), SettingsResourceLoader.GetString("UpperCase/Header")));
+                    }
+
+                    if (textCase.TitleCase.IsShown)
+                    {
+                        content.Append(HotkeySettingsToYaml(textCase.TitleCase.Shortcut, SettingsResourceLoader.GetString("AdvancedPaste/ModuleTitle"), SettingsResourceLoader.GetString("TitleCase/Header")));
+                    }
+
+                    if (textCase.SentenceCase.IsShown)
+                    {
+                        content.Append(HotkeySettingsToYaml(textCase.SentenceCase.Shortcut, SettingsResourceLoader.GetString("AdvancedPaste/ModuleTitle"), SettingsResourceLoader.GetString("SentenceCase/Header")));
+                    }
+
+                    if (textCase.ToggleCase.IsShown)
+                    {
+                        content.Append(HotkeySettingsToYaml(textCase.ToggleCase.Shortcut, SettingsResourceLoader.GetString("AdvancedPaste/ModuleTitle"), SettingsResourceLoader.GetString("ToggleCase/Header")));
+                    }
+
+                    if (textCase.CamelCase.IsShown)
+                    {
+                        content.Append(HotkeySettingsToYaml(textCase.CamelCase.Shortcut, SettingsResourceLoader.GetString("AdvancedPaste/ModuleTitle"), SettingsResourceLoader.GetString("CamelCase/Header")));
+                    }
+
+                    if (textCase.PascalCase.IsShown)
+                    {
+                        content.Append(HotkeySettingsToYaml(textCase.PascalCase.Shortcut, SettingsResourceLoader.GetString("AdvancedPaste/ModuleTitle"), SettingsResourceLoader.GetString("PascalCase/Header")));
+                    }
+
+                    if (textCase.SnakeCase.IsShown)
+                    {
+                        content.Append(HotkeySettingsToYaml(textCase.SnakeCase.Shortcut, SettingsResourceLoader.GetString("AdvancedPaste/ModuleTitle"), SettingsResourceLoader.GetString("SnakeCase/Header")));
+                    }
+
+                    if (textCase.ScreamingSnakeCase.IsShown)
+                    {
+                        content.Append(HotkeySettingsToYaml(textCase.ScreamingSnakeCase.Shortcut, SettingsResourceLoader.GetString("AdvancedPaste/ModuleTitle"), SettingsResourceLoader.GetString("ScreamingSnakeCase/Header")));
+                    }
+
+                    if (textCase.KebabCase.IsShown)
+                    {
+                        content.Append(HotkeySettingsToYaml(textCase.KebabCase.Shortcut, SettingsResourceLoader.GetString("AdvancedPaste/ModuleTitle"), SettingsResourceLoader.GetString("KebabCase/Header")));
+                    }
+                }
+
                 foreach (var action in advancedPasteProperties.CustomActions.Value.Where(a => a.IsShown))
                 {
                     content.Append(HotkeySettingsToYaml(action.Shortcut, SettingsResourceLoader.GetString("AdvancedPaste/ModuleTitle"), action.Name));
