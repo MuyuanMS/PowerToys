@@ -151,6 +151,25 @@ namespace Microsoft.AdvancedPaste.UITests
 
         [TestMethod]
         [TestCategory("AdvancedPasteUITest")]
+        [TestCategory("PasteAsSingleLinePopupShortcut")]
+        public void TestCasePasteAsSingleLinePopupShortcut()
+        {
+            if (_notepadSettingsChanged == false)
+            {
+                ChangeNotePadSettings();
+            }
+
+            DeleteAndCopyFile(pasteAsSingleLineSrcFile, tempTxtFileName);
+            ContentCopyAndPasteAsSingleLinePopupShortcut(tempTxtFileName);
+            var result = FileReader.CompareRtfFiles(
+                Path.Combine(testFilesFolderPath, tempTxtFileName),
+                Path.Combine(testFilesFolderPath, pasteAsSingleLineResultFile),
+                compareFormatting: true);
+            Assert.IsTrue(result.IsConsistent, "Paste as single line using popup shortcut failed.");
+        }
+
+        [TestMethod]
+        [TestCategory("AdvancedPasteUITest")]
         [TestCategory("PasteAsSingleLineDirectShortcut")]
         public void TestCasePasteAsSingleLineDirectShortcut()
         {
@@ -688,6 +707,41 @@ namespace Microsoft.AdvancedPaste.UITests
         }
 
         private void ContentCopyAndPasteAsSingleLine(string fileName, bool isRTF = false)
+        {
+            string tempFile = Path.Combine(testFilesFolderPath, fileName);
+
+            Process process = Process.Start(isRTF ? wordpadPath : "notepad.exe", tempFile);
+            if (process == null)
+            {
+                throw new InvalidOperationException($"Failed to start {(isRTF ? "WordPad" : "Notepad")}.");
+            }
+
+            Thread.Sleep(15000);
+            var window = FindWindowWithFlexibleTitle(Path.GetFileName(tempFile), isRTF);
+
+            window.Click();
+            Thread.Sleep(1000);
+
+            this.SendKeys(Key.LCtrl, Key.A);
+            Thread.Sleep(1000);
+            this.SendKeys(Key.LCtrl, Key.C);
+            Thread.Sleep(1000);
+            this.SendKeys(Key.Delete);
+            Thread.Sleep(1000);
+
+            this.SendKeys(Key.Win, Key.Shift, Key.V);
+            Thread.Sleep(15000);
+
+            var apWind = this.Find<Window>("Advanced Paste", global: true);
+            apWind.Find<TextBlock>("Paste as single line").Click();
+
+            this.SendKeys(Key.LCtrl, Key.S);
+            Thread.Sleep(1000);
+
+            window.Close();
+        }
+
+        private void ContentCopyAndPasteAsSingleLinePopupShortcut(string fileName, bool isRTF = false)
         {
             string tempFile = Path.Combine(testFilesFolderPath, fileName);
 
