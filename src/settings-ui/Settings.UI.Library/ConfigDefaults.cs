@@ -18,5 +18,6 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         public static readonly bool DefaultFancyzonesQuickLayoutSwitch = true;
         public static readonly bool DefaultFancyzonesFlashZonesOnQuickSwitch = true;
         public static readonly bool DefaultFancyzonesDisplayOrWorkAreaChangeMoveWindows = true;
+        public static readonly bool DefaultFancyzonesCycleThroughAllZones = true;
     }
 }

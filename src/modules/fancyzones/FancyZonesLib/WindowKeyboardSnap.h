@@ -45,11 +45,18 @@ public:
     bool Extend(HWND window, RECT windowRect, HMONITOR monitor, DWORD vkCode, const std::unordered_map<HMONITOR, std::unique_ptr<WorkArea>>& activeWorkAreas);
 	
 private:
+    enum class SnapResult
+    {
+        Success,
+        NoTarget,
+        Failure,
+    };
+
     bool SnapHotkeyBasedOnZoneNumber(HWND window, DWORD vkCode, HMONITOR monitor, const std::unordered_map<HMONITOR, std::unique_ptr<WorkArea>>& activeWorkAreas, const std::vector<HMONITOR>& monitors);
-    bool SnapBasedOnPositionOnAnotherMonitor(HWND window, RECT windowRect, DWORD vkCode, HMONITOR monitor, const std::unordered_map<HMONITOR, std::unique_ptr<WorkArea>>& activeWorkAreas, const std::vector<std::pair<HMONITOR, RECT>>& monitors);
+    SnapResult SnapBasedOnPositionOnAnotherMonitor(HWND window, RECT windowRect, DWORD vkCode, bool cycle, HMONITOR monitor, const std::unordered_map<HMONITOR, std::unique_ptr<WorkArea>>& activeWorkAreas, const std::vector<std::pair<HMONITOR, RECT>>& monitors);
     
     bool MoveByDirectionAndIndex(HWND window, DWORD vkCode, bool cycle, WorkArea* const workArea);
-    bool MoveByDirectionAndPosition(HWND window, RECT windowRect, DWORD vkCode, bool cycle, WorkArea* const workArea);
+    SnapResult MoveByDirectionAndPosition(HWND window, RECT windowRect, DWORD vkCode, bool cycle, WorkArea* const workArea);
     bool Extend(HWND window, RECT windowRect, DWORD vkCode, WorkArea* const workArea);
 
     ExtendWindowModeData m_extendData{}; // Needed for ExtendWindowByDirectionAndPosition
