@@ -43,6 +43,7 @@ namespace PackageVerification
         {
             SignatureVerification::PackageIdentity identity;
             PackageState state;
+            winrt::Windows::ApplicationModel::Package package{ nullptr };
         };
 
         using RegistrationResolver = std::function<std::optional<Registration>(const ApplicationIdentity&, const std::function<bool()>&)>;

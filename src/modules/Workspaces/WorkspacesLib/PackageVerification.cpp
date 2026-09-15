@@ -229,7 +229,7 @@ namespace PackageVerification
             {
                 return std::nullopt;
             }
-            return details::Registration{ std::move(current->identity), current->state };
+            return details::Registration{ std::move(current->identity), current->state, std::move(current->package) };
         });
     }
 
@@ -251,8 +251,22 @@ namespace PackageVerification
             {
                 return !current;
             }
-            return current && current->identity == target.package.value() &&
-                   (!target.result.IsVerified() || MetadataEligible(current->state));
+            if (!current || current->identity != target.package.value() ||
+                (target.result.IsVerified() && !MetadataEligible(current->state)))
+            {
+                return false;
+            }
+            if (!target.result.IsVerified())
+            {
+                return true;
+            }
+            if (!current->package)
+            {
+                return false;
+            }
+            current->state.integrityValid = details::Await(current->package.VerifyContentIntegrityAsync(), std::chrono::seconds(30), isCanceled);
+            current->state.integrityChecked = true;
+            return current->state.integrityValid;
         }
         catch (const winrt::hresult_error& error)
         {
