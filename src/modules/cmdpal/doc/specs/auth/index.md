@@ -87,10 +87,11 @@ You pick how the browser gets back to Command Palette.
 - **Loopback** (`http://127.0.0.1:{ephemeral-port}/`, RFC 8252). The host listens on
   the loopback interface on a random port. This has the broadest provider support, so
   it's the default. Reach for it first.
-- **CustomScheme** (`cmdpal://auth/callback`). The redirect reactivates Command
+- **CustomScheme** (`x-cmdpal://auth/callback`). The redirect reactivates Command
   Palette through its registered protocol, so the palette comes back to the front on
   its own. Only works with providers that allow custom-scheme redirect URIs, so it's
-  the exception, not the rule.
+  the exception, not the rule. The Command Palette host registers this on the
+  publisher-controlled `x-cmdpal` scheme per RFC 8252 §7.1.
 
 ## The flows
 
@@ -135,9 +136,9 @@ A few things worth calling out:
   by the time a token exists.
 
 **Custom-scheme variant.** The shape is the same, with one difference at the redirect
-step. Instead of a loopback capture, the browser hands the OS a `cmdpal://` URL. The
-OS reactivates Command Palette, the host matches `state` back to the pending flow,
-routes the code to the extension that started it, and foregrounds the palette. From
+step. Instead of a loopback capture, the browser hands the OS an `x-cmdpal://auth/callback`
+URL. The OS reactivates Command Palette, the host matches `state` back to the pending
+flow, routes the code to the extension that started it, and foregrounds the palette. From
 your code it looks identical. You still get an `IAuthorizationResult` and still do the
 exchange in-process.
 
@@ -170,10 +171,10 @@ sequenceDiagram
     participant Idp as Identity provider
 
     Ext->>Idp: POST device authorization endpoint (client_id, scope)
-    Idp-->>Ext: device_code, user_code, verification_uri, interval
+    Idp-->>Ext: device_code, user_code, verification_uri, interval, expires_in
     Ext->>Page: Show user_code and verification_uri
     User->>Idp: Open verification_uri, enter user_code, consent
-    loop Every current interval
+    loop Until expires_in or success
         Ext->>Idp: POST token endpoint<br/>(grant_type=urn:ietf:params:oauth:grant-type:device_code,<br/>device_code, client_id)
         alt authorization_pending
             Idp-->>Ext: Keep polling at the current interval
@@ -190,10 +191,10 @@ sequenceDiagram
     end
 ```
 
-You render your own `ContentPage` with the `user_code` and the verification link. The
-Toolkit sends the RFC 8628 device-code grant type and polls on the provider's interval.
-`authorization_pending` keeps the current interval, `slow_down` adds five seconds to
-this and every later interval, and network timeouts back off before retrying.
+RFC 8628 makes `expires_in` mandatory and `interval` optional. If a provider omits
+`interval`, the Toolkit defaults to five seconds and stops polling when `expires_in`
+expires. `authorization_pending` keeps the current interval, `slow_down` adds five
+seconds to this and all later intervals, and network timeouts back off before retrying.
 Authorization denial and code expiry stop the flow immediately. Device-code does not
 need a host ABI touchpoint.
 
@@ -210,16 +211,18 @@ the new flow implements `IExtensionHost2`, which extends `IExtensionHost`.
 enum AuthorizationRedirectKind
 {
     Loopback = 0,      // http://127.0.0.1:{ephemeral-port}/  (RFC 8252)
-    CustomScheme = 1,  // cmdpal://auth/callback
+    CustomScheme = 1,  // x-cmdpal://auth/callback
 };
 
 interface IAuthorizationRequest
 {
     String DisplayName { get; };            // shown in the "waiting to sign in" status
     String AuthorizationEndpoint { get; };  // the provider authorize URL
-    // Parameters appended to the authorize URL. Do not include redirect_uri, state,
-    // response_type, or response_mode. The host injects redirect_uri/state, forces an
-    // authorization-code response, and rejects token-bearing redirects.
+    // The host rejects any raw query parameters named redirect_uri, state,
+    // response_type, response_mode, or code_challenge_method in the provider URL,
+    // and rejects the same reserved names in Parameters before the browser opens.
+    // The host injects redirect_uri/state, forces an authorization-code response, and
+    // rejects token-bearing redirects.
     Windows.Foundation.Collections.IMapView<String, String> Parameters { get; };
     AuthorizationRedirectKind RedirectKind { get; };
     UInt32 TimeoutSeconds { get; };         // absolute session lifetime; 0 means the host default (60s), capped at 300s
@@ -229,7 +232,7 @@ interface IAuthorizationRequest
 interface IAuthorizationResult
 {
     Boolean IsSuccessful { get; };
-    String SessionId { get; };              // identifies the pending brokered flow
+    String SessionId { get; };              // identifies the pending brokered flow and binds it to the initiating extension
     String RedirectUri { get; };            // the exact redirect_uri the host used
     Windows.Foundation.Collections.IMapView<String, String> ResponseParameters { get; };  // e.g. code; state is stripped
     String Error { get; };                  // set when IsSuccessful is false
@@ -260,8 +263,10 @@ exchange fails or the extension abandons the flow, it completes the session with
 The session deadline starts when the host accepts `RequestAuthorizationAsync` and
 continues after the redirect is delivered until completion. When the deadline expires,
 or when the extension disconnects or unloads, the host clears the retained page and
-all pending broker state. Late, duplicate, or unknown completion calls fail without
-navigating.
+all pending broker state. The host binds each pending session to the extension that
+started it and rejects completion requests from any other extension, even if a leaked
+`SessionId` is guessed or replayed. Late, duplicate, or unknown completion calls fail
+without navigating.
 
 ### Toolkit
 
@@ -320,8 +325,10 @@ message instead of an error.
 The broker is built so a mistake in one extension can't leak tokens through the host,
 and so the redirect is hard to spoof.
 
-- **PKCE is required.** `OAuthClient` always sends `code_challenge` with
-  `code_challenge_method=S256`. The verifier never leaves your process.
+- **PKCE is required.** `RequestAuthorizationAsync` rejects a brokered flow if the
+  caller omits `code_challenge` or uses a method other than `S256`. `OAuthClient`
+  always sends `code_challenge` with `code_challenge_method=S256`, and the verifier
+  never leaves your process.
 - **Public clients only.** No client secret, ever. Treat every extension as a public
   client, because that's what it is.
 - **`state` is host-owned, random, and single use.** The host generates it, matches it
