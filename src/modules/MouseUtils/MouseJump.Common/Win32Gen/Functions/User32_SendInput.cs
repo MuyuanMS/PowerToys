@@ -48,8 +48,9 @@ internal static partial class User32
         // To get extended error information, call GetLastError.
         // This function fails when it is blocked by UIPI.
         // Note that neither GetLastError nor the return value will indicate the failure was caused by UIPI blocking.
-        return PInvoke.SendInput(pInputs, cbSize)
-            .SuccessIsNonZero()
-            .WithLastError();
+        var result = PInvoke.SendInput(pInputs, cbSize);
+        return result == (uint)pInputs.Length
+            ? new Win32Result<uint>(result, success: true)
+            : new Win32Result<uint>(result, success: false, lastError: Marshal.GetLastPInvokeError());
     }
 }

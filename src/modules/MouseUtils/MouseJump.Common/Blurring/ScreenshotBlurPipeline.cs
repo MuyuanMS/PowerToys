@@ -229,43 +229,69 @@ public sealed class ScreenshotBlurPipeline
     /// </remarks>
     private void RunBlur(ScreenInfo screenInfo, Bitmap image)
     {
-        Bitmap blurredImage;
-        using (ScreenshotBlurPipeline.CurrentTelemetry.BeginTimer(new { }, "CreateBlurredCopy"))
-        using (image)
-        {
-            blurredImage = BlurHelper.CreateBlurredCopy(
-                image, ScreenshotBlurPipeline.BlurIntensity, ScreenshotBlurPipeline.BlurSaturation, ScreenshotBlurPipeline.BlurBrightness);
-        }
-
+        Bitmap? blurredImage = null;
         try
         {
+            using (ScreenshotBlurPipeline.CurrentTelemetry.BeginTimer(new { }, "CreateBlurredCopy"))
+            using (image)
+            {
+                blurredImage = BlurHelper.CreateBlurredCopy(
+                    image,
+                    ScreenshotBlurPipeline.BlurIntensity,
+                    ScreenshotBlurPipeline.BlurSaturation,
+                    ScreenshotBlurPipeline.BlurBrightness);
+            }
+
             lock (this.sync)
             {
                 if (!this.screens.TryGetValue(screenInfo.Handle, out var state))
                 {
                     blurredImage.Dispose();
+                    blurredImage = null;
                     return;
                 }
 
                 state.Done?.Dispose();
                 state.Done = blurredImage;
+                blurredImage = null;
                 state.DoneAt = this.TimeProvider.GetUtcNow();
                 state.BlurInProgress = false;
 
-                if (state.Todo is not null)
+                this.StartNextBlurIfQueued(screenInfo, state);
+            }
+        }
+        catch (Exception ex)
+        {
+            blurredImage?.Dispose();
+            lock (this.sync)
+            {
+                if (this.screens.TryGetValue(screenInfo.Handle, out var state))
                 {
-                    var next = state.Todo;
-                    state.Todo = null;
-                    state.BlurInProgress = true;
-                    _ = Task.Run(() => this.RunBlur(screenInfo, next));
+                    state.BlurInProgress = false;
+                    this.StartNextBlurIfQueued(screenInfo, state);
                 }
             }
+
+            ScreenshotBlurPipeline.CurrentTelemetry.WriteEvent(
+                new { handle = screenInfo.Handle, error = ex.GetType().Name },
+                "screenshotBlurFailed");
         }
         finally
         {
             // raised outside the lock, so a subscriber is free to call back into this pipeline
             // (e.g. TryGet) without risking a deadlock against the lock this method just held
             this.BlurCompleted?.Invoke(screenInfo);
+        }
+    }
+
+    private void StartNextBlurIfQueued(ScreenInfo screenInfo, ScreenshotBlurState state)
+    {
+        if (state.Todo is not null)
+        {
+            var next = state.Todo;
+            state.Todo = null;
+            state.BlurInProgress = true;
+            _ = Task.Run(() => this.RunBlur(screenInfo, next));
         }
     }
 }

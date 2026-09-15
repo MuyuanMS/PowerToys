@@ -28,7 +28,7 @@ namespace MouseJump.Common.Capture;
 /// it doesn't dispose a provider still in use, but never throws and doesn't imply cancellation.
 /// Ownership of each <see cref="IScreenshotCaptureProvider"/> passed to
 /// <see cref="AddCaptureTasks"/> transfers to this pipeline: <see cref="DisposeAsync"/> disposes
-/// every one of them (if disposable).
+/// every one of them (if disposable). Disposal failures are aggregated and surfaced.
 /// </remarks>
 public sealed class ScreenshotCapturePipeline : IAsyncDisposable
 {
@@ -118,19 +118,31 @@ public sealed class ScreenshotCapturePipeline : IAsyncDisposable
     /// </summary>
     public async ValueTask DisposeAsync()
     {
+        var exceptions = new List<Exception>();
         try
         {
             await this.WaitForCompletionAsync().ConfigureAwait(false);
         }
-        catch
+        catch (Exception ex)
         {
-            // already the caller's to observe via WaitForCompletionAsync if they want it -
-            // disposal itself shouldn't throw
+            exceptions.Add(ex);
         }
 
         foreach (var provider in this.providers.OfType<IDisposable>())
         {
-            provider.Dispose();
+            try
+            {
+                provider.Dispose();
+            }
+            catch (Exception ex)
+            {
+                exceptions.Add(ex);
+            }
+        }
+
+        if (exceptions.Count > 0)
+        {
+            throw new AggregateException("One or more screenshot pipeline operations failed.", exceptions);
         }
     }
 

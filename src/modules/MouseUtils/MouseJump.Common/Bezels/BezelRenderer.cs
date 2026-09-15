@@ -21,7 +21,9 @@ public sealed class BezelRenderer : IDisposable
 {
     public BezelRenderer(BorderStyle bezelStyle)
     {
-        this.BezelStyle = BezelRenderer.ClampDepth(bezelStyle ?? throw new ArgumentNullException(nameof(bezelStyle)));
+        ArgumentNullException.ThrowIfNull(bezelStyle);
+        BezelRenderer.ValidateStyle(bezelStyle);
+        this.BezelStyle = BezelRenderer.ClampDepth(bezelStyle);
         this.BezelProfile = new BezelProfileCurved((int)this.BezelStyle.Left, (int)this.BezelStyle.Depth);
         this.CornerAtlas = this.DrawCornerTemplates();
     }
@@ -84,6 +86,23 @@ public sealed class BezelRenderer : IDisposable
         return (borderStyle.Depth <= maxDepth)
             ? borderStyle
             : borderStyle.WithDepth(maxDepth);
+    }
+
+    private static void ValidateStyle(BorderStyle borderStyle)
+    {
+        if (borderStyle.Left <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(borderStyle), "Bezel thickness must be positive.");
+        }
+
+        if (borderStyle.Top != borderStyle.Left ||
+            borderStyle.Right != borderStyle.Left ||
+            borderStyle.Bottom != borderStyle.Left)
+        {
+            throw new ArgumentException(
+                "BezelRenderer requires the same positive thickness on all four sides.",
+                nameof(borderStyle));
+        }
     }
 
     /// <summary>

@@ -55,14 +55,14 @@ internal static partial class User32
     /// <para>Call <a href="https://docs.microsoft.com/windows/desktop/api/winuser/nf-winuser-getsystemmetrics">GetSystemMetrics</a> with <b>SM_MENUDROPALIGNMENT</b> to determine the correct horizontal alignment flag (<b>TPM_LEFTALIGN</b> or <b>TPM_RIGHTALIGN</b>) and/or horizontal animation direction flag (<b>TPM_HORPOSANIMATION</b> or <b>TPM_HORNEGANIMATION</b>) to pass to <a href="https://docs.microsoft.com/windows/desktop/api/winuser/nf-winuser-trackpopupmenu">TrackPopupMenu</a> or <b>TrackPopupMenuEx</b>. This is essential for creating an optimal user experience, especially when developing Microsoft Tablet PC applications. To display a context menu for a notification icon, the current window must be the foreground window before the application calls <a href="https://docs.microsoft.com/windows/desktop/api/winuser/nf-winuser-trackpopupmenu">TrackPopupMenu</a> or <b>TrackPopupMenuEx</b>. Otherwise, the menu will not disappear when the user clicks outside of the menu or the window that created the menu (if it is visible). If the current window is a child window, you must set the (top-level) parent window as the foreground window.</para>
     /// <para><see href="https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-trackpopupmenuex#">Read more on learn.microsoft.com</see>.</para>
     /// </remarks>
-    internal static Win32Result<BOOL> TrackPopupMenuEx(SafeHandle hMenu, uint uFlags, int x, int y, HWND hwnd, TPMPARAMS? lptpm)
+    internal static Win32Result<int> TrackPopupMenuEx(SafeHandle hMenu, uint uFlags, int x, int y, HWND hwnd, TPMPARAMS? lptpm)
     {
         // https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-trackpopupmenuex
         // If you specify TPM_RETURNCMD in the fuFlags parameter, the return value is the menu-item identifier of the item that the user selected.
         // If the user cancels the menu without making a selection, or if an error occurs, the return value is zero.
         // If you do not specify TPM_RETURNCMD in the fuFlags parameter, the return value is nonzero if the function succeeds and zero if it fails.
         // To get extended error information, call GetLastError.
-        var result = PInvoke.TrackPopupMenuEx(hMenu, uFlags, x, y, hwnd, lptpm)
+        var result = ((int)PInvoke.TrackPopupMenuEx(hMenu, uFlags, x, y, hwnd, lptpm))
             .SuccessIsNonZero();
 
         // With TPM_RETURNCMD set, a zero result means either "the user cancelled"

@@ -36,20 +36,28 @@ public sealed class StaticScreenshotCaptureProvider : IScreenshotCaptureProvider
 
         var target = thumbnailSize.Round().ToSize();
         var thumbnailImage = new Bitmap(target.Width, target.Height, PixelFormat.Format32bppPArgb);
-        using (var thumbnailGraphics = Graphics.FromImage(thumbnailImage))
+        try
         {
-            // prevent the background bleeding through into screen images
-            // (see https://github.com/mikeclayton/FancyMouse/issues/44)
-            thumbnailGraphics.PixelOffsetMode = PixelOffsetMode.Half;
-            thumbnailGraphics.InterpolationMode = InterpolationMode.NearestNeighbor;
+            using (var thumbnailGraphics = Graphics.FromImage(thumbnailImage))
+            {
+                // prevent the background bleeding through into screen images
+                // (see https://github.com/mikeclayton/FancyMouse/issues/44)
+                thumbnailGraphics.PixelOffsetMode = PixelOffsetMode.Half;
+                thumbnailGraphics.InterpolationMode = InterpolationMode.NearestNeighbor;
 
-            thumbnailGraphics.DrawImage(
-                image: this.SourceImage,
-                destRect: new Rectangle(0, 0, target.Width, target.Height),
-                srcRect: sourceArea.ToRectangle(),
-                srcUnit: GraphicsUnit.Pixel);
+                thumbnailGraphics.DrawImage(
+                    image: this.SourceImage,
+                    destRect: new Rectangle(0, 0, target.Width, target.Height),
+                    srcRect: sourceArea.ToRectangle(),
+                    srcUnit: GraphicsUnit.Pixel);
+            }
+
+            return Task.FromResult(thumbnailImage);
         }
-
-        return Task.FromResult(thumbnailImage);
+        catch
+        {
+            thumbnailImage.Dispose();
+            throw;
+        }
     }
 }

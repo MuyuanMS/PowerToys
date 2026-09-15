@@ -28,6 +28,7 @@ internal sealed class TelemetryAdapter : IDisposable
     private readonly ITelemetryWriter writer;
     private readonly SemaphoreSlim writeGate = new(1, 1);
     private readonly object pauseLock = new();
+    private Exception? writerFailure;
     private bool writingPaused;
 
     private TelemetryAdapter(ActivitySource activitySource, ITelemetryWriter writer)
@@ -46,6 +47,14 @@ internal sealed class TelemetryAdapter : IDisposable
             Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
             ActivityStopped = activity =>
             {
+                if (string.Equals(
+                    activity.GetTagItem(TelemetryContext.KindTag) as string,
+                    "scope",
+                    StringComparison.Ordinal))
+                {
+                    return;
+                }
+
                 var record = TelemetryAdapter.Flatten(activity);
                 _ = this.channel.Writer.TryWrite(() => writer.Write(record));
             },
@@ -60,8 +69,18 @@ internal sealed class TelemetryAdapter : IDisposable
                 // and buffering new records regardless, so collection never stalls, only the
                 // writer's own work does
                 await this.writeGate.WaitAsync().ConfigureAwait(false);
-                this.writeGate.Release();
-                action();
+                try
+                {
+                    action();
+                }
+                catch (Exception ex)
+                {
+                    this.writerFailure ??= ex;
+                }
+                finally
+                {
+                    this.writeGate.Release();
+                }
             }
         });
     }
@@ -114,7 +133,17 @@ internal sealed class TelemetryAdapter : IDisposable
         var signal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _ = this.channel.Writer.TryWrite(() => signal.SetResult());
         signal.Task.GetAwaiter().GetResult();
-        this.writer.Flush();
+
+        this.writeGate.Wait();
+        try
+        {
+            this.ThrowIfWriterFailed();
+            this.writer.Flush();
+        }
+        finally
+        {
+            this.writeGate.Release();
+        }
     }
 
     /// <summary>
@@ -131,7 +160,25 @@ internal sealed class TelemetryAdapter : IDisposable
         this.channel.Writer.Complete();
         this.ResumeWriting();
         this.consumerTask.GetAwaiter().GetResult();
-        this.writer.Flush();
+
+        this.writeGate.Wait();
+        try
+        {
+            this.writer.Flush();
+            this.ThrowIfWriterFailed();
+        }
+        finally
+        {
+            this.writeGate.Release();
+        }
+    }
+
+    private void ThrowIfWriterFailed()
+    {
+        if (this.writerFailure is not null)
+        {
+            throw new InvalidOperationException("Telemetry writer failed while processing a record.", this.writerFailure);
+        }
     }
 
     /// <summary>

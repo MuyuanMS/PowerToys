@@ -134,9 +134,17 @@ public sealed class DesktopScreenshotCaptureProvider : IScreenshotCaptureProvide
     private static HDC GetGraphicsDeviceContext(Graphics graphics, STRETCH_BLT_MODE mode)
     {
         var graphicsHdc = (HDC)graphics.GetHdc();
-        _ = Gdi32.SetStretchBltMode(graphicsHdc, mode)
-            .ThrowIfFailed();
-        return graphicsHdc;
+        try
+        {
+            _ = Gdi32.SetStretchBltMode(graphicsHdc, mode)
+                .ThrowIfFailed();
+            return graphicsHdc;
+        }
+        catch
+        {
+            graphics.ReleaseHdc(graphicsHdc);
+            throw;
+        }
     }
 
     /// <summary>
