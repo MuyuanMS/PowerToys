@@ -540,14 +540,12 @@ namespace EnvironmentVariablesUILib
             }
 
             var parameter = EditVariableDialog.PrimaryButtonCommandParameter as RelayCommandParameter;
-            var variables = ViewModel.SystemDefaultSet.Variables
-                .Concat(ViewModel.UserDefaultSet.Variables)
-                .Concat(ViewModel.AppliedProfile?.Variables ?? Enumerable.Empty<Variable>());
-
-            if (parameter?.Set is ProfileVariablesSet profile && !ReferenceEquals(profile, ViewModel.AppliedProfile))
-            {
-                variables = variables.Concat(profile.Variables);
-            }
+            var editingProfile = parameter?.Set as ProfileVariablesSet;
+            var variables = EnvironmentVariableComparisonHelper.BuildVariablesForPathDeduplication(
+                ViewModel.SystemDefaultSet.Variables,
+                ViewModel.UserDefaultSet.Variables,
+                ViewModel.AppliedProfile,
+                editingProfile);
 
             EditVariableDialogValueTxtBox.Text = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(variable.Values, variables, variable);
         }

@@ -62,6 +62,59 @@ internal static class EnvironmentVariableComparisonHelper
         return string.Join(';', value.Split(';').Where(entry => seen.Add(NormalizePathEntry(entry, environment))));
     }
 
+    internal static IEnumerable<Variable> BuildVariablesForPathDeduplication(
+        IEnumerable<Variable> systemVariables,
+        IEnumerable<Variable> userVariables,
+        ProfileVariablesSet appliedProfile,
+        ProfileVariablesSet editingProfile)
+    {
+        var variables = new Dictionary<string, Variable>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var variable in systemVariables ?? Enumerable.Empty<Variable>())
+        {
+            variables[variable.Name] = variable;
+        }
+
+        foreach (var variable in userVariables ?? Enumerable.Empty<Variable>())
+        {
+            variables[variable.Name] = variable;
+        }
+
+        if (appliedProfile != null)
+        {
+            foreach (var profileVariable in appliedProfile.Variables)
+            {
+                var backupName = EnvironmentVariablesHelper.GetBackupVariableName(profileVariable, appliedProfile.Name);
+                if (editingProfile != null && !ReferenceEquals(appliedProfile, editingProfile))
+                {
+                    if (variables.TryGetValue(backupName, out var backupVariable))
+                    {
+                        variables[profileVariable.Name] = new Variable(
+                            profileVariable.Name,
+                            backupVariable.Values,
+                            backupVariable.ParentType);
+                    }
+                    else
+                    {
+                        variables.Remove(profileVariable.Name);
+                    }
+                }
+
+                variables.Remove(backupName);
+            }
+        }
+
+        if (editingProfile != null)
+        {
+            foreach (var variable in editingProfile.Variables)
+            {
+                variables[variable.Name] = variable;
+            }
+        }
+
+        return variables.Values;
+    }
+
     private static string NormalizePathEntry(string entry, IReadOnlyDictionary<string, string> variables)
     {
         var expanded = ExpandEnvironmentVariables(entry.Trim(), variables, new HashSet<string>(StringComparer.OrdinalIgnoreCase));

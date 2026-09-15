@@ -80,4 +80,30 @@ public class EnvironmentVariableComparisonHelperTests
 
         Assert.AreEqual(@"%ROOT%;C:\Other", result);
     }
+
+    [TestMethod]
+    public void BuildVariablesForPathDeduplication_ReconstructsBaselineWhenEditingInactiveProfile()
+    {
+        var activeProfile = new ProfileVariablesSet(Guid.NewGuid(), "Active");
+        activeProfile.Variables.Add(new Variable("ROOT", @"C:\Applied", VariablesSetType.Profile));
+
+        var inactiveProfile = new ProfileVariablesSet(Guid.NewGuid(), "Inactive");
+        inactiveProfile.Variables.Add(new Variable("PATH", @"%ROOT%;C:\Applied", VariablesSetType.Profile));
+
+        var variables = EnvironmentVariableComparisonHelper.BuildVariablesForPathDeduplication(
+            Array.Empty<Variable>(),
+            new[]
+            {
+                new Variable("ROOT", @"C:\Applied", VariablesSetType.User),
+                new Variable("ROOT_PowerToys_Active", @"C:\Base", VariablesSetType.User),
+            },
+            activeProfile,
+            inactiveProfile);
+
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            inactiveProfile.Variables[0].Values,
+            variables);
+
+        Assert.AreEqual(@"%ROOT%;C:\Applied", result);
+    }
 }
