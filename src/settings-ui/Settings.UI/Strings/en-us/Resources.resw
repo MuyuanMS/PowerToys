@@ -867,6 +867,18 @@ opera.exe</value>
   <data name="PowerLauncher_TabSelectsContextButtons.Description" xml:space="preserve">
     <value>Pressing tab will first select through the available context buttons of the current selection before moving onto the next result</value>
   </data>
+  <data name="PowerLauncher_AudioFeedback.Header" xml:space="preserve">
+    <value>Enable audible feedback</value>
+  </data>
+  <data name="PowerLauncher_AudioFeedback.Description" xml:space="preserve">
+    <value>Play a sound when PowerToys Run opens and closes</value>
+  </data>
+  <data name="PowerLauncher_OpeningSoundToggle.Header" xml:space="preserve">
+    <value>Opening sound</value>
+  </data>
+  <data name="PowerLauncher_ClosingSoundToggle.Header" xml:space="preserve">
+    <value>Closing sound</value>
+  </data>
   <data name="PowerLauncher_GenerateThumbnailsFromFiles.Header" xml:space="preserve">
     <value>Generate thumbnails from files</value>
   </data>
@@ -4628,6 +4640,9 @@ Activate by holding the key for the character you want to add an accent to, then
   </data>
   <data name="Run_FindMorePlugins.Text" xml:space="preserve">
     <value>Find more plugins</value>
+  </data>
+  <data name="Attribution_PowerLauncher_WindowWalker.Text" xml:space="preserve">
+    <value>Beta Tadele's Window Walker</value>
   </data>
   <data name="Run_PluginUseFindMorePlugins.Content" xml:space="preserve">
     <value>Find more plugins</value>
