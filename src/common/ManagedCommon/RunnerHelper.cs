@@ -34,6 +34,28 @@ namespace ManagedCommon
             });
         }
 
+        public static bool IsPowerToysRunner(int powerToysPID)
+        {
+            const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+            IntPtr runnerHandle = NativeMethods.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, powerToysPID);
+            if (runnerHandle == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            try
+            {
+                var name = new System.Text.StringBuilder(1024);
+                uint length = (uint)name.Capacity;
+                return NativeMethods.QueryFullProcessImageName(runnerHandle, 0, name, ref length)
+                    && string.Equals(System.IO.Path.GetFileName(name.ToString()), PowerToysRunnerProcessName, StringComparison.OrdinalIgnoreCase);
+            }
+            finally
+            {
+                NativeMethods.CloseHandle(runnerHandle);
+            }
+        }
+
         private static readonly string PowerToysRunnerProcessName = "PowerToys.exe";
 
         // In case we don't have a permission to open user's processes with a SYNCHRONIZE access right, e.g. LocalSystem processes, we could use GetExitCodeProcess to check the process' exit code periodically.
