@@ -194,8 +194,8 @@ typedef enum {
 EraserMode g_EraserMode = EraserModeOff;
 
 // Click-to-toggle erasing: when the eraser tool is active the user clicks once to
-// start erasing and clicks again (or releases) to stop, rather than holding the
-// button down. While disengaged the eraser glyph simply follows the cursor.
+// start erasing and clicks again to stop, rather than holding the button down.
+// While disengaged the eraser glyph simply follows the cursor.
 BOOLEAN g_EraserEngaged = FALSE;
 
 // Transient on-screen indicator shown when the eraser mode is toggled.
@@ -6791,18 +6791,31 @@ bool EraseConnectedStrokeSegment( HDC hdcDst, HDC hdcBase, POINT p1, POINT p2,
     const int distance = max( abs( dx ), abs( dy ) );
     const int step = max( 1, g_PenWidth / 2 );
     const int steps = max( 1, ( distance + step - 1 ) / step );
+    const int radius = max( 1, g_PenWidth / 2 );
     bool erased = false;
 
     for( int i = 0; i <= steps; ++i )
     {
-        POINT sample{
+        const POINT center{
             p1.x + ( dx * i ) / steps,
             p1.y + ( dy * i ) / steps
         };
-        if( EraserIsInkPixel( hdcDst, hdcBase, sample.x, sample.y, blankMode ) )
+        for( int y = -radius; y <= radius; ++y )
         {
-            erased = EraseConnectedStroke( hdcDst, hdcBase, sample,
-                                            width, height, blankMode ) || erased;
+            for( int x = -radius; x <= radius; ++x )
+            {
+                if( x * x + y * y > radius * radius )
+                {
+                    continue;
+                }
+
+                POINT sample{ center.x + x, center.y + y };
+                if( EraserIsInkPixel( hdcDst, hdcBase, sample.x, sample.y, blankMode ) )
+                {
+                    erased = EraseConnectedStroke( hdcDst, hdcBase, sample,
+                                                    width, height, blankMode ) || erased;
+                }
+            }
         }
     }
 
@@ -8339,6 +8352,8 @@ LRESULT APIENTRY MainWndProc(
 
             if ((exStyle & WS_EX_LAYERED)) {
                 OutputDebug(L"LiveDraw reactivate\n");
+                g_EraserMode = EraserModeOff;
+                g_EraserEngaged = FALSE;
 
                 // Just focus on the window and re-enter drawing mode
                 SetFocus(hWnd);
@@ -8353,6 +8368,8 @@ LRESULT APIENTRY MainWndProc(
             }
             else {
                 OutputDebug(L"LiveDraw create\n");
+                g_EraserMode = EraserModeOff;
+                g_EraserEngaged = FALSE;
 
                 exStyle = GetWindowLongPtr(hWnd, GWL_EXSTYLE);
                 SetWindowLongPtr(hWnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
@@ -9316,6 +9333,14 @@ LRESULT APIENTRY MainWndProc(
 
             g_PenDown = TRUE;
 
+            if( g_EraserMode != EraserModeOff &&
+                ( GetWindowLong( hWnd, GWL_EXSTYLE ) & WS_EX_LAYERED ) == 0 )
+            {
+                SendPenMessage( hWnd, WM_LBUTTONDOWN, lParam );
+                SendPenMessage( hWnd, WM_MOUSEMOVE, lParam );
+                break;
+            }
+
             // Enter drawing mode
             SendPenMessage(hWnd, WM_LBUTTONDOWN, lParam);
             SendPenMessage(hWnd, WM_MOUSEMOVE, lParam);
@@ -9885,7 +9910,7 @@ LRESULT APIENTRY MainWndProc(
             // The scrub eraser needs the pristine buffer, so it isn't offered in
             // LiveDraw (layered window). Plain E still clears the whole screen.
             if( ( GetKeyState( VK_SHIFT ) & 0x8000 ) &&
-                g_Zoomed && ( g_TypeMode == TypeModeOff ) &&
+                g_Zoomed && ( g_TypeMode == TypeModeOff ) && !g_Tracing && !g_DrawingShape &&
                 ( GetWindowLong( hWnd, GWL_EXSTYLE ) & WS_EX_LAYERED ) == 0 ) {
 
                 if( g_EraserMode == EraserModeOff )        g_EraserMode = EraserModePixel;
@@ -10892,6 +10917,7 @@ LRESULT APIENTRY MainWndProc(
         break;
 
     case WM_USER_EXIT_MODE:
+        g_EraserEngaged = FALSE;
         if( g_Zoomed )
         {
             // Turn off
