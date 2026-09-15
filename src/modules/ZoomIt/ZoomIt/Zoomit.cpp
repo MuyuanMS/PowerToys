@@ -8086,6 +8086,11 @@ LRESULT APIENTRY MainWndProc(
             g_Drawing = FALSE;
             DisengageEraser();
             g_EraserMode = EraserModeOff;
+            if( g_Drawing &&
+                ( GetWindowLong( hWnd, GWL_EXSTYLE ) & WS_EX_LAYERED ) == 0 ) {
+                EnableDisableStickyKeys( FALSE );
+                boundRc = BoundMouse( zoomLevel, &monInfo, width, height, &cursorPos );
+            }
             g_EraserPopupVisible = FALSE;
             KillTimer( hWnd, ERASER_POPUP_TIMER );
             EnableDisableStickyKeys( TRUE );
@@ -8367,6 +8372,11 @@ LRESULT APIENTRY MainWndProc(
                 }
                 DisengageEraser();
                 g_EraserMode = EraserModeOff;
+                if( g_Drawing &&
+                    ( GetWindowLong( hWnd, GWL_EXSTYLE ) & WS_EX_LAYERED ) == 0 ) {
+                    EnableDisableStickyKeys( FALSE );
+                    boundRc = BoundMouse( zoomLevel, &monInfo, width, height, &cursorPos );
+                }
 
                 // Just focus on the window and re-enter drawing mode
                 SetFocus(hWnd);
@@ -9412,8 +9422,7 @@ LRESULT APIENTRY MainWndProc(
 
             if( g_TypeMode == TypeModeOff ) {
 
-                if( ( g_Drawing || g_EraserMode != EraserModeOff ) &&
-                    (LOWORD( wParam ) & MK_CONTROL) ) {
+                if( g_Drawing && (LOWORD( wParam ) & MK_CONTROL) ) {
 
                     ResizePen( hWnd, hdcScreenCompat, hdcScreenCursorCompat, prevPt,
                         g_Tracing, &g_Drawing, g_LiveZoomLevel, TRUE, g_PenWidth + delta );
@@ -9951,6 +9960,11 @@ LRESULT APIENTRY MainWndProc(
                 if( g_EraserMode == EraserModeOff )        g_EraserMode = EraserModePixel;
                 else if( g_EraserMode == EraserModePixel ) g_EraserMode = EraserModeStroke;
                 else                                       g_EraserMode = EraserModeOff;
+
+                if( g_EraserMode == EraserModeOff && g_Drawing ) {
+                    EnableDisableStickyKeys( FALSE );
+                    boundRc = BoundMouse( zoomLevel, &monInfo, width, height, &cursorPos );
+                }
 
                 if( g_EraserMode != EraserModeOff && !g_Drawing ) {
                     POINT eraserPt;
