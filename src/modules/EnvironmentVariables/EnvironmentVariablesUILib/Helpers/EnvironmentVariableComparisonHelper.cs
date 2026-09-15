@@ -85,7 +85,7 @@ internal static class EnvironmentVariableComparisonHelper
             foreach (var profileVariable in appliedProfile.Variables)
             {
                 var backupName = EnvironmentVariablesHelper.GetBackupVariableName(profileVariable, appliedProfile.Name);
-                if (editingProfile != null && !ReferenceEquals(appliedProfile, editingProfile))
+                if (!ReferenceEquals(appliedProfile, editingProfile))
                 {
                     if (variables.TryGetValue(backupName, out var backupVariable))
                     {
