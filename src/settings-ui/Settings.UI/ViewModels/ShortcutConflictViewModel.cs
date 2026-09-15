@@ -361,7 +361,8 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             var additionalActionCount = settings.Properties.AdditionalActions.GetAllActions()
                 .OfType<AdvancedPasteAdditionalAction>()
                 .Count();
-            var coachingHotkeyCount = settings.Properties.AdditionalActions.FixSpellingAndGrammar.CoachingEnabled
+            var coachingHotkeyCount = settings.Properties.AdditionalActions.FixSpellingAndGrammar.IsShown
+                && settings.Properties.AdditionalActions.FixSpellingAndGrammar.CoachingEnabled
                 && settings.Properties.AdditionalActions.FixSpellingAndGrammar.CoachingShortcut is { Code: not 0 }
                     ? 1
                     : 0;

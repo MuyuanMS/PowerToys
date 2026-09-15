@@ -252,7 +252,6 @@ private:
                 parse_single_hotkey(action.GetNamedObject(JSON_KEY_SHORTCUT), actionIsShown)
             };
             m_additional_actions.push_back(additionalAction);
-            m_additional_actions.push_back(additionalAction);
         }
         else
         {
