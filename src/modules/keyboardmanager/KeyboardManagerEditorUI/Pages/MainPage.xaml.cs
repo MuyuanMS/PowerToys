@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation
+﻿// Copyright (c) Microsoft Corporation
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -468,28 +468,31 @@ namespace KeyboardManagerEditorUI.Pages
         {
             NewProfileNameBox.Text = string.Empty;
             CopyCurrentProfileCheckBox.IsChecked = false;
+            NewProfileErrorText.Visibility = Visibility.Collapsed;
 
-            if (await NewProfileDialog.ShowAsync() != ContentDialogResult.Primary)
+            while (await NewProfileDialog.ShowAsync() == ContentDialogResult.Primary)
             {
-                return;
-            }
+                string name = NewProfileNameBox.Text.Trim();
+                ProfileCreationResult result = ProfileManager.CreateProfile(name, CopyCurrentProfileCheckBox.IsChecked == true);
+                if (result == ProfileCreationResult.Success)
+                {
+                    LoadProfiles();
 
-            string name = NewProfileNameBox.Text.Trim();
-            if (string.IsNullOrEmpty(name))
-            {
-                return;
-            }
+                    // Selecting the new profile triggers the switch through SelectionChanged.
+                    ProfileSelector.SelectedItem = name;
+                    return;
+                }
 
-            if (ProfileManager.CreateProfile(name, CopyCurrentProfileCheckBox.IsChecked == true))
-            {
-                LoadProfiles();
-
-                // Selecting the new profile triggers the switch through SelectionChanged.
-                ProfileSelector.SelectedItem = name;
-            }
-            else
-            {
-                Logger.LogWarning($"Could not create profile '{name}' (invalid name or already exists)");
+                string resourceKey = result switch
+                {
+                    ProfileCreationResult.InvalidName => "NewProfileError_InvalidName",
+                    ProfileCreationResult.ReservedName => "NewProfileError_ReservedName",
+                    ProfileCreationResult.AlreadyExists => "NewProfileError_AlreadyExists",
+                    _ => "NewProfileError_WriteFailed",
+                };
+                NewProfileErrorText.Text = ResourceHelper.GetString(resourceKey);
+                NewProfileErrorText.Visibility = Visibility.Visible;
+                Logger.LogWarning($"Could not create profile '{name}': {result}");
             }
         }
 
@@ -1406,6 +1409,7 @@ namespace KeyboardManagerEditorUI.Pages
 
         private void LoadRemappings()
         {
+            string currentProfile = ProfileManager.GetActiveProfile();
             // Clear first so switching to a profile with no remaps empties the list
             // (rather than leaving the previous profile's entries on screen).
             RemappingList.Clear();
@@ -1424,7 +1428,7 @@ namespace KeyboardManagerEditorUI.Pages
             foreach (var id in remapShortcutIds)
             {
                 if (!SettingsManager.EditorSettings.ShortcutSettingsDictionary.TryGetValue(id, out ShortcutSettings? shortcutSettings) ||
-                    !SettingsManager.IsMappingInActiveProfile(shortcutSettings))
+                    !SettingsManager.IsMappingInActiveProfile(shortcutSettings, currentProfile))
                 {
                     continue;
                 }
@@ -1463,6 +1467,7 @@ namespace KeyboardManagerEditorUI.Pages
 
         private void LoadTextMappings()
         {
+            string currentProfile = ProfileManager.GetActiveProfile();
             TextMappings.Clear();
 
             SettingsManager.EditorSettings.ShortcutsByOperationType.TryGetValue(ShortcutOperationType.RemapText, out var remapShortcutIds);
@@ -1477,7 +1482,7 @@ namespace KeyboardManagerEditorUI.Pages
             foreach (var id in remapShortcutIds)
             {
                 if (!SettingsManager.EditorSettings.ShortcutSettingsDictionary.TryGetValue(id, out ShortcutSettings? shortcutSettings) ||
-                    !SettingsManager.IsMappingInActiveProfile(shortcutSettings))
+                    !SettingsManager.IsMappingInActiveProfile(shortcutSettings, currentProfile))
                 {
                     continue;
                 }
@@ -1501,6 +1506,7 @@ namespace KeyboardManagerEditorUI.Pages
 
         private void LoadProgramShortcuts()
         {
+            string currentProfile = ProfileManager.GetActiveProfile();
             ProgramShortcuts.Clear();
 
             SettingsManager.EditorSettings.ShortcutsByOperationType.TryGetValue(ShortcutOperationType.RunProgram, out var remapShortcutIds);
@@ -1515,7 +1521,7 @@ namespace KeyboardManagerEditorUI.Pages
             foreach (var id in remapShortcutIds)
             {
                 if (!SettingsManager.EditorSettings.ShortcutSettingsDictionary.TryGetValue(id, out ShortcutSettings? shortcutSettings) ||
-                    !SettingsManager.IsMappingInActiveProfile(shortcutSettings))
+                    !SettingsManager.IsMappingInActiveProfile(shortcutSettings, currentProfile))
                 {
                     continue;
                 }
@@ -1544,6 +1550,7 @@ namespace KeyboardManagerEditorUI.Pages
 
         private void LoadUrlShortcuts()
         {
+            string currentProfile = ProfileManager.GetActiveProfile();
             UrlShortcuts.Clear();
 
             SettingsManager.EditorSettings.ShortcutsByOperationType.TryGetValue(ShortcutOperationType.OpenUri, out var remapShortcutIds);
@@ -1558,7 +1565,7 @@ namespace KeyboardManagerEditorUI.Pages
             foreach (var id in remapShortcutIds)
             {
                 if (!SettingsManager.EditorSettings.ShortcutSettingsDictionary.TryGetValue(id, out ShortcutSettings? shortcutSettings) ||
-                    !SettingsManager.IsMappingInActiveProfile(shortcutSettings))
+                    !SettingsManager.IsMappingInActiveProfile(shortcutSettings, currentProfile))
                 {
                     continue;
                 }

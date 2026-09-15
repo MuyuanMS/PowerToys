@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation
+﻿// Copyright (c) Microsoft Corporation
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -47,25 +47,12 @@ namespace KeyboardManagerEditorUI.Interop
         private static extern bool HidD_GetProductString(IntPtr hidDeviceObject, IntPtr buffer, uint bufferLength);
 
         /// <summary>
-        /// Normalizes a RIDI_DEVICENAME to the stable prefix (everything before the 2nd '#'),
-        /// dropping the instance id that some virtual keyboards churn. Must match the engine's
-        /// NormalizeDevicePath so the UI and the engine agree on device identity.
+        /// Preserves the RIDI_DEVICENAME returned by Raw Input so the UI and engine both use the
+        /// exact same per-physical-device identifier.
         /// </summary>
         public static string NormalizeDevicePath(string path)
         {
-            if (string.IsNullOrEmpty(path))
-            {
-                return path;
-            }
-
-            int first = path.IndexOf('#', StringComparison.Ordinal);
-            if (first < 0)
-            {
-                return path;
-            }
-
-            int second = path.IndexOf('#', first + 1);
-            return second < 0 ? path : path.Substring(0, second);
+            return path;
         }
 
         public static List<DetectedKeyboard> EnumerateKeyboards()

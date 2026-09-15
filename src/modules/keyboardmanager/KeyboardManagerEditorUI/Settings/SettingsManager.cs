@@ -685,7 +685,11 @@ namespace KeyboardManagerEditorUI.Settings
 
         internal static bool IsMappingInActiveProfile(ShortcutSettings shortcutSettings)
         {
-            string? profileName = CurrentProfileName;
+            return IsMappingInActiveProfile(shortcutSettings, CurrentProfileName);
+        }
+
+        internal static bool IsMappingInActiveProfile(ShortcutSettings shortcutSettings, string? profileName)
+        {
             if (string.IsNullOrWhiteSpace(profileName))
             {
                 profileName = EditorSettings.ActiveProfile;

@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "KeyboardManager.h"
 #include <interface/powertoy_module_interface.h>
 #include <common/SettingsAPI/settings_objects.h>
@@ -25,25 +25,64 @@ KeyboardManager* KeyboardManager::keyboardManagerObjectPtr;
 
 namespace
 {
-    // A RIDI_DEVICENAME path looks like "\\?\HID#<deviceId>#<instanceId>#<interfaceGuid>". Some
-    // virtual keyboards (e.g. Target_KIP) are assigned a fresh <instanceId> over time, which would
-    // break an exact-path match. Match on the stable prefix instead: everything up to the instance
-    // (the 2nd '#'). This keeps distinct keyboards apart while tolerating instance-id churn.
+    // Keep the exact RIDI_DEVICENAME returned by Raw Input so the editor and engine share the
+    // same per-device identifier.
     std::wstring NormalizeDevicePath(const std::wstring& path)
     {
-        const size_t first = path.find(L'#');
-        if (first == std::wstring::npos)
-        {
-            return path;
-        }
+        return path;
+    }
 
-        const size_t second = path.find(L'#', first + 1);
-        if (second == std::wstring::npos)
+    HANDLE AcquireEditorTransactionLock()
+    {
+        const std::wstring lockPath = PTSettingsHelper::get_module_save_folder_location(KeyboardManagerConstants::ModuleName) + L"\\editorTransaction.lock";
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+        do
         {
-            return path;
-        }
+            HANDLE handle = CreateFileW(lockPath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+            if (handle != INVALID_HANDLE_VALUE)
+            {
+                return handle;
+            }
 
-        return path.substr(0, second);
+            const DWORD error = GetLastError();
+            if (error != ERROR_SHARING_VIOLATION && error != ERROR_ACCESS_DENIED)
+            {
+                break;
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+        while (std::chrono::steady_clock::now() < deadline);
+
+        return INVALID_HANDLE_VALUE;
+    }
+
+    bool WriteJsonAtomically(const std::wstring& filePath, const json::JsonObject& object)
+    {
+        const std::wstring temporaryPath = filePath + L"." + std::to_wstring(GetCurrentProcessId()) + L"." + std::to_wstring(GetCurrentThreadId()) + L".tmp";
+
+        try
+        {
+            std::ofstream stream{ temporaryPath, std::ios::binary | std::ios::trunc };
+            stream.exceptions(std::ios::failbit | std::ios::badbit);
+
+            const std::string serialized = winrt::to_string(object.Stringify());
+            stream.write(serialized.data(), static_cast<std::streamsize>(serialized.size()));
+            stream.flush();
+            stream.close();
+
+            if (!MoveFileExW(temporaryPath.c_str(), filePath.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+            {
+                throw winrt::hresult_error(HRESULT_FROM_WIN32(GetLastError()));
+            }
+
+            return true;
+        }
+        catch (...)
+        {
+            DeleteFileW(temporaryPath.c_str());
+            return false;
+        }
     }
 }
 
@@ -113,13 +152,13 @@ KeyboardManager::KeyboardManager()
     // Start detecting which physical keyboard is being typed on (for per-keyboard profile switching).
     rawInputTracker = std::make_unique<RawInputKeyboardTracker>(
         [this](const RawInputKeyboardTracker::KeyEvent& keyEvent) { OnRawKeyEvent(keyEvent); });
-    rawInputTracker->Start();
 
     // Global profile-cycle hotkey. Re-read the config so the definition parsed before this object
     // existed is applied (LoadDeviceProfiles guards on the pointer).
     profileCycleHotkey = std::make_unique<ProfileCycleHotkey>([this] { CycleActiveProfile(); });
-    profileCycleHotkey->Start();
+
     LoadDeviceProfiles();
+    profileCycleHotkey->Start();
 }
 
 void KeyboardManager::OnRawKeyEvent(const RawInputKeyboardTracker::KeyEvent& keyEvent)
@@ -178,6 +217,9 @@ void KeyboardManager::OnRawKeyEvent(const RawInputKeyboardTracker::KeyEvent& key
         auto it = deviceProfileMap.find(NormalizeDevicePath(keyEvent.devicePath));
         if (it == deviceProfileMap.end())
         {
+            std::lock_guard<std::mutex> policyLock(autoSwitchPolicyMutex);
+            pendingTarget.clear();
+            pendingCount = 0;
             return;
         }
 
@@ -189,6 +231,8 @@ void KeyboardManager::OnRawKeyEvent(const RawInputKeyboardTracker::KeyEvent& key
         std::lock_guard<std::mutex> lock(activeProfileMutex);
         current = activeProfileName;
     }
+
+    std::lock_guard<std::mutex> policyLock(autoSwitchPolicyMutex);
 
     if (target == current)
     {
@@ -222,9 +266,11 @@ void KeyboardManager::OnRawKeyEvent(const RawInputKeyboardTracker::KeyEvent& key
     }
 
     pendingCount = 0;
-    requestedProfile = target;
     Logger::trace(L"Auto-switch: keyboard {} -> profile '{}'", keyEvent.devicePath, target);
-    SwitchActiveProfile(target);
+    if (SwitchActiveProfile(target))
+    {
+        requestedProfile = target;
+    }
 }
 
 void KeyboardManager::LoadDeviceProfiles()
@@ -296,6 +342,18 @@ void KeyboardManager::LoadDeviceProfiles()
 
     autoSwitchEnabled.store(enabled);
 
+    if (rawInputTracker)
+    {
+        if (enabled)
+        {
+            rawInputTracker->Start();
+        }
+        else
+        {
+            rawInputTracker->Stop();
+        }
+    }
+
     if (profileCycleHotkey)
     {
         profileCycleHotkey->Update(hotkeyModifiers, hotkeyVk);
@@ -343,10 +401,11 @@ void KeyboardManager::CycleActiveProfile()
 
         const std::wstring& next = profiles[(currentIndex + 1) % profiles.size()];
         Logger::trace(L"CycleActiveProfile: '{}' -> '{}'", current, next);
-        SwitchActiveProfile(next);
-
-        // Audible feedback that the profile changed (no UI surface in the engine).
-        MessageBeep(MB_OK);
+        if (SwitchActiveProfile(next))
+        {
+            // Audible feedback that the profile changed (no UI surface in the engine).
+            MessageBeep(MB_OK);
+        }
     }
     catch (...)
     {
@@ -354,16 +413,31 @@ void KeyboardManager::CycleActiveProfile()
     }
 }
 
-void KeyboardManager::SwitchActiveProfile(const std::wstring& profile)
+bool KeyboardManager::SwitchActiveProfile(const std::wstring& profile)
 {
     // Tracker thread and hotkey thread can both land here; serialize the read-modify-write.
     std::lock_guard<std::mutex> lock(switchProfileMutex);
 
+    const HANDLE transactionLock = AcquireEditorTransactionLock();
+    if (transactionLock == INVALID_HANDLE_VALUE)
+    {
+        Logger::error(L"Failed to acquire Keyboard Manager settings transaction lock");
+        return false;
+    }
+
+    bool written = false;
     try
     {
         const auto path = PTSettingsHelper::get_module_save_folder_location(moduleName) + L"\\settings.json";
         auto parsed = json::from_file(path);
-        json::JsonObject root = parsed.has_value() ? parsed.value() : json::JsonObject{};
+        if (!parsed.has_value())
+        {
+            Logger::error(L"Failed to read settings.json before switching profiles");
+            CloseHandle(transactionLock);
+            return false;
+        }
+
+        json::JsonObject root = parsed.value();
 
         json::JsonObject properties = root.HasKey(L"properties") ? root.GetNamedObject(L"properties") : json::JsonObject{};
 
@@ -372,25 +446,37 @@ void KeyboardManager::SwitchActiveProfile(const std::wstring& profile)
         properties.SetNamedValue(KeyboardManagerConstants::ActiveConfigurationSettingName, activeConfiguration);
         root.SetNamedValue(L"properties", properties);
 
-        json::to_file(path, root);
+        written = WriteJsonAtomically(path, root);
     }
     catch (...)
     {
         Logger::error(L"Failed to write activeConfiguration for auto-switch");
-        return;
+    }
+
+    CloseHandle(transactionLock);
+    if (!written)
+    {
+        Logger::error(L"Failed to atomically write activeConfiguration for auto-switch");
+        return false;
     }
 
     // Reuse the existing reload path: the engine's own settings watcher will apply the new profile.
     HANDLE hEvent = CreateEvent(nullptr, false, false, KeyboardManagerConstants::SettingsEventName.c_str());
-    if (hEvent)
+    if (!hEvent)
     {
-        SetEvent(hEvent);
-        CloseHandle(hEvent);
+        Logger::error(L"Auto-switch: failed to open settings event");
+        return false;
     }
-    else
+
+    const bool signaled = SetEvent(hEvent) != FALSE;
+    CloseHandle(hEvent);
+    if (!signaled)
     {
         Logger::error(L"Auto-switch: failed to signal settings event");
+        return false;
     }
+
+    return true;
 }
 
 void KeyboardManager::LoadSettings()
@@ -413,6 +499,12 @@ void KeyboardManager::LoadSettings()
     {
         std::lock_guard<std::mutex> lock(activeProfileMutex);
         activeProfileName = state.currentConfig;
+    }
+    {
+        std::lock_guard<std::mutex> lock(autoSwitchPolicyMutex);
+        pendingTarget.clear();
+        pendingCount = 0;
+        requestedProfile.clear();
     }
     LoadDeviceProfiles();
 

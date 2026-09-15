@@ -131,6 +131,55 @@ namespace KeyboardManagerEditorUI.UnitTests
             Assert.AreEqual(0, keys.Count);
         }
 
+        [TestMethod]
+        public void NormalizeDevicePath_ShouldPreserveExactRawInputIdentity()
+        {
+            const string devicePath = @"\\?\HID#VID_046D&PID_C31C#7&1F5D3E79&0&0000#{4d36e96b-e325-11ce-bfc1-08002be10318}";
+
+            Assert.AreEqual(devicePath, RawInputDeviceEnumerator.NormalizeDevicePath(devicePath));
+        }
+
+        [DataTestMethod]
+        [DataRow("settings")]
+        [DataRow("deviceProfiles")]
+        [DataRow("editorSettings")]
+        [DataRow("editorSettings.cache")]
+        public void ValidateProfileName_ShouldRejectReservedNames(string profile)
+        {
+            Assert.AreEqual(ProfileCreationResult.ReservedName, ProfileManager.ValidateProfileName(profile));
+        }
+
+        [DataTestMethod]
+        [DataRow("settings.json")]
+        [DataRow("deviceProfiles.json")]
+        [DataRow("editorSettings.json")]
+        [DataRow("default.backup-1.json")]
+        public void IsProfileConfigFile_ShouldExcludeSidecarsAndBackups(string file)
+        {
+            Assert.IsFalse(ProfileManager.IsProfileConfigFile(file));
+        }
+
+        [DataTestMethod]
+        [DataRow("default.json")]
+        [DataRow("work.json")]
+        public void IsProfileConfigFile_ShouldIncludeProfiles(string file)
+        {
+            Assert.IsTrue(ProfileManager.IsProfileConfigFile(file));
+        }
+
+        [TestMethod]
+        public void IsMappingInActiveProfile_ShouldUseProvidedProfileSnapshot()
+        {
+            var mapping = new ShortcutSettings
+            {
+                Shortcut = CreateMapping(ShortcutOperationType.RemapShortcut, "65", "66"),
+                Profiles = new List<string> { "profile-two" },
+            };
+
+            Assert.IsTrue(SettingsManager.IsMappingInActiveProfile(mapping, "profile-two"));
+            Assert.IsFalse(SettingsManager.IsMappingInActiveProfile(mapping, "profile-one"));
+        }
+
         // Test GetModifierSortOrder returns correct values
         [TestMethod]
         public void GetModifierSortOrder_ShouldReturnCorrectOrder_ForAllModifierTypes()

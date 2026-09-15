@@ -146,6 +146,7 @@
                             SelectionChanged="ProfileSelector_SelectionChanged" />
                         <Button
                             x:Name="NewProfileBtn"
+                            x:Uid="NewProfileBtn"
                             Width="36"
                             Height="32"
                             Padding="0"
@@ -158,6 +159,7 @@
                         </Button>
                         <Button
                             x:Name="DeleteProfileBtn"
+                            x:Uid="DeleteProfileBtn"
                             Width="36"
                             Height="32"
                             Padding="0"
@@ -918,6 +920,11 @@
                     DefaultButton="Primary">
                     <StackPanel Spacing="12">
                         <TextBox x:Name="NewProfileNameBox" x:Uid="NewProfileNameBox" />
+                        <TextBlock
+                            x:Name="NewProfileErrorText"
+                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                            TextWrapping="Wrap"
+                            Visibility="Collapsed" />
                         <CheckBox x:Name="CopyCurrentProfileCheckBox" x:Uid="CopyCurrentProfileCheckBox" />
                     </StackPanel>
                 </ContentDialog>
@@ -972,6 +979,7 @@
                                         <ComboBox
                                             Grid.Column="2"
                                             MinWidth="150"
+                                            AutomationProperties.Name="{x:Bind DisplayName}"
                                             ItemsSource="{x:Bind Profiles}"
                                             SelectedItem="{x:Bind SelectedProfile, Mode=TwoWay}" />
                                     </Grid>

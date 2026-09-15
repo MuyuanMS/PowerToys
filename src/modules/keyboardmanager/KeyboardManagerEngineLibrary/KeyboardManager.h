@@ -104,7 +104,7 @@ private:
 
     // Make the given profile active by writing settings.json + signaling the settings-changed
     // event, so the existing reload path applies it (avoids a second thread mutating `state`).
-    void SwitchActiveProfile(const std::wstring& profile);
+    bool SwitchActiveProfile(const std::wstring& profile);
 
     // Advance to the next profile in settings.json's keyboardConfigurations list (hotkey action).
     void CycleActiveProfile();
@@ -126,6 +126,7 @@ private:
     std::wstring pendingTarget;
     int pendingCount = 0;
     std::wstring requestedProfile;
+    std::mutex autoSwitchPolicyMutex;
 
     // Last keyboard seen, logged on change to help discover device paths for the profile map.
     std::wstring lastSeenDevice;

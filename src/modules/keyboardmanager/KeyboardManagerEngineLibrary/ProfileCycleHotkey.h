@@ -1,7 +1,9 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
 #include <functional>
+#include <mutex>
 #include <thread>
 
 #include <Windows.h>
@@ -39,6 +41,7 @@ private:
 
     void ThreadMain();
     void ApplyPendingRegistration(HWND hwnd);
+    void SignalStartup(bool failed);
 
     Callback m_callback;
     std::thread m_thread;
@@ -47,5 +50,10 @@ private:
     std::atomic_bool m_started{ false };
     std::atomic<UINT> m_pendingModifiers{ 0 };
     std::atomic<UINT> m_pendingVk{ 0 };
+    std::mutex m_lifecycleMutex;
+    std::mutex m_startMutex;
+    std::condition_variable m_startCv;
+    bool m_startupComplete = false;
+    bool m_startupFailed = false;
     bool m_registered = false; // listener-thread only
 };

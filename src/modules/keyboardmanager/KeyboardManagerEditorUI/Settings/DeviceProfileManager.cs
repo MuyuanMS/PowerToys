@@ -82,15 +82,47 @@ namespace KeyboardManagerEditorUI.Settings
                     CycleHotkey = Load().CycleHotkey, // preserve the engine's hotkey definition
                 };
 
-                Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
-                File.WriteAllText(_filePath, JsonSerializer.Serialize(file, _jsonOptions));
-
+                Write(file);
                 ProfileManager.SignalEngineReload();
                 return true;
             }
             catch (Exception ex)
             {
                 Logger.LogError("Failed to save deviceProfiles.json: " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Removes any assignments that point at <paramref name="profile"/>. Returns false only
+        /// when the file could not be read or written.
+        /// </summary>
+        public static bool RemoveAssignmentsForProfile(string profile)
+        {
+            if (string.IsNullOrWhiteSpace(profile))
+            {
+                return true;
+            }
+
+            try
+            {
+                if (!File.Exists(_filePath))
+                {
+                    return true;
+                }
+
+                DeviceProfilesFile file = JsonSerializer.Deserialize<DeviceProfilesFile>(File.ReadAllText(_filePath), _jsonOptions)
+                                          ?? throw new InvalidDataException("deviceProfiles.json does not contain a valid object");
+                file.Map = file.Map
+                    .Where(entry => !string.Equals(entry.Profile, profile, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                Write(file);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Failed to update deviceProfiles.json after deleting a profile: " + ex.Message);
                 return false;
             }
         }
@@ -111,6 +143,30 @@ namespace KeyboardManagerEditorUI.Settings
             }
 
             return new DeviceProfilesFile();
+        }
+
+        private static void Write(DeviceProfilesFile file)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+            string temporaryPath = _filePath + $".{Guid.NewGuid():N}.tmp";
+            try
+            {
+                File.WriteAllText(temporaryPath, JsonSerializer.Serialize(file, _jsonOptions));
+                File.Move(temporaryPath, _filePath, overwrite: true);
+            }
+            finally
+            {
+                try
+                {
+                    File.Delete(temporaryPath);
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+            }
         }
     }
 }
