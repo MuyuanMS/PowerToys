@@ -87,11 +87,11 @@ You pick how the browser gets back to Command Palette.
 - **Loopback** (`http://127.0.0.1:{ephemeral-port}/`, RFC 8252). The host listens on
   the loopback interface on a random port. This has the broadest provider support, so
   it's the default. Reach for it first.
-- **CustomScheme** (`x-cmdpal://auth/callback`). The redirect reactivates Command
+- **CustomScheme** (`com.microsoft.powertoys.cmdpal://auth/callback`). The redirect reactivates Command
   Palette through its registered protocol, so the palette comes back to the front on
   its own. Only works with providers that allow custom-scheme redirect URIs, so it's
   the exception, not the rule. The Command Palette host registers this on the
-  publisher-controlled `x-cmdpal` scheme per RFC 8252 §7.1.
+  publisher-controlled reverse-domain scheme `com.microsoft.powertoys.cmdpal` per RFC 8252 §7.1.
 
 ## The flows
 
@@ -136,7 +136,7 @@ A few things worth calling out:
   by the time a token exists.
 
 **Custom-scheme variant.** The shape is the same, with one difference at the redirect
-step. Instead of a loopback capture, the browser hands the OS an `x-cmdpal://auth/callback`
+step. Instead of a loopback capture, the browser hands the OS an `com.microsoft.powertoys.cmdpal://auth/callback`
 URL. The OS reactivates Command Palette, the host matches `state` back to the pending
 flow, routes the code to the extension that started it, and foregrounds the palette. From
 your code it looks identical. You still get an `IAuthorizationResult` and still do the
@@ -211,7 +211,7 @@ the new flow implements `IExtensionHost2`, which extends `IExtensionHost`.
 enum AuthorizationRedirectKind
 {
     Loopback = 0,      // http://127.0.0.1:{ephemeral-port}/  (RFC 8252)
-    CustomScheme = 1,  // x-cmdpal://auth/callback
+    CustomScheme = 1,  // com.microsoft.powertoys.cmdpal://auth/callback
 };
 
 interface IAuthorizationRequest
