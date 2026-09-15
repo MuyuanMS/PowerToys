@@ -235,6 +235,10 @@ public sealed class NpmArtifact
         }
 
         return string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            && uri.IsDefaultPort
+            && string.IsNullOrEmpty(uri.UserInfo)
+            && string.IsNullOrEmpty(uri.Query)
+            && string.IsNullOrEmpty(uri.Fragment)
             && ApprovedRegistryHosts.Contains(uri.Host);
     }
 

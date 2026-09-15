@@ -168,6 +168,9 @@ public class NpmArtifactTests
 
     [DataTestMethod]
     [DataRow("https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz", true)]
+    [DataRow("https://registry.npmjs.org:8443/left-pad/-/left-pad-1.3.0.tgz", false)]
+    [DataRow("https://user:password@registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz", false)]
+    [DataRow("https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz?mirror=1", false)]
     [DataRow("http://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz", false)]
     [DataRow("https://evil.example.com/left-pad/-/left-pad-1.3.0.tgz", false)]
     [DataRow("git+https://github.com/foo/bar.git", false)]

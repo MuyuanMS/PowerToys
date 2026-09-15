@@ -80,6 +80,12 @@ public sealed class NpmCommandRunner : INpmCommandRunner
             return NpmCommandResult.Fail(Resources.npm_runner_npm_not_found);
         }
 
+        if (!IsSafeDirectoryPath(stagingDirectory))
+        {
+            Logger.LogError($"Refusing npm staging directory '{stagingDirectory}' because its path contains a reparse point.");
+            return NpmCommandResult.Fail(Resources.npm_runner_create_staging_failed);
+        }
+
         try
         {
             Directory.CreateDirectory(stagingDirectory);
@@ -92,6 +98,12 @@ public sealed class NpmCommandRunner : INpmCommandRunner
 
         try
         {
+            if (!IsSafeDirectoryPath(stagingDirectory))
+            {
+                Logger.LogError($"Refusing npm staging directory '{stagingDirectory}' because its path became unsafe.");
+                return NpmCommandResult.Fail(Resources.npm_runner_create_staging_failed);
+            }
+
             // 1) Download the exact "name@version" tarball with lifecycle scripts off. npm pack fetches
             //    the published artifact without resolving dependencies.
             var packDirectory = Path.Combine(stagingDirectory, PackDirectoryName);
@@ -597,6 +609,29 @@ public sealed class NpmCommandRunner : INpmCommandRunner
         }
     }
 
+    private static bool IsSafeDirectoryPath(string path)
+    {
+        try
+        {
+            var current = new DirectoryInfo(Path.GetFullPath(path));
+            while (current is not null)
+            {
+                if (current.Exists && (current.Attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    return false;
+                }
+
+                current = current.Parent;
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or System.Security.SecurityException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>
     /// A resolved npm launcher: node.exe plus the leading arguments that make it run npm. The install
     /// spec and flags are appended after these.
@@ -651,7 +686,7 @@ public sealed class NpmCommandRunner : INpmCommandRunner
                     if (package.Value.TryGetProperty("link", out var link)
                         && link.ValueKind == JsonValueKind.True)
                     {
-                        continue;
+                        return Resources.npm_runner_lockfile_untrusted;
                     }
 
                     if (!IsTrustedResolution(package.Value))
