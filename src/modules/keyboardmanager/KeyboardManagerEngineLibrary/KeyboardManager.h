@@ -23,6 +23,8 @@ public:
     ~KeyboardManager()
     {
         // Stop the worker threads first so they can't call back into a half-destroyed object.
+        settingsEventWaiter.stop();
+
         if (rawInputTracker)
         {
             rawInputTracker->Stop();

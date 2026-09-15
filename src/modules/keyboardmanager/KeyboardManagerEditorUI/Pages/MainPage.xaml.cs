@@ -402,11 +402,12 @@ namespace KeyboardManagerEditorUI.Pages
 
                 _settingsWatcher = new FileSystemWatcher(dir, "settings.json")
                 {
-                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size,
+                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName,
                     EnableRaisingEvents = true,
                 };
                 _settingsWatcher.Changed += OnSettingsFileChanged;
                 _settingsWatcher.Created += OnSettingsFileChanged;
+                _settingsWatcher.Renamed += OnSettingsFileChanged;
             }
             catch (Exception ex)
             {
@@ -1961,6 +1962,7 @@ namespace KeyboardManagerEditorUI.Pages
                     _settingsWatcher.EnableRaisingEvents = false;
                     _settingsWatcher.Changed -= OnSettingsFileChanged;
                     _settingsWatcher.Created -= OnSettingsFileChanged;
+                    _settingsWatcher.Renamed -= OnSettingsFileChanged;
                     _settingsWatcher.Dispose();
                     _settingsWatcher = null;
                 }

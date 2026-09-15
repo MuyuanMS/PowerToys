@@ -15,6 +15,7 @@
 #include <ctime>
 
 #include "KeyboardEventHandlers.h"
+#include "AutoSwitchPolicy.h"
 #include "trace.h"
 
 HHOOK KeyboardManager::hookHandleCopy;
@@ -163,31 +164,11 @@ KeyboardManager::KeyboardManager()
 
 void KeyboardManager::OnRawKeyEvent(const RawInputKeyboardTracker::KeyEvent& keyEvent)
 {
-    // Ignore injected input (hDevice == NULL, incl. KBM's own remap output) and key-ups.
-    if (keyEvent.injected || !keyEvent.keyDown)
+    // Ignore injected input, key-ups, and modifier keys. Modifiers lead every chord and are weak
+    // evidence that the user moved to this keyboard.
+    if (KeyboardManagerAutoSwitchPolicy::ShouldIgnoreEvent(keyEvent.injected, keyEvent.keyDown, keyEvent.vkey))
     {
         return;
-    }
-
-    // Ignore modifier keys: they lead every chord (including the profile-cycle hotkey, whose own
-    // Shift/Alt key-downs would otherwise feed the hysteresis and fight the cycle), and a lone
-    // modifier is weak evidence that the user moved to this keyboard.
-    switch (keyEvent.vkey)
-    {
-    case VK_SHIFT:
-    case VK_CONTROL:
-    case VK_MENU:
-    case VK_LSHIFT:
-    case VK_RSHIFT:
-    case VK_LCONTROL:
-    case VK_RCONTROL:
-    case VK_LMENU:
-    case VK_RMENU:
-    case VK_LWIN:
-    case VK_RWIN:
-        return;
-    default:
-        break;
     }
 
     // A physical keystroke whose device path can't be resolved (observed on Surface Type Cover
@@ -244,27 +225,21 @@ void KeyboardManager::OnRawKeyEvent(const RawInputKeyboardTracker::KeyEvent& key
     }
 
     // A switch to this profile was already requested; wait for the reload to take effect.
-    if (target == requestedProfile)
+    KeyboardManagerAutoSwitchPolicy::State policyState{ pendingTarget, pendingCount, requestedProfile };
+    if (KeyboardManagerAutoSwitchPolicy::IsAwaitingRequestedProfile(policyState, target, current))
     {
         return;
     }
 
     // Hysteresis: require a few consecutive keystrokes on the new keyboard before switching.
-    if (target == pendingTarget)
+    if (!KeyboardManagerAutoSwitchPolicy::AdvanceHysteresis(policyState, target, AutoSwitchThreshold))
     {
-        ++pendingCount;
-    }
-    else
-    {
-        pendingTarget = target;
-        pendingCount = 1;
-    }
-
-    if (pendingCount < AutoSwitchThreshold)
-    {
+        pendingTarget = std::move(policyState.pendingTarget);
+        pendingCount = policyState.pendingCount;
         return;
     }
 
+    pendingTarget.clear();
     pendingCount = 0;
     Logger::trace(L"Auto-switch: keyboard {} -> profile '{}'", keyEvent.devicePath, target);
     if (SwitchActiveProfile(target))

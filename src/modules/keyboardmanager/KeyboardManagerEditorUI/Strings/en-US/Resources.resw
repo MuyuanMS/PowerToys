@@ -641,7 +641,7 @@
     <value>e.g., Mac keyboard</value>
   </data>
   <data name="NewProfileError_InvalidName" xml:space="preserve">
-    <value>Enter a profile name without periods or file-name characters.</value>
+    <value>Enter a profile name without periods or invalid file-name characters.</value>
   </data>
   <data name="NewProfileError_ReservedName" xml:space="preserve">
     <value>This name is reserved by Keyboard Manager. Choose another name.</value>

@@ -34,6 +34,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="KeyboardEventHandlers.h" />
+    <ClInclude Include="AutoSwitchPolicy.h" />
     <ClInclude Include="KeyboardManager.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="ProfileCycleHotkey.h" />
