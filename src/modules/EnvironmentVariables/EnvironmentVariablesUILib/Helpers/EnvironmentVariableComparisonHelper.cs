@@ -134,15 +134,20 @@ internal static class EnvironmentVariableComparisonHelper
                 && !ReferenceEquals(appliedProfile, editingProfile)
                 && variables.ContainsKey(originalVariable.Name)))
         {
-            bool preferUserScope = originalVariable.ParentType == VariablesSetType.Profile
-                && !ReferenceEquals(appliedProfile, editingProfile);
-            RestoreLowerScopeVariable(
-                variables,
-                systemVariableMap,
-                userVariableMap,
-                originalVariable.Name,
-                unavailableVariableNames,
-                preferUserScope);
+            if (originalVariable.ParentType == VariablesSetType.System)
+            {
+                variables.Remove(originalVariable.Name);
+                unavailableVariableNames?.Add(originalVariable.Name);
+            }
+            else
+            {
+                RestoreLowerScopeVariable(
+                    variables,
+                    systemVariableMap,
+                    userVariableMap,
+                    originalVariable.Name,
+                    unavailableVariableNames);
+            }
         }
 
         if (editingProfile != null)
