@@ -181,6 +181,9 @@ namespace WorkspacesLibUnitTests
 
             target.path = L"application.exe";
             Assert::IsFalse(SignatureVerification::IsCurrent(target));
+
+            target.path = L"C:application.exe";
+            Assert::IsFalse(SignatureVerification::IsCurrent(target));
         }
 
         TEST_METHOD (UriTargetsWithoutAFileHandleRemainCurrent)

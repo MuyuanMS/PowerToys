@@ -299,8 +299,9 @@ namespace SignatureVerification
         if (!target.package)
         {
             const auto pathView = std::filesystem::path(target.path);
+            const auto colon = target.path.find(L':');
             const bool isFilesystemTarget = !target.path.empty() && target.path.find(L'\0') == std::wstring::npos &&
-                (pathView.is_absolute() || target.path.find(L':') == std::wstring::npos);
+                (pathView.is_absolute() || colon == std::wstring::npos || colon == 1);
             if (isFilesystemTarget && !target.file)
             {
                 return false;
