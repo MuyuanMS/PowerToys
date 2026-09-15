@@ -197,6 +197,7 @@ EraserMode g_EraserMode = EraserModeOff;
 // start erasing and clicks again to stop, rather than holding the button down.
 // While disengaged the eraser glyph simply follows the cursor.
 BOOLEAN g_EraserEngaged = FALSE;
+BOOLEAN g_EraserCursorNeedsInitialSave = FALSE;
 
 // Transient on-screen indicator shown when the eraser mode is toggled.
 BOOLEAN g_EraserPopupVisible = FALSE;
@@ -9318,7 +9319,7 @@ LRESULT APIENTRY MainWndProc(
                 }
             }
         } else if( ( g_PenDown ||
-                     ( g_EraserMode != EraserModeOff &&
+                     ( g_EraserMode != EraserModeOff && g_Drawing &&
                        ( GetWindowLong( hWnd, GWL_EXSTYLE ) & WS_EX_LAYERED ) == 0 ) ) &&
                    !penInverted) {
 
@@ -9950,6 +9951,9 @@ LRESULT APIENTRY MainWndProc(
                     g_Drawing = TRUE;
                     g_Tracing = FALSE;
                     SetROP2( hdcScreenCompat, R2_COPYPEN );
+                    boundRc = BoundMouse( zoomLevel, &monInfo, width, height, &cursorPos );
+                    ClipCursor( NULL );
+                    g_EraserCursorNeedsInitialSave = TRUE;
                 }
 
                 // Switching modes stops any in-progress erasing; the user clicks
@@ -9962,9 +9966,12 @@ LRESULT APIENTRY MainWndProc(
                 // Refresh the on-canvas cursor to reflect the new tool.
                 if( g_Drawing && !g_Tracing ) {
 
-                    RestoreCursorArea( hdcScreenCompat, hdcScreenCursorCompat, prevPt );
+                    if( !g_EraserCursorNeedsInitialSave ) {
+                        RestoreCursorArea( hdcScreenCompat, hdcScreenCursorCompat, prevPt );
+                    }
                     SaveCursorArea( hdcScreenCursorCompat, hdcScreenCompat, prevPt );
                     DrawCursor( hdcScreenCompat, prevPt, zoomLevel, width, height );
+                    g_EraserCursorNeedsInitialSave = FALSE;
                     InvalidateRect( hWnd, NULL, FALSE );
                 }
                 else {
