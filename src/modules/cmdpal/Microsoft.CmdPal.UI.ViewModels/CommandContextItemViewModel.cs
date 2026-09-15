@@ -30,7 +30,7 @@ public partial class CommandContextItemViewModel : CommandItemViewModel, IContex
 
     public override void InitializeProperties()
     {
-        if (IsInitialized)
+        if (IsInitialized || IsCleanedUp)
         {
             return;
         }
@@ -38,16 +38,25 @@ public partial class CommandContextItemViewModel : CommandItemViewModel, IContex
         base.InitializeProperties();
 
         var contextItem = Model.Unsafe;
-        if (contextItem is null)
+        if (contextItem is null || IsCleanedUp)
         {
             return; // throw?
         }
 
-        IsCritical = contextItem.IsCritical;
+        var isCritical = contextItem.IsCritical;
+        var requestedShortcut = contextItem.RequestedShortcut;
+        lock (MoreCommandsLock)
+        {
+            if (IsCleanedUp)
+            {
+                return;
+            }
 
-        RequestedShortcut = new(
-            contextItem.RequestedShortcut.Modifiers,
-            contextItem.RequestedShortcut.Vkey,
-            contextItem.RequestedShortcut.ScanCode);
+            IsCritical = isCritical;
+            RequestedShortcut = new(
+                requestedShortcut.Modifiers,
+                requestedShortcut.Vkey,
+                requestedShortcut.ScanCode);
+        }
     }
 }

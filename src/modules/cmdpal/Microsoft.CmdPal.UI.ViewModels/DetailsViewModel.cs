@@ -11,9 +11,11 @@ namespace Microsoft.CmdPal.UI.ViewModels;
 
 public partial class DetailsViewModel : ExtensionObjectViewModel
 {
+    private readonly Lock _lifecycleLock = new();
     private readonly ExtensionObject<IDetails> _detailsModel;
     private INotifyPropChanged? _observableDetails;
     private bool _isSubscribed;
+    private bool _isCleanedUp;
 
     // Remember - "observable" properties from the model (via PropChanged)
     // cannot be marked [ObservableProperty]
@@ -39,6 +41,14 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
 
     private void Model_PropChanged(object sender, IPropChangedEventArgs args)
     {
+        lock (_lifecycleLock)
+        {
+            if (_isCleanedUp)
+            {
+                return;
+            }
+        }
+
         try
         {
             FetchProperty(args.PropertyName);
@@ -60,20 +70,67 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
         switch (propertyName)
         {
             case nameof(IDetails.Title):
-                Title = model.Title ?? string.Empty;
+                var title = model.Title ?? string.Empty;
+                lock (_lifecycleLock)
+                {
+                    if (_isCleanedUp)
+                    {
+                        return;
+                    }
+
+                    Title = title;
+                }
+
                 UpdateProperty(nameof(Title));
                 break;
             case nameof(IDetails.Body):
-                Body = model.Body ?? string.Empty;
+                var body = model.Body ?? string.Empty;
+                lock (_lifecycleLock)
+                {
+                    if (_isCleanedUp)
+                    {
+                        return;
+                    }
+
+                    Body = body;
+                }
+
                 UpdateProperty(nameof(Body));
                 break;
             case nameof(IDetails.HeroImage):
-                HeroImage = new(model.HeroImage);
-                HeroImage.InitializeProperties();
+                var heroImage = new IconInfoViewModel(model.HeroImage);
+                heroImage.InitializeProperties();
+                lock (_lifecycleLock)
+                {
+                    if (_isCleanedUp)
+                    {
+                        return;
+                    }
+
+                    HeroImage = heroImage;
+                }
+
                 UpdateProperty(nameof(HeroImage));
                 break;
             case nameof(IDetails.Metadata):
-                RebuildMetadata(model);
+                var metadata = BuildMetadata(model);
+                List<DetailsElementViewModel>? replacedMetadata = null;
+                lock (_lifecycleLock)
+                {
+                    if (!_isCleanedUp)
+                    {
+                        replacedMetadata = Metadata;
+                        Metadata = metadata;
+                    }
+                }
+
+                if (replacedMetadata is null)
+                {
+                    metadata.ForEach(item => item.SafeCleanup());
+                    return;
+                }
+
+                replacedMetadata.ForEach(item => item.SafeCleanup());
                 UpdateProperty(nameof(Metadata));
                 break;
 
@@ -86,7 +143,7 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
         }
     }
 
-    private void RebuildMetadata(IDetails model)
+    private List<DetailsElementViewModel> BuildMetadata(IDetails model)
     {
         var newMetadata = new List<DetailsElementViewModel>();
         var meta = model.Metadata;
@@ -110,7 +167,7 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
             }
         }
 
-        Metadata = newMetadata;
+        return newMetadata;
     }
 
     public override void InitializeProperties()
@@ -129,31 +186,45 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
             _isSubscribed = true;
         }
 
-        Title = model.Title ?? string.Empty;
-        Body = model.Body ?? string.Empty;
-        HeroImage = new(model.HeroImage);
-        HeroImage.InitializeProperties();
+        var title = model.Title ?? string.Empty;
+        var body = model.Body ?? string.Empty;
+        var heroImage = new IconInfoViewModel(model.HeroImage);
+        heroImage.InitializeProperties();
 
-        UpdateProperty(nameof(Title));
-        UpdateProperty(nameof(Body));
-        UpdateProperty(nameof(HeroImage));
-
+        ContentSize? size = ContentSize.Small;
         if (model is IExtendedAttributesProvider provider)
         {
             if (provider.GetProperties()?.TryGetValue("Size", out var rawValue) == true)
             {
                 if (rawValue is int sizeAsInt)
                 {
-                    Size = (ContentSize)sizeAsInt;
+                    size = (ContentSize)sizeAsInt;
                 }
             }
         }
 
-        Size ??= ContentSize.Small;
+        size ??= ContentSize.Small;
+        var metadata = BuildMetadata(model);
+        lock (_lifecycleLock)
+        {
+            if (_isCleanedUp)
+            {
+                metadata.ForEach(item => item.SafeCleanup());
+                return;
+            }
 
+            Title = title;
+            Body = body;
+            HeroImage = heroImage;
+            Size = size;
+            Metadata = metadata;
+        }
+
+        UpdateProperty(nameof(Title));
+        UpdateProperty(nameof(Body));
+        UpdateProperty(nameof(HeroImage));
         UpdateProperty(nameof(Size));
-
-        RebuildMetadata(model);
+        UpdateProperty(nameof(Metadata));
         RebuildContent(model);
     }
 
@@ -177,8 +248,21 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
         DoOnUiThread(
             () =>
             {
-                ListHelpers.InPlaceUpdateList(Content, content);
-                UpdateProperty(nameof(Content));
+                var published = false;
+                lock (_lifecycleLock)
+                {
+                    if (!_isCleanedUp)
+                    {
+                        ListHelpers.InPlaceUpdateList(Content, content);
+                        UpdateProperty(nameof(Content));
+                        published = true;
+                    }
+                }
+
+                if (!published)
+                {
+                    content.ForEach(item => item.SafeCleanup());
+                }
             });
     }
 
@@ -186,11 +270,41 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
     {
         base.UnsafeCleanup();
 
+        List<DetailsElementViewModel> metadata;
+        lock (_lifecycleLock)
+        {
+            _isCleanedUp = true;
+            Title = string.Empty;
+            Body = string.Empty;
+            HeroImage = new(null);
+            Size = ContentSize.Small;
+            metadata = Metadata;
+            Metadata = [];
+        }
+
+        metadata.ForEach(item => item.SafeCleanup());
+        if (!TryDoOnUiThread(ClearContent))
+        {
+            ClearContent();
+        }
+
         if (_isSubscribed && _observableDetails is not null)
         {
             _observableDetails.PropChanged -= Model_PropChanged;
             _observableDetails = null;
             _isSubscribed = false;
         }
+    }
+
+    private void ClearContent()
+    {
+        List<ContentViewModel> content;
+        lock (_lifecycleLock)
+        {
+            content = [.. Content];
+            Content.Clear();
+        }
+
+        content.ForEach(item => item.SafeCleanup());
     }
 }
