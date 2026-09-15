@@ -156,8 +156,15 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
                 return false;
             }
 
-            var set = new HashSet<object>(currentValue);
-            return set.SetEquals(newValue);
+            for (int index = 0; index < currentValue.Count; index++)
+            {
+                if (!Equals(currentValue[index], newValue[index]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }
