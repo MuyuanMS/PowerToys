@@ -167,21 +167,23 @@ void LightSwitchStateManager::OnBrightnessChange(int brightness)
             LightSwitchBrightnessLogic::ShouldBeLight(_state.lastBrightness, settings.brightnessThreshold));
     }
 
-    if (brightness < 0)
+    const auto transition = LightSwitchBrightnessLogic::EvaluateTransition(
+        _state.lastBrightness,
+        brightness,
+        settings.brightnessThreshold,
+        _state.lastAppliedMode == ScheduleMode::FollowBrightness && _state.isManualOverride);
+
+    if (!transition.isKnown)
     {
         _state.lastBrightness = -1;
         return;
     }
 
-    if (_state.lastAppliedMode == ScheduleMode::FollowBrightness && _state.isManualOverride)
+    if (transition.clearsManualOverride)
     {
-        int threshold = settings.brightnessThreshold;
-        if (LightSwitchBrightnessLogic::CrossedThreshold(_state.lastBrightness, brightness, threshold))
-        {
-            Logger::info(L"[LightSwitchStateManager] Brightness crossed threshold while manual override active; "
-                         L"treating as a boundary and clearing manual override.");
-            _state.isManualOverride = false;
-        }
+        Logger::info(L"[LightSwitchStateManager] Brightness crossed threshold while manual override active; "
+                     L"treating as a boundary and clearing manual override.");
+        _state.isManualOverride = false;
     }
 
     _state.lastBrightness = brightness;

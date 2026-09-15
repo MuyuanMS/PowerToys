@@ -10,6 +10,7 @@
 #include <memory>
 #include <algorithm>
 #include <chrono>
+#include <mutex>
 
 #pragma comment(lib, "wbemuuid.lib")
 #ifdef _DEBUG
@@ -39,6 +40,12 @@ public:
     void Stop()
     {
         _state->stop = true;
+        {
+            // Wait for an in-flight callback and prevent any new callback from
+            // starting after shutdown begins.
+            std::lock_guard<std::mutex> lock(_state->callbackMutex);
+        }
+
         if (_thread.joinable())
         {
             auto done = _state->done.get_future();
@@ -71,6 +78,7 @@ private:
         int pollInterval;
         std::atomic<bool> stop = false;
         std::promise<void> done;
+        std::mutex callbackMutex;
     };
 
     std::shared_ptr<State> _state;
@@ -81,6 +89,21 @@ private:
         for (int i = 0; i < state->pollInterval && !state->stop; ++i)
         {
             std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+    }
+
+    static void InvokeCallback(const std::shared_ptr<State>& state, int brightness)
+    {
+        std::lock_guard<std::mutex> lock(state->callbackMutex);
+        if (!state->stop)
+        {
+            try
+            {
+                state->callback(brightness);
+            }
+            catch (...)
+            {
+            }
         }
     }
 
@@ -179,20 +202,12 @@ private:
                     if (!state->stop && maxBrightness && *maxBrightness != lastBrightness)
                     {
                         lastBrightness = *maxBrightness;
-                        try
-                        {
-                            state->callback(lastBrightness);
-                        }
-                        catch (...) {}
+                        InvokeCallback(state, lastBrightness);
                     }
                     else if (!state->stop && !maxBrightness && lastBrightness != -1)
                     {
                         lastBrightness = -1;
-                        try
-                        {
-                            state->callback(lastBrightness);
-                        }
-                        catch (...) {}
+                        InvokeCallback(state, lastBrightness);
                     }
 
                     pEnum->Release();

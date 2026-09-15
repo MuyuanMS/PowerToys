@@ -48,5 +48,34 @@ namespace LightSwitchServiceUnitTests
         {
             Assert::IsFalse(LightSwitchBrightnessLogic::CrossedThreshold(-1, 75, 50));
         }
+
+        TEST_METHOD(SameSideUpdatePreservesManualOverride)
+        {
+            const auto transition = LightSwitchBrightnessLogic::EvaluateTransition(40, 45, 50, true);
+
+            Assert::IsTrue(transition.isKnown);
+            Assert::IsFalse(transition.clearsManualOverride);
+            Assert::IsFalse(transition.shouldApplyTheme);
+            Assert::IsFalse(transition.shouldBeLight);
+        }
+
+        TEST_METHOD(ThresholdCrossingClearsManualOverrideAndAppliesTheme)
+        {
+            const auto transition = LightSwitchBrightnessLogic::EvaluateTransition(40, 60, 50, true);
+
+            Assert::IsTrue(transition.isKnown);
+            Assert::IsTrue(transition.clearsManualOverride);
+            Assert::IsTrue(transition.shouldApplyTheme);
+            Assert::IsTrue(transition.shouldBeLight);
+        }
+
+        TEST_METHOD(UnknownSampleDoesNotApplyTheme)
+        {
+            const auto transition = LightSwitchBrightnessLogic::EvaluateTransition(40, -1, 50, true);
+
+            Assert::IsFalse(transition.isKnown);
+            Assert::IsFalse(transition.clearsManualOverride);
+            Assert::IsFalse(transition.shouldApplyTheme);
+        }
     };
 }
