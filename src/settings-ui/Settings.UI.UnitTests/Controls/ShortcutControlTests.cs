@@ -28,6 +28,7 @@ namespace Microsoft.PowerToys.Settings.UI.UnitTests.Controls
     {
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
         private static readonly FieldInfo RepositoryField = typeof(SettingsRepository<GeneralSettings>).GetField("settingsRepository", BindingFlags.Static | BindingFlags.NonPublic);
+        private static readonly FieldInfo SettingsConfigField = typeof(SettingsRepository<GeneralSettings>).GetField("settingsConfig", BindingFlags.Instance | BindingFlags.NonPublic);
         private static DispatcherQueue dispatcher;
         private static Thread uiThread;
         private static SettingsRepository<GeneralSettings> repository;
@@ -40,7 +41,7 @@ namespace Microsoft.PowerToys.Settings.UI.UnitTests.Controls
             // No Settings app, settings files, IPC connection or visible window is needed.
             RuntimeHelpers.RunClassConstructor(typeof(HotkeyConflictIgnoreHelper).TypeHandle);
             repository = (SettingsRepository<GeneralSettings>)RepositoryField.GetValue(null);
-            previousSettingsConfig = repository.SettingsConfig;
+            previousSettingsConfig = (GeneralSettings)SettingsConfigField.GetValue(repository);
             repository.SettingsConfig = new GeneralSettings();
 
             var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -88,7 +89,7 @@ namespace Microsoft.PowerToys.Settings.UI.UnitTests.Controls
             }
             finally
             {
-                repository.SettingsConfig = previousSettingsConfig;
+                SettingsConfigField.SetValue(repository, previousSettingsConfig);
             }
         }
 
