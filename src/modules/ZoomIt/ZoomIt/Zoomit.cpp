@@ -9307,7 +9307,7 @@ LRESULT APIENTRY MainWndProc(
         if( penInverted != g_PenInverted) {
 
             g_PenInverted = penInverted;
-            if (g_PenInverted) {
+            if (g_PenInverted && !g_EraserEngaged) {
                 if (PopDrawUndo(hdcScreenCompat, &drawUndoList, width, height)) {
 
                     SaveCursorArea(hdcScreenCursorCompat, hdcScreenCompat, prevPt);
@@ -9951,6 +9951,11 @@ LRESULT APIENTRY MainWndProc(
 
                     InvalidateRect( hWnd, NULL, FALSE );
                 }
+                break;
+            }
+
+            // Shift+E is an eraser shortcut, not a fallback clear command.
+            if( GetKeyState( VK_SHIFT ) & 0x8000 ) {
                 break;
             }
 
