@@ -61,27 +61,23 @@ public class EnvironmentVariableComparisonHelperTests
     public void RemoveDuplicatePathEntries_NormalizesSeparatorsAndTrailingSeparators()
     {
         var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
-            @"C:\Tools\;C:/Tools;C:\Other");
+            @"C:\Tools\\;C:/Tools;C:\Other");
 
-        Assert.AreEqual(@"C:\Tools\;C:\Other", result);
+        Assert.AreEqual(@"C:\Tools\\;C:\Other", result);
     }
 
     [TestMethod]
-    public void RemoveDuplicatePathEntries_ExpandsEnvironmentVariablesForComparison()
+    public void RemoveDuplicatePathEntries_ExpandsEditedVariableDefinitions()
     {
-        const string variableName = "POWERTOYS_PATH_DUPLICATE_TEST";
-        Environment.SetEnvironmentVariable(variableName, @"C:\Tools");
-
-        try
+        var variables = new[]
         {
-            var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
-                $@"%{variableName}%;C:\Tools;C:\Other");
+            new Variable("ROOT", @"C:\Tools", VariablesSetType.Profile),
+        };
 
-            Assert.AreEqual($@"%{variableName}%;C:\Other", result);
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable(variableName, null);
-        }
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @"%ROOT%;C:\Tools;C:\Other",
+            variables);
+
+        Assert.AreEqual(@"%ROOT%;C:\Other", result);
     }
 }

@@ -539,7 +539,17 @@ namespace EnvironmentVariablesUILib
                 return;
             }
 
-            EditVariableDialogValueTxtBox.Text = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(variable.Values);
+            var parameter = EditVariableDialog.PrimaryButtonCommandParameter as RelayCommandParameter;
+            var variables = ViewModel.SystemDefaultSet.Variables
+                .Concat(ViewModel.UserDefaultSet.Variables)
+                .Concat(ViewModel.AppliedProfile?.Variables ?? Enumerable.Empty<Variable>());
+
+            if (parameter?.Set is ProfileVariablesSet profile && !ReferenceEquals(profile, ViewModel.AppliedProfile))
+            {
+                variables = variables.Concat(profile.Variables);
+            }
+
+            EditVariableDialogValueTxtBox.Text = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(variable.Values, variables, variable);
         }
 
         private void InsertListEntryBeforeButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
