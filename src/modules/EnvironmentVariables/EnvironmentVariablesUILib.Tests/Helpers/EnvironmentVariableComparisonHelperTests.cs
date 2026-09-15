@@ -2,6 +2,8 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
+using System.Collections.Generic;
 using System.Linq;
 
 using EnvironmentVariablesUILib.Helpers;
@@ -45,5 +47,402 @@ public class EnvironmentVariableComparisonHelperTests
 
         Assert.AreEqual(1, duplicates.Count);
         CollectionAssert.AreEquivalent(new[] { first, second }, duplicates[0].ToList());
+    }
+
+    [TestMethod]
+    public void RemoveDuplicatePathEntries_PreservesFirstOccurrenceAndOrder()
+    {
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @"C:\Tools;C:\Windows;c:\tools;C:\Program Files;C:\WINDOWS");
+
+        Assert.AreEqual(@"C:\Tools;C:\Windows;C:\Program Files", result);
+    }
+
+    [TestMethod]
+    public void RemoveDuplicatePathEntries_NormalizesSeparatorsAndTrailingSeparators()
+    {
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @"C:\Tools\\;C:/Tools;C:\Other");
+
+        Assert.AreEqual(@"C:\Tools\\;C:\Other", result);
+    }
+
+    [TestMethod]
+    public void RemoveDuplicatePathEntries_NormalizesUncShareRootSeparators()
+    {
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @"\\server\share\;\\server\share");
+
+        Assert.AreEqual(@"\\server\share\", result);
+    }
+
+    [TestMethod]
+    public void RemoveDuplicatePathEntries_DoesNotTreatDeviceDriveRootsAsUncShares()
+    {
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @"\\?\C:\\;\\?\C:\");
+
+        Assert.AreEqual(@"\\?\C:\\", result);
+    }
+
+    [TestMethod]
+    public void RemoveDuplicatePathEntries_NormalizesExtendedUncShareRootSeparators()
+    {
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @"\\?\UNC\server\share\;\\?\UNC\server\share");
+
+        Assert.AreEqual(@"\\?\UNC\server\share\", result);
+    }
+
+    [TestMethod]
+    public void RemoveDuplicatePathEntries_ExpandsEditedVariableDefinitions()
+    {
+        var variables = new[]
+        {
+            new Variable("ROOT", @"C:\Tools", VariablesSetType.Profile),
+        };
+
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @"%ROOT%;C:\Tools;C:\Other",
+            variables);
+
+        Assert.AreEqual(@"%ROOT%;C:\Other", result);
+    }
+
+    [TestMethod]
+    public void RemoveDuplicatePathEntries_ExpandsPathReferenceAgainstLowerScopePath()
+    {
+        var editedPath = new Variable("PATH", @"%PATH%;C:\Windows", VariablesSetType.User);
+
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            editedPath.Values,
+            new[]
+            {
+                new Variable("PATH", @"C:\Windows", VariablesSetType.System),
+            },
+            editedPath);
+
+        Assert.AreEqual(@"%PATH%", result);
+    }
+
+    [TestMethod]
+    public void RemoveDuplicatePathEntries_DeduplicatesComponentsFromMultiEntryExpansion()
+    {
+        var editedPath = new Variable("PATH", @"%PATH%;C:\Tools", VariablesSetType.User);
+
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            editedPath.Values,
+            new[]
+            {
+                new Variable("PATH", @"C:\Windows;C:\Tools", VariablesSetType.System),
+            },
+            editedPath);
+
+        Assert.AreEqual(@"%PATH%", result);
+    }
+
+    [TestMethod]
+    public void RemoveDuplicatePathEntries_PreservesMeaningfulEntryWhitespace()
+    {
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @" C:\Tools;C:\Tools");
+
+        Assert.AreEqual(@" C:\Tools;C:\Tools", result);
+    }
+
+    [TestMethod]
+    public void BuildVariablesForPathDeduplication_ReconstructsBaselineWhenEditingInactiveProfile()
+    {
+        var activeProfile = new ProfileVariablesSet(Guid.NewGuid(), "Active");
+        activeProfile.Variables.Add(new Variable("ROOT", @"C:\Applied", VariablesSetType.Profile));
+
+        var inactiveProfile = new ProfileVariablesSet(Guid.NewGuid(), "Inactive");
+        inactiveProfile.Variables.Add(new Variable("PATH", @"%ROOT%;C:\Applied", VariablesSetType.Profile));
+
+        var variables = EnvironmentVariableComparisonHelper.BuildVariablesForPathDeduplication(
+            Array.Empty<Variable>(),
+            new[]
+            {
+                new Variable("ROOT", @"C:\Applied", VariablesSetType.User),
+                new Variable("ROOT_PowerToys_Active", @"C:\Base", VariablesSetType.User),
+            },
+            activeProfile,
+            inactiveProfile,
+            inactiveProfile.Variables[0]);
+
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            inactiveProfile.Variables[0].Values,
+            variables);
+
+        Assert.AreEqual(@"%ROOT%;C:\Applied", result);
+    }
+
+    [TestMethod]
+    public void BuildVariablesForPathDeduplication_PreservesUserValueWhenRenamingInactiveProfileVariable()
+    {
+        var inactiveProfile = new ProfileVariablesSet(Guid.NewGuid(), "Inactive");
+        var originalVariable = new Variable("ROOT", @"C:\Profile", VariablesSetType.Profile);
+        inactiveProfile.Variables.Add(originalVariable);
+
+        var variables = EnvironmentVariableComparisonHelper.BuildVariablesForPathDeduplication(
+            new[]
+            {
+                new Variable("ROOT", @"C:\Machine", VariablesSetType.System),
+            },
+            new[]
+            {
+                new Variable("ROOT", @"C:\User", VariablesSetType.User),
+            },
+            appliedProfile: null,
+            editingProfile: inactiveProfile,
+            originalVariable: originalVariable);
+
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @"%ROOT%;C:\User",
+            variables);
+
+        Assert.AreEqual(@"%ROOT%", result);
+    }
+
+    [TestMethod]
+    public void BuildVariablesForPathDeduplication_RestoresMachineValueForMachineOnlyOverride()
+    {
+        var activeProfile = new ProfileVariablesSet(Guid.NewGuid(), "Active");
+        activeProfile.Variables.Add(new Variable("ROOT", @"C:\Applied", VariablesSetType.Profile));
+
+        var variables = EnvironmentVariableComparisonHelper.BuildVariablesForPathDeduplication(
+            new[]
+            {
+                new Variable("ROOT", @"C:\Base", VariablesSetType.System),
+            },
+            new[]
+            {
+                new Variable("ROOT", @"C:\Applied", VariablesSetType.User),
+            },
+            activeProfile,
+            editingProfile: null);
+
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @"%ROOT%;C:\Applied",
+            variables);
+
+        Assert.AreEqual(@"%ROOT%;C:\Applied", result);
+    }
+
+    [TestMethod]
+    public void BuildVariablesForPathDeduplication_RemovesOriginalDefinitionWhenVariableIsRenamed()
+    {
+        var originalVariable = new Variable("ROOT", @"C:\Tools", VariablesSetType.User);
+        var editedVariable = new Variable("PATH", @"%ROOT%;C:\Tools", VariablesSetType.User);
+        var unavailableVariableNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var variables = EnvironmentVariableComparisonHelper.BuildVariablesForPathDeduplication(
+            Array.Empty<Variable>(),
+            new[] { originalVariable },
+            appliedProfile: null,
+            editingProfile: null,
+            originalVariable,
+            unavailableVariableNames);
+
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            editedVariable.Values,
+            variables,
+            editedVariable,
+            unavailableVariableNames);
+
+        Assert.AreEqual(@"%ROOT%;C:\Tools", result);
+    }
+
+    [TestMethod]
+    public void BuildVariablesForPathDeduplication_UsesOnlyMachineScopeForMachineEdits()
+    {
+        var originalVariable = new Variable("PATH", @"%ROOT%;C:\User", VariablesSetType.System);
+
+        var variables = EnvironmentVariableComparisonHelper.BuildVariablesForPathDeduplication(
+            new[]
+            {
+                new Variable("ROOT", @"C:\Machine", VariablesSetType.System),
+            },
+            new[]
+            {
+                new Variable("ROOT", @"C:\User", VariablesSetType.User),
+            },
+            appliedProfile: null,
+            editingProfile: null,
+            originalVariable);
+
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            originalVariable.Values,
+            variables,
+            originalVariable);
+
+        Assert.AreEqual(@"%ROOT%;C:\User", result);
+    }
+
+    [TestMethod]
+    public void BuildVariablesForPathDeduplication_DoesNotRestoreRenamedMachineDefinition()
+    {
+        var originalVariable = new Variable("ROOT", @"C:\Tools", VariablesSetType.System);
+        var editedVariable = new Variable("PATH", @"%ROOT%;C:\Tools", VariablesSetType.System);
+        var unavailableVariableNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var variables = EnvironmentVariableComparisonHelper.BuildVariablesForPathDeduplication(
+            new[] { originalVariable },
+            Array.Empty<Variable>(),
+            appliedProfile: null,
+            editingProfile: null,
+            originalVariable,
+            unavailableVariableNames);
+
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            editedVariable.Values,
+            variables,
+            editedVariable,
+            unavailableVariableNames);
+
+        Assert.AreEqual(@"%ROOT%;C:\Tools", result);
+    }
+
+    [TestMethod]
+    public void BuildVariablesForPathDeduplication_DoesNotRestoreActiveUserValueForInactiveRenameWithoutBackup()
+    {
+        var activeProfile = new ProfileVariablesSet(Guid.NewGuid(), "Active");
+        activeProfile.Variables.Add(new Variable("ROOT", @"C:\Applied", VariablesSetType.Profile));
+        var inactiveProfile = new ProfileVariablesSet(Guid.NewGuid(), "Inactive");
+        var originalVariable = new Variable("ROOT", @"C:\Inactive", VariablesSetType.Profile);
+        inactiveProfile.Variables.Add(originalVariable);
+        var unavailableVariableNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var variables = EnvironmentVariableComparisonHelper.BuildVariablesForPathDeduplication(
+            Array.Empty<Variable>(),
+            new[] { new Variable("ROOT", @"C:\Applied", VariablesSetType.User) },
+            activeProfile,
+            inactiveProfile,
+            originalVariable,
+            unavailableVariableNames,
+            new Variable("PATH", @"%PATH%;C:\Applied", VariablesSetType.Profile));
+
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @"%ROOT%;C:\Applied",
+            variables,
+            new Variable("PATH", @"%ROOT%;C:\Applied", VariablesSetType.Profile),
+            unavailableVariableNames);
+
+        Assert.AreEqual(@"%ROOT%;C:\Applied", result);
+    }
+
+    [TestMethod]
+    public void BuildVariablesForPathDeduplication_UsesMachinePathForProfilePathEdits()
+    {
+        var activeProfile = new ProfileVariablesSet(Guid.NewGuid(), "Active");
+        activeProfile.Variables.Add(new Variable("PATH", @"%PATH%;C:\User", VariablesSetType.Profile));
+        var editedVariable = new Variable("PATH", @"%PATH%;C:\User", VariablesSetType.Profile);
+
+        var variables = EnvironmentVariableComparisonHelper.BuildVariablesForPathDeduplication(
+            new[]
+            {
+                new Variable("PATH", @"C:\Machine", VariablesSetType.System),
+            },
+            new[]
+            {
+                new Variable("PATH", @"C:\User", VariablesSetType.User),
+                new Variable("PATH_PowerToys_Active", @"C:\User", VariablesSetType.User),
+            },
+            activeProfile,
+            activeProfile,
+            activeProfile.Variables[0],
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            editedVariable);
+
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            editedVariable.Values,
+            variables,
+            editedVariable);
+
+        Assert.AreEqual(@"%PATH%;C:\User", result);
+    }
+
+    [TestMethod]
+    public void RemoveDuplicatePathEntries_DoesNotUseProcessValueForRemovedDefinition()
+    {
+        var originalValue = Environment.GetEnvironmentVariable("ROOT");
+        try
+        {
+            Environment.SetEnvironmentVariable("ROOT", @"C:\Tools");
+            var originalVariable = new Variable("ROOT", @"C:\Tools", VariablesSetType.User);
+            var editedVariable = new Variable("PATH", @"%ROOT%;C:\Tools", VariablesSetType.User);
+            var unavailableVariableNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var variables = EnvironmentVariableComparisonHelper.BuildVariablesForPathDeduplication(
+                Array.Empty<Variable>(),
+                new[] { originalVariable },
+                appliedProfile: null,
+                editingProfile: null,
+                originalVariable,
+                unavailableVariableNames);
+
+            var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+                editedVariable.Values,
+                variables,
+                editedVariable,
+                unavailableVariableNames);
+
+            Assert.AreEqual(@"%ROOT%;C:\Tools", result);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("ROOT", originalValue);
+        }
+    }
+
+    [TestMethod]
+    public void BuildVariablesForPathDeduplication_PreservesActiveProfileBackupWhenRenaming()
+    {
+        var activeProfile = new ProfileVariablesSet(Guid.NewGuid(), "Active");
+        var originalVariable = new Variable("ROOT", @"C:\Applied", VariablesSetType.Profile);
+        activeProfile.Variables.Add(originalVariable);
+
+        var variables = EnvironmentVariableComparisonHelper.BuildVariablesForPathDeduplication(
+            new[]
+            {
+                new Variable("ROOT", @"C:\Machine", VariablesSetType.System),
+            },
+            new[]
+            {
+                new Variable("ROOT", @"C:\Applied", VariablesSetType.User),
+                new Variable("ROOT_PowerToys_Active", @"C:\Base", VariablesSetType.User),
+            },
+            activeProfile,
+            activeProfile,
+            originalVariable);
+
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @"%ROOT%;C:\Machine",
+            variables);
+
+        Assert.AreEqual(@"%ROOT%;C:\Machine", result);
+    }
+
+    [TestMethod]
+    public void BuildVariablesForPathDeduplication_ReconstructsBaselineWhenEditingDefaultVariable()
+    {
+        var activeProfile = new ProfileVariablesSet(Guid.NewGuid(), "Active");
+        activeProfile.Variables.Add(new Variable("ROOT", @"C:\Applied", VariablesSetType.Profile));
+
+        var variables = EnvironmentVariableComparisonHelper.BuildVariablesForPathDeduplication(
+            Array.Empty<Variable>(),
+            new[]
+            {
+                new Variable("ROOT", @"C:\Applied", VariablesSetType.User),
+                new Variable("ROOT_PowerToys_Active", @"C:\Base", VariablesSetType.User),
+            },
+            activeProfile,
+            editingProfile: null,
+            originalVariable: new Variable("PATH", @"%ROOT%;C:\Applied", VariablesSetType.User));
+
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @"%ROOT%;C:\Applied",
+            variables);
+
+        Assert.AreEqual(@"%ROOT%;C:\Applied", result);
     }
 }

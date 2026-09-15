@@ -4,7 +4,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 using EnvironmentVariablesUILib.Models;
 
@@ -42,4 +44,251 @@ internal static class EnvironmentVariableComparisonHelper
     internal static IEnumerable<IGrouping<string, Variable>> GetDuplicateNameGroups(IEnumerable<Variable> variables) =>
         variables.GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
             .Where(g => g.Count() > 1);
+
+    internal static string RemoveDuplicatePathEntries(
+        string value,
+        IEnumerable<Variable> variables = null,
+        Variable editedVariable = null,
+        ISet<string> unavailableVariableNames = null)
+    {
+        var environment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var variable in variables ?? Enumerable.Empty<Variable>())
+        {
+            environment[variable.Name] = variable.Values;
+        }
+
+        if (editedVariable != null && !NamesEqual(editedVariable.Name, "PATH"))
+        {
+            environment[editedVariable.Name] = editedVariable.Values;
+        }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new List<string>();
+        foreach (var entry in value.Split(';'))
+        {
+            bool contributesEntry = false;
+            var expanded = ExpandEnvironmentVariables(
+                entry,
+                environment,
+                unavailableVariableNames,
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+            foreach (var component in expanded.Split(';'))
+            {
+                contributesEntry |= seen.Add(NormalizePathEntry(component, unavailableVariableNames));
+            }
+
+            if (contributesEntry)
+            {
+                result.Add(entry);
+            }
+        }
+
+        return string.Join(';', result);
+    }
+
+    internal static IEnumerable<Variable> BuildVariablesForPathDeduplication(
+        IEnumerable<Variable> systemVariables,
+        IEnumerable<Variable> userVariables,
+        ProfileVariablesSet appliedProfile,
+        ProfileVariablesSet editingProfile,
+        Variable originalVariable = null,
+        ISet<string> unavailableVariableNames = null,
+        Variable editedVariable = null)
+    {
+        var systemVariableMap = (systemVariables ?? Enumerable.Empty<Variable>())
+            .ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
+        var userVariableMap = (userVariables ?? Enumerable.Empty<Variable>())
+            .ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
+        var variables = new Dictionary<string, Variable>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var variable in systemVariableMap.Values)
+        {
+            variables[variable.Name] = variable;
+        }
+
+        if (originalVariable?.ParentType != VariablesSetType.System)
+        {
+            foreach (var variable in userVariableMap.Values)
+            {
+                variables[variable.Name] = variable;
+            }
+        }
+
+        bool originalBackupRestored = false;
+        if (appliedProfile != null && originalVariable?.ParentType != VariablesSetType.System)
+        {
+            foreach (var profileVariable in appliedProfile.Variables)
+            {
+                var backupName = EnvironmentVariablesHelper.GetBackupVariableName(profileVariable, appliedProfile.Name);
+                bool isRenamedOriginal = ReferenceEquals(appliedProfile, editingProfile)
+                    && ReferenceEquals(profileVariable, originalVariable);
+                if (!ReferenceEquals(appliedProfile, editingProfile))
+                {
+                    if (variables.TryGetValue(backupName, out var backupVariable))
+                    {
+                        variables[profileVariable.Name] = new Variable(
+                            profileVariable.Name,
+                            backupVariable.Values,
+                            backupVariable.ParentType);
+                    }
+                    else
+                    {
+                        RestoreLowerScopeVariable(variables, systemVariableMap, userVariableMap, profileVariable.Name, unavailableVariableNames);
+                    }
+                }
+                else if (isRenamedOriginal && variables.TryGetValue(backupName, out var originalBackup))
+                {
+                    variables[profileVariable.Name] = new Variable(
+                        profileVariable.Name,
+                        originalBackup.Values,
+                        originalBackup.ParentType);
+                    originalBackupRestored = true;
+                }
+
+                variables.Remove(backupName);
+            }
+        }
+
+        if (originalVariable != null
+            && !originalBackupRestored
+            && !(originalVariable.ParentType == VariablesSetType.Profile
+                && !ReferenceEquals(appliedProfile, editingProfile)
+                && variables.ContainsKey(originalVariable.Name)))
+        {
+            if (originalVariable.ParentType == VariablesSetType.System)
+            {
+                variables.Remove(originalVariable.Name);
+                unavailableVariableNames?.Add(originalVariable.Name);
+            }
+            else
+            {
+                RestoreLowerScopeVariable(
+                    variables,
+                    systemVariableMap,
+                    userVariableMap,
+                    originalVariable.Name,
+                    unavailableVariableNames);
+            }
+        }
+
+        if (editingProfile != null)
+        {
+            foreach (var variable in editingProfile.Variables)
+            {
+                if (!ReferenceEquals(variable, originalVariable))
+                {
+                    variables[variable.Name] = variable;
+                    unavailableVariableNames?.Remove(variable.Name);
+                }
+            }
+        }
+
+        if (editedVariable?.ParentType == VariablesSetType.Profile
+            && NamesEqual(editedVariable.Name, "PATH"))
+        {
+            if (systemVariableMap.TryGetValue("PATH", out var systemPath))
+            {
+                variables["PATH"] = systemPath;
+                unavailableVariableNames?.Remove("PATH");
+            }
+            else
+            {
+                variables.Remove("PATH");
+                unavailableVariableNames?.Add("PATH");
+            }
+        }
+
+        return variables.Values;
+    }
+
+    private static void RestoreLowerScopeVariable(
+        IDictionary<string, Variable> variables,
+        IReadOnlyDictionary<string, Variable> systemVariables,
+        IReadOnlyDictionary<string, Variable> userVariables,
+        string name,
+        ISet<string> unavailableVariableNames,
+        bool preferUserScope = false)
+    {
+        if (preferUserScope && userVariables.TryGetValue(name, out var userVariable))
+        {
+            variables[name] = userVariable;
+        }
+        else if (systemVariables.TryGetValue(name, out var systemVariable))
+        {
+            variables[name] = systemVariable;
+        }
+        else
+        {
+            variables.Remove(name);
+            unavailableVariableNames?.Add(name);
+        }
+    }
+
+    private static string NormalizePathEntry(string entry, ISet<string> unavailableVariableNames)
+    {
+        var normalizedSeparators = entry.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+        string previous;
+        do
+        {
+            previous = normalizedSeparators;
+            normalizedSeparators = Path.TrimEndingDirectorySeparator(previous);
+        }
+        while (!string.Equals(previous, normalizedSeparators, StringComparison.Ordinal));
+
+        return IsUncShareRoot(normalizedSeparators)
+            ? normalizedSeparators.TrimEnd(Path.DirectorySeparatorChar)
+            : normalizedSeparators;
+    }
+
+    private static bool IsUncShareRoot(string path)
+    {
+        bool isExtendedUncRoot = path.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase)
+            && path.TrimEnd(Path.DirectorySeparatorChar)
+                .Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries)
+                .Length == 4;
+        if (!path.StartsWith(@"\\", StringComparison.Ordinal)
+            || (path.StartsWith(@"\\?\", StringComparison.Ordinal)
+                && !isExtendedUncRoot)
+            || path.StartsWith(@"\\.\", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        int componentCount = path.TrimEnd(Path.DirectorySeparatorChar)
+            .Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries)
+            .Length;
+        return componentCount == 2 || isExtendedUncRoot;
+    }
+
+    private static string ExpandEnvironmentVariables(
+        string value,
+        IReadOnlyDictionary<string, string> variables,
+        ISet<string> unavailableVariableNames,
+        HashSet<string> expansionStack)
+    {
+        return Regex.Replace(value, "%([^%]+)%", match =>
+        {
+            string name = match.Groups[1].Value;
+            if (!expansionStack.Add(name))
+            {
+                return match.Value;
+            }
+
+            try
+            {
+                string replacement = variables.TryGetValue(name, out var definedValue)
+                    ? definedValue
+                    : null;
+
+                return replacement == null
+                    ? match.Value
+                    : ExpandEnvironmentVariables(replacement, variables, unavailableVariableNames, expansionStack);
+            }
+            finally
+            {
+                expansionStack.Remove(name);
+            }
+        });
+    }
 }

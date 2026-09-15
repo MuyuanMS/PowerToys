@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -529,6 +530,33 @@ namespace EnvironmentVariablesUILib
 
             var newValues = string.Join(";", variable.ValuesList?.Select(x => x.Text).ToArray());
             EditVariableDialogValueTxtBox.Text = newValues;
+        }
+
+        private void RemoveDuplicatePathEntriesButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+        {
+            var variable = EditVariableDialog.DataContext as Variable;
+            if (variable == null)
+            {
+                return;
+            }
+
+            var parameter = EditVariableDialog.PrimaryButtonCommandParameter as RelayCommandParameter;
+            var editingProfile = parameter?.Set as ProfileVariablesSet;
+            var unavailableVariableNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var variables = EnvironmentVariableComparisonHelper.BuildVariablesForPathDeduplication(
+                ViewModel.SystemDefaultSet.Variables,
+                ViewModel.UserDefaultSet.Variables,
+                ViewModel.AppliedProfile,
+                editingProfile,
+                parameter?.Variable,
+                unavailableVariableNames,
+                variable);
+
+            EditVariableDialogValueTxtBox.Text = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+                variable.Values,
+                variables,
+                variable,
+                unavailableVariableNames);
         }
 
         private void InsertListEntryBeforeButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
