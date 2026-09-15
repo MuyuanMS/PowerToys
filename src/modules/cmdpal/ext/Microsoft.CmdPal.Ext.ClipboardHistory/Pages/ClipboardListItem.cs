@@ -231,14 +231,19 @@ internal sealed partial class ClipboardListItem : ListItem
 
         if (_item.IsImage)
         {
-            var iconData = new IconData(_item.ImageData);
-            var heroImage = new IconInfo(iconData);
-            return new Details
+            var details = new Details
             {
                 Title = _item.GetDataType(),
-                HeroImage = heroImage,
+                Body = DetailsMarkdownHelper.BuildImageBody(_item.ImagePath, Properties.Resources.clipboard_item_image_title),
                 Metadata = [.. metadata],
             };
+
+            if (string.IsNullOrEmpty(_item.ImagePath))
+            {
+                details.HeroImage = new IconInfo(new IconData(_item.ImageData));
+            }
+
+            return details;
         }
 
         if (_item.IsText)
@@ -246,7 +251,7 @@ internal sealed partial class ClipboardListItem : ListItem
             return new Details
             {
                 Title = _item.GetDataType(),
-                Body = $"```text\n{_item.Content}\n```",
+                Body = DetailsMarkdownHelper.BuildTextBody(_item.Content),
                 Metadata = [.. metadata],
             };
         }
