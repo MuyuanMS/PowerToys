@@ -505,7 +505,7 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
         private void Hotkey_KeyDown(int key)
         {
             KeyEventHandler(key, true, key);
-            if (lastKeyDownSettings != null && string.Equals(lastKeyDownSettings.ToString(), internalSettings.ToString(), StringComparison.OrdinalIgnoreCase))
+            if (AreHotkeySettingsEqual(lastKeyDownSettings, internalSettings))
             {
                 return;
             }
@@ -572,6 +572,17 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
             }
 
             c.IsWarningAltGr = internalSettings.Ctrl && internalSettings.Alt && !internalSettings.Win && (internalSettings.Code > 0);
+        }
+
+        private static bool AreHotkeySettingsEqual(HotkeySettings first, HotkeySettings second)
+        {
+            return first != null &&
+                   second != null &&
+                   first.Win == second.Win &&
+                   first.Ctrl == second.Ctrl &&
+                   first.Alt == second.Alt &&
+                   first.Shift == second.Shift &&
+                   first.Code == second.Code;
         }
 
         private void CheckForConflicts(HotkeySettings settings)
