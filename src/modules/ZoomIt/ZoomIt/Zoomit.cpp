@@ -9942,6 +9942,16 @@ LRESULT APIENTRY MainWndProc(
                 else if( g_EraserMode == EraserModePixel ) g_EraserMode = EraserModeStroke;
                 else                                       g_EraserMode = EraserModeOff;
 
+                if( g_EraserMode != EraserModeOff && !g_Drawing ) {
+                    POINT eraserPt;
+                    GetCursorPos( &eraserPt );
+                    ScreenToClient( hWnd, &eraserPt );
+                    prevPt = eraserPt;
+                    g_Drawing = TRUE;
+                    g_Tracing = FALSE;
+                    SetROP2( hdcScreenCompat, R2_COPYPEN );
+                }
+
                 // Switching modes stops any in-progress erasing; the user clicks
                 // again to engage with the newly selected tool.
                 // Show the auto-dismissing mode indicator.
