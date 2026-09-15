@@ -8362,6 +8362,9 @@ LRESULT APIENTRY MainWndProc(
 
             if ((exStyle & WS_EX_LAYERED)) {
                 OutputDebug(L"LiveDraw reactivate\n");
+                if( g_EraserMode != EraserModeOff && g_Drawing ) {
+                    RestoreCursorArea( hdcScreenCompat, hdcScreenCursorCompat, prevPt );
+                }
                 DisengageEraser();
                 g_EraserMode = EraserModeOff;
 
@@ -8378,6 +8381,9 @@ LRESULT APIENTRY MainWndProc(
             }
             else {
                 OutputDebug(L"LiveDraw create\n");
+                if( g_EraserMode != EraserModeOff && g_Drawing ) {
+                    RestoreCursorArea( hdcScreenCompat, hdcScreenCursorCompat, prevPt );
+                }
                 DisengageEraser();
                 g_EraserMode = EraserModeOff;
 
@@ -9822,6 +9828,9 @@ LRESULT APIENTRY MainWndProc(
             if( (g_Zoomed || g_TimerActive) && (g_TypeMode == TypeModeOff)) {
 
                 // Choosing a pen color leaves the eraser tool.
+                if( g_EraserMode != EraserModeOff && g_Drawing ) {
+                    RestoreCursorArea( hdcScreenCompat, hdcScreenCursorCompat, prevPt );
+                }
                 DisengageEraser();
                 g_EraserMode = EraserModeOff;
 
@@ -9987,6 +9996,9 @@ LRESULT APIENTRY MainWndProc(
             }
 
             // Plain E: clear the whole screen. Also exits the eraser tool.
+            if( g_EraserMode != EraserModeOff && g_Drawing ) {
+                RestoreCursorArea( hdcScreenCompat, hdcScreenCursorCompat, prevPt );
+            }
             DisengageEraser();
             g_EraserMode = EraserModeOff;
 
@@ -10484,7 +10496,7 @@ LRESULT APIENTRY MainWndProc(
             OutputDebug(L"LBUTTONDOWN: drawing\n");
 
             // Save current bitmap to undo history
-            if( g_HaveDrawn ) {
+            if( g_HaveDrawn || ( g_EraserMode != EraserModeOff && g_Drawing ) ) {
 
                 RestoreCursorArea( hdcScreenCompat, hdcScreenCursorCompat, prevPt );
             }
