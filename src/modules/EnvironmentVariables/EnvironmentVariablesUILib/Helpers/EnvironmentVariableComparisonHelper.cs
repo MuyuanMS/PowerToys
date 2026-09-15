@@ -57,7 +57,7 @@ internal static class EnvironmentVariableComparisonHelper
             environment[variable.Name] = variable.Values;
         }
 
-        if (editedVariable != null)
+        if (editedVariable != null && !NamesEqual(editedVariable.Name, "PATH"))
         {
             environment[editedVariable.Name] = editedVariable.Values;
         }

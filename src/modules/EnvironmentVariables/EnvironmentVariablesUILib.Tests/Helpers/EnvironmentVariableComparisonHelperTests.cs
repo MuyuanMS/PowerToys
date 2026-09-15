@@ -110,6 +110,22 @@ public class EnvironmentVariableComparisonHelperTests
     }
 
     [TestMethod]
+    public void RemoveDuplicatePathEntries_ExpandsPathReferenceAgainstLowerScopePath()
+    {
+        var editedPath = new Variable("PATH", @"%PATH%;C:\Windows", VariablesSetType.User);
+
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            editedPath.Values,
+            new[]
+            {
+                new Variable("PATH", @"C:\Windows", VariablesSetType.System),
+            },
+            editedPath);
+
+        Assert.AreEqual(@"%PATH%", result);
+    }
+
+    [TestMethod]
     public void BuildVariablesForPathDeduplication_ReconstructsBaselineWhenEditingInactiveProfile()
     {
         var activeProfile = new ProfileVariablesSet(Guid.NewGuid(), "Active");
