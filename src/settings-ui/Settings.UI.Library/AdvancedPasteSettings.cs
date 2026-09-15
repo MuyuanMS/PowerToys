@@ -15,6 +15,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
     public class AdvancedPasteSettings : BasePTModuleSettings, ISettingsConfig, IHotkeyConfig
     {
         public const string ModuleName = "AdvancedPaste";
+        public const string ModuleVersion = "2";
 
         private static readonly JsonSerializerOptions _serializerOptions = new JsonSerializerOptions
         {
@@ -27,7 +28,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         public AdvancedPasteSettings()
         {
             Properties = new AdvancedPasteProperties();
-            Version = "1";
+            Version = ModuleVersion;
             Name = ModuleName;
         }
 
@@ -74,13 +75,23 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                 "PasteAsHtmlFile",
                 "TranscodeToMp3",
                 "TranscodeToMp4",
+                "LowerCase",
+                "UpperCase",
+                "TitleCase",
+                "SentenceCase",
+                "ToggleCase",
+                "CamelCase",
+                "PascalCase",
+                "SnakeCase",
+                "ScreamingSnakeCase",
+                "KebabCase",
             ];
             int index = 0;
             foreach (var action in Properties.AdditionalActions.GetAllActions())
             {
                 if (action is AdvancedPasteAdditionalAction additionalAction)
                 {
-                    var headerKey = additionalActionHeaderKeys[Math.Min(index, additionalActionHeaderKeys.Length - 1)];
+                    var headerKey = additionalActionHeaderKeys[index];
                     hotkeyAccessors.Add(new HotkeyAccessor(
                         () => additionalAction.Shortcut,
                         value => additionalAction.Shortcut = value ?? new HotkeySettings(),
@@ -119,6 +130,14 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
         // This can be utilized in the future if the settings.json file is to be modified/deleted.
         public bool UpgradeSettingsConfiguration()
-            => false;
+        {
+            if (Version == "1")
+            {
+                Version = ModuleVersion;
+                return true;
+            }
+
+            return false;
+        }
     }
 }
