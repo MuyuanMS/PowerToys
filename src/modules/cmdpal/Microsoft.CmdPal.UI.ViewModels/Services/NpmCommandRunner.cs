@@ -52,6 +52,8 @@ public sealed class NpmCommandRunner : INpmCommandRunner
     // and takes precedence over package-lock.json.
     private static readonly string[] LockfileNames = [ShrinkwrapFileName, "package-lock.json"];
 
+    private const string DefaultRegistry = "https://registry.npmjs.org/";
+
     // Upper bound on one npm operation so the gallery cannot stay on "Installing..." forever when
     // npm hangs, such as an unreachable registry with no output.
     private static readonly TimeSpan InstallTimeout = TimeSpan.FromMinutes(5);
@@ -196,11 +198,7 @@ public sealed class NpmCommandRunner : INpmCommandRunner
             packDestination,
         };
 
-        if (!string.IsNullOrWhiteSpace(artifact.Registry))
-        {
-            arguments.Add("--registry");
-            arguments.Add(artifact.Registry);
-        }
+        AddRegistryArguments(arguments, artifact);
 
         return arguments;
     }
@@ -222,13 +220,16 @@ public sealed class NpmCommandRunner : INpmCommandRunner
             "--loglevel=error",
         };
 
-        if (!string.IsNullOrWhiteSpace(artifact.Registry))
-        {
-            arguments.Add("--registry");
-            arguments.Add(artifact.Registry);
-        }
+        AddRegistryArguments(arguments, artifact);
 
         return arguments;
+    }
+
+    private static void AddRegistryArguments(List<string> arguments, NpmArtifact artifact)
+    {
+        arguments.Add("--registry");
+        arguments.Add(artifact.Registry ?? DefaultRegistry);
+        arguments.Add("--replace-registry-host=never");
     }
 
     /// <summary>
@@ -600,11 +601,23 @@ public sealed class NpmCommandRunner : INpmCommandRunner
             using var document = JsonDocument.Parse(stream);
             var root = document.RootElement;
 
+            if (!root.TryGetProperty("lockfileVersion", out var lockfileVersionElement)
+                || lockfileVersionElement.ValueKind != JsonValueKind.Number
+                || !lockfileVersionElement.TryGetInt32(out var lockfileVersion))
+            {
+                return Resources.npm_runner_lockfile_untrusted;
+            }
+
             // lockfileVersion 2 and 3 use a "packages" map keyed by install path. The root package has
             // an empty key and no resolution of its own. A "link": true entry points at a local
             // workspace and is skipped. Every other entry must carry a trusted resolved URL and hash.
-            if (root.TryGetProperty("packages", out var packages) && packages.ValueKind == JsonValueKind.Object)
+            if (lockfileVersion is 2 or 3)
             {
+                if (!root.TryGetProperty("packages", out var packages) || packages.ValueKind != JsonValueKind.Object)
+                {
+                    return Resources.npm_runner_lockfile_untrusted;
+                }
+
                 foreach (var package in packages.EnumerateObject())
                 {
                     if (package.Name.Length == 0)
@@ -628,12 +641,17 @@ public sealed class NpmCommandRunner : INpmCommandRunner
             }
 
             // lockfileVersion 1 uses a nested "dependencies" tree. Walk it recursively.
-            if (root.TryGetProperty("dependencies", out var dependencies) && dependencies.ValueKind == JsonValueKind.Object)
+            if (lockfileVersion == 1)
             {
+                if (!root.TryGetProperty("dependencies", out var dependencies) || dependencies.ValueKind != JsonValueKind.Object)
+                {
+                    return Resources.npm_runner_lockfile_untrusted;
+                }
+
                 return VerifyLegacyDependencies(dependencies) ? null : Resources.npm_runner_lockfile_untrusted;
             }
 
-            // Neither shape is present. Nothing was pinned, so the tree cannot be trusted.
+            // Unsupported lockfile versions may change which dependency tree npm consumes.
             return Resources.npm_runner_lockfile_untrusted;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)

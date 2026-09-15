@@ -51,8 +51,10 @@ public class NpmCommandRunnerTests
         Assert.IsTrue(destinationIndex >= 0);
         Assert.AreEqual("C:\\stage\\pack", args[destinationIndex + 1]);
 
-        // With no registry configured, the registry flag is never emitted.
-        CollectionAssert.DoesNotContain(args, "--registry");
+        var registryIndex = args.ToList().IndexOf("--registry");
+        Assert.IsTrue(registryIndex >= 0);
+        Assert.AreEqual("https://registry.npmjs.org/", args[registryIndex + 1]);
+        CollectionAssert.Contains(args, "--replace-registry-host=never");
     }
 
     [TestMethod]
@@ -76,6 +78,7 @@ public class NpmCommandRunnerTests
         var registryIndex = args.ToList().IndexOf("--registry");
         Assert.IsTrue(registryIndex >= 0);
         Assert.AreEqual("https://registry.npmjs.org/", args[registryIndex + 1]);
+        CollectionAssert.Contains(args, "--replace-registry-host=never");
     }
 
     [TestMethod]
@@ -97,6 +100,11 @@ public class NpmCommandRunnerTests
         CollectionAssert.DoesNotContain(args, artifact!.InstallSpec);
         CollectionAssert.DoesNotContain(args, "install");
         CollectionAssert.DoesNotContain(args, "--save-exact");
+
+        var registryIndex = args.ToList().IndexOf("--registry");
+        Assert.IsTrue(registryIndex >= 0);
+        Assert.AreEqual("https://registry.npmjs.org/", args[registryIndex + 1]);
+        CollectionAssert.Contains(args, "--replace-registry-host=never");
     }
 
     [TestMethod]
@@ -109,6 +117,7 @@ public class NpmCommandRunnerTests
         var registryIndex = args.ToList().IndexOf("--registry");
         Assert.IsTrue(registryIndex >= 0);
         Assert.AreEqual("https://registry.npmjs.org/", args[registryIndex + 1]);
+        CollectionAssert.Contains(args, "--replace-registry-host=never");
     }
 
     [TestMethod]
@@ -464,6 +473,78 @@ public class NpmCommandRunnerTests
               "version": "file:../left-pad",
               "resolved": "file:../left-pad"
             }
+          }
+        }
+        """;
+        File.WriteAllText(Path.Combine(dir, "package-lock.json"), lockfile);
+
+        Assert.IsNotNull(NpmCommandRunner.VerifyLockfileIntegrity(dir));
+    }
+
+    [TestMethod]
+    public void VerifyLockfileIntegrity_UsesLegacyDependencies_ForVersionOne()
+    {
+        var dir = CreateTempDirectory();
+        var lockfile = """
+        {
+          "lockfileVersion": 1,
+          "packages": {
+            "": { "name": "root" }
+          },
+          "dependencies": {
+            "left-pad": {
+              "version": "file:../left-pad",
+              "resolved": "file:../left-pad"
+            }
+          }
+        }
+        """;
+        File.WriteAllText(Path.Combine(dir, "package-lock.json"), lockfile);
+
+        Assert.IsNotNull(NpmCommandRunner.VerifyLockfileIntegrity(dir));
+    }
+
+    [TestMethod]
+    public void VerifyLockfileIntegrity_RejectsPackagesShape_ForVersionOne()
+    {
+        var dir = CreateTempDirectory();
+        var lockfile = """
+        {
+          "lockfileVersion": 1,
+          "packages": {
+            "": { "name": "root" }
+          }
+        }
+        """;
+        File.WriteAllText(Path.Combine(dir, "package-lock.json"), lockfile);
+
+        Assert.IsNotNull(NpmCommandRunner.VerifyLockfileIntegrity(dir));
+    }
+
+    [TestMethod]
+    public void VerifyLockfileIntegrity_RejectsDependenciesShape_ForVersionThree()
+    {
+        var dir = CreateTempDirectory();
+        var lockfile = """
+        {
+          "lockfileVersion": 3,
+          "dependencies": {}
+        }
+        """;
+        File.WriteAllText(Path.Combine(dir, "package-lock.json"), lockfile);
+
+        Assert.IsNotNull(NpmCommandRunner.VerifyLockfileIntegrity(dir));
+    }
+
+    [TestMethod]
+    public void VerifyLockfileIntegrity_RejectsUnsupportedLockfileVersion()
+    {
+        var dir = CreateTempDirectory();
+        var lockfile = """
+        {
+          "lockfileVersion": 4,
+          "packages": {
+            "": { "name": "root" }
           }
         }
         """;
