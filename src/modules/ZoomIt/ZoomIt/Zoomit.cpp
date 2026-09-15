@@ -159,7 +159,7 @@ typedef enum {
     TypeModeRightJustify
 } TypeModeState;
 
-const DWORD CURSOR_ARM_LENGTH = 4;
+const DWORD CURSOR_ARM_LENGTH = 5;
 
 const float NORMAL_BLUR_RADIUS = 20;
 const float STRONG_BLUR_RADIUS = 40;
@@ -6429,6 +6429,7 @@ void DrawEraserCursor( HDC hDcTarget, POINT pt )
 
     float s = static_cast<float>( g_PenWidth );
     if( s < 12.0f ) s = 12.0f;
+    s = min( s, 520.0f );
 
     float w = s * 0.95f;
     float h = s * 0.62f;
@@ -8086,11 +8087,6 @@ LRESULT APIENTRY MainWndProc(
             g_Drawing = FALSE;
             DisengageEraser();
             g_EraserMode = EraserModeOff;
-            if( g_Drawing &&
-                ( GetWindowLong( hWnd, GWL_EXSTYLE ) & WS_EX_LAYERED ) == 0 ) {
-                EnableDisableStickyKeys( FALSE );
-                boundRc = BoundMouse( zoomLevel, &monInfo, width, height, &cursorPos );
-            }
             g_EraserPopupVisible = FALSE;
             KillTimer( hWnd, ERASER_POPUP_TIMER );
             EnableDisableStickyKeys( TRUE );
@@ -9842,6 +9838,11 @@ LRESULT APIENTRY MainWndProc(
                 }
                 DisengageEraser();
                 g_EraserMode = EraserModeOff;
+                if( g_Drawing &&
+                    ( GetWindowLong( hWnd, GWL_EXSTYLE ) & WS_EX_LAYERED ) == 0 ) {
+                    EnableDisableStickyKeys( FALSE );
+                    boundRc = BoundMouse( zoomLevel, &monInfo, width, height, &cursorPos );
+                }
 
                 PDWORD	penColor;
                 if( g_TimerActive )
@@ -9973,6 +9974,7 @@ LRESULT APIENTRY MainWndProc(
                     prevPt = eraserPt;
                     g_Drawing = TRUE;
                     g_Tracing = FALSE;
+                    g_HaveDrawn = TRUE;
                     SetROP2( hdcScreenCompat, R2_COPYPEN );
                     boundRc = BoundMouse( zoomLevel, &monInfo, width, height, &cursorPos );
                     ClipCursor( NULL );
@@ -10015,6 +10017,11 @@ LRESULT APIENTRY MainWndProc(
             }
             DisengageEraser();
             g_EraserMode = EraserModeOff;
+            if( g_Drawing &&
+                ( GetWindowLong( hWnd, GWL_EXSTYLE ) & WS_EX_LAYERED ) == 0 ) {
+                EnableDisableStickyKeys( FALSE );
+                boundRc = BoundMouse( zoomLevel, &monInfo, width, height, &cursorPos );
+            }
 
             // Don't allow erase while we have the typing cursor active
             if( g_HaveDrawn && (g_TypeMode == TypeModeOff)) {
