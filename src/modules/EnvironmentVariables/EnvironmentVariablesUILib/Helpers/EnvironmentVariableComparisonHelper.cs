@@ -63,7 +63,28 @@ internal static class EnvironmentVariableComparisonHelper
         }
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        return string.Join(';', value.Split(';').Where(entry => seen.Add(NormalizePathEntry(entry, environment, unavailableVariableNames))));
+        var result = new List<string>();
+        foreach (var entry in value.Split(';'))
+        {
+            bool contributesEntry = false;
+            var expanded = ExpandEnvironmentVariables(
+                entry.Trim(),
+                environment,
+                unavailableVariableNames,
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+            foreach (var component in expanded.Split(';'))
+            {
+                contributesEntry |= seen.Add(NormalizePathEntry(component, unavailableVariableNames));
+            }
+
+            if (contributesEntry)
+            {
+                result.Add(entry);
+            }
+        }
+
+        return string.Join(';', result);
     }
 
     internal static IEnumerable<Variable> BuildVariablesForPathDeduplication(
@@ -72,7 +93,8 @@ internal static class EnvironmentVariableComparisonHelper
         ProfileVariablesSet appliedProfile,
         ProfileVariablesSet editingProfile,
         Variable originalVariable = null,
-        ISet<string> unavailableVariableNames = null)
+        ISet<string> unavailableVariableNames = null,
+        Variable editedVariable = null)
     {
         var systemVariableMap = (systemVariables ?? Enumerable.Empty<Variable>())
             .ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
@@ -162,6 +184,21 @@ internal static class EnvironmentVariableComparisonHelper
             }
         }
 
+        if (editedVariable?.ParentType == VariablesSetType.Profile
+            && NamesEqual(editedVariable.Name, "PATH"))
+        {
+            if (systemVariableMap.TryGetValue("PATH", out var systemPath))
+            {
+                variables["PATH"] = systemPath;
+                unavailableVariableNames?.Remove("PATH");
+            }
+            else
+            {
+                variables.Remove("PATH");
+                unavailableVariableNames?.Add("PATH");
+            }
+        }
+
         return variables.Values;
     }
 
@@ -188,17 +225,9 @@ internal static class EnvironmentVariableComparisonHelper
         }
     }
 
-    private static string NormalizePathEntry(
-        string entry,
-        IReadOnlyDictionary<string, string> variables,
-        ISet<string> unavailableVariableNames)
+    private static string NormalizePathEntry(string entry, ISet<string> unavailableVariableNames)
     {
-        var expanded = ExpandEnvironmentVariables(
-            entry.Trim(),
-            variables,
-            unavailableVariableNames,
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
-        var normalizedSeparators = expanded.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+        var normalizedSeparators = entry.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
         string previous;
         do
         {

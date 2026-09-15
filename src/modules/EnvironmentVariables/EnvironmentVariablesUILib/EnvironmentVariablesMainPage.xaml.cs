@@ -549,7 +549,8 @@ namespace EnvironmentVariablesUILib
                 ViewModel.AppliedProfile,
                 editingProfile,
                 parameter?.Variable,
-                unavailableVariableNames);
+                unavailableVariableNames,
+                variable);
 
             EditVariableDialogValueTxtBox.Text = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
                 variable.Values,
