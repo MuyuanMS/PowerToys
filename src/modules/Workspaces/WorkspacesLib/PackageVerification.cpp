@@ -231,7 +231,7 @@ namespace PackageVerification
     bool IsCurrent(const SignatureVerification::LaunchTarget& target, const std::function<bool()>& isCanceled)
     {
         return details::IsCurrent(target, isCanceled, [&target](const ApplicationIdentity& application, const std::function<bool()>& canceled) -> std::optional<details::Registration> {
-            auto current = Resolve(application, canceled, target.result.IsVerified());
+            auto current = Resolve(application, canceled, target.package && target.package->integrityChecked);
             if (!current)
             {
                 return std::nullopt;

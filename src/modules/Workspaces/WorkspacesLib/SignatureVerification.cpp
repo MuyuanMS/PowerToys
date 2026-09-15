@@ -299,9 +299,9 @@ namespace SignatureVerification
         if (!target.package)
         {
             const auto pathView = std::filesystem::path(target.path);
-            const bool isDirectExecutable = !target.path.empty() && target.path.find(L'\0') == std::wstring::npos &&
-                pathView.is_absolute() && _wcsicmp(pathView.extension().c_str(), L".exe") == 0;
-            if (isDirectExecutable && !target.file)
+            const bool isFilesystemTarget = !target.path.empty() && target.path.find(L'\0') == std::wstring::npos &&
+                (pathView.is_absolute() || target.path.find(L':') == std::wstring::npos);
+            if (isFilesystemTarget && !target.file)
             {
                 return false;
             }
@@ -361,6 +361,20 @@ namespace SignatureVerification
             resolved.erase(0, 4);
         }
         executable.path = std::move(resolved);
+        for (auto parent = std::filesystem::path(executable.path).parent_path(); !parent.empty(); parent = parent.parent_path())
+        {
+            wil::unique_hfile directory(CreateFileW(parent.c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr));
+            if (!directory)
+            {
+                executable.result = Failure(LastError());
+                return executable;
+            }
+            executable.directories.push_back(std::move(directory));
+            if (parent == parent.root_path())
+            {
+                break;
+            }
+        }
 
         WINTRUST_FILE_INFO file{};
         file.cbStruct = sizeof(file);

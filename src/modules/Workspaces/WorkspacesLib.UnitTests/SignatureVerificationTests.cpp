@@ -175,6 +175,12 @@ namespace WorkspacesLibUnitTests
             target.path = fixture.path;
             target.result = { Status::UnableToVerify, HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED) };
             Assert::IsFalse(SignatureVerification::IsCurrent(target));
+
+            target.path = L"C:\\test.lnk";
+            Assert::IsFalse(SignatureVerification::IsCurrent(target));
+
+            target.path = L"application.exe";
+            Assert::IsFalse(SignatureVerification::IsCurrent(target));
         }
 
         TEST_METHOD (UriTargetsWithoutAFileHandleRemainCurrent)

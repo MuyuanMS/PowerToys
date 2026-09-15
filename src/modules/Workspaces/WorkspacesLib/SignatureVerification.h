@@ -10,6 +10,7 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <vector>
 #include <wil/resource.h>
 
 namespace SignatureVerification
@@ -60,8 +61,9 @@ namespace SignatureVerification
     {
         std::wstring path;
         Result result;
-        // Keep the checked file open without write/delete sharing through the launch.
+        // Keep the checked file and its parent directories open without write/delete sharing through the launch.
         wil::unique_hfile file;
+        std::vector<wil::unique_hfile> directories;
         std::optional<PackageIdentity> package;
     };
 
