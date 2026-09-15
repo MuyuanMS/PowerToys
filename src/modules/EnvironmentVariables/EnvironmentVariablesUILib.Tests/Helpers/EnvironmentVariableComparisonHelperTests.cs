@@ -77,6 +77,15 @@ public class EnvironmentVariableComparisonHelperTests
     }
 
     [TestMethod]
+    public void RemoveDuplicatePathEntries_DoesNotTreatDeviceDriveRootsAsUncShares()
+    {
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @"\\?\C:\\;\\?\C:\");
+
+        Assert.AreEqual(@"\\?\C:\\", result);
+    }
+
+    [TestMethod]
     public void RemoveDuplicatePathEntries_ExpandsEditedVariableDefinitions()
     {
         var variables = new[]

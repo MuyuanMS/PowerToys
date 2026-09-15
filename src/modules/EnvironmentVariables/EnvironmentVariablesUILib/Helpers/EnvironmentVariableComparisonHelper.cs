@@ -202,7 +202,9 @@ internal static class EnvironmentVariableComparisonHelper
 
     private static bool IsUncShareRoot(string path)
     {
-        if (!path.StartsWith(@"\\", StringComparison.Ordinal))
+        if (!path.StartsWith(@"\\", StringComparison.Ordinal)
+            || path.StartsWith(@"\\?\", StringComparison.Ordinal)
+            || path.StartsWith(@"\\.\", StringComparison.Ordinal))
         {
             return false;
         }
