@@ -423,6 +423,10 @@ private:
                     {
                         m_paste_as_single_line_hotkey = parse_single_hotkey(JSON_KEY_PASTE_AS_SINGLE_LINE_HOTKEY, settingsObject);
                     }
+                    else
+                    {
+                        m_paste_as_single_line_hotkey = {};
+                    }
 
                     if (propertiesObject.HasKey(JSON_KEY_ADDITIONAL_ACTIONS))
                     {

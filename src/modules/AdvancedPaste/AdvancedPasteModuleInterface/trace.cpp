@@ -63,6 +63,7 @@ void Trace::AdvancedPaste_SettingsTelemetry(const PowertoyModuleIface::Hotkey& p
     };
 
     std::vector<std::wstring> hotkeyStrs;
+    hotkeyStrs.reserve(5 + additionalActionsHotkeys.size());
     const auto getHotkeyCStr = [&](const PowertoyModuleIface::Hotkey& hotkey)
     {
         hotkeyStrs.push_back(getHotKeyStr(hotkey)); // Probably unnecessary, but offers protection against the macro TraceLoggingWideString expanding to something that would invalidate the pointer
