@@ -23,7 +23,7 @@ namespace Microsoft.CmdPal.UI.ViewModels.Services;
 internal static class NodeRuntimeLocator
 {
     private const string NodeExecutableName = "node.exe";
-    private static readonly Version MinimumSupportedVersion = new(22, 0, 0);
+    private static readonly SemanticVersion MinimumSupportedVersion = new(new Version(22, 0, 0), null);
 
     /// <summary>
     /// Resolves <c>node.exe</c> from the current process PATH.
@@ -114,13 +114,13 @@ internal static class NodeRuntimeLocator
             process.WaitForExit();
 
             var output = standardOutput.ToString().Trim();
-            if (!Version.TryParse(output.TrimStart('v'), out var actual))
+            if (!IsSupportedNodeVersion(output, requirement, out var actual))
             {
                 reason = $"Node.js returned an invalid version '{output}'. {standardError}".Trim();
                 return false;
             }
 
-            if (IsSupportedNodeVersion(actual, requirement))
+            if (actual)
             {
                 return true;
             }
@@ -145,6 +145,28 @@ internal static class NodeRuntimeLocator
     {
         ArgumentNullException.ThrowIfNull(actual);
 
+        return IsSupportedNodeVersion(new SemanticVersion(actual, null), requirement);
+    }
+
+    internal static bool IsSupportedNodeVersion(string actual, string? requirement)
+    {
+        return IsSupportedNodeVersion(actual, requirement, out var supported) && supported;
+    }
+
+    private static bool IsSupportedNodeVersion(string actual, string? requirement, out bool supported)
+    {
+        supported = false;
+        if (!TryParseSemanticVersion(actual, out var semanticVersion))
+        {
+            return false;
+        }
+
+        supported = IsSupportedNodeVersion(semanticVersion, requirement);
+        return true;
+    }
+
+    private static bool IsSupportedNodeVersion(SemanticVersion actual, string? requirement)
+    {
         return actual.CompareTo(MinimumSupportedVersion) >= 0
             && (string.IsNullOrWhiteSpace(requirement) || MatchesRequirement(actual, requirement));
     }
@@ -154,6 +176,11 @@ internal static class NodeRuntimeLocator
         ArgumentNullException.ThrowIfNull(actual);
         ArgumentException.ThrowIfNullOrWhiteSpace(requirement);
 
+        return MatchesRequirement(new SemanticVersion(actual, null), requirement);
+    }
+
+    private static bool MatchesRequirement(SemanticVersion actual, string requirement)
+    {
         foreach (var clause in requirement.Split("||", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
         {
             if (TryMatchClause(actual, clause))
@@ -165,7 +192,7 @@ internal static class NodeRuntimeLocator
         return false;
     }
 
-    private static bool TryMatchClause(Version actual, string clause)
+    private static bool TryMatchClause(SemanticVersion actual, string clause)
     {
         clause = clause.Replace("~>", "~", StringComparison.Ordinal);
         var hyphen = clause.IndexOf(" - ", StringComparison.Ordinal);
@@ -199,12 +226,13 @@ internal static class NodeRuntimeLocator
             }
         }
 
-        return tokens.All(token => TryMatchToken(actual, token));
+        return (actual.Prerelease is null || tokens.Any(token => AllowsPrerelease(actual, token)))
+            && tokens.All(token => TryMatchToken(actual, token));
     }
 
     private static bool IsComparator(string token) => token is ">" or ">=" or "<" or "<=" or "=" or "^" or "~";
 
-    private static bool TryMatchToken(Version actual, string token)
+    private static bool TryMatchToken(SemanticVersion actual, string token)
     {
         var op = token.StartsWith(">=", StringComparison.Ordinal) || token.StartsWith("<=", StringComparison.Ordinal)
             ? token[..2]
@@ -283,30 +311,33 @@ internal static class NodeRuntimeLocator
 
             return op switch
             {
-                ">" => upper is not null && actual.CompareTo(upper) >= 0,
-                ">=" => actual.CompareTo(lower) >= 0,
-                "<" => actual.CompareTo(lower) < 0,
-                "<=" => upper is null || actual.CompareTo(upper) < 0,
-                "^" => specifiedComponents == 0 || (actual.CompareTo(lower) >= 0 && actual.CompareTo(GetCaretUpperBound(components)) < 0),
-                "=" or "" or "~" => (upper is null || actual.CompareTo(upper) < 0) && actual.CompareTo(lower) >= 0,
+                ">" => upper is not null && actual.CompareTo(new SemanticVersion(upper, null)) >= 0,
+                ">=" => actual.CompareTo(new SemanticVersion(lower, null)) >= 0,
+                "<" => actual.CompareTo(new SemanticVersion(lower, null)) < 0,
+                "<=" => upper is null || actual.CompareTo(new SemanticVersion(upper, null)) < 0,
+                "^" => specifiedComponents == 0 || (actual.CompareTo(new SemanticVersion(lower, null)) >= 0 && actual.CompareTo(new SemanticVersion(GetCaretUpperBound(components), null)) < 0),
+                "=" or "" or "~" => (upper is null || actual.CompareTo(new SemanticVersion(upper, null)) < 0) && actual.CompareTo(new SemanticVersion(lower, null)) >= 0,
                 _ => false,
             };
         }
 
-        var comparison = CompareActualToRequested(actual, lower, prerelease);
+        var requested = new SemanticVersion(lower, prerelease);
+        var comparison = actual.CompareTo(requested);
         if (specifiedComponents < 3 && op is "<=")
         {
-            return upper is not null && actual.CompareTo(upper) < 0;
+            return upper is not null && actual.CompareTo(new SemanticVersion(upper, null)) < 0;
         }
 
         if (specifiedComponents < 3 && op is ">")
         {
-            return upper is not null && actual.CompareTo(upper) >= 0;
+            return upper is not null && actual.CompareTo(new SemanticVersion(upper, null)) >= 0;
         }
 
         if (specifiedComponents < 3 && op is ("" or "="))
         {
-            return upper is not null && actual.CompareTo(lower) >= 0 && actual.CompareTo(upper) < 0;
+            return upper is not null
+                && actual.CompareTo(new SemanticVersion(lower, null)) >= 0
+                && actual.CompareTo(new SemanticVersion(upper, null)) < 0;
         }
 
         return op switch
@@ -315,17 +346,82 @@ internal static class NodeRuntimeLocator
             "<=" => comparison <= 0,
             ">" => comparison > 0,
             "<" => comparison < 0,
-            "^" => comparison >= 0 && actual.CompareTo(GetCaretUpperBound(components)) < 0,
-            "~" => comparison >= 0 && actual.CompareTo(GetTildeUpperBound(components, specifiedComponents)) < 0,
-            "=" or "" => prerelease is null && comparison == 0,
+            "^" => comparison >= 0 && actual.CompareTo(new SemanticVersion(GetCaretUpperBound(components), null)) < 0,
+            "~" => comparison >= 0 && actual.CompareTo(new SemanticVersion(GetTildeUpperBound(components, specifiedComponents), null)) < 0,
+            "=" or "" => comparison == 0,
             _ => false,
         };
     }
 
-    private static int CompareActualToRequested(Version actual, Version requested, string? requestedPrerelease)
+    private static bool AllowsPrerelease(SemanticVersion actual, string token)
     {
-        var comparison = actual.CompareTo(requested);
-        return comparison == 0 && requestedPrerelease is not null ? 1 : comparison;
+        var versionText = token.TrimStart('>', '<', '=', '^', '~');
+        if (versionText.StartsWith('v'))
+        {
+            versionText = versionText[1..];
+        }
+
+        var buildMetadataIndex = versionText.IndexOf('+');
+        if (buildMetadataIndex >= 0)
+        {
+            versionText = versionText[..buildMetadataIndex];
+        }
+
+        var prereleaseIndex = versionText.IndexOf('-');
+        if (prereleaseIndex < 0)
+        {
+            return false;
+        }
+
+        return Version.TryParse(versionText[..prereleaseIndex], out var requestedCore)
+            && requestedCore == actual.Core;
+    }
+
+    private static bool TryParseSemanticVersion(string value, out SemanticVersion version)
+    {
+        version = default;
+        var versionText = value.Trim();
+        if (versionText.StartsWith('v'))
+        {
+            versionText = versionText[1..];
+        }
+
+        var buildMetadataIndex = versionText.IndexOf('+');
+        if (buildMetadataIndex >= 0)
+        {
+            var buildMetadata = versionText[(buildMetadataIndex + 1)..];
+            if (buildMetadataIndex == 0 || !IsValidBuildMetadata(buildMetadata))
+            {
+                return false;
+            }
+
+            versionText = versionText[..buildMetadataIndex];
+        }
+
+        string? prerelease = null;
+        var prereleaseIndex = versionText.IndexOf('-');
+        if (prereleaseIndex >= 0)
+        {
+            prerelease = versionText[(prereleaseIndex + 1)..];
+            versionText = versionText[..prereleaseIndex];
+            if (!IsValidPrerelease(prerelease))
+            {
+                return false;
+            }
+        }
+
+        var parts = versionText.Split('.');
+        if (parts.Length != 3
+            || parts.Any(part => !IsCanonicalNumericIdentifier(part))
+            || !int.TryParse(parts[0], out var major)
+            || !int.TryParse(parts[1], out var minor)
+            || !int.TryParse(parts[2], out var patch))
+        {
+            return false;
+        }
+
+        version = new SemanticVersion(new Version(major, minor, patch), prerelease);
+        return true;
     }
 
     private static bool IsValidPrerelease(string prerelease)
@@ -382,6 +478,53 @@ internal static class NodeRuntimeLocator
         return specifiedComponents == 1
             ? new Version(components[0] + 1, 0, 0)
             : new Version(components[0], components[1] + 1, 0);
+    }
+
+    private readonly record struct SemanticVersion(Version Core, string? Prerelease) : IComparable<SemanticVersion>
+    {
+        public int CompareTo(SemanticVersion other)
+        {
+            var coreComparison = Core.CompareTo(other.Core);
+            if (coreComparison != 0)
+            {
+                return coreComparison;
+            }
+
+            if (Prerelease is null)
+            {
+                return other.Prerelease is null ? 0 : 1;
+            }
+
+            if (other.Prerelease is null)
+            {
+                return -1;
+            }
+
+            var leftIdentifiers = Prerelease.Split('.');
+            var rightIdentifiers = other.Prerelease.Split('.');
+            for (var index = 0; index < Math.Min(leftIdentifiers.Length, rightIdentifiers.Length); index++)
+            {
+                var left = leftIdentifiers[index];
+                var right = rightIdentifiers[index];
+                var leftIsNumeric = left.All(char.IsAsciiDigit);
+                var rightIsNumeric = right.All(char.IsAsciiDigit);
+                var comparison = leftIsNumeric && rightIsNumeric
+                    ? left.Length != right.Length
+                        ? left.Length.CompareTo(right.Length)
+                        : string.CompareOrdinal(left, right)
+                    : leftIsNumeric
+                        ? -1
+                        : rightIsNumeric
+                            ? 1
+                            : string.CompareOrdinal(left, right);
+                if (comparison != 0)
+                {
+                    return comparison;
+                }
+            }
+
+            return leftIdentifiers.Length.CompareTo(rightIdentifiers.Length);
+        }
     }
 
     private static IReadOnlyList<string> GetPathDirectories()
