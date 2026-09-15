@@ -164,6 +164,10 @@ public sealed class EnhancedVaultCredentialsProvider : IAICredentialsProvider
                 resource = "https://ai.google.dev/";
                 serviceKey = "google";
                 break;
+            case AIServiceType.Anthropic:
+                resource = "https://console.anthropic.com/settings/keys";
+                serviceKey = "anthropic";
+                break;
             case AIServiceType.FoundryLocal:
             case AIServiceType.ML:
             case AIServiceType.Onnx:
