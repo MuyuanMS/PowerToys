@@ -117,7 +117,10 @@ internal static class EnvironmentVariableComparisonHelper
                 }
                 else if (isRenamedOriginal && variables.TryGetValue(backupName, out var originalBackup))
                 {
-                    variables[profileVariable.Name] = originalBackup;
+                    variables[profileVariable.Name] = new Variable(
+                        profileVariable.Name,
+                        originalBackup.Values,
+                        originalBackup.ParentType);
                     originalBackupRestored = true;
                 }
 
@@ -125,7 +128,11 @@ internal static class EnvironmentVariableComparisonHelper
             }
         }
 
-        if (originalVariable != null && !originalBackupRestored)
+        if (originalVariable != null
+            && !originalBackupRestored
+            && !(originalVariable.ParentType == VariablesSetType.Profile
+                && !ReferenceEquals(appliedProfile, editingProfile)
+                && variables.ContainsKey(originalVariable.Name)))
         {
             bool preferUserScope = originalVariable.ParentType == VariablesSetType.Profile
                 && !ReferenceEquals(appliedProfile, editingProfile);
@@ -202,16 +209,22 @@ internal static class EnvironmentVariableComparisonHelper
 
     private static bool IsUncShareRoot(string path)
     {
+        bool isExtendedUncRoot = path.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase)
+            && path.TrimEnd(Path.DirectorySeparatorChar)
+                .Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries)
+                .Length == 4;
         if (!path.StartsWith(@"\\", StringComparison.Ordinal)
-            || path.StartsWith(@"\\?\", StringComparison.Ordinal)
+            || (path.StartsWith(@"\\?\", StringComparison.Ordinal)
+                && !isExtendedUncRoot)
             || path.StartsWith(@"\\.\", StringComparison.Ordinal))
         {
             return false;
         }
 
-        return path.TrimEnd(Path.DirectorySeparatorChar)
+        int componentCount = path.TrimEnd(Path.DirectorySeparatorChar)
             .Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries)
-            .Length == 2;
+            .Length;
+        return componentCount == 2 || isExtendedUncRoot;
     }
 
     private static string ExpandEnvironmentVariables(

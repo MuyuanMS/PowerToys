@@ -86,6 +86,15 @@ public class EnvironmentVariableComparisonHelperTests
     }
 
     [TestMethod]
+    public void RemoveDuplicatePathEntries_NormalizesExtendedUncShareRootSeparators()
+    {
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @"\\?\UNC\server\share\;\\?\UNC\server\share");
+
+        Assert.AreEqual(@"\\?\UNC\server\share\", result);
+    }
+
+    [TestMethod]
     public void RemoveDuplicatePathEntries_ExpandsEditedVariableDefinitions()
     {
         var variables = new[]
