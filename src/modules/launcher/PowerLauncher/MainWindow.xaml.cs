@@ -53,6 +53,8 @@ namespace PowerLauncher
         private static readonly string CloseSoundPath = Path.Combine(AppContext.BaseDirectory, "Sounds", "close.wav");
         private static readonly Lazy<byte[]> OpenSoundBytes = new Lazy<byte[]>(() => LoadSoundBytes(OpenSoundPath));
         private static readonly Lazy<byte[]> CloseSoundBytes = new Lazy<byte[]>(() => LoadSoundBytes(CloseSoundPath));
+        private static readonly Lazy<GCHandle> OpenSoundHandle = new Lazy<GCHandle>(() => PinSound(OpenSoundBytes.Value));
+        private static readonly Lazy<GCHandle> CloseSoundHandle = new Lazy<GCHandle>(() => PinSound(CloseSoundBytes.Value));
 
         private IDisposable _reactiveSubscription;
         private Point _mouseDownPosition;
@@ -857,12 +859,18 @@ namespace PowerLauncher
 
             try
             {
-                NativeMethods.PlaySound(soundBytes, IntPtr.Zero, NativeMethods.SndMemory | NativeMethods.SndAsync | NativeMethods.SndNoDefault);
+                GCHandle soundHandle = isOpening ? OpenSoundHandle.Value : CloseSoundHandle.Value;
+                NativeMethods.PlaySound(soundHandle.AddrOfPinnedObject(), IntPtr.Zero, NativeMethods.SndMemory | NativeMethods.SndAsync | NativeMethods.SndNoDefault);
             }
             catch (Exception ex)
             {
                 Log.Exception("Failed to play audible feedback", ex, GetType());
             }
+        }
+
+        private static GCHandle PinSound(byte[] soundBytes)
+        {
+            return soundBytes == null ? default : GCHandle.Alloc(soundBytes, GCHandleType.Pinned);
         }
 
         private static byte[] LoadSoundBytes(string path)
