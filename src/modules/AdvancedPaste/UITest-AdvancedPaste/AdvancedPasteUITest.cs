@@ -146,7 +146,7 @@ namespace Microsoft.AdvancedPaste.UITests
                 Path.Combine(testFilesFolderPath, tempTxtFileName),
                 Path.Combine(testFilesFolderPath, pasteAsSingleLineResultFile),
                 compareFormatting: true);
-            Assert.IsTrue(result.IsConsistent, "Paste as single line using popup shortcut failed.");
+            Assert.IsTrue(result.IsConsistent, "Paste as single line action failed.");
         }
 
         [TestMethod]
