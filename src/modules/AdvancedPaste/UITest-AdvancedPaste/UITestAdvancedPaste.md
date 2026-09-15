@@ -11,13 +11,13 @@
    - [x] Copy some rich text again.
    - [x] Open Advanced Paste window using hotkey, press Ctrl + 1 and confirm that plain text without any formatting is pasted.
  * Paste As Single Line
-   - [] Open Settings and set Paste as single line directly hotkey
-   - [] Copy multiline text
-   - [] Paste the text using the set hotkey and confirm that line breaks are replaced with single spaces
-   - [] Copy multiline text again
-   - [] Open Advanced Paste window using hotkey, click Paste as single line and confirm that the text is pasted on one line
-   - [] Copy multiline text again
-   - [] Open Advanced Paste window using hotkey, press Ctrl + 2 and confirm that the text is pasted on one line
+   - [ ] Open Settings and set Paste as single line directly hotkey
+   - [ ] Copy multiline text
+   - [ ] Paste the text using the set hotkey and confirm that line breaks are replaced with single spaces
+   - [ ] Copy multiline text again
+   - [ ] Open Advanced Paste window using hotkey, click Paste as single line and confirm that the text is pasted on one line
+   - [ ] Copy multiline text again
+   - [ ] Open Advanced Paste window using hotkey, press Ctrl + 2 and confirm that the text is pasted on one line
  * Paste As Markdown
    - [] Open Settings and set Paste as Markdown directly hotkey
    - [x] Copy some text (e.g. some HTML text - convertible to Markdown)
