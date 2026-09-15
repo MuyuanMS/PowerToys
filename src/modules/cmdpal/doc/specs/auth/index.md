@@ -136,7 +136,7 @@ A few things worth calling out:
   by the time a token exists.
 
 **Custom-scheme variant.** The shape is the same, with one difference at the redirect
-step. Instead of a loopback capture, the browser hands the OS an `com.microsoft.powertoys.cmdpal://auth/callback`
+step. Instead of a loopback capture, the browser hands the OS a `com.microsoft.powertoys.cmdpal://auth/callback`
 URL. The OS reactivates Command Palette, the host matches `state` back to the pending
 flow, routes the code to the extension that started it, and foregrounds the palette. From
 your code it looks identical. You still get an `IAuthorizationResult` and still do the
