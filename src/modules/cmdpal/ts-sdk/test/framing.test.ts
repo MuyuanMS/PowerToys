@@ -86,4 +86,15 @@ describe('MessageFramer round-trip', () => {
     const good = encodeMessage({ ok: true });
     expect(decodeAll(framer, Buffer.concat([garbage, good]))).toEqual([{ ok: true }]);
   });
+
+  it('rejects malformed Content-Length values instead of truncating them', () => {
+    const framer = new MessageFramer();
+    const good = encodeMessage({ ok: true });
+    const malformed = Buffer.from(
+      `Content-Length: ${good.length}abc\r\n\r\n${good.toString('utf8')}`,
+      'ascii',
+    );
+
+    expect(decodeAll(framer, malformed)).toEqual([{ ok: true }]);
+  });
 });
