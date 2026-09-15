@@ -198,8 +198,13 @@ internal static class NodeRuntimeLocator
         var hyphen = clause.IndexOf(" - ", StringComparison.Ordinal);
         if (hyphen >= 0)
         {
-            return TryMatchToken(actual, $">={clause[..hyphen].Trim()}")
-                && TryMatchToken(actual, $"<={clause[(hyphen + 3)..].Trim()}");
+            var lowerToken = $">={clause[..hyphen].Trim()}";
+            var upperToken = $"<={clause[(hyphen + 3)..].Trim()}";
+            return (actual.Prerelease is null
+                || AllowsPrerelease(actual, lowerToken)
+                || AllowsPrerelease(actual, upperToken))
+                && TryMatchToken(actual, lowerToken)
+                && TryMatchToken(actual, upperToken);
         }
 
         var rawTokens = clause.Split((char[]?)null, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);

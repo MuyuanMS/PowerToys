@@ -224,6 +224,7 @@ public class NodeRuntimeLocatorTests
     [DataRow("v24.0.0-beta.2", ">=24.0.0-rc.1", false)]
     [DataRow("v24.0.0-rc.1", ">=24.0.0", false)]
     [DataRow("v24.0.0-rc.1", ">=22", false)]
+    [DataRow("v24.0.0-rc.1", "22.0.0 - 25.0.0", false)]
     public void IsSupportedNodeVersion_EvaluatesPrereleaseNodeVersions(string actual, string requirement, bool expected)
     {
         Assert.AreEqual(expected, NodeRuntimeLocator.IsSupportedNodeVersion(actual, requirement));
