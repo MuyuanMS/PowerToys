@@ -13,7 +13,8 @@
 #include <utils/logger_helper.h>
 #include "LightSwitchStateManager.h"
 #include <LightSwitchUtils.h>
-#include <NightLightRegistryObserver.h>
+#include "NightLightRegistryObserver.h"
+#include "BrightnessObserver.h"
 #include <trace.h>
 
 SERVICE_STATUS g_ServiceStatus = {};
@@ -127,7 +128,7 @@ VOID WINAPI ServiceCtrlHandler(DWORD dwCtrl)
 
 void ApplyTheme(bool shouldBeLight)
 {
-    const auto& s = LightSwitchSettings::settings();
+    const auto s = LightSwitchSettings::settings_snapshot();
 
     if (s.changeSystem)
     {
@@ -152,7 +153,7 @@ void ApplyTheme(bool shouldBeLight)
 
 static void DetectAndHandleExternalThemeChange(LightSwitchStateManager& stateManager)
 {
-    const auto& s = LightSwitchSettings::settings();
+    const auto s = LightSwitchSettings::settings_snapshot();
     if (s.scheduleMode == ScheduleMode::Off)
         return;
 
@@ -171,29 +172,22 @@ static void DetectAndHandleExternalThemeChange(LightSwitchStateManager& stateMan
     }
 
     // Use shared helper (handles wraparound logic)
-    bool shouldBeLight = false;
+    std::optional<bool> shouldBeLight;
     if (s.scheduleMode == ScheduleMode::FollowNightLight)
     {
         shouldBeLight = !IsNightLightEnabled();
-    } 
+    }
+    else if (s.scheduleMode == ScheduleMode::FollowBrightness)
+    {
+        stateManager.OnExternalThemeChange(std::nullopt);
+        return;
+    }
     else
     {
         shouldBeLight = ShouldBeLight(nowMinutes, effectiveLight, effectiveDark);
     }
 
-    // Compare current system/apps theme
-    bool currentSystemLight = GetCurrentSystemTheme();
-    bool currentAppsLight = GetCurrentAppsTheme();
-
-    bool systemMismatch = s.changeSystem && (currentSystemLight != shouldBeLight);
-    bool appsMismatch = s.changeApps && (currentAppsLight != shouldBeLight);
-
-    // Trigger manual override only if mismatch and not already active
-    if ((systemMismatch || appsMismatch) && !stateManager.GetState().isManualOverride)
-    {
-        Logger::info(L"[LightSwitchService] External theme change detected (Windows Settings). Entering manual override mode.");
-        stateManager.OnManualOverride();
-    }
+    stateManager.OnExternalThemeChange(shouldBeLight);
 }
 
 DWORD WINAPI ServiceWorkerThread(LPVOID lpParam)
@@ -218,12 +212,14 @@ DWORD WINAPI ServiceWorkerThread(LPVOID lpParam)
     HANDLE hSettingsChanged = LightSwitchSettings::instance().GetSettingsChangedEvent();
 
     static std::unique_ptr<NightLightRegistryObserver> g_nightLightWatcher;
+    static std::unique_ptr<BrightnessObserver> g_brightnessWatcher;
 
     LightSwitchSettings::instance().LoadSettings();
-    const auto& settings = LightSwitchSettings::instance().settings();
+    const auto settings = LightSwitchSettings::settings_snapshot();
 
     // after loading settings:
     bool nightLightNeeded = (settings.scheduleMode == ScheduleMode::FollowNightLight);
+    bool brightnessNeeded = (settings.scheduleMode == ScheduleMode::FollowBrightness);
 
     if (nightLightNeeded && !g_nightLightWatcher)
     {
@@ -242,6 +238,23 @@ DWORD WINAPI ServiceWorkerThread(LPVOID lpParam)
         Logger::info(L"[LightSwitchService] Stopping Night Light registry watcher...");
         g_nightLightWatcher->Stop();
         g_nightLightWatcher.reset();
+    }
+
+    if (brightnessNeeded && !g_brightnessWatcher)
+    {
+        Logger::info(L"[LightSwitchService] Starting Brightness watcher...");
+        g_brightnessWatcher = std::make_unique<BrightnessObserver>(
+            [](int brightness) {
+                if (g_stateManagerPtr)
+                    g_stateManagerPtr->OnBrightnessChange(brightness);
+            });
+    }
+    else if (!brightnessNeeded && g_brightnessWatcher)
+    {
+        Logger::info(L"[LightSwitchService] Stopping Brightness watcher...");
+        g_brightnessWatcher->Stop();
+        g_brightnessWatcher.reset();
+        stateManager.InvalidateBrightness();
     }
 
     SYSTEMTIME st;
@@ -310,8 +323,9 @@ DWORD WINAPI ServiceWorkerThread(LPVOID lpParam)
             LightSwitchSettings::instance().LoadSettings();
             stateManager.OnSettingsChanged();
 
-            const auto& settings = LightSwitchSettings::instance().settings();
+            const auto settings = LightSwitchSettings::settings_snapshot();
             bool nightLightNeeded = (settings.scheduleMode == ScheduleMode::FollowNightLight);
+            bool brightnessNeeded = (settings.scheduleMode == ScheduleMode::FollowBrightness);
 
             if (nightLightNeeded && !g_nightLightWatcher)
             {
@@ -334,6 +348,23 @@ DWORD WINAPI ServiceWorkerThread(LPVOID lpParam)
                 g_nightLightWatcher.reset();
             }
 
+            if (brightnessNeeded && !g_brightnessWatcher)
+            {
+                Logger::info(L"[LightSwitchService] Starting Brightness watcher...");
+                g_brightnessWatcher = std::make_unique<BrightnessObserver>(
+                    [](int brightness) {
+                        if (g_stateManagerPtr)
+                            g_stateManagerPtr->OnBrightnessChange(brightness);
+                    });
+            }
+            else if (!brightnessNeeded && g_brightnessWatcher)
+            {
+                Logger::info(L"[LightSwitchService] Stopping Brightness watcher...");
+                g_brightnessWatcher->Stop();
+                g_brightnessWatcher.reset();
+                stateManager.InvalidateBrightness();
+            }
+
             continue;
         }
     }
@@ -349,6 +380,11 @@ DWORD WINAPI ServiceWorkerThread(LPVOID lpParam)
     {
         g_nightLightWatcher->Stop();
         g_nightLightWatcher.reset();
+    }
+    if (g_brightnessWatcher)
+    {
+        g_brightnessWatcher->Stop();
+        g_brightnessWatcher.reset();
     }
 
     Logger::info(L"[LightSwitchService] Worker thread exiting cleanly.");
