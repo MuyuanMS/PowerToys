@@ -337,6 +337,8 @@ void KeyboardManager::LoadDeviceProfiles()
 
 void KeyboardManager::CycleActiveProfile()
 {
+    std::lock_guard<std::mutex> lock(switchProfileMutex);
+
     try
     {
         const auto path = PTSettingsHelper::get_module_save_folder_location(moduleName) + L"\\settings.json";
@@ -376,7 +378,7 @@ void KeyboardManager::CycleActiveProfile()
 
         const std::wstring& next = profiles[(currentIndex + 1) % profiles.size()];
         Logger::trace(L"CycleActiveProfile: '{}' -> '{}'", current, next);
-        if (SwitchActiveProfile(next))
+        if (SwitchActiveProfileLocked(next))
         {
             // Audible feedback that the profile changed (no UI surface in the engine).
             MessageBeep(MB_OK);
@@ -392,7 +394,11 @@ bool KeyboardManager::SwitchActiveProfile(const std::wstring& profile)
 {
     // Tracker thread and hotkey thread can both land here; serialize the read-modify-write.
     std::lock_guard<std::mutex> lock(switchProfileMutex);
+    return SwitchActiveProfileLocked(profile);
+}
 
+bool KeyboardManager::SwitchActiveProfileLocked(const std::wstring& profile)
+{
     const HANDLE transactionLock = AcquireEditorTransactionLock();
     if (transactionLock == INVALID_HANDLE_VALUE)
     {
@@ -403,6 +409,14 @@ bool KeyboardManager::SwitchActiveProfile(const std::wstring& profile)
     bool written = false;
     try
     {
+        const auto profilePath = PTSettingsHelper::get_module_save_folder_location(moduleName) + L"\\" + profile + L".json";
+        if (GetFileAttributesW(profilePath.c_str()) == INVALID_FILE_ATTRIBUTES)
+        {
+            Logger::error(L"Refusing to activate missing profile '{}'", profile);
+            CloseHandle(transactionLock);
+            return false;
+        }
+
         const auto path = PTSettingsHelper::get_module_save_folder_location(moduleName) + L"\\settings.json";
         auto parsed = json::from_file(path);
         if (!parsed.has_value())

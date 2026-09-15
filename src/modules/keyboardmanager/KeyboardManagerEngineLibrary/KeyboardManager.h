@@ -107,6 +107,7 @@ private:
     // Make the given profile active by writing settings.json + signaling the settings-changed
     // event, so the existing reload path applies it (avoids a second thread mutating `state`).
     bool SwitchActiveProfile(const std::wstring& profile);
+    bool SwitchActiveProfileLocked(const std::wstring& profile);
 
     // Advance to the next profile in settings.json's keyboardConfigurations list (hotkey action).
     void CycleActiveProfile();

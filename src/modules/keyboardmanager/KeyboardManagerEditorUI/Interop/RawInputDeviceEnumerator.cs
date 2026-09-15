@@ -11,8 +11,8 @@ namespace KeyboardManagerEditorUI.Interop
 {
     /// <summary>
     /// Enumerates connected keyboards using Raw Input (no window required). Mirrors the engine's
-    /// identity model: device paths are normalized to the stable prefix (up to the 2nd '#') and
-    /// de-duplicated, so the list matches what the engine writes into the device→profile map.
+    /// identity model: device paths retain the complete Raw Input identity and are de-duplicated,
+    /// so the list matches what the engine writes into the device→profile map.
     /// </summary>
     internal static class RawInputDeviceEnumerator
     {
