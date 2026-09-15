@@ -91,11 +91,14 @@ internal static class EnvironmentVariableComparisonHelper
             }
         }
 
+        bool originalBackupRestored = false;
         if (appliedProfile != null && originalVariable?.ParentType != VariablesSetType.System)
         {
             foreach (var profileVariable in appliedProfile.Variables)
             {
                 var backupName = EnvironmentVariablesHelper.GetBackupVariableName(profileVariable, appliedProfile.Name);
+                bool isRenamedOriginal = ReferenceEquals(appliedProfile, editingProfile)
+                    && ReferenceEquals(profileVariable, originalVariable);
                 if (!ReferenceEquals(appliedProfile, editingProfile))
                 {
                     if (variables.TryGetValue(backupName, out var backupVariable))
@@ -110,12 +113,17 @@ internal static class EnvironmentVariableComparisonHelper
                         RestoreLowerScopeVariable(variables, systemVariableMap, profileVariable.Name, unavailableVariableNames);
                     }
                 }
+                else if (isRenamedOriginal && variables.TryGetValue(backupName, out var originalBackup))
+                {
+                    variables[profileVariable.Name] = originalBackup;
+                    originalBackupRestored = true;
+                }
 
                 variables.Remove(backupName);
             }
         }
 
-        if (originalVariable != null)
+        if (originalVariable != null && !originalBackupRestored)
         {
             RestoreLowerScopeVariable(variables, systemVariableMap, originalVariable.Name, unavailableVariableNames);
         }
@@ -192,9 +200,7 @@ internal static class EnvironmentVariableComparisonHelper
             {
                 string replacement = variables.TryGetValue(name, out var definedValue)
                     ? definedValue
-                    : unavailableVariableNames?.Contains(name) == true
-                        ? null
-                        : Environment.GetEnvironmentVariable(name);
+                    : null;
 
                 return replacement == null
                     ? match.Value

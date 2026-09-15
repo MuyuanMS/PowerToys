@@ -217,6 +217,34 @@ public class EnvironmentVariableComparisonHelperTests
     }
 
     [TestMethod]
+    public void BuildVariablesForPathDeduplication_PreservesActiveProfileBackupWhenRenaming()
+    {
+        var activeProfile = new ProfileVariablesSet(Guid.NewGuid(), "Active");
+        var originalVariable = new Variable("ROOT", @"C:\Applied", VariablesSetType.Profile);
+        activeProfile.Variables.Add(originalVariable);
+
+        var variables = EnvironmentVariableComparisonHelper.BuildVariablesForPathDeduplication(
+            new[]
+            {
+                new Variable("ROOT", @"C:\Machine", VariablesSetType.System),
+            },
+            new[]
+            {
+                new Variable("ROOT", @"C:\Applied", VariablesSetType.User),
+                new Variable("ROOT_PowerToys_Active", @"C:\Base", VariablesSetType.User),
+            },
+            activeProfile,
+            activeProfile,
+            originalVariable);
+
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @"%ROOT%;C:\Machine",
+            variables);
+
+        Assert.AreEqual(@"%ROOT%;C:\Machine", result);
+    }
+
+    [TestMethod]
     public void BuildVariablesForPathDeduplication_ReconstructsBaselineWhenEditingDefaultVariable()
     {
         var activeProfile = new ProfileVariablesSet(Guid.NewGuid(), "Active");
