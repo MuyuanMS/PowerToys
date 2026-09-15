@@ -33,6 +33,8 @@ namespace CommonSharedConstants
 
     const wchar_t ADVANCED_PASTE_MARKDOWN_MESSAGE[] = L"PasteMarkdown";
 
+    const wchar_t ADVANCED_PASTE_RICH_TEXT_MESSAGE[] = L"PasteRichText";
+
     const wchar_t ADVANCED_PASTE_JSON_MESSAGE[] = L"PasteJson";
 
     const wchar_t ADVANCED_PASTE_ADDITIONAL_ACTION_MESSAGE[] = L"AdditionalAction";
@@ -193,4 +195,3 @@ namespace CommonSharedConstants
     // Max DWORD for key code to disable keys.
     const DWORD VK_DISABLED = 0x100;
 }
-

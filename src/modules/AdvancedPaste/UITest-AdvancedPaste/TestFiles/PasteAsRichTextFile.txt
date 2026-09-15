@@ -1,0 +1,3 @@
+# Rich text title
+
+This is **bold** text.
