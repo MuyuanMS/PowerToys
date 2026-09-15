@@ -8,6 +8,8 @@ namespace Microsoft.CmdPal.UI.ViewModels;
 
 public record HistoryItem
 {
+    public string? ProviderId { get; init; }
+
     public required string CommandId { get; init; }
 
     public required int Uses { get; init; }
@@ -20,4 +22,9 @@ public record HistoryItem
     /// day-one ordering degrades gracefully to Uses-ordering rather than going all-equal.
     /// </summary>
     public DateTimeOffset LastUsed { get; init; }
+}
+
+public readonly record struct RecentCommandIdentity(string? ProviderId, string CommandId)
+{
+    public bool IsProviderQualified => !string.IsNullOrEmpty(ProviderId);
 }
