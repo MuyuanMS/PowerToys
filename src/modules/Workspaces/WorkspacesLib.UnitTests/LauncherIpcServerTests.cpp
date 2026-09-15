@@ -155,6 +155,21 @@ namespace WorkspacesLibUnitTests
                 wil::unique_hfile pipe;
                 PTP_IO io = nullptr;
 
+                void Shutdown()
+                {
+                    if (pipe)
+                    {
+                        CancelIoEx(pipe.get(), nullptr);
+                    }
+                    if (io)
+                    {
+                        WaitForThreadpoolIoCallbacks(io, TRUE);
+                        CloseThreadpoolIo(io);
+                        io = nullptr;
+                    }
+                    pipe.reset();
+                }
+
                 ~Connection()
                 {
                     if (io)
@@ -284,7 +299,7 @@ namespace WorkspacesLibUnitTests
             {
                 if (m_connection)
                 {
-                    CancelIoEx(m_connection->pipe.get(), nullptr);
+                    m_connection->Shutdown();
                     m_connection.reset();
                 }
             }
