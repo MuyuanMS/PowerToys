@@ -54,8 +54,8 @@ namespace Microsoft.PowerToys.Settings.UI.UnitTests.Controls
                     {
                         try
                         {
-                            _ = new ShortcutTestApplication(ready);
                             dispatcher = DispatcherQueue.GetForCurrentThread();
+                            _ = new ShortcutTestApplication(ready);
                         }
                         catch (Exception ex)
                         {

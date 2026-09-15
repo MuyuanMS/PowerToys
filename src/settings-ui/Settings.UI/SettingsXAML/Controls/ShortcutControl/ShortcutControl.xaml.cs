@@ -348,8 +348,8 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
 
         private void ShortcutControl_Unloaded(object sender, RoutedEventArgs e)
         {
-            shortcutDialog?.Hide();
             _isActive = false;
+            shortcutDialog?.Hide();
 
             if (settingsWindow != null)
             {
