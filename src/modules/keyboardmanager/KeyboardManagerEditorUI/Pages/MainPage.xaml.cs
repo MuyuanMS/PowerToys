@@ -46,6 +46,8 @@ namespace KeyboardManagerEditorUI.Pages
         private bool _isServiceRunning = true;
         private bool _isUpdatingToggle;
         private bool _suppressProfileSelection;
+        private bool _profileRefreshPending;
+        private bool _remappingDialogOpen;
         private RawInputWatcher? _autoSwitchWatcher;
         private ObservableCollection<KeyboardAssignmentRow>? _keyboardRows;
         private List<string> _autoSwitchProfiles = new();
@@ -436,6 +438,12 @@ namespace KeyboardManagerEditorUI.Pages
                 return;
             }
 
+            if (_remappingDialogOpen)
+            {
+                _profileRefreshPending = true;
+                return;
+            }
+
             string active = ProfileManager.GetActiveProfile();
             if (ProfileSelector.SelectedItem is string current &&
                 string.Equals(current, active, StringComparison.OrdinalIgnoreCase))
@@ -777,17 +785,25 @@ namespace KeyboardManagerEditorUI.Pages
 
         private async System.Threading.Tasks.Task ShowRemappingDialog()
         {
+            _remappingDialogOpen = true;
             RemappingDialog.PrimaryButtonClick += RemappingDialog_PrimaryButtonClick;
             UnifiedMappingControl.ValidationStateChanged += UnifiedMappingControl_ValidationStateChanged;
             RemappingDialog.IsPrimaryButtonEnabled = UnifiedMappingControl.IsInputComplete();
 
             await RemappingDialog.ShowAsync();
 
+            _remappingDialogOpen = false;
             RemappingDialog.PrimaryButtonClick -= RemappingDialog_PrimaryButtonClick;
             UnifiedMappingControl.ValidationStateChanged -= UnifiedMappingControl_ValidationStateChanged;
             _isEditMode = false;
             _editingItem = null;
             KeyboardHookHelper.Instance.CleanupHook();
+
+            if (_profileRefreshPending && !_disposed)
+            {
+                _profileRefreshPending = false;
+                RefreshActiveProfileFromDisk();
+            }
         }
 
         private void UnifiedMappingControl_ValidationStateChanged(object? sender, EventArgs e)
@@ -823,6 +839,15 @@ namespace KeyboardManagerEditorUI.Pages
 
         private void RemappingDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
         {
+            if (_profileRefreshPending)
+            {
+                args.Cancel = true;
+                UnifiedMappingControl.ShowValidationError(
+                    ResourceHelper.GetString("Error_Generic_Title"),
+                    ResourceHelper.GetString("Error_Generic_Message"));
+                return;
+            }
+
             UnifiedMappingControl.HideValidationMessage();
 
             if (_mappingService == null)

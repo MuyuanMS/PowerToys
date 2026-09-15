@@ -267,7 +267,11 @@ namespace KeyboardManagerEditorUI.Settings
                     return false;
                 }
 
-                SettingsManager.RemoveProfileMembership(profile);
+                if (!SettingsManager.RemoveProfileMembership(profile))
+                {
+                    Logger.LogError($"ProfileManager.DeleteProfile('{profile}'): could not persist editor membership cleanup");
+                    return false;
+                }
 
                 JsonObject root = ReadSettingsRootForUpdate();
                 JsonObject properties = EnsureObject(root, "properties");

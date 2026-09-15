@@ -217,11 +217,11 @@ namespace KeyboardManagerEditorUI.Settings
         /// that profile. Mappings carrying no profile at all are left alone — an untagged mapping
         /// predates profiles and is treated as belonging everywhere, so a deletion must not adopt it.
         /// </summary>
-        public static void RemoveProfileMembership(string profileName)
+        public static bool RemoveProfileMembership(string profileName)
         {
             if (string.IsNullOrWhiteSpace(profileName))
             {
-                return;
+                return false;
             }
 
             try
@@ -263,7 +263,7 @@ namespace KeyboardManagerEditorUI.Settings
 
                 if (!changed)
                 {
-                    return;
+                    return true;
                 }
 
                 updatedSettings.ProfileDictionary = BuildProfileIndex(updatedSettings);
@@ -275,11 +275,16 @@ namespace KeyboardManagerEditorUI.Settings
                 if (WriteSettings(updatedSettings))
                 {
                     EditorSettings = updatedSettings;
+                    return true;
                 }
+
+                ManagedCommon.Logger.LogError($"SettingsManager.RemoveProfileMembership('{profileName}') could not persist editor settings.");
+                return false;
             }
             catch (Exception exception)
             {
                 ManagedCommon.Logger.LogError($"SettingsManager.RemoveProfileMembership('{profileName}'): {exception.Message}");
+                return false;
             }
         }
 
