@@ -137,7 +137,7 @@ public class WorkspaceItemDesignTests : WorkspacesUiAutomationBase
         try
         {
             var root = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
-            return root.FindAll<Element>(By.ClassName("WorkspaceItem")).Count > 0;
+            return root.FindAll<Element>(By.AccessibilityId("WorkspaceItem")).Count > 0;
         }
         catch
         {
@@ -148,7 +148,7 @@ public class WorkspaceItemDesignTests : WorkspacesUiAutomationBase
     private Element GetFirstWorkspaceItem()
     {
         var root = Find<Element>(By.AccessibilityId("WorkspacesItemsControl"));
-        var items = root.FindAll<Element>(By.ClassName("WorkspaceItem"));
+        var items = root.FindAll<Element>(By.AccessibilityId("WorkspaceItem"));
         Assert.IsTrue(items.Count > 0, "Expected at least one workspace list item.");
         return items[0];
     }
