@@ -103,6 +103,13 @@ namespace PackageVerification
                         candidate.state.integrityValid = details::Await(candidate.package.VerifyContentIntegrityAsync(), std::chrono::seconds(30), isCanceled);
                         candidate.state.integrityChecked = true;
                     }
+                    candidate.identity.externalContent = candidate.state.externalContent;
+                    candidate.identity.mutableContent = candidate.state.mutableContent;
+                    candidate.identity.stub = candidate.state.stub;
+                    candidate.identity.statusOk = candidate.state.statusOk;
+                    candidate.identity.modified = candidate.state.modified;
+                    candidate.identity.integrityChecked = candidate.state.integrityChecked;
+                    candidate.identity.integrityValid = candidate.state.integrityValid;
                     resolved = std::move(candidate);
                 }
             }

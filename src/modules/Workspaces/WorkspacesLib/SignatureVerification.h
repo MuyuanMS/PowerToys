@@ -45,6 +45,13 @@ namespace SignatureVerification
         std::wstring mutablePath;
         int32_t signatureKind{};
         bool developmentMode{};
+        bool externalContent{};
+        bool mutableContent{};
+        bool stub{};
+        bool statusOk{};
+        bool modified{};
+        bool integrityChecked{};
+        bool integrityValid{};
 
         bool operator==(const PackageIdentity&) const = default;
     };

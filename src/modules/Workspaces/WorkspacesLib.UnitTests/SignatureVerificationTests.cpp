@@ -216,8 +216,21 @@ namespace WorkspacesLibUnitTests
             registration.identity.installedPath = L"C:\\Packages\\Test";
             registration.identity.effectivePath = registration.identity.installedPath;
             registration.state = HealthyPackage();
-            registration.identity.signatureKind = static_cast<int32_t>(registration.state.signatureKind);
+            CapturePackageState(registration);
             return registration;
+        }
+
+        static void CapturePackageState(PackageVerification::details::Registration& registration)
+        {
+            registration.identity.signatureKind = static_cast<int32_t>(registration.state.signatureKind);
+            registration.identity.developmentMode = registration.state.developmentMode;
+            registration.identity.externalContent = registration.state.externalContent;
+            registration.identity.mutableContent = registration.state.mutableContent;
+            registration.identity.stub = registration.state.stub;
+            registration.identity.statusOk = registration.state.statusOk;
+            registration.identity.modified = registration.state.modified;
+            registration.identity.integrityChecked = registration.state.integrityChecked;
+            registration.identity.integrityValid = registration.state.integrityValid;
         }
 
         static SignatureVerification::LaunchTarget MissingPackageTarget()
@@ -458,6 +471,37 @@ namespace WorkspacesLibUnitTests
             Assert::IsFalse(PackageVerification::details::IsCurrent(target, {}, [&](const auto&, const auto&) { return std::optional{ current }; }));
             current.state.integrityChecked = true;
             current.state.statusOk = false;
+            Assert::IsFalse(PackageVerification::details::IsCurrent(target, {}, [&](const auto&, const auto&) { return std::optional{ current }; }));
+        }
+
+        TEST_METHOD (ApprovedUnverifiedPackageMustRetainCapturedState)
+        {
+            auto target = MissingPackageTarget();
+            auto original = RegisteredPackage();
+            original.state.signatureKind = winrt::Windows::ApplicationModel::PackageSignatureKind::None;
+            CapturePackageState(original);
+            target.package = original.identity;
+            target.result = PackageVerification::Evaluate(original.state);
+            Assert::IsTrue(PackageVerification::details::IsCurrent(target, {}, [&](const auto&, const auto&) { return std::optional{ original }; }));
+
+            auto current = original;
+            current.state.modified = true;
+            CapturePackageState(current);
+            Assert::IsFalse(PackageVerification::details::IsCurrent(target, {}, [&](const auto&, const auto&) { return std::optional{ current }; }));
+
+            current = original;
+            current.state.stub = true;
+            CapturePackageState(current);
+            Assert::IsFalse(PackageVerification::details::IsCurrent(target, {}, [&](const auto&, const auto&) { return std::optional{ current }; }));
+
+            current = original;
+            current.state.statusOk = false;
+            CapturePackageState(current);
+            Assert::IsFalse(PackageVerification::details::IsCurrent(target, {}, [&](const auto&, const auto&) { return std::optional{ current }; }));
+
+            current = original;
+            current.state.externalContent = true;
+            CapturePackageState(current);
             Assert::IsFalse(PackageVerification::details::IsCurrent(target, {}, [&](const auto&, const auto&) { return std::optional{ current }; }));
         }
 
