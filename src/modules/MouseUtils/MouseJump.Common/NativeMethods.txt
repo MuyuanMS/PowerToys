@@ -42,6 +42,9 @@ GetMonitorInfo
 GetSystemMetrics
 MonitorFromPoint
 SendInput
+DestroyCursor
+DestroyIcon
+DestroyMenu
 
 GetCursorPos
 SetCursorPos
@@ -54,12 +57,15 @@ TRACK_POPUP_MENU_FLAGS
 
 SetStretchBltMode
 StretchBlt
+DeleteObject
 
 GetDesktopWindow
 GetWindowDC
 ReleaseDC
 
 Shell_NotifyIconW
+CloseHandle
+FreeLibrary
 
 GetAwarenessFromDpiAwarenessContext
 GetThreadDpiAwarenessContext
