@@ -76,6 +76,8 @@ internal static class EnvironmentVariableComparisonHelper
     {
         var systemVariableMap = (systemVariables ?? Enumerable.Empty<Variable>())
             .ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
+        var userVariableMap = (userVariables ?? Enumerable.Empty<Variable>())
+            .ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
         var variables = new Dictionary<string, Variable>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var variable in systemVariableMap.Values)
@@ -85,7 +87,7 @@ internal static class EnvironmentVariableComparisonHelper
 
         if (originalVariable?.ParentType != VariablesSetType.System)
         {
-            foreach (var variable in userVariables ?? Enumerable.Empty<Variable>())
+            foreach (var variable in userVariableMap.Values)
             {
                 variables[variable.Name] = variable;
             }
@@ -110,7 +112,7 @@ internal static class EnvironmentVariableComparisonHelper
                     }
                     else
                     {
-                        RestoreLowerScopeVariable(variables, systemVariableMap, profileVariable.Name, unavailableVariableNames);
+                        RestoreLowerScopeVariable(variables, systemVariableMap, userVariableMap, profileVariable.Name, unavailableVariableNames);
                     }
                 }
                 else if (isRenamedOriginal && variables.TryGetValue(backupName, out var originalBackup))
@@ -125,7 +127,15 @@ internal static class EnvironmentVariableComparisonHelper
 
         if (originalVariable != null && !originalBackupRestored)
         {
-            RestoreLowerScopeVariable(variables, systemVariableMap, originalVariable.Name, unavailableVariableNames);
+            bool preferUserScope = originalVariable.ParentType == VariablesSetType.Profile
+                && !ReferenceEquals(appliedProfile, editingProfile);
+            RestoreLowerScopeVariable(
+                variables,
+                systemVariableMap,
+                userVariableMap,
+                originalVariable.Name,
+                unavailableVariableNames,
+                preferUserScope);
         }
 
         if (editingProfile != null)
@@ -146,10 +156,16 @@ internal static class EnvironmentVariableComparisonHelper
     private static void RestoreLowerScopeVariable(
         IDictionary<string, Variable> variables,
         IReadOnlyDictionary<string, Variable> systemVariables,
+        IReadOnlyDictionary<string, Variable> userVariables,
         string name,
-        ISet<string> unavailableVariableNames)
+        ISet<string> unavailableVariableNames,
+        bool preferUserScope = false)
     {
-        if (systemVariables.TryGetValue(name, out var systemVariable))
+        if (preferUserScope && userVariables.TryGetValue(name, out var userVariable))
+        {
+            variables[name] = userVariable;
+        }
+        else if (systemVariables.TryGetValue(name, out var systemVariable))
         {
             variables[name] = systemVariable;
         }
@@ -179,7 +195,21 @@ internal static class EnvironmentVariableComparisonHelper
         }
         while (!string.Equals(previous, normalizedSeparators, StringComparison.Ordinal));
 
-        return normalizedSeparators;
+        return IsUncShareRoot(normalizedSeparators)
+            ? normalizedSeparators.TrimEnd(Path.DirectorySeparatorChar)
+            : normalizedSeparators;
+    }
+
+    private static bool IsUncShareRoot(string path)
+    {
+        if (!path.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return path.TrimEnd(Path.DirectorySeparatorChar)
+            .Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries)
+            .Length == 2;
     }
 
     private static string ExpandEnvironmentVariables(

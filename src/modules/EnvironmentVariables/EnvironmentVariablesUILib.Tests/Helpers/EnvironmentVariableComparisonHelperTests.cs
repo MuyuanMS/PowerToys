@@ -68,6 +68,15 @@ public class EnvironmentVariableComparisonHelperTests
     }
 
     [TestMethod]
+    public void RemoveDuplicatePathEntries_NormalizesUncShareRootSeparators()
+    {
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @"\\server\share\;\\server\share");
+
+        Assert.AreEqual(@"\\server\share\", result);
+    }
+
+    [TestMethod]
     public void RemoveDuplicatePathEntries_ExpandsEditedVariableDefinitions()
     {
         var variables = new[]
@@ -107,6 +116,33 @@ public class EnvironmentVariableComparisonHelperTests
             variables);
 
         Assert.AreEqual(@"%ROOT%;C:\Applied", result);
+    }
+
+    [TestMethod]
+    public void BuildVariablesForPathDeduplication_PreservesUserValueWhenRenamingInactiveProfileVariable()
+    {
+        var inactiveProfile = new ProfileVariablesSet(Guid.NewGuid(), "Inactive");
+        var originalVariable = new Variable("ROOT", @"C:\Profile", VariablesSetType.Profile);
+        inactiveProfile.Variables.Add(originalVariable);
+
+        var variables = EnvironmentVariableComparisonHelper.BuildVariablesForPathDeduplication(
+            new[]
+            {
+                new Variable("ROOT", @"C:\Machine", VariablesSetType.System),
+            },
+            new[]
+            {
+                new Variable("ROOT", @"C:\User", VariablesSetType.User),
+            },
+            appliedProfile: null,
+            editingProfile: inactiveProfile,
+            originalVariable: originalVariable);
+
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @"%ROOT%;C:\User",
+            variables);
+
+        Assert.AreEqual(@"%ROOT%", result);
     }
 
     [TestMethod]
