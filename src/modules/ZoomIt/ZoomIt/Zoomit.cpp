@@ -9405,7 +9405,8 @@ LRESULT APIENTRY MainWndProc(
 
             if( g_TypeMode == TypeModeOff ) {
 
-                if( g_Drawing && (LOWORD( wParam ) & MK_CONTROL) ) {
+                if( ( g_Drawing || g_EraserMode != EraserModeOff ) &&
+                    (LOWORD( wParam ) & MK_CONTROL) ) {
 
                     ResizePen( hWnd, hdcScreenCompat, hdcScreenCursorCompat, prevPt,
                         g_Tracing, &g_Drawing, g_LiveZoomLevel, TRUE, g_PenWidth + delta );
@@ -9478,7 +9479,9 @@ LRESULT APIENTRY MainWndProc(
                     }
                     if( zoomLevel != zoomTelescopeTarget ) {
 
-                        if( g_Drawing ) {
+                        if( g_Drawing ||
+                            ( g_EraserMode != EraserModeOff &&
+                              ( GetWindowLong( hWnd, GWL_EXSTYLE ) & WS_EX_LAYERED ) == 0 ) ) {
 
                             if( !g_Tracing ) {
 
@@ -9603,6 +9606,9 @@ LRESULT APIENTRY MainWndProc(
 
     case WM_KEYUP:
         if( wParam == 'T' && (g_TypeMode == TypeModeOff)) {
+
+            DisengageEraser();
+            g_EraserMode = EraserModeOff;
 
             // lParam is 0 when we're resizing the font and so don't have a cursor that
             // we need to restore
@@ -9928,6 +9934,7 @@ LRESULT APIENTRY MainWndProc(
             // LiveDraw (layered window). Plain E still clears the whole screen.
             if( ( GetKeyState( VK_SHIFT ) & 0x8000 ) &&
                 g_Zoomed && ( g_TypeMode == TypeModeOff ) && !g_Tracing && !g_DrawingShape &&
+                !( lParam & ( 1 << 30 ) ) &&
                 ( GetWindowLong( hWnd, GWL_EXSTYLE ) & WS_EX_LAYERED ) == 0 ) {
 
                 DisengageEraser();
