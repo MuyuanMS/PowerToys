@@ -438,6 +438,13 @@ const wchar_t* HotkeyIdToString( WPARAM hotkeyId )
     }
 }
 
+void DisengageEraser()
+{
+    ClipCursor( NULL );
+    EnableDisableStickyKeys( TRUE );
+    g_EraserEngaged = FALSE;
+}
+
 static void LogHotkeyRegistrationResult( const wchar_t* phase, HWND hWnd, int hotkeyId, UINT modifiers, UINT key, BOOL success )
 {
 #if _DEBUG
@@ -6627,11 +6634,7 @@ static inline bool EraserPixelDiffers( DWORD a, DWORD b )
 {
     a &= 0xFFFFFF;
     b &= 0xFFFFFF;
-    if( a == b ) return false;
-    int dr = abs( static_cast<int>( ( a >> 16 ) & 0xFF ) - static_cast<int>( ( b >> 16 ) & 0xFF ) );
-    int dg = abs( static_cast<int>( ( a >> 8 ) & 0xFF ) - static_cast<int>( ( b >> 8 ) & 0xFF ) );
-    int db = abs( static_cast<int>( a & 0xFF ) - static_cast<int>( b & 0xFF ) );
-    return ( dr + dg + db ) > 24;
+    return a != b;
 }
 
 //----------------------------------------------------------------------------
@@ -8074,8 +8077,8 @@ LRESULT APIENTRY MainWndProc(
             g_TypeMode = TypeModeOff;
             g_HaveTyped = FALSE;
             g_Drawing = FALSE;
+            DisengageEraser();
             g_EraserMode = EraserModeOff;
-            g_EraserEngaged = FALSE;
             g_EraserPopupVisible = FALSE;
             KillTimer( hWnd, ERASER_POPUP_TIMER );
             EnableDisableStickyKeys( TRUE );
@@ -8352,8 +8355,8 @@ LRESULT APIENTRY MainWndProc(
 
             if ((exStyle & WS_EX_LAYERED)) {
                 OutputDebug(L"LiveDraw reactivate\n");
+                DisengageEraser();
                 g_EraserMode = EraserModeOff;
-                g_EraserEngaged = FALSE;
 
                 // Just focus on the window and re-enter drawing mode
                 SetFocus(hWnd);
@@ -8368,8 +8371,8 @@ LRESULT APIENTRY MainWndProc(
             }
             else {
                 OutputDebug(L"LiveDraw create\n");
+                DisengageEraser();
                 g_EraserMode = EraserModeOff;
-                g_EraserEngaged = FALSE;
 
                 exStyle = GetWindowLongPtr(hWnd, GWL_EXSTYLE);
                 SetWindowLongPtr(hWnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
@@ -9799,8 +9802,8 @@ LRESULT APIENTRY MainWndProc(
             if( (g_Zoomed || g_TimerActive) && (g_TypeMode == TypeModeOff)) {
 
                 // Choosing a pen color leaves the eraser tool.
+                DisengageEraser();
                 g_EraserMode = EraserModeOff;
-                g_EraserEngaged = FALSE;
 
                 PDWORD	penColor;
                 if( g_TimerActive )
@@ -9871,7 +9874,8 @@ LRESULT APIENTRY MainWndProc(
             break;
 
         case 'Z':
-            if( (GetKeyState( VK_CONTROL ) & 0x8000 ) && g_HaveDrawn && !g_Tracing ) {
+            if( (GetKeyState( VK_CONTROL ) & 0x8000 ) && g_HaveDrawn && !g_Tracing &&
+                !g_EraserEngaged ) {
 
                 if( PopDrawUndo( hdcScreenCompat, &drawUndoList, width, height )) {
 
@@ -9913,14 +9917,13 @@ LRESULT APIENTRY MainWndProc(
                 g_Zoomed && ( g_TypeMode == TypeModeOff ) && !g_Tracing && !g_DrawingShape &&
                 ( GetWindowLong( hWnd, GWL_EXSTYLE ) & WS_EX_LAYERED ) == 0 ) {
 
+                DisengageEraser();
                 if( g_EraserMode == EraserModeOff )        g_EraserMode = EraserModePixel;
                 else if( g_EraserMode == EraserModePixel ) g_EraserMode = EraserModeStroke;
                 else                                       g_EraserMode = EraserModeOff;
 
                 // Switching modes stops any in-progress erasing; the user clicks
                 // again to engage with the newly selected tool.
-                g_EraserEngaged = FALSE;
-
                 // Show the auto-dismissing mode indicator.
                 g_EraserPopupVisible = TRUE;
                 KillTimer( hWnd, ERASER_POPUP_TIMER );
@@ -9942,8 +9945,8 @@ LRESULT APIENTRY MainWndProc(
             }
 
             // Plain E: clear the whole screen. Also exits the eraser tool.
+            DisengageEraser();
             g_EraserMode = EraserModeOff;
-            g_EraserEngaged = FALSE;
 
             // Don't allow erase while we have the typing cursor active
             if( g_HaveDrawn && (g_TypeMode == TypeModeOff)) {
@@ -10917,7 +10920,7 @@ LRESULT APIENTRY MainWndProc(
         break;
 
     case WM_USER_EXIT_MODE:
-        g_EraserEngaged = FALSE;
+        DisengageEraser();
         if( g_Zoomed )
         {
             // Turn off
