@@ -440,9 +440,12 @@ const wchar_t* HotkeyIdToString( WPARAM hotkeyId )
 
 void DisengageEraser()
 {
-    ClipCursor( NULL );
-    EnableDisableStickyKeys( TRUE );
-    g_EraserEngaged = FALSE;
+    if( g_EraserEngaged )
+    {
+        ClipCursor( NULL );
+        EnableDisableStickyKeys( TRUE );
+        g_EraserEngaged = FALSE;
+    }
 }
 
 static void LogHotkeyRegistrationResult( const wchar_t* phase, HWND hWnd, int hotkeyId, UINT modifiers, UINT key, BOOL success )
@@ -9311,7 +9314,10 @@ LRESULT APIENTRY MainWndProc(
                     InvalidateRect(hWnd, NULL, FALSE);
                 }
             }
-        } else if( g_PenDown && !penInverted) {
+        } else if( ( g_PenDown ||
+                     ( g_EraserMode != EraserModeOff &&
+                       ( GetWindowLong( hWnd, GWL_EXSTYLE ) & WS_EX_LAYERED ) == 0 ) ) &&
+                   !penInverted) {
 
             SendPenMessage(hWnd, WM_MOUSEMOVE, lParam);
         }
@@ -9324,7 +9330,11 @@ LRESULT APIENTRY MainWndProc(
         if (!penInverted) {
 
             SendPenMessage(hWnd, WM_LBUTTONUP, lParam);
-            SendPenMessage(hWnd, WM_RBUTTONDOWN, lParam);
+            if( g_EraserMode == EraserModeOff ||
+                ( GetWindowLong( hWnd, GWL_EXSTYLE ) & WS_EX_LAYERED ) != 0 )
+            {
+                SendPenMessage(hWnd, WM_RBUTTONDOWN, lParam);
+            }
             g_PenDown = FALSE;
         }
         break;
