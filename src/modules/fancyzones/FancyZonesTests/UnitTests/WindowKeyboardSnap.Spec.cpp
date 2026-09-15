@@ -262,6 +262,23 @@ namespace FancyZonesUnitTests
             Assert::IsTrue(IsZoomed(window));
         }
 
+        TEST_METHOD (WinUp_OnMaximizedWindowIsNoOpWhenCyclingDisabled)
+        {
+            WindowKeyboardSnap windowKeyboardSnap;
+            const auto window = Mocks::WindowCreate(m_hInst);
+
+            auto settings = FancyZonesSettings::settings();
+            settings.cycleThroughAllZones = false;
+            FancyZonesSettings::instance().SetSettings(settings);
+
+            Assert::IsTrue(ShowWindow(window, SW_MAXIMIZE));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+            Assert::IsTrue(windowKeyboardSnap.Snap(window, m_monitor, VK_UP, m_workAreaMap, { m_monitor }));
+            Assert::IsTrue(IsZoomed(window));
+            Assert::IsTrue(m_workAreaMap.at(m_monitor)->GetLayoutWindows().GetZoneIndexSetFromWindow(window).empty());
+        }
+
         TEST_METHOD (WinDown_MinimizesWhenCyclingDisabled)
         {
             WindowKeyboardSnap windowKeyboardSnap;
@@ -291,6 +308,20 @@ namespace FancyZonesUnitTests
 
             Assert::IsTrue(windowKeyboardSnap.Snap(window, m_monitor, VK_UP, m_workAreaMap, { m_monitor }));
             Assert::IsFalse(IsZoomed(window));
+            Assert::IsFalse(m_workAreaMap.at(m_monitor)->GetLayoutWindows().GetZoneIndexSetFromWindow(window).empty());
+        }
+
+        TEST_METHOD (WinDown_MovesUnsnappedWindowBeforeMinimizing)
+        {
+            WindowKeyboardSnap windowKeyboardSnap;
+            const auto window = Mocks::WindowCreate(m_hInst);
+
+            auto settings = FancyZonesSettings::settings();
+            settings.cycleThroughAllZones = false;
+            FancyZonesSettings::instance().SetSettings(settings);
+
+            Assert::IsTrue(windowKeyboardSnap.Snap(window, m_monitor, VK_DOWN, m_workAreaMap, { m_monitor }));
+            Assert::IsFalse(IsIconic(window));
             Assert::IsFalse(m_workAreaMap.at(m_monitor)->GetLayoutWindows().GetZoneIndexSetFromWindow(window).empty());
         }
     };

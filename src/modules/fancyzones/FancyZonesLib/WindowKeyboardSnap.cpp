@@ -74,6 +74,10 @@ bool WindowKeyboardSnap::Snap(HWND window, RECT windowRect, HMONITOR monitor, DW
     {
         return SetWindowState(window, SW_SHOWNORMAL);
     }
+    if (!cycle && vkCode == VK_UP && IsZoomed(window))
+    {
+        return true;
+    }
 
     const auto& currentWorkArea = activeWorkAreas.at(monitor);
     if (monitors.size() > 1 && FancyZonesSettings::settings().moveWindowAcrossMonitors)
@@ -106,6 +110,40 @@ bool WindowKeyboardSnap::Snap(HWND window, RECT windowRect, HMONITOR monitor, DW
 
     if (result == SnapResult::NoTarget && !cycle && (vkCode == VK_UP || vkCode == VK_DOWN))
     {
+        const auto& layoutWindows = currentWorkArea->GetLayoutWindows();
+        if (layoutWindows.GetZoneIndexSetFromWindow(window).empty())
+        {
+            const auto& zones = currentWorkArea->GetLayout()->Zones();
+            std::optional<ZoneIndex> boundaryZone;
+            for (const auto& [zoneId, zone] : zones)
+            {
+                if (!layoutWindows.IsZoneEmpty(zoneId))
+                {
+                    continue;
+                }
+
+                if (!boundaryZone)
+                {
+                    boundaryZone = zoneId;
+                    continue;
+                }
+
+                const auto& candidateRect = zone.GetZoneRect();
+                const auto& boundaryRect = zones.at(*boundaryZone).GetZoneRect();
+                if ((vkCode == VK_UP && candidateRect.top < boundaryRect.top) ||
+                    (vkCode == VK_DOWN && candidateRect.bottom > boundaryRect.bottom))
+                {
+                    boundaryZone = zoneId;
+                }
+            }
+
+            if (boundaryZone && currentWorkArea->Snap(window, { *boundaryZone }))
+            {
+                Trace::FancyZones::KeyboardSnapWindowToZone(currentWorkArea->GetLayout().get(), layoutWindows);
+                return true;
+            }
+        }
+
         return SetWindowState(window, vkCode == VK_UP ? SW_SHOWMAXIMIZED : SW_MINIMIZE);
     }
 
