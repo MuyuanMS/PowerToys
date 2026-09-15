@@ -129,12 +129,24 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
             {
                 // Stop the Node.js process before delete so file handles are released. The token lets
                 // Cancel stop waiting on a busy lifecycle gate without blocking the UI thread.
+                if (!CreateInstallMarker(targetDirectory))
+                {
+                    return JsExtensionInstallResult.Fail(Resources.npm_installer_remove_failed);
+                }
+
                 await _host.StopExtensionAsync(targetDirectory, cancellationToken).ConfigureAwait(false);
                 stoppedExtension = true;
 
                 // Delete on a worker thread since process handles can take a moment to close.
+                if (!IsCurrentTargetSafe(extensionName, targetDirectory))
+                {
+                    TryRemoveInstallMarker(targetDirectory);
+                    return JsExtensionInstallResult.Fail(Resources.npm_installer_remove_failed);
+                }
+
                 if (!await RemoveDirectoryAsync(targetDirectory, cancellationToken).ConfigureAwait(false))
                 {
+                    TryRemoveInstallMarker(targetDirectory);
                     await _host.RefreshAndAwaitProviderAsync(targetDirectory, RegistrationTimeout, CancellationToken.None).ConfigureAwait(false);
                     Logger.LogError($"Uninstall of JS extension '{extensionName}' failed: could not delete {targetDirectory}.");
                     return JsExtensionInstallResult.Fail(Resources.npm_installer_remove_failed);
@@ -145,6 +157,7 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
             }
             catch (OperationCanceledException)
             {
+                TryRemoveInstallMarker(targetDirectory);
                 if (stoppedExtension && Directory.Exists(targetDirectory))
                 {
                     await _host.RefreshAndAwaitProviderAsync(targetDirectory, RegistrationTimeout, CancellationToken.None).ConfigureAwait(false);
@@ -229,13 +242,22 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
                 return JsExtensionInstallResult.Fail(Resources.npm_installer_version_mismatch);
             }
 
-            File.WriteAllText(Path.Combine(packageDirectory, JsonRpcExtensionService.GalleryInstallMarkerFileName), string.Empty);
+            if (!CreateInstallMarker(packageDirectory))
+            {
+                Logger.LogError($"Failed to create the gallery install marker in '{packageDirectory}'.");
+                return JsExtensionInstallResult.Fail(Resources.npm_installer_install_failed);
+            }
 
             // The extracted package root already has the layout discovery expects: package.json at the
             // root with the frozen dependency closure under its own node_modules. Promote it directly.
             //
             // Keep the promote on the same volume. The target does not exist, so this is a plain rename,
             // and the watched root only sees the fully validated tree.
+            if (!IsCurrentTargetSafe(extensionName, targetDirectory))
+            {
+                return JsExtensionInstallResult.Fail(Resources.npm_installer_install_failed);
+            }
+
             Directory.CreateDirectory(_host.ExtensionsRootPath);
             Directory.Move(packageDirectory, targetDirectory);
             promoted = true;
@@ -298,6 +320,12 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
     private async Task<bool> RollbackPromotedInstallAsync(string targetDirectory)
     {
         await _host.StopExtensionAsync(targetDirectory, CancellationToken.None).ConfigureAwait(false);
+        if (!IsCurrentTargetSafe(Path.GetFileName(targetDirectory), targetDirectory))
+        {
+            Logger.LogError($"Refusing to roll back '{targetDirectory}' because its parent path is no longer safe.");
+            return false;
+        }
+
         var removed = await RemoveDirectoryAsync(targetDirectory, CancellationToken.None).ConfigureAwait(false);
         if (!removed)
         {
@@ -309,6 +337,55 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
 
     private Task<bool> RemoveDirectoryAsync(string targetDirectory, CancellationToken cancellationToken) =>
         Task.Run(() => _npmCommandRunner.RemoveDirectory(targetDirectory, cancellationToken), CancellationToken.None);
+
+    private bool IsCurrentTargetSafe(string extensionName, string targetDirectory) =>
+        TryResolveTargetDirectory(extensionName, out var resolvedTarget)
+        && string.Equals(CanonicalKey(resolvedTarget), CanonicalKey(targetDirectory), StringComparison.OrdinalIgnoreCase);
+
+    private static bool CreateInstallMarker(string targetDirectory)
+    {
+        var markerPath = Path.Combine(targetDirectory, JsonRpcExtensionService.GalleryInstallMarkerFileName);
+        try
+        {
+            if (!Directory.Exists(targetDirectory) || IsReparsePoint(targetDirectory))
+            {
+                return false;
+            }
+
+            if (File.Exists(markerPath) || Directory.Exists(markerPath))
+            {
+                return false;
+            }
+
+            using var stream = new FileStream(markerPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Logger.LogWarning($"Failed to create gallery install marker '{markerPath}': {ex.Message}");
+            return false;
+        }
+    }
+
+    private static bool IsReparsePoint(string path)
+    {
+        try
+        {
+            return (File.GetAttributes(path) & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint;
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or System.Security.SecurityException)
+        {
+            return true;
+        }
+    }
 
     private static void TryRemoveInstallMarker(string targetDirectory)
     {

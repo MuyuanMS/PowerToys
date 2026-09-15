@@ -304,8 +304,26 @@ public sealed class NpmCommandRunner : INpmCommandRunner
             using (var fileStream = File.OpenRead(tarballPath))
             using (var gzipStream = new GZipStream(fileStream, CompressionMode.Decompress))
             {
+                using (var tarReader = new TarReader(gzipStream))
+                {
+                    TarEntry? entry;
+                    while ((entry = tarReader.GetNextEntry()) is not null)
+                    {
+                        if (entry.EntryType is TarEntryType.SymbolicLink or TarEntryType.HardLink)
+                        {
+                            Logger.LogError($"Tarball {tarballPath} contains an unsupported link entry '{entry.Name}'.");
+                            return Resources.npm_runner_extract_failed;
+                        }
+                    }
+                }
+            }
+
+            using (var fileStream = File.OpenRead(tarballPath))
+            using (var gzipStream = new GZipStream(fileStream, CompressionMode.Decompress))
+            {
                 // ExtractToDirectory refuses to write outside extractRoot, so a malicious "../" path in
-                // the tarball cannot escape staging.
+                // the tarball cannot escape staging. Link entries are rejected above because older
+                // runtimes can follow them during extraction.
                 TarFile.ExtractToDirectory(gzipStream, extractRoot, overwriteFiles: true);
             }
 
@@ -460,9 +478,14 @@ public sealed class NpmCommandRunner : INpmCommandRunner
 
     public bool RemoveDirectory(string targetDirectory, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(targetDirectory) || !Directory.Exists(targetDirectory))
+        if (string.IsNullOrEmpty(targetDirectory))
         {
             return true;
+        }
+
+        if (!Directory.Exists(targetDirectory))
+        {
+            return !File.Exists(targetDirectory);
         }
 
         // Never recurse through a junction or symbolic link. Recursive delete could reach files outside
