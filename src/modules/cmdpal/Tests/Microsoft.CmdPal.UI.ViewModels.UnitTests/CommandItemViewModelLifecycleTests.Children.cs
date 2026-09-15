@@ -3,6 +3,9 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CommandPalette.Extensions;
@@ -77,7 +80,7 @@ public partial class CommandItemViewModelLifecycleTests
         public string TextToSuggest => string.Empty;
     }
 
-    private sealed partial class TestDetails : TestObservable, IDetails
+    private sealed partial class TestDetails : TestObservable, IDetails2
     {
         public IIconInfo HeroImage => new IconInfo(string.Empty);
 
@@ -86,6 +89,29 @@ public partial class CommandItemViewModelLifecycleTests
         public string Body => string.Empty;
 
         public IDetailsElement[] Metadata => [];
+
+        public IContent[] GetContent() => [new PlainTextContent("queued")];
+    }
+
+    private sealed class QueuedTaskScheduler : TaskScheduler
+    {
+        private readonly ConcurrentQueue<Task> _tasks = [];
+
+        protected override IEnumerable<Task> GetScheduledTasks() => _tasks.ToArray();
+
+        protected override void QueueTask(Task task) => _tasks.Enqueue(task);
+
+        protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued) => false;
+
+        public void ExecuteAllAvailable()
+        {
+            var timeout = Stopwatch.StartNew();
+            while (_tasks.TryDequeue(out var task))
+            {
+                Assert.IsTrue(TryExecuteTask(task));
+                Assert.IsTrue(timeout.Elapsed < TestTimeout, "Timed out executing queued details work.");
+            }
+        }
     }
 
     private sealed partial class TestContextItem : TestCommandItem, ICommandContextItem
@@ -273,6 +299,11 @@ public partial class CommandItemViewModelLifecycleTests
             primary.SafeCleanup();
             Assert.AreEqual(1, command.CountSubscribers<CommandViewModel>());
 
+            var cleanedTitle = primary.Title;
+            command.Name = "Updated after child cleanup";
+            command.RaisePropertyChanged(nameof(ICommand.Name));
+            Assert.AreEqual(cleanedTitle, primary.Title);
+
             viewModel.SafeCleanup();
             Assert.AreEqual(0, command.CountSubscribers<CommandViewModel>());
         }
@@ -331,6 +362,23 @@ public partial class CommandItemViewModelLifecycleTests
         await RunWithCleanup(viewModel, viewModel.SlowInitializeProperties, block => item.ReadDetails = block);
 
         Assert.IsNull(viewModel.Details);
+        Assert.AreEqual(0, details.SubscriberCount);
+        GC.KeepAlive(context);
+    }
+
+    [TestMethod]
+    public void CleanupBeforeQueuedDetailsContentPublication_DiscardsContent()
+    {
+        var scheduler = new QueuedTaskScheduler();
+        var context = new TestPageContext(scheduler);
+        var details = new TestDetails();
+        var viewModel = new DetailsViewModel(details, new(context));
+
+        viewModel.InitializeProperties();
+        viewModel.SafeCleanup();
+        scheduler.ExecuteAllAvailable();
+
+        Assert.AreEqual(0, viewModel.Content.Count);
         Assert.AreEqual(0, details.SubscriberCount);
         GC.KeepAlive(context);
     }

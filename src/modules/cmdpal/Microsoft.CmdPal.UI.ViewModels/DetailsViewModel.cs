@@ -11,9 +11,11 @@ namespace Microsoft.CmdPal.UI.ViewModels;
 
 public partial class DetailsViewModel : ExtensionObjectViewModel
 {
+    private readonly Lock _lifecycleLock = new();
     private readonly ExtensionObject<IDetails> _detailsModel;
     private INotifyPropChanged? _observableDetails;
     private bool _isSubscribed;
+    private bool _isCleanedUp;
 
     // Remember - "observable" properties from the model (via PropChanged)
     // cannot be marked [ObservableProperty]
@@ -177,14 +179,41 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
         DoOnUiThread(
             () =>
             {
-                ListHelpers.InPlaceUpdateList(Content, content);
-                UpdateProperty(nameof(Content));
+                var published = false;
+                lock (_lifecycleLock)
+                {
+                    if (!_isCleanedUp)
+                    {
+                        ListHelpers.InPlaceUpdateList(Content, content);
+                        UpdateProperty(nameof(Content));
+                        published = true;
+                    }
+                }
+
+                if (!published)
+                {
+                    content.ForEach(item => item.SafeCleanup());
+                }
             });
     }
 
     protected override void UnsafeCleanup()
     {
         base.UnsafeCleanup();
+
+        List<DetailsElementViewModel> metadata;
+        List<ContentViewModel> content;
+        lock (_lifecycleLock)
+        {
+            _isCleanedUp = true;
+            metadata = Metadata;
+            Metadata = [];
+            content = [.. Content];
+            Content.Clear();
+        }
+
+        metadata.ForEach(item => item.SafeCleanup());
+        content.ForEach(item => item.SafeCleanup());
 
         if (_isSubscribed && _observableDetails is not null)
         {

@@ -622,9 +622,12 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
     private void Command_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (IsCleanedUp)
+        lock (_moreCommandsLock)
         {
-            return;
+            if (IsCleanedUp || !ReferenceEquals(sender, Command))
+            {
+                return;
+            }
         }
 
         var propertyName = e.PropertyName;
@@ -644,7 +647,9 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
                 var titlePublished = false;
                 lock (_moreCommandsLock)
                 {
-                    if (!IsCleanedUp)
+                    if (!IsCleanedUp &&
+                        ReferenceEquals(sender, Command) &&
+                        ReferenceEquals(commandModel, Command.Model.Unsafe))
                     {
                         _itemTitle = title;
                         _titleCache.Invalidate();
@@ -676,7 +681,7 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
             case nameof(Command.Icon):
                 lock (_moreCommandsLock)
                 {
-                    if (IsCleanedUp)
+                    if (IsCleanedUp || !ReferenceEquals(sender, Command))
                     {
                         break;
                     }
@@ -769,16 +774,33 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
     private void UpdateTitle(string? title)
     {
-        _itemTitle = title ?? string.Empty;
-        _titleCache.Invalidate();
-        UpdateProperty(nameof(Title));
+        lock (_moreCommandsLock)
+        {
+            if (IsCleanedUp)
+            {
+                return;
+            }
+
+            _itemTitle = title ?? string.Empty;
+            _titleCache.Invalidate();
+            UpdateProperty(nameof(Title));
+        }
     }
 
     private void UpdateIcon(IIconInfo? iconInfo)
     {
-        _icon = new(iconInfo);
-        _icon.InitializeProperties();
-        UpdateProperty(nameof(Icon));
+        var icon = new IconInfoViewModel(iconInfo);
+        icon.InitializeProperties();
+        lock (_moreCommandsLock)
+        {
+            if (IsCleanedUp)
+            {
+                return;
+            }
+
+            _icon = icon;
+            UpdateProperty(nameof(Icon));
+        }
     }
 
     protected void UpdateExtendedAttributes(IDictionary<string, object?>? properties)

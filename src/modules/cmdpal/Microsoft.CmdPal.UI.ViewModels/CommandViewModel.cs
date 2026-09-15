@@ -210,6 +210,13 @@ public partial class CommandViewModel : ExtensionObjectViewModel
                 }
 
                 break;
+            default:
+                lock (_lifecycleLock)
+                {
+                    published = !IsCleanedUp;
+                }
+
+                break;
         }
 
         if (published)
