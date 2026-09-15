@@ -30,17 +30,17 @@ namespace Microsoft.PowerToys.Settings.UI.UnitTests.Controls
         private static readonly FieldInfo RepositoryField = typeof(SettingsRepository<GeneralSettings>).GetField("settingsRepository", BindingFlags.Static | BindingFlags.NonPublic);
         private static DispatcherQueue dispatcher;
         private static Thread uiThread;
-        private static object previousRepository;
+        private static SettingsRepository<GeneralSettings> repository;
+        private static GeneralSettings previousSettingsConfig;
 
         [ClassInitialize]
         public static async Task Initialize(TestContext context)
         {
-            // Use an in-memory repository before the conflict helper is initialized.
+            // Reuse the helper's repository and replace only its settings for isolation.
             // No Settings app, settings files, IPC connection or visible window is needed.
-            previousRepository = RepositoryField.GetValue(null);
-            var repository = (SettingsRepository<GeneralSettings>)Activator.CreateInstance(typeof(SettingsRepository<GeneralSettings>), nonPublic: true);
+            repository = (SettingsRepository<GeneralSettings>)RepositoryField.GetValue(null);
+            previousSettingsConfig = repository.SettingsConfig;
             repository.SettingsConfig = new GeneralSettings();
-            RepositoryField.SetValue(null, repository);
 
             var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             uiThread = new Thread(() =>
@@ -77,13 +77,18 @@ namespace Microsoft.PowerToys.Settings.UI.UnitTests.Controls
         [ClassCleanup]
         public static void Cleanup()
         {
-            if (dispatcher != null)
+            try
             {
-                Assert.IsTrue(dispatcher.TryEnqueue(() => Application.Current.Exit()));
-                Assert.IsTrue(uiThread.Join(Timeout), "The test XAML thread did not exit.");
+                if (dispatcher != null)
+                {
+                    Assert.IsTrue(dispatcher.TryEnqueue(() => Application.Current.Exit()));
+                    Assert.IsTrue(uiThread.Join(Timeout), "The test XAML thread did not exit.");
+                }
             }
-
-            RepositoryField.SetValue(null, previousRepository);
+            finally
+            {
+                repository.SettingsConfig = previousSettingsConfig;
+            }
         }
 
         [TestMethod]
