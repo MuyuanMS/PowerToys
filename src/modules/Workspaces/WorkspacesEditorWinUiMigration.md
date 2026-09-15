@@ -13,7 +13,7 @@ The Editor is the primary user-facing window for creating, editing, and managing
 Migrate the Workspaces Editor from WPF to WinUI 3 to:
 
 - Complete the Workspaces module WinUI modernization
-- Remove all WPF dependencies from the Workspaces module
+- Remove WPF dependencies from the Workspaces Editor UI surface
 - Maintain feature parity with existing Editor functionality
 - Leverage patterns established in the Launcher UI migration
 - Improve long-term maintainability and UI consistency
@@ -36,7 +36,7 @@ The following are explicitly out of scope:
 
 ### In Scope
 
-- WorkspacesEditor WPF application (6 XAML files, 31 C# files)
+- WorkspacesEditor WPF application (6 XAML files, 31 C# files); the launcher remains a separate WPF-based UI surface
 - WorkspacesCsharpLibrary WPF imaging code (`BaseApplication.cs` icon handling)
 - Resource dictionaries and styling
 - ViewModels and data binding
@@ -47,7 +47,7 @@ The following are explicitly out of scope:
 ### Out of Scope
 
 - Workspaces core C++ functionality
-- Launcher UI (already migrated to WinUI 3)
+- Launcher UI (already migrated to WinUI 3 and not part of this editor migration)
 - Named pipe IPC protocol
 - Window placement algorithms
 - Configuration file format changes

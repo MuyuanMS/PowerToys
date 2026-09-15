@@ -171,6 +171,11 @@ namespace WorkspacesEditor.ViewModels
             RefreshWorkspacesView();
         }
 
+        public void RefreshEditedProjectPreview()
+        {
+            _editedProject?.InitializePreview();
+        }
+
         [ObservableProperty]
         private bool _isLoading;
 

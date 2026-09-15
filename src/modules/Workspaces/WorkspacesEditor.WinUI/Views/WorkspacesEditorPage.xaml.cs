@@ -81,6 +81,24 @@ namespace WorkspacesEditor.Views
             }
         }
 
+        private void AppPointerEntered(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.DataContext is Application app)
+            {
+                app.IsHighlighted = true;
+                app.Parent?.InitializePreview();
+            }
+        }
+
+        private void AppPointerExited(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.DataContext is Application app)
+            {
+                app.IsHighlighted = false;
+                app.Parent?.InitializePreview();
+            }
+        }
+
         private async void DeleteWorkspaceButtonClicked(object sender, RoutedEventArgs e)
         {
             if (this.DataContext is not Project project)

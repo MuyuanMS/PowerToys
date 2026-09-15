@@ -23,7 +23,7 @@ namespace WorkspacesEditor.UnitTests
             var app = project.Applications[0];
             app.IsIncluded = true;
 
-            app.IsIncluded = !app.IsIncluded;
+            app.SwitchDeletion();
 
             Assert.IsFalse(app.IsIncluded);
         }
@@ -36,7 +36,7 @@ namespace WorkspacesEditor.UnitTests
             var app = project.Applications[0];
             app.IsIncluded = false;
 
-            app.IsIncluded = !app.IsIncluded;
+            app.SwitchDeletion();
 
             Assert.IsTrue(app.IsIncluded);
         }
@@ -49,8 +49,8 @@ namespace WorkspacesEditor.UnitTests
             var app = project.Applications[0];
             app.IsIncluded = true;
 
-            app.IsIncluded = !app.IsIncluded;
-            app.IsIncluded = !app.IsIncluded;
+            app.SwitchDeletion();
+            app.SwitchDeletion();
 
             Assert.IsTrue(app.IsIncluded);
         }

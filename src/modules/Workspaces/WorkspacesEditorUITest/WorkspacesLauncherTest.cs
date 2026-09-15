@@ -44,8 +44,8 @@ public class WorkspacesLauncherTest : WorkspacesUiAutomationBase
         CreateWorkspaceWithApps();
 
         // Launch workspace
-        var workspacesList = Find<Custom>("WorkspacesList");
-        var workspaceItem = workspacesList.FindAll<Custom>(By.AccessibilityId("WorkspaceItem"))[0];
+        var workspacesList = Find<Element>("WorkspacesList");
+        var workspaceItem = workspacesList.FindAll<Element>(By.AccessibilityId("WorkspaceItem"))[0];
         var launchButton = workspaceItem.Find<Button>("Launch");
         launchButton.Click();
         Thread.Sleep(1000);
@@ -72,8 +72,8 @@ public class WorkspacesLauncherTest : WorkspacesUiAutomationBase
         CreateWorkspaceWithApps();
 
         // Launch workspace
-        var workspacesList = Find<Custom>("WorkspacesList");
-        var workspaceItem = workspacesList.FindAll<Custom>(By.AccessibilityId("WorkspaceItem"))[0];
+        var workspacesList = Find<Element>("WorkspacesList");
+        var workspaceItem = workspacesList.FindAll<Element>(By.AccessibilityId("WorkspaceItem"))[0];
         var launchButton = workspaceItem.Find<Button>("Launch");
         launchButton.Click();
         Thread.Sleep(1000);

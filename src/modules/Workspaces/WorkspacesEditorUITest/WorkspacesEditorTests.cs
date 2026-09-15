@@ -47,8 +47,8 @@ public class WorkspacesEditorTests : WorkspacesUiAutomationBase
         Thread.Sleep(1000);
 
         // Verify workspace appears in list
-        var workspacesList = Find<Custom>("WorkspacesList");
-        var workspaceItems = workspacesList.FindAll<Custom>(By.AccessibilityId("WorkspaceItem"));
+        var workspacesList = Find<Element>("WorkspacesList");
+        var workspaceItems = workspacesList.FindAll<Element>(By.AccessibilityId("WorkspaceItem"));
         Assert.IsTrue(workspaceItems.Count > 0, "New workspace should appear in the list");
 
         CloseNotepad();
@@ -59,8 +59,8 @@ public class WorkspacesEditorTests : WorkspacesUiAutomationBase
     public void TestCancelCaptureDoesNotAddWorkspace()
     {
         // Count existing workspaces
-        var workspacesList = Find<Custom>("WorkspacesList");
-        var initialCount = workspacesList.FindAll<Custom>(By.AccessibilityId("WorkspaceItem")).Count;
+        var workspacesList = Find<Element>("WorkspacesList");
+        var initialCount = workspacesList.FindAll<Element>(By.AccessibilityId("WorkspaceItem")).Count;
 
         // Create workspace
         var createButton = Find<Button>("Create Workspace");
@@ -73,7 +73,7 @@ public class WorkspacesEditorTests : WorkspacesUiAutomationBase
         Thread.Sleep(1000);
 
         // Verify count hasn't changed
-        var finalCount = workspacesList.FindAll<Custom>(By.AccessibilityId("WorkspaceItem")).Count;
+        var finalCount = workspacesList.FindAll<Element>(By.AccessibilityId("WorkspaceItem")).Count;
         Assert.AreEqual(initialCount, finalCount, "Workspace count should not change after canceling");
     }
 
@@ -92,8 +92,8 @@ public class WorkspacesEditorTests : WorkspacesUiAutomationBase
         Thread.Sleep(1000);
 
         // Verify filtered results
-        var workspacesList = Find<Custom>("WorkspacesList");
-        var visibleItems = workspacesList.FindAll<Custom>(By.AccessibilityId("WorkspaceItem"));
+        var workspacesList = Find<Element>("WorkspacesList");
+        var visibleItems = workspacesList.FindAll<Element>(By.AccessibilityId("WorkspaceItem"));
 
         // Should only show items matching "TestWorkspace"
         Assert.IsTrue(visibleItems.Count >= 2, "Should show at least 2 TestWorkspace items");
@@ -120,7 +120,7 @@ public class WorkspacesEditorTests : WorkspacesUiAutomationBase
             Thread.Sleep(1000);
 
             // Verify list is updated (we can't easily verify sort order in UI tests)
-            var workspacesList = Find<Custom>("WorkspacesList");
+            var workspacesList = Find<Element>("WorkspacesList");
             Assert.IsNotNull(workspacesList, "Workspaces list should still be visible after sorting");
         }
     }
@@ -160,7 +160,7 @@ public class WorkspacesEditorTests : WorkspacesUiAutomationBase
         CreateTestWorkspace("WorkspaceToRemove");
 
         // Find the workspace in the list
-        var workspacesList = Find<Custom>("WorkspacesList");
+        var workspacesList = Find<Element>("WorkspacesList");
         var workspaceItem = workspacesList.Find<Custom>(By.Name("WorkspaceToRemove"));
 
         // Click remove button
@@ -184,14 +184,14 @@ public class WorkspacesEditorTests : WorkspacesUiAutomationBase
     public void TestEditOpensEditingPage()
     {
         // Create a test workspace if none exist
-        if (!Has<Custom>("WorkspacesList"))
+        if (!Has<Element>("WorkspacesList"))
         {
             CreateTestWorkspace("TestWorkspace");
         }
 
         // Find first workspace
-        var workspacesList = Find<Custom>("WorkspacesList");
-        var workspaceItem = workspacesList.FindAll<Custom>(By.AccessibilityId("WorkspaceItem"))[0];
+        var workspacesList = Find<Element>("WorkspacesList");
+        var workspaceItem = workspacesList.FindAll<Element>(By.AccessibilityId("WorkspaceItem"))[0];
 
         // Click edit button
         var editButton = workspaceItem.Find<Button>("Edit");
@@ -212,14 +212,14 @@ public class WorkspacesEditorTests : WorkspacesUiAutomationBase
     public void TestClickWorkspaceOpensEditingPage()
     {
         // Create a test workspace if none exist
-        if (!Has<Custom>("WorkspacesList"))
+        if (!Has<Element>("WorkspacesList"))
         {
             CreateTestWorkspace("TestWorkspace");
         }
 
         // Find first workspace
-        var workspacesList = Find<Custom>("WorkspacesList");
-        var workspaceItem = workspacesList.FindAll<Custom>(By.AccessibilityId("WorkspaceItem"))[0];
+        var workspacesList = Find<Element>("WorkspacesList");
+        var workspaceItem = workspacesList.FindAll<Element>(By.AccessibilityId("WorkspaceItem"))[0];
 
         // Click on the workspace item itself
         workspaceItem.Click();

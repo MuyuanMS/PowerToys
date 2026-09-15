@@ -19,6 +19,7 @@ namespace WorkspacesEditor
 {
     public partial class App : Application, IDisposable
     {
+        private readonly ETWTrace _etwTrace = new ETWTrace();
         private MainWindow _mainWindow;
         private bool _isDisposed;
 
@@ -78,6 +79,7 @@ namespace WorkspacesEditor
             if (!_isDisposed)
             {
                 MainViewModel?.Dispose();
+                _etwTrace.Dispose();
                 _isDisposed = true;
             }
 

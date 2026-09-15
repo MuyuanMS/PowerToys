@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using Microsoft.UI.Xaml;
+using System;
 
 namespace WorkspacesEditor.Helpers
 {
@@ -10,10 +11,14 @@ namespace WorkspacesEditor.Helpers
     {
         private static ElementTheme _actualTheme = ElementTheme.Default;
 
-        internal static void TrackActualTheme(FrameworkElement root)
+        internal static void TrackActualTheme(FrameworkElement root, Action themeChanged = null)
         {
             _actualTheme = root.ActualTheme;
-            root.ActualThemeChanged += (_, _) => _actualTheme = root.ActualTheme;
+            root.ActualThemeChanged += (_, _) =>
+            {
+                _actualTheme = root.ActualTheme;
+                themeChanged?.Invoke();
+            };
         }
 
         /// <summary>
