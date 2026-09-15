@@ -68,7 +68,7 @@ internal static class EnvironmentVariableComparisonHelper
         {
             bool contributesEntry = false;
             var expanded = ExpandEnvironmentVariables(
-                entry.Trim(),
+                entry,
                 environment,
                 unavailableVariableNames,
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase));

@@ -142,6 +142,15 @@ public class EnvironmentVariableComparisonHelperTests
     }
 
     [TestMethod]
+    public void RemoveDuplicatePathEntries_PreservesMeaningfulEntryWhitespace()
+    {
+        var result = EnvironmentVariableComparisonHelper.RemoveDuplicatePathEntries(
+            @" C:\Tools;C:\Tools");
+
+        Assert.AreEqual(@" C:\Tools;C:\Tools", result);
+    }
+
+    [TestMethod]
     public void BuildVariablesForPathDeduplication_ReconstructsBaselineWhenEditingInactiveProfile()
     {
         var activeProfile = new ProfileVariablesSet(Guid.NewGuid(), "Active");
