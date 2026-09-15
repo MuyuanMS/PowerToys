@@ -145,7 +145,7 @@ public sealed class MainListPageCacheTests
     }
 
     [TestMethod]
-    public void InvalidatedDefaultViewRebuild_IsRetriedByNextGetItemsCall()
+    public void InvalidatedDefaultViewRebuild_IsRetriedBeforeReturningItems()
     {
         var settings = new SettingsModel();
         var settingsService = new Mock<ISettingsService>();
@@ -186,11 +186,10 @@ public sealed class MainListPageCacheTests
                 commandManager.RebuildPinnedCache();
             });
 
-            _ = page.GetItems();
-            Assert.AreEqual(readsBeforeRebuild + 1, providerContext.ReadCount);
-
-            _ = page.GetItems();
+            var rebuilt = page.GetItems();
             Assert.AreEqual(readsBeforeRebuild + 2, providerContext.ReadCount);
+            Assert.AreEqual(2, rebuilt.Length);
+            Assert.AreSame(command, rebuilt[1]);
         }
         finally
         {

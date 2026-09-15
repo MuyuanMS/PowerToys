@@ -503,21 +503,27 @@ public sealed partial class MainListPage : DynamicListPage,
 
     private DefaultViewCache GetDefaultViewCache()
     {
-        var existing = Volatile.Read(ref _defaultViewCache);
-        var generation = Volatile.Read(ref _defaultViewGeneration);
-        if (existing?.Generation == generation)
+        while (true)
         {
-            return existing;
-        }
+            var existing = Volatile.Read(ref _defaultViewCache);
+            var generation = Volatile.Read(ref _defaultViewGeneration);
+            if (existing?.Generation == generation)
+            {
+                return existing;
+            }
 
-        var rebuilt = BuildDefaultViewCache(existing, generation);
-        if (generation == Volatile.Read(ref _defaultViewGeneration))
-        {
-            Interlocked.CompareExchange(ref _defaultViewCache, rebuilt, existing);
-        }
+            var rebuilt = BuildDefaultViewCache(existing, generation);
+            if (generation != Volatile.Read(ref _defaultViewGeneration))
+            {
+                continue;
+            }
 
-        var current = Volatile.Read(ref _defaultViewCache);
-        return current?.Generation == Volatile.Read(ref _defaultViewGeneration) ? current : rebuilt;
+            var current = Interlocked.CompareExchange(ref _defaultViewCache, rebuilt, existing);
+            if (current == existing)
+            {
+                return rebuilt;
+            }
+        }
     }
 
     private DefaultViewCache BuildDefaultViewCache(DefaultViewCache? existing, int generation)
