@@ -677,11 +677,12 @@ public partial class ListViewModel : PageViewModel, IDisposable
         var work = Volatile.Read(ref _workState);
         if (work.Status == ListPageWorkStatus.Active &&
             work.Phase == ListPageFetchPhase.Published &&
+            (!IsMainPage || work.Generation > Volatile.Read(ref _minValidFetchGeneration)) &&
             !IsLoading &&
             Volatile.Read(ref _searchAppliedEpoch) == Volatile.Read(ref _searchEpoch))
         {
             Volatile.Write(ref _readySearchEpoch, Volatile.Read(ref _searchEpoch));
-            TryConsumePendingActivation();
+            DoOnUiThread(TryConsumePendingActivation);
         }
     }
 
