@@ -92,6 +92,7 @@
                                     Margin="10"
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
+                                    AutomationProperties.AutomationId="{Binding Name, StringFormat='LaunchState_{0}'}"
                                     AutomationProperties.Name="{Binding StateDescription}"
                                     Foreground="{Binding StateColor}"
                                     Text="{Binding StateDescription}"

@@ -310,6 +310,14 @@ LaunchDecision Launcher::requestApproval(const std::wstring& name, const std::ws
         {
             return decision.value();
         }
+        if (!m_approval.IsShown())
+        {
+            std::lock_guard lock(m_uiHelperMutex);
+            if (!m_uiHelper->RequestApproval(requestId, name, path, arguments, result))
+            {
+                m_approval.Fail(LaunchDecision::UiUnavailable);
+            }
+        }
         if (!m_uiHelper->IsRunning())
         {
             m_approval.Fail(LaunchDecision::UiUnavailable);

@@ -106,6 +106,12 @@ public:
         return m_canceled;
     }
 
+    bool IsShown() const
+    {
+        std::lock_guard lock(m_mutex);
+        return m_shown;
+    }
+
 private:
     bool MatchesPending(const std::wstring& requestId) const
     {
