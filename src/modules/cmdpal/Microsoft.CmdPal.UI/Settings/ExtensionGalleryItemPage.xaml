@@ -268,7 +268,7 @@
                         HorizontalContentAlignment="Left"
                         FontWeight="SemiBold"
                         IsEnabled="{x:Bind ViewModel.ShowInstallButton, Mode=OneWay}"
-                        Visibility="{x:Bind help:BindTransformers.BoolToVisibility(ViewModel.HasLegacyInstallSource), Mode=OneWay, FallbackValue=Collapsed}"
+                        Visibility="{x:Bind help:BindTransformers.BoolToVisibility(ViewModel.ShowInstallButton), Mode=OneWay, FallbackValue=Collapsed}"
                         Style="{StaticResource AccentDropDownButtonStyle}">
                         <DropDownButton.Flyout>
                             <MenuFlyout Placement="Bottom">

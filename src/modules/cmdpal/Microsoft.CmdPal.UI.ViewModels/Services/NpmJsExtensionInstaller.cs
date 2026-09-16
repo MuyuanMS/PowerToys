@@ -106,6 +106,16 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
         {
             return JsExtensionInstallResult.Fail(Resources.npm_installer_canceled);
         }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Logger.LogError($"Uninstall of JS extension '{extensionName}' failed: {ex.Message}");
+            return JsExtensionInstallResult.Fail(Resources.npm_installer_remove_failed);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Uninstall of JS extension '{extensionName}' failed unexpectedly: {ex.Message}");
+            return JsExtensionInstallResult.Fail(Resources.npm_installer_remove_failed);
+        }
         finally
         {
             ReleaseDirectoryLock(lockKey);

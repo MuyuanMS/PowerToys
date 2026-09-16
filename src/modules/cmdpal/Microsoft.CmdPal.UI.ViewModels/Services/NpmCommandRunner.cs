@@ -434,16 +434,8 @@ public sealed class NpmCommandRunner : INpmCommandRunner
             return NpmProcessResult.Fail(Resources.npm_runner_start_failed);
         }
 
-        var stderrBuilder = new StringBuilder();
-        process.ErrorDataReceived += (_, e) =>
-        {
-            if (e.Data is not null)
-            {
-                stderrBuilder.AppendLine(e.Data);
-            }
-        };
-        process.BeginErrorReadLine();
-        process.BeginOutputReadLine();
+        var stderrTask = process.StandardError.ReadToEndAsync(CancellationToken.None);
+        var stdoutTask = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
 
         // Bound the wait so a hung npm does not leave the UI stuck. The caller token and timeout share
         // one linked source; the catch below tells them apart.
@@ -466,9 +458,11 @@ public sealed class NpmCommandRunner : INpmCommandRunner
             throw;
         }
 
+        await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
+
         if (process.ExitCode != 0)
         {
-            var error = stderrBuilder.ToString().Trim();
+            var error = stderrTask.Result.Trim();
             Logger.LogError($"npm {installSpec} failed (exit {process.ExitCode}): {error}");
             return NpmProcessResult.Fail(string.IsNullOrEmpty(error)
                 ? string.Format(CultureInfo.CurrentCulture, FailedExitFormat, process.ExitCode)
@@ -683,6 +677,8 @@ public sealed class NpmCommandRunner : INpmCommandRunner
                         continue;
                     }
 
+                    // Workspace links do not have independently verifiable registry provenance, so reject
+                    // them rather than treating them as trusted resolutions.
                     if (package.Value.TryGetProperty("link", out var link)
                         && link.ValueKind == JsonValueKind.True)
                     {
