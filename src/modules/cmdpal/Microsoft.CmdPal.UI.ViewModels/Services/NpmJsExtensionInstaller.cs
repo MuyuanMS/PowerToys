@@ -108,13 +108,13 @@ public sealed class NpmJsExtensionInstaller : IJsExtensionInstaller
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Logger.LogError($"Uninstall of JS extension '{extensionName}' failed: {ex.Message}");
-            return JsExtensionInstallResult.Fail(Resources.npm_installer_remove_failed);
+            Logger.LogError($"Install of JS extension '{extensionName}' failed: {ex.Message}");
+            return JsExtensionInstallResult.Fail(Resources.npm_installer_install_failed);
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Uninstall of JS extension '{extensionName}' failed unexpectedly: {ex.Message}");
-            return JsExtensionInstallResult.Fail(Resources.npm_installer_remove_failed);
+            Logger.LogError($"Install of JS extension '{extensionName}' failed unexpectedly: {ex.Message}");
+            return JsExtensionInstallResult.Fail(Resources.npm_installer_install_failed);
         }
         finally
         {

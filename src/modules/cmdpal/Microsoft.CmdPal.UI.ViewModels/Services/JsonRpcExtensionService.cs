@@ -664,13 +664,29 @@ public sealed partial class JsonRpcExtensionService : IExtensionService, IJsExte
 
             return string.Equals(Path.GetDirectoryName(normalizedDirectory), normalizedRoot, StringComparison.OrdinalIgnoreCase)
                 && IsUnderDirectory(markerPath, normalizedRoot)
-                && (File.GetAttributes(normalizedRoot) & FileAttributes.ReparsePoint) == 0
-                && (File.GetAttributes(normalizedDirectory) & FileAttributes.ReparsePoint) == 0;
+                && IsSafeDirectoryPath(normalizedRoot)
+                && IsSafeDirectoryPath(normalizedDirectory);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or PathTooLongException or System.Security.SecurityException)
         {
             return false;
         }
+    }
+
+    private static bool IsSafeDirectoryPath(string path)
+    {
+        var current = new DirectoryInfo(path);
+        while (current is not null)
+        {
+            if (current.Exists && (current.Attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                return false;
+            }
+
+            current = current.Parent;
+        }
+
+        return true;
     }
 
     /// <summary>

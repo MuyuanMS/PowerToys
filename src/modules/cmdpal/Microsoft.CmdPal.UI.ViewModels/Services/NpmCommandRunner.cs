@@ -494,11 +494,11 @@ public sealed class NpmCommandRunner : INpmCommandRunner
             return !File.Exists(targetDirectory);
         }
 
-        // Never recurse through a junction or symbolic link. Recursive delete could reach files outside
-        // the extensions tree, so refuse when the directory itself is a reparse point.
-        if (IsReparsePoint(targetDirectory))
+        // Never recurse through a junction or symbolic link. The directory and all existing parents
+        // must remain ordinary directories immediately before each recursive delete attempt.
+        if (!IsSafeDirectoryPath(targetDirectory))
         {
-            Logger.LogError($"Refusing to delete '{targetDirectory}' because it is a reparse point (junction or symbolic link).");
+            Logger.LogError($"Refusing to delete '{targetDirectory}' because its path contains a reparse point.");
             return false;
         }
 
@@ -508,6 +508,12 @@ public sealed class NpmCommandRunner : INpmCommandRunner
 
             try
             {
+                if (!IsSafeDirectoryPath(targetDirectory))
+                {
+                    Logger.LogError($"Refusing to delete '{targetDirectory}' because its path became unsafe.");
+                    return false;
+                }
+
                 Directory.Delete(targetDirectory, recursive: true);
                 return true;
             }
