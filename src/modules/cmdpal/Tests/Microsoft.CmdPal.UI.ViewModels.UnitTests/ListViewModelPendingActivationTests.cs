@@ -233,6 +233,36 @@ public sealed partial class ListViewModelPendingActivationTests
 
     [TestMethod]
     [Timeout(15000)]
+    public async Task NonMainPageDelayedPublication_KeepsEnterQueuedUntilNewGenerationPublishes()
+    {
+        var page = new DelayedPublicationPage(CreateItem("Initial"));
+        var viewModel = CreateViewModel(page);
+        using var listener = new InvokeListener();
+
+        try
+        {
+            await ObserveItemsAsync(viewModel, "Initial", viewModel.InitializeProperties);
+
+            viewModel.SearchTextBox = "Notepad";
+            viewModel.InvokeSelectedItemOrQueue(viewModel.FilteredItems[0]);
+
+            await Task.Delay(200);
+            Assert.IsFalse(listener.Invoked.IsCompleted, "Enter should wait for delayed non-main-page publication instead of invoking the stale result.");
+
+            page.PublishSearchResults();
+
+            var invoked = await listener.Invoked.WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.AreEqual("Notepad", invoked);
+        }
+        finally
+        {
+            viewModel.SafeCleanup();
+            viewModel.Dispose();
+        }
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
     public async Task SecondaryEnterDuringInFlightSearch_InvokesSecondaryResultWhenPublished()
     {
         var page = new DelayedSearchPage(CreateItemWithSecondary("Initial"))
@@ -270,6 +300,45 @@ public sealed partial class ListViewModelPendingActivationTests
         finally
         {
             viewModel.ItemsUpdated -= InitializeSecondaryCommand;
+            page.GetItemsGate.Set();
+            viewModel.SafeCleanup();
+            viewModel.Dispose();
+        }
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
+    public async Task SecondaryEnterWhenResultPublishedBeforeSlowInitialization_KeepsActivationQueued()
+    {
+        var page = new DelayedSearchPage(CreateItemWithSecondary("Initial"))
+        {
+            SearchResultFactory = CreateItemWithSecondary,
+        };
+        var viewModel = CreateViewModel(page);
+        using var listener = new InvokeListener();
+
+        try
+        {
+            await ObserveItemsAsync(viewModel, "Initial", viewModel.InitializeProperties);
+
+            page.GetItemsGate.Reset();
+            page.GetItemsStarted.Reset();
+            viewModel.SearchTextBox = "Notepad";
+
+            Assert.IsTrue(page.GetItemsStarted.Wait(TimeSpan.FromSeconds(3)), "The search fetch did not start.");
+            viewModel.InvokeSecondaryCommandOrQueue(viewModel.FilteredItems[0]);
+            page.GetItemsGate.Set();
+
+            await ObserveItemsAsync(viewModel, "Notepad", () => { });
+            Assert.IsFalse(listener.Invoked.IsCompleted, "Ctrl+Enter should remain queued until the selected row exposes its secondary command.");
+
+            viewModel.UpdateSelectedItemCommand.Execute(viewModel.FilteredItems[0]);
+
+            var invoked = await listener.Invoked.WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.AreEqual("Notepad secondary", invoked);
+        }
+        finally
+        {
             page.GetItemsGate.Set();
             viewModel.SafeCleanup();
             viewModel.Dispose();
