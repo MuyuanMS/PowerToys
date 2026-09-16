@@ -262,6 +262,12 @@ namespace PackageVerification
             }
             if (!current->package)
             {
+                if (current->verifyIntegrity)
+                {
+                    current->state.integrityChecked = true;
+                    current->state.integrityValid = current->verifyIntegrity();
+                    return current->state.integrityValid;
+                }
                 return false;
             }
             current->state.integrityValid = details::Await(current->package.VerifyContentIntegrityAsync(), std::chrono::seconds(30), isCanceled);
