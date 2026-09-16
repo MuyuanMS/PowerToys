@@ -12,7 +12,7 @@ public:
 
     bool LaunchUI();
     void Shutdown();
-    void UpdateLaunchStatus(WorkspacesData::LaunchingAppStateMap launchedApps) const;
+    void UpdateLaunchStatus(const WorkspacesData::LaunchingAppStateMap& launchedApps) const;
     bool IsRunning() const;
     bool IsReady() const;
     bool MarkReady();

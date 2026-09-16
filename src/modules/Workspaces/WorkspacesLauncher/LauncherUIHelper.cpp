@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <common/utils/process_path.h>
+#include <common/utils/winapi_error.h>
 
 namespace
 {
@@ -40,7 +41,7 @@ void LauncherUIHelper::Shutdown()
         Logger::warn(L"Stopping unresponsive Workspaces UI process {}", m_processId);
         if (!TerminateProcess(m_process.get(), 1))
         {
-            Logger::error(L"Unable to stop the Workspaces UI process: {}", GetLastError());
+            Logger::error(L"Unable to stop the Workspaces UI process: {}", get_last_error_or_default(GetLastError()));
         }
     }
     m_process.reset();
@@ -146,7 +147,7 @@ void LauncherUIHelper::DismissApproval(const std::wstring& requestId) const
     }
 }
 
-void LauncherUIHelper::UpdateLaunchStatus(WorkspacesData::LaunchingAppStateMap launchedApps) const
+void LauncherUIHelper::UpdateLaunchStatus(const WorkspacesData::LaunchingAppStateMap& launchedApps) const
 {
     if (!IsReady())
     {

@@ -25,6 +25,11 @@ WindowArrangerHelper::~WindowArrangerHelper()
         bool res = TerminateProcess(m_process.get(), 0);
         if (!res)
         {
+            wil::unique_handle process(OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, false, m_processId));
+            res = process && TerminateProcess(process.get(), 0);
+        }
+        if (!res)
+        {
             Logger::error(L"Unable to terminate PowerToys.WorkspacesWindowArranger process: {}", get_last_error_or_default(GetLastError()));
         }
     }
