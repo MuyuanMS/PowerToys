@@ -1015,12 +1015,12 @@ public partial class ListViewModel : PageViewModel, IDisposable
             return;
         }
 
-        if (TryInvokePending(pending, selectedItem: null))
+        if (TryInvokePending(pending, _lastSelectedItem))
         {
             return;
         }
 
-        if (ShouldKeepPendingActivation(pending, selectedItem: null))
+        if (ShouldKeepPendingActivation(pending, _lastSelectedItem))
         {
             Interlocked.CompareExchange(ref _pendingActivation, (int)pending, (int)PendingActivation.None);
             return;
@@ -1030,7 +1030,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
         // lookup and the pending-state check. Retry once after observing it done.
         if (pending == PendingActivation.Secondary)
         {
-            TryInvokePending(pending, selectedItem: null);
+            TryInvokePending(pending, _lastSelectedItem);
         }
     }
 
