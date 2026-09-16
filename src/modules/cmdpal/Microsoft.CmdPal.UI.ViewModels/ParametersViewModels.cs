@@ -588,6 +588,11 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
     public void SetActiveListParameter(CommandParameterRunViewModel? param)
     {
         CoreLogger.LogDebug($"[ParametersPageVM] SetActiveListParameter: {(param != null ? "setting" : "clearing")} (was {(_activeListParam != null ? "set" : "null")})");
+        if (_activeListParam != param)
+        {
+            ActiveListViewModel?.ClearPendingActivation();
+        }
+
         _activeListParam = param;
         ActiveListViewModel = param?.ListViewModel;
     }

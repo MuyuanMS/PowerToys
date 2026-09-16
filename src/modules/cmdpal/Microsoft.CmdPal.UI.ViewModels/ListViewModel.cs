@@ -144,6 +144,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
     private int _readySearchEpoch;
     private int _searchAppliedEpoch;
     private int _minValidFetchGeneration = -1;
+    private int _loadingSearchEpoch;
     private int _pendingActivation;
 
     // For cancelling a deferred SafeSlowInit when the user navigates rapidly
@@ -249,7 +250,12 @@ public partial class ListViewModel : PageViewModel, IDisposable
                         Volatile.Write(ref _minValidFetchGeneration, previousGeneration);
                         if (_model.Unsafe is IDynamicListPage dynamic)
                         {
+                            Volatile.Write(ref _loadingSearchEpoch, epoch);
                             dynamic.SearchText = searchTextBox;
+                            if (!dynamic.IsLoading)
+                            {
+                                Interlocked.CompareExchange(ref _loadingSearchEpoch, 0, epoch);
+                            }
                         }
 
                         if (epoch == Volatile.Read(ref _searchEpoch))
@@ -1017,7 +1023,10 @@ public partial class ListViewModel : PageViewModel, IDisposable
     private bool IsActivationReady =>
         Volatile.Read(ref _readySearchEpoch) == Volatile.Read(ref _searchEpoch) &&
         !IsFetching &&
-        _homePage?.CurrentFetchIsSettledFor(SearchTextBox) == true;
+        _homePage?.CurrentFetchIsSettledFor(SearchTextBox) == true &&
+        (Volatile.Read(ref _loadingSearchEpoch) == 0 ||
+         Volatile.Read(ref _loadingSearchEpoch) != Volatile.Read(ref _searchEpoch) ||
+         !IsLoading);
 
     private void OnHomeSearchSettlementChanged(object? sender, EventArgs e) =>
         DoOnUiThread(TryConsumePendingActivation);
@@ -1118,7 +1127,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
         return null;
     }
 
-    private void ClearPendingActivation() =>
+    public void ClearPendingActivation() =>
         Interlocked.Exchange(ref _pendingActivation, (int)PendingActivation.None);
 
     [RelayCommand]
