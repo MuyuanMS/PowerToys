@@ -39,6 +39,7 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
         private HotkeySettings hotkeySettings;
         private HotkeySettings internalSettings;
         private HotkeySettings lastValidSettings;
+        private HotkeySettings lastKeyDownSettings;
         private HotkeySettingsControlHook hook;
         private bool _isActive;
         private bool disposedValue;
@@ -504,8 +505,19 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
         private void Hotkey_KeyDown(int key)
         {
             KeyEventHandler(key, true, key);
+            if (AreHotkeySettingsEqual(lastKeyDownSettings, internalSettings))
+            {
+                return;
+            }
 
-            c.Keys = internalSettings.GetKeysList();
+            lastKeyDownSettings = internalSettings with { };
+
+            List<object> newKeys = internalSettings.GetKeysList();
+            if (c.Keys == null || !c.JudgeIfKeyValueSame(newKeys))
+            {
+                c.Keys = newKeys;
+            }
+
             c.ConflictMessage = string.Empty;
             c.HasConflict = false;
 
@@ -560,6 +572,17 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
             }
 
             c.IsWarningAltGr = internalSettings.Ctrl && internalSettings.Alt && !internalSettings.Win && (internalSettings.Code > 0);
+        }
+
+        private static bool AreHotkeySettingsEqual(HotkeySettings first, HotkeySettings second)
+        {
+            return first != null &&
+                   second != null &&
+                   first.Win == second.Win &&
+                   first.Ctrl == second.Ctrl &&
+                   first.Alt == second.Alt &&
+                   first.Shift == second.Shift &&
+                   first.Code == second.Code;
         }
 
         private void CheckForConflicts(HotkeySettings settings)
@@ -622,6 +645,7 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
         private void Hotkey_KeyUp(int key)
         {
             KeyEventHandler(key, false, 0);
+            lastKeyDownSettings = null;
         }
 
         private bool Hotkey_IsActive()
@@ -682,8 +706,14 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
             _isDialogOpen = true;
             try
             {
-                c.Keys = null;
-                c.Keys = HotkeySettings?.GetKeysList() ?? new List<object>();
+                lastKeyDownSettings = null;
+                List<object> newKeys = HotkeySettings?.GetKeysList() ?? new List<object>();
+
+                if (c.Keys == null || !c.JudgeIfKeyValueSame(newKeys))
+                {
+                    c.Keys = null;
+                    c.Keys = newKeys ?? new List<object>();
+                }
 
                 c.IgnoreConflict = IgnoreConflict;
                 c.HasConflict = hotkeySettings?.HasConflict ?? false;
