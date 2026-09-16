@@ -438,6 +438,27 @@ namespace WorkspacesLibUnitTests
             Assert::IsFalse(PackageVerification::details::IsCurrent(target, {}, [&](const auto&, const auto&) { return std::optional{ current }; }));
         }
 
+        TEST_METHOD (VerifiedRevalidationUsesResolverIntegritySeamWhenPackageIsMissing)
+        {
+            auto target = MissingPackageTarget();
+            auto current = RegisteredPackage();
+            target.package = current.identity;
+            target.result = { Status::Verified, ERROR_SUCCESS };
+            int revalidations = 0;
+            current.verifyIntegrity = [&] {
+                ++revalidations;
+                return true;
+            };
+            Assert::IsTrue(PackageVerification::details::IsCurrent(target, {}, [&](const auto&, const auto&) { return std::optional{ current }; }));
+            Assert::AreEqual(1, revalidations);
+            current.verifyIntegrity = [&] {
+                ++revalidations;
+                return false;
+            };
+            Assert::IsFalse(PackageVerification::details::IsCurrent(target, {}, [&](const auto&, const auto&) { return std::optional{ current }; }));
+            Assert::AreEqual(2, revalidations);
+        }
+
         TEST_METHOD (CanceledRevalidationDoesNotConsultTheResolver)
         {
             auto target = MissingPackageTarget();

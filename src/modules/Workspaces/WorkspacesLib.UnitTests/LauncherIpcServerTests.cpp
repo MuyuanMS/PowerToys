@@ -497,6 +497,7 @@ namespace WorkspacesLibUnitTests
                     return false;
                 }
                 WaitForThreadpoolWorkCallbacks(m_stop->work, FALSE);
+                WaitForThreadpoolWorkCallbacks(m_stop->work, FALSE);
                 return true;
             }
 
