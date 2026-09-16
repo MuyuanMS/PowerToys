@@ -60,6 +60,18 @@ public sealed partial class ListViewModelPendingActivationTests
         }
     }
 
+    private sealed partial class DelayedPublicationPage(params IListItem[] items) : DynamicListPage
+    {
+        private IListItem[] _items = items;
+
+        public override IListItem[] GetItems() => Volatile.Read(ref _items);
+
+        public override void UpdateSearchText(string oldSearch, string newSearch) =>
+            Volatile.Write(ref _items, [CreateItem(newSearch)]);
+
+        internal void PublishSearchResults() => RaiseItemsChanged(_items.Length);
+    }
+
     private sealed partial class StaticSearchPage(IListItem[] items) : ListPage
     {
         public override IListItem[] GetItems() => items;
@@ -196,6 +208,36 @@ public sealed partial class ListViewModelPendingActivationTests
 
     [TestMethod]
     [Timeout(15000)]
+    public async Task MainPageDelayedPublication_KeepsEnterQueuedUntilNewGenerationPublishes()
+    {
+        var page = new DelayedPublicationPage(CreateItem("Initial"));
+        var viewModel = CreateViewModel(page, isMainPage: true);
+        using var listener = new InvokeListener();
+
+        try
+        {
+            await ObserveItemsAsync(viewModel, "Initial", viewModel.InitializeProperties);
+
+            viewModel.SearchTextBox = "Notepad";
+            viewModel.InvokeSelectedItemOrQueue(viewModel.FilteredItems[0]);
+
+            await Task.Delay(200);
+            Assert.IsFalse(listener.Invoked.IsCompleted, "Enter should wait for the delayed main-page publication instead of invoking the stale result.");
+
+            page.PublishSearchResults();
+
+            var invoked = await listener.Invoked.WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.AreEqual("Notepad", invoked);
+        }
+        finally
+        {
+            viewModel.SafeCleanup();
+            viewModel.Dispose();
+        }
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
     public async Task SecondaryEnterDuringInFlightSearch_InvokesSecondaryResultWhenPublished()
     {
         var page = new DelayedSearchPage(CreateItemWithSecondary("Initial"))
@@ -274,8 +316,8 @@ public sealed partial class ListViewModelPendingActivationTests
             MoreCommands = [new CommandContextItem(new NoOpCommand { Name = $"{title} secondary" })],
         };
 
-    private static ListViewModel CreateViewModel(IListPage page) =>
-        new(page, TaskScheduler.Default, new TestHost(), CommandProviderContext.Empty, DefaultContextMenuFactory.Instance);
+    private static ListViewModel CreateViewModel(IListPage page, bool isMainPage = false) =>
+        new(page, TaskScheduler.Default, new TestHost(), CommandProviderContext.Empty, DefaultContextMenuFactory.Instance) { IsMainPage = isMainPage };
 
     private static async Task ObserveItemsAsync(ListViewModel viewModel, string expectedTitle, Action action) =>
         await ObserveItemsAsync(viewModel, vm => vm.FilteredItems.Count >= 1 && vm.FilteredItems[0].Title == expectedTitle, action);
