@@ -194,6 +194,17 @@ namespace WorkspacesLibUnitTests
             Assert::IsTrue(SignatureVerification::IsCurrent(target));
         }
 
+        TEST_METHOD (DirectFileTargetsWithoutProtectedDirectoriesAreNotCurrent)
+        {
+            TemporaryExecutable fixture;
+            SignatureVerification::LaunchTarget target;
+            target.path = fixture.path;
+            target.result = { Status::UnableToVerify, HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED) };
+            target.file.reset(CreateFileW(fixture.path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+            Assert::IsTrue(static_cast<bool>(target.file));
+            Assert::IsFalse(SignatureVerification::IsCurrent(target));
+        }
+
         TEST_METHOD (MalformedImageIsNotReportedAsUnsigned)
         {
             TemporaryExecutable fixture;
