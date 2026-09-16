@@ -97,6 +97,7 @@ namespace WorkspacesLauncherUI.IPC
         internal async Task WaitForExitAsync(CancellationToken cancellationToken)
         {
             using var waitHandle = new ProcessWaitHandle(_handle);
+            using var callbackDrained = new ManualResetEvent(false);
             var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var registration = ThreadPool.RegisterWaitForSingleObject(
                 waitHandle,
@@ -110,7 +111,8 @@ namespace WorkspacesLauncherUI.IPC
             }
             finally
             {
-                registration.Unregister(null);
+                registration.Unregister(callbackDrained);
+                callbackDrained.WaitOne();
             }
         }
 

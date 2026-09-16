@@ -30,12 +30,16 @@ LauncherUIHelper::~LauncherUIHelper()
 
 void LauncherUIHelper::Shutdown()
 {
-    if (IsReady())
+    const bool gracefulShutdownSent = IsReady() && m_channel.Send(Message(L"shutdown").Stringify().c_str());
+    DWORD gracefulShutdownWait = WAIT_FAILED;
+    if (gracefulShutdownSent && m_process)
     {
-        m_channel.Send(Message(L"shutdown").Stringify().c_str());
+        gracefulShutdownWait = WaitForSingleObject(m_process.get(), 1500);
     }
+
     m_channel.Stop();
-    if (m_process && WaitForSingleObject(m_process.get(), 1500) == WAIT_TIMEOUT)
+    if (m_process && gracefulShutdownWait != WAIT_OBJECT_0 &&
+        WaitForSingleObject(m_process.get(), gracefulShutdownSent ? 0 : 1500) == WAIT_TIMEOUT)
     {
         Logger::warn(L"Stopping unresponsive Workspaces UI process {}", m_processId);
         if (!TerminateProcess(m_process.get(), 1))
