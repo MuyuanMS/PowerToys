@@ -50,9 +50,18 @@ namespace WorkspacesLauncherUI.ViewModels
 
         private void ReceiveMessage(string message)
         {
-            if (!_dispatcher.HasShutdownStarted)
+            if (_stopped || _dispatcher.HasShutdownStarted || _dispatcher.HasShutdownFinished)
+            {
+                return;
+            }
+
+            try
             {
                 _dispatcher.BeginInvoke(DispatcherPriority.Send, new Action(() => HandleMessage(message)));
+            }
+            catch (InvalidOperationException exception)
+            {
+                Logger.LogWarning($"Ignoring a Workspaces launcher message after dispatcher shutdown. {exception.Message}");
             }
         }
 

@@ -34,6 +34,19 @@ namespace SignatureVerification
             return error == ERROR_SUCCESS ? E_FAIL : HRESULT_FROM_WIN32(error);
         }
 
+        std::wstring NormalizeFinalPathForDispatch(std::wstring path)
+        {
+            if (path.starts_with(L"\\\\?\\UNC\\"))
+            {
+                return L"\\\\" + path.substr(8);
+            }
+            if (path.starts_with(L"\\\\?\\") && path.size() > 6 && path[5] == L':')
+            {
+                path.erase(0, 4);
+            }
+            return path;
+        }
+
         LONG MachineChainStatus(const CRYPT_PROVIDER_SGNR& signer, bool timestamp)
         {
             if (!signer.csCertChain || !signer.pasCertChain)
@@ -355,15 +368,7 @@ namespace SignatureVerification
             return executable;
         }
         resolved.resize(written);
-        if (resolved.starts_with(L"\\\\?\\UNC\\"))
-        {
-            resolved = L"\\\\" + resolved.substr(8);
-        }
-        else if (resolved.starts_with(L"\\\\?\\"))
-        {
-            resolved.erase(0, 4);
-        }
-        executable.path = std::move(resolved);
+        executable.path = NormalizeFinalPathForDispatch(std::move(resolved));
 
         WINTRUST_FILE_INFO file{};
         file.cbStruct = sizeof(file);
