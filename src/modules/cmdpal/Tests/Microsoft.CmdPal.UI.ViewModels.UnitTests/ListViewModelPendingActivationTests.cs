@@ -167,10 +167,13 @@ public sealed partial class ListViewModelPendingActivationTests
             Assert.IsTrue(page.GetItemsStarted.Wait(TimeSpan.FromSeconds(3)), "The search fetch did not start.");
             viewModel.InvokeSelectedItemOrQueue(null);
 
-            viewModel.SearchTextBox = string.Empty;
+            var cleared = ObserveItemsAsync(
+                viewModel,
+                string.Empty,
+                () => viewModel.SearchTextBox = string.Empty);
             page.GetItemsGate.Set();
 
-            await Task.Delay(200);
+            await cleared;
             Assert.IsFalse(listener.Invoked.IsCompleted, "Clearing the query should drop the queued Enter.");
         }
         finally
@@ -195,6 +198,33 @@ public sealed partial class ListViewModelPendingActivationTests
 
             viewModel.SearchTextBox = "Beta";
             viewModel.InvokeSelectedItemOrQueue(null);
+
+            var invoked = await listener.Invoked.WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.AreEqual("Beta", invoked);
+        }
+        finally
+        {
+            viewModel.SafeCleanup();
+            viewModel.Dispose();
+        }
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
+    public async Task StaticPageFilter_DoesNotInvokeSelectionFromPreviousSearch()
+    {
+        var page = new StaticSearchPage([CreateItem("Alpha"), CreateItem("Beta"), CreateItem("Beta Two")]);
+        var viewModel = CreateViewModel(page);
+        using var listener = new InvokeListener();
+
+        try
+        {
+            await ObserveItemsAsync(viewModel, vm => vm.FilteredItems.Count == 3, viewModel.InitializeProperties);
+            var previousSelection = viewModel.FilteredItems[2];
+            viewModel.UpdateSelectedItemCommand.Execute(previousSelection);
+
+            viewModel.SearchTextBox = "Beta";
+            viewModel.InvokeSelectedItemOrQueue(previousSelection);
 
             var invoked = await listener.Invoked.WaitAsync(TimeSpan.FromSeconds(3));
             Assert.AreEqual("Beta", invoked);

@@ -139,6 +139,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
     private int _minValidFetchGeneration = -1;
     private int _loadingSearchEpoch;
     private int _pendingActivation;
+    private int _selectedItemSearchEpoch;
 
     // For cancelling a deferred SafeSlowInit when the user navigates rapidly
     private CancellationTokenSource? _selectedItemCts;
@@ -1014,10 +1015,22 @@ public partial class ListViewModel : PageViewModel, IDisposable
             return;
         }
 
-        if (!TryInvokePending(pending, selectedItem: null) &&
-            ShouldKeepPendingActivation(pending, selectedItem: null))
+        if (TryInvokePending(pending, selectedItem: null))
+        {
+            return;
+        }
+
+        if (ShouldKeepPendingActivation(pending, selectedItem: null))
         {
             Interlocked.CompareExchange(ref _pendingActivation, (int)pending, (int)PendingActivation.None);
+            return;
+        }
+
+        // Slow initialization can complete between the failed secondary-command
+        // lookup and the pending-state check. Retry once after observing it done.
+        if (pending == PendingActivation.Secondary)
+        {
+            TryInvokePending(pending, selectedItem: null);
         }
     }
 
@@ -1083,7 +1096,9 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     private ListItemViewModel? SelectedItemIfCurrent(ListItemViewModel? selectedItem)
     {
-        if (selectedItem is { IsInteractive: true } && FilteredItems.Contains(selectedItem))
+        if (selectedItem is { IsInteractive: true } &&
+            Volatile.Read(ref _selectedItemSearchEpoch) == Volatile.Read(ref _searchEpoch) &&
+            FilteredItems.Contains(selectedItem))
         {
             return selectedItem;
         }
@@ -1123,6 +1138,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
         // Retain selection changes, including clearing selection, during navigation.
         // Only the active page may update the shared command bar and details.
         _lastSelectedItem = item;
+        Volatile.Write(ref _selectedItemSearchEpoch, Volatile.Read(ref _searchEpoch));
         if (!IsWorkActive)
         {
             return;
