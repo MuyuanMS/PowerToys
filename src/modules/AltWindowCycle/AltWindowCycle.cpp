@@ -439,7 +439,10 @@ static LRESULT CALLBACK EscapeHookProc(int code, WPARAM wParam, LPARAM lParam)
 
 static LRESULT CALLBACK MouseHookProc(int code, WPARAM wParam, LPARAM lParam)
 {
-    if (code == HC_ACTION && g_overlayVisible.load(std::memory_order_relaxed) && g_uiThreadId)
+    const bool overlayVisible = g_overlayVisible.load(std::memory_order_relaxed);
+    const bool swallowingButtonUp =
+        wParam == WM_LBUTTONUP && g_swallowedLeftDown.load(std::memory_order_relaxed);
+    if (code == HC_ACTION && (overlayVisible || swallowingButtonUp) && g_uiThreadId)
     {
         const auto* info = reinterpret_cast<const MSLLHOOKSTRUCT*>(lParam);
         if (info)
@@ -472,6 +475,11 @@ static LRESULT CALLBACK MouseHookProc(int code, WPARAM wParam, LPARAM lParam)
             {
                 // Swallow the matching up so the window under the overlay does not
                 // see a button-up without a down.
+                if (g_mouseHook)
+                {
+                    UnhookWindowsHookEx(g_mouseHook);
+                    g_mouseHook = nullptr;
+                }
                 return 1;
             }
         }
@@ -899,8 +907,7 @@ void Switcher::RemoveEscapeHook()
 {
     g_overlayVisible.store(false, std::memory_order_release);
     g_pointerMovePosted.store(false, std::memory_order_relaxed);
-    g_swallowedLeftDown.store(false, std::memory_order_relaxed);
-    if (g_mouseHook)
+    if (g_mouseHook && !g_swallowedLeftDown.load(std::memory_order_relaxed))
     {
         UnhookWindowsHookEx(g_mouseHook);
         g_mouseHook = nullptr;
