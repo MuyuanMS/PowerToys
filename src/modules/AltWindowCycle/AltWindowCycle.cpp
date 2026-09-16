@@ -475,7 +475,7 @@ static LRESULT CALLBACK MouseHookProc(int code, WPARAM wParam, LPARAM lParam)
             {
                 // Swallow the matching up so the window under the overlay does not
                 // see a button-up without a down.
-                if (g_mouseHook)
+                if (g_mouseHook && !g_overlayVisible.load(std::memory_order_relaxed))
                 {
                     UnhookWindowsHookEx(g_mouseHook);
                     g_mouseHook = nullptr;
@@ -524,7 +524,7 @@ private:
     void RegisterThumbnails();
     void UnregisterThumbnails();
     void InstallEscapeHook();
-    void RemoveEscapeHook();
+    void RemoveEscapeHook(bool force = false);
     void EnsureFont();
     void EnsureLayeredBuffer(int w, int h);
     void ReleaseLayeredBuffer();
@@ -621,7 +621,7 @@ bool Switcher::Init(HINSTANCE instance)
 
 void Switcher::Shutdown()
 {
-    RemoveEscapeHook();
+    RemoveEscapeHook(true);
     UnregisterThumbnails();
     ReleaseLayeredBuffer();
     if (thumbHost)
@@ -903,14 +903,18 @@ void Switcher::InstallEscapeHook()
     }
 }
 
-void Switcher::RemoveEscapeHook()
+void Switcher::RemoveEscapeHook(bool force)
 {
     g_overlayVisible.store(false, std::memory_order_release);
     g_pointerMovePosted.store(false, std::memory_order_relaxed);
-    if (g_mouseHook && !g_swallowedLeftDown.load(std::memory_order_relaxed))
+    if (g_mouseHook && (force || !g_swallowedLeftDown.load(std::memory_order_relaxed)))
     {
         UnhookWindowsHookEx(g_mouseHook);
         g_mouseHook = nullptr;
+    }
+    if (force)
+    {
+        g_swallowedLeftDown.store(false, std::memory_order_relaxed);
     }
     if (g_escapeHook)
     {
