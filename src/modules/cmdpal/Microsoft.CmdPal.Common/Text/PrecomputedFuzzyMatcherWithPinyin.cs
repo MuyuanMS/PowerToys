@@ -3,13 +3,20 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Globalization;
+using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text;
 using ToolGood.Words.Pinyin;
 
 namespace Microsoft.CmdPal.Common.Text;
 
 public sealed class PrecomputedFuzzyMatcherWithPinyin : IPrecomputedFuzzyMatcher
 {
+    // Upper bound on the number of pinyin readings generated per target. Polyphonic characters
+    // expand the candidate readings combinatorially, so this cap keeps memory and scoring work
+    // bounded (each variant is a full folded string plus a bloom value cached per item).
+    private const int MaxSecondaryVariants = 8;
+
     private readonly IBloomFilter _bloom;
     private readonly PrecomputedFuzzyMatcher _core;
 
@@ -85,20 +92,113 @@ public sealed class PrecomputedFuzzyMatcherWithPinyin : IPrecomputedFuzzyMatcher
             return primary;
         }
 
-        var pinyin = WordsHelper.GetPinyin(input);
-        if (string.IsNullOrEmpty(pinyin))
+        var variants = BuildPinyinVariants(input, MaxSecondaryVariants);
+        if (variants.Count == 0)
         {
             return primary;
         }
 
-        var secondary = _core.PrecomputeTarget(pinyin);
+        var secondaryOriginals = new string[variants.Count];
+        var secondaryFoldeds = new string[variants.Count];
+        var secondaryBlooms = new ulong[variants.Count];
+
+        for (var i = 0; i < variants.Count; i++)
+        {
+            var variantTarget = _core.PrecomputeTarget(variants[i]);
+            secondaryOriginals[i] = variantTarget.Original;
+            secondaryFoldeds[i] = variantTarget.Folded;
+            secondaryBlooms[i] = variantTarget.Bloom;
+        }
+
         return new FuzzyTarget(
             primary.Original,
             primary.Folded,
             primary.Bloom,
-            secondary.Original,
-            secondary.Folded,
-            secondary.Bloom);
+            secondaryOriginals,
+            secondaryFoldeds,
+            secondaryBlooms);
+    }
+
+    // Builds the set of pinyin readings to match a Chinese target against. The library's
+    // context-aware reading is always included first (so behavior is a superset of the previous
+    // single-reading approach); alternative readings of polyphonic characters are then added via a
+    // bounded Cartesian expansion so that, for example, 重启 is reachable by both "zhongqi" and
+    // "chongqi". Expansion stops once MaxSecondaryVariants distinct readings have been produced.
+    private static List<string> BuildPinyinVariants(string input, int maxVariants)
+    {
+        var result = new List<string>(maxVariants);
+
+        var basePinyin = WordsHelper.GetPinyin(input);
+        if (!string.IsNullOrEmpty(basePinyin))
+        {
+            result.Add(basePinyin);
+        }
+
+        var combos = new List<string>(maxVariants) { string.Empty };
+
+        foreach (var c in input)
+        {
+            string[] readings;
+            if (WordsHelper.HasChinese(c.ToString()))
+            {
+                var all = WordsHelper.GetAllPinyin(c);
+                readings = all is { Count: > 0 }
+                    ? all.Distinct(StringComparer.Ordinal).ToArray()
+                    : new[] { c.ToString() };
+            }
+            else
+            {
+                readings = new[] { c.ToString() };
+            }
+
+            if (readings.Length == 1)
+            {
+                for (var i = 0; i < combos.Count; i++)
+                {
+                    combos[i] += readings[0];
+                }
+
+                continue;
+            }
+
+            // Branch, but never exceed the variant cap. Once capped we stop adding branches;
+            // the combos kept so far still accumulate the remaining characters below.
+            var next = new List<string>(Math.Min(maxVariants, combos.Count * readings.Length));
+            foreach (var prefix in combos)
+            {
+                foreach (var reading in readings)
+                {
+                    if (next.Count >= maxVariants)
+                    {
+                        break;
+                    }
+
+                    next.Add(prefix + reading);
+                }
+
+                if (next.Count >= maxVariants)
+                {
+                    break;
+                }
+            }
+
+            combos = next;
+        }
+
+        foreach (var combo in combos)
+        {
+            if (result.Count >= maxVariants)
+            {
+                break;
+            }
+
+            if (combo.Length > 0 && !result.Contains(combo, StringComparer.Ordinal))
+            {
+                result.Add(combo);
+            }
+        }
+
+        return result;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -169,7 +269,7 @@ public sealed class PrecomputedFuzzyMatcherWithPinyin : IPrecomputedFuzzyMatcher
         h = unchecked((h ^ (p.RemoveApostrophesForQuery ? 1u : 0u)) * fnvPrime);
 
         // bump if you change formatting/conversion behavior
-        const uint pinyinAlgoVersion = 1;
+        const uint pinyinAlgoVersion = 2;
         h = unchecked((h ^ pinyinAlgoVersion) * fnvPrime);
 
         return h;

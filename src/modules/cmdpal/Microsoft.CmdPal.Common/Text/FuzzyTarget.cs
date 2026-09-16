@@ -10,37 +10,66 @@ public readonly struct FuzzyTarget
     public readonly string Folded;
     public readonly ulong Bloom;
 
-    public readonly string? SecondaryOriginal;
-    public readonly string? SecondaryFolded;
-    public readonly ulong SecondaryBloom;
+    // Secondary match variants (for example, pinyin readings). A single target can expose more
+    // than one secondary variant so that polyphonic characters, whose reading depends on context
+    // (for example, 重 can be read "zhong" or "chong"), are all matchable. The three arrays are
+    // parallel: each index describes one variant and they always have the same length.
+    public readonly string[]? SecondaryOriginals;
+    public readonly string[]? SecondaryFoldeds;
+    public readonly ulong[]? SecondaryBlooms;
 
     public int Length => Folded.Length;
 
-    public bool HasSecondary => SecondaryFolded is not null;
+    public bool HasSecondary => SecondaryFoldeds is { Length: > 0 };
 
-    public int SecondaryLength => SecondaryFolded?.Length ?? 0;
+    public int SecondaryCount => SecondaryFoldeds?.Length ?? 0;
 
     public ReadOnlySpan<char> OriginalSpan => Original.AsSpan();
 
     public ReadOnlySpan<char> FoldedSpan => Folded.AsSpan();
 
-    public ReadOnlySpan<char> SecondaryOriginalSpan => SecondaryOriginal.AsSpan();
+    public ReadOnlySpan<char> SecondaryOriginalSpan(int index) => SecondaryOriginals![index].AsSpan();
 
-    public ReadOnlySpan<char> SecondaryFoldedSpan => SecondaryFolded.AsSpan();
+    public ReadOnlySpan<char> SecondaryFoldedSpan(int index) => SecondaryFoldeds![index].AsSpan();
+
+    public int SecondaryLength(int index) => SecondaryFoldeds![index].Length;
+
+    public ulong SecondaryBloom(int index) => SecondaryBlooms![index];
 
     public FuzzyTarget(
         string original,
         string folded,
         ulong bloom,
-        string? secondaryOriginal = null,
-        string? secondaryFolded = null,
-        ulong secondaryBloom = 0)
+        string[]? secondaryOriginals = null,
+        string[]? secondaryFoldeds = null,
+        ulong[]? secondaryBlooms = null)
     {
         Original = original;
         Folded = folded;
         Bloom = bloom;
-        SecondaryOriginal = secondaryOriginal;
-        SecondaryFolded = secondaryFolded;
-        SecondaryBloom = secondaryBloom;
+        SecondaryOriginals = secondaryOriginals;
+        SecondaryFoldeds = secondaryFoldeds;
+        SecondaryBlooms = secondaryBlooms;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="FuzzyTarget"/> struct with a single secondary
+    /// variant. Kept for callers (and tests) that only produce one secondary reading.
+    /// </summary>
+    public FuzzyTarget(
+        string original,
+        string folded,
+        ulong bloom,
+        string? secondaryOriginal,
+        string? secondaryFolded,
+        ulong secondaryBloom)
+        : this(
+            original,
+            folded,
+            bloom,
+            secondaryFolded is null ? null : new[] { secondaryOriginal ?? string.Empty },
+            secondaryFolded is null ? null : new[] { secondaryFolded },
+            secondaryFolded is null ? null : new[] { secondaryBloom })
+    {
     }
 }
