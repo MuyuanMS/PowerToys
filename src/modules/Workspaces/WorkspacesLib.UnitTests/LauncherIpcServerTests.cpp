@@ -163,7 +163,7 @@ namespace WorkspacesLibUnitTests
                     }
                     if (io)
                     {
-                        WaitForThreadpoolIoCallbacks(io, TRUE);
+                        WaitForThreadpoolIoCallbacks(io, FALSE);
                         CloseThreadpoolIo(io);
                         io = nullptr;
                     }
@@ -790,3 +790,4 @@ namespace WorkspacesLibUnitTests
         }
     };
 }
+
