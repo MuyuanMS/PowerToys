@@ -1212,7 +1212,7 @@
       <Platform Solution="*|ARM64" Project="ARM64" />
       <Platform Solution="*|x64" Project="x64" />
     </Project>
-    <Project Path="src/modules/Workspaces/WorkspacesEditor/WorkspacesEditor.csproj">
+    <Project Path="src/modules/Workspaces/WorkspacesEditor.WinUI/WorkspacesEditor.WinUI.csproj">
       <Platform Solution="*|ARM64" Project="ARM64" />
       <Platform Solution="*|x64" Project="x64" />
     </Project>
@@ -1232,6 +1232,10 @@
       <Platform Solution="*|x64" Project="x64" />
     </Project>
     <Project Path="src/modules/Workspaces/Tests/Workspaces.UITests.Next/Workspaces.UITests.Next.csproj">
+      <Platform Solution="*|ARM64" Project="ARM64" />
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="src/modules/Workspaces/WorkspacesEditor.UnitTests/WorkspacesEditor.UnitTests.csproj">
       <Platform Solution="*|ARM64" Project="ARM64" />
       <Platform Solution="*|x64" Project="x64" />
     </Project>
