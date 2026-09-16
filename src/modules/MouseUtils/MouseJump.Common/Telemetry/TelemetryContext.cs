@@ -92,8 +92,9 @@ public sealed class TelemetryContext
     /// </summary>
     public void Stop()
     {
-        this.adapter?.Dispose();
+        var adapter = this.adapter;
         this.adapter = null;
+        adapter?.Dispose();
     }
 
     /// <summary>
