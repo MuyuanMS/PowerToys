@@ -10,6 +10,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Microsoft.Workspaces.UITests
 {
     [TestClass]
+    [TestCategory("Workspaces")]
     [DoNotParallelize]
     public sealed class ProcessImagePathTests
     {
