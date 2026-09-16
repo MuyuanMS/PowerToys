@@ -448,11 +448,12 @@ public sealed partial class SearchBar : UserControl,
 
     private void FlushPendingFilterUpdate()
     {
-        if (_debounceTimer.IsRunning)
+        if (!_debounceTimer.IsRunning)
         {
-            _debounceTimer.Stop();
+            return;
         }
 
+        _debounceTimer.Stop();
         DoFilterBoxUpdate();
     }
 

@@ -1107,10 +1107,11 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         {
             // Ctrl+Enter
             case VirtualKey.Enter when mods.OnlyCtrl:
+                if (GetActiveListViewModel() is { } listForSecondary)
                 {
                     var secondary = new ActivateSecondaryCommandMessage();
                     WeakReferenceMessenger.Default.Send(secondary);
-                    if (!secondary.Handled && ViewModel.CurrentPage is ListViewModel listForSecondary)
+                    if (!secondary.Handled)
                     {
                         listForSecondary.InvokeSecondaryCommandOrQueue();
                     }
@@ -1120,10 +1121,11 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
             // Enter
             case VirtualKey.Enter when mods.None:
+                if (GetActiveListViewModel() is { } list)
                 {
                     var activate = new ActivateSelectedListItemMessage();
                     WeakReferenceMessenger.Default.Send(activate);
-                    if (!activate.Handled && ViewModel.CurrentPage is ListViewModel list)
+                    if (!activate.Handled)
                     {
                         list.InvokeSelectedItemOrQueue();
                     }
@@ -1142,6 +1144,13 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         e.Handled = true;
         return true;
     }
+
+    private ListViewModel? GetActiveListViewModel() => ViewModel.CurrentPage switch
+    {
+        ListViewModel list => list,
+        ParametersPageViewModel parameters => parameters.ActiveListViewModel,
+        _ => null,
+    };
 
     private void ShellPage_OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
