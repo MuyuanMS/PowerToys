@@ -439,6 +439,8 @@ const wchar_t* HotkeyIdToString( WPARAM hotkeyId )
     }
 }
 
+void EnableDisableStickyKeys( BOOLEAN Enable );
+
 void DisengageEraser()
 {
     if( g_EraserEngaged )
