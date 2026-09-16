@@ -10,6 +10,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Microsoft.Workspaces.UITests
 {
     [TestClass]
+    [DoNotParallelize]
     public sealed class ProcessImagePathTests
     {
         private const uint CreateSuspended = 0x00000004;
