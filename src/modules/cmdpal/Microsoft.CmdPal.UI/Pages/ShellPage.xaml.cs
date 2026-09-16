@@ -1062,7 +1062,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         {
             // Ctrl+Enter
             case VirtualKey.Enter when mods.OnlyCtrl:
-                if (ViewModel.CurrentPage is ListViewModel listForSecondary)
+                if (GetActiveListViewModel() is { } listForSecondary)
                 {
                     listForSecondary.InvokeSecondaryCommandOrQueue();
                 }
@@ -1075,7 +1075,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
             // Enter
             case VirtualKey.Enter when mods.None:
-                if (ViewModel.CurrentPage is ListViewModel list)
+                if (GetActiveListViewModel() is { } list)
                 {
                     list.InvokeSelectedItemOrQueue();
                 }
@@ -1097,6 +1097,13 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         e.Handled = true;
         return true;
     }
+
+    private ListViewModel? GetActiveListViewModel() => ViewModel.CurrentPage switch
+    {
+        ListViewModel list => list,
+        ParametersPageViewModel parameters => parameters.ActiveListViewModel,
+        _ => null,
+    };
 
     private void ShellPage_OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
