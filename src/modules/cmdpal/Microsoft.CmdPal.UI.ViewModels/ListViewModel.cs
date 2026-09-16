@@ -635,10 +635,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     private void MarkSearchResultsReady(int fetchGeneration)
     {
+        var searchEpoch = Volatile.Read(ref _searchEpoch);
         if (fetchGeneration > Volatile.Read(ref _minValidFetchGeneration) &&
-            Volatile.Read(ref _searchAppliedEpoch) == Volatile.Read(ref _searchEpoch))
+            Volatile.Read(ref _searchAppliedEpoch) == searchEpoch)
         {
-            Volatile.Write(ref _readySearchEpoch, Volatile.Read(ref _searchEpoch));
+            Volatile.Write(ref _readySearchEpoch, searchEpoch);
         }
     }
 
@@ -646,9 +647,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
     {
         var work = Volatile.Read(ref _workState);
         if (work.Status == ListPageWorkStatus.Active &&
-            work.Phase == ListPageFetchPhase.Published)
+            work.Phase == ListPageFetchPhase.Published &&
+            !IsLoading &&
+            Volatile.Read(ref _searchAppliedEpoch) == Volatile.Read(ref _searchEpoch))
         {
-            MarkSearchResultsReady(work.Generation);
+            Volatile.Write(ref _readySearchEpoch, Volatile.Read(ref _searchEpoch));
             TryConsumePendingActivation();
         }
     }
@@ -1058,7 +1061,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
         return null;
     }
 
-    public void ClearPendingActivation() =>
+    internal void ClearPendingActivation() =>
         Interlocked.Exchange(ref _pendingActivation, (int)PendingActivation.None);
 
     [RelayCommand]
@@ -1379,7 +1382,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
                 break;
             case nameof(IsLoading):
                 UpdateEmptyContent();
-                TryConsumePendingActivation();
+                DoOnUiThread(TryConsumePendingActivation);
                 break;
         }
 

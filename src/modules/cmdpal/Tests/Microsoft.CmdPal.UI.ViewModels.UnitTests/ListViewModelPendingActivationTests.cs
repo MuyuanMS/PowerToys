@@ -31,6 +31,8 @@ public sealed partial class ListViewModelPendingActivationTests
 
         internal ManualResetEventSlim GetItemsGate { get; } = new(true);
 
+        internal Func<string, IListItem> SearchResultFactory { get; set; } = CreateItem;
+
         internal DelayedSearchPage(params IListItem[] items) => _items = items;
 
         public override IListItem[] GetItems()
@@ -49,7 +51,7 @@ public sealed partial class ListViewModelPendingActivationTests
         }
 
         public override void UpdateSearchText(string oldSearch, string newSearch) =>
-            ReplaceItems([CreateItem(newSearch)]);
+            ReplaceItems([SearchResultFactory(newSearch)]);
 
         internal void ReplaceItems(IListItem[] items)
         {
@@ -192,8 +194,85 @@ public sealed partial class ListViewModelPendingActivationTests
         }
     }
 
+    [TestMethod]
+    [Timeout(15000)]
+    public async Task SecondaryEnterDuringInFlightSearch_InvokesSecondaryResultWhenPublished()
+    {
+        var page = new DelayedSearchPage(CreateItemWithSecondary("Initial"))
+        {
+            SearchResultFactory = CreateItemWithSecondary,
+        };
+        var viewModel = CreateViewModel(page);
+        using var listener = new InvokeListener();
+        void InitializeSecondaryCommand(ListViewModel sender, ItemsUpdatedEventArgs args)
+        {
+            if (sender.FilteredItems[0].Title == "Notepad")
+            {
+                sender.FilteredItems[0].SlowInitializeProperties();
+            }
+        }
+
+        try
+        {
+            await ObserveItemsAsync(viewModel, "Initial", viewModel.InitializeProperties);
+            viewModel.ItemsUpdated += InitializeSecondaryCommand;
+
+            page.GetItemsGate.Reset();
+            page.GetItemsStarted.Reset();
+            viewModel.SearchTextBox = "Notepad";
+
+            Assert.IsTrue(page.GetItemsStarted.Wait(TimeSpan.FromSeconds(3)), "The search fetch did not start.");
+            viewModel.InvokeSecondaryCommandOrQueue(viewModel.FilteredItems[0]);
+            Assert.IsFalse(listener.Invoked.IsCompleted, "Ctrl+Enter should not run a stale result while the query is in flight.");
+
+            page.GetItemsGate.Set();
+
+            var invoked = await listener.Invoked.WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.AreEqual("Notepad secondary", invoked);
+        }
+        finally
+        {
+            viewModel.ItemsUpdated -= InitializeSecondaryCommand;
+            page.GetItemsGate.Set();
+            viewModel.SafeCleanup();
+            viewModel.Dispose();
+        }
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
+    public async Task SecondaryEnterWhenResultsAreReady_InvokesSecondarySelectedItemImmediately()
+    {
+        var page = new DelayedSearchPage(CreateItemWithSecondary("Calculator"));
+        var viewModel = CreateViewModel(page);
+        using var listener = new InvokeListener();
+
+        try
+        {
+            await ObserveItemsAsync(viewModel, "Calculator", viewModel.InitializeProperties);
+            viewModel.FilteredItems[0].SlowInitializeProperties();
+
+            viewModel.InvokeSecondaryCommandOrQueue(viewModel.FilteredItems[0]);
+
+            var invoked = await listener.Invoked.WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.AreEqual("Calculator secondary", invoked);
+        }
+        finally
+        {
+            viewModel.SafeCleanup();
+            viewModel.Dispose();
+        }
+    }
+
     private static ListItem CreateItem(string title) =>
         new(new NoOpCommand { Name = title }) { Title = title };
+
+    private static ListItem CreateItemWithSecondary(string title) =>
+        new(new NoOpCommand { Name = title })
+        {
+            Title = title,
+            MoreCommands = [new CommandContextItem(new NoOpCommand { Name = $"{title} secondary" })],
+        };
 
     private static ListViewModel CreateViewModel(IListPage page) =>
         new(page, TaskScheduler.Default, new TestHost(), CommandProviderContext.Empty, DefaultContextMenuFactory.Instance);
