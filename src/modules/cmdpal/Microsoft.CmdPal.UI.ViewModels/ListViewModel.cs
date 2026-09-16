@@ -646,13 +646,14 @@ public partial class ListViewModel : PageViewModel, IDisposable
     private void MarkCurrentSearchReadyIfPublished()
     {
         var work = Volatile.Read(ref _workState);
+        var searchEpoch = Volatile.Read(ref _searchEpoch);
         if (work.Status == ListPageWorkStatus.Active &&
             work.Phase == ListPageFetchPhase.Published &&
-            (!IsMainPage || work.Generation > Volatile.Read(ref _minValidFetchGeneration)) &&
+            work.Generation > Volatile.Read(ref _minValidFetchGeneration) &&
             !IsLoading &&
-            Volatile.Read(ref _searchAppliedEpoch) == Volatile.Read(ref _searchEpoch))
+            Volatile.Read(ref _searchAppliedEpoch) == searchEpoch)
         {
-            Volatile.Write(ref _readySearchEpoch, Volatile.Read(ref _searchEpoch));
+            Volatile.Write(ref _readySearchEpoch, searchEpoch);
             DoOnUiThread(TryConsumePendingActivation);
         }
     }
@@ -986,8 +987,9 @@ public partial class ListViewModel : PageViewModel, IDisposable
             }
 
             // Results are in but the first row isn't available yet (the
-            // catalog is still initializing). Queue until it is.
-            if (!IsInitialized || IsLoading)
+            // catalog is still initializing), or Ctrl+Enter is waiting for the
+            // selected row's slow secondary-command initialization.
+            if (ShouldKeepPendingActivation(kind, selectedItem))
             {
                 Interlocked.Exchange(ref _pendingActivation, (int)kind);
             }
@@ -1013,10 +1015,26 @@ public partial class ListViewModel : PageViewModel, IDisposable
         }
 
         if (!TryInvokePending(pending, selectedItem: null) &&
-            (!IsInitialized || IsLoading || IsFetching))
+            ShouldKeepPendingActivation(pending, selectedItem: null))
         {
             Interlocked.CompareExchange(ref _pendingActivation, (int)pending, (int)PendingActivation.None);
         }
+    }
+
+    private bool ShouldKeepPendingActivation(PendingActivation kind, ListItemViewModel? selectedItem)
+    {
+        if (!IsInitialized || IsLoading || IsFetching)
+        {
+            return true;
+        }
+
+        if (kind != PendingActivation.Secondary)
+        {
+            return false;
+        }
+
+        var item = SelectedItemIfCurrent(selectedItem) ?? FirstInteractiveItem();
+        return item is not null && !item.IsSelectionInitialized;
     }
 
     private bool TryInvokePending(PendingActivation kind, ListItemViewModel? selectedItem)
@@ -1029,7 +1047,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
         if (kind == PendingActivation.Secondary)
         {
-            InvokeSecondaryCommand(item);
+            return TryInvokeSecondaryCommand(item);
         }
         else
         {
@@ -1037,6 +1055,30 @@ public partial class ListViewModel : PageViewModel, IDisposable
         }
 
         return true;
+    }
+
+    private bool TryInvokeSecondaryCommand(ListItemViewModel? item)
+    {
+        if (item is not null)
+        {
+            if (item.SecondaryCommand is null)
+            {
+                return false;
+            }
+
+            WeakReferenceMessenger.Default.Send<PerformCommandMessage>(new(item.SecondaryCommand.Command.Model, item.Model));
+            return true;
+        }
+
+        if (ShowEmptyContent && EmptyContent.SecondaryCommand?.Model.Unsafe is not null)
+        {
+            WeakReferenceMessenger.Default.Send<PerformCommandMessage>(new(
+                EmptyContent.SecondaryCommand.Command.Model,
+                EmptyContent.SecondaryCommand.Model));
+            return true;
+        }
+
+        return false;
     }
 
     private ListItemViewModel? SelectedItemIfCurrent(ListItemViewModel? selectedItem)
@@ -1202,6 +1244,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
             case nameof(item.AllCommands):
             case nameof(item.Name):
                 WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(item));
+                if (e.PropertyName == nameof(item.SecondaryCommand))
+                {
+                    DoOnUiThread(TryConsumePendingActivation);
+                }
+
                 break;
             case nameof(item.Details):
                 if (ShowDetails && item.HasDetails)
