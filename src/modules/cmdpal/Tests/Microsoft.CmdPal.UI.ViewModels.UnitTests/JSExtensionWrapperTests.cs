@@ -4,6 +4,8 @@
 
 using System;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CmdPal.JsonRpc;
 using Microsoft.CmdPal.UI.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
@@ -105,6 +107,17 @@ public class JSExtensionWrapperTests
     }
 
     [TestMethod]
+    public void Version_IgnoresSemVerSuffix_WhenParsingManifestVersion()
+    {
+        var wrapper = CreateWrapper("4.5.6-beta.1+build7");
+        var version = wrapper.Version;
+
+        Assert.AreEqual(4, version.Major);
+        Assert.AreEqual(5, version.Minor);
+        Assert.AreEqual(6, version.Build);
+    }
+
+    [TestMethod]
     public void Version_MissingVersion_DefaultsToOneZeroZero()
     {
         var wrapper = CreateWrapper(version: null);
@@ -184,5 +197,18 @@ public class JSExtensionWrapperTests
                 Icon = icon,
             },
             extensionDirectory);
+    }
+
+    [TestMethod]
+    public async Task StartExtensionAsync_StopsBeforeLaunch_WhenCanceled()
+    {
+        var wrapper = CreateWrapper();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            () => wrapper.StartExtensionAsync(cancellation.Token));
+
+        Assert.IsFalse(wrapper.IsRunning());
     }
 }
