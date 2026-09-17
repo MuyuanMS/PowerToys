@@ -430,7 +430,7 @@ namespace ShortcutGuide
                                         or UnauthorizedAccessException)
                 {
                     // Fall back to the empty default if the file is corrupt or unreadable.
-                    Logger.LogWarning($"Failed to load pinned shortcuts from '{PathAnonymizer.Anonymize(pinnedPath)}'. Falling back to empty list. Reason: {ex.Message}");
+                    Logger.LogWarning($"Failed to load pinned shortcuts from '{PathAnonymizer.Anonymize(pinnedPath)}'. Falling back to empty list. Reason: {PathAnonymizer.Anonymize(ex.Message)}");
                 }
             }
 
@@ -443,7 +443,7 @@ namespace ShortcutGuide
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 // Persisting the round-tripped settings is best-effort; the in-memory copy is still valid.
-                Logger.LogWarning($"Failed to persist Shortcut Guide settings on launch. Reason: {ex.Message}");
+                Logger.LogWarning($"Failed to persist Shortcut Guide settings on launch. Reason: {PathAnonymizer.Anonymize(ex.Message)}");
             }
         }
 

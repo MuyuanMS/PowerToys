@@ -137,7 +137,7 @@ namespace ShortcutGuide
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError($"Failed to generate index in-process. There may be a corrupt shortcuts file in \"{PathAnonymizer.Anonymize(ManifestInterpreter.PathOfManifestFiles)}\".", ex);
+                        Logger.LogError($"Failed to generate index in-process. There may be a corrupt shortcuts file in \"{PathAnonymizer.Anonymize(ManifestInterpreter.PathOfManifestFiles)}\". Reason: {PathAnonymizer.Anonymize(ex.Message)}.");
                     }
                 }
             });
@@ -179,7 +179,7 @@ namespace ShortcutGuide
                 return;
             }
 
-            Task.Run(async () =>
+            Task.Run(() =>
             {
                 try
                 {

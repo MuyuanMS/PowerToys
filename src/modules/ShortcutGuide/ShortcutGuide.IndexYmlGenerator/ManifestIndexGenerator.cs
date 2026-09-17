@@ -7,6 +7,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -39,6 +41,7 @@ namespace ShortcutGuide.IndexYmlGenerator
         private const string WindowFilterPrefix = "WindowFilter:";
         private const string BackgroundProcessPrefix = "BackgroundProcess:";
         private const string ShortcutsPrefix = "Shortcuts:";
+        private const string ManifestSetFingerprintPrefix = "ManifestSetFingerprint:";
 
         public static string DefaultManifestsPath => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -75,22 +78,34 @@ namespace ShortcutGuide.IndexYmlGenerator
                 return true;
             }
 
-            DateTime indexWriteTimeUtc = File.GetLastWriteTimeUtc(indexPath);
-
             HashSet<string>? ignoredSet = ignoredFileNames != null
                 ? new HashSet<string>(ignoredFileNames, StringComparer.OrdinalIgnoreCase)
                 : null;
 
-            foreach (string manifestPath in Directory.EnumerateFiles(path, "*.yml"))
-            {
-                string fileName = Path.GetFileName(manifestPath);
-                if (string.Equals(fileName, IndexFileName, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(fileName, TempIndexFileName, StringComparison.OrdinalIgnoreCase) ||
-                    (ignoredSet != null && ignoredSet.Contains(fileName)))
+            IEnumerable<string> manifestPaths = Directory.EnumerateFiles(path, "*.yml")
+                .Where(manifestPath =>
                 {
-                    continue;
+                    string fileName = Path.GetFileName(manifestPath);
+                    return !string.Equals(fileName, IndexFileName, StringComparison.OrdinalIgnoreCase) &&
+                           !string.Equals(fileName, TempIndexFileName, StringComparison.OrdinalIgnoreCase) &&
+                           (ignoredSet == null || !ignoredSet.Contains(fileName));
+                })
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
+
+            if (TryReadManifestSetFingerprint(indexPath, out string? storedFingerprint))
+            {
+                string currentFingerprint = ComputeManifestSetFingerprint(manifestPaths);
+                if (!string.Equals(storedFingerprint, currentFingerprint, StringComparison.Ordinal))
+                {
+                    return true;
                 }
 
+                return false;
+            }
+
+            DateTime indexWriteTimeUtc = File.GetLastWriteTimeUtc(indexPath);
+            foreach (string manifestPath in manifestPaths)
+            {
                 if (File.GetLastWriteTimeUtc(manifestPath) > indexWriteTimeUtc)
                 {
                     return true;
@@ -105,7 +120,8 @@ namespace ShortcutGuide.IndexYmlGenerator
             ArgumentException.ThrowIfNullOrWhiteSpace(path);
             Directory.CreateDirectory(path);
 
-            string[] files = Directory.GetFiles(path, "*.yml");
+            IEnumerable<string> files = Directory.EnumerateFiles(path, "*.yml")
+                .Where(file => !string.Equals(Path.GetFileName(file), IndexFileName, StringComparison.OrdinalIgnoreCase));
 
             ConcurrentBag<ManifestHeader> parsedHeaders = [];
             ConcurrentBag<(string FileName, Exception Exception)> errors = [];
@@ -167,7 +183,7 @@ namespace ShortcutGuide.IndexYmlGenerator
             // Build the index file content in memory and write it to disk.
             var sb = new StringBuilder(InitialIndexFileCapacity);
             sb.AppendLine("DefaultShellName: +WindowsNT.Shell");
-            sb.AppendLine("Index:");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"{ManifestSetFingerprintPrefix} {ComputeManifestSetFingerprint(files)}");
 
             List<(string WindowFilter, bool BackgroundProcess)> sortedKeys = new(processes.Keys);
             sortedKeys.Sort(static (a, b) =>
@@ -175,6 +191,15 @@ namespace ShortcutGuide.IndexYmlGenerator
                 int cmp = string.Compare(a.WindowFilter, b.WindowFilter, StringComparison.Ordinal);
                 return cmp != 0 ? cmp : a.BackgroundProcess.CompareTo(b.BackgroundProcess);
             });
+
+            if (sortedKeys.Count == 0)
+            {
+                sb.AppendLine("Index: []");
+            }
+            else
+            {
+                sb.AppendLine("Index:");
+            }
 
             foreach (var key in sortedKeys)
             {
@@ -200,7 +225,7 @@ namespace ShortcutGuide.IndexYmlGenerator
             File.Move(tempPath, indexPath, overwrite: true);
 
             return new IndexGenerationResult(
-                TotalFiles: files.Length - (indexFileExists ? 1 : 0), // exclude index.yml itself from the count
+                TotalFiles: files.Count() - (indexFileExists ? 1 : 0), // exclude index.yml itself from the count
                 IndexedFiles: parsedHeaders.Count,
                 Errors: errors.ToArray(),
                 Warnings: warnings.ToArray());
@@ -214,6 +239,42 @@ namespace ShortcutGuide.IndexYmlGenerator
             value.Contains('\'', StringComparison.Ordinal)
                 ? $"'{value.Replace("'", "''", StringComparison.Ordinal)}'"
                 : $"'{value}'";
+
+        private static string ComputeManifestSetFingerprint(IEnumerable<string> manifestPaths)
+        {
+            var fingerprintBuilder = new StringBuilder();
+            foreach (string manifestPath in manifestPaths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+            {
+                fingerprintBuilder.Append(Path.GetFileName(manifestPath));
+                fingerprintBuilder.Append(':');
+                fingerprintBuilder.Append(File.GetLastWriteTimeUtc(manifestPath).ToBinary());
+                fingerprintBuilder.Append(';');
+            }
+
+            byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(fingerprintBuilder.ToString()));
+            return Convert.ToHexString(hash).ToLowerInvariant();
+        }
+
+        private static bool TryReadManifestSetFingerprint(string indexPath, out string? fingerprint)
+        {
+            fingerprint = null;
+            if (!File.Exists(indexPath))
+            {
+                return false;
+            }
+
+            foreach (ReadOnlySpan<char> rawLine in File.ReadAllText(indexPath).AsSpan().EnumerateLines())
+            {
+                ReadOnlySpan<char> trimmed = rawLine.TrimStart();
+                if (trimmed.StartsWith(ManifestSetFingerprintPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    fingerprint = trimmed[ManifestSetFingerprintPrefix.Length..].Trim().ToString();
+                    return !string.IsNullOrWhiteSpace(fingerprint);
+                }
+            }
+
+            return false;
+        }
 
         private static bool TryParseManifestHeader(
             string content,
@@ -308,7 +369,17 @@ namespace ShortcutGuide.IndexYmlGenerator
         private static bool ExtractBoolScalar(ReadOnlySpan<char> span, string filename, string propertyName)
         {
             span = CleanScalarSpan(span, filename, propertyName);
-            return span.Equals("true", StringComparison.OrdinalIgnoreCase);
+            if (span.Equals("true", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (span.Equals("false", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            throw new YamlFormatException($"Invalid boolean value for '{propertyName}' in file '{filename}'.");
         }
 
         // Note: this does not decode escape sequences inside double-quoted scalars
@@ -321,10 +392,18 @@ namespace ShortcutGuide.IndexYmlGenerator
         {
             span = span.Trim();
 
-            int commentIdx = span.IndexOf('#');
-            if (commentIdx >= 0)
+            for (int i = 0; i < span.Length; i++)
             {
-                span = span[..commentIdx].Trim();
+                if (span[i] != '#')
+                {
+                    continue;
+                }
+
+                if (i == 0 || char.IsWhiteSpace(span[i - 1]))
+                {
+                    span = span[..i].TrimEnd();
+                    break;
+                }
             }
 
             if (span.IsEmpty)

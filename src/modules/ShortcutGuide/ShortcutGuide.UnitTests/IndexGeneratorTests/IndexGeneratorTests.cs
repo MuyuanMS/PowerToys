@@ -4,6 +4,7 @@
 
 #nullable enable
 
+// cspell:ignore PackageName WindowFilter BackgroundProcess
 using System;
 using System.IO;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
