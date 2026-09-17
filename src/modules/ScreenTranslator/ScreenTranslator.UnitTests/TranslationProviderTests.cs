@@ -220,6 +220,10 @@ public class TranslationProviderTests
         settings.Properties.SelectedProvider = "LibreTranslate";
         var libre = TranslationProviderFactory.Create(settings);
         Assert.IsInstanceOfType(libre, typeof(LibreTranslateProvider));
+
+        settings.Properties.SelectedProvider = "AcpAgent";
+        var acp = TranslationProviderFactory.Create(settings);
+        Assert.IsInstanceOfType(acp, typeof(AcpAgentTranslationProvider));
     }
 
     [TestMethod]
@@ -229,20 +233,40 @@ public class TranslationProviderTests
         settings.Properties.SourceLanguage = "ja-JP";
         settings.Properties.TargetLanguage = "en-US";
         settings.Properties.SelectedProvider = "AzureTranslator";
+        settings.Properties.OcrProvider = "AzureVision";
         settings.Properties.EnableCloudConsent = true;
+        settings.Properties.FreezeCapturedContent = true;
         settings.Properties.AzureEndpoint = "https://custom.azure.com";
         settings.Properties.AzureRegion = "westus2";
+        settings.Properties.AzureVisionEndpoint = "https://vision.example.com";
         settings.Properties.LibreTranslateEndpoint = "http://localhost:8080";
+        settings.Properties.AcpAgentCommand = "copilot --acp";
+        settings.Properties.CurrentScreenShortcut = settings.Properties.DefaultCurrentScreenShortcut;
+        settings.Properties.ActiveWindowShortcut = settings.Properties.DefaultActiveWindowShortcut;
 
         string json = settings.ToJsonString();
         Assert.IsNotNull(json);
         Assert.IsTrue(json.Contains("ja-JP"));
         Assert.IsTrue(json.Contains("AzureTranslator"));
         Assert.IsTrue(json.Contains("custom.azure.com"));
+        Assert.IsTrue(json.Contains("AzureVision"));
+        Assert.IsTrue(json.Contains("vision.example.com"));
+        Assert.IsTrue(json.Contains("copilot --acp"));
+        Assert.IsTrue(json.Contains("CurrentScreenShortcut"));
+        Assert.IsTrue(json.Contains("ActiveWindowShortcut"));
+        Assert.IsTrue(json.Contains("\"FreezeCapturedContent\":true"));
 
         // Verify API key is NOT present in serialized JSON
         Assert.IsFalse(json.Contains("ApiKey", StringComparison.OrdinalIgnoreCase));
         Assert.IsFalse(json.Contains("Password", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public void ScreenTranslatorSettings_FreezeCapturedContent_DefaultsOff()
+    {
+        var settings = new ScreenTranslatorSettings();
+
+        Assert.IsFalse(settings.Properties.FreezeCapturedContent);
     }
 
     [TestMethod]
@@ -258,5 +282,21 @@ public class TranslationProviderTests
 
         // Result is either English (if supported) or preferred fallback
         Assert.IsNotNull(enLang != null || autoLang != null || systemLang != null || nullLang != null);
+    }
+
+    [TestMethod]
+    public void AzureVisionOcr_RequiresConsentKeyAndEndpoint()
+    {
+        using var provider = new AzureVisionOcrBackend(
+            "https://vision.example.com",
+            "mock-key",
+            cloudConsentEnabled: true);
+        Assert.IsTrue(provider.IsAvailable);
+
+        using var disabledProvider = new AzureVisionOcrBackend(
+            "https://vision.example.com",
+            "mock-key",
+            cloudConsentEnabled: false);
+        Assert.IsFalse(disabledProvider.IsAvailable);
     }
 }

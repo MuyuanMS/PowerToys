@@ -324,6 +324,14 @@
     <value>Restore hidden translated text</value>
     <comment>Accessible name for restoring hidden translated text</comment>
   </data>
+  <data name="CaptureRegionOutlineButton.Content" xml:space="preserve">
+    <value>Region</value>
+    <comment>Toggles the capture region outline</comment>
+  </data>
+  <data name="CaptureRegionOutlineButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Toggle capture region outline</value>
+    <comment>Accessible name for toggling the capture region outline</comment>
+  </data>
   <data name="ProcessingStatus.Text" xml:space="preserve">
     <value>Recognizing text...</value>
     <comment>Status shown while OCR is running</comment>

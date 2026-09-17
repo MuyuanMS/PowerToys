@@ -44,6 +44,10 @@ namespace
     const wchar_t JSON_KEY_SHIFT[] = L"shift";
     const wchar_t JSON_KEY_CODE[] = L"code";
     const wchar_t JSON_KEY_ACTIVATION_SHORTCUT[] = L"ActivationShortcut";
+    const wchar_t JSON_KEY_CURRENT_SCREEN_SHORTCUT[] = L"CurrentScreenShortcut";
+    const wchar_t JSON_KEY_ACTIVE_WINDOW_SHORTCUT[] = L"ActiveWindowShortcut";
+    const wchar_t CURRENT_SCREEN_EVENT[] = L"Local\\PowerToys_ScreenTranslator_CurrentScreenEvent-4ec42bb8-08cf-4d8c-a799-910c49020b75";
+    const wchar_t ACTIVE_WINDOW_EVENT[] = L"Local\\PowerToys_ScreenTranslator_ActiveWindowEvent-a681d2ea-e2d8-430e-9bac-a1339fefd4ac";
 }
 
 class ScreenTranslatorModule : public PowertoyModuleIface
@@ -57,8 +61,12 @@ private:
     HANDLE m_hProcess = nullptr;
 
     Hotkey m_hotkey;
+    Hotkey m_currentScreenHotkey;
+    Hotkey m_activeWindowHotkey;
 
     HANDLE m_hInvokeEvent = nullptr;
+    HANDLE m_hCurrentScreenEvent = nullptr;
+    HANDLE m_hActiveWindowEvent = nullptr;
     HANDLE m_hTerminateEvent = nullptr;
 
     void parse_hotkey(PowerToysSettings::PowerToyValues& settings)
@@ -68,12 +76,25 @@ private:
         {
             try
             {
-                auto jsonHotkeyObject = settingsObject.GetNamedObject(JSON_KEY_PROPERTIES).GetNamedObject(JSON_KEY_ACTIVATION_SHORTCUT);
-                m_hotkey.win = jsonHotkeyObject.GetNamedBoolean(JSON_KEY_WIN);
-                m_hotkey.alt = jsonHotkeyObject.GetNamedBoolean(JSON_KEY_ALT);
-                m_hotkey.shift = jsonHotkeyObject.GetNamedBoolean(JSON_KEY_SHIFT);
-                m_hotkey.ctrl = jsonHotkeyObject.GetNamedBoolean(JSON_KEY_CTRL);
-                m_hotkey.key = static_cast<unsigned char>(jsonHotkeyObject.GetNamedNumber(JSON_KEY_CODE));
+                auto properties = settingsObject.GetNamedObject(JSON_KEY_PROPERTIES);
+                auto read_hotkey = [&](const wchar_t* key, Hotkey& hotkey) {
+                    try
+                    {
+                        auto jsonHotkeyObject = properties.GetNamedObject(key);
+                        hotkey.win = jsonHotkeyObject.GetNamedBoolean(JSON_KEY_WIN);
+                        hotkey.alt = jsonHotkeyObject.GetNamedBoolean(JSON_KEY_ALT);
+                        hotkey.shift = jsonHotkeyObject.GetNamedBoolean(JSON_KEY_SHIFT);
+                        hotkey.ctrl = jsonHotkeyObject.GetNamedBoolean(JSON_KEY_CTRL);
+                        hotkey.key = static_cast<unsigned char>(jsonHotkeyObject.GetNamedNumber(JSON_KEY_CODE));
+                    }
+                    catch (...)
+                    {
+                        Logger::info(L"ScreenTranslator shortcut setting '{}' is missing; using its default", key);
+                    }
+                };
+                read_hotkey(JSON_KEY_ACTIVATION_SHORTCUT, m_hotkey);
+                read_hotkey(JSON_KEY_CURRENT_SCREEN_SHORTCUT, m_currentScreenHotkey);
+                read_hotkey(JSON_KEY_ACTIVE_WINDOW_SHORTCUT, m_activeWindowHotkey);
             }
             catch (...)
             {
@@ -93,6 +114,24 @@ private:
             m_hotkey.shift = false;
             m_hotkey.ctrl = true;
             m_hotkey.key = 'T';
+        }
+
+        if (!m_currentScreenHotkey.key)
+        {
+            m_currentScreenHotkey.win = true;
+            m_currentScreenHotkey.ctrl = true;
+            m_currentScreenHotkey.alt = false;
+            m_currentScreenHotkey.shift = true;
+            m_currentScreenHotkey.key = 'T';
+        }
+
+        if (!m_activeWindowHotkey.key)
+        {
+            m_activeWindowHotkey.win = true;
+            m_activeWindowHotkey.ctrl = true;
+            m_activeWindowHotkey.alt = true;
+            m_activeWindowHotkey.shift = false;
+            m_activeWindowHotkey.key = 'T';
         }
     }
 
@@ -154,6 +193,8 @@ public:
         app_key = ScreenTranslatorConstants::ModuleKey;
         LoggerHelpers::init_logger(app_key, L"ModuleInterface", "ScreenTranslator");
         m_hInvokeEvent = CreateDefaultEvent(CommonSharedConstants::SHOW_SCREEN_TRANSLATOR_SHARED_EVENT);
+        m_hCurrentScreenEvent = CreateEventW(nullptr, FALSE, FALSE, CURRENT_SCREEN_EVENT);
+        m_hActiveWindowEvent = CreateEventW(nullptr, FALSE, FALSE, ACTIVE_WINDOW_EVENT);
         m_hTerminateEvent = CreateDefaultEvent(CommonSharedConstants::TERMINATE_SCREEN_TRANSLATOR_SHARED_EVENT);
         init_settings();
     }
@@ -174,6 +215,16 @@ public:
         {
             CloseHandle(m_hTerminateEvent);
             m_hTerminateEvent = nullptr;
+        }
+        if (m_hCurrentScreenEvent)
+        {
+            CloseHandle(m_hCurrentScreenEvent);
+            m_hCurrentScreenEvent = nullptr;
+        }
+        if (m_hActiveWindowEvent)
+        {
+            CloseHandle(m_hActiveWindowEvent);
+            m_hActiveWindowEvent = nullptr;
         }
         if (m_hProcess)
         {
@@ -244,6 +295,14 @@ public:
         {
             ResetEvent(m_hInvokeEvent);
         }
+        if (m_hCurrentScreenEvent)
+        {
+            ResetEvent(m_hCurrentScreenEvent);
+        }
+        if (m_hActiveWindowEvent)
+        {
+            ResetEvent(m_hActiveWindowEvent);
+        }
         launch_process();
         m_enabled = true;
         Trace::EnableScreenTranslator(true);
@@ -279,7 +338,7 @@ public:
         Trace::EnableScreenTranslator(false);
     }
 
-    virtual bool on_hotkey(size_t /*hotkeyId*/) override
+    virtual bool on_hotkey(size_t hotkeyId) override
     {
         if (m_enabled)
         {
@@ -289,9 +348,12 @@ public:
                 launch_process();
             }
 
-            if (m_hInvokeEvent)
+            HANDLE eventToSignal = hotkeyId == 1 ? m_hCurrentScreenEvent :
+                                   hotkeyId == 2 ? m_hActiveWindowEvent :
+                                                   m_hInvokeEvent;
+            if (eventToSignal)
             {
-                SetEvent(m_hInvokeEvent);
+                SetEvent(eventToSignal);
             }
             return true;
         }
@@ -301,19 +363,15 @@ public:
 
     virtual size_t get_hotkeys(Hotkey* hotkeys, size_t buffer_size) override
     {
-        if (m_hotkey.key)
+        constexpr size_t hotkeyCount = 3;
+        if (hotkeys && buffer_size >= hotkeyCount)
         {
-            if (hotkeys && buffer_size >= 1)
-            {
-                hotkeys[0] = m_hotkey;
-            }
+            hotkeys[0] = m_hotkey;
+            hotkeys[1] = m_currentScreenHotkey;
+            hotkeys[2] = m_activeWindowHotkey;
+        }
 
-            return 1;
-        }
-        else
-        {
-            return 0;
-        }
+        return hotkeyCount;
     }
 };
 

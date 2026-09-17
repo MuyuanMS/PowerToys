@@ -9,24 +9,51 @@ using ManagedCommon;
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.PowerToys.Settings.UI.Library.Utilities;
 using ScreenTranslator.Core.Layout;
+using ScreenTranslator.Core.Ocr;
 using ScreenTranslator.Core.Translation;
+using Windows.Graphics.Imaging;
 
 namespace ScreenTranslator.Helpers;
 
 public static class WindowManager
 {
+    private enum CaptureLaunchMode
+    {
+        Region,
+        CurrentScreen,
+        ActiveWindow,
+    }
+
     private static readonly List<SelectionOverlay> SelectionWindows = new();
     private static readonly List<ResultOverlay> ResultWindows = new();
     private static readonly object Lock = new();
     private static ProcessingOverlay? _processingWindow;
     private static PhysicalRect? _foregroundWindowBounds;
     private static IntPtr _foregroundWindowHandle;
+    private static volatile bool _resultCardEditing;
+    private static ITranslationProvider? _translationProvider;
+    private static string? _translationProviderSettingsKey;
 
     public static void LaunchScreenTranslatorOnEveryScreen()
     {
+        LaunchScreenTranslator(CaptureLaunchMode.Region);
+    }
+
+    public static void TranslateCurrentScreen()
+    {
+        LaunchScreenTranslator(CaptureLaunchMode.CurrentScreen);
+    }
+
+    public static void TranslateActiveWindow()
+    {
+        LaunchScreenTranslator(CaptureLaunchMode.ActiveWindow);
+    }
+
+    private static void LaunchScreenTranslator(CaptureLaunchMode launchMode)
+    {
         CloseAllOverlays();
 
-        Logger.LogInfo("Launching ScreenTranslator selection overlay on every screen");
+        Logger.LogInfo($"Launching ScreenTranslator with capture mode {launchMode}");
 
         ScreenTranslatorSettings? settings = null;
         try
@@ -38,18 +65,48 @@ public static class WindowManager
             Logger.LogWarning($"Failed to load ScreenTranslator settings: {ex.Message}");
         }
 
-        var provider = TranslationProviderFactory.Create(settings);
+        string translationProviderSettingsKey = GetTranslationProviderSettingsKey(settings);
+        if (_translationProvider is null ||
+            !string.Equals(_translationProviderSettingsKey, translationProviderSettingsKey, StringComparison.Ordinal))
+        {
+            (_translationProvider as IDisposable)?.Dispose();
+            _translationProvider = TranslationProviderFactory.Create(settings);
+            _translationProviderSettingsKey = translationProviderSettingsKey;
+        }
+
+        IOcrBackend ocrBackend = CreateOcrBackend(settings);
+        var provider = _translationProvider;
         var sourceLang = settings?.Properties?.SourceLanguage ?? "auto";
         var targetLang = settings?.Properties?.TargetLanguage ?? "en-US";
+        var freezeCapturedContent = settings?.Properties?.FreezeCapturedContent ?? false;
         (_foregroundWindowHandle, _foregroundWindowBounds) = CaptureForegroundWindow();
 
-        var screens = MonitorHelper.GetAllScreens();
+        IReadOnlyList<ScreenInfo> screens = MonitorHelper.GetAllScreens();
+        if (launchMode != CaptureLaunchMode.Region)
+        {
+            if (!_foregroundWindowBounds.HasValue)
+            {
+                Logger.LogWarning("Screen Translator could not determine the foreground application bounds.");
+                return;
+            }
+
+            screens = [FindTargetScreen(_foregroundWindowBounds.Value)];
+        }
 
         lock (Lock)
         {
             foreach (var screen in screens)
             {
-                SelectionOverlay overlay = new(screen, provider, sourceLang, targetLang, _foregroundWindowBounds);
+                bool showSelectionUi = launchMode == CaptureLaunchMode.Region;
+                SelectionOverlay overlay = new(
+                    screen,
+                    provider,
+                    sourceLang,
+                    targetLang,
+                    _foregroundWindowBounds,
+                    ocrBackend,
+                    freezeCapturedContent,
+                    showSelectionUi);
                 overlay.Closed += (s, e) =>
                 {
                     lock (Lock)
@@ -59,9 +116,54 @@ public static class WindowManager
                 };
 
                 SelectionWindows.Add(overlay);
-                overlay.Show();
+                if (showSelectionUi)
+                {
+                    overlay.Show();
+                }
+
+                if (launchMode == CaptureLaunchMode.CurrentScreen)
+                {
+                    overlay.BeginFullScreenCapture();
+                }
+                else if (launchMode == CaptureLaunchMode.ActiveWindow)
+                {
+                    overlay.BeginActiveWindowCapture();
+                }
             }
         }
+    }
+
+    private static IOcrBackend CreateOcrBackend(ScreenTranslatorSettings? settings)
+    {
+        string ocrProvider = settings?.Properties?.OcrProvider ?? "Automatic";
+        if (string.Equals(ocrProvider, "AzureVision", StringComparison.OrdinalIgnoreCase))
+        {
+            return new AzureVisionOcrBackend(
+                settings?.Properties?.AzureVisionEndpoint ?? string.Empty,
+                ScreenTranslatorCredentialsVault.GetAzureVisionApiKey(),
+                settings?.Properties?.EnableCloudConsent ?? false);
+        }
+
+        return new OcrBackendSelector().GetOrSelectBackendAsync().GetAwaiter().GetResult();
+    }
+
+    private static string GetTranslationProviderSettingsKey(ScreenTranslatorSettings? settings)
+    {
+        if (settings?.Properties is null)
+        {
+            return "Passthrough";
+        }
+
+        return string.Join(
+            "\u001f",
+            settings.Properties.SelectedProvider ?? "Passthrough",
+            settings.Properties.AcpAgentCommand ?? string.Empty,
+            settings.Properties.SourceLanguage ?? "auto",
+            settings.Properties.TargetLanguage ?? "en-US",
+            settings.Properties.EnableCloudConsent,
+            settings.Properties.AzureEndpoint ?? string.Empty,
+            settings.Properties.AzureRegion ?? string.Empty,
+            settings.Properties.LibreTranslateEndpoint ?? string.Empty);
     }
 
     private static (IntPtr Handle, PhysicalRect? Bounds) CaptureForegroundWindow()
@@ -89,6 +191,28 @@ public static class WindowManager
         }
 
         foreach (var window in windowsToClose)
+        {
+            try
+            {
+                window.Close();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning($"Exception closing SelectionOverlay: {ex.Message}");
+            }
+        }
+    }
+
+    public static void CloseOtherSelectionOverlays(SelectionOverlay retainedOverlay)
+    {
+        SelectionOverlay[] windowsToClose;
+        lock (Lock)
+        {
+            windowsToClose = SelectionWindows.FindAll(window => !ReferenceEquals(window, retainedOverlay)).ToArray();
+            SelectionWindows.RemoveAll(window => !ReferenceEquals(window, retainedOverlay));
+        }
+
+        foreach (SelectionOverlay window in windowsToClose)
         {
             try
             {
@@ -201,9 +325,32 @@ public static class WindowManager
         CloseProcessingOverlay(processingWindow, cancelOperation: true);
     }
 
+    public static void UndoActiveResultCard()
+    {
+        ResultOverlay? overlay;
+        lock (Lock)
+        {
+            overlay = ResultWindows.Count > 0 ? ResultWindows[^1] : null;
+        }
+
+        overlay?.UndoLastTextChange();
+    }
+
+    public static bool IsEditingResultCard()
+    {
+        return _resultCardEditing;
+    }
+
+    public static void SetResultCardEditing(bool isEditing)
+    {
+        _resultCardEditing = isEditing;
+    }
+
     public static void ShowResultOverlay(
         PhysicalRect capturedRegion,
         IReadOnlyList<TranslatedLine> lines,
+        SoftwareBitmap capturedSnapshot,
+        bool freezeCapturedContent,
         string sourceLanguage = "auto",
         string targetLanguage = "en-US",
         Func<string, string, Task>? retranslateAll = null,
@@ -213,6 +360,7 @@ public static class WindowManager
 
         if (lines == null || lines.Count == 0)
         {
+            capturedSnapshot.Dispose();
             Logger.LogInfo("No translated lines to display in ResultOverlay.");
             return;
         }
@@ -227,6 +375,8 @@ public static class WindowManager
                 targetScreen,
                 capturedRegion,
                 lines,
+                capturedSnapshot,
+                freezeCapturedContent,
                 _foregroundWindowHandle,
                 sourceLanguage,
                 targetLanguage,
@@ -236,6 +386,7 @@ public static class WindowManager
         }
         catch (Exception ex)
         {
+            capturedSnapshot.Dispose();
             Logger.LogError($"Failed to construct ResultOverlay: {ex}");
             return;
         }

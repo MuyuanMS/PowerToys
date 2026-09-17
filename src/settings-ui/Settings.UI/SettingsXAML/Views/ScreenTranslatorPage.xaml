@@ -45,6 +45,35 @@
                             AutomationProperties.Name="Screen Translator Activation Shortcut"
                             HotkeySettings="{x:Bind Path=ViewModel.ActivationShortcut, Mode=TwoWay}" />
                     </tkcontrols:SettingsCard>
+                    <tkcontrols:SettingsCard
+                        Header="Translate Current Screen"
+                        Description="Immediately capture and translate the monitor containing the foreground application.">
+                        <controls:ShortcutControl
+                            MinWidth="{StaticResource SettingActionControlMinWidth}"
+                            AutomationProperties.AutomationId="ScreenTranslatorCurrentScreenShortcutControl"
+                            AutomationProperties.Name="Translate Current Screen Shortcut"
+                            HotkeySettings="{x:Bind Path=ViewModel.CurrentScreenShortcut, Mode=TwoWay}" />
+                    </tkcontrols:SettingsCard>
+                    <tkcontrols:SettingsCard
+                        Header="Translate Active Application"
+                        Description="Immediately capture and translate the current foreground application window.">
+                        <controls:ShortcutControl
+                            MinWidth="{StaticResource SettingActionControlMinWidth}"
+                            AutomationProperties.AutomationId="ScreenTranslatorActiveWindowShortcutControl"
+                            AutomationProperties.Name="Translate Active Application Shortcut"
+                            HotkeySettings="{x:Bind Path=ViewModel.ActiveWindowShortcut, Mode=TwoWay}" />
+                    </tkcontrols:SettingsCard>
+                </controls:SettingsGroup>
+
+                <controls:SettingsGroup Header="Overlay Appearance" IsEnabled="{x:Bind ViewModel.IsEnabled, Mode=OneWay}">
+                    <tkcontrols:SettingsCard
+                        Header="Freeze captured content"
+                        Description="Display the captured screenshot behind translations so changing source content does not show through the overlay.">
+                        <ToggleSwitch
+                            AutomationProperties.AutomationId="ScreenTranslatorFreezeCapturedContentToggleSwitch"
+                            AutomationProperties.Name="Freeze captured content"
+                            IsOn="{x:Bind ViewModel.FreezeCapturedContent, Mode=TwoWay}" />
+                    </tkcontrols:SettingsCard>
                 </controls:SettingsGroup>
 
                 <!-- Language Configuration -->
@@ -56,6 +85,59 @@
                         Severity="Informational"
                         Title="OCR Language Support"
                         Message="Windows OCR requires the corresponding Windows language pack installed. Screen resolution, fonts, vertical text, and protected overlays may affect recognition accuracy." />
+
+                    <tkcontrols:SettingsCard
+                        Header="OCR Provider"
+                        Description="Choose local OCR or Azure AI Vision OCR for improved recognition and geometry.">
+                        <ComboBox
+                            MinWidth="{StaticResource SettingActionControlMinWidth}"
+                            AutomationProperties.AutomationId="ScreenTranslatorOcrProviderComboBox"
+                            AutomationProperties.Name="OCR Provider"
+                            ItemsSource="{x:Bind Path=ViewModel.AvailableOcrProviders, Mode=OneWay}"
+                            SelectedIndex="{x:Bind Path=ViewModel.SelectedOcrProviderIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </tkcontrols:SettingsCard>
+
+                    <tkcontrols:SettingsExpander
+                        Header="Azure AI Vision OCR Configuration"
+                        Description="Send the captured image to Azure AI Vision Image Analysis Read OCR."
+                        HeaderIcon="{ui:FontIcon Glyph=&#xE774;}"
+                        IsExpanded="{x:Bind ViewModel.IsAzureVisionOcrSelected, Mode=OneWay}"
+                        Visibility="{x:Bind views:ScreenTranslatorPage.BoolToVisibility(ViewModel.IsAzureVisionOcrSelected), Mode=OneWay}">
+                        <tkcontrols:SettingsExpander.Items>
+                            <tkcontrols:SettingsCard
+                                Header="Azure Vision Endpoint"
+                                Description="Use the endpoint of your Azure AI Vision resource.">
+                                <TextBox
+                                    MinWidth="350"
+                                    AutomationProperties.AutomationId="ScreenTranslatorAzureVisionEndpointTextBox"
+                                    AutomationProperties.Name="Azure Vision Endpoint"
+                                    Text="{x:Bind ViewModel.AzureVisionEndpoint, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            </tkcontrols:SettingsCard>
+                            <tkcontrols:SettingsCard
+                                Header="Azure Vision Subscription Key"
+                                Description="The key is encrypted and stored in Windows Credential Vault.">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <PasswordBox
+                                        x:Name="AzureVisionApiKeyPasswordBox"
+                                        MinWidth="260"
+                                        AutomationProperties.AutomationId="ScreenTranslatorAzureVisionApiKeyPasswordBox"
+                                        AutomationProperties.Name="Azure Vision Subscription Key"
+                                        PlaceholderText="Enter subscription key" />
+                                    <Button
+                                        AutomationProperties.AutomationId="ScreenTranslatorSaveAzureVisionApiKeyButton"
+                                        AutomationProperties.Name="Save Azure Vision Key"
+                                        Click="SaveAzureVisionApiKey_Click"
+                                        Content="Save"
+                                        Style="{StaticResource AccentButtonStyle}" />
+                                    <Button
+                                        AutomationProperties.AutomationId="ScreenTranslatorClearAzureVisionApiKeyButton"
+                                        AutomationProperties.Name="Clear Azure Vision Key"
+                                        Click="ClearAzureVisionApiKey_Click"
+                                        Content="Clear" />
+                                </StackPanel>
+                            </tkcontrols:SettingsCard>
+                        </tkcontrols:SettingsExpander.Items>
+                    </tkcontrols:SettingsExpander>
 
                     <tkcontrols:SettingsCard
                         x:Uid="ScreenTranslator_SourceLanguageCard"
@@ -103,7 +185,7 @@
                     <tkcontrols:SettingsCard
                         x:Uid="ScreenTranslator_CloudConsentCard"
                         Header="Allow Online Translation Services"
-                        Description="Allows sending captured text to external translation APIs (Azure / Remote LibreTranslate). API keys are stored securely in Windows Credential Vault.">
+                        Description="Allows sending captured images or text to external OCR and translation APIs. API keys are stored securely in Windows Credential Vault.">
                         <ToggleSwitch
                             x:Name="CloudConsentToggleSwitch"
                             AutomationProperties.AutomationId="ScreenTranslatorCloudConsentToggleSwitch"
@@ -213,6 +295,27 @@
                                         Click="ClearLibreTranslateApiKey_Click"
                                         Content="Clear" />
                                 </StackPanel>
+                            </tkcontrols:SettingsCard>
+                        </tkcontrols:SettingsExpander.Items>
+                    </tkcontrols:SettingsExpander>
+
+                    <tkcontrols:SettingsExpander
+                        x:Uid="ScreenTranslator_AcpExpander"
+                        Header="ACP Agent Configuration"
+                        Description="Run an ACP-compatible agent locally for contextual translation."
+                        HeaderIcon="{ui:FontIcon Glyph=&#xE756;}"
+                        IsExpanded="{x:Bind ViewModel.IsAcpAgentProviderSelected, Mode=OneWay}"
+                        Visibility="{x:Bind views:ScreenTranslatorPage.BoolToVisibility(ViewModel.IsAcpAgentProviderSelected), Mode=OneWay}">
+                        <tkcontrols:SettingsExpander.Items>
+                            <tkcontrols:SettingsCard
+                                x:Uid="ScreenTranslator_AcpCommandCard"
+                                Header="ACP Agent Command"
+                                Description="Default uses gpt-5-mini with minimal reasoning for lower latency. The agent receives OCR text only; filesystem and terminal capabilities are not offered.">
+                                <TextBox
+                                    MinWidth="350"
+                                    AutomationProperties.AutomationId="ScreenTranslatorAcpCommandTextBox"
+                                    AutomationProperties.Name="ACP Agent Command"
+                                    Text="{x:Bind ViewModel.AcpAgentCommand, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </tkcontrols:SettingsCard>
                         </tkcontrols:SettingsExpander.Items>
                     </tkcontrols:SettingsExpander>

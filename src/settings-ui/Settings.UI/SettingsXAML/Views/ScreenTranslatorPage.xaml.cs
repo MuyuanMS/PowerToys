@@ -43,6 +43,11 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             {
                 LibreTranslateApiKeyPasswordBox.Password = string.Empty;
             }
+
+            if (AzureVisionApiKeyPasswordBox != null)
+            {
+                AzureVisionApiKeyPasswordBox.Password = string.Empty;
+            }
         }
 
         private void SaveAzureApiKey_Click(object sender, RoutedEventArgs e)
@@ -60,6 +65,24 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             if (AzureApiKeyPasswordBox != null)
             {
                 AzureApiKeyPasswordBox.Password = string.Empty;
+            }
+        }
+
+        private void SaveAzureVisionApiKey_Click(object sender, RoutedEventArgs e)
+        {
+            if (AzureVisionApiKeyPasswordBox != null)
+            {
+                ViewModel.SaveAzureVisionApiKey(AzureVisionApiKeyPasswordBox.Password);
+                AzureVisionApiKeyPasswordBox.Password = string.Empty;
+            }
+        }
+
+        private void ClearAzureVisionApiKey_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel.RemoveAzureVisionApiKey();
+            if (AzureVisionApiKeyPasswordBox != null)
+            {
+                AzureVisionApiKeyPasswordBox.Password = string.Empty;
             }
         }
 

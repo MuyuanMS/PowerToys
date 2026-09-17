@@ -27,4 +27,14 @@ public static class OcrEngineHelper
         IOcrBackend backend = await Selector.GetOrSelectBackendAsync();
         return await backend.RecognizeTextAsync(bitmap, capturedRegionPhysical, sourceLanguageTag, cancellationToken);
     }
+
+    public static Task<IReadOnlyList<TranslationLine>> ExtractLinesWithGeometryAsync(
+        IOcrBackend backend,
+        SoftwareBitmap bitmap,
+        PhysicalRect capturedRegionPhysical,
+        string? sourceLanguageTag = null,
+        CancellationToken cancellationToken = default)
+    {
+        return backend.RecognizeTextAsync(bitmap, capturedRegionPhysical, sourceLanguageTag, cancellationToken);
+    }
 }

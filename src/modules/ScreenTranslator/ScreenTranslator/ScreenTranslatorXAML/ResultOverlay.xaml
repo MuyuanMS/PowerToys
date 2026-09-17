@@ -14,7 +14,18 @@
     mc:Ignorable="d">
 
     <Grid Background="Transparent">
-        <Canvas x:Name="ResultCanvas" Background="Transparent" />
+        <Canvas x:Name="ResultCanvas" Background="Transparent">
+            <Image
+                x:Name="FrozenBackgroundImage"
+                IsHitTestVisible="False"
+                Stretch="Fill"
+                Visibility="Collapsed" />
+            <Border
+                x:Name="CaptureRegionOutline"
+                BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                BorderThickness="3"
+                IsHitTestVisible="False" />
+        </Canvas>
         <Canvas x:Name="ContextMenuCanvas" IsHitTestVisible="False">
             <Border
                 x:Name="CardContextMenu"
@@ -119,6 +130,34 @@
                         Padding="6,4">
                         <FontIcon Glyph="&#xE72C;" FontSize="14" />
                     </Button>
+                    <Button
+                    x:Name="MoveCardUpButton"
+                    x:Uid="MoveCardUpButton"
+                    AutomationProperties.AutomationId="BtnMoveOverlayCardUp"
+                    Click="MoveCardUpButton_Click"
+                    Content="↑"
+                    Padding="6,4" />
+                    <Button
+                    x:Name="MoveCardDownButton"
+                    x:Uid="MoveCardDownButton"
+                    AutomationProperties.AutomationId="BtnMoveOverlayCardDown"
+                    Click="MoveCardDownButton_Click"
+                    Content="↓"
+                    Padding="6,4" />
+                    <Button
+                    x:Name="BringCardToTopButton"
+                    x:Uid="BringCardToTopButton"
+                    AutomationProperties.AutomationId="BtnBringOverlayCardToTop"
+                    Click="BringCardToTopButton_Click"
+                    Content="Top"
+                    Padding="6,4" />
+                    <Button
+                    x:Name="SendCardToBottomButton"
+                    x:Uid="SendCardToBottomButton"
+                    AutomationProperties.AutomationId="BtnSendOverlayCardToBottom"
+                    Click="SendCardToBottomButton_Click"
+                    Content="Bottom"
+                    Padding="6,4" />
                     <StackPanel Spacing="4" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" Spacing="4">
                             <TextBlock
@@ -174,6 +213,7 @@
         <!-- Floating toolbar to dismiss the overlay -->
         <Border
             x:Name="FloatingToolbar"
+            AutomationProperties.Name="Overall translation toolbar"
             HorizontalAlignment="Left"
             VerticalAlignment="Top"
             Background="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}"
@@ -181,8 +221,19 @@
             BorderThickness="1"
             CornerRadius="{StaticResource OverlayCornerRadius}"
             Padding="8,4"
-            Margin="16,16,0,0">
+            Margin="16,16,0,0"
+            Visibility="Collapsed">
             <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button
+                    x:Name="MoveToolbarButton"
+                    AutomationProperties.AutomationId="BtnMoveOverallToolbar"
+                    AutomationProperties.Name="Move overall toolbar"
+                    PointerMoved="MoveToolbarButton_PointerMoved"
+                    PointerPressed="MoveToolbarButton_PointerPressed"
+                    PointerReleased="MoveToolbarButton_PointerReleased"
+                    Padding="8,2">
+                    <FontIcon Glyph="&#xE7C2;" />
+                </Button>
                 <FontIcon Glyph="&#xE774;" VerticalAlignment="Center" FontSize="16" />
                 <TextBlock
                     x:Uid="OverlayTitle"
@@ -207,6 +258,28 @@
                     AutomationProperties.Name="Restore hidden translated text"
                     Click="RestoreHiddenButton_Click"
                     Content="Restore hidden" />
+                <ToggleButton
+                    x:Name="FreezeContentToggleButton"
+                    AutomationProperties.AutomationId="BtnToggleFrozenContent"
+                    AutomationProperties.Name="Freeze captured content"
+                    Click="FreezeContentToggleButton_Click"
+                    Content="Freeze"
+                    Padding="8,2" />
+                <Button
+                    x:Name="CaptureRegionOutlineButton"
+                    x:Uid="CaptureRegionOutlineButton"
+                    AutomationProperties.AutomationId="BtnToggleCaptureRegionOutline"
+                    Click="CaptureRegionOutlineButton_Click"
+                    Content="Region"
+                    Padding="8,2" />
+                <Button
+                    x:Name="HideToolbarButton"
+                    AutomationProperties.AutomationId="BtnHideOverallToolbar"
+                    AutomationProperties.Name="Hide overall toolbar"
+                    Click="HideToolbarButton_Click"
+                    Padding="8,2">
+                    <FontIcon Glyph="&#xE70D;" />
+                </Button>
                 <StackPanel Spacing="4" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" Spacing="4">
                         <TextBlock

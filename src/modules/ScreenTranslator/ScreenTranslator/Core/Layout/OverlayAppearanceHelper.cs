@@ -14,7 +14,7 @@ namespace ScreenTranslator.Core.Layout;
 public static class OverlayAppearanceHelper
 {
     private const int BytesPerPixel = 4;
-    private const double StableBackgroundDeviation = 35.0;
+    private const int ColorBucketSize = 24;
 
     public static IReadOnlyList<TranslatedLine> ApplySampledAppearance(
         SoftwareBitmap capturedBitmap,
@@ -136,44 +136,58 @@ public static class OverlayAppearanceHelper
         AddHorizontalSamples(samples, pixels, pixelWidth, left, right, bottom + padding, pixelHeight);
         AddVerticalSamples(samples, pixels, pixelWidth, left - padding, top, bottom, pixelWidth, pixelHeight);
         AddVerticalSamples(samples, pixels, pixelWidth, right + padding, top, bottom, pixelWidth, pixelHeight);
+        AddInteriorSamples(samples, pixels, pixelWidth, left, top, right, bottom);
 
         if (samples.Count < 4)
         {
             return null;
         }
 
-        double redAverage = 0;
-        double greenAverage = 0;
-        double blueAverage = 0;
-        foreach (var sample in samples)
-        {
-            redAverage += sample.Red;
-            greenAverage += sample.Green;
-            blueAverage += sample.Blue;
-        }
+        var dominantBucket = samples
+            .GroupBy(sample => (
+                sample.Red / ColorBucketSize,
+                sample.Green / ColorBucketSize,
+                sample.Blue / ColorBucketSize))
+            .OrderByDescending(group => group.Count())
+            .First();
 
-        redAverage /= samples.Count;
-        greenAverage /= samples.Count;
-        blueAverage /= samples.Count;
-
-        double deviation = 0;
-        foreach (var sample in samples)
-        {
-            deviation += Math.Sqrt(
-                Math.Pow(sample.Red - redAverage, 2) +
-                Math.Pow(sample.Green - greenAverage, 2) +
-                Math.Pow(sample.Blue - blueAverage, 2));
-        }
-
-        if (deviation / samples.Count > StableBackgroundDeviation)
+        List<(byte Red, byte Green, byte Blue)> backgroundSamples = dominantBucket.ToList();
+        if (backgroundSamples.Count < Math.Max(4, samples.Count / 6))
         {
             return null;
         }
 
-        return 0xFF000000u |
-            ((uint)Math.Clamp((int)Math.Round(redAverage), 0, 255) << 16) |
-            ((uint)Math.Clamp((int)Math.Round(greenAverage), 0, 255) << 8) |
-            (uint)Math.Clamp((int)Math.Round(blueAverage), 0, 255);
+        byte red = Median(backgroundSamples.Select(sample => sample.Red));
+        byte green = Median(backgroundSamples.Select(sample => sample.Green));
+        byte blue = Median(backgroundSamples.Select(sample => sample.Blue));
+
+        return ToArgb(red, green, blue);
+    }
+
+    private static void AddInteriorSamples(
+        List<(byte Red, byte Green, byte Blue)> samples,
+        byte[] pixels,
+        int pixelWidth,
+        int left,
+        int top,
+        int right,
+        int bottom)
+    {
+        int horizontalStep = Math.Max(1, (right - left) / 20);
+        int verticalStep = Math.Max(1, (bottom - top) / 12);
+        for (int y = top; y < bottom; y += verticalStep)
+        {
+            for (int x = left; x < right; x += horizontalStep)
+            {
+                samples.Add(ReadPixel(pixels, pixelWidth, x, y));
+            }
+        }
+    }
+
+    private static byte Median(IEnumerable<byte> values)
+    {
+        byte[] ordered = values.OrderBy(value => value).ToArray();
+        return ordered[ordered.Length / 2];
     }
 
     private static void AddHorizontalSamples(

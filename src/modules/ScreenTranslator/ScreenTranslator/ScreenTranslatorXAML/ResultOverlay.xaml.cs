@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using ManagedCommon;
 using Microsoft.PowerToys.Common.UI.Controls.Window;
@@ -16,11 +17,13 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 using ScreenTranslator.Core.Layout;
 using ScreenTranslator.Core.Translation;
 using ScreenTranslator.Helpers;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Graphics;
+using Windows.Graphics.Imaging;
 using WinUIEx;
 
 namespace ScreenTranslator;
@@ -49,6 +52,9 @@ public sealed partial class ResultOverlay : TransparentWindow
         double MinHeight)> _initialAppearance = new();
 
     private readonly Dictionary<int, string> _translatedTexts = new();
+    private readonly Dictionary<int, string> _sourceTexts = new();
+    private readonly Dictionary<int, Stack<(string Source, string Translated, bool ShowingOriginal)>> _textUndo = new();
+    private readonly Dictionary<int, List<ResizeHandle>> _resizeHandles = new();
     private readonly HashSet<int> _showingOriginalText = new();
 
     private readonly DispatcherQueueTimer _windowSwitchTimer;
@@ -59,6 +65,11 @@ public sealed partial class ResultOverlay : TransparentWindow
     private Windows.Foundation.Point _dragStart;
     private double _dragLeft;
     private double _dragTop;
+    private ResizeHandle? _activeResizeHandle;
+    private double _resizeStartWidth;
+    private double _resizeStartHeight;
+    private double _resizeStartLeft;
+    private double _resizeStartTop;
     private int _contextMenuLineIndex = -1;
     private TranslatedLine? _contextMenuLine;
     private Border? _contextMenuCard;
@@ -66,11 +77,19 @@ public sealed partial class ResultOverlay : TransparentWindow
     private TextBox? _editingTextBox;
     private Border? _editingCard;
     private string _editingOriginalText = string.Empty;
+    private int _selectedLineIndex = -1;
+    private bool _isToolbarDragging;
+    private bool _toolbarWasManuallyPositioned;
+    private uint _toolbarPointerId;
+    private Windows.Foundation.Point _toolbarDragStart;
+    private Thickness _toolbarDragStartMargin;
 
     public ResultOverlay(
         ScreenInfo screenInfo,
         PhysicalRect capturedRegion,
         IReadOnlyList<TranslatedLine> lines,
+        SoftwareBitmap capturedSnapshot,
+        bool freezeCapturedContent,
         IntPtr sourceWindow,
         string sourceLanguage,
         string targetLanguage,
@@ -128,14 +147,139 @@ public sealed partial class ResultOverlay : TransparentWindow
         _windowSwitchTimer.Start();
 
         RenderTranslatedBoxes();
+        PositionCaptureRegionOutline();
         PositionToolbar();
         SelectLanguage(OverallSourceLanguageComboBox, sourceLanguage);
         SelectLanguage(OverallTargetLanguageComboBox, targetLanguage);
+        _ = InitializeFrozenBackgroundAsync(capturedSnapshot, freezeCapturedContent);
+    }
+
+    private async Task InitializeFrozenBackgroundAsync(SoftwareBitmap capturedSnapshot, bool freezeCapturedContent)
+    {
+        SoftwareBitmap? convertedSnapshot = null;
+        try
+        {
+            SoftwareBitmap bitmapSource = capturedSnapshot;
+            if (capturedSnapshot.BitmapPixelFormat != BitmapPixelFormat.Bgra8 ||
+                capturedSnapshot.BitmapAlphaMode != BitmapAlphaMode.Premultiplied)
+            {
+                convertedSnapshot = SoftwareBitmap.Convert(
+                    capturedSnapshot,
+                    BitmapPixelFormat.Bgra8,
+                    BitmapAlphaMode.Premultiplied);
+                bitmapSource = convertedSnapshot;
+            }
+
+            var imageSource = new SoftwareBitmapSource();
+            await imageSource.SetBitmapAsync(bitmapSource);
+            FrozenBackgroundImage.Source = imageSource;
+
+            var (leftDip, topDip, widthDip, heightDip) = OverlayLayoutHelper.PhysicalToDip(
+                _capturedRegion,
+                _overlayBounds,
+                _screenInfo.DpiScaleX,
+                _screenInfo.DpiScaleY);
+            Canvas.SetLeft(FrozenBackgroundImage, leftDip);
+            Canvas.SetTop(FrozenBackgroundImage, topDip);
+            FrozenBackgroundImage.Width = widthDip;
+            FrozenBackgroundImage.Height = heightDip;
+            FreezeContentToggleButton.IsChecked = freezeCapturedContent;
+            FrozenBackgroundImage.Visibility = freezeCapturedContent ? Visibility.Visible : Visibility.Collapsed;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Failed to initialize frozen capture background: {ex}");
+            FreezeContentToggleButton.IsEnabled = false;
+        }
+        finally
+        {
+            convertedSnapshot?.Dispose();
+            capturedSnapshot.Dispose();
+        }
+    }
+
+    private void FreezeContentToggleButton_Click(object sender, RoutedEventArgs e)
+    {
+        FrozenBackgroundImage.Visibility = FreezeContentToggleButton.IsChecked == true
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private void ResultOverlay_Closed(object sender, WindowEventArgs args)
     {
         _windowSwitchTimer.Stop();
+        ScreenTranslator.Helpers.WindowManager.SetResultCardEditing(false);
+    }
+
+    public void UndoLastTextChange()
+    {
+        if (_selectedLineIndex < 0 ||
+            !_textUndo.TryGetValue(_selectedLineIndex, out Stack<(string Source, string Translated, bool ShowingOriginal)>? history) ||
+            history.Count == 0 ||
+            _selectedLineIndex >= _cardHitRegions.Count)
+        {
+            return;
+        }
+
+        (string source, string translated, bool showingOriginal) = history.Pop();
+        _sourceTexts[_selectedLineIndex] = source;
+        _translatedTexts[_selectedLineIndex] = translated;
+        if (_cardHitRegions[_selectedLineIndex].Card.Child is TextBlock textBlock)
+        {
+            textBlock.Text = showingOriginal ? source : translated;
+            textBlock.InvalidateMeasure();
+            _cardHitRegions[_selectedLineIndex].Card.InvalidateMeasure();
+        }
+
+        if (showingOriginal)
+        {
+            _showingOriginalText.Add(_selectedLineIndex);
+        }
+        else
+        {
+            _showingOriginalText.Remove(_selectedLineIndex);
+        }
+
+        if (_contextMenuLineIndex == _selectedLineIndex)
+        {
+            SetOriginalTextButtonState(!showingOriginal);
+        }
+    }
+
+    private void PushTextUndo(int lineIndex)
+    {
+        if (!_textUndo.TryGetValue(lineIndex, out Stack<(string Source, string Translated, bool ShowingOriginal)>? history))
+        {
+            history = new Stack<(string Source, string Translated, bool ShowingOriginal)>();
+            _textUndo[lineIndex] = history;
+        }
+
+        history.Push((
+            _sourceTexts[lineIndex],
+            _translatedTexts[lineIndex],
+            _showingOriginalText.Contains(lineIndex)));
+    }
+
+    private void HighlightSelectedCard()
+    {
+        for (int i = 0; i < _cardHitRegions.Count; i++)
+        {
+            _cardHitRegions[i].Card.BorderThickness = i == _selectedLineIndex
+                ? new Thickness(2)
+                : new Thickness(1);
+        }
+
+        foreach (KeyValuePair<int, List<ResizeHandle>> pair in _resizeHandles)
+        {
+            foreach (ResizeHandle handle in pair.Value)
+            {
+                handle.Visibility = pair.Key == _selectedLineIndex
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+        }
+
+        UpdateResizeHandles();
     }
 
     private void WindowSwitchTimer_Tick(DispatcherQueueTimer sender, object args)
@@ -221,11 +365,25 @@ public sealed partial class ResultOverlay : TransparentWindow
         ContextMenuCanvas.IsHitTestVisible = false;
     }
 
+    private void CaptureRegionOutlineButton_Click(object sender, RoutedEventArgs e)
+    {
+        CaptureRegionOutline.Visibility = CaptureRegionOutline.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        CaptureRegionOutlineButton.Content = CaptureRegionOutline.Visibility == Visibility.Visible
+            ? "Region"
+            : "Show region";
+    }
+
     private void RenderTranslatedBoxes()
     {
         ResultCanvas.Children.Clear();
+        ResultCanvas.Children.Add(FrozenBackgroundImage);
+        Canvas.SetZIndex(FrozenBackgroundImage, -1);
+        ResultCanvas.Children.Add(CaptureRegionOutline);
 
         _cardHitRegions.Clear();
+        _resizeHandles.Clear();
         for (int lineIndex = 0; lineIndex < _lines.Count; lineIndex++)
         {
             TranslatedLine line = _lines[lineIndex];
@@ -282,13 +440,15 @@ public sealed partial class ResultOverlay : TransparentWindow
                 card.Width,
                 card.MinHeight);
             _translatedTexts[lineIndex] = line.TranslatedText;
+            _sourceTexts[lineIndex] = line.OriginalText;
 
             ResultCanvas.Children.Add(card);
+            Canvas.SetZIndex(card, lineIndex);
             _cardHitRegions.Add((line.BoundingBox, card));
         }
     }
 
-    private void OriginalTextButton_Click(object sender, RoutedEventArgs e)
+    private async void OriginalTextButton_Click(object sender, RoutedEventArgs e)
     {
         if (_contextMenuLine is null ||
             _contextMenuCard is null ||
@@ -298,15 +458,44 @@ public sealed partial class ResultOverlay : TransparentWindow
             return;
         }
 
-        if (_showingOriginalText.Remove(_contextMenuLineIndex))
+        int lineIndex = _contextMenuLineIndex;
+        bool wasShowingOriginal = _showingOriginalText.Contains(lineIndex);
+        PushTextUndo(lineIndex);
+        if (wasShowingOriginal)
         {
-            textBlock.Text = _translatedTexts[_contextMenuLineIndex];
+            _showingOriginalText.Remove(lineIndex);
+            if (_retranslateLine is not null)
+            {
+                TranslationLine sourceLine = new(
+                    _sourceTexts[lineIndex],
+                    _contextMenuLine.BoundingBox,
+                    _contextMenuLine.Confidence,
+                    _contextMenuLine.PolygonVertices,
+                    _contextMenuLine.SourceLineCount);
+                string sourceLanguage = GetSelectedLanguage(CardSourceLanguageComboBox, _sourceLanguage);
+                string targetLanguage = GetSelectedLanguage(CardTargetLanguageComboBox, _targetLanguage);
+                TranslationResult result = await _retranslateLine(sourceLine, sourceLanguage, targetLanguage);
+                if (result.Success && result.Lines.Count > 0)
+                {
+                    _translatedTexts[lineIndex] = result.Lines[0].TranslatedText;
+                }
+                else
+                {
+                    _showingOriginalText.Add(lineIndex);
+                    textBlock.Text = _sourceTexts[lineIndex];
+                    SetOriginalTextButtonState(showOriginalText: false);
+                    Logger.LogWarning($"Unable to retranslate edited source text for line {lineIndex}: {result.ErrorMessage}");
+                    return;
+                }
+            }
+
+            textBlock.Text = _translatedTexts[lineIndex];
             SetOriginalTextButtonState(showOriginalText: true);
         }
         else
         {
-            _showingOriginalText.Add(_contextMenuLineIndex);
-            textBlock.Text = _contextMenuLine.OriginalText;
+            _showingOriginalText.Add(lineIndex);
+            textBlock.Text = _sourceTexts[lineIndex];
             SetOriginalTextButtonState(showOriginalText: false);
         }
 
@@ -319,6 +508,8 @@ public sealed partial class ResultOverlay : TransparentWindow
     {
         _contextMenuLineIndex = lineIndex;
         _contextMenuLine = line;
+        _selectedLineIndex = lineIndex;
+        HighlightSelectedCard();
         _contextMenuCard = card;
 
         SelectLanguage(CardSourceLanguageComboBox, _sourceLanguage);
@@ -329,6 +520,18 @@ public sealed partial class ResultOverlay : TransparentWindow
         PositionContextMenu(card);
         CardContextMenu.Visibility = Visibility.Visible;
         ContextMenuCanvas.IsHitTestVisible = true;
+        FloatingToolbar.Visibility = Visibility.Visible;
+        if (!_toolbarWasManuallyPositioned)
+        {
+            PositionToolbar(card);
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (!_toolbarWasManuallyPositioned)
+                {
+                    PositionToolbar(card);
+                }
+            });
+        }
 
         _isInitializingColorPickers = true;
         DispatcherQueue.TryEnqueue(() =>
@@ -372,6 +575,87 @@ public sealed partial class ResultOverlay : TransparentWindow
         _isInitializingColorPickers = false;
     }
 
+    private void MoveCardUpButton_Click(object sender, RoutedEventArgs e)
+    {
+        MoveSelectedCardLayer(1);
+    }
+
+    private void MoveCardDownButton_Click(object sender, RoutedEventArgs e)
+    {
+        MoveSelectedCardLayer(-1);
+    }
+
+    private void BringCardToTopButton_Click(object sender, RoutedEventArgs e)
+    {
+        SetSelectedCardLayer(toTop: true);
+    }
+
+    private void SendCardToBottomButton_Click(object sender, RoutedEventArgs e)
+    {
+        SetSelectedCardLayer(toTop: false);
+    }
+
+    private void MoveSelectedCardLayer(int direction)
+    {
+        if (!TryGetSelectedCard(out Border? card))
+        {
+            return;
+        }
+
+        int cardZIndex = Canvas.GetZIndex(card);
+        Border? adjacent = _cardHitRegions
+            .Select(region => region.Card)
+            .Where(candidate => candidate != card)
+            .Where(candidate => direction > 0
+                ? Canvas.GetZIndex(candidate) > cardZIndex
+                : Canvas.GetZIndex(candidate) < cardZIndex)
+            .OrderBy(candidate => Canvas.GetZIndex(candidate) * (direction > 0 ? 1 : -1))
+            .FirstOrDefault();
+
+        if (adjacent is null)
+        {
+            return;
+        }
+
+        int adjacentZIndex = Canvas.GetZIndex(adjacent);
+        Canvas.SetZIndex(card, adjacentZIndex);
+        Canvas.SetZIndex(adjacent, cardZIndex);
+        EnsureResizeHandlesOnTop();
+    }
+
+    private void SetSelectedCardLayer(bool toTop)
+    {
+        if (!TryGetSelectedCard(out Border? card))
+        {
+            return;
+        }
+
+        int targetZIndex = toTop
+            ? _cardHitRegions.Max(region => Canvas.GetZIndex(region.Card)) + 1
+            : _cardHitRegions.Min(region => Canvas.GetZIndex(region.Card)) - 1;
+        Canvas.SetZIndex(card, targetZIndex);
+        EnsureResizeHandlesOnTop();
+    }
+
+    private bool TryGetSelectedCard(out Border? card)
+    {
+        card = _selectedLineIndex >= 0 && _selectedLineIndex < _cardHitRegions.Count
+            ? _cardHitRegions[_selectedLineIndex].Card
+            : null;
+        return card is not null;
+    }
+
+    private void EnsureResizeHandlesOnTop()
+    {
+        foreach (List<ResizeHandle> handles in _resizeHandles.Values)
+        {
+            foreach (ResizeHandle handle in handles)
+            {
+                Canvas.SetZIndex(handle, 1000);
+            }
+        }
+    }
+
     private void OriginalAllTextButton_Click(object sender, RoutedEventArgs e)
     {
         bool showOriginalText = _showingOriginalText.Count != _lines.Count;
@@ -385,7 +669,7 @@ public sealed partial class ResultOverlay : TransparentWindow
             if (showOriginalText)
             {
                 _showingOriginalText.Add(lineIndex);
-                textBlock.Text = _lines[lineIndex].OriginalText;
+                textBlock.Text = _sourceTexts[lineIndex];
             }
             else
             {
@@ -414,6 +698,7 @@ public sealed partial class ResultOverlay : TransparentWindow
 
         _editingOriginalText = textBlock.Text;
         _editingCard = card;
+        ScreenTranslator.Helpers.WindowManager.SetResultCardEditing(true);
         _editingTextBox = new TextBox
         {
             Text = textBlock.Text,
@@ -497,9 +782,17 @@ public sealed partial class ResultOverlay : TransparentWindow
             VerticalAlignment = VerticalAlignment.Center,
         };
         _editingCard.Child = textBlock;
-        if (_contextMenuLineIndex >= 0 && !_showingOriginalText.Contains(_contextMenuLineIndex))
+        if (_contextMenuLineIndex >= 0)
         {
-            _translatedTexts[_contextMenuLineIndex] = textBlock.Text;
+            PushTextUndo(_contextMenuLineIndex);
+            if (_showingOriginalText.Contains(_contextMenuLineIndex))
+            {
+                _sourceTexts[_contextMenuLineIndex] = textBlock.Text;
+            }
+            else
+            {
+                _translatedTexts[_contextMenuLineIndex] = textBlock.Text;
+            }
         }
 
         Logger.LogInfo($"Committed edited overlay text for line {_contextMenuLineIndex}.");
@@ -537,6 +830,7 @@ public sealed partial class ResultOverlay : TransparentWindow
         _editingTextBox = null;
         _editingCard = null;
         _editingOriginalText = string.Empty;
+        ScreenTranslator.Helpers.WindowManager.SetResultCardEditing(false);
 
         int exStyle = OSInterop.GetWindowLong(_hwnd, OSInterop.GwlExStyle);
         _ = OSInterop.SetWindowLong(_hwnd, OSInterop.GwlExStyle, exStyle | OSInterop.WsExNoActivate);
@@ -701,7 +995,7 @@ public sealed partial class ResultOverlay : TransparentWindow
         string targetLanguage = GetSelectedLanguage(CardTargetLanguageComboBox, "en-US");
         int cardLineIndex = _contextMenuLineIndex;
         TranslationLine sourceLine = new(
-            _contextMenuLine.OriginalText,
+            _sourceTexts[cardLineIndex],
             _contextMenuLine.BoundingBox,
             _contextMenuLine.Confidence,
             _contextMenuLine.PolygonVertices,
@@ -717,6 +1011,7 @@ public sealed partial class ResultOverlay : TransparentWindow
 
         if (card.Child is TextBlock textBlock)
         {
+            PushTextUndo(cardLineIndex);
             _translatedTexts[cardLineIndex] = result.Lines[0].TranslatedText;
             if (!_showingOriginalText.Contains(cardLineIndex))
             {
@@ -802,6 +1097,16 @@ public sealed partial class ResultOverlay : TransparentWindow
         }
 
         PointerPoint point = e.GetCurrentPoint(ResultCanvas);
+        if (sender is Border selectedCard)
+        {
+            _selectedLineIndex = _cardHitRegions.FindIndex(region => ReferenceEquals(region.Card, selectedCard));
+            HighlightSelectedCard();
+            if (_selectedLineIndex >= 0 && _selectedLineIndex < _lines.Count)
+            {
+                ShowCardContextMenu(selectedCard, _selectedLineIndex, _lines[_selectedLineIndex]);
+            }
+        }
+
         _dragCard = card;
         _dragPointerId = point.PointerId;
         _dragStart = point.Position;
@@ -821,6 +1126,9 @@ public sealed partial class ResultOverlay : TransparentWindow
         PointerPoint point = e.GetCurrentPoint(ResultCanvas);
         Canvas.SetLeft(_dragCard, Math.Max(0, _dragLeft + point.Position.X - _dragStart.X));
         Canvas.SetTop(_dragCard, Math.Max(0, _dragTop + point.Position.Y - _dragStart.Y));
+        UpdateResizeHandles();
+        PositionContextMenu(_dragCard);
+
         e.Handled = true;
     }
 
@@ -843,6 +1151,164 @@ public sealed partial class ResultOverlay : TransparentWindow
 
         _dragCard = null;
         _dragPointerId = 0;
+    }
+
+    private void ResizeHandle_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is not ResizeHandle handle ||
+            !e.GetCurrentPoint(handle).Properties.IsLeftButtonPressed ||
+            _selectedLineIndex < 0 ||
+            _selectedLineIndex >= _cardHitRegions.Count)
+        {
+            return;
+        }
+
+        Border card = _cardHitRegions[_selectedLineIndex].Card;
+        _activeResizeHandle = handle;
+        _resizeStartWidth = card.ActualWidth;
+        _resizeStartHeight = card.ActualHeight;
+        _resizeStartLeft = Canvas.GetLeft(card);
+        _resizeStartTop = Canvas.GetTop(card);
+        _dragStart = e.GetCurrentPoint(ResultCanvas).Position;
+        _dragPointerId = e.Pointer.PointerId;
+        handle.CapturePointer(e.Pointer);
+        e.Handled = true;
+    }
+
+    private void ResizeHandle_PointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (!ReferenceEquals(sender, _activeResizeHandle) ||
+            e.Pointer.PointerId != _dragPointerId ||
+            _selectedLineIndex < 0 ||
+            _selectedLineIndex >= _cardHitRegions.Count)
+        {
+            return;
+        }
+
+        PointerPoint point = e.GetCurrentPoint(ResultCanvas);
+        double deltaX = point.Position.X - _dragStart.X;
+        double deltaY = point.Position.Y - _dragStart.Y;
+        Border card = _cardHitRegions[_selectedLineIndex].Card;
+        const double minWidth = 24;
+        const double minHeight = 18;
+        double left = _resizeStartLeft;
+        double top = _resizeStartTop;
+        double width = _resizeStartWidth;
+        double height = _resizeStartHeight;
+
+        switch (_activeResizeHandle.Direction)
+        {
+            case ResizeHandleDirection.North:
+                top = Math.Min(_resizeStartTop + deltaY, _resizeStartTop + _resizeStartHeight - minHeight);
+                height = _resizeStartHeight - (top - _resizeStartTop);
+                break;
+            case ResizeHandleDirection.NorthEast:
+                top = Math.Min(_resizeStartTop + deltaY, _resizeStartTop + _resizeStartHeight - minHeight);
+                height = _resizeStartHeight - (top - _resizeStartTop);
+                width = Math.Max(minWidth, _resizeStartWidth + deltaX);
+                break;
+            case ResizeHandleDirection.East:
+                width = Math.Max(minWidth, _resizeStartWidth + deltaX);
+                break;
+            case ResizeHandleDirection.SouthEast:
+                width = Math.Max(minWidth, _resizeStartWidth + deltaX);
+                height = Math.Max(minHeight, _resizeStartHeight + deltaY);
+                break;
+            case ResizeHandleDirection.South:
+                height = Math.Max(minHeight, _resizeStartHeight + deltaY);
+                break;
+            case ResizeHandleDirection.SouthWest:
+                left = Math.Min(_resizeStartLeft + deltaX, _resizeStartLeft + _resizeStartWidth - minWidth);
+                width = _resizeStartWidth - (left - _resizeStartLeft);
+                height = Math.Max(minHeight, _resizeStartHeight + deltaY);
+                break;
+            case ResizeHandleDirection.West:
+                left = Math.Min(_resizeStartLeft + deltaX, _resizeStartLeft + _resizeStartWidth - minWidth);
+                width = _resizeStartWidth - (left - _resizeStartLeft);
+                break;
+            case ResizeHandleDirection.NorthWest:
+                left = Math.Min(_resizeStartLeft + deltaX, _resizeStartLeft + _resizeStartWidth - minWidth);
+                top = Math.Min(_resizeStartTop + deltaY, _resizeStartTop + _resizeStartHeight - minHeight);
+                width = _resizeStartWidth - (left - _resizeStartLeft);
+                height = _resizeStartHeight - (top - _resizeStartTop);
+                break;
+        }
+
+        Canvas.SetLeft(card, Math.Max(0, left));
+        Canvas.SetTop(card, Math.Max(0, top));
+        card.Width = width;
+        card.Height = height;
+        card.MinHeight = minHeight;
+        UpdateResizeHandles();
+        PositionContextMenu(card);
+        e.Handled = true;
+    }
+
+    private void ResizeHandle_PointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        EndResize(e.Pointer);
+    }
+
+    private void ResizeHandle_PointerCanceled(object sender, PointerRoutedEventArgs e)
+    {
+        EndResize(e.Pointer);
+    }
+
+    private void EndResize(Pointer pointer)
+    {
+        _activeResizeHandle?.ReleasePointerCapture(pointer);
+        _activeResizeHandle = null;
+        _dragPointerId = 0;
+    }
+
+    private void UpdateResizeHandles()
+    {
+        if (_selectedLineIndex < 0 || _selectedLineIndex >= _cardHitRegions.Count)
+        {
+            return;
+        }
+
+        Border card = _cardHitRegions[_selectedLineIndex].Card;
+        if (!_resizeHandles.TryGetValue(_selectedLineIndex, out List<ResizeHandle>? handles))
+        {
+            handles = new List<ResizeHandle>();
+            foreach (ResizeHandleDirection direction in Enum.GetValues<ResizeHandleDirection>())
+            {
+                ResizeHandle handle = new(direction);
+                handle.PointerPressed += ResizeHandle_PointerPressed;
+                handle.PointerMoved += ResizeHandle_PointerMoved;
+                handle.PointerReleased += ResizeHandle_PointerReleased;
+                handle.PointerCanceled += ResizeHandle_PointerCanceled;
+                handles.Add(handle);
+                ResultCanvas.Children.Add(handle);
+                Canvas.SetZIndex(handle, 1000);
+            }
+
+            _resizeHandles[_selectedLineIndex] = handles;
+        }
+
+        double left = Canvas.GetLeft(card);
+        double top = Canvas.GetTop(card);
+        double right = left + card.ActualWidth;
+        double bottom = top + card.ActualHeight;
+        foreach (ResizeHandle handle in handles)
+        {
+            double x = handle.Direction switch
+            {
+                ResizeHandleDirection.NorthWest or ResizeHandleDirection.West or ResizeHandleDirection.SouthWest => left - 4,
+                ResizeHandleDirection.North or ResizeHandleDirection.South => ((left + right) / 2) - 4,
+                _ => right - 4,
+            };
+            double y = handle.Direction switch
+            {
+                ResizeHandleDirection.NorthWest or ResizeHandleDirection.North or ResizeHandleDirection.NorthEast => top - 4,
+                ResizeHandleDirection.West or ResizeHandleDirection.East => ((top + bottom) / 2) - 4,
+                _ => bottom - 4,
+            };
+            Canvas.SetLeft(handle, x);
+            Canvas.SetTop(handle, y);
+            handle.Visibility = Visibility.Visible;
+        }
     }
 
     private void HideMatchingCardsButton_Click(object sender, RoutedEventArgs e)
@@ -895,7 +1361,7 @@ public sealed partial class ResultOverlay : TransparentWindow
             (byte)argb);
     }
 
-    private void PositionToolbar()
+    private void PositionToolbar(Border? selectedCard = null)
     {
         var (regionLeftDip, regionTopDip, _, _) = OverlayLayoutHelper.PhysicalToDip(
             _capturedRegion,
@@ -903,9 +1369,92 @@ public sealed partial class ResultOverlay : TransparentWindow
             _screenInfo.DpiScaleX,
             _screenInfo.DpiScaleY);
 
-        double toolbarLeft = Math.Max(16, regionLeftDip);
-        double toolbarTop = Math.Max(16, regionTopDip - 42);
+        double overlayWidth = _overlayBounds.Width / _screenInfo.DpiScaleX;
+        double overlayHeight = _overlayBounds.Height / _screenInfo.DpiScaleY;
+        double toolbarWidth = Math.Max(48, FloatingToolbar.ActualWidth);
+        double toolbarHeight = Math.Max(48, FloatingToolbar.ActualHeight);
+        double toolbarLeft = Math.Clamp(regionLeftDip, 8, Math.Max(8, overlayWidth - toolbarWidth - 8));
+        double toolbarTop = regionTopDip >= toolbarHeight + 16
+            ? regionTopDip - toolbarHeight - 8
+            : 8;
+
+        if (selectedCard is not null)
+        {
+            double cardLeft = Canvas.GetLeft(selectedCard);
+            double cardTop = Canvas.GetTop(selectedCard);
+            double cardWidth = Math.Max(selectedCard.ActualWidth, selectedCard.Width);
+            double cardBottom = cardTop + Math.Max(selectedCard.ActualHeight, selectedCard.MinHeight);
+            bool overlapsSelectedCard =
+                toolbarLeft < cardLeft + cardWidth &&
+                toolbarLeft + toolbarWidth > cardLeft &&
+                toolbarTop < cardBottom &&
+                toolbarTop + toolbarHeight > cardTop;
+            if (overlapsSelectedCard)
+            {
+                toolbarLeft = Math.Clamp(cardLeft, 8, Math.Max(8, overlayWidth - toolbarWidth - 8));
+                toolbarTop = Math.Clamp(cardBottom + 8, 8, Math.Max(8, overlayHeight - toolbarHeight - 8));
+            }
+        }
 
         FloatingToolbar.Margin = new Thickness(toolbarLeft, toolbarTop, 0, 0);
+    }
+
+    private void HideToolbarButton_Click(object sender, RoutedEventArgs e)
+    {
+        FloatingToolbar.Visibility = Visibility.Collapsed;
+    }
+
+    private void MoveToolbarButton_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        _isToolbarDragging = true;
+        _toolbarPointerId = e.Pointer.PointerId;
+        _toolbarDragStart = e.GetCurrentPoint(ResultCanvas).Position;
+        _toolbarDragStartMargin = FloatingToolbar.Margin;
+        MoveToolbarButton.CapturePointer(e.Pointer);
+        e.Handled = true;
+    }
+
+    private void MoveToolbarButton_PointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_isToolbarDragging || e.Pointer.PointerId != _toolbarPointerId)
+        {
+            return;
+        }
+
+        Windows.Foundation.Point current = e.GetCurrentPoint(ResultCanvas).Position;
+        double maxLeft = Math.Max(8, (_overlayBounds.Width / _screenInfo.DpiScaleX) - Math.Max(48, FloatingToolbar.ActualWidth) - 8);
+        double maxTop = Math.Max(8, (_overlayBounds.Height / _screenInfo.DpiScaleY) - Math.Max(48, FloatingToolbar.ActualHeight) - 8);
+        double left = Math.Clamp(_toolbarDragStartMargin.Left + current.X - _toolbarDragStart.X, 8, maxLeft);
+        double top = Math.Clamp(_toolbarDragStartMargin.Top + current.Y - _toolbarDragStart.Y, 8, maxTop);
+        FloatingToolbar.Margin = new Thickness(left, top, 0, 0);
+        _toolbarWasManuallyPositioned = true;
+        e.Handled = true;
+    }
+
+    private void MoveToolbarButton_PointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_isToolbarDragging || e.Pointer.PointerId != _toolbarPointerId)
+        {
+            return;
+        }
+
+        _isToolbarDragging = false;
+        MoveToolbarButton.ReleasePointerCapture(e.Pointer);
+        e.Handled = true;
+    }
+
+    private void PositionCaptureRegionOutline()
+    {
+        var (leftDip, topDip, widthDip, heightDip) = OverlayLayoutHelper.PhysicalToDip(
+            _capturedRegion,
+            _overlayBounds,
+            _screenInfo.DpiScaleX,
+            _screenInfo.DpiScaleY);
+
+        Canvas.SetLeft(CaptureRegionOutline, leftDip);
+        Canvas.SetTop(CaptureRegionOutline, topDip);
+        CaptureRegionOutline.Width = widthDip;
+        CaptureRegionOutline.Height = heightDip;
+        CaptureRegionOutline.Visibility = Visibility.Visible;
     }
 }

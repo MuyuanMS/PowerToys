@@ -35,9 +35,22 @@ public static class TranslationProviderFactory
                 var libreApiKey = ScreenTranslatorCredentialsVault.GetLibreTranslateApiKey();
                 return new LibreTranslateProvider(libreEndpoint, libreApiKey, cloudConsent);
 
+            case "AcpAgent":
+                return new AcpAgentTranslationProvider(
+                    GetOptimizedAcpCommand(settings.Properties.AcpAgentCommand));
+
             case "Passthrough":
             default:
                 return new PassthroughTranslationProvider();
         }
+    }
+
+    private static string GetOptimizedAcpCommand(string? configuredCommand)
+    {
+        string command = configuredCommand?.Trim() ?? string.Empty;
+        return string.IsNullOrEmpty(command) ||
+            string.Equals(command, "copilot --acp", StringComparison.OrdinalIgnoreCase)
+                ? "copilot --acp --model gpt-5-mini --reasoning-effort minimal"
+                : command;
     }
 }

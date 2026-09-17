@@ -23,6 +23,8 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         public const string AzureCredentialResource = "https://api.cognitive.microsofttranslator.com";
 
         public const string AzureCredentialUsername = "PowerToys_ScreenTranslator_AzureTranslator";
+        public const string AzureVisionCredentialResource = "https://*.cognitiveservices.azure.com";
+        public const string AzureVisionCredentialUsername = "PowerToys_ScreenTranslator_AzureVision";
 
         public const string LibreTranslateCredentialResource = "https://libretranslate.com";
 
@@ -50,7 +52,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         private Func<string, int> SendConfigMSG { get; }
 
-        public static readonly string[] ProviderKeys = ["Passthrough", "AzureTranslator", "LibreTranslate"];
+        public static readonly string[] ProviderKeys = ["Passthrough", "AzureTranslator", "LibreTranslate", "AcpAgent"];
 
         public static readonly (string Code, string DisplayName)[] SupportedSourceLanguages =
         [
@@ -82,6 +84,14 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             "Passthrough (Offline Prototype)",
             "Azure AI Translator (Cloud v3)",
             "LibreTranslate (Self-Hosted / Cloud)",
+            "ACP Agent (Experimental)",
+        };
+
+        public ObservableCollection<string> AvailableOcrProviders { get; } = new ObservableCollection<string>
+        {
+            "Automatic (Windows AI, then Windows OCR)",
+            "Windows.Media.Ocr (Local)",
+            "Azure AI Vision OCR (Cloud)",
         };
 
         public ObservableCollection<string> AvailableSourceLanguages { get; } = new ObservableCollection<string>();
@@ -143,7 +153,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         {
             return new Dictionary<string, HotkeySettings[]>
             {
-                [ModuleName] = [ActivationShortcut],
+                [ModuleName] = [ActivationShortcut, CurrentScreenShortcut, ActiveWindowShortcut],
             };
         }
 
@@ -188,6 +198,36 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
         }
 
+        public HotkeySettings CurrentScreenShortcut
+        {
+            get => _screenTranslatorSettings.Properties.CurrentScreenShortcut;
+            set
+            {
+                if (_screenTranslatorSettings.Properties.CurrentScreenShortcut != value)
+                {
+                    _screenTranslatorSettings.Properties.CurrentScreenShortcut = value ?? _screenTranslatorSettings.Properties.DefaultCurrentScreenShortcut;
+                    OnPropertyChanged(nameof(CurrentScreenShortcut));
+                    _settingsUtils.SaveSettings(_screenTranslatorSettings.ToJsonString(), ScreenTranslatorSettings.ModuleName);
+                    NotifySettingsChanged();
+                }
+            }
+        }
+
+        public HotkeySettings ActiveWindowShortcut
+        {
+            get => _screenTranslatorSettings.Properties.ActiveWindowShortcut;
+            set
+            {
+                if (_screenTranslatorSettings.Properties.ActiveWindowShortcut != value)
+                {
+                    _screenTranslatorSettings.Properties.ActiveWindowShortcut = value ?? _screenTranslatorSettings.Properties.DefaultActiveWindowShortcut;
+                    OnPropertyChanged(nameof(ActiveWindowShortcut));
+                    _settingsUtils.SaveSettings(_screenTranslatorSettings.ToJsonString(), ScreenTranslatorSettings.ModuleName);
+                    NotifySettingsChanged();
+                }
+            }
+        }
+
         public int SelectedProviderIndex
         {
             get
@@ -215,6 +255,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                         OnPropertyChanged(nameof(SelectedProviderIndex));
                         OnPropertyChanged(nameof(IsAzureProviderSelected));
                         OnPropertyChanged(nameof(IsLibreTranslateProviderSelected));
+                        OnPropertyChanged(nameof(IsAcpAgentProviderSelected));
                         SaveAndNotifySettings();
                     }
                 }
@@ -223,7 +264,51 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         public bool IsAzureProviderSelected => SelectedProviderIndex == 1;
 
+        public int SelectedOcrProviderIndex
+        {
+            get => _screenTranslatorSettings.Properties.OcrProvider switch
+            {
+                "WindowsMedia" => 1,
+                "AzureVision" => 2,
+                _ => 0,
+            };
+            set
+            {
+                string selected = value switch
+                {
+                    1 => "WindowsMedia",
+                    2 => "AzureVision",
+                    _ => "Automatic",
+                };
+                if (!string.Equals(_screenTranslatorSettings.Properties.OcrProvider, selected, StringComparison.Ordinal))
+                {
+                    _screenTranslatorSettings.Properties.OcrProvider = selected;
+                    OnPropertyChanged(nameof(SelectedOcrProviderIndex));
+                    OnPropertyChanged(nameof(IsAzureVisionOcrSelected));
+                    SaveAndNotifySettings();
+                }
+            }
+        }
+
+        public bool IsAzureVisionOcrSelected => SelectedOcrProviderIndex == 2;
+
         public bool IsLibreTranslateProviderSelected => SelectedProviderIndex == 2;
+
+        public bool IsAcpAgentProviderSelected => SelectedProviderIndex == 3;
+
+        public string AcpAgentCommand
+        {
+            get => _screenTranslatorSettings.Properties.AcpAgentCommand;
+            set
+            {
+                if (_screenTranslatorSettings.Properties.AcpAgentCommand != value)
+                {
+                    _screenTranslatorSettings.Properties.AcpAgentCommand = value;
+                    OnPropertyChanged(nameof(AcpAgentCommand));
+                    SaveAndNotifySettings();
+                }
+            }
+        }
 
         public bool EnableCloudConsent
         {
@@ -234,6 +319,20 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 {
                     _screenTranslatorSettings.Properties.EnableCloudConsent = value;
                     OnPropertyChanged(nameof(EnableCloudConsent));
+                    SaveAndNotifySettings();
+                }
+            }
+        }
+
+        public bool FreezeCapturedContent
+        {
+            get => _screenTranslatorSettings.Properties.FreezeCapturedContent;
+            set
+            {
+                if (_screenTranslatorSettings.Properties.FreezeCapturedContent != value)
+                {
+                    _screenTranslatorSettings.Properties.FreezeCapturedContent = value;
+                    OnPropertyChanged(nameof(FreezeCapturedContent));
                     SaveAndNotifySettings();
                 }
             }
@@ -329,6 +428,20 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
         }
 
+        public string AzureVisionEndpoint
+        {
+            get => _screenTranslatorSettings.Properties.AzureVisionEndpoint;
+            set
+            {
+                if (_screenTranslatorSettings.Properties.AzureVisionEndpoint != value)
+                {
+                    _screenTranslatorSettings.Properties.AzureVisionEndpoint = value;
+                    OnPropertyChanged(nameof(AzureVisionEndpoint));
+                    SaveAndNotifySettings();
+                }
+            }
+        }
+
         public string LibreTranslateEndpoint
         {
             get => _screenTranslatorSettings.Properties.LibreTranslateEndpoint;
@@ -345,6 +458,8 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         public bool HasAzureApiKey => !string.IsNullOrWhiteSpace(RetrieveCredential(AzureCredentialResource, AzureCredentialUsername));
 
+        public bool HasAzureVisionApiKey => !string.IsNullOrWhiteSpace(RetrieveCredential(AzureVisionCredentialResource, AzureVisionCredentialUsername));
+
         public bool HasLibreTranslateApiKey => !string.IsNullOrWhiteSpace(RetrieveCredential(LibreTranslateCredentialResource, LibreTranslateCredentialUsername));
 
         public void SaveAzureApiKey(string key)
@@ -357,6 +472,18 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         {
             RemoveCredential(AzureCredentialResource, AzureCredentialUsername);
             OnPropertyChanged(nameof(HasAzureApiKey));
+        }
+
+        public void SaveAzureVisionApiKey(string key)
+        {
+            SaveCredential(AzureVisionCredentialResource, AzureVisionCredentialUsername, key);
+            OnPropertyChanged(nameof(HasAzureVisionApiKey));
+        }
+
+        public void RemoveAzureVisionApiKey()
+        {
+            RemoveCredential(AzureVisionCredentialResource, AzureVisionCredentialUsername);
+            OnPropertyChanged(nameof(HasAzureVisionApiKey));
         }
 
         public void SaveLibreTranslateApiKey(string key)

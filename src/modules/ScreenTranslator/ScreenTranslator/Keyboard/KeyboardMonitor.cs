@@ -14,7 +14,6 @@ public sealed class KeyboardMonitor : IDisposable
 {
     private readonly DispatcherQueue _dispatcherQueue;
     private GlobalKeyboardHook? _keyboardHook;
-    private bool _winPressed;
     private bool _ctrlPressed;
 
     public KeyboardMonitor()
@@ -30,24 +29,14 @@ public sealed class KeyboardMonitor : IDisposable
 
     private void Hook_KeyboardPressed(object? sender, GlobalKeyboardHookEventArgs e)
     {
-        if (e.Key == VirtualKey.LeftWindows || e.Key == VirtualKey.RightWindows)
-        {
-            _winPressed = e.IsKeyDown;
-        }
-        else if (e.Key == VirtualKey.Control || e.Key == VirtualKey.LeftControl || e.Key == VirtualKey.RightControl)
+        if (e.Key == VirtualKey.Control || e.Key == VirtualKey.LeftControl || e.Key == VirtualKey.RightControl)
         {
             _ctrlPressed = e.IsKeyDown;
         }
-        else if (e.Key == VirtualKey.T && e.IsKeyDown)
+        else if (e.Key == VirtualKey.Z && e.IsKeyDown && _ctrlPressed && !WindowManager.IsEditingResultCard())
         {
-            if (_winPressed && _ctrlPressed)
-            {
-                e.Handled = true;
-                _dispatcherQueue.TryEnqueue(() =>
-                {
-                    WindowManager.LaunchScreenTranslatorOnEveryScreen();
-                });
-            }
+            e.Handled = true;
+            _dispatcherQueue.TryEnqueue(WindowManager.UndoActiveResultCard);
         }
         else if (e.Key == VirtualKey.Escape && e.IsKeyDown)
         {

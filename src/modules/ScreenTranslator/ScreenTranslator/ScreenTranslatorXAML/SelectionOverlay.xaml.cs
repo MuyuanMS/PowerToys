@@ -28,10 +28,12 @@ public sealed partial class SelectionOverlay : TransparentWindow
 {
     private readonly ScreenInfo _screenInfo;
     private readonly ITranslationProvider _translationProvider;
+    private readonly IOcrBackend? _ocrBackend;
     private readonly string _sourceLanguage;
     private readonly string _targetLanguage;
     private readonly PhysicalRect? _foregroundWindowBounds;
     private readonly DispatcherQueue _dispatcherQueue;
+    private readonly bool _freezeCapturedContentByDefault;
 
     private bool _isSelecting;
     private Windows.Foundation.Point _startPoint;
@@ -41,13 +43,18 @@ public sealed partial class SelectionOverlay : TransparentWindow
         ITranslationProvider? translationProvider = null,
         string sourceLanguage = "auto",
         string targetLanguage = "en-US",
-        PhysicalRect? foregroundWindowBounds = null)
+        PhysicalRect? foregroundWindowBounds = null,
+        IOcrBackend? ocrBackend = null,
+        bool freezeCapturedContentByDefault = false,
+        bool showSelectionUi = true)
     {
         _screenInfo = screenInfo;
         _translationProvider = translationProvider ?? new PassthroughTranslationProvider();
+        _ocrBackend = ocrBackend;
         _sourceLanguage = sourceLanguage;
         _targetLanguage = targetLanguage;
         _foregroundWindowBounds = foregroundWindowBounds;
+        _freezeCapturedContentByDefault = freezeCapturedContentByDefault;
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
 
         InitializeComponent();
@@ -66,6 +73,12 @@ public sealed partial class SelectionOverlay : TransparentWindow
             (int)_screenInfo.Bounds.Y,
             (int)_screenInfo.Bounds.Width,
             (int)_screenInfo.Bounds.Height));
+        uint setWindowFlags = OSInterop.SwpNoActivate | OSInterop.SwpNoOwnerZOrder;
+        if (showSelectionUi)
+        {
+            setWindowFlags |= OSInterop.SwpShowWindow;
+        }
+
         _ = OSInterop.SetWindowPos(
             hwnd,
             OSInterop.HwndTopMost,
@@ -73,7 +86,7 @@ public sealed partial class SelectionOverlay : TransparentWindow
             (int)_screenInfo.Bounds.Y,
             (int)_screenInfo.Bounds.Width,
             (int)_screenInfo.Bounds.Height,
-            OSInterop.SwpNoActivate | OSInterop.SwpNoOwnerZOrder | OSInterop.SwpShowWindow);
+            setWindowFlags);
 
         try
         {
@@ -87,8 +100,7 @@ public sealed partial class SelectionOverlay : TransparentWindow
 
     private void FullScreenButton_Click(object sender, RoutedEventArgs e)
     {
-        WindowManager.CloseAllSelectionOverlays();
-        _ = ProcessCaptureAndTranslateAsync(_screenInfo.Bounds);
+        BeginFullScreenCapture();
     }
 
     private void ActiveWindowButton_Click(object sender, RoutedEventArgs e)
@@ -98,8 +110,37 @@ public sealed partial class SelectionOverlay : TransparentWindow
             return;
         }
 
-        WindowManager.CloseAllSelectionOverlays();
-        _ = ProcessCaptureAndTranslateAsync(_foregroundWindowBounds.Value);
+        BeginActiveWindowCapture();
+    }
+
+    public async void BeginFullScreenCapture()
+    {
+        await BeginDirectCaptureAsync(_screenInfo.Bounds);
+    }
+
+    public async void BeginActiveWindowCapture()
+    {
+        if (!_foregroundWindowBounds.HasValue)
+        {
+            return;
+        }
+
+        await BeginDirectCaptureAsync(_foregroundWindowBounds.Value);
+    }
+
+    private async Task BeginDirectCaptureAsync(PhysicalRect captureBounds)
+    {
+        await Task.Yield();
+        WindowManager.CloseOtherSelectionOverlays(this);
+
+        try
+        {
+            await ProcessCaptureAndTranslateAsync(captureBounds);
+        }
+        finally
+        {
+            Close();
+        }
     }
 
     private void SelectionCanvas_PointerPressed(object sender, PointerRoutedEventArgs e)
@@ -155,10 +196,9 @@ public sealed partial class SelectionOverlay : TransparentWindow
         double widthDip = Math.Abs(endPoint.X - _startPoint.X);
         double heightDip = Math.Abs(endPoint.Y - _startPoint.Y);
 
-        WindowManager.CloseAllSelectionOverlays();
-
         if (widthDip < 8 || heightDip < 8)
         {
+            WindowManager.CloseAllSelectionOverlays();
             Logger.LogInfo("Selection region too small; cancelling capture.");
             return;
         }
@@ -174,7 +214,18 @@ public sealed partial class SelectionOverlay : TransparentWindow
 
         physicalRect = OverlayLayoutHelper.ClampToScreen(physicalRect, _screenInfo.Bounds);
 
-        await ProcessCaptureAndTranslateAsync(physicalRect);
+        WindowManager.CloseOtherSelectionOverlays(this);
+        AppWindow.Hide();
+        await Task.Delay(100);
+
+        try
+        {
+            await ProcessCaptureAndTranslateAsync(physicalRect);
+        }
+        finally
+        {
+            Close();
+        }
     }
 
     private async Task ProcessCaptureAndTranslateAsync(
@@ -202,11 +253,18 @@ public sealed partial class SelectionOverlay : TransparentWindow
             processingOverlay = WindowManager.ShowProcessingOverlay(capturedRegionPhysical, cancellationTokenSource.Cancel);
             processingOverlay.UpdateStatus("Recognizing text...");
 
-            var recognizedLines = await OcrEngineHelper.ExtractLinesWithGeometryAsync(
-                capturedBitmap,
-                capturedRegionPhysical,
-                sourceLanguage,
-                cancellationTokenSource.Token);
+            var recognizedLines = _ocrBackend is null
+                ? await OcrEngineHelper.ExtractLinesWithGeometryAsync(
+                    capturedBitmap,
+                    capturedRegionPhysical,
+                    sourceLanguage,
+                    cancellationTokenSource.Token)
+                : await OcrEngineHelper.ExtractLinesWithGeometryAsync(
+                    _ocrBackend,
+                    capturedBitmap,
+                    capturedRegionPhysical,
+                    sourceLanguage,
+                    cancellationTokenSource.Token);
             Logger.LogInfo($"Recognized {recognizedLines.Count} text lines.");
 
             if (recognizedLines.Count == 0)
@@ -244,16 +302,23 @@ public sealed partial class SelectionOverlay : TransparentWindow
                         OverlayForegroundColorArgb = 0xFFFFFFFFu,
                     });
 
-                    _dispatcherQueue.TryEnqueue(() =>
+                    SoftwareBitmap errorSnapshot = SoftwareBitmap.Copy(capturedBitmap);
+                    if (!_dispatcherQueue.TryEnqueue(() =>
                     {
                         WindowManager.ShowResultOverlay(
                             capturedRegionPhysical,
                             errorLines,
+                            errorSnapshot,
+                            _freezeCapturedContentByDefault,
                             sourceLanguage,
                             targetLanguage,
                             (newSource, newTarget) => ProcessCaptureAndTranslateAsync(capturedRegionPhysical, newSource, newTarget),
                             TranslateLineAsync);
-                    });
+                    }))
+                    {
+                        errorSnapshot.Dispose();
+                    }
+
                     return;
                 }
             }
@@ -265,16 +330,22 @@ public sealed partial class SelectionOverlay : TransparentWindow
                     result.Lines),
                 cancellationTokenSource.Token);
 
-            _dispatcherQueue.TryEnqueue(() =>
+            SoftwareBitmap capturedSnapshot = SoftwareBitmap.Copy(capturedBitmap);
+            if (!_dispatcherQueue.TryEnqueue(() =>
             {
                 WindowManager.ShowResultOverlay(
                     capturedRegionPhysical,
                     styledLines,
+                    capturedSnapshot,
+                    _freezeCapturedContentByDefault,
                     sourceLanguage,
                     targetLanguage,
                     (newSource, newTarget) => ProcessCaptureAndTranslateAsync(capturedRegionPhysical, newSource, newTarget),
                     TranslateLineAsync);
-            });
+            }))
+            {
+                capturedSnapshot.Dispose();
+            }
         }
         catch (OperationCanceledException)
         {

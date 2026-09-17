@@ -15,6 +15,8 @@ public static class ScreenTranslatorCredentialsVault
 {
     public const string AzureCredentialResource = "https://api.cognitive.microsofttranslator.com";
     public const string AzureCredentialUsername = "PowerToys_ScreenTranslator_AzureTranslator";
+    public const string AzureVisionCredentialResource = "https://*.cognitiveservices.azure.com";
+    public const string AzureVisionCredentialUsername = "PowerToys_ScreenTranslator_AzureVision";
 
     public const string LibreTranslateCredentialResource = "https://libretranslate.com";
     public const string LibreTranslateCredentialUsername = "PowerToys_ScreenTranslator_LibreTranslate";
@@ -29,6 +31,11 @@ public static class ScreenTranslatorCredentialsVault
         return RetrieveKey(LibreTranslateCredentialResource, LibreTranslateCredentialUsername);
     }
 
+    public static string GetAzureVisionApiKey()
+    {
+        return RetrieveKey(AzureVisionCredentialResource, AzureVisionCredentialUsername);
+    }
+
     public static void SaveAzureApiKey(string apiKey)
     {
         SaveKey(AzureCredentialResource, AzureCredentialUsername, apiKey);
@@ -39,6 +46,11 @@ public static class ScreenTranslatorCredentialsVault
         SaveKey(LibreTranslateCredentialResource, LibreTranslateCredentialUsername, apiKey);
     }
 
+    public static void SaveAzureVisionApiKey(string apiKey)
+    {
+        SaveKey(AzureVisionCredentialResource, AzureVisionCredentialUsername, apiKey);
+    }
+
     public static void RemoveAzureApiKey()
     {
         RemoveKey(AzureCredentialResource, AzureCredentialUsername);
@@ -47,6 +59,11 @@ public static class ScreenTranslatorCredentialsVault
     public static void RemoveLibreTranslateApiKey()
     {
         RemoveKey(LibreTranslateCredentialResource, LibreTranslateCredentialUsername);
+    }
+
+    public static void RemoveAzureVisionApiKey()
+    {
+        RemoveKey(AzureVisionCredentialResource, AzureVisionCredentialUsername);
     }
 
     private static string RetrieveKey(string resource, string username)
