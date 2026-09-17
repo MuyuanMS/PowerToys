@@ -112,7 +112,7 @@ namespace AppLauncher
         }
         const auto execute = [&](const std::wstring& path, const std::wstring& arguments) {
             auto result = LaunchApp(path, arguments, app.isElevated);
-            if (result.isError() && result.error().code == ERROR_CANCELLED)
+            if (app.isElevated && result.isError() && result.error().code == ERROR_CANCELLED)
             {
                 terminalResult = LaunchResult::Canceled;
             }
