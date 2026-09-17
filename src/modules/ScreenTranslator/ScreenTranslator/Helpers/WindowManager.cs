@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using ManagedCommon;
 using Microsoft.PowerToys.Settings.UI.Library;
@@ -82,7 +83,7 @@ public static class WindowManager
         (_foregroundWindowHandle, _foregroundWindowBounds) = CaptureForegroundWindow();
 
         IReadOnlyList<ScreenInfo> screens = MonitorHelper.GetAllScreens();
-        if (launchMode != CaptureLaunchMode.Region)
+        if (launchMode == CaptureLaunchMode.ActiveWindow)
         {
             if (!_foregroundWindowBounds.HasValue)
             {
@@ -91,6 +92,12 @@ public static class WindowManager
             }
 
             screens = [FindTargetScreen(_foregroundWindowBounds.Value)];
+        }
+        else if (launchMode == CaptureLaunchMode.CurrentScreen)
+        {
+            screens = _foregroundWindowBounds.HasValue
+                ? [FindTargetScreen(_foregroundWindowBounds.Value)]
+                : [screens.FirstOrDefault(screen => screen.IsPrimary) ?? screens[0]];
         }
 
         lock (Lock)
