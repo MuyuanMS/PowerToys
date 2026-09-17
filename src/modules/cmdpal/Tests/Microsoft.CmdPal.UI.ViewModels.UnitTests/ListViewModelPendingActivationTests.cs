@@ -77,6 +77,24 @@ public sealed partial class ListViewModelPendingActivationTests
         public override IListItem[] GetItems() => items;
     }
 
+    private sealed partial class ModelDrivenSearchPage : DynamicListPage
+    {
+        private IListItem[] _items = [CreateItem("Initial")];
+
+        public override IListItem[] GetItems() => Volatile.Read(ref _items);
+
+        public override void UpdateSearchText(string oldSearch, string newSearch)
+        {
+            if (oldSearch == newSearch)
+            {
+                return;
+            }
+
+            Volatile.Write(ref _items, [CreateItem(newSearch)]);
+            RaiseItemsChanged(1);
+        }
+    }
+
     private sealed class InvokeListener : IDisposable
     {
         private readonly TaskCompletionSource<string> _invoked = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -285,6 +303,34 @@ public sealed partial class ListViewModelPendingActivationTests
             Assert.IsFalse(listener.Invoked.IsCompleted, "Enter should wait for delayed non-main-page publication instead of invoking the stale result.");
 
             page.PublishSearchResults();
+
+            var invoked = await listener.Invoked.WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.AreEqual("Notepad", invoked);
+        }
+        finally
+        {
+            viewModel.SafeCleanup();
+            viewModel.Dispose();
+        }
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
+    public async Task ModelDrivenSearchTextRoundTrip_UsesCurrentPublication()
+    {
+        var page = new ModelDrivenSearchPage();
+        var viewModel = CreateViewModel(page);
+        using var listener = new InvokeListener();
+
+        try
+        {
+            await ObserveItemsAsync(viewModel, "Initial", viewModel.InitializeProperties);
+
+            page.SearchText = "Notepad";
+            await ObserveItemsAsync(viewModel, "Notepad", () => { });
+
+            viewModel.SearchTextBox = "Notepad";
+            viewModel.InvokeSelectedItemOrQueue(null);
 
             var invoked = await listener.Invoked.WaitAsync(TimeSpan.FromSeconds(3));
             Assert.AreEqual("Notepad", invoked);

@@ -219,9 +219,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
                         // so a synchronous ItemsChanged during SearchText can
                         // publish against this generation.
                         var previousGeneration = Volatile.Read(ref _workState).Generation;
+                        var searchWasAlreadyApplied = false;
                         Volatile.Write(ref _minValidFetchGeneration, previousGeneration);
                         if (_model.Unsafe is IDynamicListPage dynamic)
                         {
+                            searchWasAlreadyApplied = dynamic.SearchText == searchTextBox;
                             Volatile.Write(ref _loadingSearchEpoch, epoch);
                             dynamic.SearchText = searchTextBox;
                             if (!dynamic.IsLoading)
@@ -233,7 +235,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
                         if (epoch == Volatile.Read(ref _searchEpoch))
                         {
                             Volatile.Write(ref _searchAppliedEpoch, epoch);
-                            MarkCurrentSearchReadyIfPublished();
+                            MarkCurrentSearchReadyIfPublished(searchWasAlreadyApplied ? previousGeneration : previousGeneration + 1);
                         }
                     }
                     catch (OperationCanceledException)
@@ -644,14 +646,14 @@ public partial class ListViewModel : PageViewModel, IDisposable
         }
     }
 
-    private void MarkCurrentSearchReadyIfPublished()
+    private void MarkCurrentSearchReadyIfPublished(int minimumGeneration)
     {
         var work = Volatile.Read(ref _workState);
         var searchEpoch = Volatile.Read(ref _searchEpoch);
         if (work.Status == ListPageWorkStatus.Active &&
             work.Phase == ListPageFetchPhase.Published &&
-            work.Generation > Volatile.Read(ref _minValidFetchGeneration) &&
-            !IsLoading &&
+            work.Generation >= minimumGeneration &&
+            !ModelIsLoading &&
             Volatile.Read(ref _searchAppliedEpoch) == searchEpoch)
         {
             Volatile.Write(ref _readySearchEpoch, searchEpoch);
@@ -971,7 +973,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
         !IsFetching &&
         (Volatile.Read(ref _loadingSearchEpoch) == 0 ||
          Volatile.Read(ref _loadingSearchEpoch) != Volatile.Read(ref _searchEpoch) ||
-         !IsLoading);
+         !ModelIsLoading);
 
     private void InvokeOrQueue(ListItemViewModel? selectedItem, PendingActivation kind)
     {
@@ -1036,7 +1038,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     private bool ShouldKeepPendingActivation(PendingActivation kind, ListItemViewModel? selectedItem)
     {
-        if (IsLoading || IsFetching)
+        if (ModelIsLoading || IsFetching)
         {
             return true;
         }
