@@ -4,6 +4,7 @@
 
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Markup;
@@ -46,7 +47,7 @@ namespace WorkspacesLauncherUI
             RunAnywayButton.IsEnabled = false;
 
             // Close modal children before destroying their owner so their dispatcher loops can exit.
-            foreach (Window ownedWindow in OwnedWindows)
+            foreach (Window ownedWindow in OwnedWindows.Cast<Window>().ToArray())
             {
                 ownedWindow.Close();
             }
