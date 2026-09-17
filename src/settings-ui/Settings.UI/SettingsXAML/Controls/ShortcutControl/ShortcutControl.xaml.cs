@@ -39,6 +39,7 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
         private HotkeySettings hotkeySettings;
         private HotkeySettings internalSettings;
         private HotkeySettings lastValidSettings;
+        private HotkeySettings lastKeyDownSettings;
         private HotkeySettingsControlHook hook;
         private bool _isActive;
         private bool disposedValue;
@@ -504,8 +505,19 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
         private void Hotkey_KeyDown(int key)
         {
             KeyEventHandler(key, true, key);
+            if (lastKeyDownSettings != null && string.Equals(lastKeyDownSettings.ToString(), internalSettings.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
 
-            c.Keys = internalSettings.GetKeysList();
+            lastKeyDownSettings = internalSettings with { };
+
+            List<object> newKeys = internalSettings.GetKeysList();
+            if (c.Keys == null || !c.JudgeIfKeyValueSame(newKeys))
+            {
+                c.Keys = newKeys;
+            }
+
             c.ConflictMessage = string.Empty;
             c.HasConflict = false;
 
@@ -622,6 +634,7 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
         private void Hotkey_KeyUp(int key)
         {
             KeyEventHandler(key, false, 0);
+            lastKeyDownSettings = null;
         }
 
         private bool Hotkey_IsActive()
@@ -682,8 +695,14 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
             _isDialogOpen = true;
             try
             {
-                c.Keys = null;
-                c.Keys = HotkeySettings?.GetKeysList() ?? new List<object>();
+                lastKeyDownSettings = null;
+                List<object> newKeys = HotkeySettings?.GetKeysList() ?? new List<object>();
+
+                if (c.Keys == null || !c.JudgeIfKeyValueSame(newKeys))
+                {
+                    c.Keys = null;
+                    c.Keys = newKeys ?? new List<object>();
+                }
 
                 c.IgnoreConflict = IgnoreConflict;
                 c.HasConflict = hotkeySettings?.HasConflict ?? false;
