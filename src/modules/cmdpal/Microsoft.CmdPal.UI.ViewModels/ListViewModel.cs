@@ -1036,7 +1036,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     private bool ShouldKeepPendingActivation(PendingActivation kind, ListItemViewModel? selectedItem)
     {
-        if (!IsInitialized || IsLoading || IsFetching)
+        if (IsLoading || IsFetching)
         {
             return true;
         }

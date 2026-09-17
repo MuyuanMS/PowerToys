@@ -405,6 +405,36 @@ public sealed partial class ListViewModelPendingActivationTests
         }
     }
 
+    [TestMethod]
+    [Timeout(15000)]
+    public async Task SecondaryEnterWithoutSecondaryCommand_DoesNotRemainQueued()
+    {
+        var page = new DelayedSearchPage(CreateItem("Initial"))
+        {
+            SearchResultFactory = CreateItemWithSecondary,
+        };
+        var viewModel = CreateViewModel(page);
+        using var listener = new InvokeListener();
+
+        try
+        {
+            await ObserveItemsAsync(viewModel, "Initial", viewModel.InitializeProperties);
+            viewModel.FilteredItems[0].SlowInitializeProperties();
+            viewModel.InvokeSecondaryCommandOrQueue(viewModel.FilteredItems[0]);
+
+            viewModel.SearchTextBox = "Notepad";
+            await ObserveItemsAsync(viewModel, "Notepad", () => viewModel.FilteredItems[0].SlowInitializeProperties());
+
+            await Task.Delay(200);
+            Assert.IsFalse(listener.Invoked.IsCompleted, "A failed secondary activation should not execute after a later refresh.");
+        }
+        finally
+        {
+            viewModel.SafeCleanup();
+            viewModel.Dispose();
+        }
+    }
+
     private static ListItem CreateItem(string title) =>
         new(new NoOpCommand { Name = title }) { Title = title };
 
