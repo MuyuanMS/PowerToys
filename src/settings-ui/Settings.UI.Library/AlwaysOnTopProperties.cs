@@ -20,6 +20,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         public const bool DefaultFrameAccentColor = true;
         public const int DefaultFrameOpacity = 100;
         public const bool DefaultSoundEnabled = true;
+        public const bool DefaultOpacitySoundEnabled = true;
         public const bool DefaultDoNotActivateOnGameMode = true;
         public const bool DefaultRoundCornersEnabled = true;
 
@@ -35,6 +36,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             FrameAccentColor = new BoolProperty(DefaultFrameAccentColor);
             FrameOpacity = new IntProperty(DefaultFrameOpacity);
             SoundEnabled = new BoolProperty(DefaultSoundEnabled);
+            OpacitySoundEnabled = new BoolProperty(DefaultOpacitySoundEnabled);
             DoNotActivateOnGameMode = new BoolProperty(DefaultDoNotActivateOnGameMode);
             RoundCornersEnabled = new BoolProperty(DefaultRoundCornersEnabled);
             ExcludedApps = new StringProperty();
@@ -69,6 +71,9 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
         [JsonPropertyName("sound-enabled")]
         public BoolProperty SoundEnabled { get; set; }
+
+        [JsonPropertyName("opacity-sound-enabled")]
+        public BoolProperty OpacitySoundEnabled { get; set; }
 
         [JsonPropertyName("do-not-activate-on-game-mode")]
         public BoolProperty DoNotActivateOnGameMode { get; set; }
