@@ -48,6 +48,21 @@ namespace
     const wchar_t JSON_KEY_ACTIVE_WINDOW_SHORTCUT[] = L"ActiveWindowShortcut";
     const wchar_t CURRENT_SCREEN_EVENT[] = L"Local\\PowerToys_ScreenTranslator_CurrentScreenEvent-4ec42bb8-08cf-4d8c-a799-910c49020b75";
     const wchar_t ACTIVE_WINDOW_EVENT[] = L"Local\\PowerToys_ScreenTranslator_ActiveWindowEvent-a681d2ea-e2d8-430e-9bac-a1339fefd4ac";
+    const wchar_t ACTIVE_WINDOW_SNAPSHOT[] = L"Local\\PowerToys_ScreenTranslator_ActiveWindowSnapshot-7bb7644a-ecaa-4baa-8b79-3df430451f20";
+
+#pragma pack(push, 1)
+    struct ActiveWindowSnapshot
+    {
+        unsigned long long windowHandle;
+        LONG left;
+        LONG top;
+        LONG right;
+        LONG bottom;
+        LONG isValid;
+    };
+#pragma pack(pop)
+
+    static_assert(sizeof(ActiveWindowSnapshot) == 28);
 }
 
 class ScreenTranslatorModule : public PowertoyModuleIface
@@ -68,6 +83,43 @@ private:
     HANDLE m_hCurrentScreenEvent = nullptr;
     HANDLE m_hActiveWindowEvent = nullptr;
     HANDLE m_hTerminateEvent = nullptr;
+    HANDLE m_hActiveWindowSnapshot = nullptr;
+
+    void capture_active_window_snapshot()
+    {
+        if (!m_hActiveWindowSnapshot)
+        {
+            return;
+        }
+
+        ActiveWindowSnapshot snapshot{};
+        HWND foregroundWindow = GetForegroundWindow();
+        RECT windowRect{};
+        if (foregroundWindow &&
+            IsWindowVisible(foregroundWindow) &&
+            GetWindowRect(foregroundWindow, &windowRect) &&
+            windowRect.right > windowRect.left &&
+            windowRect.bottom > windowRect.top)
+        {
+            snapshot.windowHandle = reinterpret_cast<unsigned long long>(foregroundWindow);
+            snapshot.left = windowRect.left;
+            snapshot.top = windowRect.top;
+            snapshot.right = windowRect.right;
+            snapshot.bottom = windowRect.bottom;
+            snapshot.isValid = TRUE;
+        }
+
+        void* view = MapViewOfFile(m_hActiveWindowSnapshot, FILE_MAP_WRITE, 0, 0, sizeof(snapshot));
+        if (view)
+        {
+            CopyMemory(view, &snapshot, sizeof(snapshot));
+            UnmapViewOfFile(view);
+        }
+        else
+        {
+            Logger::warn(L"ScreenTranslator could not write the active-window snapshot. Error: {}", get_last_error_or_default(GetLastError()));
+        }
+    }
 
     void parse_hotkey(PowerToysSettings::PowerToyValues& settings)
     {
@@ -195,6 +247,17 @@ public:
         m_hInvokeEvent = CreateDefaultEvent(CommonSharedConstants::SHOW_SCREEN_TRANSLATOR_SHARED_EVENT);
         m_hCurrentScreenEvent = CreateEventW(nullptr, FALSE, FALSE, CURRENT_SCREEN_EVENT);
         m_hActiveWindowEvent = CreateEventW(nullptr, FALSE, FALSE, ACTIVE_WINDOW_EVENT);
+        m_hActiveWindowSnapshot = CreateFileMappingW(
+            INVALID_HANDLE_VALUE,
+            nullptr,
+            PAGE_READWRITE,
+            0,
+            sizeof(ActiveWindowSnapshot),
+            ACTIVE_WINDOW_SNAPSHOT);
+        if (!m_hActiveWindowSnapshot)
+        {
+            Logger::error(L"ScreenTranslator could not create the active-window snapshot mapping. Error: {}", get_last_error_or_default(GetLastError()));
+        }
         m_hTerminateEvent = CreateDefaultEvent(CommonSharedConstants::TERMINATE_SCREEN_TRANSLATOR_SHARED_EVENT);
         init_settings();
     }
@@ -225,6 +288,11 @@ public:
         {
             CloseHandle(m_hActiveWindowEvent);
             m_hActiveWindowEvent = nullptr;
+        }
+        if (m_hActiveWindowSnapshot)
+        {
+            CloseHandle(m_hActiveWindowSnapshot);
+            m_hActiveWindowSnapshot = nullptr;
         }
         if (m_hProcess)
         {
@@ -343,6 +411,11 @@ public:
         if (m_enabled)
         {
             Logger::trace(L"ScreenTranslator hotkey pressed");
+            if (hotkeyId == 2)
+            {
+                capture_active_window_snapshot();
+            }
+
             if (!is_process_running())
             {
                 launch_process();

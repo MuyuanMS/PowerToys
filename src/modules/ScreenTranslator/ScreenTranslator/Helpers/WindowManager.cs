@@ -52,6 +52,20 @@ public static class WindowManager
 
     private static void LaunchScreenTranslator(CaptureLaunchMode launchMode)
     {
+        (IntPtr Handle, PhysicalRect Bounds)? activeWindowSnapshot = launchMode == CaptureLaunchMode.ActiveWindow
+            ? ActiveWindowSnapshotReader.TryRead()
+            : null;
+        (IntPtr Handle, PhysicalRect? Bounds) foregroundWindow = activeWindowSnapshot.HasValue
+            ? (activeWindowSnapshot.Value.Handle, activeWindowSnapshot.Value.Bounds)
+            : CaptureForegroundWindow();
+        if (activeWindowSnapshot.HasValue)
+        {
+            Logger.LogInfo(
+                $"Using active window captured at hotkey time: HWND=0x{activeWindowSnapshot.Value.Handle.ToInt64():X}, " +
+                $"bounds={activeWindowSnapshot.Value.Bounds.X},{activeWindowSnapshot.Value.Bounds.Y} " +
+                $"{activeWindowSnapshot.Value.Bounds.Width}x{activeWindowSnapshot.Value.Bounds.Height}.");
+        }
+
         CloseAllOverlays();
 
         Logger.LogInfo($"Launching ScreenTranslator with capture mode {launchMode}");
@@ -80,7 +94,7 @@ public static class WindowManager
         var sourceLang = settings?.Properties?.SourceLanguage ?? "auto";
         var targetLang = settings?.Properties?.TargetLanguage ?? "en-US";
         var freezeCapturedContent = settings?.Properties?.FreezeCapturedContent ?? false;
-        (_foregroundWindowHandle, _foregroundWindowBounds) = CaptureForegroundWindow();
+        (_foregroundWindowHandle, _foregroundWindowBounds) = foregroundWindow;
 
         IReadOnlyList<ScreenInfo> screens = MonitorHelper.GetAllScreens();
         if (launchMode == CaptureLaunchMode.ActiveWindow)
