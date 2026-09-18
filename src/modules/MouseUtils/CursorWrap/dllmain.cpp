@@ -116,6 +116,7 @@ private:
     static constexpr UINT_PTR TIMER_UPDATE_MONITORS = 1;
     static constexpr UINT DEBOUNCE_DELAY_MS = 500;
     static constexpr UINT GAME_MODE_POLL_MS = 1000;
+    static constexpr UINT WM_UPDATE_GAME_MODE_POLLING = WM_APP;
 
 public:
     // Constructor
@@ -369,16 +370,22 @@ private:
 
     bool StartGameModePolling()
     {
-        // The initial query happens before installing WH_MOUSE_LL, so no hook delivery can be blocked
-        // and the cached state is valid as soon as wrapping becomes active.
-        RefreshGameModeState();
+        if (m_gameModePollStopEvent)
+        {
+            return true;
+        }
 
         m_gameModePollStopEvent = CreateEventW(nullptr, true, false, nullptr);
         if (!m_gameModePollStopEvent)
         {
+            m_gameModeActive = false;
             Logger::error(L"Failed to create CursorWrap Game Mode polling stop event, error: {}", GetLastError());
             return false;
         }
+
+        // The initial query happens before installing WH_MOUSE_LL, so no hook delivery can be blocked
+        // and the cached state is valid as soon as wrapping becomes active.
+        RefreshGameModeState();
 
         HANDLE stopEvent = m_gameModePollStopEvent;
         try
@@ -395,6 +402,7 @@ private:
             Logger::error("Failed to start CursorWrap Game Mode polling thread: {}", error.what());
             CloseHandle(m_gameModePollStopEvent);
             m_gameModePollStopEvent = nullptr;
+            m_gameModeActive = false;
             return false;
         }
 
@@ -420,6 +428,26 @@ private:
         }
 
         m_gameModeActive = false;
+    }
+
+    void UpdateGameModePolling()
+    {
+        if (!m_hookActive)
+        {
+            return;
+        }
+
+        if (m_disableInGameMode.load())
+        {
+            if (!StartGameModePolling())
+            {
+                Logger::warn("CursorWrap Game Mode polling is unavailable; cursor wrapping will remain enabled");
+            }
+        }
+        else
+        {
+            StopGameModePolling();
+        }
     }
 
     // Load the settings file.
@@ -538,7 +566,15 @@ private:
                 if (propertiesObject.HasKey(JSON_KEY_DISABLE_IN_GAME_MODE))
                 {
                     auto disableInGameModeObject = propertiesObject.GetNamedObject(JSON_KEY_DISABLE_IN_GAME_MODE);
-                    m_disableInGameMode = disableInGameModeObject.GetNamedBoolean(JSON_KEY_VALUE);
+                    const bool disableInGameMode = disableInGameModeObject.GetNamedBoolean(JSON_KEY_VALUE);
+                    const bool settingChanged = m_disableInGameMode.exchange(disableInGameMode) != disableInGameMode;
+                    if (settingChanged && m_messageWindow &&
+                        !PostMessageW(m_messageWindow, WM_UPDATE_GAME_MODE_POLLING, 0, 0))
+                    {
+                        Logger::error(
+                            L"Failed to queue CursorWrap Game Mode polling update, error: {}",
+                            GetLastError());
+                    }
                 }
             }
             catch (...)
@@ -575,7 +611,7 @@ private:
 
         if (m_disableInGameMode.load() && !StartGameModePolling())
         {
-            return;
+            Logger::warn("CursorWrap Game Mode polling is unavailable; cursor wrapping will remain enabled");
         }
 
         m_mouseHook = SetWindowsHookEx(WH_MOUSE_LL, MouseHookProc, GetModuleHandle(nullptr), 0);
@@ -755,6 +791,10 @@ private:
                 SetTimer(hwnd, TIMER_UPDATE_MONITORS, DEBOUNCE_DELAY_MS, nullptr);
                 return TRUE;
             }
+            break;
+
+        case WM_UPDATE_GAME_MODE_POLLING:
+            g_cursorWrapInstance->UpdateGameModePolling();
             break;
 
         case WM_TIMER:
