@@ -14,7 +14,12 @@
     mc:Ignorable="d">
 
     <Grid Background="Transparent">
-        <Canvas x:Name="ResultCanvas" Background="Transparent">
+        <Canvas
+            x:Name="ResultCanvas"
+            AutomationProperties.AutomationId="CanvasTranslationResult"
+            AutomationProperties.Name="Translation overlay background"
+            Background="Transparent"
+            PointerPressed="ResultCanvas_PointerPressed">
             <Image
                 x:Name="FrozenBackgroundImage"
                 IsHitTestVisible="False"
@@ -37,71 +42,76 @@
                 MaxWidth="720"
                 Padding="8"
                 Visibility="Collapsed">
-                <StackPanel Spacing="8">
-                    <StackPanel Orientation="Horizontal" Spacing="4">
-                        <FontIcon
-                            AutomationProperties.Name="Move the selected text by dragging it"
-                            Glyph="&#xE7C2;"
-                            VerticalAlignment="Center" />
-                        <Button
-                            x:Name="OriginalTextButton"
-                            x:Uid="OriginalTextButton"
-                            AutomationProperties.AutomationId="BtnToggleOriginalText"
-                            Click="OriginalTextButton_Click"
-                            Content="Original"
-                            Padding="8,4" />
-                        <Button
-                            x:Name="EditCardButton"
-                            x:Uid="EditCardButton"
-                            AutomationProperties.AutomationId="BtnEditOverlayText"
-                            Click="EditCardButton_Click"
-                            Padding="8,4">
-                            <FontIcon Glyph="&#xE70F;" />
-                        </Button>
-                        <Button
-                            x:Name="CopyCardButton"
-                            x:Uid="CopyCardButton"
-                            AutomationProperties.AutomationId="BtnCopyOverlayText"
-                            Click="CopyCardButton_Click"
-                            Padding="8,4">
-                            <FontIcon Glyph="&#xE8C8;" />
-                        </Button>
-                        <ToggleButton
-                            x:Name="FormatPanelButton"
-                            x:Uid="FormatPanelButton"
-                            AutomationProperties.AutomationId="BtnShowOverlayFormat"
-                            Click="FormatPanelButton_Click"
-                            Content="Format"
-                            Padding="8,4" />
-                        <ToggleButton
-                            x:Name="TranslatePanelButton"
-                            x:Uid="TranslatePanelButton"
-                            AutomationProperties.AutomationId="BtnShowOverlayTranslate"
-                            Click="TranslatePanelButton_Click"
-                            Content="Language"
-                            Padding="8,4" />
-                        <ToggleButton
-                            x:Name="ArrangePanelButton"
-                            x:Uid="ArrangePanelButton"
-                            AutomationProperties.AutomationId="BtnShowOverlayArrange"
-                            Click="ArrangePanelButton_Click"
-                            Content="Layer"
-                            Padding="8,4" />
-                        <Button
-                            x:Name="HideCardButton"
-                            x:Uid="HideCardButton"
-                            AutomationProperties.AutomationId="BtnHideOverlayCard"
-                            Click="HideCardButton_Click"
-                            Content="Hide"
-                            Padding="8,4" />
-                    </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <FontIcon
+                        AutomationProperties.Name="Move the selected text by dragging it"
+                        Glyph="&#xE7C2;"
+                        VerticalAlignment="Center" />
+                    <Button
+                        x:Name="OriginalTextButton"
+                        x:Uid="OriginalTextButton"
+                        AutomationProperties.AutomationId="BtnToggleOriginalText"
+                        Click="OriginalTextButton_Click"
+                        Content="Original"
+                        Padding="8,4" />
+                    <Button
+                        x:Name="EditCardButton"
+                        x:Uid="EditCardButton"
+                        AutomationProperties.AutomationId="BtnEditOverlayText"
+                        Click="EditCardButton_Click"
+                        Padding="8,4">
+                        <FontIcon Glyph="&#xE70F;" />
+                    </Button>
+                    <Button
+                        x:Name="CopyCardButton"
+                        x:Uid="CopyCardButton"
+                        AutomationProperties.AutomationId="BtnCopyOverlayText"
+                        Click="CopyCardButton_Click"
+                        Padding="8,4">
+                        <FontIcon Glyph="&#xE8C8;" />
+                    </Button>
+                    <ToggleButton
+                        x:Name="FormatPanelButton"
+                        x:Uid="FormatPanelButton"
+                        AutomationProperties.AutomationId="BtnShowOverlayFormat"
+                        Click="FormatPanelButton_Click"
+                        Content="Format"
+                        Padding="8,4" />
+                    <ToggleButton
+                        x:Name="TranslatePanelButton"
+                        x:Uid="TranslatePanelButton"
+                        AutomationProperties.AutomationId="BtnShowOverlayTranslate"
+                        Click="TranslatePanelButton_Click"
+                        Content="Language"
+                        Padding="8,4" />
+                    <ToggleButton
+                        x:Name="ArrangePanelButton"
+                        x:Uid="ArrangePanelButton"
+                        AutomationProperties.AutomationId="BtnShowOverlayArrange"
+                        Click="ArrangePanelButton_Click"
+                        Content="Layer"
+                        Padding="8,4" />
+                    <Button
+                        x:Name="HideCardButton"
+                        x:Uid="HideCardButton"
+                        AutomationProperties.AutomationId="BtnHideOverlayCard"
+                        Click="HideCardButton_Click"
+                        Content="Hide"
+                        Padding="8,4" />
+                </StackPanel>
+            </Border>
 
-                    <Border
-                        x:Name="CardDetailDivider"
-                        Height="1"
-                        Background="{ThemeResource DividerStrokeColorDefaultBrush}"
-                        Visibility="Collapsed" />
-
+            <Border
+                x:Name="CardDetailMenu"
+                Background="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}"
+                BackgroundSizing="InnerBorderEdge"
+                BorderBrush="{ThemeResource SurfaceStrokeColorFlyoutBrush}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource OverlayCornerRadius}"
+                MaxWidth="720"
+                Padding="8"
+                Visibility="Collapsed">
+                <Grid>
                     <StackPanel
                         x:Name="FormatDetailPanel"
                         Orientation="Horizontal"
@@ -254,7 +264,7 @@
                             Content="Send to back"
                             Padding="8,4" />
                     </StackPanel>
-                </StackPanel>
+                </Grid>
             </Border>
         </Canvas>
 

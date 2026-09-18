@@ -84,6 +84,7 @@ public sealed partial class ResultOverlay : TransparentWindow
     private uint _toolbarPointerId;
     private Windows.Foundation.Point _toolbarDragStart;
     private Thickness _toolbarDragStartMargin;
+    private bool _isContextMenuAboveCard;
 
     public ResultOverlay(
         ScreenInfo screenInfo,
@@ -573,12 +574,46 @@ public sealed partial class ResultOverlay : TransparentWindow
         double cardTop = Canvas.GetTop(card);
         double cardHeight = Math.Max(card.ActualHeight, card.MinHeight);
         double left = Math.Clamp(cardLeft, 8, Math.Max(8, overlayWidth - menuWidth - 8));
-        double top = cardTop >= menuHeight + 8
+        _isContextMenuAboveCard = cardTop >= menuHeight + 8;
+        double top = _isContextMenuAboveCard
             ? cardTop - menuHeight - 4
             : cardTop + cardHeight + 4;
 
         Canvas.SetLeft(CardContextMenu, left);
         Canvas.SetTop(CardContextMenu, Math.Clamp(top, 8, Math.Max(8, overlayHeight - menuHeight - 8)));
+        PositionCardDetailMenu(card);
+    }
+
+    private void PositionCardDetailMenu(Border card)
+    {
+        if (CardDetailMenu.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        double overlayWidth = _overlayBounds.Width / _screenInfo.DpiScaleX;
+        double overlayHeight = _overlayBounds.Height / _screenInfo.DpiScaleY;
+        CardDetailMenu.Measure(new Windows.Foundation.Size(Math.Max(320, overlayWidth - 16), double.PositiveInfinity));
+
+        double detailWidth = Math.Max(48, CardDetailMenu.DesiredSize.Width);
+        double detailHeight = Math.Max(48, CardDetailMenu.DesiredSize.Height);
+        double primaryLeft = Canvas.GetLeft(CardContextMenu);
+        double primaryTop = Canvas.GetTop(CardContextMenu);
+        double primaryHeight = Math.Max(48, CardContextMenu.ActualHeight);
+        double cardTop = Canvas.GetTop(card);
+        double cardHeight = Math.Max(card.ActualHeight, card.MinHeight);
+        double left = Math.Clamp(primaryLeft, 8, Math.Max(8, overlayWidth - detailWidth - 8));
+        double top = OverlayLayoutHelper.CalculateDetailMenuTop(
+            overlayHeight,
+            detailHeight,
+            primaryTop,
+            primaryHeight,
+            cardTop,
+            cardHeight,
+            _isContextMenuAboveCard);
+
+        Canvas.SetLeft(CardDetailMenu, left);
+        Canvas.SetTop(CardDetailMenu, top);
     }
 
     private void FormatPanelButton_Click(object sender, RoutedEventArgs e)
@@ -604,12 +639,12 @@ public sealed partial class ResultOverlay : TransparentWindow
         {
             selectedButton.IsChecked = true;
             panel.Visibility = Visibility.Visible;
-            CardDetailDivider.Visibility = Visibility.Visible;
+            CardDetailMenu.Visibility = Visibility.Visible;
         }
 
         if (_contextMenuCard is not null)
         {
-            DispatcherQueue.TryEnqueue(() => PositionContextMenu(_contextMenuCard));
+            DispatcherQueue.TryEnqueue(() => PositionCardDetailMenu(_contextMenuCard));
         }
     }
 
@@ -618,7 +653,7 @@ public sealed partial class ResultOverlay : TransparentWindow
         FormatDetailPanel.Visibility = Visibility.Collapsed;
         TranslateDetailPanel.Visibility = Visibility.Collapsed;
         ArrangeDetailPanel.Visibility = Visibility.Collapsed;
-        CardDetailDivider.Visibility = Visibility.Collapsed;
+        CardDetailMenu.Visibility = Visibility.Collapsed;
         FormatPanelButton.IsChecked = false;
         TranslatePanelButton.IsChecked = false;
         ArrangePanelButton.IsChecked = false;
@@ -1132,11 +1167,26 @@ public sealed partial class ResultOverlay : TransparentWindow
 
     private void CloseContextMenu()
     {
+        CollapseCardDetailPanels();
         CardContextMenu.Visibility = Visibility.Collapsed;
         ContextMenuCanvas.IsHitTestVisible = false;
         _contextMenuCard = null;
         _contextMenuLine = null;
         _contextMenuLineIndex = -1;
+    }
+
+    private void ResultCanvas_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(ResultCanvas).Properties.IsLeftButtonPressed ||
+            !ReferenceEquals(e.OriginalSource, ResultCanvas))
+        {
+            return;
+        }
+
+        _selectedLineIndex = -1;
+        HighlightSelectedCard();
+        CloseContextMenu();
+        e.Handled = true;
     }
 
     private static Windows.UI.Color GetBrushColor(Brush brush)

@@ -109,6 +109,36 @@ public class OverlayLayoutHelperTests
     }
 
     [TestMethod]
+    public void CalculateDetailMenuTop_PlacesDetailOutwardWithoutMovingPrimaryMenu()
+    {
+        double detailTop = OverlayLayoutHelper.CalculateDetailMenuTop(
+            overlayHeight: 1080,
+            detailHeight: 64,
+            primaryTop: 300,
+            primaryHeight: 48,
+            cardTop: 352,
+            cardHeight: 40,
+            primaryIsAboveCard: true);
+
+        Assert.AreEqual(232.0, detailTop, 0.001);
+    }
+
+    [TestMethod]
+    public void CalculateDetailMenuTop_UsesOppositeSideOfCardWhenOutwardSideDoesNotFit()
+    {
+        double detailTop = OverlayLayoutHelper.CalculateDetailMenuTop(
+            overlayHeight: 500,
+            detailHeight: 80,
+            primaryTop: 8,
+            primaryHeight: 48,
+            cardTop: 60,
+            cardHeight: 40,
+            primaryIsAboveCard: true);
+
+        Assert.AreEqual(104.0, detailTop, 0.001);
+    }
+
+    [TestMethod]
     public void GetContrastingTextColorArgb_UsesDarkTextOnLightBackground()
     {
         Assert.AreEqual(0xFF000000u, OverlayAppearanceHelper.GetContrastingTextColorArgb(0xFFFFFFFFu));

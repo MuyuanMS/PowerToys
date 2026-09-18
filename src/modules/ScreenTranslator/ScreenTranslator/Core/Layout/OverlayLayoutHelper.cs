@@ -93,6 +93,33 @@ public static class OverlayLayoutHelper
     }
 
     /// <summary>
+    /// Positions a detail menu away from its primary menu and selected content, preferring the outward side.
+    /// </summary>
+    public static double CalculateDetailMenuTop(
+        double overlayHeight,
+        double detailHeight,
+        double primaryTop,
+        double primaryHeight,
+        double cardTop,
+        double cardHeight,
+        bool primaryIsAboveCard,
+        double margin = 8.0,
+        double gap = 4.0)
+    {
+        double outwardTop = primaryIsAboveCard
+            ? primaryTop - detailHeight - gap
+            : primaryTop + primaryHeight + gap;
+        double oppositeCardTop = primaryIsAboveCard
+            ? cardTop + cardHeight + gap
+            : cardTop - detailHeight - gap;
+        double preferredTop = outwardTop >= margin && outwardTop + detailHeight <= overlayHeight - margin
+            ? outwardTop
+            : oppositeCardTop;
+
+        return Math.Clamp(preferredTop, margin, Math.Max(margin, overlayHeight - detailHeight - margin));
+    }
+
+    /// <summary>
     /// Combines multiple word bounding rects into a single bounding rect for a line.
     /// </summary>
     public static PhysicalRect CombineWordRects(IEnumerable<PhysicalRect> wordRects)
