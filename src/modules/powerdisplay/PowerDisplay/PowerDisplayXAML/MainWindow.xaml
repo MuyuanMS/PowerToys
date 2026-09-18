@@ -560,7 +560,7 @@
                                                         IsEnabled="{x:Bind IsInteractionEnabled, Mode=OneWay}"
                                                         IsTabStop="True"
                                                         Maximum="100"
-                                                        Minimum="0"
+                                                        Minimum="1"
                                                         Value="{x:Bind Contrast, Mode=TwoWay}" />
                                                 </Grid>
 
