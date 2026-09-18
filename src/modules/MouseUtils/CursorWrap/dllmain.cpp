@@ -107,6 +107,7 @@ private:
     // Event-driven trigger support (for CmdPal/automation)
     HANDLE m_triggerEventHandle = nullptr;
     HANDLE m_terminateEventHandle = nullptr;
+    HANDLE m_gameModeSettingsChangedEventHandle = nullptr;
     std::thread m_eventThread;
     std::atomic_bool m_listening{ false };
 
@@ -116,13 +117,19 @@ private:
     static constexpr UINT_PTR TIMER_UPDATE_MONITORS = 1;
     static constexpr UINT DEBOUNCE_DELAY_MS = 500;
     static constexpr UINT GAME_MODE_POLL_MS = 1000;
-    static constexpr UINT WM_UPDATE_GAME_MODE_POLLING = WM_APP;
 
 public:
     // Constructor
     CursorWrap()
     {
         LoggerHelpers::init_logger(MODULE_NAME, L"ModuleInterface", LogSettings::cursorWrapLoggerName);
+        m_gameModeSettingsChangedEventHandle = CreateEventW(nullptr, false, false, nullptr);
+        if (!m_gameModeSettingsChangedEventHandle)
+        {
+            Logger::error(
+                L"Failed to create CursorWrap Game Mode settings event, error: {}",
+                GetLastError());
+        }
         init_settings();
         m_core.UpdateMonitorInfo();
         g_cursorWrapInstance = this; // Set global instance pointer
@@ -133,6 +140,11 @@ public:
     {
         // Ensure hooks/threads/handles are torn down before deletion
         disable();
+        if (m_gameModeSettingsChangedEventHandle)
+        {
+            CloseHandle(m_gameModeSettingsChangedEventHandle);
+            m_gameModeSettingsChangedEventHandle = nullptr;
+        }
         g_cursorWrapInstance = nullptr; // Clear global instance pointer
         delete this;
     }
@@ -218,7 +230,12 @@ public:
         {
             m_listening = true;
             m_eventThread = std::thread([this]() {
-                HANDLE handles[2] = { m_triggerEventHandle, m_terminateEventHandle };
+                HANDLE handles[3] = {
+                    m_triggerEventHandle,
+                    m_terminateEventHandle,
+                    m_gameModeSettingsChangedEventHandle
+                };
+                const DWORD handleCount = m_gameModeSettingsChangedEventHandle ? 3 : 2;
 
                 // WH_MOUSE_LL callbacks are delivered to the thread that installed the hook.
                 // Ensure this thread has a message queue and pumps messages while the hook is active.
@@ -241,7 +258,7 @@ public:
 
                 while (m_listening)
                 {
-                    auto res = MsgWaitForMultipleObjects(2, handles, false, INFINITE, QS_ALLINPUT);
+                    auto res = MsgWaitForMultipleObjects(handleCount, handles, false, INFINITE, QS_ALLINPUT);
                     if (!m_listening)
                     {
                         break;
@@ -254,6 +271,10 @@ public:
                     else if (res == WAIT_OBJECT_0 + 1)
                     {
                         break;
+                    }
+                    else if (handleCount == 3 && res == WAIT_OBJECT_0 + 2)
+                    {
+                        UpdateGameModePolling();
                     }
                     else
                     {
@@ -568,8 +589,8 @@ private:
                     auto disableInGameModeObject = propertiesObject.GetNamedObject(JSON_KEY_DISABLE_IN_GAME_MODE);
                     const bool disableInGameMode = disableInGameModeObject.GetNamedBoolean(JSON_KEY_VALUE);
                     const bool settingChanged = m_disableInGameMode.exchange(disableInGameMode) != disableInGameMode;
-                    if (settingChanged && m_messageWindow &&
-                        !PostMessageW(m_messageWindow, WM_UPDATE_GAME_MODE_POLLING, 0, 0))
+                    if (settingChanged && m_gameModeSettingsChangedEventHandle &&
+                        !SetEvent(m_gameModeSettingsChangedEventHandle))
                     {
                         Logger::error(
                             L"Failed to queue CursorWrap Game Mode polling update, error: {}",
@@ -791,10 +812,6 @@ private:
                 SetTimer(hwnd, TIMER_UPDATE_MONITORS, DEBOUNCE_DELAY_MS, nullptr);
                 return TRUE;
             }
-            break;
-
-        case WM_UPDATE_GAME_MODE_POLLING:
-            g_cursorWrapInstance->UpdateGameModePolling();
             break;
 
         case WM_TIMER:
