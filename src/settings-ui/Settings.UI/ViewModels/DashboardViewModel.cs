@@ -35,6 +35,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         protected override string ModuleName => "Dashboard";
 
+        private readonly Action<Action> _enqueue;
         private DispatcherQueue dispatcher;
 
         public Func<string, int> SendConfigMSG { get; }
@@ -57,7 +58,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         // Flag to prevent toggle operations during sorting to avoid race conditions.
         private bool _isSorting;
-        private bool _isDisposed;
+        private volatile bool _isDisposed;
 
         private AllHotkeyConflictsData _allHotkeyConflictsData = new AllHotkeyConflictsData();
 
@@ -106,13 +107,38 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         private ISettingsRepository<GeneralSettings> _settingsRepository;
         private GeneralSettings generalSettingsConfig;
-        private Windows.ApplicationModel.Resources.ResourceLoader resourceLoader = Helpers.ResourceLoaderInstance.ResourceLoader;
+        private Windows.ApplicationModel.Resources.ResourceLoader resourceLoader;
 
         public DashboardViewModel(ISettingsRepository<GeneralSettings> settingsRepository, Func<string, int> ipcMSGCallBackFunc)
+            : this(
+                settingsRepository,
+                ipcMSGCallBackFunc,
+                new QuickAccessViewModel(
+                    settingsRepository,
+                    new Microsoft.PowerToys.Settings.UI.Controls.QuickAccessLauncher(App.IsElevated),
+                    moduleType => Helpers.ModuleGpoHelper.GetModuleGpoConfiguration(moduleType) == global::PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                    moduleType => Helpers.ModuleGpoHelper.GetModuleGpoConfiguration(moduleType) == global::PowerToys.GPOWrapper.GpoRuleConfigured.Enabled,
+                    Helpers.ResourceLoaderInstance.ResourceLoader),
+                DispatcherQueue.GetForCurrentThread())
         {
-            dispatcher = DispatcherQueue.GetForCurrentThread();
+            resourceLoader = Helpers.ResourceLoaderInstance.ResourceLoader;
+            BuildModuleList();
+            SortModuleList();
+            RefreshShortcutModules();
+        }
+
+        internal DashboardViewModel(
+            ISettingsRepository<GeneralSettings> settingsRepository,
+            Func<string, int> ipcMSGCallBackFunc,
+            QuickAccessViewModel quickAccessViewModel,
+            DispatcherQueue dispatcherQueue = null,
+            Action<Action> enqueue = null)
+        {
+            dispatcher = dispatcherQueue;
+            _enqueue = enqueue ?? (action => dispatcher.TryEnqueue(() => action()));
             _settingsRepository = settingsRepository;
             generalSettingsConfig = settingsRepository.SettingsConfig;
+            _quickAccessViewModel = quickAccessViewModel;
 
             _settingsRepository.SettingsChanged += OnSettingsChanged;
 
@@ -121,17 +147,6 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
             // set the callback functions value to handle outgoing IPC message.
             SendConfigMSG = ipcMSGCallBackFunc;
-
-            _quickAccessViewModel = new QuickAccessViewModel(
-                _settingsRepository,
-                new Microsoft.PowerToys.Settings.UI.Controls.QuickAccessLauncher(App.IsElevated),
-                moduleType => Helpers.ModuleGpoHelper.GetModuleGpoConfiguration(moduleType) == global::PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
-                moduleType => Helpers.ModuleGpoHelper.GetModuleGpoConfiguration(moduleType) == global::PowerToys.GPOWrapper.GpoRuleConfigured.Enabled,
-                resourceLoader);
-
-            BuildModuleList();
-            SortModuleList();
-            RefreshShortcutModules();
         }
 
         private void OnSettingsChanged(GeneralSettings newSettings)
@@ -141,14 +156,14 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 return;
             }
 
-            dispatcher.TryEnqueue(() =>
+            _enqueue(() =>
             {
                 if (_isDisposed)
                 {
                     return;
                 }
 
-                generalSettingsConfig = newSettings;
+                generalSettingsConfig = _settingsRepository.SettingsConfig;
 
                 // Update local field and notify UI if sort order changed
                 if (_dashboardSortOrder != generalSettingsConfig.DashboardSortOrder)
@@ -168,7 +183,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 return;
             }
 
-            dispatcher.TryEnqueue(() =>
+            _enqueue(() =>
             {
                 if (_isDisposed)
                 {
@@ -403,8 +418,6 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 RefreshModuleList();
                 RefreshShortcutModules();
 
-                OnPropertyChanged(nameof(ShortcutModules));
-
                 // Request updated conflicts after module state change.
                 RequestConflictData();
             }
@@ -415,8 +428,8 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         }
 
         /// <summary>
-        /// Rebuilds ShortcutModules and ActionModules collections by filtering AllModules
-        /// to only include enabled modules and their respective shortcut/action items.
+        /// Reconciles ShortcutModules in place and rebuilds ActionModules by filtering
+        /// AllModules to only include enabled modules and their respective items.
         /// </summary>
         private void RefreshShortcutModules()
         {
@@ -431,31 +444,8 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 return;
             }
 
-            ShortcutModules.Clear();
+            DashboardShortcutProjection.Refresh(AllModules, ShortcutModules);
             ActionModules.Clear();
-
-            foreach (var x in AllModules.Where(x => x.IsEnabled))
-            {
-                var filteredItems = x.DashboardModuleItems
-                    .Where(m => m is DashboardModuleShortcutItem || m is DashboardModuleActivationItem)
-                    .ToList();
-
-                if (filteredItems.Count != 0)
-                {
-                    var newItem = new DashboardListItem
-                    {
-                        Icon = x.Icon,
-                        IsLocked = x.IsLocked,
-                        Label = x.Label,
-                        Tag = x.Tag,
-                        IsEnabled = x.IsEnabled,
-                        DashboardModuleItems = new ObservableCollection<DashboardModuleItem>(filteredItems),
-                    };
-
-                    ShortcutModules.Add(newItem);
-                    newItem.EnabledChangedCallback = x.EnabledChangedCallback;
-                }
-            }
 
             foreach (var x in AllModules.Where(x => x.IsEnabled))
             {
@@ -904,6 +894,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
 
             _isDisposed = true;
+            _quickAccessViewModel.Dispose();
             base.Dispose();
             if (_settingsRepository != null)
             {
