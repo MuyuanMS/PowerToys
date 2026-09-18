@@ -283,18 +283,26 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
 
     public async Task CommitPendingTextChangeAsync()
     {
-        var pendingWriteTask = _pendingWriteTask;
-        if (pendingWriteTask is null)
+        while (true)
         {
-            return;
-        }
+            var pendingWriteTask = Volatile.Read(ref _pendingWriteTask);
+            if (pendingWriteTask is null)
+            {
+                return;
+            }
 
-        try
-        {
-            await pendingWriteTask;
-        }
-        catch (OperationCanceledException)
-        {
+            try
+            {
+                await pendingWriteTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+
+            if (ReferenceEquals(pendingWriteTask, Volatile.Read(ref _pendingWriteTask)))
+            {
+                return;
+            }
         }
     }
 
@@ -635,6 +643,7 @@ public partial class ParametersPageViewModel : PageViewModel, ICommandBarContext
         _model = new(model);
         _contextMenuFactory = contextMenuFactory;
         _command = new(new(null), PageContext, _contextMenuFactory);
+        _command.PropertyChanged += CommandPropertyChanged;
     }
 
     /// <summary>
@@ -647,7 +656,19 @@ public partial class ParametersPageViewModel : PageViewModel, ICommandBarContext
 
         if (!ReferenceEquals(replaced, command))
         {
+            replaced.PropertyChanged -= CommandPropertyChanged;
             replaced.SafeCleanup();
+            command.PropertyChanged += CommandPropertyChanged;
+        }
+    }
+
+    private void CommandPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(CommandItemViewModel.MoreCommands) or
+            nameof(CommandItemViewModel.SecondaryCommand) or
+            nameof(CommandItemViewModel.CanOpenContextMenu))
+        {
+            UpdateCommand();
         }
     }
 

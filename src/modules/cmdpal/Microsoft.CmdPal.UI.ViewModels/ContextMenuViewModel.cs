@@ -259,6 +259,14 @@ public partial class ContextMenuViewModel : ObservableObject,
         }
         else
         {
+            if (SelectedItem is ParametersPageViewModel parametersPage)
+            {
+                parametersPage.SubmitCommand(command);
+                UpdateContextItems();
+                CommandInvoked?.Invoke(this, command);
+                return ContextKeybindingResult.Hide;
+            }
+
             var message = new PerformCommandMessage(command.Command.Model, command.Model);
             CommandInvoking?.Invoke(this, message);
             WeakReferenceMessenger.Default.Send(message);

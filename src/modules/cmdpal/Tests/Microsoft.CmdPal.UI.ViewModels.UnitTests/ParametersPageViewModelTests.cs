@@ -163,7 +163,11 @@ public partial class ParametersPageViewModelTests
         var vm = CreateViewModel(page, host);
         var recipient = new object();
         PerformCommandMessage? receivedMessage = null;
-        WeakReferenceMessenger.Default.Register<PerformCommandMessage>(recipient, (_, message) => receivedMessage = message);
+        WeakReferenceMessenger.Default.Register<PerformCommandMessage>(recipient, (_, message) =>
+        {
+            Assert.AreEqual("latest value", stringParameter.Text);
+            receivedMessage = message;
+        });
 
         try
         {
