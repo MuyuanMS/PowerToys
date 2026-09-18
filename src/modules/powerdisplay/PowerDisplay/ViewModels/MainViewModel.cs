@@ -600,4 +600,21 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         _displayChangeWatcher.Stop();
     }
+
+    // WM_DISPLAYCHANGE — sent to all top-level windows when the display
+    // configuration changes (orientation, resolution, color depth).
+    private const uint WmDisplayChange = 0x007E;
+
+    /// <summary>
+    /// Routes a Win32 window message to the appropriate internal handler.
+    /// Called by the window's message hook on the dispatcher thread.
+    /// </summary>
+    /// <param name="uMsg">The Win32 message identifier.</param>
+    public void OnWindowMessage(uint uMsg)
+    {
+        if (uMsg == WmDisplayChange)
+        {
+            _displayChangeWatcher.OnWmDisplayChange();
+        }
+    }
 }
