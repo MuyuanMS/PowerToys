@@ -281,11 +281,17 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
             _writeTaskFactory.Scheduler!);
     }
 
-    public void CommitPendingTextChange()
+    public async Task CommitPendingTextChangeAsync()
     {
+        var pendingWriteTask = _pendingWriteTask;
+        if (pendingWriteTask is null)
+        {
+            return;
+        }
+
         try
         {
-            _pendingWriteTask?.GetAwaiter().GetResult();
+            await pendingWriteTask;
         }
         catch (OperationCanceledException)
         {
@@ -545,7 +551,7 @@ public partial class CommandParameterRunViewModel : ParameterValueRunViewModel, 
     }
 }
 
-public partial class ParametersPageViewModel : PageViewModel, IDisposable
+public partial class ParametersPageViewModel : PageViewModel, ICommandBarContext, IDisposable
 {
     private ExtensionObject<IParametersPage> _model;
 
@@ -577,6 +583,20 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
         IsLoading == false &&
         !NeedsAnyValues()
         ;
+
+    public string SecondaryCommandName => Command.SecondaryCommandName;
+
+    public CommandItemViewModel? PrimaryCommand => Command;
+
+    public CommandItemViewModel? SecondaryCommand => Command.SecondaryCommand;
+
+    public IReadOnlyList<IContextItemViewModel> MoreCommands => Command.MoreCommands;
+
+    public bool HasMoreCommands => Command.HasMoreCommands;
+
+    public bool CanOpenContextMenu => Command.CanOpenContextMenu;
+
+    public IReadOnlyList<IContextItemViewModel> AllCommands => Command.AllCommands;
 
     private ListViewModel? _activeListViewModel;
 
@@ -779,7 +799,7 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
         DoOnUiThread(
            () =>
            {
-               WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(Command));
+               WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(this));
            });
     }
 
@@ -853,7 +873,12 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
 
     public void TrySubmit()
     {
-        CommitPendingStringParameterWrites();
+        _ = TrySubmitAsync();
+    }
+
+    public async Task TrySubmitAsync()
+    {
+        await CommitPendingStringParameterWritesAsync();
 
         if (ShowCommand)
         {
@@ -862,7 +887,27 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
         }
     }
 
-    private void CommitPendingStringParameterWrites()
+    public void SubmitCommand(CommandItemViewModel? command)
+    {
+        _ = SubmitCommandAsync(command);
+    }
+
+    public async Task SubmitCommandAsync(CommandItemViewModel? command)
+    {
+        if (command is null)
+        {
+            return;
+        }
+
+        await CommitPendingStringParameterWritesAsync();
+
+        if (ShowCommand)
+        {
+            WeakReferenceMessenger.Default.Send<PerformCommandMessage>(new(command.Command.Model, command.Model));
+        }
+    }
+
+    private async Task CommitPendingStringParameterWritesAsync()
     {
         StringParameterRunViewModel[] stringParameters;
         lock (_listLock)
@@ -872,7 +917,7 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
 
         foreach (var stringParameter in stringParameters)
         {
-            stringParameter.CommitPendingTextChange();
+            await stringParameter.CommitPendingTextChangeAsync();
         }
     }
 

@@ -7,6 +7,8 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using CommunityToolkit.Mvvm.Messaging;
+using Microsoft.CmdPal.UI.ViewModels.Messages;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -114,7 +116,7 @@ public partial class ParametersPageViewModelTests
     }
 
     [TestMethod]
-    public void TrySubmit_CommitsPendingStringParameterTextBeforeSendingCommand()
+    public async Task TrySubmit_CommitsPendingStringParameterTextBeforeSendingCommand()
     {
         var host = new TestAppExtensionHost();
         var stringParameter = new StringParameterRun("query")
@@ -134,12 +136,49 @@ public partial class ParametersPageViewModelTests
             var stringParameterVm = vm.Items.OfType<StringParameterRunViewModel>().Single();
 
             stringParameterVm.SetTextFromUi("latest value");
-            vm.TrySubmit();
+            await vm.TrySubmitAsync();
 
             Assert.AreEqual("latest value", stringParameter.Text);
         }
         finally
         {
+            vm.SafeCleanup();
+            vm.Dispose();
+        }
+    }
+
+    [TestMethod]
+    public async Task SubmitCommand_CommitsPendingStringParameterTextBeforeSendingCommandBarCommand()
+    {
+        var host = new TestAppExtensionHost();
+        var stringParameter = new StringParameterRun("query")
+        {
+            Text = "old value",
+        };
+        var page = new TestParametersPage
+        {
+            Command = new ListItem(new NoOpCommand { Name = "Run it" }) { Title = "Go" },
+            Parameters = [stringParameter],
+        };
+        var vm = CreateViewModel(page, host);
+        var recipient = new object();
+        PerformCommandMessage? receivedMessage = null;
+        WeakReferenceMessenger.Default.Register<PerformCommandMessage>(recipient, (_, message) => receivedMessage = message);
+
+        try
+        {
+            vm.InitializeProperties();
+            var stringParameterVm = vm.Items.OfType<StringParameterRunViewModel>().Single();
+
+            stringParameterVm.SetTextFromUi("latest value");
+            await vm.SubmitCommandAsync(vm.Command);
+
+            Assert.AreEqual("latest value", stringParameter.Text);
+            Assert.IsNotNull(receivedMessage);
+        }
+        finally
+        {
+            WeakReferenceMessenger.Default.Unregister<PerformCommandMessage>(recipient);
             vm.SafeCleanup();
             vm.Dispose();
         }
