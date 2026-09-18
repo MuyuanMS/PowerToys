@@ -127,6 +127,19 @@ internal sealed class EditorUi(Session session, TestContext context)
             $"PATH list editing did not produce '{expected}'.");
     }
 
+    internal void RemoveDuplicatePathEntries()
+    {
+        Step("Removing duplicate PATH entries");
+        Session.Find<Button>(By.AccessibilityId("RemoveDuplicatePathEntriesButton")).Invoke(msPostAction: 0);
+    }
+
+    internal void AssertRemoveDuplicatePathEntriesUnavailable()
+    {
+        Assert.IsFalse(
+            Session.FindAll<Button>(By.AccessibilityId("RemoveDuplicatePathEntriesButton"), 500).Any(),
+            "The duplicate PATH action must not be exposed for non-PATH variables.");
+    }
+
     internal void AssertPathList(string profile, params string[] expected)
     {
         var card = VariableCard(Expand(profile), "PATH");

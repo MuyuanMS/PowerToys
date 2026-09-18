@@ -292,6 +292,28 @@ public sealed class EnvironmentVariablesTests : UITestBase
     }
 
     [TestMethod]
+    public void DuplicatePathEntriesCanBeRemoved()
+    {
+        string profile = prefix + "_PathDuplicates";
+        editor.CreateProfileAndVerify(
+            profile,
+            false,
+            ("PATH", @"C:\PowerToys\\;C:/PowerToys;C:\Other;C:\Other\\"),
+            ("OTHER", "value"));
+
+        editor.VariableMenu(profile, "PATH", "Edit");
+        editor.RemoveDuplicatePathEntries();
+        editor.AssertPathEditor(@"C:\PowerToys\\;C:\Other");
+        editor.SaveDialog();
+        editor.AssertProfile(profile, false, ("PATH", @"C:\PowerToys\\;C:\Other"), ("OTHER", "value"));
+
+        editor.VariableMenu(profile, "OTHER", "Edit");
+        editor.AssertRemoveDuplicatePathEntriesUnavailable();
+        editor.Session.Find<Button>(By.AccessibilityId("SecondaryButton")).Invoke(msPostAction: 0);
+        editor.RemoveProfileAndVerify(profile);
+    }
+
+    [TestMethod]
     public void AppliedPathSurvivesReopenAndDeletingProfileRestoresUserPath()
     {
         string profile = prefix + "_PathProfile";
