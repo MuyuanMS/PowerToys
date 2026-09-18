@@ -106,8 +106,7 @@ namespace ShortcutGuide
                 }
 
                 bool needsRegeneration = IndexYmlGenerator.ManifestIndexGenerator.NeedsIndexRegeneration(
-                    ManifestInterpreter.PathOfManifestFiles,
-                    [Path.GetFileName(PowerToysShortcutsPopulator.PowerToysManifestPath)]);
+                    ManifestInterpreter.PathOfManifestFiles);
 
                 if (!needsRegeneration)
                 {

@@ -264,7 +264,7 @@ BackgroundProcess: false
         string manifest4 = @"
 PackageName: Global.Wildcard.App
 Name: Wildcard App
-WindowFilter: *
+WindowFilter: '*'
 BackgroundProcess: false
 ";
         File.WriteAllText(Path.Combine(_tempDirectory, "Numeric.en-US.yml"), manifest1);
@@ -484,7 +484,7 @@ BackgroundProcess: false
     }
 
     [TestMethod]
-    public void NeedsIndexRegeneration_WhenIndexIsNewerThanAllManifests_ReturnsFalse()
+    public void NeedsIndexRegeneration_WhenIndexHasNoFingerprint_ReturnsTrue()
     {
         string manifestPath = Path.Combine(_tempDirectory, "App.One.en-US.yml");
         string manifestContent = @"
@@ -502,7 +502,7 @@ BackgroundProcess: false
 
         bool needsRegen = ManifestIndexGenerator.NeedsIndexRegeneration(_tempDirectory);
 
-        Assert.IsFalse(needsRegen, "NeedsIndexRegeneration should return false when index.yml is newer than all manifests.");
+        Assert.IsTrue(needsRegen, "A legacy index without a fingerprint should be regenerated once.");
     }
 
     [TestMethod]
@@ -531,14 +531,11 @@ BackgroundProcess: false
     [TestMethod]
     public void NeedsIndexRegeneration_IgnoresIndexYmlAndTempFiles()
     {
-        string indexPath = Path.Combine(_tempDirectory, "index.yml");
-        File.WriteAllText(indexPath, "DefaultShellName: +WindowsNT.Shell\nIndex:\n");
-        File.SetLastWriteTimeUtc(indexPath, DateTime.UtcNow.AddMinutes(-5));
+        ManifestIndexGenerator.CreateIndexYmlFile(_tempDirectory);
 
         // A temp file or index.yml itself should not be considered a newer manifest.
         string tempPath = Path.Combine(_tempDirectory, "index.yml.tmp");
         File.WriteAllText(tempPath, "temp");
-        File.SetLastWriteTimeUtc(tempPath, DateTime.UtcNow.AddMinutes(-1));
 
         bool needsRegen = ManifestIndexGenerator.NeedsIndexRegeneration(_tempDirectory);
 
@@ -546,27 +543,42 @@ BackgroundProcess: false
     }
 
     [TestMethod]
-    public void NeedsIndexRegeneration_IgnoresSpecifiedFileNames()
+    public void CreateIndexYmlFile_WhenManifestReadFails_DoesNotMarkIndexCurrent()
     {
-        string indexPath = Path.Combine(_tempDirectory, "index.yml");
-        File.WriteAllText(indexPath, "DefaultShellName: +WindowsNT.Shell\nIndex:\n");
-        File.SetLastWriteTimeUtc(indexPath, DateTime.UtcNow.AddMinutes(-5));
-
-        // When a caller passes an ignored file name (such as PowerToysShortcutsPopulator.PowerToysManifestPath),
-        // timestamp changes on that specific manifest should not trigger index regeneration.
-        const string ignoredFileName = "Microsoft.PowerToys.en-US.yml";
-        string ptManifestPath = Path.Combine(_tempDirectory, ignoredFileName);
-        string ptContent = @"
-PackageName: Microsoft.PowerToys
-Name: PowerToys
-WindowFilter: powertoys.exe
-BackgroundProcess: true
+        string manifestPath = Path.Combine(_tempDirectory, "Locked.en-US.yml");
+        string manifestContent = @"
+PackageName: Locked.App
+Name: Locked App
+WindowFilter: Locked.exe
+BackgroundProcess: false
 ";
-        File.WriteAllText(ptManifestPath, ptContent);
-        File.SetLastWriteTimeUtc(ptManifestPath, DateTime.UtcNow);
+        File.WriteAllText(manifestPath, manifestContent);
 
-        bool needsRegen = ManifestIndexGenerator.NeedsIndexRegeneration(_tempDirectory, [ignoredFileName]);
+        using (File.Open(manifestPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            IndexGenerationResult result = ManifestIndexGenerator.CreateIndexYmlFile(_tempDirectory);
+            Assert.AreEqual(1, result.Errors.Count);
+        }
 
-        Assert.IsFalse(needsRegen, "NeedsIndexRegeneration should ignore explicitly passed file names.");
+        Assert.IsTrue(
+            ManifestIndexGenerator.NeedsIndexRegeneration(_tempDirectory),
+            "An index generated with transient read errors should be retried.");
+    }
+
+    [TestMethod]
+    public void CreateIndexYmlFile_WithInvalidYamlAliasScalar_ReportsError()
+    {
+        string manifest = @"
+PackageName: Invalid.Alias.App
+Name: Invalid Alias App
+WindowFilter: *
+BackgroundProcess: false
+";
+        File.WriteAllText(Path.Combine(_tempDirectory, "InvalidAlias.en-US.yml"), manifest);
+
+        IndexGenerationResult result = ManifestIndexGenerator.CreateIndexYmlFile(_tempDirectory);
+
+        Assert.AreEqual(1, result.Errors.Count);
+        Assert.AreEqual(0, result.IndexedFiles);
     }
 }

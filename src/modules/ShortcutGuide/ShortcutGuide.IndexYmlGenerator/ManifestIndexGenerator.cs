@@ -54,16 +54,15 @@ namespace ShortcutGuide.IndexYmlGenerator
 
         /// <summary>
         /// Determines whether index.yml needs to be created or regenerated based on the
-        /// existence of index.yml and the last write timestamps of all manifest files in
-        /// the directory.
+        /// existence of index.yml and the fingerprint of all manifest files in the
+        /// directory.
         /// </summary>
         /// <param name="path">The directory containing manifest files and index.yml.
         /// </param>
-        /// <param name="ignoredFileNames">Optional collection of file names to exclude
-        /// from the timestamp comparison.</param>
-        /// <returns><c>true</c> if index.yml is missing or older than any unignored
-        /// manifest; otherwise <c>false</c>.</returns>
-        public static bool NeedsIndexRegeneration(string path, IEnumerable<string>? ignoredFileNames = null)
+        /// <returns><c>true</c> if index.yml is missing, does not contain a fingerprint,
+        /// or its fingerprint differs from the current manifest set; otherwise
+        /// <c>false</c>.</returns>
+        public static bool NeedsIndexRegeneration(string path)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
@@ -78,41 +77,22 @@ namespace ShortcutGuide.IndexYmlGenerator
                 return true;
             }
 
-            HashSet<string>? ignoredSet = ignoredFileNames != null
-                ? new HashSet<string>(ignoredFileNames, StringComparer.OrdinalIgnoreCase)
-                : null;
-
             IEnumerable<string> manifestPaths = Directory.EnumerateFiles(path, "*.yml")
                 .Where(manifestPath =>
                 {
                     string fileName = Path.GetFileName(manifestPath);
                     return !string.Equals(fileName, IndexFileName, StringComparison.OrdinalIgnoreCase) &&
-                           !string.Equals(fileName, TempIndexFileName, StringComparison.OrdinalIgnoreCase) &&
-                           (ignoredSet == null || !ignoredSet.Contains(fileName));
+                           !string.Equals(fileName, TempIndexFileName, StringComparison.OrdinalIgnoreCase);
                 })
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
 
-            if (TryReadManifestSetFingerprint(indexPath, out string? storedFingerprint))
+            if (!TryReadManifestSetFingerprint(indexPath, out string? storedFingerprint))
             {
-                string currentFingerprint = ComputeManifestSetFingerprint(manifestPaths);
-                if (!string.Equals(storedFingerprint, currentFingerprint, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-
-                return false;
+                return true;
             }
 
-            DateTime indexWriteTimeUtc = File.GetLastWriteTimeUtc(indexPath);
-            foreach (string manifestPath in manifestPaths)
-            {
-                if (File.GetLastWriteTimeUtc(manifestPath) > indexWriteTimeUtc)
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            string currentFingerprint = ComputeManifestSetFingerprint(manifestPaths);
+            return !string.Equals(storedFingerprint, currentFingerprint, StringComparison.Ordinal);
         }
 
         public static IndexGenerationResult CreateIndexYmlFile(string path)
@@ -183,7 +163,10 @@ namespace ShortcutGuide.IndexYmlGenerator
             // Build the index file content in memory and write it to disk.
             var sb = new StringBuilder(InitialIndexFileCapacity);
             sb.AppendLine("DefaultShellName: +WindowsNT.Shell");
-            sb.AppendLine(CultureInfo.InvariantCulture, $"{ManifestSetFingerprintPrefix} {ComputeManifestSetFingerprint(files)}");
+            if (errors.IsEmpty)
+            {
+                sb.AppendLine(CultureInfo.InvariantCulture, $"{ManifestSetFingerprintPrefix} {ComputeManifestSetFingerprint(files)}");
+            }
 
             List<(string WindowFilter, bool BackgroundProcess)> sortedKeys = new(processes.Keys);
             sortedKeys.Sort(static (a, b) =>
@@ -416,9 +399,19 @@ namespace ShortcutGuide.IndexYmlGenerator
                 throw new YamlFormatException($"Invalid scalar format for '{propertyName}' in file '{filename}'.");
             }
 
-            if (span.Length >= 2 && ((span[0] == '"' && span[^1] == '"') || (span[0] == '\'' && span[^1] == '\'')))
+            if (span[0] == '"' || span[0] == '\'')
             {
+                if (span.Length < 2 || span[^1] != span[0])
+                {
+                    throw new YamlFormatException($"Invalid quoted scalar for '{propertyName}' in file '{filename}'.");
+                }
+
                 span = span[1..^1];
+            }
+            else if (span[0] is '*' or '&' or '!' or '|' or '>' or '@' or '`' ||
+                     ((span[0] is '-' or '?' or ':') && (span.Length == 1 || char.IsWhiteSpace(span[1]))))
+            {
+                throw new YamlFormatException($"Invalid plain scalar for '{propertyName}' in file '{filename}'.");
             }
 
             return span;
