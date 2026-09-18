@@ -330,6 +330,54 @@ public class OverlayLayoutHelperTests
     }
 
     [TestMethod]
+    public void GroupAdjacentTextLines_Scored_KeepsCompletedStatementsSeparate()
+    {
+        var lines = new List<TranslationLine>
+        {
+            new("First status is complete.", new PhysicalRect(100, 100, 280, 24)),
+            new("Second status is pending.", new PhysicalRect(100, 130, 280, 24)),
+        };
+
+        IReadOnlyList<TranslationLine> grouped = OverlayLayoutHelper.GroupAdjacentTextLines(
+            lines,
+            TextBlockGroupingStrategy.Scored);
+
+        Assert.HasCount(2, grouped);
+    }
+
+    [TestMethod]
+    public void GroupAdjacentTextLines_Scored_KeepsTerminalPromptsSeparate()
+    {
+        var lines = new List<TranslationLine>
+        {
+            new("> first command", new PhysicalRect(100, 100, 220, 24)),
+            new("> second command", new PhysicalRect(100, 130, 230, 24)),
+        };
+
+        IReadOnlyList<TranslationLine> grouped = OverlayLayoutHelper.GroupAdjacentTextLines(
+            lines,
+            TextBlockGroupingStrategy.Scored);
+
+        Assert.HasCount(2, grouped);
+    }
+
+    [TestMethod]
+    public void GroupAdjacentTextLines_LegacyStrategyRemainsAvailable()
+    {
+        var lines = new List<TranslationLine>
+        {
+            new("First status is complete.", new PhysicalRect(100, 100, 280, 24)),
+            new("Second status is pending.", new PhysicalRect(100, 130, 280, 24)),
+        };
+
+        IReadOnlyList<TranslationLine> grouped = OverlayLayoutHelper.GroupAdjacentTextLines(
+            lines,
+            TextBlockGroupingStrategy.Legacy);
+
+        Assert.HasCount(1, grouped);
+    }
+
+    [TestMethod]
     public void ClampToScreen_ClampsOutOfBoundsRect()
     {
         PhysicalRect screen = new(0, 0, 1920, 1080);

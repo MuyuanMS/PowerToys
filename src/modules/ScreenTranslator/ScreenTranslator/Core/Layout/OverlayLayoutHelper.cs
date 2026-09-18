@@ -142,9 +142,20 @@ public static class OverlayLayoutHelper
     }
 
     /// <summary>
-    /// Groups adjacent OCR lines that form one wrapped text block.
+    /// Groups adjacent OCR lines that form one wrapped text block using the selected provider-neutral strategy.
     /// </summary>
-    public static IReadOnlyList<TranslationLine> GroupAdjacentTextLines(IEnumerable<TranslationLine> lines)
+    public static IReadOnlyList<TranslationLine> GroupAdjacentTextLines(
+        IEnumerable<TranslationLine> lines,
+        TextBlockGroupingStrategy strategy = TextBlockGroupingStrategy.Legacy)
+    {
+        return strategy switch
+        {
+            TextBlockGroupingStrategy.Legacy => GroupAdjacentTextLinesLegacy(lines),
+            _ => ScoredTextBlockGrouper.Group(lines),
+        };
+    }
+
+    internal static IReadOnlyList<TranslationLine> GroupAdjacentTextLinesLegacy(IEnumerable<TranslationLine> lines)
     {
         if (lines == null)
         {
@@ -193,7 +204,7 @@ public static class OverlayLayoutHelper
         return groups.Select(MergeTextLineGroup).ToList();
     }
 
-    private static List<TranslationLine> MergeSameBaselineFragments(IReadOnlyList<TranslationLine> lines)
+    internal static List<TranslationLine> MergeSameBaselineFragments(IReadOnlyList<TranslationLine> lines)
     {
         List<List<TranslationLine>> rows = new();
         foreach (TranslationLine line in lines)
@@ -358,7 +369,7 @@ public static class OverlayLayoutHelper
         return leftAligned || overlapRatio >= 0.6;
     }
 
-    private static TranslationLine MergeTextLineGroup(IReadOnlyList<TranslationLine> group)
+    internal static TranslationLine MergeTextLineGroup(IReadOnlyList<TranslationLine> group)
     {
         if (group.Count == 1)
         {

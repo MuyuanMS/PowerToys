@@ -283,7 +283,9 @@ public sealed partial class SelectionOverlay : TransparentWindow
                 return;
             }
 
-            IReadOnlyList<TranslationLine> groupedLines = OverlayLayoutHelper.GroupAdjacentTextLines(recognizedLines);
+            IReadOnlyList<TranslationLine> groupedLines = OverlayLayoutHelper.GroupAdjacentTextLines(
+                recognizedLines,
+                TextBlockGroupingStrategy.Scored);
             Logger.LogInfo($"Grouped recognized text into {groupedLines.Count} layout blocks.");
 
             processingOverlay.UpdateStatus("Translating text...");
