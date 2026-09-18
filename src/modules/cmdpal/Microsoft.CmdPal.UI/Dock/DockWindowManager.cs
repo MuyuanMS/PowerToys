@@ -73,13 +73,15 @@ public sealed partial class DockWindowManager : IDisposable
     /// </summary>
     public void HideDocks()
     {
-        foreach (var (_, (window, viewModel)) in _docks)
+        // Snapshot and clear before closing so that the synchronous Closed callbacks
+        // fired by window.Close() do not mutate _docks while we are enumerating it.
+        var snapshot = _docks.ToList();
+        _docks.Clear();
+        foreach (var (_, (window, viewModel)) in snapshot)
         {
             window.Close();
             viewModel.Dispose();
         }
-
-        _docks.Clear();
     }
 
     /// <summary>
@@ -215,6 +217,19 @@ public sealed partial class DockWindowManager : IDisposable
 
         var window = new DockWindow(viewModel, monitor, sideOverride);
         _docks[monitorDeviceId] = (window, viewModel);
+
+        // Self-heal: if the dock ever closes through an unexpected path, remove the
+        // stale entry so the next SyncDocksToSettings can recreate it cleanly.
+        // Guard with ReferenceEquals so a later replacement dock for the same monitor
+        // is never removed by this (now-stale) handler.
+        window.Closed += (_, _) =>
+        {
+            if (_docks.TryGetValue(monitorDeviceId, out var current) && ReferenceEquals(current.Window, window))
+            {
+                _docks.Remove(monitorDeviceId);
+            }
+        };
+
         window.Show();
 
         viewModel.InitializeBands();
