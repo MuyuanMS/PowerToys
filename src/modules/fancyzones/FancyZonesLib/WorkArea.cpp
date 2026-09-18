@@ -242,9 +242,37 @@ void WorkArea::InitLayout()
 void WorkArea::UpdateWindowPositions()
 {
     const auto& snappedWindows = m_layoutWindows.SnappedWindows();
+    const size_t layoutSize = m_layout ? m_layout->Zones().size() : 0;
     for (const auto& [window, zones] : snappedWindows)
     {
-        Snap(window, zones, true);
+        if (!Snap(window, zones, true) && layoutSize > 0 && !zones.empty())
+        {
+            // Only fall back when the failure is caused by an out-of-range zone index
+            // (e.g. switching to a layout with fewer zones). If all indices are within
+            // bounds, Snap failed for an unrelated reason such as StampZoneIndexProperty
+            // returning false, in which case the window has already been moved and recorded
+            // and we must not overwrite that valid assignment.
+            bool hasOutOfRangeZone = false;
+            for (ZoneIndex zone : zones)
+            {
+                if (static_cast<size_t>(zone) >= layoutSize)
+                {
+                    hasOutOfRangeZone = true;
+                    break;
+                }
+            }
+            if (hasOutOfRangeZone)
+            {
+                for (ZoneIndex zone : zones)
+                {
+                    if (static_cast<size_t>(zone) < layoutSize)
+                    {
+                        Snap(window, { zone }, true);
+                        break;
+                    }
+                }
+            }
+        }
     }
 }
 
