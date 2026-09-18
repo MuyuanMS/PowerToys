@@ -604,7 +604,7 @@ namespace winrt::PowerRenameUI::implementation
         if (m_prManager && SUCCEEDED(m_prManager->GetRenameRegEx(&prRegEx)))
         {
             winrt::hstring searchTerm = textBox_search().Text();
-            prRegEx->PutSearchTerm(searchTerm.c_str(), forceRenaming);
+            prRegEx->PutSearchTerm(searchTerm.c_str(), false);
 
             winrt::hstring replaceTerm = textBox_replace().Text();
             prRegEx->PutReplaceTerm(replaceTerm.c_str(), forceRenaming);
@@ -1367,6 +1367,12 @@ namespace winrt::PowerRenameUI::implementation
         return S_OK;
     }
 
+    HRESULT MainWindow::OnRenameStarted()
+    {
+        button_rename().IsEnabled(false);
+        return S_OK;
+    }
+
     HRESULT MainWindow::OnRenameCompleted(bool closeUIWindowAfterRenaming)
     {
         _TRACER_;
@@ -1377,17 +1383,30 @@ namespace winrt::PowerRenameUI::implementation
             // Close the window
             PostMessage(m_window, WM_CLOSE, static_cast<WPARAM>(0), static_cast<LPARAM>(0));
         }
-        else
+        else if (!m_postRenamePreviewPending)
         {
-            // Force renaming work to start so newly renamed items are processed right away
-            SearchReplaceChanged(true);
+            m_postRenamePreviewPending = true;
+            auto weakThis = get_weak();
+            auto dispatcherQueue = DispatcherQueue();
+            const bool enqueued = dispatcherQueue.TryEnqueue([weakThis]() {
+                if (auto self = weakThis.get())
+                {
+                    self->m_postRenamePreviewPending = false;
+                    self->SearchReplaceChanged(true);
+                }
+            });
+
+            if (!enqueued)
+            {
+                m_postRenamePreviewPending = false;
+            }
         }
 
+        UpdateCounts();
         InvalidateItemListViewState();
 
         return S_OK;
     }
 }
-
 
 

@@ -6,6 +6,9 @@
 #include "MockPowerRenameManagerEvents.h"
 #include "TestFileHelper.h"
 #include "Helpers.h"
+#include <atomic>
+#include <thread>
+#include <vector>
 
 #define DEFAULT_FLAGS 0
 
@@ -19,6 +22,28 @@ HINSTANCE g_hostHInst = HINST_THISCOMPONENT;
 
 namespace PowerRenameManagerTests
 {
+    namespace
+    {
+        class CConcurrentReadPowerRenameManagerEvents : public CMockPowerRenameManagerEvents
+        {
+        public:
+            IFACEMETHODIMP OnRegExStarted(_In_ DWORD threadId) override
+            {
+                m_regExStartedSignal = true;
+                return CMockPowerRenameManagerEvents::OnRegExStarted(threadId);
+            }
+
+            IFACEMETHODIMP OnRegExCompleted(_In_ DWORD threadId) override
+            {
+                m_regExCompletedSignal = true;
+                return CMockPowerRenameManagerEvents::OnRegExCompleted(threadId);
+            }
+
+            std::atomic_bool m_regExStartedSignal{ false };
+            std::atomic_bool m_regExCompletedSignal{ false };
+        };
+    }
+
     TEST_CLASS (SimpleTests)
     {
     public:
@@ -336,28 +361,32 @@ namespace PowerRenameManagerTests
 
         TEST_METHOD (VerifyFileAttributesMonthAndDayNames)
         {
-            std::locale::global(std::locale(""));
             SYSTEMTIME fileTime = { 2020, 1, 3, 1, 15, 6, 42, 453 };
             wchar_t localeName[LOCALE_NAME_MAX_LENGTH];
             wchar_t result[MAX_PATH] = L"bar";
             wchar_t formattedDate[MAX_PATH];
+            wchar_t upper;
             if (GetUserDefaultLocaleName(localeName, LOCALE_NAME_MAX_LENGTH) == 0)
                 StringCchCopy(localeName, LOCALE_NAME_MAX_LENGTH, L"en_US");
 
             GetDateFormatEx(localeName, NULL, &fileTime, L"MMM", formattedDate, MAX_PATH, NULL);
-            formattedDate[0] = towupper(formattedDate[0]);
+            LCMapStringEx(localeName, LCMAP_UPPERCASE | LCMAP_LINGUISTIC_CASING, &formattedDate[0], 1, &upper, 1, NULL, NULL, 0);
+            formattedDate[0] = upper;
             StringCchPrintf(result, MAX_PATH, TEXT("%s%s"), result, formattedDate);
 
             GetDateFormatEx(localeName, NULL, &fileTime, L"MMMM", formattedDate, MAX_PATH, NULL);
-            formattedDate[0] = towupper(formattedDate[0]);
+            LCMapStringEx(localeName, LCMAP_UPPERCASE | LCMAP_LINGUISTIC_CASING, &formattedDate[0], 1, &upper, 1, NULL, NULL, 0);
+            formattedDate[0] = upper;
             StringCchPrintf(result, MAX_PATH, TEXT("%s-%s"), result, formattedDate);
 
             GetDateFormatEx(localeName, NULL, &fileTime, L"ddd", formattedDate, MAX_PATH, NULL);
-            formattedDate[0] = towupper(formattedDate[0]);
+            LCMapStringEx(localeName, LCMAP_UPPERCASE | LCMAP_LINGUISTIC_CASING, &formattedDate[0], 1, &upper, 1, NULL, NULL, 0);
+            formattedDate[0] = upper;
             StringCchPrintf(result, MAX_PATH, TEXT("%s-%s"), result, formattedDate);
 
             GetDateFormatEx(localeName, NULL, &fileTime, L"dddd", formattedDate, MAX_PATH, NULL);
-            formattedDate[0] = towupper(formattedDate[0]);
+            LCMapStringEx(localeName, LCMAP_UPPERCASE | LCMAP_LINGUISTIC_CASING, &formattedDate[0], 1, &upper, 1, NULL, NULL, 0);
+            formattedDate[0] = upper;
             StringCchPrintf(result, MAX_PATH, TEXT("%s-%s"), result, formattedDate);
 
             rename_pairs renamePairs[] = {
@@ -365,6 +394,236 @@ namespace PowerRenameManagerTests
             };
 
             RenameHelper(renamePairs, ARRAYSIZE(renamePairs), L"foo", L"bar$MMM-$MMMM-$DDD-$DDDD", SYSTEMTIME{ 2020, 1, 3, 1, 15, 6, 42, 453 }, DEFAULT_FLAGS);
+        }
+
+        // Regression test: rename with non-ASCII (Simplified Chinese) filenames should not hang.
+        // This exercises the regex worker event sequencing and exclusive-lock paths added to fix
+        // the AppHangTransient reported when processing Chinese filenames.
+        TEST_METHOD (VerifyNonAsciiRename)
+        {
+            rename_pairs renamePairs[] = {
+                { L"\u6d4b\u8bd5\u6587\u4ef6.txt", L"\u65b0\u6587\u4ef6.txt", true, true, 0 },
+                { L"\u6d4b\u8bd5\u6587\u4ef6\u4e8c.txt", L"\u65b0\u6587\u4ef6\u4e8c.txt", true, true, 0 },
+            };
+            // Search for Chinese "test file" prefix and replace with Chinese "new file"
+            RenameHelper(renamePairs, ARRAYSIZE(renamePairs),
+                         L"\u6d4b\u8bd5", L"\u65b0",
+                         SYSTEMTIME{ 2020, 7, 3, 22, 15, 6, 42, 453 }, DEFAULT_FLAGS);
+        }
+
+        // Regression test: changing the search term multiple times before Apply completes must not
+        // leave the reentrancy flag permanently set or corrupt the shared regex events.
+        TEST_METHOD (VerifyRepeatedSearchTermChange)
+        {
+            CTestFileHelper testFileHelper;
+            Assert::IsTrue(testFileHelper.AddFile(L"foo.txt"));
+
+            CComPtr<IPowerRenameManager> mgr;
+            Assert::IsTrue(CPowerRenameManager::s_CreateInstance(&mgr) == S_OK);
+            CComPtr<CMockPowerRenameManagerEvents> mockMgrEvents;
+            mockMgrEvents.Attach(new CMockPowerRenameManagerEvents());
+            CComPtr<IPowerRenameManagerEvents> mgrEvents;
+            Assert::IsTrue(mockMgrEvents->QueryInterface(IID_PPV_ARGS(&mgrEvents)) == S_OK);
+            DWORD cookie = 0;
+            Assert::IsTrue(mgr->Advise(mgrEvents, &cookie) == S_OK);
+
+            CComPtr<IPowerRenameItem> item;
+            CMockPowerRenameItem::CreateInstance(
+                testFileHelper.GetFullPath(L"foo.txt").c_str(), L"foo.txt", 0, false,
+                SYSTEMTIME{ 2020, 7, 3, 22, 15, 6, 42, 453 }, &item);
+            mgr->AddItem(item);
+
+            CComPtr<IPowerRenameRegEx> renRegEx;
+            Assert::IsTrue(mgr->GetRenameRegEx(&renRegEx) == S_OK);
+            renRegEx->PutFlags(DEFAULT_FLAGS);
+
+            // Simulate rapid search term changes (cancels previous worker each time).
+            renRegEx->PutSearchTerm(L"foo");
+            renRegEx->PutSearchTerm(L"f");
+            renRegEx->PutSearchTerm(L"foo");
+            renRegEx->PutReplaceTerm(L"bar");
+
+            // Rename should succeed; verifies no event-sequencing deadlock after repeated cancel/restart.
+            bool replaceSuccess = false;
+            for (int step = 0; step < 20; step++)
+            {
+                replaceSuccess = mgr->Rename(0, true) == S_OK;
+                if (replaceSuccess)
+                {
+                    break;
+                }
+                Sleep(10);
+            }
+            Assert::IsTrue(replaceSuccess);
+            Assert::IsTrue(testFileHelper.PathExistsCaseSensitive(L"bar.txt"));
+
+            Assert::IsTrue(mgr->Shutdown() == S_OK);
+        }
+
+        TEST_METHOD(VerifyConcurrentPreviewReadsDuringRegEx)
+        {
+            CComPtr<IPowerRenameManager> mgr;
+            Assert::IsTrue(CPowerRenameManager::s_CreateInstance(&mgr) == S_OK);
+
+            CComPtr<CConcurrentReadPowerRenameManagerEvents> mockMgrEvents;
+            mockMgrEvents.Attach(new CConcurrentReadPowerRenameManagerEvents());
+            CComPtr<IPowerRenameManagerEvents> mgrEvents;
+            Assert::IsTrue(mockMgrEvents->QueryInterface(IID_PPV_ARGS(&mgrEvents)) == S_OK);
+            DWORD cookie = 0;
+            Assert::IsTrue(mgr->Advise(mgrEvents, &cookie) == S_OK);
+
+            std::vector<CComPtr<IPowerRenameItem>> items;
+            constexpr int itemCount = 128;
+            for (int i = 0; i < itemCount; i++)
+            {
+                CComPtr<IPowerRenameItem> item;
+                wchar_t fileName[MAX_PATH] = {};
+                StringCchPrintf(fileName, ARRAYSIZE(fileName), L"\u6d4b\u8bd5\u6587\u4ef6_%03d.txt", i);
+                CMockPowerRenameItem::CreateInstance(fileName, fileName, 0, false, SYSTEMTIME{ 2020, 7, 3, 22, 15, 6, 42, 453 }, &item);
+                items.push_back(item);
+                mgr->AddItem(item);
+            }
+
+            CComPtr<IPowerRenameRegEx> renRegEx;
+            Assert::IsTrue(mgr->GetRenameRegEx(&renRegEx) == S_OK);
+            renRegEx->PutFlags(DEFAULT_FLAGS);
+
+            std::atomic_bool keepReading{ true };
+            std::atomic_bool readSucceeded{ true };
+            std::thread reader([&]() {
+                const HRESULT coInit = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+                while (keepReading.load() && !mockMgrEvents->m_regExStartedSignal.load() && !mockMgrEvents->m_regExCompletedSignal.load())
+                {
+                    Sleep(1);
+                }
+
+                while (keepReading.load())
+                {
+                    for (const auto& item : items)
+                    {
+                        PWSTR newName = nullptr;
+                        readSucceeded = readSucceeded.load() && SUCCEEDED(item->GetNewName(&newName));
+
+                        bool shouldRename = false;
+                        readSucceeded = readSucceeded.load() && SUCCEEDED(item->ShouldRenameItem(DEFAULT_FLAGS, &shouldRename));
+
+                        PowerRenameItemRenameStatus status{};
+                        readSucceeded = readSucceeded.load() && SUCCEEDED(item->GetStatus(&status));
+                        CoTaskMemFree(newName);
+                    }
+                }
+
+                if (SUCCEEDED(coInit))
+                {
+                    CoUninitialize();
+                }
+            });
+
+            renRegEx->PutSearchTerm(L"\u6d4b\u8bd5");
+            renRegEx->PutReplaceTerm(L"\u65b0");
+
+            for (int attempt = 0; attempt < 200 && !mockMgrEvents->m_regExCompletedSignal.load(); attempt++)
+            {
+                Sleep(5);
+            }
+
+            keepReading = false;
+            reader.join();
+
+            Assert::IsTrue(readSucceeded.load());
+            Assert::IsTrue(mockMgrEvents->m_regExCompletedSignal.load());
+            Assert::IsTrue(mgr->Shutdown() == S_OK);
+        }
+
+        TEST_METHOD(VerifyKeepOpenRenameCanRepreviewNonAsciiItem)
+        {
+            CTestFileHelper testFileHelper;
+            Assert::IsTrue(testFileHelper.AddFile(L"\u6d4b\u8bd5\u6587\u4ef6.txt"));
+
+            CComPtr<IPowerRenameManager> mgr;
+            Assert::IsTrue(CPowerRenameManager::s_CreateInstance(&mgr) == S_OK);
+            CComPtr<CMockPowerRenameManagerEvents> mockMgrEvents;
+            mockMgrEvents.Attach(new CMockPowerRenameManagerEvents());
+            CComPtr<IPowerRenameManagerEvents> mgrEvents;
+            Assert::IsTrue(mockMgrEvents->QueryInterface(IID_PPV_ARGS(&mgrEvents)) == S_OK);
+            DWORD cookie = 0;
+            Assert::IsTrue(mgr->Advise(mgrEvents, &cookie) == S_OK);
+
+            CComPtr<IPowerRenameItem> item;
+            CMockPowerRenameItem::CreateInstance(
+                testFileHelper.GetFullPath(L"\u6d4b\u8bd5\u6587\u4ef6.txt").c_str(),
+                L"\u6d4b\u8bd5\u6587\u4ef6.txt",
+                0,
+                false,
+                SYSTEMTIME{ 2020, 7, 3, 22, 15, 6, 42, 453 },
+                &item);
+            mgr->AddItem(item);
+
+            CComPtr<IPowerRenameRegEx> renRegEx;
+            Assert::IsTrue(mgr->GetRenameRegEx(&renRegEx) == S_OK);
+            renRegEx->PutFlags(DEFAULT_FLAGS);
+            renRegEx->PutSearchTerm(L"\u6d4b\u8bd5");
+            renRegEx->PutReplaceTerm(L"\u65b0");
+
+            // Wait for the regex preview to complete before calling Rename; the item count
+            // check in _PerformFileOperation runs before _WaitForRegExWorkerThread, so calling
+            // Rename before the worker has set m_newName returns E_FAIL (0 items to rename).
+            for (int attempt = 0; attempt < 200 && !mockMgrEvents->m_regExCompleted; attempt++)
+            {
+                Sleep(5);
+            }
+            Assert::IsTrue(mockMgrEvents->m_regExCompleted);
+
+            bool renameSuccess = false;
+            for (int step = 0; step < 20; step++)
+            {
+                renameSuccess = mgr->Rename(0, false) == S_OK;
+                if (renameSuccess)
+                {
+                    break;
+                }
+                Sleep(10);
+            }
+            Assert::IsTrue(renameSuccess);
+            Assert::IsTrue(testFileHelper.PathExistsCaseSensitive(L"\u65b0\u6587\u4ef6.txt"));
+
+            PWSTR originalName = nullptr;
+            Assert::IsTrue(SUCCEEDED(item->GetOriginalName(&originalName)));
+            Assert::AreEqual(L"\u65b0\u6587\u4ef6.txt", originalName);
+            CoTaskMemFree(originalName);
+
+            renRegEx->PutSearchTerm(L"\u65b0");
+            renRegEx->PutReplaceTerm(L"\u6700\u7ec8", true);
+
+            // PutReplaceTerm cancels any in-flight worker (W_a) and starts a new one
+            // (W_b) with the correct terms.  During the cancellation,
+            // _WaitForRegExWorkerThread pumps messages and processes W_a's
+            // SRM_REGEX_COMPLETE, which sets m_regExCompleted even though W_b has not
+            // run DoRename yet.  Waiting on m_regExCompleted therefore exits too early.
+            //
+            // DoRename writes m_newName directly via PutNewName (exclusive lock, no
+            // window-message dispatch required), so poll GetNewName() instead.  This
+            // verifies the production keep-open re-preview path: after PutReplaceTerm
+            // returns, W_b will call DoRename on the already-renamed item
+            // (originalName = "\u65b0\u6587\u4ef6.txt") and set newName to
+            // "\u6700\u7ec8\u6587\u4ef6.txt".
+            PWSTR newName = nullptr;
+            for (int attempt = 0; attempt < 200; attempt++)
+            {
+                CoTaskMemFree(newName);
+                newName = nullptr;
+                if (SUCCEEDED(item->GetNewName(&newName)) && newName != nullptr)
+                {
+                    break;
+                }
+                Sleep(5);
+            }
+
+            Assert::IsTrue(newName != nullptr);
+            Assert::AreEqual(L"\u6700\u7ec8\u6587\u4ef6.txt", newName);
+            CoTaskMemFree(newName);
+
+            Assert::IsTrue(mgr->Shutdown() == S_OK);
         }
     };
 }
