@@ -359,7 +359,7 @@ BackgroundProcess: false
         string manifest = @"
 PackageName: ""Quoted.Double.App"" # trailing comment on package
 Name: Quoted Double App
-WindowFilter: 'Commented.exe' # trailing comment on filter
+WindowFilter: ""My # App.exe"" # trailing comment on filter
 BackgroundProcess: false # trailing comment on bool
 ";
         File.WriteAllText(Path.Combine(_tempDirectory, "Quoted.en-US.yml"), manifest);
@@ -369,15 +369,14 @@ BackgroundProcess: false # trailing comment on bool
         string indexPath = Path.Combine(_tempDirectory, "index.yml");
         string indexContent = File.ReadAllText(indexPath);
 
-        StringAssert.Contains(indexContent, "- WindowFilter: 'Commented.exe'");
+        StringAssert.Contains(indexContent, "- WindowFilter: 'My # App.exe'");
         StringAssert.Contains(indexContent, "- 'Quoted.Double.App'");
-        Assert.IsFalse(indexContent.Contains('#'), "Trailing comments should not leak into index.yml.");
 
         var deserializer = new YamlDotNet.Serialization.Deserializer();
         var deserialized = deserializer.Deserialize<ShortcutGuide.Models.IndexFile>(indexContent);
 
         Assert.AreEqual(1, deserialized.Index.Length);
-        Assert.AreEqual("Commented.exe", deserialized.Index[0].WindowFilter);
+        Assert.AreEqual("My # App.exe", deserialized.Index[0].WindowFilter);
         Assert.AreEqual("Quoted.Double.App", deserialized.Index[0].Apps[0]);
     }
 
@@ -506,13 +505,11 @@ BackgroundProcess: false
     }
 
     [TestMethod]
-    public void NeedsIndexRegeneration_WhenUserAddsOrModifiesManifest_ReturnsTrue()
+    public void NeedsIndexRegeneration_WhenUserAddsManifest_ReturnsTrue()
     {
-        string indexPath = Path.Combine(_tempDirectory, "index.yml");
-        File.WriteAllText(indexPath, "DefaultShellName: +WindowsNT.Shell\nIndex:\n");
-        File.SetLastWriteTimeUtc(indexPath, DateTime.UtcNow.AddMinutes(-5));
+        ManifestIndexGenerator.CreateIndexYmlFile(_tempDirectory);
+        Assert.IsFalse(ManifestIndexGenerator.NeedsIndexRegeneration(_tempDirectory));
 
-        // Simulate a user creating or editing a custom manifest in the folder.
         string userManifestPath = Path.Combine(_tempDirectory, "Custom.UserApp.en-US.yml");
         string userManifestContent = @"
 PackageName: Custom.UserApp
@@ -521,11 +518,31 @@ WindowFilter: CustomApp.exe
 BackgroundProcess: false
 ";
         File.WriteAllText(userManifestPath, userManifestContent);
-        File.SetLastWriteTimeUtc(userManifestPath, DateTime.UtcNow);
 
         bool needsRegen = ManifestIndexGenerator.NeedsIndexRegeneration(_tempDirectory);
 
-        Assert.IsTrue(needsRegen, "NeedsIndexRegeneration should return true when a user-added or modified manifest is newer than index.yml.");
+        Assert.IsTrue(needsRegen, "NeedsIndexRegeneration should detect a newly added manifest.");
+    }
+
+    [TestMethod]
+    public void NeedsIndexRegeneration_WhenUserModifiesManifest_ReturnsTrue()
+    {
+        string manifestPath = Path.Combine(_tempDirectory, "Custom.UserApp.en-US.yml");
+        string manifestContent = @"
+PackageName: Custom.UserApp
+Name: Custom User App
+WindowFilter: CustomApp.exe
+BackgroundProcess: false
+";
+        File.WriteAllText(manifestPath, manifestContent);
+        ManifestIndexGenerator.CreateIndexYmlFile(_tempDirectory);
+        Assert.IsFalse(ManifestIndexGenerator.NeedsIndexRegeneration(_tempDirectory));
+
+        File.AppendAllText(manifestPath, "# changed");
+
+        Assert.IsTrue(
+            ManifestIndexGenerator.NeedsIndexRegeneration(_tempDirectory),
+            "NeedsIndexRegeneration should detect a modified manifest.");
     }
 
     [TestMethod]

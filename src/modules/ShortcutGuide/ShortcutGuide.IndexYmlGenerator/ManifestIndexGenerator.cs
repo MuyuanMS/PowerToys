@@ -375,14 +375,37 @@ namespace ShortcutGuide.IndexYmlGenerator
         {
             span = span.Trim();
 
+            bool inSingleQuotes = false;
+            bool inDoubleQuotes = false;
             for (int i = 0; i < span.Length; i++)
             {
-                if (span[i] != '#')
+                if (span[i] == '\'' && !inDoubleQuotes)
                 {
+                    if (inSingleQuotes && i + 1 < span.Length && span[i + 1] == '\'')
+                    {
+                        i++;
+                        continue;
+                    }
+
+                    inSingleQuotes = !inSingleQuotes;
                     continue;
                 }
 
-                if (i == 0 || char.IsWhiteSpace(span[i - 1]))
+                if (span[i] == '"' && !inSingleQuotes)
+                {
+                    bool escaped = i > 0 && span[i - 1] == '\\';
+                    if (!escaped)
+                    {
+                        inDoubleQuotes = !inDoubleQuotes;
+                    }
+
+                    continue;
+                }
+
+                if (span[i] == '#' &&
+                    !inSingleQuotes &&
+                    !inDoubleQuotes &&
+                    (i == 0 || char.IsWhiteSpace(span[i - 1])))
                 {
                     span = span[..i].TrimEnd();
                     break;
