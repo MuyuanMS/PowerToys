@@ -17,6 +17,8 @@ namespace ShortcutGuide.Models
 
         public string DefaultShellName { get; set; }
 
+        public string? ManifestSetFingerprint { get; set; }
+
         public IndexItem[] Index { get; set; }
     }
 }
