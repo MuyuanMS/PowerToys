@@ -200,26 +200,33 @@ namespace ShortcutGuide.Helpers
             }
 
             return applicationIds;
+        }
 
-            static bool IsMatch(string input, string filter)
+        internal static bool IsMatch(string input, string filter)
+        {
+            return filter
+                .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Any(singleFilter => IsSingleMatch(input, singleFilter));
+        }
+
+        private static bool IsSingleMatch(string input, string filter)
+        {
+            if (filter == "*")
             {
-                if (filter == "*")
-                {
-                    return true;
-                }
-
-                if (input.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                {
-                    input = input[..^4];
-                }
-
-                if (filter.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                {
-                    filter = filter[..^4];
-                }
-
-                return string.Equals(input, filter, StringComparison.OrdinalIgnoreCase);
+                return true;
             }
+
+            if (input.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            {
+                input = input[..^4];
+            }
+
+            if (filter.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            {
+                filter = filter[..^4];
+            }
+
+            return string.Equals(input, filter, StringComparison.OrdinalIgnoreCase);
         }
     }
 }
