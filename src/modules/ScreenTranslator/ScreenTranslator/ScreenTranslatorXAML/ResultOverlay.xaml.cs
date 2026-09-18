@@ -15,6 +15,7 @@ using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -517,9 +518,11 @@ public sealed partial class ResultOverlay : TransparentWindow
         SetOriginalTextButtonState(!_showingOriginalText.Contains(lineIndex));
         SetOriginalAllTextButtonState(_showingOriginalText.Count != _lines.Count);
 
-        PositionContextMenu(card);
+        CollapseCardDetailPanels();
         CardContextMenu.Visibility = Visibility.Visible;
         ContextMenuCanvas.IsHitTestVisible = true;
+        PositionContextMenu(card);
+        DispatcherQueue.TryEnqueue(() => PositionContextMenu(card));
         FloatingToolbar.Visibility = Visibility.Visible;
         if (!_toolbarWasManuallyPositioned)
         {
@@ -548,6 +551,8 @@ public sealed partial class ResultOverlay : TransparentWindow
                 {
                     TextColorPicker.Color = foregroundBrush.Color;
                 }
+
+                UpdateSelectedFontSizeLabel();
             }
             finally
             {
@@ -558,8 +563,72 @@ public sealed partial class ResultOverlay : TransparentWindow
 
     private void PositionContextMenu(Border card)
     {
-        Canvas.SetLeft(CardContextMenu, Math.Max(8, Canvas.GetLeft(card)));
-        Canvas.SetTop(CardContextMenu, Math.Max(8, Canvas.GetTop(card) + Math.Max(card.ActualHeight, card.MinHeight) + 4));
+        double overlayWidth = _overlayBounds.Width / _screenInfo.DpiScaleX;
+        double overlayHeight = _overlayBounds.Height / _screenInfo.DpiScaleY;
+        CardContextMenu.Measure(new Windows.Foundation.Size(Math.Max(320, overlayWidth - 16), double.PositiveInfinity));
+
+        double menuWidth = Math.Max(320, CardContextMenu.DesiredSize.Width);
+        double menuHeight = Math.Max(48, CardContextMenu.DesiredSize.Height);
+        double cardLeft = Canvas.GetLeft(card);
+        double cardTop = Canvas.GetTop(card);
+        double cardHeight = Math.Max(card.ActualHeight, card.MinHeight);
+        double left = Math.Clamp(cardLeft, 8, Math.Max(8, overlayWidth - menuWidth - 8));
+        double top = cardTop >= menuHeight + 8
+            ? cardTop - menuHeight - 4
+            : cardTop + cardHeight + 4;
+
+        Canvas.SetLeft(CardContextMenu, left);
+        Canvas.SetTop(CardContextMenu, Math.Clamp(top, 8, Math.Max(8, overlayHeight - menuHeight - 8)));
+    }
+
+    private void FormatPanelButton_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleCardDetailPanel(FormatDetailPanel, FormatPanelButton);
+    }
+
+    private void TranslatePanelButton_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleCardDetailPanel(TranslateDetailPanel, TranslatePanelButton);
+    }
+
+    private void ArrangePanelButton_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleCardDetailPanel(ArrangeDetailPanel, ArrangePanelButton);
+    }
+
+    private void MorePanelButton_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleCardDetailPanel(MoreDetailPanel, MorePanelButton);
+    }
+
+    private void ToggleCardDetailPanel(FrameworkElement panel, ToggleButton selectedButton)
+    {
+        bool showPanel = selectedButton.IsChecked == true;
+        CollapseCardDetailPanels();
+        if (showPanel)
+        {
+            selectedButton.IsChecked = true;
+            panel.Visibility = Visibility.Visible;
+            CardDetailDivider.Visibility = Visibility.Visible;
+        }
+
+        if (_contextMenuCard is not null)
+        {
+            DispatcherQueue.TryEnqueue(() => PositionContextMenu(_contextMenuCard));
+        }
+    }
+
+    private void CollapseCardDetailPanels()
+    {
+        FormatDetailPanel.Visibility = Visibility.Collapsed;
+        TranslateDetailPanel.Visibility = Visibility.Collapsed;
+        ArrangeDetailPanel.Visibility = Visibility.Collapsed;
+        MoreDetailPanel.Visibility = Visibility.Collapsed;
+        CardDetailDivider.Visibility = Visibility.Collapsed;
+        FormatPanelButton.IsChecked = false;
+        TranslatePanelButton.IsChecked = false;
+        ArrangePanelButton.IsChecked = false;
+        MorePanelButton.IsChecked = false;
     }
 
     private void HideCardButton_Click(object sender, RoutedEventArgs e)
@@ -890,6 +959,7 @@ public sealed partial class ResultOverlay : TransparentWindow
             }
 
             card.InvalidateMeasure();
+            UpdateSelectedFontSizeLabel();
             Logger.LogInfo($"Decreased overlay font size for line {_contextMenuLineIndex} to {fontSize}.");
         }
         else
@@ -916,6 +986,7 @@ public sealed partial class ResultOverlay : TransparentWindow
             }
 
             card.InvalidateMeasure();
+            UpdateSelectedFontSizeLabel();
             Logger.LogInfo($"Increased overlay font size for line {_contextMenuLineIndex} to {fontSize}.");
         }
         else
@@ -957,6 +1028,7 @@ public sealed partial class ResultOverlay : TransparentWindow
             _translatedTexts[_contextMenuLineIndex] = initial.Text;
             SetOriginalTextButtonState(showOriginalText: true);
             SetOriginalAllTextButtonState(_showingOriginalText.Count != _lines.Count);
+            UpdateSelectedFontSizeLabel();
             PositionContextMenu(card);
 
             Logger.LogInfo($"Restored initial overlay text, appearance, and position for line {_contextMenuLineIndex}.");
@@ -1033,6 +1105,16 @@ public sealed partial class ResultOverlay : TransparentWindow
     private void SetOriginalTextButtonState(bool showOriginalText)
     {
         OriginalTextButton.Content = showOriginalText ? "Original" : "Translated";
+    }
+
+    private void UpdateSelectedFontSizeLabel()
+    {
+        if (TryGetActiveCard(out Border card) &&
+            TryGetTextSizeElement(card, out TextBlock? textBlock, out TextBox? textBox))
+        {
+            double fontSize = textBlock?.FontSize ?? textBox!.FontSize;
+            CurrentFontSizeText.Text = Math.Round(fontSize).ToString(System.Globalization.CultureInfo.CurrentCulture);
+        }
     }
 
     private void SetOriginalAllTextButtonState(bool showOriginalText)

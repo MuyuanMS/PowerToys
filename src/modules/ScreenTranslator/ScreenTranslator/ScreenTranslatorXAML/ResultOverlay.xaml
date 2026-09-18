@@ -30,181 +30,258 @@
             <Border
                 x:Name="CardContextMenu"
                 Background="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}"
-                BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}"
+                BackgroundSizing="InnerBorderEdge"
+                BorderBrush="{ThemeResource SurfaceStrokeColorFlyoutBrush}"
                 BorderThickness="1"
                 CornerRadius="{StaticResource OverlayCornerRadius}"
-                Padding="4"
+                MaxWidth="720"
+                Padding="8"
                 Visibility="Collapsed">
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                    <Button
-                        x:Name="HideCardButton"
-                        x:Uid="HideCardButton"
-                        AutomationProperties.AutomationId="BtnHideOverlayCard"
-                        Click="HideCardButton_Click"
-                        Content="Hide"
-                        Padding="8,4" />
-                    <Button
-                        x:Name="OriginalTextButton"
-                        x:Uid="OriginalTextButton"
-                        AutomationProperties.AutomationId="BtnToggleOriginalText"
-                        Click="OriginalTextButton_Click"
-                        Content="Original"
-                        Padding="8,4" />
-                    <Button
-                        x:Name="EditCardButton"
-                        x:Uid="EditCardButton"
-                        AutomationProperties.AutomationId="BtnEditOverlayText"
-                        Click="EditCardButton_Click"
-                        Padding="6,4">
-                        <FontIcon Glyph="&#xE70F;" FontSize="14" />
-                    </Button>
-                    <Button
-                        x:Name="CopyCardButton"
-                        x:Uid="CopyCardButton"
-                        AutomationProperties.AutomationId="BtnCopyOverlayText"
-                        Click="CopyCardButton_Click"
-                        Padding="6,4">
-                        <FontIcon Glyph="&#xE8C8;" FontSize="14" />
-                    </Button>
-                    <Button
-                        x:Name="BackgroundColorButton"
-                        x:Uid="BackgroundColorButton"
-                        AutomationProperties.AutomationId="BtnOverlayBackgroundColor"
-                        Padding="6,4">
-                        <Button.Flyout>
-                            <Flyout Placement="Bottom">
-                                <ColorPicker
-                                    x:Name="BackgroundColorPicker"
-                                    x:Uid="BackgroundColorPicker"
-                                    AutomationProperties.AutomationId="PickerOverlayBackground"
-                                    IsAlphaEnabled="True"
-                                    ColorChanged="BackgroundColorPicker_ColorChanged" />
-                            </Flyout>
-                        </Button.Flyout>
-                        <StackPanel Orientation="Horizontal" Spacing="2">
-                            <TextBlock Text="BG" FontWeight="SemiBold" />
-                            <FontIcon Glyph="&#xE790;" FontSize="12" />
-                        </StackPanel>
-                    </Button>
-                    <Button
-                        x:Name="TextColorButton"
-                        x:Uid="TextColorButton"
-                        AutomationProperties.AutomationId="BtnOverlayTextColor"
-                        Padding="6,4">
-                        <Button.Flyout>
-                            <Flyout Placement="Bottom">
-                                <ColorPicker
-                                    x:Name="TextColorPicker"
-                                    x:Uid="TextColorPicker"
-                                    AutomationProperties.AutomationId="PickerOverlayText"
-                                    IsAlphaEnabled="False"
-                                    ColorChanged="TextColorPicker_ColorChanged" />
-                            </Flyout>
-                        </Button.Flyout>
-                        <StackPanel Orientation="Horizontal" Spacing="2">
-                            <TextBlock Text="T" FontWeight="SemiBold" />
-                            <FontIcon Glyph="&#xE790;" FontSize="12" />
-                        </StackPanel>
-                    </Button>
-                    <Button
-                        x:Name="DecreaseFontSizeButton"
-                        x:Uid="DecreaseFontSizeButton"
-                        AutomationProperties.AutomationId="BtnDecreaseOverlayFontSize"
-                        Click="DecreaseFontSizeButton_Click"
-                        Padding="6,4">
-                        <TextBlock Text="A−" FontWeight="SemiBold" />
-                    </Button>
-                    <Button
-                        x:Name="IncreaseFontSizeButton"
-                        x:Uid="IncreaseFontSizeButton"
-                        AutomationProperties.AutomationId="BtnIncreaseOverlayFontSize"
-                        Click="IncreaseFontSizeButton_Click"
-                        Padding="6,4">
-                        <TextBlock Text="A+" FontWeight="SemiBold" />
-                    </Button>
-                    <Button
-                        x:Name="RestoreInitialButton"
-                        x:Uid="RestoreInitialButton"
-                        AutomationProperties.AutomationId="BtnRestoreInitialOverlay"
-                        Click="RestoreInitialButton_Click"
-                        Padding="6,4">
-                        <FontIcon Glyph="&#xE72C;" FontSize="14" />
-                    </Button>
-                    <Button
-                    x:Name="MoveCardUpButton"
-                    x:Uid="MoveCardUpButton"
-                    AutomationProperties.AutomationId="BtnMoveOverlayCardUp"
-                    Click="MoveCardUpButton_Click"
-                    Content="↑"
-                    Padding="6,4" />
-                    <Button
-                    x:Name="MoveCardDownButton"
-                    x:Uid="MoveCardDownButton"
-                    AutomationProperties.AutomationId="BtnMoveOverlayCardDown"
-                    Click="MoveCardDownButton_Click"
-                    Content="↓"
-                    Padding="6,4" />
-                    <Button
-                    x:Name="BringCardToTopButton"
-                    x:Uid="BringCardToTopButton"
-                    AutomationProperties.AutomationId="BtnBringOverlayCardToTop"
-                    Click="BringCardToTopButton_Click"
-                    Content="Top"
-                    Padding="6,4" />
-                    <Button
-                    x:Name="SendCardToBottomButton"
-                    x:Uid="SendCardToBottomButton"
-                    AutomationProperties.AutomationId="BtnSendOverlayCardToBottom"
-                    Click="SendCardToBottomButton_Click"
-                    Content="Bottom"
-                    Padding="6,4" />
-                    <StackPanel Spacing="4" VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" Spacing="4">
-                            <TextBlock
-                                x:Uid="CardSourceLanguageLabel"
-                                Style="{StaticResource CaptionTextBlockStyle}"
-                                Text="Source Language"
-                                VerticalAlignment="Center" />
-                            <ComboBox
-                                x:Name="CardSourceLanguageComboBox"
-                                x:Uid="CardSourceLanguageComboBox"
-                                AutomationProperties.AutomationId="ComboCardSourceLanguage"
-                                Width="144">
-                                <ComboBoxItem x:Uid="CardSourceAuto" Tag="auto" />
-                                <ComboBoxItem x:Uid="CardSourceEnglish" Tag="en" />
-                                <ComboBoxItem x:Uid="CardSourceChinese" Tag="zh" />
-                                <ComboBoxItem x:Uid="CardSourceJapanese" Tag="ja" />
-                                <ComboBoxItem x:Uid="CardSourceKorean" Tag="ko" />
-                                <ComboBoxItem x:Uid="CardSourceFrench" Tag="fr" />
-                                <ComboBoxItem x:Uid="CardSourceGerman" Tag="de" />
-                                <ComboBoxItem x:Uid="CardSourceSpanish" Tag="es" />
-                            </ComboBox>
-                            <TextBlock
-                                x:Uid="CardTargetLanguageLabel"
-                                Style="{StaticResource CaptionTextBlockStyle}"
-                                Text="Target Language"
-                                VerticalAlignment="Center" />
-                            <ComboBox
-                                x:Name="CardTargetLanguageComboBox"
-                                x:Uid="CardTargetLanguageComboBox"
-                                AutomationProperties.AutomationId="ComboCardTargetLanguage"
-                                Width="144">
-                                <ComboBoxItem x:Uid="CardTargetEnglish" Tag="en-US" />
-                                <ComboBoxItem x:Uid="CardTargetChinese" Tag="zh-Hans" />
-                                <ComboBoxItem x:Uid="CardTargetJapanese" Tag="ja" />
-                                <ComboBoxItem x:Uid="CardTargetKorean" Tag="ko" />
-                                <ComboBoxItem x:Uid="CardTargetFrench" Tag="fr" />
-                                <ComboBoxItem x:Uid="CardTargetGerman" Tag="de" />
-                                <ComboBoxItem x:Uid="CardTargetSpanish" Tag="es" />
-                            </ComboBox>
-                            <Button
-                                x:Name="ApplyCardLanguageButton"
-                                x:Uid="ApplyCardLanguageButton"
-                                AutomationProperties.AutomationId="BtnApplyCardLanguage"
-                                Click="ApplyCardLanguageButton_Click"
-                                Content="Translate"
-                                Padding="8,4" />
-                        </StackPanel>
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon
+                            AutomationProperties.Name="Move the selected text by dragging it"
+                            Glyph="&#xE7C2;"
+                            VerticalAlignment="Center" />
+                        <Button
+                            x:Name="OriginalTextButton"
+                            x:Uid="OriginalTextButton"
+                            AutomationProperties.AutomationId="BtnToggleOriginalText"
+                            Click="OriginalTextButton_Click"
+                            Content="Original"
+                            Padding="8,4" />
+                        <Button
+                            x:Name="EditCardButton"
+                            x:Uid="EditCardButton"
+                            AutomationProperties.AutomationId="BtnEditOverlayText"
+                            Click="EditCardButton_Click"
+                            Padding="8,4">
+                            <FontIcon Glyph="&#xE70F;" />
+                        </Button>
+                        <Button
+                            x:Name="CopyCardButton"
+                            x:Uid="CopyCardButton"
+                            AutomationProperties.AutomationId="BtnCopyOverlayText"
+                            Click="CopyCardButton_Click"
+                            Padding="8,4">
+                            <FontIcon Glyph="&#xE8C8;" />
+                        </Button>
+                        <ToggleButton
+                            x:Name="FormatPanelButton"
+                            x:Uid="FormatPanelButton"
+                            AutomationProperties.AutomationId="BtnShowOverlayFormat"
+                            Click="FormatPanelButton_Click"
+                            Content="Format"
+                            Padding="8,4" />
+                        <ToggleButton
+                            x:Name="TranslatePanelButton"
+                            x:Uid="TranslatePanelButton"
+                            AutomationProperties.AutomationId="BtnShowOverlayTranslate"
+                            Click="TranslatePanelButton_Click"
+                            Content="Translate"
+                            Padding="8,4" />
+                        <ToggleButton
+                            x:Name="ArrangePanelButton"
+                            x:Uid="ArrangePanelButton"
+                            AutomationProperties.AutomationId="BtnShowOverlayArrange"
+                            Click="ArrangePanelButton_Click"
+                            Content="Arrange"
+                            Padding="8,4" />
+                        <ToggleButton
+                            x:Name="MorePanelButton"
+                            x:Uid="MorePanelButton"
+                            AutomationProperties.AutomationId="BtnShowOverlayMore"
+                            Click="MorePanelButton_Click"
+                            Padding="8,4">
+                            <FontIcon Glyph="&#xE712;" />
+                        </ToggleButton>
+                        <Button
+                            x:Name="HideCardButton"
+                            x:Uid="HideCardButton"
+                            AutomationProperties.AutomationId="BtnHideOverlayCard"
+                            Click="HideCardButton_Click"
+                            Content="Hide"
+                            Padding="8,4" />
+                    </StackPanel>
+
+                    <Border
+                        x:Name="CardDetailDivider"
+                        Height="1"
+                        Background="{ThemeResource DividerStrokeColorDefaultBrush}"
+                        Visibility="Collapsed" />
+
+                    <StackPanel
+                        x:Name="FormatDetailPanel"
+                        Orientation="Horizontal"
+                        Spacing="8"
+                        Visibility="Collapsed">
+                        <Button
+                            x:Name="BackgroundColorButton"
+                            x:Uid="BackgroundColorButton"
+                            AutomationProperties.AutomationId="BtnOverlayBackgroundColor"
+                            Content="Background"
+                            Padding="8,4">
+                            <Button.Flyout>
+                                <Flyout Placement="Bottom">
+                                    <ColorPicker
+                                        x:Name="BackgroundColorPicker"
+                                        x:Uid="BackgroundColorPicker"
+                                        AutomationProperties.AutomationId="PickerOverlayBackground"
+                                        IsAlphaEnabled="True"
+                                        ColorChanged="BackgroundColorPicker_ColorChanged" />
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                        <Button
+                            x:Name="TextColorButton"
+                            x:Uid="TextColorButton"
+                            AutomationProperties.AutomationId="BtnOverlayTextColor"
+                            Content="Text color"
+                            Padding="8,4">
+                            <Button.Flyout>
+                                <Flyout Placement="Bottom">
+                                    <ColorPicker
+                                        x:Name="TextColorPicker"
+                                        x:Uid="TextColorPicker"
+                                        AutomationProperties.AutomationId="PickerOverlayText"
+                                        IsAlphaEnabled="False"
+                                        ColorChanged="TextColorPicker_ColorChanged" />
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                        <TextBlock
+                            x:Uid="FontSizeLabel"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Text="Font size"
+                            VerticalAlignment="Center" />
+                        <Button
+                            x:Name="DecreaseFontSizeButton"
+                            x:Uid="DecreaseFontSizeButton"
+                            AutomationProperties.AutomationId="BtnDecreaseOverlayFontSize"
+                            Click="DecreaseFontSizeButton_Click"
+                            Content="−"
+                            Padding="8,4" />
+                        <TextBlock
+                            x:Name="CurrentFontSizeText"
+                            MinWidth="24"
+                            TextAlignment="Center"
+                            VerticalAlignment="Center" />
+                        <Button
+                            x:Name="IncreaseFontSizeButton"
+                            x:Uid="IncreaseFontSizeButton"
+                            AutomationProperties.AutomationId="BtnIncreaseOverlayFontSize"
+                            Click="IncreaseFontSizeButton_Click"
+                            Content="+"
+                            Padding="8,4" />
+                        <Button
+                            x:Name="RestoreInitialButton"
+                            x:Uid="RestoreInitialButton"
+                            AutomationProperties.AutomationId="BtnRestoreInitialOverlay"
+                            Click="RestoreInitialButton_Click"
+                            Content="Reset"
+                            Padding="8,4" />
+                    </StackPanel>
+
+                    <StackPanel
+                        x:Name="TranslateDetailPanel"
+                        Orientation="Horizontal"
+                        Spacing="8"
+                        Visibility="Collapsed">
+                        <ComboBox
+                            x:Name="CardSourceLanguageComboBox"
+                            x:Uid="CardSourceLanguageComboBox"
+                            AutomationProperties.AutomationId="ComboCardSourceLanguage"
+                            Header="From"
+                            Width="176">
+                            <ComboBoxItem x:Uid="CardSourceAuto" Tag="auto" />
+                            <ComboBoxItem x:Uid="CardSourceEnglish" Tag="en" />
+                            <ComboBoxItem x:Uid="CardSourceChinese" Tag="zh" />
+                            <ComboBoxItem x:Uid="CardSourceJapanese" Tag="ja" />
+                            <ComboBoxItem x:Uid="CardSourceKorean" Tag="ko" />
+                            <ComboBoxItem x:Uid="CardSourceFrench" Tag="fr" />
+                            <ComboBoxItem x:Uid="CardSourceGerman" Tag="de" />
+                            <ComboBoxItem x:Uid="CardSourceSpanish" Tag="es" />
+                        </ComboBox>
+                        <FontIcon Glyph="&#xE72A;" VerticalAlignment="Center" />
+                        <ComboBox
+                            x:Name="CardTargetLanguageComboBox"
+                            x:Uid="CardTargetLanguageComboBox"
+                            AutomationProperties.AutomationId="ComboCardTargetLanguage"
+                            Header="To"
+                            Width="176">
+                            <ComboBoxItem x:Uid="CardTargetEnglish" Tag="en-US" />
+                            <ComboBoxItem x:Uid="CardTargetChinese" Tag="zh-Hans" />
+                            <ComboBoxItem x:Uid="CardTargetJapanese" Tag="ja" />
+                            <ComboBoxItem x:Uid="CardTargetKorean" Tag="ko" />
+                            <ComboBoxItem x:Uid="CardTargetFrench" Tag="fr" />
+                            <ComboBoxItem x:Uid="CardTargetGerman" Tag="de" />
+                            <ComboBoxItem x:Uid="CardTargetSpanish" Tag="es" />
+                        </ComboBox>
+                        <Button
+                            x:Name="ApplyCardLanguageButton"
+                            x:Uid="ApplyCardLanguageButton"
+                            AutomationProperties.AutomationId="BtnApplyCardLanguage"
+                            VerticalAlignment="Bottom"
+                            Click="ApplyCardLanguageButton_Click"
+                            Content="Translate"
+                            Padding="12,4"
+                            Style="{StaticResource AccentButtonStyle}" />
+                    </StackPanel>
+
+                    <StackPanel
+                        x:Name="ArrangeDetailPanel"
+                        Orientation="Horizontal"
+                        Spacing="4"
+                        Visibility="Collapsed">
+                        <Button
+                            x:Name="MoveCardUpButton"
+                            x:Uid="MoveCardUpButton"
+                            AutomationProperties.AutomationId="BtnMoveOverlayCardUp"
+                            Click="MoveCardUpButton_Click"
+                            Content="Forward"
+                            Padding="8,4" />
+                        <Button
+                            x:Name="MoveCardDownButton"
+                            x:Uid="MoveCardDownButton"
+                            AutomationProperties.AutomationId="BtnMoveOverlayCardDown"
+                            Click="MoveCardDownButton_Click"
+                            Content="Backward"
+                            Padding="8,4" />
+                        <Button
+                            x:Name="BringCardToTopButton"
+                            x:Uid="BringCardToTopButton"
+                            AutomationProperties.AutomationId="BtnBringOverlayCardToTop"
+                            Click="BringCardToTopButton_Click"
+                            Content="Bring to front"
+                            Padding="8,4" />
+                        <Button
+                            x:Name="SendCardToBottomButton"
+                            x:Uid="SendCardToBottomButton"
+                            AutomationProperties.AutomationId="BtnSendOverlayCardToBottom"
+                            Click="SendCardToBottomButton_Click"
+                            Content="Send to back"
+                            Padding="8,4" />
+                    </StackPanel>
+
+                    <StackPanel
+                        x:Name="MoreDetailPanel"
+                        Orientation="Horizontal"
+                        Spacing="4"
+                        Visibility="Collapsed">
+                        <Button
+                            x:Name="HideMatchingCardsButton"
+                            x:Uid="HideMatchingCardsButton"
+                            AutomationProperties.AutomationId="BtnHideMatchingOverlayCards"
+                            Click="HideMatchingCardsButton_Click"
+                            Content="Hide matching"
+                            Padding="8,4" />
+                        <Button
+                            x:Name="RestoreContextMenuButton"
+                            x:Uid="RestoreContextMenuButton"
+                            AutomationProperties.AutomationId="BtnRestoreHiddenFromCardMenu"
+                            Click="RestoreContextMenuButton_Click"
+                            Content="Restore hidden"
+                            Padding="8,4" />
                     </StackPanel>
                 </StackPanel>
             </Border>

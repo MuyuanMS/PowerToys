@@ -210,9 +210,41 @@
     <value>Copy text</value>
     <comment>Tooltip for copying the selected translated text</comment>
   </data>
+  <data name="FormatPanelButton.Content" xml:space="preserve">
+    <value>Format</value>
+    <comment>Opens formatting controls for the selected translated text card</comment>
+  </data>
+  <data name="FormatPanelButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Show formatting controls</value>
+    <comment>Accessible name for opening card formatting controls</comment>
+  </data>
+  <data name="TranslatePanelButton.Content" xml:space="preserve">
+    <value>Translate</value>
+    <comment>Opens language controls for the selected translated text card</comment>
+  </data>
+  <data name="TranslatePanelButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Show translation controls</value>
+    <comment>Accessible name for opening card translation controls</comment>
+  </data>
+  <data name="ArrangePanelButton.Content" xml:space="preserve">
+    <value>Arrange</value>
+    <comment>Opens layer controls for the selected translated text card</comment>
+  </data>
+  <data name="ArrangePanelButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Show layer controls</value>
+    <comment>Accessible name for opening card layer controls</comment>
+  </data>
+  <data name="MorePanelButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Show more card actions</value>
+    <comment>Accessible name for opening additional card actions</comment>
+  </data>
   <data name="BackgroundColorButton.ToolTipService.ToolTip" xml:space="preserve">
     <value>Background color</value>
     <comment>Tooltip for opening the background color picker</comment>
+  </data>
+  <data name="BackgroundColorButton.Content" xml:space="preserve">
+    <value>Background</value>
+    <comment>Button that opens the selected card background color picker</comment>
   </data>
   <data name="TextColorButton.AutomationProperties.Name" xml:space="preserve">
     <value>Choose overlay text color</value>
@@ -221,6 +253,10 @@
   <data name="TextColorButton.ToolTipService.ToolTip" xml:space="preserve">
     <value>Text color</value>
     <comment>Tooltip for opening the text color picker</comment>
+  </data>
+  <data name="TextColorButton.Content" xml:space="preserve">
+    <value>Text color</value>
+    <comment>Button that opens the selected card text color picker</comment>
   </data>
   <data name="DecreaseFontSizeButton.AutomationProperties.Name" xml:space="preserve">
     <value>Decrease overlay text size</value>
@@ -245,6 +281,42 @@
   <data name="RestoreInitialButton.ToolTipService.ToolTip" xml:space="preserve">
     <value>Restore initial appearance</value>
     <comment>Tooltip for restoring the selected card appearance</comment>
+  </data>
+  <data name="RestoreInitialButton.Content" xml:space="preserve">
+    <value>Reset</value>
+    <comment>Restores the selected card text, appearance, size, and position</comment>
+  </data>
+  <data name="MoveCardUpButton.Content" xml:space="preserve">
+    <value>Forward</value>
+    <comment>Moves the selected card one layer forward</comment>
+  </data>
+  <data name="MoveCardUpButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Move card forward</value>
+    <comment>Accessible name for moving the selected card one layer forward</comment>
+  </data>
+  <data name="MoveCardDownButton.Content" xml:space="preserve">
+    <value>Backward</value>
+    <comment>Moves the selected card one layer backward</comment>
+  </data>
+  <data name="MoveCardDownButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Move card backward</value>
+    <comment>Accessible name for moving the selected card one layer backward</comment>
+  </data>
+  <data name="BringCardToTopButton.Content" xml:space="preserve">
+    <value>Bring to front</value>
+    <comment>Moves the selected card above all other translated cards</comment>
+  </data>
+  <data name="BringCardToTopButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Bring card to front</value>
+    <comment>Accessible name for moving the selected card above all other cards</comment>
+  </data>
+  <data name="SendCardToBottomButton.Content" xml:space="preserve">
+    <value>Send to back</value>
+    <comment>Moves the selected card behind all other translated cards</comment>
+  </data>
+  <data name="SendCardToBottomButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Send card to back</value>
+    <comment>Accessible name for moving the selected card behind all other cards</comment>
   </data>
   <data name="FullScreenButton.Content" xml:space="preserve">
     <value>Full screen</value>
@@ -277,6 +349,14 @@
   <data name="CardSourceLanguageLabel.Text" xml:space="preserve">
     <value>Source Language</value>
     <comment>Labels the source language selector for a card</comment>
+  </data>
+  <data name="CardSourceLanguageComboBox.Header" xml:space="preserve">
+    <value>From</value>
+    <comment>Header for the selected card source language</comment>
+  </data>
+  <data name="CardTargetLanguageComboBox.Header" xml:space="preserve">
+    <value>To</value>
+    <comment>Header for the selected card target language</comment>
   </data>
   <data name="CardTargetLanguageLabel.Text" xml:space="preserve">
     <value>Target Language</value>
