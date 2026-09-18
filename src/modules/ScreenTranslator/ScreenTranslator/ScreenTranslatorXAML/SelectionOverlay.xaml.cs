@@ -34,6 +34,7 @@ public sealed partial class SelectionOverlay : TransparentWindow
     private readonly PhysicalRect? _foregroundWindowBounds;
     private readonly DispatcherQueue _dispatcherQueue;
     private readonly bool _freezeCapturedContentByDefault;
+    private readonly bool _showsSelectionUi;
 
     private bool _isSelecting;
     private Windows.Foundation.Point _startPoint;
@@ -55,6 +56,7 @@ public sealed partial class SelectionOverlay : TransparentWindow
         _targetLanguage = targetLanguage;
         _foregroundWindowBounds = foregroundWindowBounds;
         _freezeCapturedContentByDefault = freezeCapturedContentByDefault;
+        _showsSelectionUi = showSelectionUi;
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
 
         InitializeComponent();
@@ -130,8 +132,7 @@ public sealed partial class SelectionOverlay : TransparentWindow
 
     private async Task BeginDirectCaptureAsync(PhysicalRect captureBounds)
     {
-        await Task.Yield();
-        WindowManager.CloseOtherSelectionOverlays(this);
+        await PrepareSelectionUiForCaptureAsync();
 
         try
         {
@@ -214,9 +215,7 @@ public sealed partial class SelectionOverlay : TransparentWindow
 
         physicalRect = OverlayLayoutHelper.ClampToScreen(physicalRect, _screenInfo.Bounds);
 
-        WindowManager.CloseOtherSelectionOverlays(this);
-        AppWindow.Hide();
-        await Task.Delay(100);
+        await PrepareSelectionUiForCaptureAsync();
 
         try
         {
@@ -226,6 +225,18 @@ public sealed partial class SelectionOverlay : TransparentWindow
         {
             Close();
         }
+    }
+
+    private async Task PrepareSelectionUiForCaptureAsync()
+    {
+        WindowManager.CloseOtherSelectionOverlays(this);
+        if (!_showsSelectionUi)
+        {
+            return;
+        }
+
+        AppWindow.Hide();
+        await Task.Delay(100);
     }
 
     private async Task ProcessCaptureAndTranslateAsync(
