@@ -5,6 +5,7 @@
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using ManagedCommon;
 using Microsoft.CmdPal.Ext.Apps.Properties;
 using Microsoft.CmdPal.Ext.Apps.Utils;
 using Microsoft.CommandPalette.Extensions.Toolkit;
@@ -25,13 +26,22 @@ internal sealed partial class RunAsUserCommand : InvokableCommand
         _parentDir = parentDir;
     }
 
-    internal static async Task RunAsUser(string target, string parentDir)
+    internal static async Task RunAsUser(string target, string parentDir, Func<ProcessStartInfo, Process?>? startProcess = null)
     {
         await Task.Run(() =>
         {
-            var info = ShellCommand.GetProcessStartInfo(target, parentDir, string.Empty, ShellCommand.RunAsType.OtherUser);
+            try
+            {
+                startProcess ??= Process.Start;
 
-            Process.Start(info);
+                var info = ShellCommand.GetProcessStartInfo(target, parentDir, string.Empty, ShellCommand.RunAsType.OtherUser);
+
+                startProcess(info);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex.Message);
+            }
         });
     }
 
