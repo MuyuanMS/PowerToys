@@ -28,6 +28,7 @@ namespace PowerToys.FileLocksmithUI.ViewModels
         private string[] paths;
         private bool _disposed;
         private CancellationTokenSource _cancelProcessWatching;
+        private readonly List<Task> _watcherTasks = new();
 
         public ObservableCollection<ProcessResult> Processes { get; } = new();
 
@@ -92,17 +93,26 @@ namespace PowerToys.FileLocksmithUI.ViewModels
             if (_cancelProcessWatching is not null)
             {
                 _cancelProcessWatching.Cancel();
+                _cancelProcessWatching.Dispose();
             }
 
             _cancelProcessWatching = new CancellationTokenSource();
+            var currentCancellationSource = _cancelProcessWatching;
+            var currentCancellationToken = currentCancellationSource.Token;
+            _watcherTasks.Clear();
 
-            var processes_found = await FindProcesses(paths);
-            if (processes_found is not null)
+            var processesFound = await FindProcesses(paths);
+            if (currentCancellationToken.IsCancellationRequested || _cancelProcessWatching != currentCancellationSource)
             {
-                foreach (ProcessResult p in processes_found)
+                return;
+            }
+
+            if (processesFound is not null)
+            {
+                foreach (ProcessResult p in processesFound)
                 {
                     Processes.Add(p);
-                    WatchProcess(p, _cancelProcessWatching.Token);
+                    _watcherTasks.Add(WatchProcess(p, currentCancellationToken));
                 }
             }
 
@@ -119,7 +129,7 @@ namespace PowerToys.FileLocksmithUI.ViewModels
             return results;
         }
 
-        private async void WatchProcess(ProcessResult process, CancellationToken token)
+        private async Task WatchProcess(ProcessResult process, CancellationToken token)
         {
             try
             {
@@ -130,10 +140,11 @@ namespace PowerToys.FileLocksmithUI.ViewModels
                 }
                 catch (TaskCanceledException)
                 {
-                    // Nothing to do, normal operation
+                    // Cancellation is normal (reload or window close); do not mutate Processes.
+                    return;
                 }
 
-                if (handle.HasExited)
+                if (handle.HasExited && !token.IsCancellationRequested)
                 {
                     Processes.Remove(process);
                 }
@@ -141,7 +152,10 @@ namespace PowerToys.FileLocksmithUI.ViewModels
             catch (Exception ex)
             {
                 Logger.LogError($"Couldn't add a waiter to wait for a process to exit. PID = {process.pid} and Name = {process.name}.", ex);
-                Processes.Remove(process); // If we couldn't get a handle to the process or it has exited in the meanwhile, don't show it.
+                if (!token.IsCancellationRequested)
+                {
+                    Processes.Remove(process); // If we couldn't get a handle to the process or it has exited in the meanwhile, don't show it.
+                }
             }
         }
 
@@ -194,6 +208,9 @@ namespace PowerToys.FileLocksmithUI.ViewModels
             {
                 if (disposing)
                 {
+                    _cancelProcessWatching?.Cancel();
+                    _cancelProcessWatching?.Dispose();
+                    _watcherTasks.Clear();
                     _disposed = true;
                 }
             }
