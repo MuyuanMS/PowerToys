@@ -210,6 +210,8 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
     // For cancelling in-flight writes when a newer value arrives.
     private CancellationTokenSource? _writeCancellationTokenSource;
 
+    private Task? _pendingWriteTask;
+
     public string TextForUI { get => _modelText; set => SetTextFromUi(value); }
 
     public StringParameterRunViewModel(IStringParameterRun stringRun, WeakReference<IPageContext> context)
@@ -250,7 +252,7 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
         // Hop off to an exclusive scheduler background thread to update the
         // extension. The exclusive scheduler ensures writes are serialized
         // and in-order (mirroring ListViewModel.OnSearchTextBoxUpdated).
-        _ = _writeTaskFactory.StartNew(
+        _pendingWriteTask = _writeTaskFactory.StartNew(
             () =>
             {
                 if (writeToken.IsCancellationRequested)
@@ -277,6 +279,17 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
             writeToken,
             TaskCreationOptions.None,
             _writeTaskFactory.Scheduler!);
+    }
+
+    public void CommitPendingTextChange()
+    {
+        try
+        {
+            _pendingWriteTask?.GetAwaiter().GetResult();
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     private static void CancelAndDisposeTokenSource(ref CancellationTokenSource? tokenSource)
@@ -840,10 +853,26 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
 
     public void TrySubmit()
     {
+        CommitPendingStringParameterWrites();
+
         if (ShowCommand)
         {
             PerformCommandMessage m = new(this.Command.Command.Model);
             WeakReferenceMessenger.Default.Send(m);
+        }
+    }
+
+    private void CommitPendingStringParameterWrites()
+    {
+        StringParameterRunViewModel[] stringParameters;
+        lock (_listLock)
+        {
+            stringParameters = Items.OfType<StringParameterRunViewModel>().ToArray();
+        }
+
+        foreach (var stringParameter in stringParameters)
+        {
+            stringParameter.CommitPendingTextChange();
         }
     }
 

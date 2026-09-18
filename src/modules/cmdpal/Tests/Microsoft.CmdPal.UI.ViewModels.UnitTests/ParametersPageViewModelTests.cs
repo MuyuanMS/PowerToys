@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,6 +15,7 @@ using Windows.Foundation;
 namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
 
 [TestClass]
+[DoNotParallelize]
 public partial class ParametersPageViewModelTests
 {
     private sealed partial class TestAppExtensionHost : AppExtensionHost
@@ -109,6 +111,38 @@ public partial class ParametersPageViewModelTests
         GC.KeepAlive(item);
         GC.KeepAlive(page);
         GC.KeepAlive(host);
+    }
+
+    [TestMethod]
+    public void TrySubmit_CommitsPendingStringParameterTextBeforeSendingCommand()
+    {
+        var host = new TestAppExtensionHost();
+        var stringParameter = new StringParameterRun("query")
+        {
+            Text = "old value",
+        };
+        var page = new TestParametersPage
+        {
+            Command = new ListItem(new NoOpCommand { Name = "Run it" }) { Title = "Go" },
+            Parameters = [stringParameter],
+        };
+        var vm = CreateViewModel(page, host);
+
+        try
+        {
+            vm.InitializeProperties();
+            var stringParameterVm = vm.Items.OfType<StringParameterRunViewModel>().Single();
+
+            stringParameterVm.SetTextFromUi("latest value");
+            vm.TrySubmit();
+
+            Assert.AreEqual("latest value", stringParameter.Text);
+        }
+        finally
+        {
+            vm.SafeCleanup();
+            vm.Dispose();
+        }
     }
 
     // Separate frames so the view-models are unreachable on return - a Debug
