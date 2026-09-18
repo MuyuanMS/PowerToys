@@ -301,6 +301,11 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
             }
             catch (OperationCanceledException)
             {
+                if (!ReferenceEquals(pendingWriteTask, Volatile.Read(ref _pendingWriteTask)))
+                {
+                    continue;
+                }
+
                 return false;
             }
 
@@ -916,12 +921,18 @@ public partial class ParametersPageViewModel : PageViewModel, ICommandBarContext
         }
     }
 
-    public void SubmitCommand(CommandItemViewModel? command)
+    public void SubmitCommand(
+        CommandItemViewModel? command,
+        Action<PerformCommandMessage>? commandInvoking = null,
+        Action? commandInvoked = null)
     {
-        _ = SubmitCommandAsync(command);
+        _ = SubmitCommandAsync(command, commandInvoking, commandInvoked);
     }
 
-    public async Task SubmitCommandAsync(CommandItemViewModel? command)
+    public async Task SubmitCommandAsync(
+        CommandItemViewModel? command,
+        Action<PerformCommandMessage>? commandInvoking = null,
+        Action? commandInvoked = null)
     {
         if (command is null)
         {
@@ -935,7 +946,10 @@ public partial class ParametersPageViewModel : PageViewModel, ICommandBarContext
 
         if (ShowCommand)
         {
-            WeakReferenceMessenger.Default.Send<PerformCommandMessage>(new(command.Command.Model, command.Model));
+            var message = new PerformCommandMessage(command.Command.Model, command.Model);
+            commandInvoking?.Invoke(message);
+            WeakReferenceMessenger.Default.Send(message);
+            commandInvoked?.Invoke();
         }
     }
 

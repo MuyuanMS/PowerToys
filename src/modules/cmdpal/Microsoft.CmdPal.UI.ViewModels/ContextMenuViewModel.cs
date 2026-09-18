@@ -261,9 +261,11 @@ public partial class ContextMenuViewModel : ObservableObject,
         {
             if (SelectedItem is ParametersPageViewModel parametersPage)
             {
-                parametersPage.SubmitCommand(command);
+                parametersPage.SubmitCommand(
+                    command,
+                    message => CommandInvoking?.Invoke(this, message),
+                    () => CommandInvoked?.Invoke(this, command));
                 UpdateContextItems();
-                CommandInvoked?.Invoke(this, command);
                 return ContextKeybindingResult.Hide;
             }
 
