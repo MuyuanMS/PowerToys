@@ -24,9 +24,16 @@ public class Program
             // If you want to instantiate a new instance each time the host asks, create the new instance inside the delegate.
             server.RegisterExtension(() => extensionInstance);
 
-            // This will make the main thread wait until the event is signalled by the extension class.
-            // Since we have single instance of the extension object, we exit as soon as it is disposed.
-            extensionDisposedEvent.WaitOne();
+            // Start the lifecycle monitor so the process responds to OS-initiated
+            // shutdown requests (WM_QUERYENDSESSION / WM_ENDSESSION) promptly.
+            // Without this, the COM server blocks on WaitOne indefinitely and is
+            // force-terminated by the OS, producing MOAPPLICATION_HANG reports.
+            using AppLifeMonitor appLifeMonitor = new();
+            appLifeMonitor.Start();
+
+            // Wait until the extension is disposed by the host OR the OS requests
+            // a shutdown / session end, whichever comes first.
+            WaitHandle.WaitAny([extensionDisposedEvent, appLifeMonitor.ExitRequestedWaitHandle]);
         }
         else
         {
