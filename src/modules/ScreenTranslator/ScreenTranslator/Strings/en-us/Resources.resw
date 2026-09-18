@@ -70,6 +70,22 @@
     <value>Close translated overlay</value>
     <comment>Accessible name for the overlay close button</comment>
   </data>
+  <data name="MoveToolbarButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Move overall toolbar</value>
+    <comment>Accessible name for dragging the overall toolbar</comment>
+  </data>
+  <data name="HideToolbarButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Hide overall toolbar</value>
+    <comment>Accessible name for hiding the overall toolbar</comment>
+  </data>
+  <data name="FreezeContentToggleButton.Content" xml:space="preserve">
+    <value>Freeze</value>
+    <comment>Toggles the captured screenshot behind translated text</comment>
+  </data>
+  <data name="FreezeContentToggleButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Freeze captured content</value>
+    <comment>Accessible name for toggling the captured screenshot</comment>
+  </data>
   <data name="SelectionCanvas.AutomationProperties.Name" xml:space="preserve">
     <value>Screen region selection canvas</value>
     <comment>Accessible name for selection canvas</comment>
@@ -219,15 +235,15 @@
     <comment>Accessible name for opening card formatting controls</comment>
   </data>
   <data name="TranslatePanelButton.Content" xml:space="preserve">
-    <value>Translate</value>
+    <value>Language</value>
     <comment>Opens language controls for the selected translated text card</comment>
   </data>
   <data name="TranslatePanelButton.AutomationProperties.Name" xml:space="preserve">
-    <value>Show translation controls</value>
+    <value>Show language controls</value>
     <comment>Accessible name for opening card translation controls</comment>
   </data>
   <data name="ArrangePanelButton.Content" xml:space="preserve">
-    <value>Arrange</value>
+    <value>Layer</value>
     <comment>Opens layer controls for the selected translated text card</comment>
   </data>
   <data name="ArrangePanelButton.AutomationProperties.Name" xml:space="preserve">
@@ -405,12 +421,36 @@
     <comment>Accessible name for restoring hidden translated text</comment>
   </data>
   <data name="CaptureRegionOutlineButton.Content" xml:space="preserve">
-    <value>Region</value>
+    <value>Region outline</value>
     <comment>Toggles the capture region outline</comment>
   </data>
   <data name="CaptureRegionOutlineButton.AutomationProperties.Name" xml:space="preserve">
     <value>Toggle capture region outline</value>
     <comment>Accessible name for toggling the capture region outline</comment>
+  </data>
+  <data name="OverallLanguagePanelButton.Content" xml:space="preserve">
+    <value>Language</value>
+    <comment>Opens capture-wide language controls</comment>
+  </data>
+  <data name="OverallLanguagePanelButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Show capture language controls</value>
+    <comment>Accessible name for opening capture-wide language controls</comment>
+  </data>
+  <data name="OverallViewPanelButton.Content" xml:space="preserve">
+    <value>View</value>
+    <comment>Opens capture-wide view controls</comment>
+  </data>
+  <data name="OverallViewPanelButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Show capture view controls</value>
+    <comment>Accessible name for opening capture-wide view controls</comment>
+  </data>
+  <data name="OverallSourceLanguageComboBox.Header" xml:space="preserve">
+    <value>From</value>
+    <comment>Header for the capture source language</comment>
+  </data>
+  <data name="OverallTargetLanguageComboBox.Header" xml:space="preserve">
+    <value>To</value>
+    <comment>Header for the capture target language</comment>
   </data>
   <data name="ProcessingStatus.Text" xml:space="preserve">
     <value>Recognizing text...</value>

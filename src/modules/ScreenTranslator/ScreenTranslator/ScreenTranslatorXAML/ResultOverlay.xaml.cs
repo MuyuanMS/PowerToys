@@ -372,8 +372,8 @@ public sealed partial class ResultOverlay : TransparentWindow
             ? Visibility.Collapsed
             : Visibility.Visible;
         CaptureRegionOutlineButton.Content = CaptureRegionOutline.Visibility == Visibility.Visible
-            ? "Region"
-            : "Show region";
+            ? "Region outline"
+            : "Show outline";
     }
 
     private void RenderTranslatedBoxes()
@@ -1453,8 +1453,9 @@ public sealed partial class ResultOverlay : TransparentWindow
 
         double overlayWidth = _overlayBounds.Width / _screenInfo.DpiScaleX;
         double overlayHeight = _overlayBounds.Height / _screenInfo.DpiScaleY;
-        double toolbarWidth = Math.Max(48, FloatingToolbar.ActualWidth);
-        double toolbarHeight = Math.Max(48, FloatingToolbar.ActualHeight);
+        FloatingToolbar.Measure(new Windows.Foundation.Size(Math.Max(320, overlayWidth - 16), double.PositiveInfinity));
+        double toolbarWidth = Math.Max(48, FloatingToolbar.DesiredSize.Width);
+        double toolbarHeight = Math.Max(48, FloatingToolbar.DesiredSize.Height);
         double toolbarLeft = Math.Clamp(regionLeftDip, 8, Math.Max(8, overlayWidth - toolbarWidth - 8));
         double toolbarTop = regionTopDip >= toolbarHeight + 16
             ? regionTopDip - toolbarHeight - 8
@@ -1481,8 +1482,62 @@ public sealed partial class ResultOverlay : TransparentWindow
         FloatingToolbar.Margin = new Thickness(toolbarLeft, toolbarTop, 0, 0);
     }
 
+    private void OverallLanguagePanelButton_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleOverallDetailPanel(OverallLanguageDetailPanel, OverallLanguagePanelButton);
+    }
+
+    private void OverallViewPanelButton_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleOverallDetailPanel(OverallViewDetailPanel, OverallViewPanelButton);
+    }
+
+    private void ToggleOverallDetailPanel(FrameworkElement panel, ToggleButton selectedButton)
+    {
+        bool showPanel = selectedButton.IsChecked == true;
+        CollapseOverallDetailPanels();
+        if (showPanel)
+        {
+            selectedButton.IsChecked = true;
+            panel.Visibility = Visibility.Visible;
+            OverallDetailDivider.Visibility = Visibility.Visible;
+        }
+
+        DispatcherQueue.TryEnqueue(RepositionToolbarAfterLayout);
+    }
+
+    private void CollapseOverallDetailPanels()
+    {
+        OverallLanguageDetailPanel.Visibility = Visibility.Collapsed;
+        OverallViewDetailPanel.Visibility = Visibility.Collapsed;
+        OverallDetailDivider.Visibility = Visibility.Collapsed;
+        OverallLanguagePanelButton.IsChecked = false;
+        OverallViewPanelButton.IsChecked = false;
+    }
+
+    private void RepositionToolbarAfterLayout()
+    {
+        if (!_toolbarWasManuallyPositioned)
+        {
+            PositionToolbar(_contextMenuCard);
+            return;
+        }
+
+        double overlayWidth = _overlayBounds.Width / _screenInfo.DpiScaleX;
+        double overlayHeight = _overlayBounds.Height / _screenInfo.DpiScaleY;
+        FloatingToolbar.Measure(new Windows.Foundation.Size(Math.Max(320, overlayWidth - 16), double.PositiveInfinity));
+        double maxLeft = Math.Max(8, overlayWidth - Math.Max(48, FloatingToolbar.DesiredSize.Width) - 8);
+        double maxTop = Math.Max(8, overlayHeight - Math.Max(48, FloatingToolbar.DesiredSize.Height) - 8);
+        FloatingToolbar.Margin = new Thickness(
+            Math.Clamp(FloatingToolbar.Margin.Left, 8, maxLeft),
+            Math.Clamp(FloatingToolbar.Margin.Top, 8, maxTop),
+            0,
+            0);
+    }
+
     private void HideToolbarButton_Click(object sender, RoutedEventArgs e)
     {
+        CollapseOverallDetailPanels();
         FloatingToolbar.Visibility = Visibility.Collapsed;
     }
 

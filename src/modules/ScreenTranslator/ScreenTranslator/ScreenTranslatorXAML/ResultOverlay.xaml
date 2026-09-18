@@ -78,14 +78,14 @@
                             x:Uid="TranslatePanelButton"
                             AutomationProperties.AutomationId="BtnShowOverlayTranslate"
                             Click="TranslatePanelButton_Click"
-                            Content="Translate"
+                            Content="Language"
                             Padding="8,4" />
                         <ToggleButton
                             x:Name="ArrangePanelButton"
                             x:Uid="ArrangePanelButton"
                             AutomationProperties.AutomationId="BtnShowOverlayArrange"
                             Click="ArrangePanelButton_Click"
-                            Content="Arrange"
+                            Content="Layer"
                             Padding="8,4" />
                         <ToggleButton
                             x:Name="MorePanelButton"
@@ -294,123 +294,154 @@
             HorizontalAlignment="Left"
             VerticalAlignment="Top"
             Background="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}"
-            BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}"
+            BackgroundSizing="InnerBorderEdge"
+            BorderBrush="{ThemeResource SurfaceStrokeColorFlyoutBrush}"
             BorderThickness="1"
             CornerRadius="{StaticResource OverlayCornerRadius}"
-            Padding="8,4"
+            MaxWidth="760"
+            Padding="8"
             Margin="16,16,0,0"
             Visibility="Collapsed">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button
-                    x:Name="MoveToolbarButton"
-                    AutomationProperties.AutomationId="BtnMoveOverallToolbar"
-                    AutomationProperties.Name="Move overall toolbar"
-                    PointerMoved="MoveToolbarButton_PointerMoved"
-                    PointerPressed="MoveToolbarButton_PointerPressed"
-                    PointerReleased="MoveToolbarButton_PointerReleased"
-                    Padding="8,2">
-                    <FontIcon Glyph="&#xE7C2;" />
-                </Button>
-                <FontIcon Glyph="&#xE774;" VerticalAlignment="Center" FontSize="16" />
-                <TextBlock
-                    x:Uid="OverlayTitle"
-                    Text="Screen Translator"
-                    Style="{StaticResource BodyStrongTextBlockStyle}"
-                    VerticalAlignment="Center" />
-                <Button
-                    x:Name="CloseButton"
-                    Click="CloseButton_Click"
-                    AutomationProperties.Name="Close translated overlay"
-                    AutomationProperties.AutomationId="BtnCloseOverlay"
-                    Padding="8,2">
-                    <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <Button
+                        x:Name="MoveToolbarButton"
+                        x:Uid="MoveToolbarButton"
+                        AutomationProperties.AutomationId="BtnMoveOverallToolbar"
+                        AutomationProperties.Name="Move overall toolbar"
+                        PointerMoved="MoveToolbarButton_PointerMoved"
+                        PointerPressed="MoveToolbarButton_PointerPressed"
+                        PointerReleased="MoveToolbarButton_PointerReleased"
+                        Padding="8,4">
+                        <FontIcon Glyph="&#xE7C2;" />
+                    </Button>
+                    <FontIcon Glyph="&#xE774;" VerticalAlignment="Center" />
+                    <TextBlock
+                        x:Uid="OverlayTitle"
+                        Text="Screen Translator"
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        VerticalAlignment="Center" />
+                    <Button
+                        x:Name="OriginalAllTextButton"
+                        x:Uid="OriginalAllTextButton"
+                        AutomationProperties.AutomationId="BtnToggleAllOriginalText"
+                        Click="OriginalAllTextButton_Click"
+                        Content="Original"
+                        Padding="8,4" />
+                    <ToggleButton
+                        x:Name="OverallLanguagePanelButton"
+                        x:Uid="OverallLanguagePanelButton"
+                        AutomationProperties.AutomationId="BtnShowOverallLanguage"
+                        Click="OverallLanguagePanelButton_Click"
+                        Content="Language"
+                        Padding="8,4" />
+                    <ToggleButton
+                        x:Name="OverallViewPanelButton"
+                        x:Uid="OverallViewPanelButton"
+                        AutomationProperties.AutomationId="BtnShowOverallView"
+                        Click="OverallViewPanelButton_Click"
+                        Content="View"
+                        Padding="8,4" />
+                    <Button
+                        x:Name="HideToolbarButton"
+                        x:Uid="HideToolbarButton"
+                        AutomationProperties.AutomationId="BtnHideOverallToolbar"
+                        AutomationProperties.Name="Hide overall toolbar"
+                        Click="HideToolbarButton_Click"
+                        Padding="8,4">
+                        <FontIcon Glyph="&#xE70D;" />
+                    </Button>
+                    <Button
+                        x:Name="CloseButton"
+                        x:Uid="CloseButton"
+                        AutomationProperties.AutomationId="BtnCloseOverlay"
+                        AutomationProperties.Name="Close translated overlay"
+                        Click="CloseButton_Click"
+                        Padding="8,4">
                         <SymbolIcon Symbol="Cancel" />
-                        <TextBlock x:Uid="CloseButtonText" Text="Close (Esc)" />
-                    </StackPanel>
-                </Button>
-                <Button
-                    x:Name="RestoreHiddenButton"
-                    x:Uid="RestoreHiddenButton"
-                    AutomationProperties.AutomationId="BtnRestoreHidden"
-                    AutomationProperties.Name="Restore hidden translated text"
-                    Click="RestoreHiddenButton_Click"
-                    Content="Restore hidden" />
-                <ToggleButton
-                    x:Name="FreezeContentToggleButton"
-                    AutomationProperties.AutomationId="BtnToggleFrozenContent"
-                    AutomationProperties.Name="Freeze captured content"
-                    Click="FreezeContentToggleButton_Click"
-                    Content="Freeze"
-                    Padding="8,2" />
-                <Button
-                    x:Name="CaptureRegionOutlineButton"
-                    x:Uid="CaptureRegionOutlineButton"
-                    AutomationProperties.AutomationId="BtnToggleCaptureRegionOutline"
-                    Click="CaptureRegionOutlineButton_Click"
-                    Content="Region"
-                    Padding="8,2" />
-                <Button
-                    x:Name="HideToolbarButton"
-                    AutomationProperties.AutomationId="BtnHideOverallToolbar"
-                    AutomationProperties.Name="Hide overall toolbar"
-                    Click="HideToolbarButton_Click"
-                    Padding="8,2">
-                    <FontIcon Glyph="&#xE70D;" />
-                </Button>
-                <StackPanel Spacing="4" VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal" Spacing="4">
-                        <TextBlock
-                            x:Uid="OverallSourceLanguageLabel"
-                            Style="{StaticResource CaptionTextBlockStyle}"
-                            Text="Source Language"
-                            VerticalAlignment="Center" />
-                        <ComboBox
-                            x:Name="OverallSourceLanguageComboBox"
-                            x:Uid="OverallSourceLanguageComboBox"
-                            AutomationProperties.AutomationId="ComboOverallSourceLanguage"
-                            Width="144">
-                            <ComboBoxItem x:Uid="OverallSourceAuto" Tag="auto" />
-                            <ComboBoxItem x:Uid="OverallSourceEnglish" Tag="en" />
-                            <ComboBoxItem x:Uid="OverallSourceChinese" Tag="zh" />
-                            <ComboBoxItem x:Uid="OverallSourceJapanese" Tag="ja" />
-                            <ComboBoxItem x:Uid="OverallSourceKorean" Tag="ko" />
-                            <ComboBoxItem x:Uid="OverallSourceFrench" Tag="fr" />
-                            <ComboBoxItem x:Uid="OverallSourceGerman" Tag="de" />
-                            <ComboBoxItem x:Uid="OverallSourceSpanish" Tag="es" />
-                        </ComboBox>
-                        <TextBlock
-                            x:Uid="OverallTargetLanguageLabel"
-                            Style="{StaticResource CaptionTextBlockStyle}"
-                            Text="Target Language"
-                            VerticalAlignment="Center" />
-                        <ComboBox
-                            x:Name="OverallTargetLanguageComboBox"
-                            x:Uid="OverallTargetLanguageComboBox"
-                            AutomationProperties.AutomationId="ComboOverallTargetLanguage"
-                            Width="144">
-                            <ComboBoxItem x:Uid="OverallTargetEnglish" Tag="en-US" />
-                            <ComboBoxItem x:Uid="OverallTargetChinese" Tag="zh-Hans" />
-                            <ComboBoxItem x:Uid="OverallTargetJapanese" Tag="ja" />
-                            <ComboBoxItem x:Uid="OverallTargetKorean" Tag="ko" />
-                            <ComboBoxItem x:Uid="OverallTargetFrench" Tag="fr" />
-                            <ComboBoxItem x:Uid="OverallTargetGerman" Tag="de" />
-                            <ComboBoxItem x:Uid="OverallTargetSpanish" Tag="es" />
-                        </ComboBox>
-                        <Button
-                            x:Name="ApplyOverallLanguageButton"
-                            x:Uid="ApplyOverallLanguageButton"
-                            AutomationProperties.AutomationId="BtnApplyOverallLanguage"
-                            Click="ApplyOverallLanguageButton_Click"
-                            Content="Translate"
-                            Padding="8,2" />
-                        <Button
-                            x:Name="OriginalAllTextButton"
-                            x:Uid="OriginalAllTextButton"
-                            AutomationProperties.AutomationId="BtnToggleAllOriginalText"
-                            Click="OriginalAllTextButton_Click"
-                            Content="Original"
-                            Padding="8,2" />
-                    </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <Border
+                    x:Name="OverallDetailDivider"
+                    Height="1"
+                    Background="{ThemeResource DividerStrokeColorDefaultBrush}"
+                    Visibility="Collapsed" />
+
+                <StackPanel
+                    x:Name="OverallLanguageDetailPanel"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    Visibility="Collapsed">
+                    <ComboBox
+                        x:Name="OverallSourceLanguageComboBox"
+                        x:Uid="OverallSourceLanguageComboBox"
+                        AutomationProperties.AutomationId="ComboOverallSourceLanguage"
+                        Header="From"
+                        Width="176">
+                        <ComboBoxItem x:Uid="OverallSourceAuto" Tag="auto" />
+                        <ComboBoxItem x:Uid="OverallSourceEnglish" Tag="en" />
+                        <ComboBoxItem x:Uid="OverallSourceChinese" Tag="zh" />
+                        <ComboBoxItem x:Uid="OverallSourceJapanese" Tag="ja" />
+                        <ComboBoxItem x:Uid="OverallSourceKorean" Tag="ko" />
+                        <ComboBoxItem x:Uid="OverallSourceFrench" Tag="fr" />
+                        <ComboBoxItem x:Uid="OverallSourceGerman" Tag="de" />
+                        <ComboBoxItem x:Uid="OverallSourceSpanish" Tag="es" />
+                    </ComboBox>
+                    <FontIcon Glyph="&#xE72A;" VerticalAlignment="Center" />
+                    <ComboBox
+                        x:Name="OverallTargetLanguageComboBox"
+                        x:Uid="OverallTargetLanguageComboBox"
+                        AutomationProperties.AutomationId="ComboOverallTargetLanguage"
+                        Header="To"
+                        Width="176">
+                        <ComboBoxItem x:Uid="OverallTargetEnglish" Tag="en-US" />
+                        <ComboBoxItem x:Uid="OverallTargetChinese" Tag="zh-Hans" />
+                        <ComboBoxItem x:Uid="OverallTargetJapanese" Tag="ja" />
+                        <ComboBoxItem x:Uid="OverallTargetKorean" Tag="ko" />
+                        <ComboBoxItem x:Uid="OverallTargetFrench" Tag="fr" />
+                        <ComboBoxItem x:Uid="OverallTargetGerman" Tag="de" />
+                        <ComboBoxItem x:Uid="OverallTargetSpanish" Tag="es" />
+                    </ComboBox>
+                    <Button
+                        x:Name="ApplyOverallLanguageButton"
+                        x:Uid="ApplyOverallLanguageButton"
+                        AutomationProperties.AutomationId="BtnApplyOverallLanguage"
+                        VerticalAlignment="Bottom"
+                        Click="ApplyOverallLanguageButton_Click"
+                        Content="Translate"
+                        Padding="12,4"
+                        Style="{StaticResource AccentButtonStyle}" />
+                </StackPanel>
+
+                <StackPanel
+                    x:Name="OverallViewDetailPanel"
+                    Orientation="Horizontal"
+                    Spacing="4"
+                    Visibility="Collapsed">
+                    <ToggleButton
+                        x:Name="FreezeContentToggleButton"
+                        x:Uid="FreezeContentToggleButton"
+                        AutomationProperties.AutomationId="BtnToggleFrozenContent"
+                        AutomationProperties.Name="Freeze captured content"
+                        Click="FreezeContentToggleButton_Click"
+                        Content="Freeze"
+                        Padding="8,4" />
+                    <Button
+                        x:Name="CaptureRegionOutlineButton"
+                        x:Uid="CaptureRegionOutlineButton"
+                        AutomationProperties.AutomationId="BtnToggleCaptureRegionOutline"
+                        Click="CaptureRegionOutlineButton_Click"
+                        Content="Region outline"
+                        Padding="8,4" />
+                    <Button
+                        x:Name="RestoreHiddenButton"
+                        x:Uid="RestoreHiddenButton"
+                        AutomationProperties.AutomationId="BtnRestoreHidden"
+                        AutomationProperties.Name="Restore hidden translated text"
+                        Click="RestoreHiddenButton_Click"
+                        Content="Restore hidden"
+                        Padding="8,4" />
                 </StackPanel>
             </StackPanel>
         </Border>
