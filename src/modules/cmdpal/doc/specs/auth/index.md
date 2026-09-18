@@ -20,8 +20,8 @@ piece you can't do safely from inside your extension: the browser redirect.
   Authorization Code with PKCE, refreshes tokens, and drives device-code sign-in.
 - A thin, shared redirect broker in the host so every extension gets the same tested
   path through the browser instead of each rolling its own.
-- Optional token storage backed by the package-isolated Windows Credential Locker,
-  all inside your process.
+- Optional token storage backed by the Windows Credential Locker, with an explicit
+  same-user process boundary, all called from your process.
 
 ## When not to use this
 
@@ -38,11 +38,13 @@ The design is a hybrid, and the line between the two halves is the whole point.
 The **host** owns the risky, shared parts of the browser round trip. It opens the
 system browser, allocates and hosts the `redirect_uri`, generates and validates
 `state`, captures the redirect, and pulls the palette back to the front. That's it.
-It never sees your tokens.
+Tokens never cross its ABI.
 
 Your **extension** owns everything private to you. The Toolkit generates the PKCE
 verifier, exchanges the code for a token, refreshes it, and stores it if you want.
 All of that happens in your process. The verifier and the tokens never cross the ABI.
+Persistent token stores can have broader operating-system access boundaries; see
+[Token storage](#token-storage).
 
 | Responsibility | Host | Extension (Toolkit) |
 |---|---|---|
@@ -63,7 +65,7 @@ keeps you in control of your own tokens.
 ## Goals
 
 - One tested OAuth path that any extension can adopt in a few lines.
-- Tokens never touch the host. Ever.
+- Tokens never cross the host ABI.
 - PKCE by default, public clients only, no secrets in packages.
 - Graceful behavior on older hosts that don't support the flow.
 
@@ -152,10 +154,12 @@ refresh tokens behind it.
 Providers are allowed to omit `refresh_token` from a successful refresh response.
 `RefreshAsync` accepts the previous `OAuthToken`, preserves its refresh token and
 granted scope when the provider omits either value, and replaces them only when the
-provider returns updated metadata.
+provider returns updated metadata. It does not inherit the previous access token's
+expiry when `expires_in` is omitted; the refreshed token's expiry is unknown.
 
-`OAuthToken.IsExpired(skew)` helps you decide when to refresh, so you can refresh a
-little early instead of waiting for a 401.
+`OAuthToken.ExpiresAt` is nullable because RFC 6749 makes `expires_in` optional.
+`OAuthToken.IsExpired(skew)` returns `false` when expiry is unknown; in that state,
+react to an authorization failure or apply a provider-specific refresh policy.
 
 ### Device-code
 
@@ -206,7 +210,9 @@ There are two layers. Most extensions only ever touch the Toolkit.
 ### Host ABI
 
 The contract lives in `Microsoft.CommandPalette.Extensions.idl`. A host that speaks
-the new flow implements `IExtensionHost2`, which extends `IExtensionHost`.
+the new flow implements `IExtensionHost2`, which extends `IExtensionHost`. Host-owned
+sign-in UI derives the extension identity from the bound extension manifest rather
+than accepting caller-controlled identity text.
 
 ```c++
 enum AuthorizationRedirectKind
@@ -217,7 +223,6 @@ enum AuthorizationRedirectKind
 
 interface IAuthorizationRequest
 {
-    String DisplayName { get; };            // shown in the "waiting to sign in" status
     String AuthorizationEndpoint { get; };  // the provider authorize URL
     // The host rejects any raw query parameters named redirect_uri, state,
     // response_type, response_mode, or code_challenge_method in the provider URL,
@@ -281,14 +286,15 @@ var client = new OAuthClient
     TokenEndpoint = "https://provider.example/oauth/token",
     Scopes = ["openid", "profile"],
     RedirectKind = AuthorizationRedirectKind.Loopback,
-    DisplayName = "My extension",
 };
 
 // Interactive: PKCE, host broker, token exchange, then navigate to the landing page.
 OAuthToken token = await client.AuthorizeAsync(new MySignedInPage());
 
 // Later, when the token is close to expiring:
-if (token.IsExpired(TimeSpan.FromMinutes(2)) && token.RefreshToken is not null)
+if (token.ExpiresAt is not null &&
+    token.IsExpired(TimeSpan.FromMinutes(2)) &&
+    token.RefreshToken is not null)
 {
     token = await client.RefreshAsync(token);
 }
@@ -299,7 +305,7 @@ The pieces the Toolkit gives you:
 - `OAuthClient`: `AuthorizeAsync`, `RefreshAsync`, and the device-code entry point.
 - `Pkce`: S256 verifier and challenge, base64url helpers.
 - `OAuthToken`: access token, optional refresh and id tokens, token type, scope,
-  expiry, and `IsExpired(skew)`.
+  nullable expiry, and `IsExpired(skew)`.
 - `OAuthException`: thrown with a provider error when the exchange fails.
 - `ITokenStore` and `CredentialLockerTokenStore`: optional storage, covered below.
 
@@ -345,7 +351,8 @@ and so the redirect is hard to spoof.
   host-owned loopback redirect on `127.0.0.1`.
 - **Loopback is bound to `127.0.0.1` only,** on an ephemeral port, per RFC 8252.
 - **No token storage in the host.** Tokens are exchanged and stored entirely in your
-  process.
+  process and never cross the host ABI. A persistent store's own access boundary still
+  applies.
 - **Timeouts are capped.** `TimeoutSeconds` defaults to 60 and the host caps it at
   300. The absolute deadline spans redirect capture through extension completion;
   expiry or extension disconnect clears the session, and late completion is rejected.
@@ -359,20 +366,19 @@ Storing a token is optional, and it happens in your process. The Toolkit gives y
 
 - `ITokenStore`: a small `Retrieve` / `Save` / `Remove` abstraction keyed by a string.
 - `CredentialLockerTokenStore`: an `ITokenStore` backed by
-  `Windows.Security.Credentials.PasswordVault`. The package identity isolates these
-  credentials from other package identities and same-user unpackaged desktop
-  processes, but extensions or providers sharing one package identity also share its
-  vault. It is available only to packaged extensions; when package identity is
-  unavailable, use a caller-supplied `ITokenStore` or keep the token in memory. Do not
-  fall back to Win32 generic credentials, which are user-scoped and do not provide
-  package isolation. Namespace keys by extension, provider, and account to prevent
-  collisions; key names are not an access-control boundary within a shared package.
+  `Windows.Security.Credentials.PasswordVault`. It protects stored values at rest and
+  separates Windows users, but it is not an isolation boundary from other full-trust
+  desktop processes running as the same user; those processes can access the user's
+  lockers. Namespace keys by extension, provider, and account to prevent collisions,
+  but do not treat key names or package identity as access control. Extensions whose
+  threat model requires same-user process isolation must supply a stronger store or
+  keep tokens in memory.
 
 There's an important thing to note though: the Credential Locker caps a stored secret
 at a few kilobytes. That's plenty for typical access and refresh tokens, but a very
 large JWT can blow past it. Guard `Save` in a try/catch and treat storage as best
-effort. If you routinely carry large tokens, a package-isolated alternative is a
-reasonable future addition.
+effort. If you routinely carry large tokens or require a narrower access boundary,
+provide a store designed for that threat model.
 
 ## Durability
 
