@@ -1,17 +1,64 @@
 #include "pch.h"
-#if _DEBUG && _WIN64
 #include "unhandled_exception_handler.h"
+#include <csignal>
+#include <cstdint>
+#include <cstdio>
+#include <string>
+
+#if _DEBUG && _WIN64
 #include <DbgHelp.h>
 #pragma comment(lib, "DbgHelp.lib")
-#include <string>
 #include <sstream>
-#include <csignal>
+#endif
 
-static IMAGEHLP_SYMBOL64* p_symbol = static_cast<IMAGEHLP_SYMBOL64*>(malloc(sizeof(IMAGEHLP_SYMBOL64) + MAX_PATH * sizeof(WCHAR)));
-static IMAGEHLP_LINE64 line;
-static bool processing_exception = false;
-static WCHAR module_path[MAX_PATH];
-static LPTOP_LEVEL_EXCEPTION_FILTER default_top_level_exception_handler = NULL;
+static thread_local bool processing_exception = false;
+static LPTOP_LEVEL_EXCEPTION_FILTER default_top_level_exception_handler = nullptr;
+
+// Pre-opened crash-marker file handle.  Opened once in init_global_error_handlers()
+// before any potentially-throwing startup code.  WriteFile to this handle is
+// allocation-free and mutex-free so it is safe to use from the SEH filter and
+// std::terminate handler.
+static HANDLE g_crash_marker_handle = INVALID_HANDLE_VALUE;
+
+// Write a null-terminated ASCII message to the crash marker file.
+// Must not allocate memory, lock mutexes, or throw.
+static void write_crash_marker(const char* msg) noexcept
+{
+    if (g_crash_marker_handle == INVALID_HANDLE_VALUE || msg == nullptr)
+    {
+        return;
+    }
+    DWORD len = static_cast<DWORD>(strlen(msg));
+    if (len > 0)
+    {
+        DWORD written = 0;
+        WriteFile(g_crash_marker_handle, msg, len, &written, nullptr);
+    }
+}
+
+void write_crash_marker_message(const char* msg)
+{
+    write_crash_marker(msg);
+}
+
+#if _DEBUG && _WIN64
+static LONG s_diagnostics_in_progress = 0;
+
+struct debug_diagnostics_guard
+{
+    debug_diagnostics_guard() noexcept = default;
+    debug_diagnostics_guard(const debug_diagnostics_guard&) = delete;
+    debug_diagnostics_guard& operator=(const debug_diagnostics_guard&) = delete;
+    debug_diagnostics_guard(debug_diagnostics_guard&&) = delete;
+    debug_diagnostics_guard& operator=(debug_diagnostics_guard&&) = delete;
+
+    // Caller must construct this only after InterlockedCompareExchange has set
+    // s_diagnostics_in_progress from 0 -> 1.
+    ~debug_diagnostics_guard()
+    {
+        InterlockedExchange(&s_diagnostics_in_progress, 0);
+    }
+};
 
 static const WCHAR* exception_description(const DWORD& code)
 {
@@ -61,6 +108,9 @@ static const WCHAR* exception_description(const DWORD& code)
         return L"UNKNOWN EXCEPTION";
     }
 }
+static IMAGEHLP_SYMBOL64* p_symbol = static_cast<IMAGEHLP_SYMBOL64*>(malloc(sizeof(IMAGEHLP_SYMBOL64) + MAX_PATH * sizeof(WCHAR)));
+static IMAGEHLP_LINE64 line;
+static WCHAR module_path[MAX_PATH];
 
 void init_symbols()
 {
@@ -139,44 +189,124 @@ void log_stack_trace(std::wstring& generalErrorDescription)
     auto errorString = ss.str();
     MessageBoxW(NULL, errorString.c_str(), L"Unhandled Error", MB_OK | MB_ICONERROR);
 }
+#endif // _DEBUG && _WIN64
 
 LONG WINAPI unhandled_exception_handler(PEXCEPTION_POINTERS info)
 {
     if (!processing_exception)
     {
         processing_exception = true;
-        try
+        DWORD code = 0;
+        if (info != nullptr && info->ExceptionRecord != nullptr)
         {
-            init_symbols();
-            std::wstring ex_description = L"Exception code not available";
-            if (info != NULL && info->ExceptionRecord != NULL && info->ExceptionRecord->ExceptionCode != NULL)
+            code = info->ExceptionRecord->ExceptionCode;
+        }
+        // Primary: allocation-free, mutex-free persistent marker.  Works even before
+        // Logger is initialised and even if the heap or spdlog internals are corrupted.
+        static constexpr char kCrashPrefix[] = "[PowerToys Runner] CRASH: Unhandled exception code=0x";
+        static constexpr size_t kPrefixLen = sizeof(kCrashPrefix) - 1;
+        static constexpr int kHexDigitCount = 8;
+        static constexpr int kBitsPerNibble = 4;
+        static constexpr int kMsNibbleShift = (kHexDigitCount - 1) * kBitsPerNibble;
+        static constexpr size_t kNewlineAndNullCount = 2;
+        char crashMsg[kPrefixLen + kHexDigitCount + kNewlineAndNullCount];
+        memcpy(crashMsg, kCrashPrefix, kPrefixLen);
+        static constexpr char kHexDigits[] = "0123456789ABCDEF";
+        for (int i = 0; i < kHexDigitCount; ++i)
+        {
+            // Extract each 4-bit nibble from most-significant to least-significant.
+            const int nibbleShift = kMsNibbleShift - (kBitsPerNibble * i);
+            crashMsg[kPrefixLen + i] = kHexDigits[(static_cast<uint32_t>(code) >> nibbleShift) & 0xF];
+        }
+        crashMsg[kPrefixLen + kHexDigitCount] = '\n';
+        crashMsg[kPrefixLen + kHexDigitCount + 1] = '\0';
+        write_crash_marker(crashMsg);
+#if _DEBUG && _WIN64
+        // DbgHelp/global symbol state is not thread-safe; use a process-wide non-blocking
+        // guard so only one thread runs rich debug diagnostics. Losing threads still write
+        // their crash marker and continue normal handler chaining.
+        if (InterlockedCompareExchange(&s_diagnostics_in_progress, 1, 0) == 0)
+        {
+            debug_diagnostics_guard diagnostics_guard;
+            try
             {
-                ex_description = exception_description(info->ExceptionRecord->ExceptionCode);
+                init_symbols();
+                std::wstring ex_description = (info != nullptr && info->ExceptionRecord != nullptr) ? std::wstring{ exception_description(code) } : L"Exception code not available";
+                log_stack_trace(ex_description);
             }
-            log_stack_trace(ex_description);
+            catch (...)
+            {
+                // Diagnostic failures must not block crash handling/filter chaining.
+            }
         }
-        catch (...)
+#endif
+        // Keep the recursion guard SET while invoking the previous handler so that a
+        // nested exception raised by that filter does not re-enter this code.  Reset
+        // the guard after the call so that any later fault on this thread is handled
+        // normally (e.g. EXCEPTION_CONTINUE_EXECUTION resumes execution and the next
+        // fault must still produce a marker).
+        LONG disposition = EXCEPTION_CONTINUE_SEARCH;
+        if (default_top_level_exception_handler != nullptr && info != nullptr)
         {
-        }
-        if (default_top_level_exception_handler != NULL && info != NULL)
-        {
-            default_top_level_exception_handler(info);
+            disposition = default_top_level_exception_handler(info);
         }
         processing_exception = false;
+        return disposition;
     }
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
-extern "C" void AbortHandler(int /*signal_number*/)
+extern "C" void AbortHandler(int signal_number)
 {
-    init_symbols();
-    std::wstring ex_description = L"SIGABRT was raised.";
-    log_stack_trace(ex_description);
+    // MSVC's signal handler contract permits only very limited work here.
+    // Do not log, allocate, take locks, or call Win32 diagnostics from this context.
+    // std::terminate writes the crash marker before calling abort(); direct abort()
+    // continues through the CRT's normal termination path after this handler returns.
+    signal(signal_number, SIG_DFL);
 }
 
 void init_global_error_handlers()
 {
+    // Open a crash-marker file before registering the handlers so the SEH filter and
+    // std::terminate handler can write an allocation-free diagnostic to disk even
+    // before Logger::init() has been called.  GetEnvironmentVariableW requires no COM
+    // and is safe at the earliest startup point.
+    wchar_t localAppData[MAX_PATH];
+    DWORD envLen = GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, MAX_PATH);
+    if (envLen > 0 && envLen < MAX_PATH)
+    {
+        wchar_t dirPath[MAX_PATH];
+        // Create the Microsoft parent directory, then the PowerToys child.
+        // _snwprintf_s returns -1 on truncation; a truncated path would be unusable.
+        if (_snwprintf_s(dirPath, MAX_PATH, _TRUNCATE,
+                         L"%s\\Microsoft", localAppData) > 0)
+        {
+            CreateDirectoryW(dirPath, nullptr); // no-op if the directory already exists
+        }
+        if (_snwprintf_s(dirPath, MAX_PATH, _TRUNCATE,
+                         L"%s\\Microsoft\\PowerToys", localAppData) > 0)
+        {
+            CreateDirectoryW(dirPath, nullptr); // no-op if the directory already exists
+            wchar_t crashPath[MAX_PATH];
+            if (_snwprintf_s(crashPath, MAX_PATH, _TRUNCATE,
+                             L"%s\\runner-crash.log", dirPath) > 0)
+            {
+                // FILE_APPEND_DATA ensures each crash is appended rather than overwriting
+                // a prior record, so multiple faults in a session are all preserved.
+                // FILE_SHARE_READ | FILE_SHARE_WRITE lets a restarted replacement runner
+                // process also open this file for appending (e.g. after restart_if_scheduled).
+                g_crash_marker_handle = CreateFileW(
+                    crashPath,
+                    FILE_APPEND_DATA,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE,
+                    nullptr,
+                    OPEN_ALWAYS,
+                    FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH,
+                    nullptr);
+            }
+        }
+    }
+
     default_top_level_exception_handler = SetUnhandledExceptionFilter(unhandled_exception_handler);
     signal(SIGABRT, &AbortHandler);
 }
-#endif
