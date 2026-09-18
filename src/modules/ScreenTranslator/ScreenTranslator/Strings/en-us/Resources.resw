@@ -70,14 +70,6 @@
     <value>Close translated overlay</value>
     <comment>Accessible name for the overlay close button</comment>
   </data>
-  <data name="MoveToolbarButton.AutomationProperties.Name" xml:space="preserve">
-    <value>Move overall toolbar</value>
-    <comment>Accessible name for dragging the overall toolbar</comment>
-  </data>
-  <data name="HideToolbarButton.AutomationProperties.Name" xml:space="preserve">
-    <value>Hide overall toolbar</value>
-    <comment>Accessible name for hiding the overall toolbar</comment>
-  </data>
   <data name="FreezeContentToggleButton.Content" xml:space="preserve">
     <value>Freeze</value>
     <comment>Toggles the captured screenshot behind translated text</comment>
@@ -113,14 +105,6 @@
   <data name="HideCardButton.AutomationProperties.Name" xml:space="preserve">
     <value>Hide this translated text</value>
     <comment>Accessible name for hiding the selected translated text card</comment>
-  </data>
-  <data name="HideMatchingCardsButton.Content" xml:space="preserve">
-    <value>Hide same source text</value>
-    <comment>Hides translated cards with matching source text</comment>
-  </data>
-  <data name="HideMatchingCardsButton.AutomationProperties.Name" xml:space="preserve">
-    <value>Hide translated text with the same source</value>
-    <comment>Accessible name for hiding matching translated text cards</comment>
   </data>
   <data name="RestoreContextMenuButton.Content" xml:space="preserve">
     <value>Restore hidden text</value>
@@ -249,10 +233,6 @@
   <data name="ArrangePanelButton.AutomationProperties.Name" xml:space="preserve">
     <value>Show layer controls</value>
     <comment>Accessible name for opening card layer controls</comment>
-  </data>
-  <data name="MorePanelButton.AutomationProperties.Name" xml:space="preserve">
-    <value>Show more card actions</value>
-    <comment>Accessible name for opening additional card actions</comment>
   </data>
   <data name="BackgroundColorButton.ToolTipService.ToolTip" xml:space="preserve">
     <value>Background color</value>

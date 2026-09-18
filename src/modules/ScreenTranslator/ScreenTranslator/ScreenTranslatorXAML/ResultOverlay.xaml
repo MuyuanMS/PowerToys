@@ -87,14 +87,6 @@
                             Click="ArrangePanelButton_Click"
                             Content="Layer"
                             Padding="8,4" />
-                        <ToggleButton
-                            x:Name="MorePanelButton"
-                            x:Uid="MorePanelButton"
-                            AutomationProperties.AutomationId="BtnShowOverlayMore"
-                            Click="MorePanelButton_Click"
-                            Padding="8,4">
-                            <FontIcon Glyph="&#xE712;" />
-                        </ToggleButton>
                         <Button
                             x:Name="HideCardButton"
                             x:Uid="HideCardButton"
@@ -262,27 +254,6 @@
                             Content="Send to back"
                             Padding="8,4" />
                     </StackPanel>
-
-                    <StackPanel
-                        x:Name="MoreDetailPanel"
-                        Orientation="Horizontal"
-                        Spacing="4"
-                        Visibility="Collapsed">
-                        <Button
-                            x:Name="HideMatchingCardsButton"
-                            x:Uid="HideMatchingCardsButton"
-                            AutomationProperties.AutomationId="BtnHideMatchingOverlayCards"
-                            Click="HideMatchingCardsButton_Click"
-                            Content="Hide matching"
-                            Padding="8,4" />
-                        <Button
-                            x:Name="RestoreContextMenuButton"
-                            x:Uid="RestoreContextMenuButton"
-                            AutomationProperties.AutomationId="BtnRestoreHiddenFromCardMenu"
-                            Click="RestoreContextMenuButton_Click"
-                            Content="Restore hidden"
-                            Padding="8,4" />
-                    </StackPanel>
                 </StackPanel>
             </Border>
         </Canvas>
@@ -301,20 +272,13 @@
             MaxWidth="760"
             Padding="8"
             Margin="16,16,0,0"
+            PointerCanceled="FloatingToolbar_PointerReleased"
+            PointerMoved="FloatingToolbar_PointerMoved"
+            PointerPressed="FloatingToolbar_PointerPressed"
+            PointerReleased="FloatingToolbar_PointerReleased"
             Visibility="Collapsed">
             <StackPanel Spacing="8">
                 <StackPanel Orientation="Horizontal" Spacing="4">
-                    <Button
-                        x:Name="MoveToolbarButton"
-                        x:Uid="MoveToolbarButton"
-                        AutomationProperties.AutomationId="BtnMoveOverallToolbar"
-                        AutomationProperties.Name="Move overall toolbar"
-                        PointerMoved="MoveToolbarButton_PointerMoved"
-                        PointerPressed="MoveToolbarButton_PointerPressed"
-                        PointerReleased="MoveToolbarButton_PointerReleased"
-                        Padding="8,4">
-                        <FontIcon Glyph="&#xE7C2;" />
-                    </Button>
                     <FontIcon Glyph="&#xE774;" VerticalAlignment="Center" />
                     <TextBlock
                         x:Uid="OverlayTitle"
@@ -342,15 +306,6 @@
                         Click="OverallViewPanelButton_Click"
                         Content="View"
                         Padding="8,4" />
-                    <Button
-                        x:Name="HideToolbarButton"
-                        x:Uid="HideToolbarButton"
-                        AutomationProperties.AutomationId="BtnHideOverallToolbar"
-                        AutomationProperties.Name="Hide overall toolbar"
-                        Click="HideToolbarButton_Click"
-                        Padding="8,4">
-                        <FontIcon Glyph="&#xE70D;" />
-                    </Button>
                     <Button
                         x:Name="CloseButton"
                         x:Uid="CloseButton"

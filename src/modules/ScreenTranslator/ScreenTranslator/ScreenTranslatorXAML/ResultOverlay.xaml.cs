@@ -596,11 +596,6 @@ public sealed partial class ResultOverlay : TransparentWindow
         ToggleCardDetailPanel(ArrangeDetailPanel, ArrangePanelButton);
     }
 
-    private void MorePanelButton_Click(object sender, RoutedEventArgs e)
-    {
-        ToggleCardDetailPanel(MoreDetailPanel, MorePanelButton);
-    }
-
     private void ToggleCardDetailPanel(FrameworkElement panel, ToggleButton selectedButton)
     {
         bool showPanel = selectedButton.IsChecked == true;
@@ -623,12 +618,10 @@ public sealed partial class ResultOverlay : TransparentWindow
         FormatDetailPanel.Visibility = Visibility.Collapsed;
         TranslateDetailPanel.Visibility = Visibility.Collapsed;
         ArrangeDetailPanel.Visibility = Visibility.Collapsed;
-        MoreDetailPanel.Visibility = Visibility.Collapsed;
         CardDetailDivider.Visibility = Visibility.Collapsed;
         FormatPanelButton.IsChecked = false;
         TranslatePanelButton.IsChecked = false;
         ArrangePanelButton.IsChecked = false;
-        MorePanelButton.IsChecked = false;
     }
 
     private void HideCardButton_Click(object sender, RoutedEventArgs e)
@@ -639,8 +632,9 @@ public sealed partial class ResultOverlay : TransparentWindow
             _cardHitRegions[_contextMenuLineIndex].Card.Visibility = Visibility.Collapsed;
         }
 
-        CardContextMenu.Visibility = Visibility.Collapsed;
-        ContextMenuCanvas.IsHitTestVisible = false;
+        _selectedLineIndex = -1;
+        HighlightSelectedCard();
+        CloseContextMenu();
         _isInitializingColorPickers = false;
     }
 
@@ -1393,31 +1387,6 @@ public sealed partial class ResultOverlay : TransparentWindow
         }
     }
 
-    private void HideMatchingCardsButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (_contextMenuLine is not null)
-        {
-            for (int i = 0; i < _lines.Count; i++)
-            {
-                if (string.Equals(_lines[i].OriginalText, _contextMenuLine.OriginalText, StringComparison.Ordinal))
-                {
-                    _hiddenLineIndices.Add(i);
-                    _cardHitRegions[i].Card.Visibility = Visibility.Collapsed;
-                }
-            }
-        }
-
-        CardContextMenu.Visibility = Visibility.Collapsed;
-        ContextMenuCanvas.IsHitTestVisible = false;
-    }
-
-    private void RestoreContextMenuButton_Click(object sender, RoutedEventArgs e)
-    {
-        RestoreHiddenButton_Click(sender, e);
-        CardContextMenu.Visibility = Visibility.Collapsed;
-        ContextMenuCanvas.IsHitTestVisible = false;
-    }
-
     private static Brush CreateBackgroundBrush(TranslatedLine line)
     {
         return line.OverlayBackgroundColorArgb.HasValue
@@ -1535,23 +1504,22 @@ public sealed partial class ResultOverlay : TransparentWindow
             0);
     }
 
-    private void HideToolbarButton_Click(object sender, RoutedEventArgs e)
+    private void FloatingToolbar_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        CollapseOverallDetailPanels();
-        FloatingToolbar.Visibility = Visibility.Collapsed;
-    }
+        if (IsInteractiveToolbarSource(e.OriginalSource as DependencyObject))
+        {
+            return;
+        }
 
-    private void MoveToolbarButton_PointerPressed(object sender, PointerRoutedEventArgs e)
-    {
         _isToolbarDragging = true;
         _toolbarPointerId = e.Pointer.PointerId;
         _toolbarDragStart = e.GetCurrentPoint(ResultCanvas).Position;
         _toolbarDragStartMargin = FloatingToolbar.Margin;
-        MoveToolbarButton.CapturePointer(e.Pointer);
+        FloatingToolbar.CapturePointer(e.Pointer);
         e.Handled = true;
     }
 
-    private void MoveToolbarButton_PointerMoved(object sender, PointerRoutedEventArgs e)
+    private void FloatingToolbar_PointerMoved(object sender, PointerRoutedEventArgs e)
     {
         if (!_isToolbarDragging || e.Pointer.PointerId != _toolbarPointerId)
         {
@@ -1568,7 +1536,7 @@ public sealed partial class ResultOverlay : TransparentWindow
         e.Handled = true;
     }
 
-    private void MoveToolbarButton_PointerReleased(object sender, PointerRoutedEventArgs e)
+    private void FloatingToolbar_PointerReleased(object sender, PointerRoutedEventArgs e)
     {
         if (!_isToolbarDragging || e.Pointer.PointerId != _toolbarPointerId)
         {
@@ -1576,8 +1544,24 @@ public sealed partial class ResultOverlay : TransparentWindow
         }
 
         _isToolbarDragging = false;
-        MoveToolbarButton.ReleasePointerCapture(e.Pointer);
+        FloatingToolbar.ReleasePointerCapture(e.Pointer);
         e.Handled = true;
+    }
+
+    private bool IsInteractiveToolbarSource(DependencyObject? source)
+    {
+        DependencyObject? current = source;
+        while (current is not null && !ReferenceEquals(current, FloatingToolbar))
+        {
+            if (current is ButtonBase or ComboBox or ComboBoxItem)
+            {
+                return true;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return false;
     }
 
     private void PositionCaptureRegionOutline()
