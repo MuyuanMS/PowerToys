@@ -707,7 +707,7 @@ HRESULT CPowerRenameManager::_CreateFileOpWorkerThread()
     if (pwtd)
     {
         pwtd->hwndManager = m_hwndMessage;
-        pwtd->startEvent = m_startRegExWorkerEvent;
+        pwtd->startEvent = m_startFileOpWorkerEvent;
         pwtd->cancelEvent = nullptr;
         pwtd->spsrm = this;
         m_fileOpWorkerThreadHandle = CreateThread(nullptr, 0, s_fileOpWorkerThread, pwtd, 0, nullptr);
