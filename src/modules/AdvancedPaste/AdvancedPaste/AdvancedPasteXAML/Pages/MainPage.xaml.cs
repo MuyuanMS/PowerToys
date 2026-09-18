@@ -44,10 +44,17 @@ namespace AdvancedPaste.Pages
 
         private void LoadClipboardHistoryEvent(object sender, object e)
         {
-            Task.Run(() =>
+            // WinRT clipboard history APIs require STA; calling LoadClipboardHistoryAsync
+            // through the UI dispatcher keeps execution on the UI/STA thread and prevents
+            // the hang/crash reported in https://github.com/microsoft/PowerToys/issues/49114.
+            if (_dispatcherQueue.HasThreadAccess)
             {
                 LoadClipboardHistoryAsync();
-            });
+            }
+            else
+            {
+                _dispatcherQueue.TryEnqueue(LoadClipboardHistoryAsync);
+            }
         }
 
         public async void LoadClipboardHistoryAsync()
