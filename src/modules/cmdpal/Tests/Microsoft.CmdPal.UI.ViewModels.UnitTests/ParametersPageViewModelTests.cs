@@ -129,6 +129,13 @@ public partial class ParametersPageViewModelTests
             Parameters = [stringParameter],
         };
         var vm = CreateViewModel(page, host);
+        var recipient = new object();
+        PerformCommandMessage? receivedMessage = null;
+        WeakReferenceMessenger.Default.Register<PerformCommandMessage>(recipient, (_, message) =>
+        {
+            Assert.AreEqual("latest value", stringParameter.Text);
+            receivedMessage = message;
+        });
 
         try
         {
@@ -139,9 +146,11 @@ public partial class ParametersPageViewModelTests
             await vm.TrySubmitAsync();
 
             Assert.AreEqual("latest value", stringParameter.Text);
+            Assert.IsNotNull(receivedMessage);
         }
         finally
         {
+            WeakReferenceMessenger.Default.Unregister<PerformCommandMessage>(recipient);
             vm.SafeCleanup();
             vm.Dispose();
         }

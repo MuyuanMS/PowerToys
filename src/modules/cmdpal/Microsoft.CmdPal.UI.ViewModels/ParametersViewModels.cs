@@ -211,6 +211,7 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
     private CancellationTokenSource? _writeCancellationTokenSource;
 
     private Task? _pendingWriteTask;
+    private long _textVersion;
 
     public string TextForUI { get => _modelText; set => SetTextFromUi(value); }
 
@@ -242,6 +243,7 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
         }
 
         _modelText = value;
+        Interlocked.Increment(ref _textVersion);
 
         // Cancel any pending write that hasn't started yet, so we don't push
         // stale values to the extension.
@@ -281,14 +283,16 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
             _writeTaskFactory.Scheduler!);
     }
 
-    public async Task CommitPendingTextChangeAsync()
+    internal long TextVersion => Volatile.Read(ref _textVersion);
+
+    public async Task<bool> CommitPendingTextChangeAsync()
     {
         while (true)
         {
             var pendingWriteTask = Volatile.Read(ref _pendingWriteTask);
             if (pendingWriteTask is null)
             {
-                return;
+                return true;
             }
 
             try
@@ -297,11 +301,12 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
             }
             catch (OperationCanceledException)
             {
+                return false;
             }
 
             if (ReferenceEquals(pendingWriteTask, Volatile.Read(ref _pendingWriteTask)))
             {
-                return;
+                return true;
             }
         }
     }
@@ -899,7 +904,10 @@ public partial class ParametersPageViewModel : PageViewModel, ICommandBarContext
 
     public async Task TrySubmitAsync()
     {
-        await CommitPendingStringParameterWritesAsync();
+        if (!await CommitPendingStringParameterWritesAsync())
+        {
+            return;
+        }
 
         if (ShowCommand)
         {
@@ -920,7 +928,10 @@ public partial class ParametersPageViewModel : PageViewModel, ICommandBarContext
             return;
         }
 
-        await CommitPendingStringParameterWritesAsync();
+        if (!await CommitPendingStringParameterWritesAsync())
+        {
+            return;
+        }
 
         if (ShowCommand)
         {
@@ -928,17 +939,30 @@ public partial class ParametersPageViewModel : PageViewModel, ICommandBarContext
         }
     }
 
-    private async Task CommitPendingStringParameterWritesAsync()
+    private async Task<bool> CommitPendingStringParameterWritesAsync()
     {
-        StringParameterRunViewModel[] stringParameters;
-        lock (_listLock)
+        while (true)
         {
-            stringParameters = Items.OfType<StringParameterRunViewModel>().ToArray();
-        }
+            StringParameterRunViewModel[] stringParameters;
+            long[] versions;
+            lock (_listLock)
+            {
+                stringParameters = Items.OfType<StringParameterRunViewModel>().ToArray();
+                versions = stringParameters.Select(parameter => parameter.TextVersion).ToArray();
+            }
 
-        foreach (var stringParameter in stringParameters)
-        {
-            await stringParameter.CommitPendingTextChangeAsync();
+            foreach (var stringParameter in stringParameters)
+            {
+                if (!await stringParameter.CommitPendingTextChangeAsync())
+                {
+                    return false;
+                }
+            }
+
+            if (stringParameters.Select(parameter => parameter.TextVersion).SequenceEqual(versions))
+            {
+                return true;
+            }
         }
     }
 
@@ -985,6 +1009,7 @@ public partial class ParametersPageViewModel : PageViewModel, ICommandBarContext
     protected override void UnsafeCleanup()
     {
         base.UnsafeCleanup();
+        _command.PropertyChanged -= CommandPropertyChanged;
 
         // Drop the active list param reference before disposing items so we
         // don't end up pointing at a disposed ListViewModel.
