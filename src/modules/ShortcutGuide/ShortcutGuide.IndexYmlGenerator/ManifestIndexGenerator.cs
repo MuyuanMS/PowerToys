@@ -11,6 +11,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using YamlDotNet.Core;
 
 namespace ShortcutGuide.IndexYmlGenerator
 {
@@ -125,6 +126,7 @@ namespace ShortcutGuide.IndexYmlGenerator
                     // ReadAllText() is a single I/O system call and faster than
                     // StreamReader for small files.
                     string content = File.ReadAllText(file);
+                    ValidateYamlDocument(content, filename);
 
                     if (TryParseManifestHeader(
                         content, filename, out ManifestHeader manifestHeader, out string? warning))
@@ -269,7 +271,6 @@ namespace ShortcutGuide.IndexYmlGenerator
             string? packageName = null;
             string? windowFilter = null;
             bool backgroundProcess = false;
-            bool hasBackgroundProcess = false;
             bool hasAnyNonEmptyContent = false;
 
             // EnumerateLines runs over the single string in memory without allocating.
@@ -299,16 +300,10 @@ namespace ShortcutGuide.IndexYmlGenerator
                 else if (rawLine.StartsWith(BackgroundProcessPrefix, StringComparison.OrdinalIgnoreCase))
                 {
                     backgroundProcess = ExtractBoolScalar(rawLine[BackgroundProcessPrefix.Length..], filename, "BackgroundProcess");
-                    hasBackgroundProcess = true;
                 }
                 else if (rawLine.StartsWith(ShortcutsPrefix, StringComparison.OrdinalIgnoreCase))
                 {
-                    // Only short-circuit if all top-level header fields have already been parsed.
-                    // BackgroundProcess may appear before or after Shortcuts.
-                    if (packageName != null && windowFilter != null && hasBackgroundProcess)
-                    {
-                        break;
-                    }
+                    continue;
                 }
             }
 
@@ -341,6 +336,21 @@ namespace ShortcutGuide.IndexYmlGenerator
             };
 
             return true;
+        }
+
+        private static void ValidateYamlDocument(string content, string filename)
+        {
+            try
+            {
+                var parser = new Parser(new StringReader(content));
+                while (parser.MoveNext())
+                {
+                }
+            }
+            catch (YamlException ex)
+            {
+                throw new YamlFormatException($"Invalid YAML in file '{filename}': {ex.Message}");
+            }
         }
 
         private static string ExtractStringScalar(ReadOnlySpan<char> span, string filename, string propertyName)
@@ -430,6 +440,10 @@ namespace ShortcutGuide.IndexYmlGenerator
                 }
 
                 span = span[1..^1];
+                if (span.IndexOf("''", StringComparison.Ordinal) >= 0)
+                {
+                    span = span.ToString().Replace("''", "'", StringComparison.Ordinal);
+                }
             }
             else if (span[0] is '*' or '&' or '!' or '|' or '>' or '@' or '`' ||
                      ((span[0] is '-' or '?' or ':') && (span.Length == 1 || char.IsWhiteSpace(span[1]))))
