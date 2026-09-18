@@ -150,8 +150,9 @@ Toolkit posts your refresh token to the token endpoint and hands back a fresh
 refresh tokens behind it.
 
 Providers are allowed to omit `refresh_token` from a successful refresh response.
-`RefreshAsync` preserves the refresh token supplied by the caller when that happens,
-and replaces it only when the provider returns a rotated refresh token.
+`RefreshAsync` accepts the previous `OAuthToken`, preserves its refresh token and
+granted scope when the provider omits either value, and replaces them only when the
+provider returns updated metadata.
 
 `OAuthToken.IsExpired(skew)` helps you decide when to refresh, so you can refresh a
 little early instead of waiting for a 401.
@@ -289,7 +290,7 @@ OAuthToken token = await client.AuthorizeAsync(new MySignedInPage());
 // Later, when the token is close to expiring:
 if (token.IsExpired(TimeSpan.FromMinutes(2)) && token.RefreshToken is not null)
 {
-    token = await client.RefreshAsync(token.RefreshToken);
+    token = await client.RefreshAsync(token);
 }
 ```
 
@@ -333,9 +334,10 @@ and so the redirect is hard to spoof.
   client, because that's what it is.
 - **`state` is host-owned, random, and single use.** The host generates it, matches it
   on the redirect, and strips it before handing anything back. You never touch it.
-- **Only code-bearing redirects are allowed.** The host forces `response_type=code`,
-  rejects token-bearing or `form_post` responses, and never forwards `access_token` or
-  `id_token` through the broker channel.
+- **Redirects carry exactly one result.** After validating `state`, the host accepts
+  either an authorization `code` or a standard OAuth `error`, but never both. It
+  forces `response_type=code`, rejects token-bearing or `form_post` responses, and
+  never forwards `access_token` or `id_token` through the broker channel.
 - **`redirect_uri` binding.** The host returns the exact `redirect_uri` it used, and
   the Toolkit replays that same value at the token endpoint per RFC 6749.
 - **Provider endpoints must use HTTPS.** Authorization, token, and device-code
@@ -358,11 +360,13 @@ Storing a token is optional, and it happens in your process. The Toolkit gives y
 - `ITokenStore`: a small `Retrieve` / `Save` / `Remove` abstraction keyed by a string.
 - `CredentialLockerTokenStore`: an `ITokenStore` backed by
   `Windows.Security.Credentials.PasswordVault`. The package identity isolates these
-  credentials from other extensions and same-user desktop processes. It is available
-  only to packaged extensions; when package identity is unavailable, use a caller-
-  supplied `ITokenStore` or keep the token in memory. Do not fall back to Win32 generic
-  credentials, which are user-scoped and do not provide extension isolation. Use a
-  distinct key per provider or account so entries do not collide.
+  credentials from other package identities and same-user unpackaged desktop
+  processes, but extensions or providers sharing one package identity also share its
+  vault. It is available only to packaged extensions; when package identity is
+  unavailable, use a caller-supplied `ITokenStore` or keep the token in memory. Do not
+  fall back to Win32 generic credentials, which are user-scoped and do not provide
+  package isolation. Namespace keys by extension, provider, and account to prevent
+  collisions; key names are not an access-control boundary within a shared package.
 
 There's an important thing to note though: the Credential Locker caps a stored secret
 at a few kilobytes. That's plenty for typical access and refresh tokens, but a very
