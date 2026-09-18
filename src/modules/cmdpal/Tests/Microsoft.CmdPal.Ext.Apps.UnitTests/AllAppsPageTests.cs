@@ -76,6 +76,46 @@ public class AllAppsPageTests : AppsTestBase
     }
 
     [TestMethod]
+    public async Task AllAppsPage_TryGetCurrentItemUsesPublishedCatalogWithoutReloading()
+    {
+        var mockCache = new MockAppCache();
+        mockCache.AddWin32Program(TestDataHelper.CreateTestWin32Program("Notepad", "C:\\Windows\\System32\\notepad.exe"));
+        var page = new AllAppsPage(mockCache);
+        await Task.Delay(100);
+
+        var expected = page.GetItems().OfType<AppListItem>().Single();
+
+        Assert.IsTrue(page.TryGetCurrentItem(expected.Command.Id, out var actual));
+        Assert.AreSame(expected, actual);
+        Assert.IsFalse(page.TryGetCurrentItem("missing", out var missing));
+        Assert.IsNull(missing);
+    }
+
+    [TestMethod]
+    public async Task AllAppsPage_TryGetCurrentItemRefreshesDirtyCatalogInBackground()
+    {
+        var mockCache = new MockAppCache();
+        mockCache.AddWin32Program(TestDataHelper.CreateTestWin32Program("Notepad", "C:\\Windows\\System32\\notepad.exe"));
+        var page = new AllAppsPage(mockCache);
+
+        var original = page.GetItems().OfType<AppListItem>().Single();
+        mockCache.ClearAll();
+        mockCache.AddWin32Program(TestDataHelper.CreateTestWin32Program("Calculator", "C:\\Windows\\System32\\calc.exe"));
+        mockCache.MarkForReload();
+
+        Assert.IsTrue(page.TryGetCurrentItem(original.Command.Id, out _));
+
+        for (var attempt = 0; mockCache.ShouldReload() && attempt < 100; attempt++)
+        {
+            await Task.Delay(10);
+        }
+
+        Assert.IsFalse(mockCache.ShouldReload());
+        Assert.IsFalse(page.TryGetCurrentItem(original.Command.Id, out _));
+        Assert.AreEqual("Calculator", page.GetItems().Single().Title);
+    }
+
+    [TestMethod]
     public async Task AllAppsPage_GetItems_HidesSubtitlesWhenSettingEnabled()
     {
         // Arrange
