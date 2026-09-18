@@ -21,6 +21,7 @@ public sealed partial class AllAppsPage : ListPage
     private readonly IAppCache _appCache;
 
     private volatile AppListSnapshot _snapshot = AppListSnapshot.Empty;
+    private int _refreshScheduled;
 
     public AllAppsPage()
         : this(AppCache.Instance.Value)
@@ -64,7 +65,32 @@ public sealed partial class AllAppsPage : ListPage
             return false;
         }
 
+        ScheduleRefreshIfNeeded();
         return _snapshot.ItemsByCommandId.TryGetValue(commandId, out item);
+    }
+
+    private void ScheduleRefreshIfNeeded()
+    {
+        if (!_appCache.ShouldReload() || Interlocked.CompareExchange(ref _refreshScheduled, 1, 0) != 0)
+        {
+            return;
+        }
+
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                BuildListItems();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Failed to refresh the app catalog", ex);
+            }
+            finally
+            {
+                Volatile.Write(ref _refreshScheduled, 0);
+            }
+        });
     }
 
     private void BuildListItems()

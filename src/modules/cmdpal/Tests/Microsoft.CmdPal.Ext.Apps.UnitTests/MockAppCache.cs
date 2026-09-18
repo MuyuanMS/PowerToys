@@ -40,6 +40,8 @@ public class MockAppCache : IAppCache
     /// </summary>
     public void ResetReloadFlag() => _shouldReload = false;
 
+    public void MarkForReload() => _shouldReload = true;
+
     /// <summary>
     /// Asynchronously refreshes the cache.
     /// </summary>
