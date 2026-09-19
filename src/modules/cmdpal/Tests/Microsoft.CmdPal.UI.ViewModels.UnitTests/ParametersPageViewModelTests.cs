@@ -149,11 +149,10 @@ public partial class ParametersPageViewModelTests
             Assert.IsNotNull(receivedMessage);
 
             stringParameterVm.SetTextFromUi("post-submit value");
-            await stringParameterVm.CommitPendingTextChangeAsync();
+            Assert.AreEqual("post-submit value", stringParameterVm.TextForUI);
             Assert.AreEqual("latest value", stringParameter.Text);
 
             receivedMessage.OnInvocationCompleted?.Invoke(CommandResultKind.KeepOpen);
-            stringParameterVm.SetTextFromUi("post-submit value");
             await stringParameterVm.CommitPendingTextChangeAsync();
             Assert.AreEqual("post-submit value", stringParameter.Text);
         }

@@ -383,11 +383,14 @@ public partial class ShellViewModel : ObservableObject,
     private void StartInvoke(PerformCommandMessage message, IInvokableCommand invokable, AppExtensionHost? host)
     {
         // TODO GH #525 This needs more better locking.
+        Action<CommandResultKind?>? rejectedInvocationCallback = null;
         lock (_invokeLock)
         {
             if (_handleInvokeTask is not null)
             {
-                // do nothing - a command is already doing a thing
+                // Release senders that use this callback to track submission
+                // state when the invocation is rejected.
+                rejectedInvocationCallback = message.OnInvocationCompleted;
             }
             else
             {
@@ -399,6 +402,8 @@ public partial class ShellViewModel : ObservableObject,
                 });
             }
         }
+
+        rejectedInvocationCallback?.Invoke(null);
     }
 
     private void SafeHandleInvokeCommandSynchronous(PerformCommandMessage message, IInvokableCommand invokable, AppExtensionHost? host)

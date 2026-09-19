@@ -213,6 +213,7 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
     private Task? _pendingWriteTask;
     private long _textVersion;
     private int _textChangesSuspended;
+    private string? _deferredText;
 
     public string TextForUI { get => _modelText; set => SetTextFromUi(value); }
 
@@ -240,6 +241,9 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
     {
         if (Volatile.Read(ref _textChangesSuspended) != 0)
         {
+            _modelText = value;
+            Interlocked.Increment(ref _textVersion);
+            _deferredText = value;
             return;
         }
 
@@ -251,6 +255,11 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
         _modelText = value;
         Interlocked.Increment(ref _textVersion);
 
+        ScheduleTextWrite(value);
+    }
+
+    private void ScheduleTextWrite(string value)
+    {
         // Cancel any pending write that hasn't started yet, so we don't push
         // stale values to the extension.
         CancelAndDisposeTokenSource(ref _writeCancellationTokenSource);
@@ -293,7 +302,19 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
 
     internal void SuspendTextChanges() => Interlocked.Exchange(ref _textChangesSuspended, 1);
 
-    internal void ResumeTextChanges() => Interlocked.Exchange(ref _textChangesSuspended, 0);
+    internal void ResumeTextChanges()
+    {
+        if (Interlocked.Exchange(ref _textChangesSuspended, 0) == 0)
+        {
+            return;
+        }
+
+        var deferredText = Interlocked.Exchange(ref _deferredText, null);
+        if (deferredText is not null)
+        {
+            ScheduleTextWrite(deferredText);
+        }
+    }
 
     public async Task<bool> CommitPendingTextChangeAsync()
     {
