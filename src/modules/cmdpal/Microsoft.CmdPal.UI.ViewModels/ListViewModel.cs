@@ -119,6 +119,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     // For cancelling a deferred SafeSlowInit when the user navigates rapidly
     private CancellationTokenSource? _selectedItemCts;
+    private bool _suspendedForNavigation;
 
     public override bool IsInitialized
     {
@@ -588,7 +589,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
             // entered the error state. I had issues doing that without having
             // multiple threads muck with `Items` (and possibly FilteredItems!)
             // at once.
-            item.SafeInitializeProperties();
+            item.InitializePropertiesOnce();
 
             if (ct.IsCancellationRequested)
             {
@@ -825,6 +826,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
             _lastSelectedItem.PropertyChanged -= SelectedItemPropertyChanged;
         }
 
+        _lastSelectedItem = item;
         if (item is not null)
         {
             SetSelectedItem(item);
@@ -860,7 +862,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
                     return;
                 }
 
-                if (!item.SafeSlowInit())
+                if (!item.RequestInitializationAsync(ct).GetAwaiter().GetResult() || !item.SafeSlowInit())
                 {
                     if (ct.IsCancellationRequested)
                     {
@@ -1004,11 +1006,24 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     internal void SuspendForNavigation()
     {
+        _suspendedForNavigation = true;
+        CanPublishContextUpdates = false;
         CancelAndDisposeTokenSource(ref _selectedItemCts);
+        CancelAndDisposeTokenSource(ref _cancellationTokenSource);
     }
 
     internal Task ResumeAfterNavigation()
     {
+        _suspendedForNavigation = false;
+        CanPublishContextUpdates = true;
+        var model = _model.Unsafe;
+        if (model is not null)
+        {
+            model.ItemsChanged -= Model_ItemsChanged;
+            model.ItemsChanged += Model_ItemsChanged;
+            FetchItems(keepSelection: true, ensureSelectionVisible: true);
+        }
+
         UpdateSelectedItem(_lastSelectedItem);
         return Task.CompletedTask;
     }
@@ -1058,8 +1073,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
             LoadExtendedAttributes(haveProperties.GetProperties().AsReadOnly());
         }
 
-        FetchItems(keepSelection: true, ensureSelectionVisible: true);
-        model.ItemsChanged += Model_ItemsChanged;
+        if (!_suspendedForNavigation)
+        {
+            FetchItems(keepSelection: true, ensureSelectionVisible: true);
+            model.ItemsChanged += Model_ItemsChanged;
+        }
     }
 
     private static IGridPropertiesViewModel? LoadGridPropertiesViewModel(IGridProperties? gridProperties)
