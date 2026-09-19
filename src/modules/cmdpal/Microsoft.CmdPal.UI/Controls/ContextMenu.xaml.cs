@@ -5,7 +5,6 @@
 using System.Globalization;
 using System.Text;
 using CommunityToolkit.Mvvm.Messaging;
-using CommunityToolkit.WinUI;
 using Microsoft.CmdPal.Common.Text;
 using Microsoft.CmdPal.UI.Helpers;
 using Microsoft.CmdPal.UI.Messages;
@@ -57,6 +56,8 @@ public sealed partial class ContextMenu : UserControl,
     }
 
     public ContextMenuViewModel ViewModel { get; }
+
+    internal bool IsFlyoutOpen { get; set; }
 
     public ContextMenu()
     {
@@ -163,6 +164,11 @@ public sealed partial class ContextMenu : UserControl,
 
     public void Receive(TryCommandKeybindingMessage msg)
     {
+        if (msg.Handled || !IsFlyoutOpen)
+        {
+            return;
+        }
+
         var result = ViewModel?.CheckKeybinding(msg.Ctrl, msg.Alt, msg.Shift, msg.Win, msg.Key);
 
         if (result == ContextKeybindingResult.Hide)
@@ -223,18 +229,14 @@ public sealed partial class ContextMenu : UserControl,
     }
 
     /// <summary>
-    /// Handles Escape to close the context menu and return focus to the "More" button.
+    /// Handles Escape to close the context menu. The flyout restores the previous focus.
     /// </summary>
     private void UserControl_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (e.Key == VirtualKey.Escape)
         {
-            // Close the context menu (if not already handled)
+            // Let the flyout restore the previously focused element, even when More is hidden.
             WeakReferenceMessenger.Default.Send(new CloseContextMenuMessage());
-
-            // Find the parent CommandBar and set focus to MoreCommandsButton
-            var parent = this.FindParent<CommandBar>();
-            parent?.FocusMoreCommandsButton();
 
             e.Handled = true;
         }
