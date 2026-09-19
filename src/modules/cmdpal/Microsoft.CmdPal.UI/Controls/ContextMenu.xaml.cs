@@ -57,6 +57,8 @@ public sealed partial class ContextMenu : UserControl,
 
     public ContextMenuViewModel ViewModel { get; }
 
+    internal bool IsFlyoutOpen { get; set; }
+
     public ContextMenu()
     {
         this.InitializeComponent();
@@ -162,6 +164,11 @@ public sealed partial class ContextMenu : UserControl,
 
     public void Receive(TryCommandKeybindingMessage msg)
     {
+        if (msg.Handled || !IsFlyoutOpen)
+        {
+            return;
+        }
+
         var result = ViewModel?.CheckKeybinding(msg.Ctrl, msg.Alt, msg.Shift, msg.Win, msg.Key);
 
         if (result == ContextKeybindingResult.Hide)

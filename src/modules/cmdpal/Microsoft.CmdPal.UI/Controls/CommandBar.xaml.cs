@@ -105,6 +105,11 @@ public sealed partial class CommandBar : UserControl,
 
     public void Receive(TryCommandKeybindingMessage msg)
     {
+        if (msg.Handled || ContextMenuFlyout.IsOpen)
+        {
+            return;
+        }
+
         if (!ViewModel.CanOpenContextMenu)
         {
             return;
@@ -163,9 +168,16 @@ public sealed partial class CommandBar : UserControl,
 
     private void ContextMenuFlyout_Opened(object sender, object e)
     {
+        ContextControl.IsFlyoutOpen = true;
+
         // Focus the filter box so the flyout captures keyboard input,
         // then fire a single consolidated Narrator announcement.
         ContextControl.FocusSearchBox();
         ContextControl.AnnounceOpened();
+    }
+
+    private void ContextMenuFlyout_Closed(object sender, object e)
+    {
+        ContextControl.IsFlyoutOpen = false;
     }
 }
