@@ -123,6 +123,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
     private int _hasPublishedFetch;
     private int _fetchPublicationPending;
     private bool _navigationRecoveryRequired;
+    private bool _itemInitializationRecoveryRequired;
     private bool _isDisposed;
     private bool _isCleaned;
 
@@ -156,6 +157,12 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     private void Model_ItemsChanged(object sender, IItemsChangedEventArgs args)
     {
+        if (_suspendedForNavigation)
+        {
+            _navigationRecoveryRequired = true;
+            return;
+        }
+
         var isLoadingMore = _isLoadingMore.Value;
 
         // Perform a soft refresh when:
@@ -503,15 +510,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
             }
         }
 
-        var initializeItemsCts = new CancellationTokenSource();
-        _cancellationTokenSource = initializeItemsCts;
-        var initializeItemsToken = initializeItemsCts.Token;
-
-        _initializeItemsTask = new Task(() =>
-        {
-            InitializeItemsTask(initializeItemsToken);
-        });
-        _initializeItemsTask.Start();
+        StartItemInitialization();
 
         Interlocked.Exchange(ref _fetchPublicationPending, 1);
         DoOnUiThread(
@@ -605,6 +604,15 @@ public partial class ListViewModel : PageViewModel, IDisposable
                 return;
             }
         }
+    }
+
+    private void StartItemInitialization()
+    {
+        CancelAndDisposeTokenSource(ref _cancellationTokenSource);
+        var initializeItemsCts = new CancellationTokenSource();
+        _cancellationTokenSource = initializeItemsCts;
+        _initializeItemsTask = new Task(() => InitializeItemsTask(initializeItemsCts.Token));
+        _initializeItemsTask.Start();
     }
 
     /// <summary>
@@ -1019,13 +1027,9 @@ public partial class ListViewModel : PageViewModel, IDisposable
             Volatile.Read(ref _hasPublishedFetch) == 0 ||
             Volatile.Read(ref _fetchPublicationPending) != 0 ||
             IsFetching;
+        _itemInitializationRecoveryRequired = Volatile.Read(ref _hasPublishedFetch) != 0;
         _suspendedForNavigation = true;
         CanPublishContextUpdates = false;
-        var model = _model.Unsafe;
-        if (model is not null)
-        {
-            model.ItemsChanged -= Model_ItemsChanged;
-        }
 
         CancelAndDisposeTokenSource(ref _selectedItemCts);
         CancelAndDisposeTokenSource(ref _cancellationTokenSource);
@@ -1043,7 +1047,13 @@ public partial class ListViewModel : PageViewModel, IDisposable
             if (_navigationRecoveryRequired)
             {
                 _navigationRecoveryRequired = false;
+                _itemInitializationRecoveryRequired = false;
                 RequestFetch(keepSelection: true, ensureSelectionVisible: true);
+            }
+            else if (_itemInitializationRecoveryRequired)
+            {
+                _itemInitializationRecoveryRequired = false;
+                StartItemInitialization();
             }
         }
 

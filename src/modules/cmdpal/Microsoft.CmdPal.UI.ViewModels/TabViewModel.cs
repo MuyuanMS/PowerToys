@@ -106,8 +106,12 @@ public partial class TabViewModel : ExtensionObjectViewModel
 
     internal void ApplyCollisionSuffix(string? suffix)
     {
-        TabId = string.IsNullOrEmpty(suffix) ? _baseTabId : $"{_baseTabId}|duplicate:{suffix}";
-        UpdateProperty(nameof(TabId));
+        var normalizedId = string.IsNullOrEmpty(suffix) ? _baseTabId : $"{_baseTabId}|duplicate:{suffix}";
+        if (TabId != normalizedId)
+        {
+            TabId = normalizedId;
+            UpdateProperty(nameof(TabId));
+        }
     }
 
     private string GetTitle(ITab tab)
