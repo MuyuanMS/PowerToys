@@ -37,6 +37,7 @@ public partial class TabbedPageViewModel : PageViewModel
     private bool _isDisposed;
     private bool _isSubscribedToItemsChanged;
     private bool _normalizingTabIds;
+    private int _tabsRefreshGeneration;
 
     private static readonly string _fallbackPlaceholder = "Type here to search...";
 
@@ -112,11 +113,12 @@ public partial class TabbedPageViewModel : PageViewModel
             }
         }
 
+        var refreshGeneration = Interlocked.Increment(ref _tabsRefreshGeneration);
         var newTabs = BuildTabViewModels(model.GetTabs());
 
         DoOnUiThread(() =>
         {
-            if (_isDisposed)
+            if (_isDisposed || refreshGeneration != Volatile.Read(ref _tabsRefreshGeneration))
             {
                 foreach (var tab in newTabs)
                 {
@@ -188,11 +190,12 @@ public partial class TabbedPageViewModel : PageViewModel
                 return;
             }
 
+            var refreshGeneration = Interlocked.Increment(ref _tabsRefreshGeneration);
             var newTabs = BuildTabViewModels(model.GetTabs());
 
             DoOnUiThread(() =>
             {
-                if (_isDisposed)
+                if (_isDisposed || refreshGeneration != Volatile.Read(ref _tabsRefreshGeneration))
                 {
                     foreach (var tab in newTabs)
                     {
