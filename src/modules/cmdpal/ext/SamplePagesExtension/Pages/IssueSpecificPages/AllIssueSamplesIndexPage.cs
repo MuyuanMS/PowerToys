@@ -19,6 +19,11 @@ internal sealed partial class AllIssueSamplesIndexPage : ListPage
     {
         return new IListItem[]
         {
+            new ListItem(new SampleCompactPinToDockPage())
+            {
+                Title = "Compact Pin to Dock dialog",
+                Subtitle = "Repro steps: Enable compact mode and the dock, open this page, then press Ctrl+K and choose Pin to Dock. The entire dialog should be visible.",
+            },
             new ListItem(new SamplePageForGridVirtualization())
             {
                 Title = "Grid virtualization and recycling",

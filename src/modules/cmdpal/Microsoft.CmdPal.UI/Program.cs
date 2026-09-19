@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using ManagedCommon;
 using Microsoft.CmdPal.Common.Services;
@@ -21,8 +22,12 @@ namespace Microsoft.CmdPal.UI;
 // https://github.com/microsoft/WindowsAppSDK-Samples/tree/main/Samples/AppLifecycle/Instancing/cs2/cs-winui-packaged/CsWinUiDesktopInstancing
 internal sealed class Program
 {
+    private static readonly object ActivationLock = new();
+    private static readonly Queue<ActivationSnapshot?> PendingActivations = [];
+
     private static DispatcherQueueSynchronizationContext? uiContext;
     private static App? app;
+    private static MainWindow? currentMainWindow;
 
     // LOAD BEARING
     //
@@ -102,6 +107,25 @@ internal sealed class Program
         return 0;
     }
 
+    internal static void ReplayPendingActivations(MainWindow mainWindow)
+    {
+        while (true)
+        {
+            ActivationSnapshot? args;
+
+            lock (ActivationLock)
+            {
+                if (!PendingActivations.TryDequeue(out args))
+                {
+                    currentMainWindow = mainWindow;
+                    return;
+                }
+            }
+
+            mainWindow.HandleLaunchNonUI(args);
+        }
+    }
+
     private static bool DecideRedirection()
     {
         var isRedirect = false;
@@ -163,16 +187,24 @@ internal sealed class Program
 
     private static void OnActivated(object? sender, AppActivationArguments args)
     {
-        // If we already have a form, display the message now.
-        // Otherwise, add it to the collection for displaying later.
-        if (App.Current?.AppWindow is MainWindow mainWindow)
+        var snapshot = MainWindow.CaptureActivation(args);
+        MainWindow? mainWindow;
+
+        lock (ActivationLock)
         {
-            // LOAD BEARING
-            // This must be synchronous to ensure the method does not return
-            // before the activation is fully handled and the parameters are processed.
-            // The sending instance remains blocked until this returns; afterward it may quit,
-            // causing the activation arguments to be lost.
-            mainWindow.HandleLaunchNonUI(args);
+            mainWindow = currentMainWindow;
+            if (mainWindow is null)
+            {
+                PendingActivations.Enqueue(snapshot);
+                return;
+            }
         }
+
+        // LOAD BEARING
+        // This must be synchronous to ensure the method does not return
+        // before the activation is fully handled and the parameters are processed.
+        // The sending instance remains blocked until this returns; afterward it may quit,
+        // causing the activation arguments to be lost.
+        mainWindow.HandleLaunchNonUI(snapshot);
     }
 }
