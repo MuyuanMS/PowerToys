@@ -51,7 +51,7 @@
                         FontWeight="SemiBold"
                         NavigateUri="https://aka.ms/cmdpal" />
 
-                    <TextBlock x:Uid="ActivationSettingsHeader" Style="{StaticResource SettingsSectionHeaderTextBlockStyle}" />
+                    <TextBlock x:Uid="Settings_GeneralPage_ActivationSettingsHeader" Style="{StaticResource SettingsSectionHeaderTextBlockStyle}" />
                     <controls:SettingsExpander
                         x:Uid="Settings_GeneralPage_ActivationKey_SettingsExpander"
                         AutomationProperties.AutomationId="CmdPal_GeneralPage_ActivationKey"
@@ -285,7 +285,7 @@
 
                     <!--  'About' section  -->
 
-                    <TextBlock x:Uid="AboutSettingsHeader" Style="{StaticResource SettingsSectionHeaderTextBlockStyle}" />
+                    <TextBlock x:Uid="Settings_GeneralPage_AboutSettingsHeader" Style="{StaticResource SettingsSectionHeaderTextBlockStyle}" />
 
                     <controls:SettingsExpander
                         x:Uid="Settings_GeneralPage_About_SettingsExpander"

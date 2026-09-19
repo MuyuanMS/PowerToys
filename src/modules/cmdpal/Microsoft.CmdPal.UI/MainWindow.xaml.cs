@@ -1503,17 +1503,8 @@ public sealed partial class MainWindow : WindowEx,
                             return;
 
                         case CmdPalProtocolRoute.Reload:
-                            var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
-                            if (settings?.AllowExternalReload == true)
-                            {
-                                Logger.LogInfo("External Reload triggered");
-                                WeakReferenceMessenger.Default.Send<ReloadCommandsMessage>(new());
-                            }
-                            else
-                            {
-                                Logger.LogInfo("External Reload is disabled");
-                            }
-
+                        case CmdPalProtocolRoute.ExecuteCommand:
+                            WeakReferenceMessenger.Default.Send(new ExternalCommandLinkRequestedMessage(route));
                             return;
                     }
                 }

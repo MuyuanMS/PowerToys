@@ -338,6 +338,11 @@ public partial class ShellViewModel : ObservableObject,
 
                 pageViewModel.IsRootPage = isMainPage;
                 pageViewModel.HasBackButton = IsNested;
+                if (pageViewModel is ListViewModel listViewModel &&
+                    message.ListPageOptions is not null)
+                {
+                    listViewModel.SetLaunchOptions(message.ListPageOptions);
+                }
 
                 // Clear command bar, ViewModel initialization can already set new commands if it wants to
                 OnUIThread(() => WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(null)));

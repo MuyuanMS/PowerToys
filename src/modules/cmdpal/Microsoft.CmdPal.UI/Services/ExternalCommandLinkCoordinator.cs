@@ -110,6 +110,11 @@ internal sealed partial class ExternalCommandLinkCoordinator : IDisposable
         }
     }
 
+    internal async Task HandleLinkForTestAsync(CmdPalProtocolRoute route)
+    {
+        await HandleLinkAsync(route);
+    }
+
     private async Task HandleLinkAsync(CmdPalProtocolRoute route)
     {
         if (!_settingsService.Settings.EnableExternalCommandLinks)

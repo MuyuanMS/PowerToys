@@ -162,13 +162,14 @@ internal sealed partial class CommandPaletteContextMenuFactory : IContextMenuFac
         var itemId = topLevelItem.Id;
         List<IContextItem> moreCommands = [];
         var commandItem = topLevelItem.ItemViewModel;
+        var commandId = commandItem.Command.Id;
 
         // Add pin/unpin commands for pinning items to the top-level or to
         // the dock.
         var providerId = providerContext.ProviderId;
         if (_settingsService.Settings.EnableExternalCommandLinks)
         {
-            TryAddCommandLink(topLevelItem, itemId, providerId, moreCommands);
+            TryAddCommandLink(topLevelItem, commandId, providerId, moreCommands);
         }
 
         if (_topLevelCommandManager.LookupProvider(providerId) is CommandProviderWrapper)
