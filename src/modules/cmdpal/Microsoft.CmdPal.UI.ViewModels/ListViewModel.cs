@@ -1156,6 +1156,17 @@ public partial class ListViewModel : PageViewModel, IDisposable
         }
     }
 
+    internal void SuspendForNavigation()
+    {
+        CancelAndDisposeTokenSource(ref _selectedItemCts);
+    }
+
+    internal Task ResumeAfterNavigation()
+    {
+        UpdateSelectedItem(_lastSelectedItem);
+        return Task.CompletedTask;
+    }
+
     public void Dispose()
     {
         GC.SuppressFinalize(this);

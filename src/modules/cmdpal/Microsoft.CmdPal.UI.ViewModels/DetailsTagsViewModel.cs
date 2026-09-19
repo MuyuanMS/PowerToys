@@ -27,15 +27,23 @@ public partial class DetailsTagsViewModel(
             return;
         }
 
-        Tags = model
-            .Tags?
-            .Select(t =>
+        var tags = new List<TagViewModel>();
+        try
         {
-            var vm = new TagViewModel(t, PageContext);
-            vm.InitializeProperties();
-            return vm;
-        })
-            .ToList() ?? [];
+            foreach (var tag in model.Tags ?? [])
+            {
+                var vm = new TagViewModel(tag, PageContext);
+                vm.InitializeProperties();
+                tags.Add(vm);
+            }
+        }
+        catch
+        {
+            tags.ForEach(vm => vm.SafeCleanup());
+            throw;
+        }
+
+        Tags = tags;
         UpdateProperty(nameof(HasTags));
         UpdateProperty(nameof(Tags));
     }
