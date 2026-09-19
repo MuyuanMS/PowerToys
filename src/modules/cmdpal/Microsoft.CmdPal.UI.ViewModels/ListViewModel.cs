@@ -20,6 +20,8 @@ namespace Microsoft.CmdPal.UI.ViewModels;
 
 public partial class ListViewModel : PageViewModel, IDisposable
 {
+    private readonly Lock _navigationStateLock = new();
+
     public const int IncrementalRefresh = -2;
 
     private static readonly IEqualityComparer<IListItem> VmCacheComparer = new ProxyReferenceEqualityComparer();
@@ -157,10 +159,13 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     private void Model_ItemsChanged(object sender, IItemsChangedEventArgs args)
     {
-        if (_suspendedForNavigation)
+        lock (_navigationStateLock)
         {
-            _navigationRecoveryRequired = true;
-            return;
+            if (_suspendedForNavigation)
+            {
+                _navigationRecoveryRequired = true;
+                return;
+            }
         }
 
         var isLoadingMore = _isLoadingMore.Value;
@@ -1023,12 +1028,16 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     internal void SuspendForNavigation()
     {
-        _navigationRecoveryRequired =
-            Volatile.Read(ref _hasPublishedFetch) == 0 ||
-            Volatile.Read(ref _fetchPublicationPending) != 0 ||
-            IsFetching;
-        _itemInitializationRecoveryRequired = Volatile.Read(ref _hasPublishedFetch) != 0;
-        _suspendedForNavigation = true;
+        lock (_navigationStateLock)
+        {
+            _navigationRecoveryRequired =
+                Volatile.Read(ref _hasPublishedFetch) == 0 ||
+                Volatile.Read(ref _fetchPublicationPending) != 0 ||
+                IsFetching;
+            _itemInitializationRecoveryRequired = Volatile.Read(ref _hasPublishedFetch) != 0;
+            _suspendedForNavigation = true;
+        }
+
         CanPublishContextUpdates = false;
 
         CancelAndDisposeTokenSource(ref _selectedItemCts);
@@ -1037,22 +1046,29 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     internal Task ResumeAfterNavigation()
     {
-        _suspendedForNavigation = false;
+        bool navigationRecoveryRequired;
+        bool itemInitializationRecoveryRequired;
+        lock (_navigationStateLock)
+        {
+            _suspendedForNavigation = false;
+            navigationRecoveryRequired = _navigationRecoveryRequired;
+            itemInitializationRecoveryRequired = _itemInitializationRecoveryRequired;
+            _navigationRecoveryRequired = false;
+            _itemInitializationRecoveryRequired = false;
+        }
+
         CanPublishContextUpdates = true;
         var model = _model.Unsafe;
         if (model is not null && !_isDisposed && !_isCleaned)
         {
             model.ItemsChanged -= Model_ItemsChanged;
             model.ItemsChanged += Model_ItemsChanged;
-            if (_navigationRecoveryRequired)
+            if (navigationRecoveryRequired)
             {
-                _navigationRecoveryRequired = false;
-                _itemInitializationRecoveryRequired = false;
                 RequestFetch(keepSelection: true, ensureSelectionVisible: true);
             }
-            else if (_itemInitializationRecoveryRequired)
+            else if (itemInitializationRecoveryRequired)
             {
-                _itemInitializationRecoveryRequired = false;
                 StartItemInitialization();
             }
         }
