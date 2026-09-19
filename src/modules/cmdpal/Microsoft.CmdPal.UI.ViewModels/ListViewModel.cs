@@ -975,7 +975,10 @@ public partial class ListViewModel : PageViewModel, IDisposable
                         {
                             if (CanPublishContextUpdates)
                             {
-                                WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                                if (CanPublishContextUpdates)
+                                {
+                                    WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                                }
                             }
                         }
 
@@ -1010,20 +1013,6 @@ public partial class ListViewModel : PageViewModel, IDisposable
                         WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
                     }
 
-                    var suggestion = item.TextToSuggest;
-                    DoOnUiThread(() =>
-                    {
-                        if (ct.IsCancellationRequested)
-                        {
-                            return;
-                        }
-
-                        if (CanPublishContextUpdates)
-                        {
-                            TextToSuggest = suggestion;
-                            WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(suggestion));
-                        }
-                    });
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
@@ -1036,6 +1025,21 @@ public partial class ListViewModel : PageViewModel, IDisposable
                         WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
                     }
                 }
+
+                var suggestion = item.TextToSuggest;
+                DoOnUiThread(() =>
+                {
+                    if (ct.IsCancellationRequested || !ReferenceEquals(_lastSelectedItem, item))
+                    {
+                        return;
+                    }
+
+                    TextToSuggest = suggestion;
+                    if (CanPublishContextUpdates)
+                    {
+                        WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(suggestion));
+                    }
+                });
             },
             ct);
     }
@@ -1125,6 +1129,17 @@ public partial class ListViewModel : PageViewModel, IDisposable
         }
 
         WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(TextToSuggest));
+    }
+
+    internal void SuspendForNavigation()
+    {
+        CancelAndDisposeTokenSource(ref _selectedItemCts);
+    }
+
+    internal Task ResumeAfterNavigation()
+    {
+        UpdateSelectedItem(_lastSelectedItem);
+        return Task.CompletedTask;
     }
 
     public override void InitializeProperties()

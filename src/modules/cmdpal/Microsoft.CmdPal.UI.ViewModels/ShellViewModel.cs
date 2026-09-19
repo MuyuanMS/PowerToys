@@ -79,6 +79,10 @@ public partial class ShellViewModel : ObservableObject,
                         // Cancel this visit's work without permanently disposing it.
                         previousList.SuspendForNavigation();
                     }
+                    else if (oldValue is TabbedPageViewModel previousTabbedPage)
+                    {
+                        previousTabbedPage.SuspendForNavigation();
+                    }
                     else if (oldValue is IDisposable disposable)
                     {
                         disposable.Dispose();
@@ -92,6 +96,10 @@ public partial class ShellViewModel : ObservableObject,
                 if (value is ListViewModel currentList)
                 {
                     _ = currentList.ResumeAfterNavigation();
+                }
+                else if (value is TabbedPageViewModel currentTabbedPage)
+                {
+                    _ = currentTabbedPage.ResumeAfterNavigation();
                 }
             }
         }
