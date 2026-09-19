@@ -500,6 +500,25 @@ public partial class TabbedPageViewModel : PageViewModel
         }
     }
 
+    internal void SuspendForNavigation()
+    {
+        if (ActiveChild is not null)
+        {
+            ActiveChild.CanPublishContextUpdates = false;
+        }
+    }
+
+    internal Task ResumeAfterNavigation()
+    {
+        if (ActiveChild is not null)
+        {
+            ActiveChild.CanPublishContextUpdates = true;
+            RefreshActiveChildContext();
+        }
+
+        return Task.CompletedTask;
+    }
+
     public void RefreshActiveChildContext()
     {
         switch (ActiveChild)
@@ -510,8 +529,8 @@ public partial class TabbedPageViewModel : PageViewModel
             case ContentPageViewModel content:
                 content.RefreshCommandContext();
                 break;
-            case ParametersPageViewModel:
-                WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(null));
+            case ParametersPageViewModel parameters:
+                WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(parameters.ShowCommand ? parameters.Command : null));
                 WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
                 WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(string.Empty));
                 break;

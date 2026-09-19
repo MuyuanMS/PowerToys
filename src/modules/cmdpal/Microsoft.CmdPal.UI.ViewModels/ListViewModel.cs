@@ -900,6 +900,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
                 var suggestion = item.TextToSuggest;
                 DoOnUiThread(() =>
                 {
+                    if (ct.IsCancellationRequested || !ReferenceEquals(_lastSelectedItem, item))
+                    {
+                        return;
+                    }
+
                     TextToSuggest = suggestion;
                     if (CanPublishContextUpdates)
                     {
@@ -995,6 +1000,17 @@ public partial class ListViewModel : PageViewModel, IDisposable
         }
 
         WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(TextToSuggest));
+    }
+
+    internal void SuspendForNavigation()
+    {
+        CancelAndDisposeTokenSource(ref _selectedItemCts);
+    }
+
+    internal Task ResumeAfterNavigation()
+    {
+        UpdateSelectedItem(_lastSelectedItem);
+        return Task.CompletedTask;
     }
 
     public override void InitializeProperties()
