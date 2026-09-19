@@ -41,6 +41,35 @@ public class CachedIconSourceProviderTests
 
     [TestMethod]
     [Timeout(5_000)]
+    public async Task ConcurrentRequestsShareRegisteredLoadDiagnostics()
+    {
+        IconLoadDiagnostics.Start();
+        var loader = new ControllableIconLoader();
+        var provider = new CachedIconSourceProvider(loader, new Size(20, 20), cacheSize: 16);
+        var icon = new IconDataViewModel { Icon = "test" };
+        var firstRequest = IconLoadDiagnostics.BeginRequest(IconRequestReason.SourceChanged, 1.0);
+        var first = provider.GetIconSource(icon, 1.0, firstRequest);
+        var secondRequest = IconLoadDiagnostics.BeginRequest(IconRequestReason.SourceChanged, 1.0);
+        var second = provider.GetIconSource(icon, 1.0, secondRequest);
+
+        Assert.AreSame(first, second);
+        loader.CompleteNext(null);
+        await Task.WhenAll(first, second);
+        firstRequest.Complete(IconRequestStatus.Empty);
+        secondRequest.Complete(IconRequestStatus.Empty);
+
+        var report = IconLoadDiagnostics.StopAndCreateReport();
+
+        Assert.IsNotNull(report);
+        StringAssert.Contains(report.Text, "Requests linked to session loads: 2");
+        StringAssert.Contains(report.Text, "Maximum demanded queue depth: 1");
+        StringAssert.Contains(report.Text, "Maximum speculative queue depth: 0");
+        StringAssert.Contains(report.Text, "Queued promotions after demand returned: 0");
+        IconLoadDiagnostics.Reset();
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
     public async Task SuccessfulLoadIsCachedBeforeInFlightEntryIsRemoved()
     {
         var loader = new ControllableIconLoader();
@@ -147,7 +176,8 @@ public class CachedIconSourceProviderTests
             Size iconSize,
             double scale,
             TaskCompletionSource<IconSource?> tcs,
-            IconLoadPriority priority)
+            IconLoadPriority priority,
+            IconLoadMeasurement? diagnostics = null)
         {
             Interlocked.Increment(ref _enqueueCount);
             if (!AcceptLoads)
@@ -156,6 +186,7 @@ public class CachedIconSourceProviderTests
             }
 
             _pending.Enqueue(tcs);
+            diagnostics?.Enqueued(priority);
             return true;
         }
 
