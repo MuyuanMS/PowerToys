@@ -255,14 +255,6 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     private void RequestFetch(bool keepSelection, bool ensureSelectionVisible)
     {
-        lock (_fetchStateLock)
-        {
-            if (IsTerminal)
-            {
-                return;
-            }
-        }
-
         // Keep RPC GetItems work off the UI thread. If the provider raises
         // ItemsChanged while we're already on a background thread, stay on that
         // thread so same-thread reentrancy detection still works.
@@ -272,6 +264,14 @@ public partial class ListViewModel : PageViewModel, IDisposable
                 () => RequestFetch(keepSelection, ensureSelectionVisible),
                 "Failed to request background fetch");
             return;
+        }
+
+        lock (_fetchStateLock)
+        {
+            if (IsTerminal)
+            {
+                return;
+            }
         }
 
         if (IsGetItemsActiveOnCurrentThread())
