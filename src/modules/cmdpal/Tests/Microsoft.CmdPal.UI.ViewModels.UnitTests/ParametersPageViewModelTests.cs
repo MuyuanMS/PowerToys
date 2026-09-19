@@ -3,9 +3,12 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using CommunityToolkit.Mvvm.Messaging;
+using Microsoft.CmdPal.UI.ViewModels.Messages;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -14,6 +17,7 @@ using Windows.Foundation;
 namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
 
 [TestClass]
+[DoNotParallelize]
 public partial class ParametersPageViewModelTests
 {
     private sealed partial class TestAppExtensionHost : AppExtensionHost
@@ -109,6 +113,96 @@ public partial class ParametersPageViewModelTests
         GC.KeepAlive(item);
         GC.KeepAlive(page);
         GC.KeepAlive(host);
+    }
+
+    [TestMethod]
+    public async Task TrySubmit_CommitsPendingStringParameterTextBeforeSendingCommand()
+    {
+        var host = new TestAppExtensionHost();
+        var stringParameter = new StringParameterRun("query")
+        {
+            Text = "old value",
+        };
+        var page = new TestParametersPage
+        {
+            Command = new ListItem(new NoOpCommand { Name = "Run it" }) { Title = "Go" },
+            Parameters = [stringParameter],
+        };
+        var vm = CreateViewModel(page, host);
+        var recipient = new object();
+        PerformCommandMessage? receivedMessage = null;
+        WeakReferenceMessenger.Default.Register<PerformCommandMessage>(recipient, (_, message) =>
+        {
+            Assert.AreEqual("latest value", stringParameter.Text);
+            receivedMessage = message;
+        });
+
+        try
+        {
+            vm.InitializeProperties();
+            var stringParameterVm = vm.Items.OfType<StringParameterRunViewModel>().Single();
+
+            stringParameterVm.SetTextFromUi("latest value");
+            await vm.TrySubmitAsync();
+
+            Assert.AreEqual("latest value", stringParameter.Text);
+            Assert.IsNotNull(receivedMessage);
+
+            stringParameterVm.SetTextFromUi("post-submit value");
+            Assert.AreEqual("post-submit value", stringParameterVm.TextForUI);
+            Assert.AreEqual("latest value", stringParameter.Text);
+
+            receivedMessage.OnInvocationCompleted?.Invoke(CommandResultKind.KeepOpen);
+            await stringParameterVm.CommitPendingTextChangeAsync();
+            Assert.AreEqual("post-submit value", stringParameter.Text);
+        }
+        finally
+        {
+            WeakReferenceMessenger.Default.Unregister<PerformCommandMessage>(recipient);
+            vm.SafeCleanup();
+            vm.Dispose();
+        }
+    }
+
+    [TestMethod]
+    public async Task SubmitCommand_CommitsPendingStringParameterTextBeforeSendingCommandBarCommand()
+    {
+        var host = new TestAppExtensionHost();
+        var stringParameter = new StringParameterRun("query")
+        {
+            Text = "old value",
+        };
+        var page = new TestParametersPage
+        {
+            Command = new ListItem(new NoOpCommand { Name = "Run it" }) { Title = "Go" },
+            Parameters = [stringParameter],
+        };
+        var vm = CreateViewModel(page, host);
+        var recipient = new object();
+        PerformCommandMessage? receivedMessage = null;
+        WeakReferenceMessenger.Default.Register<PerformCommandMessage>(recipient, (_, message) =>
+        {
+            Assert.AreEqual("latest value", stringParameter.Text);
+            receivedMessage = message;
+        });
+
+        try
+        {
+            vm.InitializeProperties();
+            var stringParameterVm = vm.Items.OfType<StringParameterRunViewModel>().Single();
+
+            stringParameterVm.SetTextFromUi("latest value");
+            await vm.SubmitCommandAsync(vm.Command);
+
+            Assert.AreEqual("latest value", stringParameter.Text);
+            Assert.IsNotNull(receivedMessage);
+        }
+        finally
+        {
+            WeakReferenceMessenger.Default.Unregister<PerformCommandMessage>(recipient);
+            vm.SafeCleanup();
+            vm.Dispose();
+        }
     }
 
     // Separate frames so the view-models are unreachable on return - a Debug

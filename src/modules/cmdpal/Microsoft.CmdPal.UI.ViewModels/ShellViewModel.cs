@@ -383,11 +383,14 @@ public partial class ShellViewModel : ObservableObject,
     private void StartInvoke(PerformCommandMessage message, IInvokableCommand invokable, AppExtensionHost? host)
     {
         // TODO GH #525 This needs more better locking.
+        Action<CommandResultKind?>? rejectedInvocationCallback = null;
         lock (_invokeLock)
         {
             if (_handleInvokeTask is not null)
             {
-                // do nothing - a command is already doing a thing
+                // Release senders that use this callback to track submission
+                // state when the invocation is rejected.
+                rejectedInvocationCallback = message.OnInvocationCompleted;
             }
             else
             {
@@ -399,6 +402,8 @@ public partial class ShellViewModel : ObservableObject,
                 });
             }
         }
+
+        rejectedInvocationCallback?.Invoke(null);
     }
 
     private void SafeHandleInvokeCommandSynchronous(PerformCommandMessage message, IInvokableCommand invokable, AppExtensionHost? host)
@@ -413,25 +418,32 @@ public partial class ShellViewModel : ObservableObject,
 
         try
         {
-            ICommandResult? result;
+            ICommandResult? result = null;
             try
             {
-                // Call out to extension process.
-                // * May fail!
-                // * May never return!
-                result = invokable.Invoke(message.Context);
-                success = true;
+                try
+                {
+                    // Call out to extension process.
+                    // * May fail!
+                    // * May never return!
+                    result = invokable.Invoke(message.Context);
+                    success = true;
+                }
+                finally
+                {
+                    // Report the invocation outcome before processing its result.
+                    stopwatch.Stop();
+                    WeakReferenceMessenger.Default.Send<TelemetryExtensionInvokedMessage>(
+                        new(extensionId, commandId, commandName, success, (ulong)stopwatch.ElapsedMilliseconds));
+                }
+
+                // But if it did succeed, we need to handle the result.
+                UnsafeHandleCommandResult(result, message.OnBeforeShowConfirmation);
             }
             finally
             {
-                // Report the invocation outcome before processing its result.
-                stopwatch.Stop();
-                WeakReferenceMessenger.Default.Send<TelemetryExtensionInvokedMessage>(
-                    new(extensionId, commandId, commandName, success, (ulong)stopwatch.ElapsedMilliseconds));
+                message.OnInvocationCompleted?.Invoke(result?.Kind);
             }
-
-            // But if it did succeed, we need to handle the result.
-            UnsafeHandleCommandResult(result, message.OnBeforeShowConfirmation);
 
             _handleInvokeTask = null;
         }

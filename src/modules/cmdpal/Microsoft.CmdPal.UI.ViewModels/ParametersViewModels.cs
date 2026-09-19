@@ -210,6 +210,11 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
     // For cancelling in-flight writes when a newer value arrives.
     private CancellationTokenSource? _writeCancellationTokenSource;
 
+    private Task? _pendingWriteTask;
+    private long _textVersion;
+    private int _textChangesSuspended;
+    private string? _deferredText;
+
     public string TextForUI { get => _modelText; set => SetTextFromUi(value); }
 
     public StringParameterRunViewModel(IStringParameterRun stringRun, WeakReference<IPageContext> context)
@@ -234,13 +239,27 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
 
     public void SetTextFromUi(string value)
     {
+        if (Volatile.Read(ref _textChangesSuspended) != 0)
+        {
+            _modelText = value;
+            Interlocked.Increment(ref _textVersion);
+            _deferredText = value;
+            return;
+        }
+
         if (value == _modelText)
         {
             return;
         }
 
         _modelText = value;
+        Interlocked.Increment(ref _textVersion);
 
+        ScheduleTextWrite(value);
+    }
+
+    private void ScheduleTextWrite(string value)
+    {
         // Cancel any pending write that hasn't started yet, so we don't push
         // stale values to the extension.
         CancelAndDisposeTokenSource(ref _writeCancellationTokenSource);
@@ -250,7 +269,7 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
         // Hop off to an exclusive scheduler background thread to update the
         // extension. The exclusive scheduler ensures writes are serialized
         // and in-order (mirroring ListViewModel.OnSearchTextBoxUpdated).
-        _ = _writeTaskFactory.StartNew(
+        _pendingWriteTask = _writeTaskFactory.StartNew(
             () =>
             {
                 if (writeToken.IsCancellationRequested)
@@ -277,6 +296,55 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
             writeToken,
             TaskCreationOptions.None,
             _writeTaskFactory.Scheduler!);
+    }
+
+    internal long TextVersion => Volatile.Read(ref _textVersion);
+
+    internal void SuspendTextChanges() => Interlocked.Exchange(ref _textChangesSuspended, 1);
+
+    internal void ResumeTextChanges()
+    {
+        if (Interlocked.Exchange(ref _textChangesSuspended, 0) == 0)
+        {
+            return;
+        }
+
+        var deferredText = Interlocked.Exchange(ref _deferredText, null);
+        if (deferredText is not null)
+        {
+            ScheduleTextWrite(deferredText);
+        }
+    }
+
+    public async Task<bool> CommitPendingTextChangeAsync()
+    {
+        while (true)
+        {
+            var pendingWriteTask = Volatile.Read(ref _pendingWriteTask);
+            if (pendingWriteTask is null)
+            {
+                return true;
+            }
+
+            try
+            {
+                await pendingWriteTask;
+            }
+            catch (OperationCanceledException)
+            {
+                if (!ReferenceEquals(pendingWriteTask, Volatile.Read(ref _pendingWriteTask)))
+                {
+                    continue;
+                }
+
+                return false;
+            }
+
+            if (ReferenceEquals(pendingWriteTask, Volatile.Read(ref _pendingWriteTask)))
+            {
+                return true;
+            }
+        }
     }
 
     private static void CancelAndDisposeTokenSource(ref CancellationTokenSource? tokenSource)
@@ -532,7 +600,7 @@ public partial class CommandParameterRunViewModel : ParameterValueRunViewModel, 
     }
 }
 
-public partial class ParametersPageViewModel : PageViewModel, IDisposable
+public partial class ParametersPageViewModel : PageViewModel, ICommandBarContext, IDisposable
 {
     private ExtensionObject<IParametersPage> _model;
 
@@ -565,7 +633,22 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
         !NeedsAnyValues()
         ;
 
+    public string SecondaryCommandName => Command.SecondaryCommandName;
+
+    public CommandItemViewModel? PrimaryCommand => Command;
+
+    public CommandItemViewModel? SecondaryCommand => Command.SecondaryCommand;
+
+    public IReadOnlyList<IContextItemViewModel> MoreCommands => Command.MoreCommands;
+
+    public bool HasMoreCommands => Command.HasMoreCommands;
+
+    public bool CanOpenContextMenu => Command.CanOpenContextMenu;
+
+    public IReadOnlyList<IContextItemViewModel> AllCommands => Command.AllCommands;
+
     private ListViewModel? _activeListViewModel;
+    private int _isSubmitting;
 
     public ListViewModel? ActiveListViewModel
     {
@@ -602,6 +685,7 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
         _model = new(model);
         _contextMenuFactory = contextMenuFactory;
         _command = new(new(null), PageContext, _contextMenuFactory);
+        _command.PropertyChanged += CommandPropertyChanged;
     }
 
     /// <summary>
@@ -614,7 +698,19 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
 
         if (!ReferenceEquals(replaced, command))
         {
+            replaced.PropertyChanged -= CommandPropertyChanged;
             replaced.SafeCleanup();
+            command.PropertyChanged += CommandPropertyChanged;
+        }
+    }
+
+    private void CommandPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(CommandItemViewModel.MoreCommands) or
+            nameof(CommandItemViewModel.SecondaryCommand) or
+            nameof(CommandItemViewModel.CanOpenContextMenu))
+        {
+            UpdateCommand();
         }
     }
 
@@ -766,7 +862,7 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
         DoOnUiThread(
            () =>
            {
-               WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(Command));
+               WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(this));
            });
     }
 
@@ -840,10 +936,136 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
 
     public void TrySubmit()
     {
+        _ = TrySubmitAsync();
+    }
+
+    public async Task TrySubmitAsync()
+    {
+        if (!TryBeginSubmission())
+        {
+            return;
+        }
+
+        if (!await CommitPendingStringParameterWritesAsync())
+        {
+            EndSubmission();
+            return;
+        }
+
         if (ShowCommand)
         {
-            PerformCommandMessage m = new(this.Command.Command.Model);
+            PerformCommandMessage m = new(this.Command.Command.Model)
+            {
+                OnInvocationCompleted = _ => EndSubmission(),
+            };
             WeakReferenceMessenger.Default.Send(m);
+        }
+        else
+        {
+            EndSubmission();
+        }
+    }
+
+    public void SubmitCommand(
+        CommandItemViewModel? command,
+        Action<PerformCommandMessage>? commandInvoking = null,
+        Action? commandInvoked = null)
+    {
+        _ = SubmitCommandAsync(command, commandInvoking, commandInvoked);
+    }
+
+    public async Task SubmitCommandAsync(
+        CommandItemViewModel? command,
+        Action<PerformCommandMessage>? commandInvoking = null,
+        Action? commandInvoked = null)
+    {
+        if (command is null)
+        {
+            return;
+        }
+
+        if (!TryBeginSubmission())
+        {
+            return;
+        }
+
+        if (!await CommitPendingStringParameterWritesAsync())
+        {
+            EndSubmission();
+            return;
+        }
+
+        if (ShowCommand)
+        {
+            var message = new PerformCommandMessage(command.Command.Model, command.Model)
+            {
+                OnInvocationCompleted = _ => EndSubmission(),
+            };
+            commandInvoking?.Invoke(message);
+            WeakReferenceMessenger.Default.Send(message);
+            commandInvoked?.Invoke();
+        }
+        else
+        {
+            EndSubmission();
+        }
+    }
+
+    private bool TryBeginSubmission()
+    {
+        if (Interlocked.CompareExchange(ref _isSubmitting, 1, 0) != 0)
+        {
+            return false;
+        }
+
+        lock (_listLock)
+        {
+            foreach (var stringParameter in Items.OfType<StringParameterRunViewModel>())
+            {
+                stringParameter.SuspendTextChanges();
+            }
+        }
+
+        return true;
+    }
+
+    private void EndSubmission()
+    {
+        lock (_listLock)
+        {
+            foreach (var stringParameter in Items.OfType<StringParameterRunViewModel>())
+            {
+                stringParameter.ResumeTextChanges();
+            }
+        }
+
+        Interlocked.Exchange(ref _isSubmitting, 0);
+    }
+
+    private async Task<bool> CommitPendingStringParameterWritesAsync()
+    {
+        while (true)
+        {
+            StringParameterRunViewModel[] stringParameters;
+            long[] versions;
+            lock (_listLock)
+            {
+                stringParameters = Items.OfType<StringParameterRunViewModel>().ToArray();
+                versions = stringParameters.Select(parameter => parameter.TextVersion).ToArray();
+            }
+
+            foreach (var stringParameter in stringParameters)
+            {
+                if (!await stringParameter.CommitPendingTextChangeAsync())
+                {
+                    return false;
+                }
+            }
+
+            if (stringParameters.Select(parameter => parameter.TextVersion).SequenceEqual(versions))
+            {
+                return true;
+            }
         }
     }
 
@@ -890,6 +1112,7 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
     protected override void UnsafeCleanup()
     {
         base.UnsafeCleanup();
+        _command.PropertyChanged -= CommandPropertyChanged;
 
         // Drop the active list param reference before disposing items so we
         // don't end up pointing at a disposed ListViewModel.
