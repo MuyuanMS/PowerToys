@@ -1492,18 +1492,17 @@ public sealed partial class MainWindow : WindowEx,
                 if (activation.ProtocolUri is not null &&
                     _protocolActivation.TryParse(activation.ProtocolUri, out var route))
                 {
-                    switch (route)
+                    switch (CmdPalProtocolPolicy.Evaluate(route))
                     {
-                        case CmdPalProtocolRoute.Background:
+                        case CmdPalProtocolAction.RunInBackground:
                             // we're running, we don't want to activate our window. bail
                             return;
 
-                        case CmdPalProtocolRoute.OpenSettings openSettings:
+                        case CmdPalProtocolAction.OpenSettings openSettings:
                             WeakReferenceMessenger.Default.Send(openSettings.Message);
                             return;
 
-                        case CmdPalProtocolRoute.Reload:
-                        case CmdPalProtocolRoute.ExecuteCommand:
+                        case CmdPalProtocolAction.RequestConsent:
                             WeakReferenceMessenger.Default.Send(new ExternalCommandLinkRequestedMessage(route));
                             return;
                     }
