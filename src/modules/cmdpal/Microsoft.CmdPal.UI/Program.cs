@@ -68,8 +68,6 @@ internal sealed class Program
 
         Logger.LogDebug($"Starting at {DateTime.UtcNow}");
 
-        AppLanguageHelper.ApplyFromPowerToysSettings();
-
         // Log application startup information
         try
         {
@@ -91,6 +89,8 @@ internal sealed class Program
         PowerToysTelemetry.Log.WriteEvent(new CmdPalProcessStarted());
 
         WinRT.ComWrappersSupport.InitializeComWrappers();
+        AppLanguageHelper.ApplyFromPowerToysSettings();
+
         var isRedirect = DecideRedirection();
         if (!isRedirect)
         {

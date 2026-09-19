@@ -12,6 +12,11 @@ namespace Microsoft.CmdPal.Common.Helpers;
 /// </summary>
 public static class AppLanguageHelper
 {
+    private static readonly CultureInfo OriginalCulture = CultureInfo.CurrentCulture;
+    private static readonly CultureInfo OriginalUiCulture = CultureInfo.CurrentUICulture;
+    private static readonly CultureInfo? OriginalDefaultCulture = CultureInfo.DefaultThreadCurrentCulture;
+    private static readonly CultureInfo? OriginalDefaultUiCulture = CultureInfo.DefaultThreadCurrentUICulture;
+
     /// <summary>
     /// Gets the language tag currently applied from PowerToys settings, or empty for Windows default.
     /// </summary>
@@ -35,6 +40,7 @@ public static class AppLanguageHelper
         {
             LanguageOverride = string.Empty;
             TrySetWinUiLanguageOverride(string.Empty);
+            RestoreDotNetCultures();
             return;
         }
 
@@ -69,5 +75,13 @@ public static class AppLanguageHelper
         {
             Logger.LogError($"Unknown application language tag '{languageTag}'", ex);
         }
+    }
+
+    private static void RestoreDotNetCultures()
+    {
+        CultureInfo.CurrentCulture = OriginalCulture;
+        CultureInfo.CurrentUICulture = OriginalUiCulture;
+        CultureInfo.DefaultThreadCurrentCulture = OriginalDefaultCulture;
+        CultureInfo.DefaultThreadCurrentUICulture = OriginalDefaultUiCulture;
     }
 }

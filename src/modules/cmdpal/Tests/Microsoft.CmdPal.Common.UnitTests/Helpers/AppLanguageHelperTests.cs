@@ -50,6 +50,10 @@ public class AppLanguageHelperTests
             AppLanguageHelper.Apply(string.Empty);
 
             Assert.IsTrue(string.Equals(string.Empty, AppLanguageHelper.LanguageOverride, StringComparison.Ordinal));
+            Assert.IsTrue(string.Equals(originalCulture.Name, CultureInfo.CurrentCulture.Name, StringComparison.OrdinalIgnoreCase));
+            Assert.IsTrue(string.Equals(originalUiCulture.Name, CultureInfo.CurrentUICulture.Name, StringComparison.OrdinalIgnoreCase));
+            Assert.AreEqual(originalDefaultCulture?.Name, CultureInfo.DefaultThreadCurrentCulture?.Name);
+            Assert.AreEqual(originalDefaultUiCulture?.Name, CultureInfo.DefaultThreadCurrentUICulture?.Name);
         }
         finally
         {
@@ -71,7 +75,7 @@ public class AppLanguageHelperTests
 
         try
         {
-            AppLanguageHelper.Apply("not-a-valid-bcp47-tag");
+            AppLanguageHelper.Apply("not-a-valid-language-tag");
         }
         finally
         {
