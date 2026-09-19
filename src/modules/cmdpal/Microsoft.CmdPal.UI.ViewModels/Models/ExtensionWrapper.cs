@@ -176,25 +176,28 @@ public class ExtensionWrapper : IExtensionWrapper
     {
         try
         {
-            var extensionObject = checkLiveness ? GetExtensionObject() : _extensionObject;
-            if (extensionObject is null)
+            lock (_lock)
             {
-                return false;
-            }
-
-            unsafe
-            {
-                var winrtObject = (IWinRTObject)extensionObject;
-                var hr = PInvoke.CoAllowSetForegroundWindow((IUnknown*)winrtObject.NativeObject.ThisPtr);
-                GC.KeepAlive(extensionObject);
-                if (hr != 0)
+                var extensionObject = checkLiveness && !IsRunning() ? null : _extensionObject;
+                if (extensionObject is null)
                 {
-                    Logger.LogWarning($"Error giving foreground rights: 0x{hr.Value:X8}");
                     return false;
                 }
-            }
 
-            return true;
+                unsafe
+                {
+                    var winrtObject = (IWinRTObject)extensionObject;
+                    var hr = PInvoke.CoAllowSetForegroundWindow((IUnknown*)winrtObject.NativeObject.ThisPtr);
+                    GC.KeepAlive(extensionObject);
+                    if (hr != 0)
+                    {
+                        Logger.LogWarning($"Error giving foreground rights: 0x{hr.Value:X8}");
+                        return false;
+                    }
+                }
+
+                return true;
+            }
         }
         catch (Exception ex)
         {
