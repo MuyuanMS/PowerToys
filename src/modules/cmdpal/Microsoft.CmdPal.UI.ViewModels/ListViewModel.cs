@@ -120,6 +120,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
     // For cancelling a deferred SafeSlowInit when the user navigates rapidly
     private CancellationTokenSource? _selectedItemCts;
     private bool _suspendedForNavigation;
+    private int _hasPublishedFetch;
+    private int _fetchPublicationPending;
+    private bool _navigationRecoveryRequired;
+    private bool _isDisposed;
+    private bool _isCleaned;
 
     public override bool IsInitialized
     {
@@ -423,7 +428,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
             {
                 ThrowIfFetchCanceledOrStale(fetchGeneration, cancellationToken);
 
-                item?.SafeInitializeProperties();
+                item?.InitializePropertiesOnce();
             }
 
             // Cancel any ongoing property initialization for the previous list.
@@ -508,57 +513,61 @@ public partial class ListViewModel : PageViewModel, IDisposable
         });
         _initializeItemsTask.Start();
 
+        Interlocked.Exchange(ref _fetchPublicationPending, 1);
         DoOnUiThread(
             () =>
             {
-                lock (_fetchStateLock)
+                try
                 {
-                    if (!IsLatestFetchGeneration(fetchGeneration))
-                    {
-                        return;
-                    }
-
-                    lock (_listLock)
+                    lock (_fetchStateLock)
                     {
                         if (!IsLatestFetchGeneration(fetchGeneration))
                         {
                             return;
                         }
 
-                        // Now that our Items contains everything we want, it's time for us to
-                        // re-evaluate our Filter on those items.
-                        if (!_isDynamic)
+                        lock (_listLock)
                         {
-                            // A static list? Great! Just run the filter.
-                            RunFilteredItemsUpdate(ApplyFilterUnderLock);
+                            // Now that our Items contains everything we want, it's time for us to
+                            // re-evaluate our Filter on those items.
+                            if (!_isDynamic)
+                            {
+                                // A static list? Great! Just run the filter.
+                                RunFilteredItemsUpdate(ApplyFilterUnderLock);
+                            }
+                            else
+                            {
+                                // A dynamic list? Even better! Just stick everything into
+                                // FilteredItems. The extension already did any filtering it cared about.
+                                var snapshot = Items.Where(i => !i.IsInErrorState).ToList();
+                                RunFilteredItemsUpdate(() => ListHelpers.InPlaceUpdateList(FilteredItems, snapshot));
+                            }
+
+                            UpdateEmptyContent();
                         }
-                        else
+
+                        if (!IsLatestFetchGeneration(fetchGeneration))
                         {
-                            // A dynamic list? Even better! Just stick everything into
-                            // FilteredItems. The extension already did any filtering it cared about.
-                            var snapshot = Items.Where(i => !i.IsInErrorState).ToList();
-                            RunFilteredItemsUpdate(() => ListHelpers.InPlaceUpdateList(FilteredItems, snapshot));
+                            return;
                         }
 
-                        UpdateEmptyContent();
+                        // Consume the pending flag on the UI thread so a
+                        // forceFirstItem=true intent survives cancellation.
+                        var forceFirst = _forceFirstItemPending;
+                        _forceFirstItemPending = false;
+
+                        ItemsUpdated?.Invoke(
+                            this,
+                            new ItemsUpdatedEventArgs(
+                                forceFirstItem: IsRootPage && forceFirst,
+                                ensureSelectionVisible: ensureSelectionVisible));
+                        Volatile.Write(ref _hasPublishedFetch, 1);
+                        _isLoadingMore.Clear();
                     }
-
-                    if (!IsLatestFetchGeneration(fetchGeneration))
-                    {
-                        return;
-                    }
-
-                    // Consume the pending flag on the UI thread so a
-                    // forceFirstItem=true intent survives cancellation.
-                    var forceFirst = _forceFirstItemPending;
-                    _forceFirstItemPending = false;
-
-                    ItemsUpdated?.Invoke(
-                        this,
-                        new ItemsUpdatedEventArgs(
-                            forceFirstItem: IsRootPage && forceFirst,
-                            ensureSelectionVisible: ensureSelectionVisible));
-                    _isLoadingMore.Clear();
+                }
+                finally
+                {
+                    Volatile.Write(ref _fetchPublicationPending, 0);
                 }
             });
     }
@@ -1006,8 +1015,18 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     internal void SuspendForNavigation()
     {
+        _navigationRecoveryRequired =
+            Volatile.Read(ref _hasPublishedFetch) == 0 ||
+            Volatile.Read(ref _fetchPublicationPending) != 0 ||
+            IsFetching;
         _suspendedForNavigation = true;
         CanPublishContextUpdates = false;
+        var model = _model.Unsafe;
+        if (model is not null)
+        {
+            model.ItemsChanged -= Model_ItemsChanged;
+        }
+
         CancelAndDisposeTokenSource(ref _selectedItemCts);
         CancelAndDisposeTokenSource(ref _cancellationTokenSource);
     }
@@ -1017,11 +1036,15 @@ public partial class ListViewModel : PageViewModel, IDisposable
         _suspendedForNavigation = false;
         CanPublishContextUpdates = true;
         var model = _model.Unsafe;
-        if (model is not null)
+        if (model is not null && !_isDisposed && !_isCleaned)
         {
             model.ItemsChanged -= Model_ItemsChanged;
             model.ItemsChanged += Model_ItemsChanged;
-            FetchItems(keepSelection: true, ensureSelectionVisible: true);
+            if (_navigationRecoveryRequired)
+            {
+                _navigationRecoveryRequired = false;
+                RequestFetch(keepSelection: true, ensureSelectionVisible: true);
+            }
         }
 
         UpdateSelectedItem(_lastSelectedItem);
@@ -1228,6 +1251,13 @@ public partial class ListViewModel : PageViewModel, IDisposable
     public void Dispose()
     {
         GC.SuppressFinalize(this);
+        _isDisposed = true;
+        var model = _model.Unsafe;
+        if (model is not null)
+        {
+            model.ItemsChanged -= Model_ItemsChanged;
+        }
+
         CancelAndDisposeTokenSource(ref _cancellationTokenSource);
         CancelAndDisposeTokenSource(ref filterCancellationTokenSource);
         CancelAndDisposeTokenSource(ref _fetchItemsCancellationTokenSource);
@@ -1237,6 +1267,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
     protected override void UnsafeCleanup()
     {
         base.UnsafeCleanup();
+        _isCleaned = true;
 
         EmptyContent?.SafeCleanup();
         EmptyContent = new(new(null), PageContext, contextMenuFactory: null); // necessary?
