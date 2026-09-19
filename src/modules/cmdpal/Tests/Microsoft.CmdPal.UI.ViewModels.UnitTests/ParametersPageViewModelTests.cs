@@ -147,6 +147,15 @@ public partial class ParametersPageViewModelTests
 
             Assert.AreEqual("latest value", stringParameter.Text);
             Assert.IsNotNull(receivedMessage);
+
+            stringParameterVm.SetTextFromUi("post-submit value");
+            await stringParameterVm.CommitPendingTextChangeAsync();
+            Assert.AreEqual("latest value", stringParameter.Text);
+
+            receivedMessage.OnInvocationCompleted?.Invoke(CommandResultKind.KeepOpen);
+            stringParameterVm.SetTextFromUi("post-submit value");
+            await stringParameterVm.CommitPendingTextChangeAsync();
+            Assert.AreEqual("post-submit value", stringParameter.Text);
         }
         finally
         {

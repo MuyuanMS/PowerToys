@@ -212,6 +212,7 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
 
     private Task? _pendingWriteTask;
     private long _textVersion;
+    private int _textChangesSuspended;
 
     public string TextForUI { get => _modelText; set => SetTextFromUi(value); }
 
@@ -237,6 +238,11 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
 
     public void SetTextFromUi(string value)
     {
+        if (Volatile.Read(ref _textChangesSuspended) != 0)
+        {
+            return;
+        }
+
         if (value == _modelText)
         {
             return;
@@ -284,6 +290,10 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
     }
 
     internal long TextVersion => Volatile.Read(ref _textVersion);
+
+    internal void SuspendTextChanges() => Interlocked.Exchange(ref _textChangesSuspended, 1);
+
+    internal void ResumeTextChanges() => Interlocked.Exchange(ref _textChangesSuspended, 0);
 
     public async Task<bool> CommitPendingTextChangeAsync()
     {
@@ -617,6 +627,7 @@ public partial class ParametersPageViewModel : PageViewModel, ICommandBarContext
     public IReadOnlyList<IContextItemViewModel> AllCommands => Command.AllCommands;
 
     private ListViewModel? _activeListViewModel;
+    private int _isSubmitting;
 
     public ListViewModel? ActiveListViewModel
     {
@@ -909,15 +920,28 @@ public partial class ParametersPageViewModel : PageViewModel, ICommandBarContext
 
     public async Task TrySubmitAsync()
     {
+        if (!TryBeginSubmission())
+        {
+            return;
+        }
+
         if (!await CommitPendingStringParameterWritesAsync())
         {
+            EndSubmission();
             return;
         }
 
         if (ShowCommand)
         {
-            PerformCommandMessage m = new(this.Command.Command.Model);
+            PerformCommandMessage m = new(this.Command.Command.Model)
+            {
+                OnInvocationCompleted = _ => EndSubmission(),
+            };
             WeakReferenceMessenger.Default.Send(m);
+        }
+        else
+        {
+            EndSubmission();
         }
     }
 
@@ -939,18 +963,62 @@ public partial class ParametersPageViewModel : PageViewModel, ICommandBarContext
             return;
         }
 
+        if (!TryBeginSubmission())
+        {
+            return;
+        }
+
         if (!await CommitPendingStringParameterWritesAsync())
         {
+            EndSubmission();
             return;
         }
 
         if (ShowCommand)
         {
-            var message = new PerformCommandMessage(command.Command.Model, command.Model);
+            var message = new PerformCommandMessage(command.Command.Model, command.Model)
+            {
+                OnInvocationCompleted = _ => EndSubmission(),
+            };
             commandInvoking?.Invoke(message);
             WeakReferenceMessenger.Default.Send(message);
             commandInvoked?.Invoke();
         }
+        else
+        {
+            EndSubmission();
+        }
+    }
+
+    private bool TryBeginSubmission()
+    {
+        if (Interlocked.CompareExchange(ref _isSubmitting, 1, 0) != 0)
+        {
+            return false;
+        }
+
+        lock (_listLock)
+        {
+            foreach (var stringParameter in Items.OfType<StringParameterRunViewModel>())
+            {
+                stringParameter.SuspendTextChanges();
+            }
+        }
+
+        return true;
+    }
+
+    private void EndSubmission()
+    {
+        lock (_listLock)
+        {
+            foreach (var stringParameter in Items.OfType<StringParameterRunViewModel>())
+            {
+                stringParameter.ResumeTextChanges();
+            }
+        }
+
+        Interlocked.Exchange(ref _isSubmitting, 0);
     }
 
     private async Task<bool> CommitPendingStringParameterWritesAsync()

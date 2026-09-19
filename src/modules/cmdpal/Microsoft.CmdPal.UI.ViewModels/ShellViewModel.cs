@@ -413,25 +413,32 @@ public partial class ShellViewModel : ObservableObject,
 
         try
         {
-            ICommandResult? result;
+            ICommandResult? result = null;
             try
             {
-                // Call out to extension process.
-                // * May fail!
-                // * May never return!
-                result = invokable.Invoke(message.Context);
-                success = true;
+                try
+                {
+                    // Call out to extension process.
+                    // * May fail!
+                    // * May never return!
+                    result = invokable.Invoke(message.Context);
+                    success = true;
+                }
+                finally
+                {
+                    // Report the invocation outcome before processing its result.
+                    stopwatch.Stop();
+                    WeakReferenceMessenger.Default.Send<TelemetryExtensionInvokedMessage>(
+                        new(extensionId, commandId, commandName, success, (ulong)stopwatch.ElapsedMilliseconds));
+                }
+
+                // But if it did succeed, we need to handle the result.
+                UnsafeHandleCommandResult(result, message.OnBeforeShowConfirmation);
             }
             finally
             {
-                // Report the invocation outcome before processing its result.
-                stopwatch.Stop();
-                WeakReferenceMessenger.Default.Send<TelemetryExtensionInvokedMessage>(
-                    new(extensionId, commandId, commandName, success, (ulong)stopwatch.ElapsedMilliseconds));
+                message.OnInvocationCompleted?.Invoke(result?.Kind);
             }
-
-            // But if it did succeed, we need to handle the result.
-            UnsafeHandleCommandResult(result, message.OnBeforeShowConfirmation);
 
             _handleInvokeTask = null;
         }
