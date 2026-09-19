@@ -13,6 +13,8 @@ namespace Microsoft.CmdPal.UI.ViewModels;
 
 public partial class PageViewModel : ExtensionObjectViewModel, IPageContext
 {
+    private volatile bool _canPublishContextUpdates = true;
+
     public TaskScheduler Scheduler { get; private set; }
 
     private readonly ExtensionObject<IPage> _pageModel;
@@ -45,6 +47,12 @@ public partial class PageViewModel : ExtensionObjectViewModel, IPageContext
     /// </summary>
     [ObservableProperty]
     public partial bool HasBackButton { get; set; } = true;
+
+    public bool CanPublishContextUpdates
+    {
+        get => _canPublishContextUpdates;
+        set => _canPublishContextUpdates = value;
+    }
 
     // This is set from the SearchBar
     [ObservableProperty]

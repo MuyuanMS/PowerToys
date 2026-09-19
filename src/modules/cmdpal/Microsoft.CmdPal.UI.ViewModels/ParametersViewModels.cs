@@ -722,7 +722,10 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
                 OnPropertyChanged(nameof(Items)); // This _could_ be promoted to a dedicated ItemsUpdated event if needed
                 UpdateCommand();
 
-                WeakReferenceMessenger.Default.Send(new FocusSearchBoxMessage());
+                if (CanPublishContextUpdates)
+                {
+                    WeakReferenceMessenger.Default.Send(new FocusSearchBoxMessage());
+                }
             });
     }
 
@@ -766,7 +769,10 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
         DoOnUiThread(
            () =>
            {
-               WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(Command));
+               if (CanPublishContextUpdates)
+               {
+                   WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(Command));
+               }
            });
     }
 
