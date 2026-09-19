@@ -4,6 +4,7 @@
 
 using System.Runtime.InteropServices;
 using ManagedCommon;
+using Microsoft.CmdPal.Common.Helpers;
 using Microsoft.CmdPal.Common.Services;
 using Microsoft.CmdPal.UI.Events;
 using Microsoft.PowerToys.Telemetry;
@@ -88,6 +89,8 @@ internal sealed class Program
         PowerToysTelemetry.Log.WriteEvent(new CmdPalProcessStarted());
 
         WinRT.ComWrappersSupport.InitializeComWrappers();
+        AppLanguageHelper.ApplyFromPowerToysSettings();
+
         var isRedirect = DecideRedirection();
         if (!isRedirect)
         {

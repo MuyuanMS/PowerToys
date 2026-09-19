@@ -11,6 +11,8 @@ public partial class ExtensionHostInstance
 {
     public IExtensionHost? Host { get; private set; }
 
+    public string LanguageOverride => Host is IExtensionHost2 host ? host.LanguageOverride : string.Empty;
+
     public void Initialize(IExtensionHost host) => Host = host;
 
     /// <summary>

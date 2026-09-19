@@ -254,6 +254,12 @@ namespace Microsoft.CommandPalette.Extensions
     };
 
     [contract(Microsoft.CommandPalette.Extensions.ExtensionsContract, 1)]
+    interface IExtensionHost2 requires IExtensionHost
+    {
+        String LanguageOverride { get; };
+    };
+
+    [contract(Microsoft.CommandPalette.Extensions.ExtensionsContract, 1)]
     interface IPage requires ICommand {
         String Title { get; };
         Boolean IsLoading { get; };

@@ -8,6 +8,8 @@ public partial class ExtensionHost
 {
     public static IExtensionHost? Host { get; private set; }
 
+    public static string LanguageOverride => Host is IExtensionHost2 host ? host.LanguageOverride : string.Empty;
+
     public static void Initialize(IExtensionHost host) => Host = host;
 
     /// <summary>
