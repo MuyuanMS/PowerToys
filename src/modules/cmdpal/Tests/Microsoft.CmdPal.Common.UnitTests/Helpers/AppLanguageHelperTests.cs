@@ -39,7 +39,10 @@ public class AppLanguageHelperTests
     [TestMethod]
     public void Apply_EmptyTag_ClearsLanguageOverrideWithoutThrowing()
     {
+        var originalCulture = CultureInfo.CurrentCulture;
         var originalUiCulture = CultureInfo.CurrentUICulture;
+        var originalDefaultCulture = CultureInfo.DefaultThreadCurrentCulture;
+        var originalDefaultUiCulture = CultureInfo.DefaultThreadCurrentUICulture;
 
         try
         {
@@ -50,8 +53,10 @@ public class AppLanguageHelperTests
         }
         finally
         {
+            CultureInfo.CurrentCulture = originalCulture;
             CultureInfo.CurrentUICulture = originalUiCulture;
-            CultureInfo.DefaultThreadCurrentUICulture = originalUiCulture;
+            CultureInfo.DefaultThreadCurrentCulture = originalDefaultCulture;
+            CultureInfo.DefaultThreadCurrentUICulture = originalDefaultUiCulture;
             AppLanguageHelper.Apply(string.Empty);
         }
     }

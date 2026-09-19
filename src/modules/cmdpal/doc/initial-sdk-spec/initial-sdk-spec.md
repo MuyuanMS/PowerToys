@@ -1942,6 +1942,11 @@ interface IExtensionHost
 
     Windows.Foundation.IAsyncAction LogMessage(ILogMessage message);
 };
+
+interface IExtensionHost2 requires IExtensionHost
+{
+    String LanguageOverride { get; };
+};
 ```
 
 There's also a `LogMessage` method provided by the `IExtensionHost` interface.
@@ -1953,7 +1958,8 @@ but may be helpful for debugging purposes.
 command provider on startup, when the host app first connects to the extension.
 For apps which use the helpers library, this will be managed for them. Consumers
 of the helpers lib can simply call `Helpers.ExtensionHost.Host` to get the
-instance from the host app.
+instance from the host app. Hosts that implement `IExtensionHost2` can also
+expose the current language override selected by the user.
 
 [TODO!]: I'm marking these methods async right now, to force extension authors
 to remember that these are x-proc calls, and should be treated asynchronously.

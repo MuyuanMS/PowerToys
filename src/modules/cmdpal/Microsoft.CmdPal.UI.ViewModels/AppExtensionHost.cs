@@ -12,7 +12,7 @@ using Windows.Foundation;
 
 namespace Microsoft.CmdPal.UI.ViewModels;
 
-public abstract partial class AppExtensionHost : IExtensionHost
+public abstract partial class AppExtensionHost : IExtensionHost2
 {
     private static readonly GlobalLogPageContext _globalLogPageContext = new();
 
