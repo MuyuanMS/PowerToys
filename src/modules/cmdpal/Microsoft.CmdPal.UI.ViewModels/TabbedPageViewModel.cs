@@ -33,7 +33,9 @@ public partial class TabbedPageViewModel : PageViewModel
     private readonly IPageViewModelFactoryService _factory;
     private readonly Dictionary<string, CachedChild> _childCache = [];
     private readonly Dictionary<TabViewModel, string> _tabCacheKeys = [];
+    private readonly object _lifetimeLock = new();
     private bool _isDisposed;
+    private bool _isSubscribedToItemsChanged;
     private bool _normalizingTabIds;
 
     private static readonly string _fallbackPlaceholder = "Type here to search...";
@@ -96,6 +98,20 @@ public partial class TabbedPageViewModel : PageViewModel
             return;
         }
 
+        lock (_lifetimeLock)
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            if (!_isSubscribedToItemsChanged)
+            {
+                model.ItemsChanged += Model_ItemsChanged;
+                _isSubscribedToItemsChanged = true;
+            }
+        }
+
         var newTabs = BuildTabViewModels(model.GetTabs());
 
         DoOnUiThread(() =>
@@ -117,8 +133,6 @@ public partial class TabbedPageViewModel : PageViewModel
             // First tab is the default active tab.
             SelectedTab = Tabs.Count > 0 ? Tabs[0] : null;
         });
-
-        model.ItemsChanged += Model_ItemsChanged;
     }
 
     private List<TabViewModel> BuildTabViewModels(ITab[]? tabs)
@@ -549,12 +563,17 @@ public partial class TabbedPageViewModel : PageViewModel
     protected override void UnsafeCleanup()
     {
         base.UnsafeCleanup();
-        _isDisposed = true;
 
         var model = _model.Unsafe;
-        if (model is not null)
+        lock (_lifetimeLock)
         {
-            model.ItemsChanged -= Model_ItemsChanged;
+            _isDisposed = true;
+
+            if (_isSubscribedToItemsChanged && model is not null)
+            {
+                model.ItemsChanged -= Model_ItemsChanged;
+                _isSubscribedToItemsChanged = false;
+            }
         }
 
         DetachActiveChildLoading(ActiveChild);
