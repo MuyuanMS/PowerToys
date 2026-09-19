@@ -123,64 +123,44 @@ internal sealed class IconLoadDiagnosticsSession
         }
     }
 
-    internal void RecordUiProbeEnqueued()
-    {
-        if (!IsStopped)
-        {
-            Interlocked.Increment(ref _uiProbeEnqueued);
-        }
-    }
+    internal void RecordUiProbeEnqueued() => RecordIfRunning(() => Interlocked.Increment(ref _uiProbeEnqueued));
 
-    internal void RecordUiProbeCompleted(long elapsedTicks)
+    internal void RecordUiProbeCompleted(long elapsedTicks) => RecordIfRunning(() =>
     {
-        if (IsStopped)
-        {
-            return;
-        }
-
         Interlocked.Increment(ref _uiProbeCompleted);
         _uiProbeWaitLatency.Record(elapsedTicks);
         IconLoadEventSource.Log.UiResponsivenessProbeCompleted(Id, ToMicroseconds(elapsedTicks));
-    }
+    });
 
-    internal void RecordUiProbeSkipped()
-    {
-        if (!IsStopped)
-        {
-            Interlocked.Increment(ref _uiProbeSkipped);
-        }
-    }
+    internal void RecordUiProbeSkipped() => RecordIfRunning(() => Interlocked.Increment(ref _uiProbeSkipped));
 
-    internal void RecordUiProbeRejected()
-    {
-        if (!IsStopped)
-        {
-            Interlocked.Increment(ref _uiProbeRejected);
-        }
-    }
+    internal void RecordUiProbeRejected() => RecordIfRunning(() => Interlocked.Increment(ref _uiProbeRejected));
 
     public IconRequestMeasurement BeginRequest(IconRequestReason reason, double scale, IconRequestOrigin origin)
     {
-        if (IsStopped)
+        lock (_stopLock)
         {
-            return default;
-        }
+            if (IsStopped)
+            {
+                return default;
+            }
 
-        origin = origin.Normalize();
-        var requestId = Interlocked.Increment(ref _nextRequestId);
-        Interlocked.Increment(ref _requestsStarted);
-        var originKey = new RequestOriginKey(origin.RequestSite, origin.DiagnosticScope);
-        var originMeasurements = _requestOriginMeasurements.GetOrAdd(originKey, static _ => new RequestOriginMeasurements());
-        originMeasurements.RecordStarted(origin.IconBoxId);
-        _requestDemandStates.TryAdd(requestId, new RequestDemandState(originMeasurements));
-        IconLoadEventSource.Log.RequestStarted(Id, requestId, (int)reason, scale);
-        IconLoadEventSource.Log.RequestOrigin(
-            Id,
-            requestId,
-            origin.IconBoxId,
-            (int)origin.RequestSite,
-            origin.DiagnosticScope);
-        return new IconRequestMeasurement(this, requestId, Stopwatch.GetTimestamp());
+            origin = origin.Normalize();
+            var requestId = Interlocked.Increment(ref _nextRequestId);
+            Interlocked.Increment(ref _requestsStarted);
+            var originKey = new RequestOriginKey(origin.RequestSite, origin.DiagnosticScope);
+            var originMeasurements = _requestOriginMeasurements.GetOrAdd(originKey, static _ => new RequestOriginMeasurements());
+            originMeasurements.RecordStarted(origin.IconBoxId);
+            _requestDemandStates.TryAdd(requestId, new RequestDemandState(originMeasurements));
+            IconLoadEventSource.Log.RequestStarted(Id, requestId, (int)reason, scale);
+            IconLoadEventSource.Log.RequestOrigin(
+                Id,
+                requestId,
+                origin.IconBoxId,
+                (int)origin.RequestSite,
+                origin.DiagnosticScope);
+            return new IconRequestMeasurement(this, requestId, Stopwatch.GetTimestamp());
+        }
     }
 
     public IconLoadMeasurement? CreateLoad(IconLoadInputKind inputKind, double width, double height, double scale)
@@ -201,7 +181,7 @@ internal sealed class IconLoadDiagnosticsSession
         }
     }
 
-    public void RecordProviderResolution(long requestId, long loadId, IconProviderResolution resolution)
+    public void RecordProviderResolution(long requestId, long loadId, IconProviderResolution resolution) => RecordIfRunning(() =>
     {
         Interlocked.Increment(ref _providerResolutions[(int)resolution]);
         if (_requestDemandStates.TryGetValue(requestId, out var requestState))
@@ -239,9 +219,9 @@ internal sealed class IconLoadDiagnosticsSession
         }
 
         IconLoadEventSource.Log.ProviderResolved(Id, requestId, loadId, (int)resolution);
-    }
+    });
 
-    public void InvalidateRequest(long requestId)
+    public void InvalidateRequest(long requestId) => RecordIfRunning(() =>
     {
         if (!_requestDemandStates.TryGetValue(requestId, out var requestState))
         {
@@ -252,7 +232,7 @@ internal sealed class IconLoadDiagnosticsSession
         {
             InvalidateRequest(requestId, requestState, Stopwatch.GetTimestamp());
         }
-    }
+    });
 
     public void RegisterLoad(Task<IconSource?> task, IconLoadMeasurement load)
     {
@@ -264,7 +244,7 @@ internal sealed class IconLoadDiagnosticsSession
         return _loadsByTask.TryGetValue(task, out var load) ? load : null;
     }
 
-    public void CompleteRequest(long requestId, IconRequestStatus status, IconLoadResultKind resultKind, long elapsedTicks)
+    public void CompleteRequest(long requestId, IconRequestStatus status, IconLoadResultKind resultKind, long elapsedTicks) => RecordIfRunning(() =>
     {
         Interlocked.Increment(ref _requestStatuses[(int)status]);
         _requestLatency.Record(elapsedTicks);
@@ -307,7 +287,7 @@ internal sealed class IconLoadDiagnosticsSession
                 }
             }
         }
-    }
+    });
 
     private void InvalidateRequest(long requestId, RequestDemandState requestState, long invalidatedAt)
     {
@@ -358,7 +338,7 @@ internal sealed class IconLoadDiagnosticsSession
             remainingLiveRequesters);
     }
 
-    public void RecordLoadEnqueued(long loadId, IconLoadPriority priority)
+    public void RecordLoadEnqueued(long loadId, IconLoadPriority priority) => RecordIfRunning(() =>
     {
         ref var currentDepth = ref (priority == IconLoadPriority.High
             ? ref _currentHighQueueDepth
@@ -375,7 +355,7 @@ internal sealed class IconLoadDiagnosticsSession
         }
 
         IconLoadEventSource.Log.LoadEnqueued(Id, loadId, (int)priority, depth);
-    }
+    });
 
     private void RecordDemandQueueEnqueued(long loadId, bool demanded)
     {
@@ -511,7 +491,7 @@ internal sealed class IconLoadDiagnosticsSession
             demandedBeyondCapacity);
     }
 
-    public void RecordLoadRejected(long loadId)
+    public void RecordLoadRejected(long loadId) => RecordIfRunning(() =>
     {
         Interlocked.Increment(ref _loadsRejected);
         if (_loadDemandStates.TryGetValue(loadId, out var demandState))
@@ -520,14 +500,14 @@ internal sealed class IconLoadDiagnosticsSession
         }
 
         IconLoadEventSource.Log.LoadRejected(Id, loadId);
-    }
+    });
 
     public void RecordWorkerStarted(
         long loadId,
         IconLoadInputKind inputKind,
         IconLoadPriority priority,
         long queueTicks,
-        int workerCount)
+        int workerCount) => RecordIfRunning(() =>
     {
         if (priority == IconLoadPriority.High)
         {
@@ -559,30 +539,30 @@ internal sealed class IconLoadDiagnosticsSession
         }
 
         IconLoadEventSource.Log.LoadStarted(Id, loadId, ToMicroseconds(queueTicks), activeWorkers);
-    }
+    });
 
-    public void RecordBackgroundPreparation(long loadId, IconLoadInputKind inputKind, long elapsedTicks)
+    public void RecordBackgroundPreparation(long loadId, IconLoadInputKind inputKind, long elapsedTicks) => RecordIfRunning(() =>
     {
         _backgroundPreparationLatency.Record(elapsedTicks);
         _inputKindMeasurements[(int)inputKind].BackgroundPreparationLatency.Record(elapsedTicks);
         IconLoadEventSource.Log.BackgroundPreparationCompleted(Id, loadId, ToMicroseconds(elapsedTicks));
-    }
+    });
 
-    public void RecordDispatcherWait(long loadId, IconLoadInputKind inputKind, long elapsedTicks)
+    public void RecordDispatcherWait(long loadId, IconLoadInputKind inputKind, long elapsedTicks) => RecordIfRunning(() =>
     {
         _dispatcherWaitLatency.Record(elapsedTicks);
         _inputKindMeasurements[(int)inputKind].DispatcherWaitLatency.Record(elapsedTicks);
         IconLoadEventSource.Log.DispatcherWaitCompleted(Id, loadId, ToMicroseconds(elapsedTicks));
-    }
+    });
 
-    public void RecordDispatcherWork(long loadId, IconLoadInputKind inputKind, long elapsedTicks)
+    public void RecordDispatcherWork(long loadId, IconLoadInputKind inputKind, long elapsedTicks) => RecordIfRunning(() =>
     {
         _dispatcherWorkLatency.Record(elapsedTicks);
         _inputKindMeasurements[(int)inputKind].DispatcherWorkLatency.Record(elapsedTicks);
         IconLoadEventSource.Log.DispatcherWorkCompleted(Id, loadId, ToMicroseconds(elapsedTicks));
-    }
+    });
 
-    public void RecordLoadCompleted(long loadId, IconLoadInputKind inputKind, IconLoadResultKind resultKind, long elapsedTicks)
+    public void RecordLoadCompleted(long loadId, IconLoadInputKind inputKind, IconLoadResultKind resultKind, long elapsedTicks) => RecordIfRunning(() =>
     {
         Interlocked.Decrement(ref _activeWorkers);
         Interlocked.Increment(ref _resultKinds[(int)resultKind]);
@@ -590,9 +570,9 @@ internal sealed class IconLoadDiagnosticsSession
         _inputKindMeasurements[(int)inputKind].LoadLatency.Record(elapsedTicks);
         RecordDemandCompletion(loadId, resultKind);
         IconLoadEventSource.Log.LoadCompleted(Id, loadId, (int)resultKind, ToMicroseconds(elapsedTicks));
-    }
+    });
 
-    public void RecordDirectGlyphCompleted(long loadId, IconLoadInputKind inputKind, IconLoadResultKind resultKind, long elapsedTicks)
+    public void RecordDirectGlyphCompleted(long loadId, IconLoadInputKind inputKind, IconLoadResultKind resultKind, long elapsedTicks) => RecordIfRunning(() =>
     {
         Interlocked.Increment(ref _directGlyphLoads);
         Interlocked.Increment(ref _resultKinds[(int)resultKind]);
@@ -600,7 +580,7 @@ internal sealed class IconLoadDiagnosticsSession
         _inputKindMeasurements[(int)inputKind].DirectGlyphLatency.Record(elapsedTicks);
         RecordDemandCompletion(loadId, resultKind);
         IconLoadEventSource.Log.DirectGlyphLoadCompleted(Id, loadId, (int)resultKind, ToMicroseconds(elapsedTicks));
-    }
+    });
 
     private void RecordDemandCompletion(long loadId, IconLoadResultKind resultKind)
     {
@@ -619,7 +599,7 @@ internal sealed class IconLoadDiagnosticsSession
         }
     }
 
-    public void RecordElementUpdate(bool reused, IconLoadResultKind resultKind, long elapsedTicks)
+    public void RecordElementUpdate(bool reused, IconLoadResultKind resultKind, long elapsedTicks) => RecordIfRunning(() =>
     {
         var measurements = _elementKindMeasurements[(int)resultKind];
         if (reused)
@@ -635,6 +615,17 @@ internal sealed class IconLoadDiagnosticsSession
         _elementUpdateLatency.Record(elapsedTicks);
         measurements.UpdateLatency.Record(elapsedTicks);
         IconLoadEventSource.Log.ElementUpdated(Id, (int)resultKind, reused, ToMicroseconds(elapsedTicks));
+    });
+
+    private void RecordIfRunning(Action record)
+    {
+        lock (_stopLock)
+        {
+            if (!IsStopped)
+            {
+                record();
+            }
+        }
     }
 
     public void Stop()
