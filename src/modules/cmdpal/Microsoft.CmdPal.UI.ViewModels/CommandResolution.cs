@@ -19,5 +19,12 @@ public sealed partial class CommandResolution : IDisposable
         _ownedCommand = ownsCommand ? command : null;
     }
 
-    public void Dispose() => Interlocked.Exchange(ref _ownedCommand, null)?.Cleanup();
+    public void Dispose()
+    {
+        var command = Interlocked.Exchange(ref _ownedCommand, null);
+        if (command is not null)
+        {
+            _ = CleanupThreadPool.Queue(command.Cleanup, $"Command '{command.Id}' from provider '{command.CommandProviderId}'");
+        }
+    }
 }

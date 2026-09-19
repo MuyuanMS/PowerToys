@@ -134,8 +134,6 @@ internal sealed partial class ExternalCommandLinkCoordinator : IDisposable
         }
     }
 
-    internal Task HandleLinkForTestAsync(CmdPalProtocolRoute route) => HandleLinkAsync(route);
-
     private async Task HandleReloadAsync(CmdPalProtocolRoute route)
     {
         var consentRequest = new ExternalCommandConsentRequest(
@@ -172,9 +170,9 @@ internal sealed partial class ExternalCommandLinkCoordinator : IDisposable
             return;
         }
 
-        // Re-resolve so consent cannot transfer across a provider reload.
+        // Re-resolve so authorization is checked against the current command and provider.
         using var refreshedResolution = await ResolveCommandAsync(executeCommand);
-        if (_isDisposed)
+        if (_isDisposed || !_settingsService.Settings.EnableExternalCommandLinks)
         {
             return;
         }
@@ -185,6 +183,7 @@ internal sealed partial class ExternalCommandLinkCoordinator : IDisposable
         if (refreshedCommand is null ||
             refreshedProvider is null ||
             refreshedCommandViewModel is null ||
+            !_topLevelCommandManager.IsProviderEnabled(refreshedProvider.ProviderId) ||
             authorized.Permission.Key.PackageFamilyName != (refreshedProvider.Extension?.PackageFamilyName ?? string.Empty) ||
             refreshedCommandViewModel.IsPage != authorized.IsPage ||
             !CanExecute(refreshedCommandViewModel, executeCommand.ListPageOptions))
