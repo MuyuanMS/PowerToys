@@ -129,6 +129,8 @@ public partial class ListViewModel : PageViewModel, IDisposable
     private bool _isDisposed;
     private bool _isCleaned;
 
+    private bool IsTerminal => Volatile.Read(ref _isDisposed) || Volatile.Read(ref _isCleaned);
+
     public override bool IsInitialized
     {
         get => base.IsInitialized; protected set
@@ -253,6 +255,14 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     private void RequestFetch(bool keepSelection, bool ensureSelectionVisible)
     {
+        lock (_fetchStateLock)
+        {
+            if (IsTerminal)
+            {
+                return;
+            }
+        }
+
         // Keep RPC GetItems work off the UI thread. If the provider raises
         // ItemsChanged while we're already on a background thread, stay on that
         // thread so same-thread reentrancy detection still works.
@@ -337,6 +347,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
         int fetchGeneration;
         lock (_fetchStateLock)
         {
+            if (IsTerminal)
+            {
+                return;
+            }
+
             // Cancel any previous FetchItems operation
             CancelAndDisposeTokenSource(ref _fetchItemsCancellationTokenSource);
             _fetchItemsCancellationTokenSource = new CancellationTokenSource();
@@ -515,9 +530,17 @@ public partial class ListViewModel : PageViewModel, IDisposable
             }
         }
 
-        StartItemInitialization();
+        lock (_fetchStateLock)
+        {
+            if (IsTerminal)
+            {
+                return;
+            }
 
-        Interlocked.Exchange(ref _fetchPublicationPending, 1);
+            StartItemInitialization();
+            Interlocked.Exchange(ref _fetchPublicationPending, 1);
+        }
+
         DoOnUiThread(
             () =>
             {
@@ -525,7 +548,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
                 {
                     lock (_fetchStateLock)
                     {
-                        if (!IsLatestFetchGeneration(fetchGeneration))
+                        if (IsTerminal || !IsLatestFetchGeneration(fetchGeneration))
                         {
                             return;
                         }
@@ -579,7 +602,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
     private void InitializeItemsTask(CancellationToken ct)
     {
         // Were we already canceled?
-        if (ct.IsCancellationRequested)
+        if (ct.IsCancellationRequested || IsTerminal)
         {
             return;
         }
@@ -592,7 +615,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
         foreach (var item in iterable)
         {
-            if (ct.IsCancellationRequested)
+            if (ct.IsCancellationRequested || IsTerminal)
             {
                 return;
             }
@@ -604,7 +627,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
             // at once.
             item.InitializePropertiesOnce();
 
-            if (ct.IsCancellationRequested)
+            if (ct.IsCancellationRequested || IsTerminal)
             {
                 return;
             }
@@ -613,6 +636,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     private void StartItemInitialization()
     {
+        if (IsTerminal)
+        {
+            return;
+        }
+
         CancelAndDisposeTokenSource(ref _cancellationTokenSource);
         var initializeItemsCts = new CancellationTokenSource();
         _cancellationTokenSource = initializeItemsCts;
@@ -1277,7 +1305,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
     public void Dispose()
     {
         GC.SuppressFinalize(this);
-        _isDisposed = true;
+        lock (_fetchStateLock)
+        {
+            Volatile.Write(ref _isDisposed, true);
+        }
+
         var model = _model.Unsafe;
         if (model is not null)
         {
@@ -1292,8 +1324,12 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     protected override void UnsafeCleanup()
     {
+        lock (_fetchStateLock)
+        {
+            Volatile.Write(ref _isCleaned, true);
+        }
+
         base.UnsafeCleanup();
-        _isCleaned = true;
 
         EmptyContent?.SafeCleanup();
         EmptyContent = new(new(null), PageContext, contextMenuFactory: null); // necessary?
