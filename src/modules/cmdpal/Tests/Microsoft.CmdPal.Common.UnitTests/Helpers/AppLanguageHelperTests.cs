@@ -25,6 +25,8 @@ public class AppLanguageHelperTests
             Assert.IsTrue(string.Equals("ja-JP", AppLanguageHelper.LanguageOverride, StringComparison.Ordinal));
             Assert.IsTrue(string.Equals("ja-JP", CultureInfo.CurrentUICulture.Name, StringComparison.OrdinalIgnoreCase));
             Assert.IsTrue(string.Equals("ja-JP", CultureInfo.DefaultThreadCurrentUICulture?.Name, StringComparison.OrdinalIgnoreCase));
+            Assert.IsTrue(string.Equals(originalCulture.Name, CultureInfo.CurrentCulture.Name, StringComparison.OrdinalIgnoreCase));
+            Assert.AreEqual(originalDefaultCulture?.Name, CultureInfo.DefaultThreadCurrentCulture?.Name);
         }
         finally
         {
@@ -75,7 +77,14 @@ public class AppLanguageHelperTests
 
         try
         {
-            AppLanguageHelper.Apply("not-a-valid-language-tag");
+            AppLanguageHelper.Apply("de-DE");
+            AppLanguageHelper.Apply("not_a_valid_language_tag");
+
+            Assert.IsTrue(string.Equals("de-DE", AppLanguageHelper.LanguageOverride, StringComparison.Ordinal));
+            Assert.IsTrue(string.Equals("de-DE", CultureInfo.CurrentUICulture.Name, StringComparison.OrdinalIgnoreCase));
+            Assert.IsTrue(string.Equals("de-DE", CultureInfo.DefaultThreadCurrentUICulture?.Name, StringComparison.OrdinalIgnoreCase));
+            Assert.IsTrue(string.Equals(originalCulture.Name, CultureInfo.CurrentCulture.Name, StringComparison.OrdinalIgnoreCase));
+            Assert.AreEqual(originalDefaultCulture?.Name, CultureInfo.DefaultThreadCurrentCulture?.Name);
         }
         finally
         {

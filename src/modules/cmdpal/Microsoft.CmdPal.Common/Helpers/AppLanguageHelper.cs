@@ -12,9 +12,7 @@ namespace Microsoft.CmdPal.Common.Helpers;
 /// </summary>
 public static class AppLanguageHelper
 {
-    private static readonly CultureInfo OriginalCulture = CultureInfo.CurrentCulture;
     private static readonly CultureInfo OriginalUiCulture = CultureInfo.CurrentUICulture;
-    private static readonly CultureInfo? OriginalDefaultCulture = CultureInfo.DefaultThreadCurrentCulture;
     private static readonly CultureInfo? OriginalDefaultUiCulture = CultureInfo.DefaultThreadCurrentUICulture;
 
     /// <summary>
@@ -40,13 +38,25 @@ public static class AppLanguageHelper
         {
             LanguageOverride = string.Empty;
             TrySetWinUiLanguageOverride(string.Empty);
-            RestoreDotNetCultures();
+            RestoreDotNetUiCultures();
             return;
         }
 
-        LanguageOverride = languageTag;
+        CultureInfo culture;
+        try
+        {
+            culture = CultureInfo.GetCultureInfo(languageTag);
+        }
+        catch (CultureNotFoundException ex)
+        {
+            Logger.LogError($"Unknown application language tag '{languageTag}'", ex);
+            return;
+        }
+
         TrySetWinUiLanguageOverride(languageTag);
-        TrySetDotNetCulture(languageTag);
+        CultureInfo.DefaultThreadCurrentUICulture = culture;
+        CultureInfo.CurrentUICulture = culture;
+        LanguageOverride = languageTag;
     }
 
     private static void TrySetWinUiLanguageOverride(string languageTag)
@@ -61,27 +71,9 @@ public static class AppLanguageHelper
         }
     }
 
-    private static void TrySetDotNetCulture(string languageTag)
+    private static void RestoreDotNetUiCultures()
     {
-        try
-        {
-            var culture = CultureInfo.GetCultureInfo(languageTag);
-            CultureInfo.DefaultThreadCurrentCulture = culture;
-            CultureInfo.DefaultThreadCurrentUICulture = culture;
-            CultureInfo.CurrentCulture = culture;
-            CultureInfo.CurrentUICulture = culture;
-        }
-        catch (CultureNotFoundException ex)
-        {
-            Logger.LogError($"Unknown application language tag '{languageTag}'", ex);
-        }
-    }
-
-    private static void RestoreDotNetCultures()
-    {
-        CultureInfo.CurrentCulture = OriginalCulture;
         CultureInfo.CurrentUICulture = OriginalUiCulture;
-        CultureInfo.DefaultThreadCurrentCulture = OriginalDefaultCulture;
         CultureInfo.DefaultThreadCurrentUICulture = OriginalDefaultUiCulture;
     }
 }
