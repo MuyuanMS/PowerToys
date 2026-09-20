@@ -309,6 +309,7 @@ DWORD WINAPI ServiceWorkerThread(LPVOID lpParam)
             ResetEvent(hSettingsChanged);
             LightSwitchSettings::instance().LoadSettings();
             stateManager.OnSettingsChanged();
+            Logger::info(L"[LightSwitchService] Settings reload applied.");
 
             const auto& settings = LightSwitchSettings::instance().settings();
             bool nightLightNeeded = (settings.scheduleMode == ScheduleMode::FollowNightLight);

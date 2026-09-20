@@ -484,10 +484,10 @@ internal sealed class TestHelper
         Step("Waiting for the LightSwitch service's debounced settings reload");
         var result = WaitHelper.WaitForStable(
             () => scheduleUpdate.ReadNew(),
-            text => text!.Contains("[LightSwitchSettings] Settings file stabilized, reloading.", StringComparison.Ordinal),
+            text => text!.Contains("[LightSwitchService] Settings reload applied.", StringComparison.Ordinal),
             timeoutMS: 20_000,
             pollIntervalMS: 250);
-        Assert.IsTrue(result.Succeeded, $"The service did not reload the changed schedule. New logs:\n{result.LastObservation}");
+        Assert.IsTrue(result.Succeeded, $"The service did not apply the changed schedule. New logs:\n{result.LastObservation}");
         Assert.HasCount(1, ObserveService(), "The native scheduler must remain alive after loading settings.");
     }
 
