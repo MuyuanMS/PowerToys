@@ -1110,7 +1110,15 @@ public partial class ListViewModel : PageViewModel, IDisposable
         var item = _lastSelectedItem;
         if (item is null)
         {
-            WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(null));
+            if (ShowEmptyContent && EmptyContent.Model.Unsafe is not null)
+            {
+                WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(EmptyContent));
+            }
+            else
+            {
+                WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(null));
+            }
+
             WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
             WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(string.Empty));
             return;

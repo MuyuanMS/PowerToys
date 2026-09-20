@@ -1053,14 +1053,14 @@ public sealed partial class ListViewModelNavigationTests
 
     private static FetchState GetWorkState(ListViewModel viewModel)
     {
-        if (GetPrivateField<int>(viewModel, "_activeFetchCount") > 0)
+        var workState = GetPrivateField<ListPageWorkState>(viewModel, "_workState");
+        return new(workState.Phase switch
         {
-            return new(FetchPhase.Fetching);
-        }
-
-        return new(GetPrivateField<int>(viewModel, "_fetchPublicationPending") != 0
-            ? FetchPhase.Committed
-            : FetchPhase.Published);
+            ListPageFetchPhase.Fetching => FetchPhase.Fetching,
+            ListPageFetchPhase.Committed => FetchPhase.Committed,
+            ListPageFetchPhase.Published => FetchPhase.Published,
+            _ => throw new AssertFailedException($"Unexpected fetch phase {workState.Phase}."),
+        });
     }
 
     private static async Task WaitForPublishedAsync(ListViewModel viewModel)
