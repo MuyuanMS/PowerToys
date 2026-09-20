@@ -279,9 +279,11 @@ public class TranslationProviderTests
 
         // Explicit tag handling
         var enLang = WindowsMediaOcrBackend.ResolveLanguage("en-US");
+        var unavailableLang = WindowsMediaOcrBackend.ResolveLanguage("zh");
 
         // Result is either English (if supported) or preferred fallback
-        Assert.IsNotNull(enLang != null || autoLang != null || systemLang != null || nullLang != null);
+        Assert.IsTrue(enLang != null || autoLang != null || systemLang != null || nullLang != null);
+        Assert.IsTrue(unavailableLang != null || !new WindowsMediaOcrBackend().IsAvailable);
     }
 
     [TestMethod]

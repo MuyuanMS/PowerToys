@@ -1078,7 +1078,6 @@ public sealed partial class ResultOverlay : TransparentWindow
         string sourceLanguage = GetSelectedLanguage(OverallSourceLanguageComboBox, "auto");
         string targetLanguage = GetSelectedLanguage(OverallTargetLanguageComboBox, "en-US");
         CloseContextMenu();
-        Close();
         await _retranslateAll(sourceLanguage, targetLanguage);
     }
 

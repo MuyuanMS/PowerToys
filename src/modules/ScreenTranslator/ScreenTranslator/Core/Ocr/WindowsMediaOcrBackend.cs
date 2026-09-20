@@ -133,8 +133,11 @@ public sealed class WindowsMediaOcrBackend : IOcrBackend
                     return requestedLang;
                 }
 
-                throw new InvalidOperationException(
-                    $"Windows OCR language '{sourceLanguageTag}' is not installed. Install the corresponding Windows language and OCR capability or choose Auto.");
+                Language? fallbackLanguage = GetPreferredLanguage();
+                Logger.LogWarning(
+                    $"Windows OCR language '{sourceLanguageTag}' is not installed. " +
+                    $"Falling back to '{fallbackLanguage?.LanguageTag ?? "the first available OCR language"}' for recognition.");
+                return fallbackLanguage;
             }
             catch (ArgumentException ex)
             {
