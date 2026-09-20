@@ -1,6 +1,7 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
 #include "pch.h"
 
+#include <atomic>
 #include <mutex>
 #include <common/SettingsAPI/settings_helpers.h>
 #include <common/utils/winapi_error.h>
@@ -31,9 +32,6 @@ public:
         LoggerHelpers::delete_old_log_folder(oldLogPath);
 
         triggerEvent = CreateEvent(nullptr, false, false, CommonSharedConstants::ROBOCOPY_UI_LAUNCH_EVENT);
-        triggerEventWaiter.start(CommonSharedConstants::ROBOCOPY_UI_LAUNCH_EVENT, [this](DWORD) {
-            StartProcess();
-        });
     }
 
     virtual const wchar_t* get_name() override
@@ -79,6 +77,15 @@ public:
         if (!_enabled)
         {
             _enabled = true;
+            triggerEventWaiter.start(CommonSharedConstants::ROBOCOPY_UI_LAUNCH_EVENT, [this](DWORD error) {
+                if (error != ERROR_SUCCESS)
+                {
+                    Logger::error(L"Robocopy UI launch event wait failed. {}", get_last_error_or_default(error));
+                    return;
+                }
+
+                StartProcess();
+            });
         }
         else
         {
@@ -92,6 +99,8 @@ public:
         if (_enabled)
         {
             _enabled = false;
+            triggerEventWaiter.stop();
+            std::lock_guard lock(m_processMutex);
             if (m_process)
             {
                 if (WaitForSingleObject(m_process.get(), 1500) == WAIT_TIMEOUT)
@@ -143,13 +152,20 @@ private:
     std::wstring app_name;
     //contains the non localized key of the powertoy
     std::wstring app_key;
-    bool _enabled = false;
+    std::atomic_bool _enabled = false;
+    std::mutex m_processMutex;
     winrt::handle m_process;
     HANDLE triggerEvent;
     EventWaiter triggerEventWaiter;
 
     bool StartProcess(std::wstring args = L"")
     {
+        if (!_enabled)
+        {
+            return false;
+        }
+
+        std::lock_guard lock(m_processMutex);
         const bool trackProcess = args.empty();
         if (trackProcess && IsProcessActive())
         {

@@ -566,7 +566,7 @@ public sealed partial class HomePage : Page
             return;
         }
 
-        if (SettingsUtils.Default.GetSettings<RobocopyUISettings>().Properties.UseLegacySaveMode.Value)
+        if (SettingsUtils.Default.GetSettingsOrDefault<RobocopyUISettings>(RobocopyUISettings.ModuleName).Properties.UseLegacySaveMode.Value)
         {
             RunRobocopy(job.RenderArguments() + " /SAVE:" + RobocopyCommand.Quote(result.Path[..^4]) + " /QUIT" + (string.IsNullOrEmpty(SourceTextBox.Text) ? " /NOSD" : string.Empty) + (string.IsNullOrEmpty(DestinationTextBox.Text) ? " /NODD" : string.Empty));
         }
