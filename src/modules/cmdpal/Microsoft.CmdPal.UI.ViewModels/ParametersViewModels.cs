@@ -438,6 +438,7 @@ public partial class CommandParameterRunViewModel : ParameterValueRunViewModel, 
             if (PageContext.TryGetTarget(out var pageContext))
             {
                 _listViewModel = new ListViewModel(list, pageContext.Scheduler, _extensionHost, _providerContext, _contextMenuFactory);
+                _listViewModel.CanPublishContextUpdates = false;
                 _listViewModel.InitializeProperties();
             }
         }
@@ -588,6 +589,11 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
     public void SetActiveListParameter(CommandParameterRunViewModel? param)
     {
         CoreLogger.LogDebug($"[ParametersPageVM] SetActiveListParameter: {(param != null ? "setting" : "clearing")} (was {(_activeListParam != null ? "set" : "null")})");
+        if (_activeListViewModel is not null && !ReferenceEquals(_activeListViewModel, param?.ListViewModel))
+        {
+            _activeListViewModel.CanPublishContextUpdates = false;
+        }
+
         _activeListParam = param;
         ActiveListViewModel = param?.ListViewModel;
         if (ActiveListViewModel is not null)

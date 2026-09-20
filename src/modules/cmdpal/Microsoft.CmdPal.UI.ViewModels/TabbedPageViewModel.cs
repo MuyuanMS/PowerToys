@@ -587,6 +587,11 @@ public partial class TabbedPageViewModel : PageViewModel
 
     public void RefreshActiveChildContext()
     {
+        if (_isSuspendedForNavigation)
+        {
+            return;
+        }
+
         switch (ActiveChild)
         {
             case ListViewModel list:
