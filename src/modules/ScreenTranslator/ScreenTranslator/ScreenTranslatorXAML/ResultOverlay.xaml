@@ -60,12 +60,6 @@
                         Text="Original text" />
                 </MenuFlyoutSubItem>
                 <MenuFlyoutItem
-                    x:Name="TranslateOriginalOnBingActionItem"
-                    x:Uid="TranslateOriginalOnBingActionItem"
-                    AutomationProperties.AutomationId="MenuTranslateOriginalOnBing"
-                    Click="TranslateOriginalOnBingActionItem_Click"
-                    Text="Translate original text on Bing" />
-                <MenuFlyoutItem
                     x:Name="ShareDisplayedTextActionItem"
                     x:Uid="ShareDisplayedTextActionItem"
                     AutomationProperties.AutomationId="MenuShareDisplayedText"
@@ -89,6 +83,12 @@
                     Icon="View"
                     Text="Open Click to Do"
                     Visibility="Collapsed" />
+                <MenuFlyoutItem
+                    x:Name="TranslateOriginalOnBingActionItem"
+                    x:Uid="TranslateOriginalOnBingActionItem"
+                    AutomationProperties.AutomationId="MenuTranslateOriginalOnBing"
+                    Click="TranslateOriginalOnBingActionItem_Click"
+                    Text="Translate original text on Bing" />
             </MenuFlyout>
         </Grid.Resources>
 
@@ -122,13 +122,6 @@
                 Visibility="Collapsed">
                 <StackPanel Orientation="Horizontal" Spacing="4">
                     <Button
-                        x:Name="OriginalTextButton"
-                        x:Uid="OriginalTextButton"
-                        AutomationProperties.AutomationId="BtnToggleOriginalText"
-                        Click="OriginalTextButton_Click"
-                        Content="Original"
-                        Padding="8,4" />
-                    <Button
                         x:Name="EditCardButton"
                         x:Uid="EditCardButton"
                         AutomationProperties.AutomationId="BtnEditOverlayText"
@@ -136,6 +129,13 @@
                         Padding="8,4">
                         <FontIcon Glyph="&#xE70F;" />
                     </Button>
+                    <Button
+                        x:Name="OriginalTextButton"
+                        x:Uid="OriginalTextButton"
+                        AutomationProperties.AutomationId="BtnToggleOriginalText"
+                        Click="OriginalTextButton_Click"
+                        Content="Original"
+                        Padding="8,4" />
                     <ToggleButton
                         x:Name="FormatPanelButton"
                         x:Uid="FormatPanelButton"
