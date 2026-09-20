@@ -137,7 +137,6 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     // For cancelling a deferred SafeSlowInit when the user navigates rapidly
     private CancellationTokenSource? _selectedItemCts;
-    private bool _suspendedForNavigation;
 
     public override bool IsInitialized
     {
@@ -1010,7 +1009,6 @@ public partial class ListViewModel : PageViewModel, IDisposable
                     {
                         WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
                     }
-
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
@@ -1137,30 +1135,6 @@ public partial class ListViewModel : PageViewModel, IDisposable
         WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(TextToSuggest));
     }
 
-    internal void SuspendForNavigation()
-    {
-        _suspendedForNavigation = true;
-        CanPublishContextUpdates = false;
-        CancelAndDisposeTokenSource(ref _selectedItemCts);
-        CancelAndDisposeTokenSource(ref _cancellationTokenSource);
-    }
-
-    internal Task ResumeAfterNavigation()
-    {
-        _suspendedForNavigation = false;
-        CanPublishContextUpdates = true;
-        var model = _model.Unsafe;
-        if (model is not null)
-        {
-            model.ItemsChanged -= Model_ItemsChanged;
-            model.ItemsChanged += Model_ItemsChanged;
-            FetchItems(keepSelection: true, ensureSelectionVisible: true);
-        }
-
-        UpdateSelectedItem(_lastSelectedItem);
-        return Task.CompletedTask;
-    }
-
     public override void InitializeProperties()
     {
         _initializationStarted = true;
@@ -1212,11 +1186,8 @@ public partial class ListViewModel : PageViewModel, IDisposable
             LoadExtendedAttributes(haveProperties.GetProperties().AsReadOnly());
         }
 
-        if (!_suspendedForNavigation)
-        {
-            FetchItems(keepSelection: true, ensureSelectionVisible: true);
-            model.ItemsChanged += Model_ItemsChanged;
-        }
+        FetchItems(keepSelection: true, ensureSelectionVisible: true);
+        model.ItemsChanged += Model_ItemsChanged;
     }
 
     private bool TryApplyLaunchOptions(IListPage model, out string initialSearchText)
