@@ -13,16 +13,15 @@ namespace Microsoft.LightSwitch.UITests;
 internal sealed class TestHelper
 {
     public const string ServiceProcess = "PowerToys.LightSwitchService";
-    private readonly Session window;
+    private const string SettingsProcess = "PowerToys.Settings";
     private readonly TestContext context;
-    private Session ui;
+    private readonly Session ui;
     private LogCursor? scheduleUpdate;
 
     public TestHelper(Session window, TestContext context)
     {
-        this.window = window;
         this.context = context;
-        ui = window;
+        ui = Session.FromProcess(SettingsProcess, PowerToysModule.PowerToysSettings);
     }
 
     public static void AssertLanguagePrerequisites()
@@ -55,14 +54,14 @@ internal sealed class TestHelper
     public void Navigate()
     {
         Step("Navigating to Light Switch settings");
-        if (!window.Has(By.AccessibilityId("LightSwitchNavItem"), 500))
+        _ = SettingsWindow();
+        if (!ui.Has(By.AccessibilityId("LightSwitchNavItem"), 500))
         {
-            window.Find<NavigationViewItem>(By.AccessibilityId("SystemToolsNavItem")).Invoke(msPostAction: 0);
+            ui.Find<NavigationViewItem>(By.AccessibilityId("SystemToolsNavItem")).Invoke(msPostAction: 0);
         }
 
-        window.Find<NavigationViewItem>(By.AccessibilityId("LightSwitchNavItem"), 10_000).Invoke(msPostAction: 0);
-        window.Find<ToggleSwitch>(By.AccessibilityId("Toggle_LightSwitch"), 10_000);
-        ui = Session.FromProcess(window.ProcessId.ToString(CultureInfo.InvariantCulture), PowerToysModule.PowerToysSettings);
+        ui.Find<NavigationViewItem>(By.AccessibilityId("LightSwitchNavItem"), 10_000).Invoke(msPostAction: 0);
+        ui.Find<ToggleSwitch>(By.AccessibilityId("Toggle_LightSwitch"), 10_000);
     }
 
     public void SetEnabled(bool enabled)
@@ -436,8 +435,24 @@ internal sealed class TestHelper
     {
         Step("Establishing foreground ownership for physical keyboard input");
         Assert.IsTrue(
-            WindowControl.WaitForForeground(new IntPtr(window.WindowHandle), 10_000, requiredConsecutiveMatches: 3),
+            WindowControl.WaitForForeground(SettingsWindow(), 10_000, requiredConsecutiveMatches: 3),
             $"Settings must own foreground before SendInput. Observed {WindowControl.GetForegroundWindowInfo()}.");
+    }
+
+    private static IntPtr SettingsWindow()
+    {
+        var result = WaitHelper.WaitForStable(
+            () => WindowsFinder.ListByApp(SettingsProcess)
+                .Where(window => window.ClassName == "WinUIDesktopWin32WindowClass" && window.Width > 400 && window.Height > 300)
+                .OrderByDescending(window => (long)window.Width * window.Height)
+                .Select(window => (long?)window.Hwnd)
+                .FirstOrDefault(),
+            hwnd => hwnd is > 0,
+            timeoutMS: 30_000,
+            requiredConsecutiveMatches: 2,
+            pollIntervalMS: 200);
+        Assert.IsTrue(result.Succeeded && result.LastObservation is > 0, "The PowerToys Settings window did not stabilize.");
+        return new IntPtr(result.LastObservation!.Value);
     }
 
     private T FindDescendant<T>(string parentId, string type)

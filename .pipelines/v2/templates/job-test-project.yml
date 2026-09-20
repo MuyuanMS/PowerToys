@@ -419,7 +419,7 @@ jobs:
           } elseif (Test-Path $dll) {
             & dotnet $dll --report-trx --results-directory $resultsDir
           } else {
-            Write-Warning "No runner (exe/dll) found for $base in $dir"
+            throw "No runner (exe/dll) found for $base in $dir"
           }
           if ($LASTEXITCODE -ne 0) {
             Write-Warning "UI tests reported failures for $base (exit $LASTEXITCODE)"

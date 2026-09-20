@@ -112,6 +112,8 @@ internal sealed class TestState
                 {
                     // LightSwitch resets ColorPrevalence as well as both theme flags.
                     SendMessageTimeout(new IntPtr(0xffff), 0x001A, UIntPtr.Zero, "ImmersiveColorSet", 0x0002, 1_000, out _);
+                    SendMessageTimeout(new IntPtr(0xffff), 0x031A, UIntPtr.Zero, null, 0x0002, 1_000, out _);
+                    SendMessageTimeout(new IntPtr(0xffff), 0x0320, UIntPtr.Zero, null, 0x0002, 1_000, out _);
                 });
         }
     }
@@ -165,7 +167,7 @@ internal sealed class TestState
         IntPtr window,
         uint message,
         UIntPtr wParam,
-        string lParam,
+        string? lParam,
         uint flags,
         uint timeout,
         out UIntPtr result);
