@@ -51,7 +51,7 @@ public sealed class AzureTranslatorProvider : ITranslationProvider, IDisposable
         {
             _httpClient = new HttpClient
             {
-                Timeout = TimeSpan.FromSeconds(15),
+                Timeout = TimeSpan.FromSeconds(60),
             };
             _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("PowerToys-ScreenTranslator/1.0");
             _disposeClient = true;
@@ -173,6 +173,14 @@ public sealed class AzureTranslatorProvider : ITranslationProvider, IDisposable
             }
 
             return new TranslationResult(translatedLines, Success: true);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            Logger.LogWarning("Azure Translator request timed out.");
+            return new TranslationResult(
+                Array.Empty<TranslatedLine>(),
+                Success: false,
+                ErrorMessage: "Azure Translator did not respond within 60 seconds. Check the network connection and try again.");
         }
         catch (OperationCanceledException)
         {

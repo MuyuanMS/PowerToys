@@ -48,7 +48,7 @@ public sealed class LibreTranslateProvider : ITranslationProvider, IDisposable
         {
             _httpClient = new HttpClient
             {
-                Timeout = TimeSpan.FromSeconds(15),
+                Timeout = TimeSpan.FromSeconds(60),
             };
             _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("PowerToys-ScreenTranslator/1.0");
             _disposeClient = true;
@@ -170,6 +170,14 @@ public sealed class LibreTranslateProvider : ITranslationProvider, IDisposable
             }
 
             return new TranslationResult(translatedLines, Success: true);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            Logger.LogWarning("LibreTranslate request timed out.");
+            return new TranslationResult(
+                Array.Empty<TranslatedLine>(),
+                Success: false,
+                ErrorMessage: "LibreTranslate did not respond within 60 seconds. Check the local translation service and try again.");
         }
         catch (OperationCanceledException)
         {

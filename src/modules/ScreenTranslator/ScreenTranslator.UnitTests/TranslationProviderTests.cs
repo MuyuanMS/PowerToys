@@ -33,6 +33,15 @@ public class TranslationProviderTests
         }
     }
 
+    private sealed class DelayedHttpMessageHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        }
+    }
+
     [TestMethod]
     public async Task AzureTranslator_Success_MapsLinesAndPreservesGeometry()
     {
@@ -202,6 +211,51 @@ public class TranslationProviderTests
         Assert.IsFalse(result.Success);
         Assert.IsFalse(networkCalled);
         Assert.IsTrue(result.ErrorMessage?.Contains("Cloud translation consent is required") == true);
+    }
+
+    [TestMethod]
+    public async Task LibreTranslate_HttpTimeout_ReturnsActionableFailure()
+    {
+        using var httpClient = new HttpClient(new DelayedHttpMessageHandler())
+        {
+            Timeout = TimeSpan.FromMilliseconds(20),
+        };
+        using var provider = new LibreTranslateProvider(
+            "http://localhost:5000",
+            apiKey: string.Empty,
+            cloudConsentEnabled: false,
+            customHttpClient: httpClient);
+
+        var lines = new List<TranslationLine> { new("Item 1", new PhysicalRect(10, 10, 50, 20)) };
+        var result = await provider.TranslateAsync(new TranslationRequest(lines, "auto", "de"));
+
+        Assert.IsFalse(result.Success);
+        StringAssert.Contains(result.ErrorMessage, "did not respond");
+    }
+
+    [TestMethod]
+    public async Task LibreTranslate_UserCancellation_RemainsCancellation()
+    {
+        using var httpClient = new HttpClient(new DelayedHttpMessageHandler());
+        using var provider = new LibreTranslateProvider(
+            "http://localhost:5000",
+            apiKey: string.Empty,
+            cloudConsentEnabled: false,
+            customHttpClient: httpClient);
+        using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(20));
+
+        var lines = new List<TranslationLine> { new("Item 1", new PhysicalRect(10, 10, 50, 20)) };
+
+        try
+        {
+            await provider.TranslateAsync(
+                new TranslationRequest(lines, "auto", "de"),
+                cancellationTokenSource.Token);
+            Assert.Fail("Expected explicit caller cancellation to remain an OperationCanceledException.");
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     [TestMethod]
