@@ -202,14 +202,6 @@
     <value>Edit text</value>
     <comment>Tooltip for editing the selected translated text</comment>
   </data>
-  <data name="CopyCardButton.AutomationProperties.Name" xml:space="preserve">
-    <value>Copy translated text</value>
-    <comment>Accessible name for copying the selected translated text</comment>
-  </data>
-  <data name="CopyCardButton.ToolTipService.ToolTip" xml:space="preserve">
-    <value>Copy text</value>
-    <comment>Tooltip for copying the selected translated text</comment>
-  </data>
   <data name="OpenLinkActionItem.Text" xml:space="preserve">
     <value>Open link</value>
     <comment>Context menu action that opens a detected web address</comment>
@@ -237,6 +229,10 @@
   <data name="ShareDisplayedTextActionItem.Text" xml:space="preserve">
     <value>Share...</value>
     <comment>Context menu action that shares the text currently displayed in a card</comment>
+  </data>
+  <data name="AskCopilotActionItem.Text" xml:space="preserve">
+    <value>Ask Copilot</value>
+    <comment>Context menu action that copies the displayed card text and opens Microsoft Copilot</comment>
   </data>
   <data name="OpenClickToDoActionItem.Text" xml:space="preserve">
     <value>Open Click to Do</value>

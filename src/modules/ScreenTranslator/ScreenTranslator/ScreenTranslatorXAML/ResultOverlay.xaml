@@ -66,7 +66,15 @@
                     Click="ShareDisplayedTextActionItem_Click"
                     Icon="Share"
                     Text="Share..." />
-                <MenuFlyoutSeparator x:Name="ClickToDoSeparator" Visibility="Collapsed" />
+                <MenuFlyoutSeparator x:Name="ExternalActionsSeparator" Visibility="Collapsed" />
+                <MenuFlyoutItem
+                    x:Name="AskCopilotActionItem"
+                    x:Uid="AskCopilotActionItem"
+                    AutomationProperties.AutomationId="MenuAskCopilot"
+                    Click="AskCopilotActionItem_Click"
+                    Icon="Message"
+                    Text="Ask Copilot"
+                    Visibility="Collapsed" />
                 <MenuFlyoutItem
                     x:Name="OpenClickToDoActionItem"
                     x:Uid="OpenClickToDoActionItem"
@@ -107,10 +115,6 @@
                 Padding="8"
                 Visibility="Collapsed">
                 <StackPanel Orientation="Horizontal" Spacing="4">
-                    <FontIcon
-                        AutomationProperties.Name="Move the selected text by dragging it"
-                        Glyph="&#xE7C2;"
-                        VerticalAlignment="Center" />
                     <Button
                         x:Name="OriginalTextButton"
                         x:Uid="OriginalTextButton"
@@ -125,14 +129,6 @@
                         Click="EditCardButton_Click"
                         Padding="8,4">
                         <FontIcon Glyph="&#xE70F;" />
-                    </Button>
-                    <Button
-                        x:Name="CopyCardButton"
-                        x:Uid="CopyCardButton"
-                        AutomationProperties.AutomationId="BtnCopyOverlayText"
-                        Click="CopyCardButton_Click"
-                        Padding="8,4">
-                        <FontIcon Glyph="&#xE8C8;" />
                     </Button>
                     <ToggleButton
                         x:Name="FormatPanelButton"

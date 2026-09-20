@@ -116,7 +116,7 @@ public sealed partial class ResultOverlay : TransparentWindow
         DismissOnFocusLost = false;
 
         InitializeComponent();
-        InitializeClickToDoAvailability();
+        InitializeExternalActionAvailability();
         Closed += (_, _) => _textShareService.Close();
 
         _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
@@ -600,21 +600,30 @@ public sealed partial class ResultOverlay : TransparentWindow
         CardActionMenu.ShowAt(card, options);
     }
 
-    private async void InitializeClickToDoAvailability()
+    private async void InitializeExternalActionAvailability()
+    {
+        bool copilotAvailable = await IsUriHandlerAvailableAsync(new Uri("ms-copilot://"), "Copilot");
+        bool clickToDoAvailable = await IsUriHandlerAvailableAsync(new Uri("ms-clicktodo://"), "Click to Do");
+        AskCopilotActionItem.Visibility = copilotAvailable ? Visibility.Visible : Visibility.Collapsed;
+        OpenClickToDoActionItem.Visibility = clickToDoAvailable ? Visibility.Visible : Visibility.Collapsed;
+        ExternalActionsSeparator.Visibility = copilotAvailable || clickToDoAvailable
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private static async Task<bool> IsUriHandlerAvailableAsync(Uri uri, string actionName)
     {
         try
         {
-            Uri clickToDoUri = new("ms-clicktodo://");
             Windows.System.LaunchQuerySupportStatus status = await Windows.System.Launcher.QueryUriSupportAsync(
-                clickToDoUri,
+                uri,
                 Windows.System.LaunchQuerySupportType.Uri);
-            bool isAvailable = status == Windows.System.LaunchQuerySupportStatus.Available;
-            OpenClickToDoActionItem.Visibility = isAvailable ? Visibility.Visible : Visibility.Collapsed;
-            ClickToDoSeparator.Visibility = isAvailable ? Visibility.Visible : Visibility.Collapsed;
+            return status == Windows.System.LaunchQuerySupportStatus.Available;
         }
         catch (Exception ex)
         {
-            Logger.LogWarning($"Unable to query Click to Do availability: {ex.Message}");
+            Logger.LogWarning($"Unable to query {actionName} availability: {ex.Message}");
+            return false;
         }
     }
 
@@ -682,6 +691,18 @@ public sealed partial class ResultOverlay : TransparentWindow
     private async void OpenClickToDoActionItem_Click(object sender, RoutedEventArgs e)
     {
         await LaunchUriAsync(new Uri("ms-clicktodo://"), "Click to Do");
+    }
+
+    private async void AskCopilotActionItem_Click(object sender, RoutedEventArgs e)
+    {
+        string text = GetActionMenuText();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        CopyTextToClipboard(text);
+        await LaunchUriAsync(new Uri("ms-copilot://"), "Copilot");
     }
 
     private async Task LaunchUriAsync(Uri uri, string actionName)
@@ -971,30 +992,6 @@ public sealed partial class ResultOverlay : TransparentWindow
         _editingTextBox.Focus(FocusState.Programmatic);
         _editingTextBox.SelectAll();
         Logger.LogInfo($"Started editing overlay text for line {_contextMenuLineIndex}.");
-    }
-
-    private void CopyCardButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (!TryGetActiveCard(out Border card))
-        {
-            Logger.LogWarning("Ignored copy because no active card was selected.");
-            return;
-        }
-
-        string text = card.Child switch
-        {
-            TextBlock textBlock => textBlock.Text,
-            TextBox textBox => textBox.Text,
-            _ => string.Empty,
-        };
-
-        if (string.IsNullOrEmpty(text))
-        {
-            return;
-        }
-
-        CopyTextToClipboard(text);
-        Logger.LogInfo($"Copied overlay text for line {_contextMenuLineIndex} to the clipboard.");
     }
 
     private static void CopyTextToClipboard(string text)
