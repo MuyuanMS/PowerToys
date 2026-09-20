@@ -29,6 +29,8 @@ public partial class TabViewModel : ExtensionObjectViewModel
     /// </summary>
     public string TabId { get; private set; } = string.Empty;
 
+    internal bool HasStableIdentity => !_baseTabId.StartsWith("fallback:", StringComparison.Ordinal);
+
     public string Title { get; private set; } = string.Empty;
 
     public string Badge { get; private set; } = string.Empty;

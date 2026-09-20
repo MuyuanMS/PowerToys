@@ -37,6 +37,7 @@ public partial class TabbedPageViewModel : PageViewModel
     private bool _isDisposed;
     private bool _isSubscribedToItemsChanged;
     private bool _normalizingTabIds;
+    private bool _isSuspendedForNavigation;
     private int _tabsRefreshGeneration;
 
     private static readonly string _fallbackPlaceholder = "Type here to search...";
@@ -169,11 +170,18 @@ public partial class TabbedPageViewModel : PageViewModel
         {
             var tab = tabs[i];
             tab.ApplyCollisionSuffix(null);
-            if (!seen.Add(tab.TabId))
+            if (seen.Add(tab.TabId))
             {
-                tab.ApplyCollisionSuffix(i.ToString(CultureInfo.InvariantCulture));
-                seen.Add(tab.TabId);
+                continue;
             }
+
+            var suffix = i;
+            do
+            {
+                tab.ApplyCollisionSuffix(suffix.ToString(CultureInfo.InvariantCulture));
+                suffix++;
+            }
+            while (!seen.Add(tab.TabId));
         }
     }
 
@@ -205,7 +213,9 @@ public partial class TabbedPageViewModel : PageViewModel
                     return;
                 }
 
-                var activeId = SelectedTab?.TabId;
+                var activeId = SelectedTab is { HasStableIdentity: true } selectedTab
+                    ? selectedTab.TabId
+                    : null;
 
                 // Drop cached children for tabs that no longer exist.
                 var keepIds = new HashSet<string>(newTabs.Select(t => t.TabId));
@@ -304,11 +314,14 @@ public partial class TabbedPageViewModel : PageViewModel
         }
 
         AttachActiveChildLoading(child);
-        child.CanPublishContextUpdates = true;
+        child.CanPublishContextUpdates = !_isSuspendedForNavigation;
         ActiveTabIsLoading = child.IsLoading;
 
         UpdateProperty(nameof(PlaceholderText));
-        RefreshActiveChildContext();
+        if (!_isSuspendedForNavigation)
+        {
+            RefreshActiveChildContext();
+        }
     }
 
     private void SetHasSearchBox(bool value)
@@ -505,6 +518,7 @@ public partial class TabbedPageViewModel : PageViewModel
 
     internal void SuspendForNavigation()
     {
+        _isSuspendedForNavigation = true;
         if (ActiveChild is not null)
         {
             ActiveChild.CanPublishContextUpdates = false;
@@ -513,6 +527,7 @@ public partial class TabbedPageViewModel : PageViewModel
 
     internal Task ResumeAfterNavigation()
     {
+        _isSuspendedForNavigation = false;
         if (ActiveChild is not null)
         {
             ActiveChild.CanPublishContextUpdates = true;

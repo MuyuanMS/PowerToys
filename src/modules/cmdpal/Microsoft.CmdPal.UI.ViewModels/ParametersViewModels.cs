@@ -811,7 +811,8 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
             // The extension confirmed a value on a list param. If it's the
             // active one (whether first pick or re-pick), clear the list and
             // move focus forward.
-            if (sender is CommandParameterRunViewModel cmdParam &&
+            if (CanPublishContextUpdates &&
+                sender is CommandParameterRunViewModel cmdParam &&
                 cmdParam == _activeListParam &&
                 !cmdParam.NeedsValue)
             {
@@ -855,6 +856,11 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
 
     public void FocusNextParameter(ParameterValueRunViewModel lastParam)
     {
+        if (!CanPublishContextUpdates)
+        {
+            return;
+        }
+
         lock (_listLock)
         {
             var found = false;
@@ -870,7 +876,11 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
                 {
                     if (found)
                     {
-                        WeakReferenceMessenger.Default.Send(new FocusParamMessage(pv));
+                        if (CanPublishContextUpdates)
+                        {
+                            WeakReferenceMessenger.Default.Send(new FocusParamMessage(pv));
+                        }
+
                         return;
                     }
                     else if (firstWithoutValue is null && pv.NeedsValue)
@@ -882,7 +892,10 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
 
             if (firstWithoutValue is not null)
             {
-                WeakReferenceMessenger.Default.Send(new FocusParamMessage(firstWithoutValue));
+                if (CanPublishContextUpdates)
+                {
+                    WeakReferenceMessenger.Default.Send(new FocusParamMessage(firstWithoutValue));
+                }
             }
         }
     }

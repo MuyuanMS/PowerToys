@@ -492,6 +492,28 @@ public partial class TabbedPageViewModelTests
     }
 
     [TestMethod]
+    public async Task TabIds_SkipExistingCollisionSuffixes()
+    {
+        var page = new TestTabbedPage(
+        [
+            new Tab("First", new TestContentPage("first")) { Id = "x|duplicate:2" },
+            new Tab("Second", new TestContentPage("second")) { Id = "x" },
+            new Tab("Third", new TestContentPage("third")) { Id = "x" },
+        ]);
+
+        var viewModel = CreateViewModel(page);
+        viewModel.InitializeProperties();
+
+        await WaitFor(() => viewModel.Tabs.Count == 3, "Tabs did not populate");
+
+        Assert.AreEqual("tab:x|duplicate:2", viewModel.Tabs[0].TabId);
+        Assert.AreEqual("tab:x", viewModel.Tabs[1].TabId);
+        Assert.AreEqual("tab:x|duplicate:3", viewModel.Tabs[2].TabId);
+
+        viewModel.SafeCleanup();
+    }
+
+    [TestMethod]
     public async Task TabIdPropertyChange_PrunesOldCacheAndRecreatesActiveChild()
     {
         var tab = new Tab("Docs", new TestContentPage("docs")) { Id = "docs-tab" };

@@ -964,6 +964,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
                     var initialized = await item.RequestInitializationAsync(ct).ConfigureAwait(false);
 
+                    if (ct.IsCancellationRequested || !ReferenceEquals(_lastSelectedItem, item))
+                    {
+                        return;
+                    }
+
                     if (CanPublishContextUpdates)
                     {
                         WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
