@@ -2,6 +2,8 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Linq;
+
 namespace Microsoft.CmdPal.Ext.WindowWalker.Helpers;
 
 /// <summary>
@@ -10,6 +12,56 @@ namespace Microsoft.CmdPal.Ext.WindowWalker.Helpers;
 /// </summary>
 internal static class WindowSearchScorer
 {
+    internal sealed class ScoringState
+    {
+        private readonly FuzzyStringMatcher.PreparedQuery _wholeQuery;
+        private readonly FuzzyStringMatcher.PreparedQuery? _normalizedQuery;
+        private readonly FuzzyStringMatcher.PreparedQuery[] _words;
+
+        private ScoringState(string query)
+        {
+            var words = query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            _wholeQuery = FuzzyStringMatcher.Prepare(query);
+            var normalizedQuery = string.Join(' ', words);
+            _normalizedQuery = string.Equals(normalizedQuery, query, StringComparison.Ordinal)
+                ? null
+                : FuzzyStringMatcher.Prepare(normalizedQuery);
+            _words = words.Length < 2
+                ? []
+                : words.Select(FuzzyStringMatcher.Prepare).ToArray();
+        }
+
+        internal static ScoringState Create(string query) => new(query);
+
+        internal int Score(string title, string processName)
+        {
+            var wholeQueryScore = ScoreBothFields(_wholeQuery, title, processName);
+            if (_normalizedQuery is not null)
+            {
+                wholeQueryScore = Math.Max(wholeQueryScore, ScoreBothFields(_normalizedQuery.Value, title, processName));
+            }
+
+            if (_words.Length < 2)
+            {
+                return wholeQueryScore;
+            }
+
+            var total = 0;
+            foreach (var word in _words)
+            {
+                var wordScore = ScoreBothFields(word, title, processName);
+                if (wordScore == 0)
+                {
+                    return wholeQueryScore;
+                }
+
+                total += wordScore;
+            }
+
+            return Math.Max(wholeQueryScore, total / _words.Length);
+        }
+    }
+
     /// <summary>
     /// Scores <paramref name="query"/> against a window's <paramref name="title"/> and
     /// <paramref name="processName"/>.
@@ -37,44 +89,13 @@ internal static class WindowSearchScorer
         title ??= string.Empty;
         processName ??= string.Empty;
 
-        // Split on every kind of Unicode whitespace rather than just the space bar: a pasted
-        // query can carry a non-breaking space, and folding that into a word would silently
-        // drop the query back to single-word behavior.
-        var words = query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-
-        // Score the query as typed, then again whitespace-normalized, and keep the better of the
-        // two. Normalizing lets a padded query match a title that is not padded; scoring the
-        // original as well keeps a query whose spacing matches the title verbatim -- a title that
-        // itself contains a run of spaces or a tab -- from being scored lower than before.
-        var wholeQueryScore = ScoreBothFields(query, title, processName);
-        var normalizedQuery = string.Join(' ', words);
-        if (!string.Equals(normalizedQuery, query, StringComparison.Ordinal))
-        {
-            wholeQueryScore = Math.Max(wholeQueryScore, ScoreBothFields(normalizedQuery, title, processName));
-        }
-
-        if (words.Length < 2)
-        {
-            return wholeQueryScore;
-        }
-
-        var total = 0;
-        foreach (var word in words)
-        {
-            var wordScore = ScoreBothFields(word, title, processName);
-            if (wordScore == 0)
-            {
-                // A word that matches neither field means this window isn't what was asked for.
-                return wholeQueryScore;
-            }
-
-            total += wordScore;
-        }
-
-        // Average rather than sum, to keep the per-word score on the same scale as the
-        // whole-query score the two are compared against.
-        return Math.Max(wholeQueryScore, total / words.Length);
+        return ScoringState.Create(query).Score(title, processName);
     }
+
+    private static int ScoreBothFields(FuzzyStringMatcher.PreparedQuery needle, string title, string processName)
+        => Math.Max(
+            FuzzyStringMatcher.ScoreFuzzy(in needle, title),
+            FuzzyStringMatcher.ScoreFuzzy(in needle, processName));
 
     private static int ScoreBothFields(string needle, string title, string processName)
         => Math.Max(

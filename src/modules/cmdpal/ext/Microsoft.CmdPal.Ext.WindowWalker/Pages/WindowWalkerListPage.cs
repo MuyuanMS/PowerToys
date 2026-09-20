@@ -118,7 +118,8 @@ internal sealed partial class WindowWalkerListPage : DynamicListPage, IDisposabl
             return AddExplorerInfoIfNeeded(entries);
         }
 
-        var scored = ListHelpers.FilterListWithScores(entries, query, ScoreFunction);
+        var scorer = WindowSearchScorer.ScoringState.Create(query);
+        var scored = ListHelpers.FilterListWithScores(entries, query, (q, entry) => scorer.Score(entry.Item.Title, entry.Window.Process.Name ?? string.Empty));
         var filteredEntries = new List<WindowEntry>(entries.Length);
         foreach (var result in scored)
         {

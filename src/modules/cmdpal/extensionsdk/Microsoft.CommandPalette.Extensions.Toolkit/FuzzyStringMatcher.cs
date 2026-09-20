@@ -55,6 +55,18 @@ public static class FuzzyStringMatcher
         return ScoreBestVariant(in query, haystack, allowNonContiguousMatches, removeDiacritics);
     }
 
+    public static PreparedQuery Prepare(string needle)
+        => new(PrepareQuery(needle, mayNeedDiacriticsRemoval: true));
+
+    public static int ScoreFuzzy(
+        in PreparedQuery query,
+        string haystack,
+        bool allowNonContiguousMatches = true)
+    {
+        var value = query.Value;
+        return ScoreBestVariant(in value, haystack, allowNonContiguousMatches, removeDiacritics: true);
+    }
+
     public static (int Score, List<int> Positions) ScoreFuzzyWithPositions(string needle, string haystack, bool allowNonContiguousMatches)
     {
         return ScoreFuzzyWithPositions(needle, haystack, allowNonContiguousMatches, removeDiacritics: true);
@@ -70,6 +82,18 @@ public static class FuzzyStringMatcher
     internal static void ClearCache()
     {
         PreparedFuzzyQueryThreadCache.Clear();
+    }
+
+    public readonly struct PreparedQuery
+    {
+        private readonly PreparedFuzzyQuery _value;
+
+        internal PreparedQuery(PreparedFuzzyQuery value)
+        {
+            _value = value;
+        }
+
+        internal PreparedFuzzyQuery Value => _value;
     }
 
     // ============================================================
@@ -968,7 +992,7 @@ public static class FuzzyStringMatcher
     // ============================================================
     // Prepared query
     // ============================================================
-    private readonly struct PreparedFuzzyQuery
+    internal readonly struct PreparedFuzzyQuery
     {
         public readonly string PrimaryRaw;
         internal readonly string? SecondaryRaw;
