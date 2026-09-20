@@ -27,6 +27,7 @@ FileWatcher::FileWatcher(const std::wstring& path, std::function<void()> callbac
     std::filesystem::path fsPath(path);
     m_file_name = fsPath.filename();
     std::transform(m_file_name.begin(), m_file_name.end(), m_file_name.begin(), ::towlower);
+    m_lastWrite = MyFileTime();
     m_folder_change_reader = wil::make_folder_change_reader_nothrow(
         fsPath.parent_path().c_str(),
         false,
