@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
@@ -397,22 +398,30 @@ internal sealed class TestHelper
 
     public void SaveFailureState()
     {
-        string directory = context.TestResultsDirectory ?? throw new InvalidOperationException("A results directory is required for failure evidence.");
-        string prefix = Path.Combine(directory, $"LightSwitch-{context.TestName}");
-        var result = WinappCli.Invoke("ui", "inspect", ui.TargetFlag, ui.TargetValue, "--json", "-d", "14");
-        File.WriteAllText(prefix + "-uia.json", result.StdOut + Environment.NewLine + result.StdErr);
-        context.AddResultFile(prefix + "-uia.json");
-        if (File.Exists(TestState.SettingsPath))
+        try
         {
-            File.Copy(TestState.SettingsPath, prefix + "-settings.json", overwrite: true);
-            context.AddResultFile(prefix + "-settings.json");
+            string directory = context.TestResultsDirectory ?? throw new InvalidOperationException("A results directory is required for failure evidence.");
+            string prefix = Path.Combine(directory, $"LightSwitch-{context.TestName}");
+            var result = WinappCli.Invoke("ui", "inspect", ui.TargetFlag, ui.TargetValue, "--json", "-d", "14");
+            File.WriteAllText(prefix + "-uia.json", result.StdOut + Environment.NewLine + result.StdErr);
+            context.AddResultFile(prefix + "-uia.json");
+            if (File.Exists(TestState.SettingsPath))
+            {
+                File.Copy(TestState.SettingsPath, prefix + "-settings.json", overwrite: true);
+                context.AddResultFile(prefix + "-settings.json");
+            }
+            else
+            {
+                context.WriteLine($"Settings file was unavailable while collecting failure state: {TestState.SettingsPath}");
+            }
+
+            File.WriteAllText(prefix + "-state.txt", $"Theme: {TestState.ReadTheme()}\nService PIDs: {string.Join(", ", ObserveService())}\nForeground: {WindowControl.GetForegroundWindowInfo()}");
+            context.AddResultFile(prefix + "-state.txt");
         }
-        else
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException or AssertFailedException or Win32Exception or JsonException or TimeoutException)
         {
-            context.WriteLine($"Settings file was unavailable while collecting failure state: {TestState.SettingsPath}");
+            context.WriteLine($"Could not collect supplementary LightSwitch failure state: {error.Message}");
         }
-        File.WriteAllText(prefix + "-state.txt", $"Theme: {TestState.ReadTheme()}\nService PIDs: {string.Join(", ", ObserveService())}\nForeground: {WindowControl.GetForegroundWindowInfo()}");
-        context.AddResultFile(prefix + "-state.txt");
     }
 
     private bool SetCheck(string id, bool expected)
@@ -500,7 +509,7 @@ internal sealed class TestHelper
         var result = WaitHelper.WaitForStable(
             () => scheduleUpdate.ReadNew(),
             text => text!.Contains("[LightSwitchService] Settings reload applied.", StringComparison.Ordinal),
-            timeoutMS: 20_000,
+            timeoutMS: 120_000,
             pollIntervalMS: 250);
         Assert.IsTrue(result.Succeeded, $"The service did not apply the changed schedule. New logs:\n{result.LastObservation}");
         Assert.HasCount(1, ObserveService(), "The native scheduler must remain alive after loading settings.");

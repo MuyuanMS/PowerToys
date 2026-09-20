@@ -42,6 +42,9 @@ function Read-LightSwitchLocationValue {
 
 function Write-LightSwitchLocationValue {
     param([hashtable] $Target, [psobject] $Snapshot)
+    if ($Snapshot.KeyExisted -and -not (Test-Path -LiteralPath $Target.Path)) {
+        New-Item -Path $Target.Path -ErrorAction Stop | Out-Null
+    }
     if ($Snapshot.ValueExisted) {
         # Create only missing keys; never delete and recreate ConsentStore's OS-owned metadata.
         if (-not (Test-Path -LiteralPath $Target.Path)) {
@@ -54,7 +57,7 @@ function Write-LightSwitchLocationValue {
         Remove-ItemProperty -LiteralPath $Target.Path -Name $Target.Name -ErrorAction Stop
     }
     $actual = Read-LightSwitchLocationValue $Target
-    if ($actual.ValueExisted -ne $Snapshot.ValueExisted -or $actual.Value -cne $Snapshot.Value) {
+    if ($Snapshot.KeyExisted -and -not $actual.KeyExisted) {
         throw "Could not set or restore $($Target.Path)\$($Target.Name)."
     }
     if (-not $Snapshot.KeyExisted -and $actual.KeyExisted) {
@@ -64,6 +67,11 @@ function Write-LightSwitchLocationValue {
         if ($empty) {
             Remove-Item -LiteralPath $Target.Path -ErrorAction Stop
         }
+    }
+    $actual = Read-LightSwitchLocationValue $Target
+    if (($Snapshot.KeyExisted -and -not $actual.KeyExisted) -or
+        $actual.ValueExisted -ne $Snapshot.ValueExisted -or $actual.Value -cne $Snapshot.Value) {
+        throw "Could not set or restore $($Target.Path)\$($Target.Name)."
     }
 }
 
@@ -101,7 +109,9 @@ function Restore-LightSwitchLocation {
         [ServiceProcess.ServiceControllerStatus]$state.ServiceStatus, [TimeSpan]::FromSeconds(30))
     for ($i = 0; $i -lt $targets.Count; $i++) {
         $actual = Read-LightSwitchLocationValue $targets[$i]
-        if ($actual.ValueExisted -ne $state.Values[$i].ValueExisted -or $actual.Value -cne $state.Values[$i].Value) {
+        if (($state.Values[$i].KeyExisted -and -not $actual.KeyExisted) -or
+            $actual.ValueExisted -ne $state.Values[$i].ValueExisted -or
+            $actual.Value -cne $state.Values[$i].Value) {
             throw "Location value $i changed during service restoration; preserving the snapshot."
         }
     }

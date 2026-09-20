@@ -500,7 +500,7 @@ public sealed partial class ZoomItTests
 
     private void CloseNotepadDocument()
     {
-        if (notepadPath is not null)
+        if (notepadPath is not null && notepad is not null)
         {
             ui.Step("Saving and closing only the test-owned Notepad document");
             var editor = FocusNotepad();

@@ -99,6 +99,14 @@ Describe 'Light Switch location prerequisites without host mutation' {
         $registry[$targets[1].Path].ContainsKey('Value') | Should Be $false
     }
 
+    It 'recreates an originally existing key when its target value was absent' {
+        Enable-LightSwitchLocation -StatePath $statePath
+        $registry.Remove($targets[1].Path)
+        Restore-LightSwitchLocation -StatePath $statePath
+        $registry.ContainsKey($targets[1].Path) | Should Be $true
+        $registry[$targets[1].Path].ContainsKey('Value') | Should Be $false
+    }
+
     It 'restores an interrupted setup before taking another snapshot and preserves a running service' {
         $fixture.Status = 'Running'
         Enable-LightSwitchLocation -StatePath $statePath
