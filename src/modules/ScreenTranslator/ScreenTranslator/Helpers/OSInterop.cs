@@ -38,6 +38,10 @@ internal static class OSInterop
     internal const uint WM_CONTEXTMENU = 0x007B;
     internal const int HTTRANSPARENT = -1;
     internal const int HTCLIENT = 1;
+    internal const uint KEYEVENTF_KEYUP = 0x0002;
+    internal const byte VK_CONTROL = 0x11;
+    internal const byte VK_A = 0x41;
+    internal const byte VK_V = 0x56;
 
     [DllImport("user32.dll")]
     internal static extern int GetSystemMetrics(int smIndex);
@@ -174,6 +178,9 @@ internal static class OSInterop
 
     [DllImport("user32.dll")]
     internal static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll", EntryPoint = "keybd_event")]
+    internal static extern void KeybdEvent(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 
     [DllImport("user32.dll")]
     internal static extern bool ClipCursor(ref RECT lpRect);

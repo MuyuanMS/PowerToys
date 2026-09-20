@@ -702,7 +702,59 @@ public sealed partial class ResultOverlay : TransparentWindow
         }
 
         CopyTextToClipboard(text);
-        await LaunchUriAsync(new Uri("ms-copilot://"), "Copilot");
+        await LaunchCopilotWithClipboardTextAsync();
+    }
+
+    private static async Task LaunchCopilotWithClipboardTextAsync()
+    {
+        try
+        {
+            bool launched = await Windows.System.Launcher.LaunchUriAsync(new Uri("ms-copilot:chat"));
+            if (!launched)
+            {
+                Logger.LogWarning("Unable to launch Copilot.");
+                return;
+            }
+
+            IntPtr copilotWindow = IntPtr.Zero;
+            for (int attempt = 0; attempt < 20 && copilotWindow == IntPtr.Zero; attempt++)
+            {
+                await Task.Delay(250);
+                foreach (Process process in Process.GetProcessesByName("copilotapp"))
+                {
+                    using (process)
+                    {
+                        if (process.MainWindowHandle != IntPtr.Zero)
+                        {
+                            copilotWindow = process.MainWindowHandle;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (copilotWindow == IntPtr.Zero || !OSInterop.SetForegroundWindow(copilotWindow))
+            {
+                Logger.LogWarning("Copilot opened, but its chat window could not be focused. The selected text remains on the clipboard.");
+                return;
+            }
+
+            await Task.Delay(300);
+            SendKeyChord(OSInterop.VK_CONTROL, OSInterop.VK_A);
+            SendKeyChord(OSInterop.VK_CONTROL, OSInterop.VK_V);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Unable to send the selected text to Copilot. The selected text remains on the clipboard.", ex);
+        }
+    }
+
+    private static void SendKeyChord(byte modifier, byte key)
+    {
+        OSInterop.KeybdEvent(modifier, 0, 0, UIntPtr.Zero);
+        OSInterop.KeybdEvent(key, 0, 0, UIntPtr.Zero);
+        OSInterop.KeybdEvent(key, 0, OSInterop.KEYEVENTF_KEYUP, UIntPtr.Zero);
+        OSInterop.KeybdEvent(modifier, 0, OSInterop.KEYEVENTF_KEYUP, UIntPtr.Zero);
     }
 
     private async Task LaunchUriAsync(Uri uri, string actionName)
