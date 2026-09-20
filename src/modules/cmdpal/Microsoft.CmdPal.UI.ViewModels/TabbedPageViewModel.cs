@@ -280,7 +280,7 @@ public partial class TabbedPageViewModel : PageViewModel
     {
         if (ActiveChild is not null)
         {
-            ActiveChild.CanPublishContextUpdates = false;
+            SetChildCanPublishContextUpdates(ActiveChild, false);
         }
 
         DetachActiveChildLoading(ActiveChild);
@@ -314,7 +314,12 @@ public partial class TabbedPageViewModel : PageViewModel
         }
 
         AttachActiveChildLoading(child);
-        child.CanPublishContextUpdates = !_isSuspendedForNavigation;
+        SetChildCanPublishContextUpdates(child, !_isSuspendedForNavigation);
+        if (_isSuspendedForNavigation)
+        {
+            SuspendChildForNavigation(child);
+        }
+
         ActiveTabIsLoading = child.IsLoading;
 
         UpdateProperty(nameof(PlaceholderText));
@@ -356,7 +361,7 @@ public partial class TabbedPageViewModel : PageViewModel
 
         child.IsRootPage = false;
         child.HasBackButton = false;
-        child.CanPublishContextUpdates = false;
+        SetChildCanPublishContextUpdates(child, false);
         var newCached = new CachedChild(page, child);
         _childCache[tab.TabId] = newCached;
 
@@ -427,9 +432,12 @@ public partial class TabbedPageViewModel : PageViewModel
                 _childCache.Remove(tab.TabId);
             }
 
-            if (ReferenceEquals(tab, SelectedTab))
+            var selectedTabKeyChanged = SelectedTab is not null &&
+                oldCacheKeys.TryGetValue(SelectedTab, out var oldSelectedKey) &&
+                oldSelectedKey != SelectedTab.TabId;
+            if (ReferenceEquals(tab, SelectedTab) || selectedTabKeyChanged)
             {
-                ActivateTab(tab);
+                ActivateTab(SelectedTab);
             }
         }
     }
@@ -521,7 +529,8 @@ public partial class TabbedPageViewModel : PageViewModel
         _isSuspendedForNavigation = true;
         if (ActiveChild is not null)
         {
-            ActiveChild.CanPublishContextUpdates = false;
+            SetChildCanPublishContextUpdates(ActiveChild, false);
+            SuspendChildForNavigation(ActiveChild);
         }
     }
 
@@ -530,11 +539,50 @@ public partial class TabbedPageViewModel : PageViewModel
         _isSuspendedForNavigation = false;
         if (ActiveChild is not null)
         {
-            ActiveChild.CanPublishContextUpdates = true;
+            SetChildCanPublishContextUpdates(ActiveChild, true);
+            _ = ResumeChildAfterNavigation(ActiveChild);
             RefreshActiveChildContext();
         }
 
         return Task.CompletedTask;
+    }
+
+    private static void SetChildCanPublishContextUpdates(PageViewModel child, bool value)
+    {
+        if (child is ParametersPageViewModel parameters)
+        {
+            parameters.SetCanPublishContextUpdates(value);
+        }
+        else
+        {
+            child.CanPublishContextUpdates = value;
+        }
+    }
+
+    private static void SuspendChildForNavigation(PageViewModel child)
+    {
+        switch (child)
+        {
+            case ListViewModel list:
+                list.SuspendForNavigation();
+                break;
+            case ParametersPageViewModel parameters:
+                parameters.SuspendForNavigation();
+                break;
+        }
+    }
+
+    private static async Task ResumeChildAfterNavigation(PageViewModel child)
+    {
+        switch (child)
+        {
+            case ListViewModel list:
+                await list.ResumeAfterNavigation();
+                break;
+            case ParametersPageViewModel parameters:
+                await parameters.ResumeAfterNavigation();
+                break;
+        }
     }
 
     public void RefreshActiveChildContext()
@@ -573,7 +621,7 @@ public partial class TabbedPageViewModel : PageViewModel
 
         var child = cached.Child;
         DetachActiveChildLoading(child);
-        child.CanPublishContextUpdates = false;
+        SetChildCanPublishContextUpdates(child, false);
         cached.InitializationCts.Cancel();
 
         void Cleanup()

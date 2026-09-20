@@ -590,6 +590,31 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
         CoreLogger.LogDebug($"[ParametersPageVM] SetActiveListParameter: {(param != null ? "setting" : "clearing")} (was {(_activeListParam != null ? "set" : "null")})");
         _activeListParam = param;
         ActiveListViewModel = param?.ListViewModel;
+        if (ActiveListViewModel is not null)
+        {
+            ActiveListViewModel.CanPublishContextUpdates = CanPublishContextUpdates;
+        }
+    }
+
+    internal void SetCanPublishContextUpdates(bool value)
+    {
+        CanPublishContextUpdates = value;
+        if (ActiveListViewModel is not null)
+        {
+            ActiveListViewModel.CanPublishContextUpdates = value;
+        }
+    }
+
+    internal void SuspendForNavigation()
+    {
+        SetCanPublishContextUpdates(false);
+        ActiveListViewModel?.SuspendForNavigation();
+    }
+
+    internal Task ResumeAfterNavigation()
+    {
+        SetCanPublishContextUpdates(true);
+        return ActiveListViewModel?.ResumeAfterNavigation() ?? Task.CompletedTask;
     }
 
     private readonly Lock _listLock = new();
@@ -811,15 +836,17 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
             // The extension confirmed a value on a list param. If it's the
             // active one (whether first pick or re-pick), clear the list and
             // move focus forward.
-            if (CanPublishContextUpdates &&
-                sender is CommandParameterRunViewModel cmdParam &&
+            if (sender is CommandParameterRunViewModel cmdParam &&
                 cmdParam == _activeListParam &&
                 !cmdParam.NeedsValue)
             {
                 CoreLogger.LogDebug($"[ParametersPageVM] Clearing active list param after value change");
                 SetActiveListParameter(null);
-                FocusNextParameter(cmdParam);
-                UpdateCommand();
+                if (CanPublishContextUpdates)
+                {
+                    FocusNextParameter(cmdParam);
+                    UpdateCommand();
+                }
             }
             else
             {
