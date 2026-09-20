@@ -14,6 +14,70 @@
     mc:Ignorable="d">
 
     <Grid Background="Transparent">
+        <Grid.Resources>
+            <MenuFlyout x:Name="CardActionMenu">
+                <MenuFlyoutItem
+                    x:Name="OpenLinkActionItem"
+                    x:Uid="OpenLinkActionItem"
+                    AutomationProperties.AutomationId="MenuOpenDetectedLink"
+                    Click="OpenLinkActionItem_Click"
+                    Icon="OpenFile"
+                    Text="Open link"
+                    Visibility="Collapsed" />
+                <MenuFlyoutItem
+                    x:Name="EmailActionItem"
+                    x:Uid="EmailActionItem"
+                    AutomationProperties.AutomationId="MenuComposeDetectedEmail"
+                    Click="EmailActionItem_Click"
+                    Icon="Mail"
+                    Text="Send email"
+                    Visibility="Collapsed" />
+                <MenuFlyoutSeparator x:Name="DetectedContentSeparator" Visibility="Collapsed" />
+                <MenuFlyoutItem
+                    x:Name="CopyDisplayedTextActionItem"
+                    x:Uid="CopyDisplayedTextActionItem"
+                    AutomationProperties.AutomationId="MenuCopyDisplayedText"
+                    Click="CopyDisplayedTextActionItem_Click"
+                    Icon="Copy"
+                    Text="Copy" />
+                <MenuFlyoutSubItem
+                    x:Name="SearchWebActionItem"
+                    x:Uid="SearchWebActionItem"
+                    AutomationProperties.AutomationId="MenuSearchWeb"
+                    Icon="Find"
+                    Text="Search the web">
+                    <MenuFlyoutItem
+                        x:Name="SearchTranslatedTextActionItem"
+                        x:Uid="SearchTranslatedTextActionItem"
+                        AutomationProperties.AutomationId="MenuSearchTranslatedText"
+                        Click="SearchTranslatedTextActionItem_Click"
+                        Text="Translated text" />
+                    <MenuFlyoutItem
+                        x:Name="SearchOriginalTextActionItem"
+                        x:Uid="SearchOriginalTextActionItem"
+                        AutomationProperties.AutomationId="MenuSearchOriginalText"
+                        Click="SearchOriginalTextActionItem_Click"
+                        Text="Original text" />
+                </MenuFlyoutSubItem>
+                <MenuFlyoutItem
+                    x:Name="ShareDisplayedTextActionItem"
+                    x:Uid="ShareDisplayedTextActionItem"
+                    AutomationProperties.AutomationId="MenuShareDisplayedText"
+                    Click="ShareDisplayedTextActionItem_Click"
+                    Icon="Share"
+                    Text="Share..." />
+                <MenuFlyoutSeparator x:Name="ClickToDoSeparator" Visibility="Collapsed" />
+                <MenuFlyoutItem
+                    x:Name="OpenClickToDoActionItem"
+                    x:Uid="OpenClickToDoActionItem"
+                    AutomationProperties.AutomationId="MenuOpenClickToDo"
+                    Click="OpenClickToDoActionItem_Click"
+                    Icon="View"
+                    Text="Open Click to Do"
+                    Visibility="Collapsed" />
+            </MenuFlyout>
+        </Grid.Resources>
+
         <Canvas
             x:Name="ResultCanvas"
             AutomationProperties.AutomationId="CanvasTranslationResult"

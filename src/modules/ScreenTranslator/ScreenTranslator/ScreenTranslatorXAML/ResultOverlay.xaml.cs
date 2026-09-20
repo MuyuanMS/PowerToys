@@ -19,6 +19,7 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using ScreenTranslator.Core.Actions;
 using ScreenTranslator.Core.Layout;
 using ScreenTranslator.Core.Translation;
 using ScreenTranslator.Helpers;
@@ -40,6 +41,7 @@ public sealed partial class ResultOverlay : TransparentWindow
     private readonly Func<string, string, Task>? _retranslateAll;
     private readonly Func<TranslationLine, string, string, Task<TranslationResult>>? _retranslateLine;
     private readonly IntPtr _hwnd;
+    private readonly TextShareService _textShareService = new();
     private readonly List<(PhysicalRect Bounds, Border Card)> _cardHitRegions = new();
     private readonly HashSet<int> _hiddenLineIndices = new();
     private readonly Dictionary<int, (
@@ -74,6 +76,10 @@ public sealed partial class ResultOverlay : TransparentWindow
     private int _contextMenuLineIndex = -1;
     private TranslatedLine? _contextMenuLine;
     private Border? _contextMenuCard;
+    private int _actionMenuLineIndex = -1;
+    private Border? _actionMenuCard;
+    private Uri? _actionMenuWebUri;
+    private string? _actionMenuEmailAddress;
     private bool _isInitializingColorPickers;
     private TextBox? _editingTextBox;
     private Border? _editingCard;
@@ -110,6 +116,8 @@ public sealed partial class ResultOverlay : TransparentWindow
         DismissOnFocusLost = false;
 
         InitializeComponent();
+        InitializeClickToDoAvailability();
+        Closed += (_, _) => _textShareService.Close();
 
         _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
 
@@ -426,7 +434,7 @@ public sealed partial class ResultOverlay : TransparentWindow
             card.RightTapped += (_, args) =>
             {
                 args.Handled = true;
-                ShowCardContextMenu(card, cardLineIndex, cardLine);
+                ShowCardActionMenu(card, cardLineIndex, args.GetPosition(card));
             };
             card.Child = textBlock;
 
@@ -508,6 +516,7 @@ public sealed partial class ResultOverlay : TransparentWindow
 
     private void ShowCardContextMenu(Border card, int lineIndex, TranslatedLine line)
     {
+        CardActionMenu.Hide();
         _contextMenuLineIndex = lineIndex;
         _contextMenuLine = line;
         _selectedLineIndex = lineIndex;
@@ -560,6 +569,150 @@ public sealed partial class ResultOverlay : TransparentWindow
                 _isInitializingColorPickers = false;
             }
         });
+    }
+
+    private void ShowCardActionMenu(Border card, int lineIndex, Windows.Foundation.Point position)
+    {
+        CloseContextMenu();
+        _selectedLineIndex = lineIndex;
+        HighlightSelectedCard();
+        _actionMenuLineIndex = lineIndex;
+        _actionMenuCard = card;
+
+        string displayedText = GetCardText(card);
+        bool hasWebUri = CardActionHelper.TryGetWebUri(displayedText, out _actionMenuWebUri);
+        bool hasEmailAddress = CardActionHelper.TryGetEmailAddress(displayedText, out _actionMenuEmailAddress);
+        OpenLinkActionItem.Visibility = hasWebUri ? Visibility.Visible : Visibility.Collapsed;
+        EmailActionItem.Visibility = hasEmailAddress ? Visibility.Visible : Visibility.Collapsed;
+        DetectedContentSeparator.Visibility = hasWebUri || hasEmailAddress ? Visibility.Visible : Visibility.Collapsed;
+
+        bool hasDistinctOriginalText =
+            _sourceTexts.TryGetValue(lineIndex, out string? originalText) &&
+            _translatedTexts.TryGetValue(lineIndex, out string? translatedText) &&
+            !string.Equals(originalText, translatedText, StringComparison.Ordinal);
+        SearchOriginalTextActionItem.Visibility = hasDistinctOriginalText ? Visibility.Visible : Visibility.Collapsed;
+
+        FlyoutShowOptions options = new()
+        {
+            Position = position,
+            Placement = FlyoutPlacementMode.BottomEdgeAlignedLeft,
+        };
+        CardActionMenu.ShowAt(card, options);
+    }
+
+    private async void InitializeClickToDoAvailability()
+    {
+        try
+        {
+            Uri clickToDoUri = new("ms-clicktodo://");
+            Windows.System.LaunchQuerySupportStatus status = await Windows.System.Launcher.QueryUriSupportAsync(
+                clickToDoUri,
+                Windows.System.LaunchQuerySupportType.Uri);
+            bool isAvailable = status == Windows.System.LaunchQuerySupportStatus.Available;
+            OpenClickToDoActionItem.Visibility = isAvailable ? Visibility.Visible : Visibility.Collapsed;
+            ClickToDoSeparator.Visibility = isAvailable ? Visibility.Visible : Visibility.Collapsed;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Unable to query Click to Do availability: {ex.Message}");
+        }
+    }
+
+    private void CopyDisplayedTextActionItem_Click(object sender, RoutedEventArgs e)
+    {
+        CopyTextToClipboard(GetActionMenuText());
+    }
+
+    private async void OpenLinkActionItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (_actionMenuWebUri is not null)
+        {
+            await LaunchUriAsync(_actionMenuWebUri, "detected link");
+        }
+    }
+
+    private async void EmailActionItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrWhiteSpace(_actionMenuEmailAddress))
+        {
+            await LaunchUriAsync(new Uri($"mailto:{_actionMenuEmailAddress}"), "email composer");
+        }
+    }
+
+    private async void SearchTranslatedTextActionItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (_translatedTexts.TryGetValue(_actionMenuLineIndex, out string? text))
+        {
+            await LaunchUriAsync(CardActionHelper.CreateSearchUri(text), "web search");
+        }
+    }
+
+    private async void SearchOriginalTextActionItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (_sourceTexts.TryGetValue(_actionMenuLineIndex, out string? text))
+        {
+            await LaunchUriAsync(CardActionHelper.CreateSearchUri(text), "web search");
+        }
+    }
+
+    private void ShareDisplayedTextActionItem_Click(object sender, RoutedEventArgs e)
+    {
+        string text = GetActionMenuText();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        try
+        {
+            int exStyle = OSInterop.GetWindowLong(_hwnd, OSInterop.GwlExStyle);
+            _ = OSInterop.SetWindowLong(_hwnd, OSInterop.GwlExStyle, exStyle & ~OSInterop.WsExNoActivate);
+            _ = OSInterop.SetForegroundWindow(_hwnd);
+            _textShareService.Show(
+                _hwnd,
+                text,
+                ResourceLoaderInstance.ResourceLoader.GetString("ShareTextTitle"));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Unable to open the Windows share dialog.", ex);
+        }
+    }
+
+    private async void OpenClickToDoActionItem_Click(object sender, RoutedEventArgs e)
+    {
+        await LaunchUriAsync(new Uri("ms-clicktodo://"), "Click to Do");
+    }
+
+    private async Task LaunchUriAsync(Uri uri, string actionName)
+    {
+        try
+        {
+            bool launched = await Windows.System.Launcher.LaunchUriAsync(uri);
+            if (!launched)
+            {
+                Logger.LogWarning($"Unable to launch {actionName}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Unable to launch {actionName}.", ex);
+        }
+    }
+
+    private string GetActionMenuText()
+    {
+        return _actionMenuCard is null ? string.Empty : GetCardText(_actionMenuCard);
+    }
+
+    private static string GetCardText(Border card)
+    {
+        return card.Child switch
+        {
+            TextBlock textBlock => textBlock.Text,
+            TextBox textBox => textBox.Text,
+            _ => string.Empty,
+        };
     }
 
     private void PositionContextMenu(Border card)
@@ -669,6 +822,7 @@ public sealed partial class ResultOverlay : TransparentWindow
 
         _selectedLineIndex = -1;
         HighlightSelectedCard();
+        CardActionMenu.Hide();
         CloseContextMenu();
         _isInitializingColorPickers = false;
     }
@@ -839,10 +993,20 @@ public sealed partial class ResultOverlay : TransparentWindow
             return;
         }
 
+        CopyTextToClipboard(text);
+        Logger.LogInfo($"Copied overlay text for line {_contextMenuLineIndex} to the clipboard.");
+    }
+
+    private static void CopyTextToClipboard(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
         DataPackage package = new();
         package.SetText(text);
         Clipboard.SetContent(package);
-        Logger.LogInfo($"Copied overlay text for line {_contextMenuLineIndex} to the clipboard.");
     }
 
     private void EditingTextBox_KeyDown(object sender, KeyRoutedEventArgs e)

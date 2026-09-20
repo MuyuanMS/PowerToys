@@ -210,6 +210,42 @@
     <value>Copy text</value>
     <comment>Tooltip for copying the selected translated text</comment>
   </data>
+  <data name="OpenLinkActionItem.Text" xml:space="preserve">
+    <value>Open link</value>
+    <comment>Context menu action that opens a detected web address</comment>
+  </data>
+  <data name="EmailActionItem.Text" xml:space="preserve">
+    <value>Send email</value>
+    <comment>Context menu action that composes an email to a detected address</comment>
+  </data>
+  <data name="CopyDisplayedTextActionItem.Text" xml:space="preserve">
+    <value>Copy</value>
+    <comment>Context menu action that copies the text currently displayed in a card</comment>
+  </data>
+  <data name="SearchWebActionItem.Text" xml:space="preserve">
+    <value>Search the web</value>
+    <comment>Context menu containing web search actions</comment>
+  </data>
+  <data name="SearchTranslatedTextActionItem.Text" xml:space="preserve">
+    <value>Translated text</value>
+    <comment>Context menu action that searches for the translated card text</comment>
+  </data>
+  <data name="SearchOriginalTextActionItem.Text" xml:space="preserve">
+    <value>Original text</value>
+    <comment>Context menu action that searches for the original OCR text</comment>
+  </data>
+  <data name="ShareDisplayedTextActionItem.Text" xml:space="preserve">
+    <value>Share...</value>
+    <comment>Context menu action that shares the text currently displayed in a card</comment>
+  </data>
+  <data name="OpenClickToDoActionItem.Text" xml:space="preserve">
+    <value>Open Click to Do</value>
+    <comment>Context menu action that launches the Windows Click to Do overlay</comment>
+  </data>
+  <data name="ShareTextTitle" xml:space="preserve">
+    <value>Screen Translator text</value>
+    <comment>Title shown by the Windows share dialog when sharing text from an overlay card</comment>
+  </data>
   <data name="FormatPanelButton.Content" xml:space="preserve">
     <value>Format</value>
     <comment>Opens formatting controls for the selected translated text card</comment>
