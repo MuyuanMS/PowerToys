@@ -59,10 +59,10 @@ internal sealed partial class SampleTabbedPage : TabbedPage
     {
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(1.5)).ConfigureAwait(false);
+            await Task.Delay(TimeSpan.FromSeconds(1.5));
             _issuesTab.Badge = "12";
 
-            await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
+            await Task.Delay(TimeSpan.FromSeconds(1));
             _pullRequestsTab.Badge = "3";
         }
         catch (Exception)

@@ -40,7 +40,7 @@ public partial class TabbedPageViewModel : PageViewModel
     private bool _isSuspendedForNavigation;
     private int _tabsRefreshGeneration;
 
-    private static readonly string _fallbackPlaceholder = "Type here to search...";
+    private static readonly string _fallbackPlaceholder = Properties.Resources.builtin_main_list_page_searchbar_placeholder;
 
     public ObservableCollection<TabViewModel> Tabs { get; } = [];
 
@@ -129,6 +129,7 @@ public partial class TabbedPageViewModel : PageViewModel
                 return;
             }
 
+            CleanupTabs();
             ListHelpers.InPlaceUpdateList(Tabs, newTabs);
             AttachTabPropertyChanged();
             UpdateProperty(nameof(HasTabs));
@@ -235,13 +236,7 @@ public partial class TabbedPageViewModel : PageViewModel
                     }
                 }
 
-                foreach (var old in Tabs)
-                {
-                    old.PropertyChanged -= Tab_PropertyChanged;
-                    _tabCacheKeys.Remove(old);
-                    old.SafeCleanup();
-                }
-
+                CleanupTabs();
                 ListHelpers.InPlaceUpdateList(Tabs, newTabs);
                 AttachTabPropertyChanged();
                 UpdateProperty(nameof(HasTabs));
@@ -375,6 +370,16 @@ public partial class TabbedPageViewModel : PageViewModel
         {
             _tabCacheKeys[tab] = tab.TabId;
             tab.PropertyChanged += Tab_PropertyChanged;
+        }
+    }
+
+    private void CleanupTabs()
+    {
+        foreach (var tab in Tabs)
+        {
+            tab.PropertyChanged -= Tab_PropertyChanged;
+            _tabCacheKeys.Remove(tab);
+            tab.SafeCleanup();
         }
     }
 
@@ -676,12 +681,7 @@ public partial class TabbedPageViewModel : PageViewModel
 
         _childCache.Clear();
 
-        foreach (var tab in Tabs)
-        {
-            tab.PropertyChanged -= Tab_PropertyChanged;
-            _tabCacheKeys.Remove(tab);
-            tab.SafeCleanup();
-        }
+        CleanupTabs();
     }
 
     private sealed class CachedChild(IPage page, PageViewModel child)
