@@ -430,6 +430,11 @@ public sealed partial class ZoomItTests
         Assert.IsTrue(File.Exists(notepadPath), "The test-owned Notepad file is missing; do not dismiss a genuine fixture error.");
         var accept = window.FindAll<Button>(By.Name("OK"), 0)
             .Where(button => button.Name == "OK" && button.Displayed && button.IsEnabled).ToArray();
+        if (accept.Length == 0)
+        {
+            throw new AssertFailedException("element_not_found: The path-error acknowledgement is still materializing.");
+        }
+
         Assert.HasCount(1, accept, "Expected the path-error acknowledgement in the test-owned Notepad window.");
         ui.Step("Dismissing a restored-session path error while the new test-owned document still exists");
         SaveDesktop("notepad-restored-path-error");

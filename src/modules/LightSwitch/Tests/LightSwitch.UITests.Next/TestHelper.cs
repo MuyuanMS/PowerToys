@@ -129,10 +129,19 @@ internal sealed class TestHelper
 
     public void SetThemeTargets(bool system, bool apps)
     {
-        SetCheck("ChangeSystemCheckbox_LightSwitch", system);
+        scheduleUpdate = new LogCursor();
+        bool systemChanged = SetCheck("ChangeSystemCheckbox_LightSwitch", system);
         WaitForSetting("changeSystem", system);
-        SetCheck("ChangeAppsCheckbox_LightSwitch", apps);
+        bool appsChanged = SetCheck("ChangeAppsCheckbox_LightSwitch", apps);
         WaitForSetting("changeApps", apps);
+        if (systemChanged || appsChanged)
+        {
+            WaitForScheduleReload();
+        }
+        else
+        {
+            scheduleUpdate = null;
+        }
     }
 
     public void SendShortcut()
@@ -394,18 +403,20 @@ internal sealed class TestHelper
         context.AddResultFile(prefix + "-state.txt");
     }
 
-    private void SetCheck(string id, bool expected)
+    private bool SetCheck(string id, bool expected)
     {
         Step($"Setting {id}={expected}");
         var check = ui.Find<CheckBox>(By.AccessibilityId(id));
         string state = check.GetProperty("ToggleState");
         Assert.IsTrue(state is "On" or "Off", $"Cannot determine checkbox state for {id}: '{state}'.");
-        if ((state == "On") != expected)
+        bool changed = (state == "On") != expected;
+        if (changed)
         {
             check.Invoke(msPostAction: 0);
         }
 
         Assert.IsTrue(check.WaitForProperty("ToggleState", expected ? "On" : "Off", 10_000), $"{id} did not reach the requested state.");
+        return changed;
     }
 
     private void RequireForeground()
