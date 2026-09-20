@@ -940,7 +940,10 @@ public partial class ListViewModel : PageViewModel, IDisposable
     {
         item.PropertyChanged += SelectedItemPropertyChanged;
 
-        WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(item));
+        if (CanPublishContextUpdates)
+        {
+            WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(item));
+        }
 
         // Cancel any in-flight slow init from a previous selection and defer
         // the expensive work (extension IPC for MoreCommands, details) so
@@ -961,9 +964,19 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
                     var initialized = await item.RequestInitializationAsync(ct).ConfigureAwait(false);
 
+                    if (ct.IsCancellationRequested || !ReferenceEquals(_lastSelectedItem, item))
+                    {
+                        return;
+                    }
+
+                    if (CanPublishContextUpdates)
+                    {
+                        WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                    }
+
                     if (!initialized || ct.IsCancellationRequested)
                     {
-                        if (!ct.IsCancellationRequested)
+                        if (!ct.IsCancellationRequested && CanPublishContextUpdates)
                         {
                             WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
                         }
@@ -978,7 +991,10 @@ public partial class ListViewModel : PageViewModel, IDisposable
                             return;
                         }
 
-                        WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                        if (CanPublishContextUpdates)
+                        {
+                            WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                        }
 
                         return;
                     }
@@ -990,26 +1006,14 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
                     // SafeSlowInit completed on a background thread — details
                     // messages will be marshalled to the UI thread by the receiver.
-                    if (ShowDetails && item.HasDetails)
+                    if (CanPublishContextUpdates && ShowDetails && item.HasDetails)
                     {
                         WeakReferenceMessenger.Default.Send<ShowDetailsMessage>(new(item.Details));
                     }
-                    else
+                    else if (CanPublishContextUpdates)
                     {
                         WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
                     }
-
-                    var suggestion = item.TextToSuggest;
-                    DoOnUiThread(() =>
-                    {
-                        if (ct.IsCancellationRequested)
-                        {
-                            return;
-                        }
-
-                        TextToSuggest = suggestion;
-                        WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(suggestion));
-                    });
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
@@ -1017,11 +1021,28 @@ public partial class ListViewModel : PageViewModel, IDisposable
                 catch (Exception ex)
                 {
                     CoreLogger.LogError("Failed to initialize the selected list item", ex);
-                    if (!ct.IsCancellationRequested)
+                    if (!ct.IsCancellationRequested && CanPublishContextUpdates)
                     {
                         WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
                     }
+
+                    return;
                 }
+
+                var suggestion = item.TextToSuggest;
+                DoOnUiThread(() =>
+                {
+                    if (ct.IsCancellationRequested || !ReferenceEquals(_lastSelectedItem, item))
+                    {
+                        return;
+                    }
+
+                    TextToSuggest = suggestion;
+                    if (CanPublishContextUpdates)
+                    {
+                        WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(suggestion));
+                    }
+                });
             },
             ct);
     }
@@ -1041,16 +1062,26 @@ public partial class ListViewModel : PageViewModel, IDisposable
             case nameof(item.SecondaryCommand):
             case nameof(item.AllCommands):
             case nameof(item.Name):
-                WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(item));
+                if (CanPublishContextUpdates)
+                {
+                    WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(item));
+                }
+
                 break;
             case nameof(item.Details):
                 if (ShowDetails && item.HasDetails)
                 {
-                    WeakReferenceMessenger.Default.Send<ShowDetailsMessage>(new(item.Details));
+                    if (CanPublishContextUpdates)
+                    {
+                        WeakReferenceMessenger.Default.Send<ShowDetailsMessage>(new(item.Details));
+                    }
                 }
                 else
                 {
-                    WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                    if (CanPublishContextUpdates)
+                    {
+                        WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+                    }
                 }
 
                 break;
@@ -1064,10 +1095,51 @@ public partial class ListViewModel : PageViewModel, IDisposable
     {
         CancelAndDisposeTokenSource(ref _selectedItemCts);
 
-        WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(null));
-        WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
-        WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(string.Empty));
+        if (CanPublishContextUpdates)
+        {
+            WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(null));
+            WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+            WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(string.Empty));
+        }
+
         TextToSuggest = string.Empty;
+    }
+
+    public void RefreshCurrentCommandContext()
+    {
+        if (!CanPublishContextUpdates)
+        {
+            return;
+        }
+
+        var item = _lastSelectedItem;
+        if (item is null)
+        {
+            if (ShowEmptyContent && EmptyContent.Model.Unsafe is not null)
+            {
+                WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(EmptyContent));
+            }
+            else
+            {
+                WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(null));
+            }
+
+            WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+            WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(string.Empty));
+            return;
+        }
+
+        WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(item));
+        if (ShowDetails && item.HasDetails)
+        {
+            WeakReferenceMessenger.Default.Send<ShowDetailsMessage>(new(item.Details));
+        }
+        else
+        {
+            WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+        }
+
+        WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(TextToSuggest));
     }
 
     public override void InitializeProperties()
@@ -1277,7 +1349,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
     private void UpdateEmptyContent()
     {
         UpdateProperty(nameof(ShowEmptyContent));
-        if (!ShowEmptyContent || EmptyContent.Model.Unsafe is null)
+        if (!ShowEmptyContent || EmptyContent.Model.Unsafe is null || !CanPublishContextUpdates)
         {
             return;
         }
@@ -1287,7 +1359,10 @@ public partial class ListViewModel : PageViewModel, IDisposable
         DoOnUiThread(
            () =>
            {
-               WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(EmptyContent));
+               if (CanPublishContextUpdates)
+               {
+                   WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(EmptyContent));
+               }
            });
     }
 

@@ -438,6 +438,7 @@ public partial class CommandParameterRunViewModel : ParameterValueRunViewModel, 
             if (PageContext.TryGetTarget(out var pageContext))
             {
                 _listViewModel = new ListViewModel(list, pageContext.Scheduler, _extensionHost, _providerContext, _contextMenuFactory);
+                _listViewModel.CanPublishContextUpdates = false;
                 _listViewModel.InitializeProperties();
             }
         }
@@ -588,8 +589,38 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
     public void SetActiveListParameter(CommandParameterRunViewModel? param)
     {
         CoreLogger.LogDebug($"[ParametersPageVM] SetActiveListParameter: {(param != null ? "setting" : "clearing")} (was {(_activeListParam != null ? "set" : "null")})");
+        if (_activeListViewModel is not null && !ReferenceEquals(_activeListViewModel, param?.ListViewModel))
+        {
+            _activeListViewModel.CanPublishContextUpdates = false;
+        }
+
         _activeListParam = param;
         ActiveListViewModel = param?.ListViewModel;
+        if (ActiveListViewModel is not null)
+        {
+            ActiveListViewModel.CanPublishContextUpdates = CanPublishContextUpdates;
+        }
+    }
+
+    internal void SetCanPublishContextUpdates(bool value)
+    {
+        CanPublishContextUpdates = value;
+        if (ActiveListViewModel is not null)
+        {
+            ActiveListViewModel.CanPublishContextUpdates = value;
+        }
+    }
+
+    internal void SuspendForNavigation()
+    {
+        SetCanPublishContextUpdates(false);
+        ActiveListViewModel?.SuspendForNavigation();
+    }
+
+    internal Task ResumeAfterNavigation()
+    {
+        SetCanPublishContextUpdates(true);
+        return ActiveListViewModel?.ResumeAfterNavigation() ?? Task.CompletedTask;
     }
 
     private readonly Lock _listLock = new();
@@ -722,7 +753,10 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
                 OnPropertyChanged(nameof(Items)); // This _could_ be promoted to a dedicated ItemsUpdated event if needed
                 UpdateCommand();
 
-                WeakReferenceMessenger.Default.Send(new FocusSearchBoxMessage());
+                if (CanPublishContextUpdates)
+                {
+                    WeakReferenceMessenger.Default.Send(new FocusSearchBoxMessage());
+                }
             });
     }
 
@@ -766,7 +800,10 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
         DoOnUiThread(
            () =>
            {
-               WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(Command));
+               if (CanPublishContextUpdates)
+               {
+                   WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(Command));
+               }
            });
     }
 
@@ -811,8 +848,11 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
             {
                 CoreLogger.LogDebug($"[ParametersPageVM] Clearing active list param after value change");
                 SetActiveListParameter(null);
-                FocusNextParameter(cmdParam);
-                UpdateCommand();
+                if (CanPublishContextUpdates)
+                {
+                    FocusNextParameter(cmdParam);
+                    UpdateCommand();
+                }
             }
             else
             {
@@ -849,6 +889,11 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
 
     public void FocusNextParameter(ParameterValueRunViewModel lastParam)
     {
+        if (!CanPublishContextUpdates)
+        {
+            return;
+        }
+
         lock (_listLock)
         {
             var found = false;
@@ -864,7 +909,11 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
                 {
                     if (found)
                     {
-                        WeakReferenceMessenger.Default.Send(new FocusParamMessage(pv));
+                        if (CanPublishContextUpdates)
+                        {
+                            WeakReferenceMessenger.Default.Send(new FocusParamMessage(pv));
+                        }
+
                         return;
                     }
                     else if (firstWithoutValue is null && pv.NeedsValue)
@@ -876,7 +925,10 @@ public partial class ParametersPageViewModel : PageViewModel, IDisposable
 
             if (firstWithoutValue is not null)
             {
-                WeakReferenceMessenger.Default.Send(new FocusParamMessage(firstWithoutValue));
+                if (CanPublishContextUpdates)
+                {
+                    WeakReferenceMessenger.Default.Send(new FocusParamMessage(firstWithoutValue));
+                }
             }
         }
     }

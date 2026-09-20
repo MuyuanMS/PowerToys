@@ -364,7 +364,6 @@ namespace Microsoft.CommandPalette.Extensions
         IDetails Details { get; };
         IContextItem[] Commands { get; };
     }
-
     [contract(Microsoft.CommandPalette.Extensions.ExtensionsContract, 1)]
     interface ICommandSettings {
         IContentPage SettingsPage { get; };
@@ -498,6 +497,20 @@ namespace Microsoft.CommandPalette.Extensions
     [contract(Microsoft.CommandPalette.Extensions.ExtensionsContract, 1)]
     interface IDetails2 requires IDetails {
         IContent[] GetContent();
+    }
+
+    [contract(Microsoft.CommandPalette.Extensions.ExtensionsContract, 1)]
+    interface ITab requires INotifyPropChanged {
+        String Id { get; };
+        String Title { get; };
+        IIconInfo Icon { get; };
+        String Badge { get; };
+        IPage Page { get; };
+    }
+
+    [contract(Microsoft.CommandPalette.Extensions.ExtensionsContract, 1)]
+    interface ITabbedPage requires IPage, INotifyItemsChanged {
+        ITab[] GetTabs();
     }
 
 

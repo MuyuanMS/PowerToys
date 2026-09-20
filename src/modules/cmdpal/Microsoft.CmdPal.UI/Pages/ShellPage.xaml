@@ -391,7 +391,7 @@
                         x:Name="SearchBox"
                         HorizontalAlignment="Stretch"
                         ActiveFocusTargetChanged="SearchBox_ActiveFocusTargetChanged"
-                        CurrentPageViewModel="{x:Bind ViewModel.CurrentPage, Mode=OneWay}" />
+                        CurrentPageViewModel="{x:Bind ViewModel.SearchHostPage, Mode=OneWay}" />
                     <Grid.Transitions>
                         <TransitionCollection>
                             <RepositionThemeTransition />
@@ -403,7 +403,7 @@
                     <cpcontrols:FiltersDropDown
                         x:Name="FiltersDropDown"
                         HorizontalAlignment="Right"
-                        CurrentPageViewModel="{x:Bind ViewModel.CurrentPage, Mode=OneWay}" />
+                        CurrentPageViewModel="{x:Bind ViewModel.SearchHostPage, Mode=OneWay}" />
                 </Grid>
             </Grid>
 

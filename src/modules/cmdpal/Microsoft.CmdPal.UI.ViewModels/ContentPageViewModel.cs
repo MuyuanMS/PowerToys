@@ -135,7 +135,10 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
         DoOnUiThread(
         () =>
         {
-            WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(this));
+            if (CanPublishContextUpdates)
+            {
+                WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(this));
+            }
         });
     }
 
@@ -192,7 +195,10 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
                 DoOnUiThread(
                 () =>
                 {
-                    WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(this));
+                    if (CanPublishContextUpdates)
+                    {
+                        WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(this));
+                    }
                 });
 
                 break;
@@ -214,6 +220,11 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
         DoOnUiThread(
             () =>
             {
+                if (!CanPublishContextUpdates)
+                {
+                    return;
+                }
+
                 if (HasDetails)
                 {
                     WeakReferenceMessenger.Default.Send<ShowDetailsMessage>(new(Details));
@@ -223,6 +234,26 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
                     WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
                 }
             });
+    }
+
+    public void RefreshCommandContext()
+    {
+        if (!CanPublishContextUpdates)
+        {
+            return;
+        }
+
+        WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(this));
+        if (HasDetails)
+        {
+            WeakReferenceMessenger.Default.Send<ShowDetailsMessage>(new(Details));
+        }
+        else
+        {
+            WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+        }
+
+        WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(string.Empty));
     }
 
     private List<IContextItemViewModel> BuildCommandViewModels(IContextItem[]? items)

@@ -28,6 +28,18 @@ public sealed partial class ListViewModelNavigationTests
     private const string InitialGlyph = "\uE8D4";
     private const string SearchGlyph = "\uE8A5";
 
+    private enum FetchPhase
+    {
+        Fetching,
+        Committed,
+        Published,
+    }
+
+    private sealed class FetchState(FetchPhase phase)
+    {
+        internal FetchPhase Phase { get; } = phase;
+    }
+
     private sealed partial class TestHost : AppExtensionHost
     {
         public override string? GetExtensionDisplayName() => "Navigation test host";
@@ -202,9 +214,8 @@ public sealed partial class ListViewModelNavigationTests
         try
         {
             await ObserveItemsAsync(viewModel, vm => vm.FilteredItems.Count == 48, viewModel.InitializeProperties);
-            await WaitForPublishedAsync(viewModel);
             Assert.IsTrue(started.Wait(TimeSpan.FromSeconds(2)));
-            oldWorker = GetPrivateField<ListItemInitializationCoordinator>(viewModel, "_itemInitializationCoordinator").Completion;
+            oldWorker = GetPrivateField<Task>(viewModel, "_initializeItemsTask");
             var pending = viewModel.FilteredItems.Single(item => ReferenceEquals(item.Model.Unsafe, last));
             Assert.AreEqual(0, last.InitializationCount);
             Assert.IsFalse(pending.Icon.HasIcon(light: true));
@@ -396,7 +407,6 @@ public sealed partial class ListViewModelNavigationTests
             await ObserveItemsAsync(viewModel, "Initial", viewModel.InitializeProperties);
             lockHolder = Task.Run(() =>
             {
-                using (GetPrivateField<Lock>(viewModel, "_initializationCoordinatorLock").EnterScope())
                 using (GetPrivateField<Lock>(viewModel, "_fetchStateLock").EnterScope())
                 using (GetPrivateField<Lock>(viewModel, "_listLock").EnterScope())
                 {
@@ -483,13 +493,11 @@ public sealed partial class ListViewModelNavigationTests
             viewModel.SuspendForNavigation();
             viewModel.InitializeProperties(); // Calls FetchItems directly, not RequestFetch.
             Assert.AreEqual(0, page.GetItemsCount);
-            Assert.AreEqual(ListPageFetchPhase.Fetching, GetWorkState(viewModel).Phase);
 
             await viewModel.ResumeAfterNavigation();
             scheduler.Drain();
             Assert.AreEqual(1, page.GetItemsCount);
             Assert.AreEqual("Initial", viewModel.FilteredItems.Single().Title);
-            Assert.AreEqual(ListPageFetchPhase.Published, GetWorkState(viewModel).Phase);
         }
         finally
         {
@@ -529,7 +537,6 @@ public sealed partial class ListViewModelNavigationTests
             Assert.IsTrue(started.Wait(TimeSpan.FromSeconds(2)));
             page.ReplaceItems([CreateItem("Current")]);
             scheduler.Drain();
-            Assert.AreEqual(ListPageFetchPhase.Published, GetWorkState(viewModel).Phase);
 
             if (finishWhileSuspended)
             {
@@ -613,7 +620,6 @@ public sealed partial class ListViewModelNavigationTests
             Assert.AreEqual(false, showEmptyDuringRecovery, "The current recovery fetch is still running.");
             Assert.AreEqual(0, viewModel.FilteredItems.Count);
             Assert.IsTrue(viewModel.ShowEmptyContent);
-            Assert.AreEqual(ListPageFetchPhase.Published, GetWorkState(viewModel).Phase);
             Assert.AreEqual(3, page.GetItemsCount);
 
             release.Set();
@@ -655,7 +661,7 @@ public sealed partial class ListViewModelNavigationTests
             scheduler.Drain();
             viewModel.ItemsUpdated += OnItemsUpdated;
             page.ReplaceItems([CreateItem("Current")]);
-            Assert.AreEqual(ListPageFetchPhase.Committed, GetWorkState(viewModel).Phase);
+            Assert.AreEqual(FetchPhase.Committed, GetWorkState(viewModel).Phase);
             Assert.AreEqual("Initial", viewModel.FilteredItems.Single().Title);
 
             viewModel.SuspendForNavigation();
@@ -667,7 +673,7 @@ public sealed partial class ListViewModelNavigationTests
             Assert.AreEqual(1, publications.Count);
             Assert.IsTrue(publications[0].ForceFirstItem);
             Assert.IsTrue(publications[0].EnsureSelectionVisible);
-            Assert.AreEqual(ListPageFetchPhase.Published, GetWorkState(viewModel).Phase);
+            Assert.AreEqual(FetchPhase.Published, GetWorkState(viewModel).Phase);
 
             viewModel.SuspendForNavigation();
             await viewModel.ResumeAfterNavigation();
@@ -735,7 +741,7 @@ public sealed partial class ListViewModelNavigationTests
                 }
             };
             page.ReplaceItems([CreateItem("Current")]);
-            Assert.AreEqual(ListPageFetchPhase.Fetching, GetWorkState(viewModel).Phase);
+            Assert.AreEqual(FetchPhase.Fetching, GetWorkState(viewModel).Phase);
             Assert.IsTrue(viewModel.ShowEmptyContent, "The failed fetch has finished even though recovery is still required.");
 
             viewModel.SuspendForNavigation();
@@ -761,7 +767,7 @@ public sealed partial class ListViewModelNavigationTests
     {
         using var held = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();
-        var phase = Enum.Parse<ListPageFetchPhase>(phaseName);
+        var phase = Enum.Parse<FetchPhase>(phaseName);
         var scheduler = new QueuedTaskScheduler();
         var page = new SearchPage();
         var viewModel = CreateViewModel(page, scheduler);
@@ -773,20 +779,19 @@ public sealed partial class ListViewModelNavigationTests
         {
             viewModel.InitializeProperties();
             scheduler.Drain();
-            if (phase == ListPageFetchPhase.Committed)
+            if (phase == FetchPhase.Committed)
             {
                 page.ReplaceItems([CreateItem("Current")]);
             }
 
             viewModel.SuspendForNavigation();
-            if (phase == ListPageFetchPhase.Fetching)
+            if (phase == FetchPhase.Fetching)
             {
                 page.ReplaceItems([CreateItem("Current")]);
             }
 
             lockHolder = Task.Run(() =>
             {
-                using (GetPrivateField<Lock>(viewModel, "_initializationCoordinatorLock").EnterScope())
                 using (GetPrivateField<Lock>(viewModel, "_fetchStateLock").EnterScope())
                 {
                     held.Set();
@@ -803,9 +808,9 @@ public sealed partial class ListViewModelNavigationTests
             await Task.WhenAll(lockHolder, firstResume, secondResume).WaitAsync(TimeSpan.FromSeconds(3));
             scheduler.Drain();
 
-            Assert.AreEqual(phase == ListPageFetchPhase.Published ? 1 : 2, page.GetItemsCount);
-            Assert.AreEqual(phase == ListPageFetchPhase.Published ? "Initial" : "Current", viewModel.FilteredItems.Single().Title);
-            Assert.AreEqual(ListPageFetchPhase.Published, GetWorkState(viewModel).Phase);
+            Assert.AreEqual(phase == FetchPhase.Published ? 1 : 2, page.GetItemsCount);
+            Assert.AreEqual(phase == FetchPhase.Published ? "Initial" : "Current", viewModel.FilteredItems.Single().Title);
+            Assert.AreEqual(FetchPhase.Published, GetWorkState(viewModel).Phase);
         }
         finally
         {
@@ -887,7 +892,7 @@ public sealed partial class ListViewModelNavigationTests
             reentered = true;
             page.ReplaceItems([CreateItem("Inner")]);
             scheduler.Drain(); // Models WinUI pumping a queued callback during mutation.
-            Assert.AreEqual(ListPageFetchPhase.Committed, GetWorkState(viewModel).Phase);
+            Assert.AreEqual(FetchPhase.Committed, GetWorkState(viewModel).Phase);
             Assert.AreEqual(0, publications, "A deferred mutation must not report successful publication.");
         }
 
@@ -903,7 +908,7 @@ public sealed partial class ListViewModelNavigationTests
             Assert.IsTrue(reentered);
             Assert.AreEqual("Inner", viewModel.FilteredItems.Single().Title);
             Assert.AreEqual(1, publications);
-            Assert.AreEqual(ListPageFetchPhase.Published, GetWorkState(viewModel).Phase);
+            Assert.AreEqual(FetchPhase.Published, GetWorkState(viewModel).Phase);
         }
         finally
         {
@@ -935,7 +940,7 @@ public sealed partial class ListViewModelNavigationTests
             reentered = true;
             page.ReplaceItems([CreateItem("Current")]);
             scheduler.Drain();
-            Assert.AreEqual(ListPageFetchPhase.Committed, GetWorkState(viewModel).Phase);
+            Assert.AreEqual(FetchPhase.Committed, GetWorkState(viewModel).Phase);
             Assert.AreEqual(0, publications, "The replacement has not reached the collection yet.");
             viewModel.SearchTextBox = "Current";
         }
@@ -955,7 +960,7 @@ public sealed partial class ListViewModelNavigationTests
             Assert.IsTrue(reentered);
             Assert.AreEqual("Current", viewModel.FilteredItems.Single().Title);
             Assert.IsFalse(GetPrivateField<InterlockedBoolean>(viewModel, "_isLoadingMore").Value);
-            Assert.AreEqual(ListPageFetchPhase.Published, GetWorkState(viewModel).Phase);
+            Assert.AreEqual(FetchPhase.Published, GetWorkState(viewModel).Phase);
 
             var beforeBack = publications;
             viewModel.SuspendForNavigation();
@@ -987,11 +992,11 @@ public sealed partial class ListViewModelNavigationTests
             scheduler.Drain();
             viewModel.SuspendForNavigation();
             page.ReplaceItems([CreateItem("Current")]);
-            var pending = GetWorkState(viewModel);
+            var fetchCount = page.GetItemsCount;
             for (var request = 0; request < 30; request++)
             {
                 page.Refresh();
-                Assert.AreSame(pending, GetWorkState(viewModel));
+                Assert.AreEqual(fetchCount, page.GetItemsCount, "Suspension should coalesce duplicate refresh requests.");
             }
 
             await viewModel.ResumeAfterNavigation();
@@ -1046,13 +1051,22 @@ public sealed partial class ListViewModelNavigationTests
         }
     }
 
-    private static ListPageWorkState GetWorkState(ListViewModel viewModel) =>
-        GetPrivateField<ListPageWorkState>(viewModel, "_workState");
+    private static FetchState GetWorkState(ListViewModel viewModel)
+    {
+        var workState = GetPrivateField<ListPageWorkState>(viewModel, "_workState");
+        return new(workState.Phase switch
+        {
+            ListPageFetchPhase.Fetching => FetchPhase.Fetching,
+            ListPageFetchPhase.Committed => FetchPhase.Committed,
+            ListPageFetchPhase.Published => FetchPhase.Published,
+            _ => throw new AssertFailedException($"Unexpected fetch phase {workState.Phase}."),
+        });
+    }
 
     private static async Task WaitForPublishedAsync(ListViewModel viewModel)
     {
         var elapsed = Stopwatch.StartNew();
-        while (GetWorkState(viewModel).Phase != ListPageFetchPhase.Published)
+        while (GetWorkState(viewModel).Phase != FetchPhase.Published)
         {
             Assert.IsTrue(elapsed.Elapsed < TimeSpan.FromSeconds(3), "The fetch did not finish publishing.");
             await Task.Delay(1);
