@@ -45,7 +45,7 @@ namespace Microsoft.PowerToys.Settings.UI.OOBE.Views
 
             // Disable the Launch button if the module is disabled
             var generalSettings = SettingsRepository<GeneralSettings>.GetInstance(SettingsUtils.Default).SettingsConfig;
-            LaunchButton.IsEnabled = ModuleHelper.GetIsModuleEnabled(generalSettings, ManagedCommon.ModuleType.RegistryPreview);
+            LaunchButton.IsEnabled = ModuleHelper.GetIsModuleEnabled(generalSettings, ManagedCommon.ModuleType.RobocopyUI);
         }
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)

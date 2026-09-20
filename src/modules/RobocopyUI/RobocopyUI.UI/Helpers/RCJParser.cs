@@ -4,7 +4,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace RobocopyUI.Helpers
 {
@@ -14,102 +13,69 @@ namespace RobocopyUI.Helpers
 
         private readonly string _input;
 
-        private int _position;
-
         internal RCJParser(string input)
         {
             _input = input;
-            _position = 0;
         }
 
         public RCJCommand[] Parse()
         {
             var commands = new List<RCJCommand>();
 
-            var currentArgument = new StringBuilder();
-            var currentArgumentValue = new StringBuilder();
-            bool inArgument = false;
-            bool inArgumentValue = false;
-
-            void AddCommand()
+            foreach (var line in _input.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
             {
-                if (inArgument)
+                var content = line.Trim();
+                if (content.Length == 0 || content.StartsWith("::", StringComparison.Ordinal))
                 {
-                    if (inArgumentValue)
-                    {
-                        string currentArgumentValueStr = currentArgumentValue.ToString();
-                        commands.Add(new RCJCommand(currentArgument.ToString(), string.IsNullOrEmpty(currentArgumentValueStr) ? null : currentArgumentValueStr));
-                        currentArgument.Clear();
-                        currentArgumentValue.Clear();
-                    }
-                    else
-                    {
-                        commands.Add(new RCJCommand(currentArgument.ToString(), null));
-                        currentArgument.Clear();
-                    }
+                    continue;
                 }
+
+                var start = content.IndexOf('/');
+                if (start < 0)
+                {
+                    continue;
+                }
+
+                content = content[start..];
+                var separator = FindSeparator(content);
+                var command = separator < 0 ? content[1..] : content[1..separator];
+                if (command.Length == 0)
+                {
+                    continue;
+                }
+
+                var argumentStart = separator < 0 ? command.Length + 1 : separator + 1;
+                var argument = argumentStart < content.Length ? content[argumentStart..].Trim() : string.Empty;
+                commands.Add(new RCJCommand(command, argument.Length == 0 ? null : Unquote(argument)));
             }
-
-            while (_position < _input.Length)
-            {
-                if (char.IsWhiteSpace(_input[_position]) || _input[_position] == '\r' || _input[_position] == '\n')
-                {
-                    _position++;
-                    AddCommand();
-                    inArgument = false;
-                    inArgumentValue = false;
-                    continue;
-                }
-
-                if (_input[_position] == ':' && _position + 1 < _input.Length && _input[_position + 1] == ':')
-                {
-                    while (_position < _input.Length && _input[_position] != '\n')
-                    {
-                        AddCommand();
-
-                        _position++;
-                        inArgument = false;
-                        inArgumentValue = false;
-                    }
-
-                    continue;
-                }
-
-                if (_input[_position] == '/')
-                {
-                    AddCommand();
-
-                    _position++;
-                    inArgument = true;
-                    inArgumentValue = false;
-                    continue;
-                }
-
-                if (_input[_position] == ':' && inArgument && !inArgumentValue)
-                {
-                    inArgumentValue = true;
-                    _position++;
-                    continue;
-                }
-
-                if (inArgument)
-                {
-                    if (inArgumentValue)
-                    {
-                        currentArgumentValue.Append(_input[_position]);
-                    }
-                    else
-                    {
-                        currentArgument.Append(_input[_position]);
-                    }
-                }
-
-                _position++;
-            }
-
-            AddCommand();
 
             return [.. commands];
+        }
+
+        private static int FindSeparator(string content)
+        {
+            var inQuotes = false;
+            for (var index = 1; index < content.Length; index++)
+            {
+                var character = content[index];
+                if (character == '"')
+                {
+                    inQuotes = !inQuotes;
+                }
+                else if (!inQuotes && (character == ':' || char.IsWhiteSpace(character)))
+                {
+                    return index;
+                }
+            }
+
+            return -1;
+        }
+
+        private static string Unquote(string argument)
+        {
+            return argument.Length >= 2 && argument[0] == '"' && argument[^1] == '"'
+                ? argument[1..^1]
+                : argument;
         }
     }
 }

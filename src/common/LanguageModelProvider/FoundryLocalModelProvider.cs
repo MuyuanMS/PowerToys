@@ -112,15 +112,11 @@ public sealed class FoundryLocalModelProvider : ILanguageModelProvider
             return byAlias.Name;
         }
 
-        var separator = modelId.LastIndexOf(':');
-        if (separator > 0)
+        var normalizedModelId = NormalizeModelName(modelId);
+        var byName = _catalogModels.FirstOrDefault(m => string.Equals(NormalizeModelName(m.Name), normalizedModelId, StringComparison.OrdinalIgnoreCase));
+        if (byName is not null)
         {
-            var withoutVersion = modelId[..separator];
-            var byName = _catalogModels.FirstOrDefault(m => string.Equals(m.Name, withoutVersion, StringComparison.OrdinalIgnoreCase));
-            if (byName is not null)
-            {
-                return byName.Name;
-            }
+            return byName.Name;
         }
 
         return modelId;
@@ -244,13 +240,16 @@ public sealed class FoundryLocalModelProvider : ILanguageModelProvider
             return false;
         }
 
-        var separator = modelId.LastIndexOf(':');
-        var withoutVersion = separator > 0 ? modelId[..separator] : modelId;
-
         return _catalogModels.Any(m =>
             string.Equals(m.Name, modelId, StringComparison.OrdinalIgnoreCase)
             || string.Equals(m.Alias, modelId, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(m.Name, withoutVersion, StringComparison.OrdinalIgnoreCase));
+            || string.Equals(NormalizeModelName(m.Name), NormalizeModelName(modelId), StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizeModelName(string modelId)
+    {
+        var separator = modelId.LastIndexOf(':');
+        return separator > 0 ? modelId[..separator] : modelId;
     }
 
     private bool EnsureModelLoadedWithRefresh(string modelId)

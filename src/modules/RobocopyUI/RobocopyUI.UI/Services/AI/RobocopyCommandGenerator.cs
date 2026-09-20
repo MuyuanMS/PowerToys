@@ -756,6 +756,13 @@ namespace RobocopyUI.Services.AI
                     return false;
                 }
 
+                if (name is "/XF" or "/XD"
+                    && !TryValidateExclusionPatterns(value, out var exclusionError))
+                {
+                    validationError = $"{name} {exclusionError}";
+                    return false;
+                }
+
                 if (!IsValueValid(descriptor, value, out var valueError))
                 {
                     validationError = $"'{name}' {valueError}. Correct form: {UsageForm(descriptor)}";
@@ -787,6 +794,68 @@ namespace RobocopyUI.Services.AI
             var wantsFlag = string.IsNullOrEmpty(value);
             return candidates.FirstOrDefault(candidate => (candidate.Kind == RobocopyOptionKind.Flag) == wantsFlag)
                    ?? candidates[0];
+        }
+
+        private bool TryValidateExclusionPatterns(string value, out string error)
+        {
+            error = string.Empty;
+            var patterns = new List<string>();
+            var current = new StringBuilder();
+            var inQuotes = false;
+
+            foreach (var character in value)
+            {
+                if (character == '"')
+                {
+                    inQuotes = !inQuotes;
+                    continue;
+                }
+
+                if (char.IsWhiteSpace(character) && !inQuotes)
+                {
+                    if (current.Length > 0)
+                    {
+                        patterns.Add(current.ToString());
+                        current.Clear();
+                    }
+
+                    continue;
+                }
+
+                if (char.IsControl(character) || character is '&' or '|' or '<' or '>')
+                {
+                    error = "contains an unsafe file pattern";
+                    return false;
+                }
+
+                current.Append(character);
+            }
+
+            if (inQuotes)
+            {
+                error = "contains an unterminated quoted file pattern";
+                return false;
+            }
+
+            if (current.Length > 0)
+            {
+                patterns.Add(current.ToString());
+            }
+
+            if (patterns.Count == 0 || patterns.Any(pattern => string.IsNullOrWhiteSpace(pattern)))
+            {
+                error = "needs one or more file or directory patterns";
+                return false;
+            }
+
+            if (patterns.Any(pattern => (pattern.Length > 0 && pattern[0] is '/' or '-')
+                                        || _catalogByName.ContainsKey(pattern)))
+            {
+                error = "contains an embedded switch token; provide only file or directory patterns";
+                return false;
+            }
+
+            return true;
         }
 
         private static bool IsValueValid(RobocopyOptionDescriptor descriptor, string value, out string error)

@@ -486,6 +486,9 @@
   <data name="NODDOption.OptionDescription" xml:space="preserve">
     <value>No destination directory specified.</value>
   </data>
+  <data name="SelectOptionsButton.Content" xml:space="preserve">
+    <value>Select Options</value>
+  </data>
   <data name="NOSDOption.OptionDescription" xml:space="preserve">
     <value>No source directory is specified.</value>
   </data>

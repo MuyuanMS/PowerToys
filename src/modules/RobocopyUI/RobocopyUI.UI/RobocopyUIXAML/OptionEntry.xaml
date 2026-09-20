@@ -22,7 +22,7 @@
                     <ComboBoxItem Content="MB" />
                     <ComboBoxItem Content="GB" />
                 </ComboBox>
-                <Button x:Name="SelectOptionsButton" Content="Select Options" Visibility="{x:Bind IsMultiSelectOption, Converter={StaticResource BoolToVisibilityConverter}, Mode=OneWay}">
+                <Button x:Name="SelectOptionsButton" x:Uid="SelectOptionsButton" Visibility="{x:Bind IsMultiSelectOption, Converter={StaticResource BoolToVisibilityConverter}, Mode=OneWay}">
                     <Button.Flyout>
                         <Flyout Placement="Bottom">
                             <ItemsControl ItemsSource="{x:Bind MultiSelectOptions, Mode=OneWay}">

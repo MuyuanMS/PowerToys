@@ -61,8 +61,15 @@ public:
 
     virtual void set_config(const wchar_t* config) override
     {
-        (void)config;
-        Logger::trace("set_config()");
+        try
+        {
+            auto values = PowerToysSettings::PowerToyValues::from_json_string(config, get_key());
+            values.save_to_settings_file();
+        }
+        catch (std::exception&)
+        {
+            Logger::error("Failed to persist Robocopy UI settings.");
+        }
     }
 
     virtual void enable() override
@@ -85,6 +92,16 @@ public:
         if (_enabled)
         {
             _enabled = false;
+            if (m_process)
+            {
+                if (WaitForSingleObject(m_process.get(), 1500) == WAIT_TIMEOUT)
+                {
+                    TerminateProcess(m_process.get(), 0);
+                    WaitForSingleObject(m_process.get(), 1500);
+                }
+
+                m_process = {};
+            }
         }
         else
         {

@@ -37,9 +37,15 @@ namespace RobocopyUI
                 return;
             }
 
-            if (args.Length >= 1 && int.TryParse(args[0], out int runnerPID))
+            if (args.Length < 1 || !int.TryParse(args[0], out int runnerPID))
             {
-                MonitorPowerToysRunner(runnerPID);
+                Logger.LogWarning("RobocopyUI was started without a valid PowerToys runner PID. Exiting.");
+                return;
+            }
+
+            if (!MonitorPowerToysRunner(runnerPID))
+            {
+                return;
             }
 
             WinRT.ComWrappersSupport.InitializeComWrappers();
@@ -64,10 +70,17 @@ namespace RobocopyUI
 
         private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
-            throw new NotImplementedException();
+            if (e.ExceptionObject is Exception exception)
+            {
+                Logger.LogError("Unhandled RobocopyUI exception.", exception);
+            }
+            else
+            {
+                Logger.LogError($"Unhandled RobocopyUI exception object: {e.ExceptionObject}");
+            }
         }
 
-        private static void MonitorPowerToysRunner(int runnerPID)
+        private static bool MonitorPowerToysRunner(int runnerPID)
         {
             Process runnerProcess;
             try
@@ -81,7 +94,7 @@ namespace RobocopyUI
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception)
             {
                 Logger.LogWarning($"PowerToys runner process (PID={runnerPID}) is no longer available. Exiting RobocopyUI.");
-                return;
+                return false;
             }
 
             var runnerWatcher = new Thread(() =>
@@ -90,6 +103,7 @@ namespace RobocopyUI
                 {
                     runnerProcess.WaitForExit();
                     Logger.LogInfo($"PowerToys runner process (PID={runnerPID}) exited. Exiting RobocopyUI.");
+                    Application.Current?.Exit();
                 }
                 catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
                 {
@@ -105,6 +119,7 @@ namespace RobocopyUI
                 Name = "RobocopyUI-RunnerWatcher",
             };
             runnerWatcher.Start();
+            return true;
         }
 
         private static void SendSettingsTelemetry()

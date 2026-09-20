@@ -80,7 +80,7 @@ namespace RobocopyUI.Services.AI
                 return $"{name} {option.Value.Trim()}";
             }
 
-            return name.Equals("/LOG", StringComparison.OrdinalIgnoreCase)
+            return name is "/LOG" or "/LOG+" or "/UNILOG" or "/UNILOG+"
                 ? $"{name}:{Quote(option.Value)}"
                 : $"{name}:{option.Value}";
         }

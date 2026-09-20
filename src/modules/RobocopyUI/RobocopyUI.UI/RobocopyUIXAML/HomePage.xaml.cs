@@ -568,7 +568,7 @@ public sealed partial class HomePage : Page
 
         if (SettingsUtils.Default.GetSettings<RobocopyUISettings>().Properties.UseLegacySaveMode.Value)
         {
-            RunRobocopy(job.RenderArguments() + " /SAVE:" + result.Path[..^4] + " /QUIT" + (string.IsNullOrEmpty(SourceTextBox.Text) ? " /NOSD" : string.Empty) + (string.IsNullOrEmpty(DestinationTextBox.Text) ? " /NODD" : string.Empty));
+            RunRobocopy(job.RenderArguments() + " /SAVE:" + RobocopyCommand.Quote(result.Path[..^4]) + " /QUIT" + (string.IsNullOrEmpty(SourceTextBox.Text) ? " /NOSD" : string.Empty) + (string.IsNullOrEmpty(DestinationTextBox.Text) ? " /NODD" : string.Empty));
         }
         else
         {
@@ -603,12 +603,12 @@ public sealed partial class HomePage : Page
 
         job.ReplaceOptions(options);
 
-        if (commands.Any(e => e.Command == "NOSD") && string.IsNullOrWhiteSpace(SourceTextBox.Text))
+        if (commands.Any(e => e.Command == "NOSD"))
         {
             SourceTextBox.Text = string.Empty;
         }
 
-        if (commands.Any(e => e.Command == "NODD") && string.IsNullOrWhiteSpace(DestinationTextBox.Text))
+        if (commands.Any(e => e.Command == "NODD"))
         {
             DestinationTextBox.Text = string.Empty;
         }
