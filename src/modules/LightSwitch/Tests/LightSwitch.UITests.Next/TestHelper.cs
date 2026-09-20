@@ -142,22 +142,17 @@ internal sealed class TestHelper
         var logs = new LogCursor();
         Step($"Sending one theme-toggle chord: {string.Join(" + ", keys)}");
         KeyboardHelper.SendKeys(keys);
-        var received = WaitHelper.WaitForStable(
-            () => logs.ReadNew(),
-            text => text!.Contains("[Light Switch] Hotkey triggered: Toggle Theme", StringComparison.Ordinal),
-            timeoutMS: 20_000,
-            pollIntervalMS: 250);
-        Assert.IsTrue(received.Succeeded, $"The Runner did not acknowledge the single shortcut. Foreground: {WindowControl.GetForegroundWindowInfo()}. New LightSwitch logs:\n{received.LastObservation}");
 
         // ThemeHelper.cpp sends several synchronous HWND_BROADCAST messages, each allowing 5s per
         // recipient window. The 120s completion budget covers those serial waits on busy desktops;
-        // hotkey acknowledgement is separate, and this wait never resends the toggle chord.
+        // the service event confirms the chord reached the native module, and this wait never
+        // resends the toggle chord.
         var completed = WaitHelper.WaitForStable(
             () => logs.ReadNew(),
-            text => text!.Contains("[Light Switch] Manual override event set", StringComparison.Ordinal),
+            text => text!.Contains("[LightSwitchService] Manual override event detected.", StringComparison.Ordinal),
             timeoutMS: 120_000,
             pollIntervalMS: 250);
-        Assert.IsTrue(completed.Succeeded, $"The Runner did not finish applying the single theme-toggle chord. New LightSwitch logs:\n{completed.LastObservation}");
+        Assert.IsTrue(completed.Succeeded, $"The LightSwitch service did not observe the single theme-toggle chord. Foreground: {WindowControl.GetForegroundWindowInfo()}. New LightSwitch logs:\n{completed.LastObservation}");
     }
 
     public void WaitForTheme(ThemeState expected)
