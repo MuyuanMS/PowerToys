@@ -33,7 +33,16 @@ namespace RobocopyUI.Services.AI
         public static string RenderArguments(string source, string destination, IReadOnlyList<RobocopyPlanOption> options, bool renderForRCJFile)
         {
             var builder = new StringBuilder();
-            builder.Append((renderForRCJFile ? "/SD:" : string.Empty) + Quote(source)).Append(renderForRCJFile ? Environment.NewLine : " ").Append((renderForRCJFile ? "/DD:" : string.Empty) + Quote(destination));
+            if (renderForRCJFile)
+            {
+                builder.Append(string.IsNullOrWhiteSpace(source) ? "/NOSD" : $"/SD:{Quote(source)}")
+                    .Append(Environment.NewLine)
+                    .Append(string.IsNullOrWhiteSpace(destination) ? "/NODD" : $"/DD:{Quote(destination)}");
+            }
+            else
+            {
+                builder.Append(Quote(source)).Append(' ').Append(Quote(destination));
+            }
 
             if (options is not null)
             {
