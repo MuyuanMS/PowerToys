@@ -91,7 +91,7 @@ public sealed partial class HomePage : Page
         optionEntries.Remove(entry);
     }
 
-    private void OptionEntry_OptionChanged(object sender, EventArgs e)
+    private void OptionEntry_OptionChanged(object? sender, EventArgs e)
     {
         if (syncing || sender is not OptionEntry entry)
         {

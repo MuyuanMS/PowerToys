@@ -103,6 +103,11 @@ namespace RobocopyUI.Services.AI
                 return false;
             }
 
+            if (!IsProviderAllowedByGpo(serviceType))
+            {
+                return false;
+            }
+
             config = CreateConfig(provider, serviceType);
             displayName = provider.DisplayName;
             return true;
@@ -129,7 +134,11 @@ namespace RobocopyUI.Services.AI
                 activeProviderId = configuration.ActiveProvider?.Id ?? string.Empty;
 
                 return configuration.Providers
-                    .Where(provider => IsSupported(NormalizeServiceType(provider.ServiceTypeKind)))
+                    .Where(provider =>
+                    {
+                        var serviceType = NormalizeServiceType(provider.ServiceTypeKind);
+                        return IsSupported(serviceType) && IsProviderAllowedByGpo(serviceType);
+                    })
                     .ToList();
             }
             catch (Exception ex)
@@ -218,6 +227,28 @@ namespace RobocopyUI.Services.AI
 
         private static AIServiceType NormalizeServiceType(AIServiceType serviceType)
             => serviceType == AIServiceType.Unknown ? AIServiceType.OpenAI : serviceType;
+
+        private static bool IsProviderAllowedByGpo(AIServiceType serviceType)
+        {
+            var metadata = AIServiceTypeRegistry.GetMetadata(serviceType);
+            if (metadata.IsOnlineService &&
+                PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOnlineAIModelsValue() == PowerToys.GPOWrapper.GpoRuleConfigured.Disabled)
+            {
+                return false;
+            }
+
+            return serviceType switch
+            {
+                AIServiceType.OpenAI => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOpenAIValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.AzureOpenAI => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteAzureOpenAIValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.AzureAIInference => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteAzureAIInferenceValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.Mistral => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteMistralValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.Google => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteGoogleValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.Ollama => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOllamaValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                AIServiceType.FoundryLocal => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteFoundryLocalValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+                _ => true,
+            };
+        }
 
         public static IAIChatProvider CreateProvider(AIProviderConfig config)
         {

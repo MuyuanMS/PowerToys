@@ -15,7 +15,7 @@ namespace RobocopyUI.Controls
 {
     public sealed partial class OptionEntry : UserControl
     {
-        public event EventHandler<object, EventArgs>? OptionChanged;
+        public event EventHandler? OptionChanged;
 
         private bool _suppressNotifications;
 
