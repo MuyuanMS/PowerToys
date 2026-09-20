@@ -118,7 +118,8 @@ internal sealed partial class WindowWalkerListPage : DynamicListPage, IDisposabl
             return AddExplorerInfoIfNeeded(entries);
         }
 
-        var scored = ListHelpers.FilterListWithScores(entries, query, ScoreFunction);
+        var scorer = WindowSearchScorer.ScoringState.Create(query);
+        var scored = ListHelpers.FilterListWithScores(entries, query, (q, entry) => scorer.Score(entry.Item.Title, entry.Window.Process.Name ?? string.Empty));
         var filteredEntries = new List<WindowEntry>(entries.Length);
         foreach (var result in scored)
         {
@@ -375,11 +376,7 @@ internal sealed partial class WindowWalkerListPage : DynamicListPage, IDisposabl
     }
 
     private static int ScoreFunction(string query, WindowEntry entry)
-    {
-        var titleScore = FuzzyStringMatcher.ScoreFuzzy(query, entry.Item.Title);
-        var processNameScore = FuzzyStringMatcher.ScoreFuzzy(query, entry.Window.Process.Name ?? string.Empty);
-        return Math.Max(titleScore, processNameScore);
-    }
+        => WindowSearchScorer.Score(query, entry.Item.Title, entry.Window.Process.Name);
 
     private void SetLoadingComplete(CancellationTokenSource cancellationTokenSource)
     {
