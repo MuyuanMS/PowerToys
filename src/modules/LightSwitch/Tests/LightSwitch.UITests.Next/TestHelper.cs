@@ -132,9 +132,15 @@ internal sealed class TestHelper
         scheduleUpdate = new LogCursor();
         bool systemChanged = SetCheck("ChangeSystemCheckbox_LightSwitch", system);
         WaitForSetting("changeSystem", system);
+        if (systemChanged)
+        {
+            WaitForScheduleReload();
+        }
+
+        scheduleUpdate = new LogCursor();
         bool appsChanged = SetCheck("ChangeAppsCheckbox_LightSwitch", apps);
         WaitForSetting("changeApps", apps);
-        if (systemChanged || appsChanged)
+        if (appsChanged)
         {
             WaitForScheduleReload();
         }
@@ -397,8 +403,15 @@ internal sealed class TestHelper
         var result = WinappCli.Invoke("ui", "inspect", ui.TargetFlag, ui.TargetValue, "--json", "-d", "14");
         File.WriteAllText(prefix + "-uia.json", result.StdOut + Environment.NewLine + result.StdErr);
         context.AddResultFile(prefix + "-uia.json");
-        File.Copy(TestState.SettingsPath, prefix + "-settings.json", overwrite: true);
-        context.AddResultFile(prefix + "-settings.json");
+        if (File.Exists(TestState.SettingsPath))
+        {
+            File.Copy(TestState.SettingsPath, prefix + "-settings.json", overwrite: true);
+            context.AddResultFile(prefix + "-settings.json");
+        }
+        else
+        {
+            context.WriteLine($"Settings file was unavailable while collecting failure state: {TestState.SettingsPath}");
+        }
         File.WriteAllText(prefix + "-state.txt", $"Theme: {TestState.ReadTheme()}\nService PIDs: {string.Join(", ", ObserveService())}\nForeground: {WindowControl.GetForegroundWindowInfo()}");
         context.AddResultFile(prefix + "-state.txt");
     }
