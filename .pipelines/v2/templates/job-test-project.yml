@@ -425,6 +425,9 @@ jobs:
             Write-Warning "UI tests reported failures for $base (exit $LASTEXITCODE)"
             $suiteFailed = $true
           }
+        } catch {
+          Write-Host "##vso[task.logissue type=error]UI test runner failed for ${base}: $($_.Exception.Message)"
+          $suiteFailed = $true
         } finally {
           try {
             if ($base -eq 'LightSwitch.UITests.Next') {
