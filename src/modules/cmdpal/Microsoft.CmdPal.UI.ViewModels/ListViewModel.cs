@@ -1025,6 +1025,8 @@ public partial class ListViewModel : PageViewModel, IDisposable
                     {
                         WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
                     }
+
+                    return;
                 }
 
                 var suggestion = item.TextToSuggest;

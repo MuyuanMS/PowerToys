@@ -108,6 +108,7 @@ public sealed partial class SearchBar : UserControl,
 
         @this?.PropertyChanged?.Invoke(@this, new(nameof(PageType)));
         @this?.PropertyChanged?.Invoke(@this, new(nameof(Parameters)));
+        @this?.UpdateParameters();
 
         // Let the shell decide if it's safe to restore focus after the
         // SwitchPresenter swaps to a different top-bar input.

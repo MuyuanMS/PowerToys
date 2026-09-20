@@ -252,6 +252,8 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
         {
             WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
         }
+
+        WeakReferenceMessenger.Default.Send<UpdateSuggestionMessage>(new(string.Empty));
     }
 
     private List<IContextItemViewModel> BuildCommandViewModels(IContextItem[]? items)

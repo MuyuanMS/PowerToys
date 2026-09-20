@@ -632,9 +632,9 @@ public partial class TabbedPageViewModel : PageViewModel
         void Cleanup()
         {
             child.SafeCleanup();
-            if (child is IDisposable disposable)
+            if (child is ListViewModel list)
             {
-                disposable.Dispose();
+                list.Dispose();
             }
 
             cached.InitializationCts.Dispose();
