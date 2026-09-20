@@ -18,7 +18,6 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using ShortcutGuide.Controls;
 using ShortcutGuide.Helpers;
-using Windows.Foundation;
 using Windows.System;
 using WinRT.Interop;
 using WinUIEx;
@@ -342,7 +341,6 @@ namespace ShortcutGuide
         {
             var hwnd = WindowNative.GetWindowHandle(this);
             float dpi = DpiHelper.GetDPIScaleForWindow(hwnd);
-            Rect workArea = DisplayHelper.GetWorkAreaForDisplayWithWindow(hwnd);
 
             var layout = this.TaskbarPane.UpdateTasklistButtons(
                 overlayPhysicalOriginX: this.AppWindow.Position.X,
