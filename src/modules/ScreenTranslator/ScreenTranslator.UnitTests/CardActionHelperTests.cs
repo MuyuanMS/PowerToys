@@ -19,6 +19,16 @@ public class CardActionHelperTests
     }
 
     [TestMethod]
+    public void CreateBingTranslatorUri_UsesOriginalTextAndTargetLanguage()
+    {
+        var uri = CardActionHelper.CreateBingTranslatorUri("hello 世界 & friends", "zh-Hans");
+
+        Assert.AreEqual(
+            "https://www.bing.com/translator?from=auto-detect&to=zh-Hans&text=hello%20%E4%B8%96%E7%95%8C%20%26%20friends",
+            uri.AbsoluteUri);
+    }
+
+    [TestMethod]
     public void TryGetWebUri_DetectsOnlyWholeWebAddresses()
     {
         Assert.IsTrue(CardActionHelper.TryGetWebUri("example.com/path", out var uri));

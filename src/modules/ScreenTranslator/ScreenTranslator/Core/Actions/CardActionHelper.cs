@@ -14,6 +14,13 @@ public static class CardActionHelper
         return new Uri($"https://www.bing.com/search?q={Uri.EscapeDataString(text.Trim())}");
     }
 
+    public static Uri CreateBingTranslatorUri(string text, string targetLanguage)
+    {
+        string target = string.IsNullOrWhiteSpace(targetLanguage) ? "en" : targetLanguage.Trim();
+        return new Uri(
+            $"https://www.bing.com/translator?from=auto-detect&to={Uri.EscapeDataString(target)}&text={Uri.EscapeDataString(text.Trim())}");
+    }
+
     public static bool TryGetWebUri(string text, out Uri? uri)
     {
         uri = null;

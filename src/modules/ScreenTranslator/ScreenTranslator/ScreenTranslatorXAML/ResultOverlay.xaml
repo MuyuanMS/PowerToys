@@ -60,6 +60,12 @@
                         Text="Original text" />
                 </MenuFlyoutSubItem>
                 <MenuFlyoutItem
+                    x:Name="TranslateOriginalOnBingActionItem"
+                    x:Uid="TranslateOriginalOnBingActionItem"
+                    AutomationProperties.AutomationId="MenuTranslateOriginalOnBing"
+                    Click="TranslateOriginalOnBingActionItem_Click"
+                    Text="Translate original text on Bing" />
+                <MenuFlyoutItem
                     x:Name="ShareDisplayedTextActionItem"
                     x:Uid="ShareDisplayedTextActionItem"
                     AutomationProperties.AutomationId="MenuShareDisplayedText"

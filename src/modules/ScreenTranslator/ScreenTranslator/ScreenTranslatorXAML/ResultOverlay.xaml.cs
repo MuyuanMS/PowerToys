@@ -664,6 +664,17 @@ public sealed partial class ResultOverlay : TransparentWindow
         }
     }
 
+    private async void TranslateOriginalOnBingActionItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (_sourceTexts.TryGetValue(_actionMenuLineIndex, out string? text) &&
+            !string.IsNullOrWhiteSpace(text))
+        {
+            await LaunchUriAsync(
+                CardActionHelper.CreateBingTranslatorUri(text, _targetLanguage),
+                "Bing Translator");
+        }
+    }
+
     private void ShareDisplayedTextActionItem_Click(object sender, RoutedEventArgs e)
     {
         string text = GetActionMenuText();

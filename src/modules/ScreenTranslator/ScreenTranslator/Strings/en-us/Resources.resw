@@ -226,6 +226,10 @@
     <value>Original text</value>
     <comment>Context menu action that searches for the original OCR text</comment>
   </data>
+  <data name="TranslateOriginalOnBingActionItem.Text" xml:space="preserve">
+    <value>Translate original text on Bing</value>
+    <comment>Context menu action that opens Bing Translator with the original OCR text and current target language</comment>
+  </data>
   <data name="ShareDisplayedTextActionItem.Text" xml:space="preserve">
     <value>Share...</value>
     <comment>Context menu action that shares the text currently displayed in a card</comment>
