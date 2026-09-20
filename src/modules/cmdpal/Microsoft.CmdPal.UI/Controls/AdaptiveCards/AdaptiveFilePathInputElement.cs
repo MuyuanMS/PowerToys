@@ -176,12 +176,17 @@ internal sealed partial class AdaptiveFilePathInputControl : AdaptiveCustomInput
     private readonly Regex? _validationRegex;
     private readonly TextBox _pathTextBox;
     private readonly Button _browseButton;
+    private bool _isPickerPending;
 
     public AdaptiveFilePathInputControl(AdaptiveFilePathInputElement element)
         : base(element.Header, element.Description, element.IsRequired)
     {
         _element = element;
         _validationRegex = AdaptiveInputValidation.CreateRegex(element.ValidationPattern);
+        if (!string.IsNullOrEmpty(element.Id))
+        {
+            AutomationProperties.SetAutomationId(this, element.Id);
+        }
 
         var fieldName = string.IsNullOrEmpty(element.Header)
             ? RS_.GetString(element.SelectionMode == AdaptiveFilePathSelectionMode.File
@@ -223,10 +228,22 @@ internal sealed partial class AdaptiveFilePathInputControl : AdaptiveCustomInput
 
     public override string CurrentValue => _pathTextBox.Text;
 
+    public override AdaptiveCustomInputState CaptureState() =>
+        new(CurrentValue, ValidationWasRequested: ValidationWasRequested);
+
+    public override void RestoreState(AdaptiveCustomInputState state)
+    {
+        _pathTextBox.Text = state.Value;
+        RestoreValidationState(state.ValidationWasRequested);
+    }
+
     public override void FocusInput() => _pathTextBox.Focus(FocusState.Programmatic);
+
+    public override bool IsOperationPending => _isPickerPending;
 
     private async void BrowseButton_Click(object sender, RoutedEventArgs e)
     {
+        _isPickerPending = true;
         try
         {
             var path = _element.SelectionMode == AdaptiveFilePathSelectionMode.File
@@ -247,6 +264,11 @@ internal sealed partial class AdaptiveFilePathInputControl : AdaptiveCustomInput
         catch (Exception ex)
         {
             Logger.LogError("Failed to pick a path for an adaptive-card input", ex);
+        }
+        finally
+        {
+            _isPickerPending = false;
+            NotifyOperationCompleted();
         }
     }
 

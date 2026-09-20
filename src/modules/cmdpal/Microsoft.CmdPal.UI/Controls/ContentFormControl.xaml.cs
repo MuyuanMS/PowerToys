@@ -27,6 +27,12 @@ public sealed partial class ContentFormControl : UserControl
     // form will do seemingly nothing.
     private RenderedAdaptiveCard? _renderedCard;
     private AdaptiveCard? _adaptiveCard;
+    private bool _themeRefreshPending;
+    private bool _themeRefreshDeferred;
+    private bool _focusFirstElementOnLoad = true;
+    private bool _restoreStateOnLayout;
+    private IReadOnlyDictionary<string, InputValue>? _inputValuesToRestore;
+    private FocusedElementState? _focusedElementToRestore;
 
     public ContentFormViewModel? ViewModel { get => _viewModel; set => AttachViewModel(value); }
 
@@ -70,8 +76,10 @@ public sealed partial class ContentFormControl : UserControl
     public ContentFormControl()
     {
         this.InitializeComponent();
-        var lightTheme = ActualTheme == Microsoft.UI.Xaml.ElementTheme.Light;
-        _renderer.HostConfig = lightTheme ? AdaptiveCardsConfig.Light : AdaptiveCardsConfig.Dark;
+
+        // Fix Issue #49435: seed the renderer's host config so the very first
+        // render already matches the current theme.
+        UpdateRendererTheme();
 
         // 5% BODGY: if we set this multiple times over the lifetime of the app,
         // then the second call will explode, because "CardOverrideStyles is already the child of another element".
@@ -81,8 +89,73 @@ public sealed partial class ContentFormControl : UserControl
             _renderer.OverrideStyles = CardOverrideStyles;
         }
 
-        // TODO in the future, we should handle ActualThemeChanged and replace
-        // our rendered card with one for that theme. But today is not that day
+        // Fix Issue #49435: re-render the card whenever the effective theme flips,
+        // instead of leaving the previous theme's colors baked into the visual tree.
+        this.ActualThemeChanged += OnActualThemeChanged;
+    }
+
+    private void UpdateRendererTheme()
+    {
+        var lightTheme = ActualTheme == ElementTheme.Light;
+        _renderer.HostConfig = lightTheme ? AdaptiveCardsConfig.Light : AdaptiveCardsConfig.Dark;
+    }
+
+    private void OnActualThemeChanged(FrameworkElement sender, object args)
+    {
+        UpdateRendererTheme();
+
+        if (_renderedCard?.FrameworkElement is FrameworkElement renderedElement &&
+            HasPendingInputOperation(renderedElement))
+        {
+            _themeRefreshDeferred = true;
+            return;
+        }
+
+        ScheduleThemeRefresh();
+    }
+
+    private void ScheduleThemeRefresh()
+    {
+        // WindowThemeSynchronizer changes RequestedTheme through two intermediate
+        // values before applying the target theme. Wait for the final value so one
+        // switch does not recreate the form several times.
+        if (_themeRefreshPending)
+        {
+            return;
+        }
+
+        var cardAtThemeChange = _adaptiveCard;
+
+        _themeRefreshPending = true;
+        if (!DispatcherQueue.TryEnqueue(() =>
+        {
+            _themeRefreshPending = false;
+
+            if (cardAtThemeChange is not null && ReferenceEquals(cardAtThemeChange, _adaptiveCard))
+            {
+                if (_renderedCard?.FrameworkElement is FrameworkElement currentElement &&
+                    HasPendingInputOperation(currentElement))
+                {
+                    _themeRefreshDeferred = true;
+                    return;
+                }
+
+                var inputValues = _renderedCard?.FrameworkElement is FrameworkElement element
+                    ? CaptureInputValues(element)
+                    : null;
+                var focusedElement = _renderedCard?.FrameworkElement is FrameworkElement focusedRoot
+                    ? CaptureFocusedElement(focusedRoot)
+                    : null;
+                RenderCard(
+                    cardAtThemeChange,
+                    focusFirstElement: false,
+                    inputValues: inputValues,
+                    focusedElement: focusedElement);
+            }
+        }))
+        {
+            _themeRefreshPending = false;
+        }
     }
 
     private void AttachViewModel(ContentFormViewModel? vm)
@@ -123,15 +196,36 @@ public sealed partial class ContentFormControl : UserControl
         }
     }
 
-    private void DisplayCard(AdaptiveCardParseResult result)
+    private void DisplayCard(AdaptiveCardParseResult result) => RenderCard(result.AdaptiveCard);
+
+    /// <summary>
+    /// Renders <paramref name="card"/> into ContentGrid, replacing whatever was
+    /// rendered before it. Shared by the initial/view-model-driven render and by
+    /// the theme-change re-render so the two can't drift apart.
+    /// </summary>
+    private void RenderCard(
+        AdaptiveCard card,
+        bool focusFirstElement = true,
+        IReadOnlyDictionary<string, InputValue>? inputValues = null,
+        FocusedElementState? focusedElement = null)
     {
-        _renderedCard = _renderer.RenderAdaptiveCard(result.AdaptiveCard);
-        _adaptiveCard = result.AdaptiveCard;
+        _themeRefreshPending = false;
+        _themeRefreshDeferred = false;
+        DetachRenderedCard();
+
+        _adaptiveCard = card;
+        _focusFirstElementOnLoad = focusFirstElement;
+        _restoreStateOnLayout = inputValues is not null || focusedElement is not null;
+        _inputValuesToRestore = inputValues;
+        _focusedElementToRestore = focusedElement;
+        _renderedCard = _renderer.RenderAdaptiveCard(card);
+
         ContentGrid.Children.Clear();
         if (_renderedCard.FrameworkElement is not null)
         {
             _renderedCard.FrameworkElement.KeyDown += OnFormKeyDown;
             ContentGrid.Children.Add(_renderedCard.FrameworkElement);
+            TrackInputOperations(_renderedCard.FrameworkElement, subscribe: true);
 
             // Use the Loaded event to ensure we focus after the card is in the visual tree
             _renderedCard.FrameworkElement.Loaded += OnFrameworkElementLoaded;
@@ -145,6 +239,28 @@ public sealed partial class ContentFormControl : UserControl
         _renderedCard.Action += Rendered_Action;
     }
 
+    /// <summary>
+    /// Unhooks the handlers on the currently rendered card, so a card that's about
+    /// to be dropped from the tree can't keep raising events against this control.
+    /// </summary>
+    private void DetachRenderedCard()
+    {
+        if (_renderedCard is null)
+        {
+            return;
+        }
+
+        if (_renderedCard.FrameworkElement is not null)
+        {
+            _renderedCard.FrameworkElement.KeyDown -= OnFormKeyDown;
+            _renderedCard.FrameworkElement.Loaded -= OnFrameworkElementLoaded;
+            _renderedCard.FrameworkElement.LayoutUpdated -= OnFrameworkElementLayoutUpdated;
+            TrackInputOperations(_renderedCard.FrameworkElement, subscribe: false);
+        }
+
+        _renderedCard.Action -= Rendered_Action;
+    }
+
     private void OnFrameworkElementLayoutUpdated(object? sender, object e)
     {
         // Only fix once — unhook from sender (not _renderedCard, which may have been
@@ -152,6 +268,13 @@ public sealed partial class ContentFormControl : UserControl
         if (sender is FrameworkElement element)
         {
             element.LayoutUpdated -= OnFrameworkElementLayoutUpdated;
+            if (_restoreStateOnLayout)
+            {
+                _restoreStateOnLayout = false;
+                RestoreInputValues(element);
+                RestoreFocusedElement(element);
+            }
+
             FixToggleAccessibilityNames(element);
         }
     }
@@ -163,7 +286,9 @@ public sealed partial class ContentFormControl : UserControl
         {
             element.Loaded -= OnFrameworkElementLoaded;
 
-            if (!ViewModel?.OnlyControlOnPage ?? true)
+            if (_restoreStateOnLayout ||
+                !_focusFirstElementOnLoad ||
+                (!ViewModel?.OnlyControlOnPage ?? true))
             {
                 return;
             }
@@ -176,6 +301,419 @@ public sealed partial class ContentFormControl : UserControl
             });
         }
     }
+
+    private static IReadOnlyDictionary<string, InputValue> CaptureInputValues(DependencyObject root)
+    {
+        var values = new Dictionary<string, InputValue>();
+        var focusedElement = root is FrameworkElement element
+            ? FocusManager.GetFocusedElement(element.XamlRoot) as DependencyObject
+            : null;
+        CaptureInputValues(root, values, focusedElement);
+        return values;
+    }
+
+    private static void CaptureInputValues(
+        DependencyObject root,
+        IDictionary<string, InputValue> values,
+        DependencyObject? focusedElement)
+    {
+        if (root is FrameworkElement element)
+        {
+            var key = GetInputKey(element);
+            var captured = false;
+            if (key is not null)
+            {
+                var hasFocus = focusedElement is not null && ContainsElement(element, focusedElement);
+                var focusPath = hasFocus ? GetVisualPath(element, focusedElement!) : null;
+                var focusedTextBox = focusedElement as TextBox;
+                var selectionStart = focusedTextBox?.SelectionStart ?? 0;
+                var selectionLength = focusedTextBox?.SelectionLength ?? 0;
+                switch (element)
+                {
+                    case IAdaptiveCustomInputControl customInput:
+                        values[key] = new InputValue(
+                            nameof(IAdaptiveCustomInputControl),
+                            customInput.CaptureState(),
+                            hasFocus,
+                            selectionStart,
+                            selectionLength,
+                            focusPath);
+                        captured = true;
+                        break;
+                    case PasswordBox passwordBox:
+                        values[key] = new InputValue(
+                            nameof(PasswordBox),
+                            passwordBox.Password,
+                            hasFocus,
+                            selectionStart,
+                            selectionLength,
+                            focusPath);
+                        captured = true;
+                        break;
+                    case TextBox textBox:
+                        values[key] = new InputValue(
+                            nameof(TextBox),
+                            textBox.Text,
+                            hasFocus,
+                            textBox.SelectionStart,
+                            textBox.SelectionLength,
+                            focusPath);
+                        captured = true;
+                        break;
+                    case ComboBox comboBox:
+                        values[key] = new InputValue(
+                            nameof(ComboBox),
+                            comboBox.SelectedIndex,
+                            hasFocus,
+                            selectionStart,
+                            selectionLength,
+                            focusPath);
+                        captured = true;
+                        break;
+                    case ToggleSwitch toggleSwitch:
+                        values[key] = new InputValue(
+                            nameof(ToggleSwitch),
+                            toggleSwitch.IsOn,
+                            hasFocus,
+                            selectionStart,
+                            selectionLength,
+                            focusPath);
+                        captured = true;
+                        break;
+                    case CheckBox checkBox:
+                        values[key] = new InputValue(
+                            nameof(CheckBox),
+                            checkBox.IsChecked,
+                            hasFocus,
+                            selectionStart,
+                            selectionLength,
+                            focusPath);
+                        captured = true;
+                        break;
+                    case NumberBox numberBox:
+                        values[key] = new InputValue(
+                            nameof(NumberBox),
+                            numberBox.Value,
+                            hasFocus,
+                            selectionStart,
+                            selectionLength,
+                            focusPath);
+                        captured = true;
+                        break;
+                    case CalendarDatePicker datePicker:
+                        values[key] = new InputValue(
+                            nameof(CalendarDatePicker),
+                            datePicker.Date,
+                            hasFocus,
+                            selectionStart,
+                            selectionLength,
+                            focusPath);
+                        captured = true;
+                        break;
+                    case TimePicker timePicker:
+                        values[key] = new InputValue(
+                            nameof(TimePicker),
+                            timePicker.Time,
+                            hasFocus,
+                            selectionStart,
+                            selectionLength,
+                            focusPath);
+                        captured = true;
+                        break;
+                    case RadioButton radioButton:
+                        values[key] = new InputValue(
+                            nameof(RadioButton),
+                            radioButton.IsChecked,
+                            hasFocus,
+                            selectionStart,
+                            selectionLength,
+                            focusPath);
+                        captured = true;
+                        break;
+                }
+            }
+
+            if (captured)
+            {
+                return;
+            }
+        }
+
+        var childCount = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < childCount; i++)
+        {
+            CaptureInputValues(VisualTreeHelper.GetChild(root, i), values, focusedElement);
+        }
+    }
+
+    private void RestoreInputValues(FrameworkElement root)
+    {
+        if (_inputValuesToRestore is null)
+        {
+            return;
+        }
+
+        RestoreInputValues(root, _inputValuesToRestore);
+        _inputValuesToRestore = null;
+    }
+
+    private static void RestoreInputValues(DependencyObject root, IReadOnlyDictionary<string, InputValue> values)
+    {
+        if (root is FrameworkElement element)
+        {
+            var key = GetInputKey(element);
+            if (key is not null && values.TryGetValue(key, out var inputValue))
+            {
+                switch (element)
+                {
+                    case IAdaptiveCustomInputControl customInput when inputValue.Kind == nameof(IAdaptiveCustomInputControl):
+                        customInput.RestoreState((AdaptiveCustomInputState)inputValue.Value!);
+                        break;
+                    case PasswordBox passwordBox when inputValue.Kind == nameof(PasswordBox):
+                        passwordBox.Password = (string)inputValue.Value!;
+                        break;
+                    case TextBox textBox when inputValue.Kind == nameof(TextBox):
+                        textBox.Text = (string)inputValue.Value!;
+                        if (inputValue.HasFocus)
+                        {
+                            textBox.Select(inputValue.SelectionStart, inputValue.SelectionLength);
+                        }
+
+                        break;
+                    case ComboBox comboBox when inputValue.Kind == nameof(ComboBox):
+                        comboBox.SelectedIndex = (int)inputValue.Value!;
+                        break;
+                    case ToggleSwitch toggleSwitch when inputValue.Kind == nameof(ToggleSwitch):
+                        toggleSwitch.IsOn = (bool)inputValue.Value!;
+                        break;
+                    case CheckBox checkBox when inputValue.Kind == nameof(CheckBox):
+                        checkBox.IsChecked = (bool?)inputValue.Value;
+                        break;
+                    case NumberBox numberBox when inputValue.Kind == nameof(NumberBox):
+                        numberBox.Value = (double)inputValue.Value!;
+                        break;
+                    case CalendarDatePicker datePicker when inputValue.Kind == nameof(CalendarDatePicker):
+                        datePicker.Date = (DateTimeOffset?)inputValue.Value;
+                        break;
+                    case TimePicker timePicker when inputValue.Kind == nameof(TimePicker):
+                        if (inputValue.Value is TimeSpan time)
+                        {
+                            timePicker.Time = time;
+                        }
+
+                        break;
+                    case RadioButton radioButton when inputValue.Kind == nameof(RadioButton):
+                        radioButton.IsChecked = (bool?)inputValue.Value;
+                        break;
+                }
+
+                return;
+            }
+        }
+
+        var childCount = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < childCount; i++)
+        {
+            RestoreInputValues(VisualTreeHelper.GetChild(root, i), values);
+        }
+    }
+
+    private static string? GetInputKey(FrameworkElement element)
+    {
+        var automationId = AutomationProperties.GetAutomationId(element);
+        if (!string.IsNullOrEmpty(automationId))
+        {
+            return automationId;
+        }
+
+        if (element is not (
+            TextBox or
+            PasswordBox or
+            ComboBox or
+            ToggleSwitch or
+            CheckBox or
+            NumberBox or
+            CalendarDatePicker or
+            TimePicker or
+            RadioButton))
+        {
+            return null;
+        }
+
+        return string.IsNullOrEmpty(element.Name) ? null : element.Name;
+    }
+
+    private static FocusedElementState? CaptureFocusedElement(FrameworkElement root)
+    {
+        if (FocusManager.GetFocusedElement(root.XamlRoot) is not DependencyObject focusedElement)
+        {
+            return null;
+        }
+
+        var path = GetVisualPath(root, focusedElement);
+        if (path is null)
+        {
+            return null;
+        }
+
+        var focusedTextBox = focusedElement as TextBox;
+        return new FocusedElementState(
+            path,
+            focusedTextBox?.SelectionStart ?? 0,
+            focusedTextBox?.SelectionLength ?? 0);
+    }
+
+    private bool RestoreFocusedElement(FrameworkElement root)
+    {
+        var state = _focusedElementToRestore;
+        _focusedElementToRestore = null;
+        if (state is null || ResolveVisualPath(root, state.Value.Path) is not Control control)
+        {
+            return false;
+        }
+
+        var focused = control.Focus(FocusState.Programmatic);
+        if (focused && control is TextBox textBox)
+        {
+            textBox.Select(state.Value.SelectionStart, state.Value.SelectionLength);
+        }
+
+        return focused;
+    }
+
+    private static IReadOnlyList<int>? GetVisualPath(DependencyObject root, DependencyObject target)
+    {
+        var path = new List<int>();
+        return TryGetVisualPath(root, target, path) ? path : null;
+    }
+
+    private static bool TryGetVisualPath(DependencyObject root, DependencyObject target, IList<int> path)
+    {
+        if (ReferenceEquals(root, target))
+        {
+            return true;
+        }
+
+        var childCount = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < childCount; i++)
+        {
+            path.Add(i);
+            if (TryGetVisualPath(VisualTreeHelper.GetChild(root, i), target, path))
+            {
+                return true;
+            }
+
+            path.RemoveAt(path.Count - 1);
+        }
+
+        return false;
+    }
+
+    private static DependencyObject? ResolveVisualPath(DependencyObject root, IReadOnlyList<int>? path)
+    {
+        if (path is null)
+        {
+            return null;
+        }
+
+        var current = root;
+        foreach (var index in path)
+        {
+            if (index < 0 || index >= VisualTreeHelper.GetChildrenCount(current))
+            {
+                return null;
+            }
+
+            current = VisualTreeHelper.GetChild(current, index);
+        }
+
+        return current;
+    }
+
+    private void InputOperationCompleted(object? sender, EventArgs e)
+    {
+        if (!_themeRefreshDeferred ||
+            _renderedCard?.FrameworkElement is not FrameworkElement element ||
+            HasPendingInputOperation(element))
+        {
+            return;
+        }
+
+        _themeRefreshDeferred = false;
+        ScheduleThemeRefresh();
+    }
+
+    private void TrackInputOperations(DependencyObject root, bool subscribe)
+    {
+        if (root is IAdaptiveCustomInputControl customInput)
+        {
+            if (subscribe)
+            {
+                customInput.OperationCompleted += InputOperationCompleted;
+            }
+            else
+            {
+                customInput.OperationCompleted -= InputOperationCompleted;
+            }
+        }
+
+        var childCount = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < childCount; i++)
+        {
+            TrackInputOperations(VisualTreeHelper.GetChild(root, i), subscribe);
+        }
+    }
+
+    private static bool HasPendingInputOperation(DependencyObject root)
+    {
+        if (root is IAdaptiveCustomInputControl { IsOperationPending: true })
+        {
+            return true;
+        }
+
+        var childCount = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < childCount; i++)
+        {
+            if (HasPendingInputOperation(VisualTreeHelper.GetChild(root, i)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ContainsElement(DependencyObject root, DependencyObject target)
+    {
+        if (ReferenceEquals(root, target))
+        {
+            return true;
+        }
+
+        var childCount = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < childCount; i++)
+        {
+            if (ContainsElement(VisualTreeHelper.GetChild(root, i), target))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private readonly record struct InputValue(
+        string Kind,
+        object? Value,
+        bool HasFocus,
+        int SelectionStart = 0,
+        int SelectionLength = 0,
+        IReadOnlyList<int>? FocusPath = null);
+
+    private readonly record struct FocusedElementState(
+        IReadOnlyList<int> Path,
+        int SelectionStart,
+        int SelectionLength);
 
     /// <summary>
     /// Fixes missing AutomationProperties.Name on CheckBox and ToggleSwitch controls

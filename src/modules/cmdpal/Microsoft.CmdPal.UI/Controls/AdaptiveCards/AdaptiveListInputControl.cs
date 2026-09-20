@@ -30,6 +30,7 @@ internal sealed partial class AdaptiveListInputControl : AdaptiveListInputContro
     private TextBox? _newItemTextBox;
     private Button? _addButton;
     private bool _wasEdited;
+    private bool _isPickerPending;
 
     public AdaptiveListInputControl(AdaptiveListInputElement element)
         : base(element)
@@ -60,10 +61,52 @@ internal sealed partial class AdaptiveListInputControl : AdaptiveListInputContro
             ? _unreadableValue
             : AdaptiveListValueCodec.ToItemsValue(_items.Select(static item => item.Source));
 
+    public override AdaptiveCustomInputState CaptureState()
+    {
+        return new(
+            CurrentValue,
+            PendingValue: _newItemTextBox?.Text,
+            WasEdited: _wasEdited,
+            ValidationWasRequested: ValidationWasRequested,
+            ListItems: _items
+                .Select(static item => new AdaptiveCustomListItemState(item.Source, item.PathKind))
+                .ToArray());
+    }
+
+    public override void RestoreState(AdaptiveCustomInputState state)
+    {
+        if (_newItemTextBox is not null)
+        {
+            _newItemTextBox.Text = state.PendingValue ?? string.Empty;
+        }
+
+        if (state.ListItems is not null)
+        {
+            _items.Clear();
+            _items.AddRange(state.ListItems.Select(static item => new AdaptiveListItem(item.Source, item.PathKind)));
+        }
+        else if (AdaptiveListValueCodec.TryParseItems(state.Value, out var parsedItems))
+        {
+            _items.Clear();
+            _items.AddRange(parsedItems.Select(static item => new AdaptiveListItem(item)));
+        }
+        else
+        {
+            RestoreValidationState(state.ValidationWasRequested);
+            return;
+        }
+
+        _wasEdited = state.WasEdited;
+        RefreshItems();
+        RestoreValidationState(state.ValidationWasRequested);
+    }
+
     public override void FocusInput()
     {
         (_newItemTextBox as Control ?? _addButton)?.Focus(FocusState.Programmatic);
     }
+
+    public override bool IsOperationPending => _isPickerPending;
 
     private UIElement CreateStringAddControl()
     {
@@ -203,6 +246,7 @@ internal sealed partial class AdaptiveListInputControl : AdaptiveListInputContro
 
     private async Task PickFileAsync()
     {
+        _isPickerPending = true;
         try
         {
             var path = await AdaptiveFilePicker.PickFileAsync(
@@ -215,10 +259,16 @@ internal sealed partial class AdaptiveListInputControl : AdaptiveListInputContro
         {
             Logger.LogError("Failed to pick a file for an adaptive-card path list", ex);
         }
+        finally
+        {
+            _isPickerPending = false;
+            NotifyOperationCompleted();
+        }
     }
 
     private async Task PickFolderAsync()
     {
+        _isPickerPending = true;
         try
         {
             var path = await AdaptiveFilePicker.PickFolderAsync(
@@ -229,6 +279,11 @@ internal sealed partial class AdaptiveListInputControl : AdaptiveListInputContro
         catch (Exception ex)
         {
             Logger.LogError("Failed to pick a folder for an adaptive-card path list", ex);
+        }
+        finally
+        {
+            _isPickerPending = false;
+            NotifyOperationCompleted();
         }
     }
 
@@ -386,11 +441,5 @@ internal sealed partial class AdaptiveListInputControl : AdaptiveListInputContro
         public string Value => Source.Value;
 
         public AdaptivePathItemKind? PathKind { get; } = kind;
-    }
-
-    private enum AdaptivePathItemKind
-    {
-        File,
-        Folder,
     }
 }

@@ -68,6 +68,14 @@ internal abstract partial class AdaptiveCustomInputControlBase : Grid, IAdaptive
 
     public UIElement ValidationErrorElement => ValidationError;
 
+    public abstract AdaptiveCustomInputState CaptureState();
+
+    public abstract void RestoreState(AdaptiveCustomInputState state);
+
+    public virtual bool IsOperationPending => false;
+
+    public event EventHandler? OperationCompleted;
+
     public bool ValidateInput()
     {
         ValidationWasRequested = true;
@@ -87,6 +95,17 @@ internal abstract partial class AdaptiveCustomInputControlBase : Grid, IAdaptive
     protected void UpdateValidationIfRequested()
     {
         if (ValidationWasRequested)
+        {
+            UpdateValidation();
+        }
+    }
+
+    protected void NotifyOperationCompleted() => OperationCompleted?.Invoke(this, EventArgs.Empty);
+
+    protected void RestoreValidationState(bool validationWasRequested)
+    {
+        ValidationWasRequested = validationWasRequested;
+        if (validationWasRequested)
         {
             UpdateValidation();
         }
@@ -136,6 +155,11 @@ internal abstract partial class AdaptiveListInputControlBase : AdaptiveCustomInp
     protected AdaptiveListInputControlBase(AdaptiveListInputElement element)
         : base(element.Header, element.Description, element.IsRequired)
     {
+        if (!string.IsNullOrEmpty(element.Id))
+        {
+            AutomationProperties.SetAutomationId(this, element.Id);
+        }
+
         ItemsList = new ListBox
         {
             HorizontalAlignment = HorizontalAlignment.Stretch,
