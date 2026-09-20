@@ -291,6 +291,11 @@ public sealed partial class SelectionOverlay : TransparentWindow
             processingOverlay.UpdateStatus("Translating text...");
             TranslationRequest request = new(groupedLines, sourceLanguage, targetLanguage);
             TranslationResult result = await _translationProvider.TranslateAsync(request, cancellationTokenSource.Token);
+            result = TranslationQualityGuard.ReplaceDegenerateTranslations(result, out int replacementCount);
+            if (replacementCount > 0)
+            {
+                Logger.LogWarning($"Suppressed {replacementCount} degenerate translation result(s) from provider {_translationProvider.ProviderId}.");
+            }
 
             if (!result.Success)
             {
@@ -380,8 +385,15 @@ public sealed partial class SelectionOverlay : TransparentWindow
         string sourceLanguage,
         string targetLanguage)
     {
-        return await _translationProvider.TranslateAsync(
+        TranslationResult result = await _translationProvider.TranslateAsync(
             new TranslationRequest(new[] { line }, sourceLanguage, targetLanguage));
+        result = TranslationQualityGuard.ReplaceDegenerateTranslations(result, out int replacementCount);
+        if (replacementCount > 0)
+        {
+            Logger.LogWarning($"Suppressed a degenerate single-line translation from provider {_translationProvider.ProviderId}.");
+        }
+
+        return result;
     }
 
     private string BuildTranslationErrorMessage(string? errorMessage)
