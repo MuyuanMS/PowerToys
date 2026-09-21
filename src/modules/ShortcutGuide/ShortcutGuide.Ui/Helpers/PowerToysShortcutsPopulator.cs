@@ -115,6 +115,16 @@ namespace ShortcutGuide.Helpers
                 content.Append(HotkeySettingsToYaml(SettingsRepository<LightSwitchSettings>.GetInstance(settingsUtils).SettingsConfig.Properties.ToggleThemeHotkey, SettingsResourceLoader.GetString("LightSwitch/ModuleTitle"), SettingsResourceLoader.GetString("LightSwitch_ForceDarkMode")));
             }
 
+            if (enabledModules.LaserPointer)
+            {
+                LaserPointerProperties laserPointerProperties = SettingsRepository<LaserPointerSettings>.GetInstance(settingsUtils).SettingsConfig.Properties;
+                string moduleName = SettingsResourceLoader.GetString("MouseUtils_LaserPointer/Header");
+                content.Append(HotkeySettingsToYaml(laserPointerProperties.ActivationShortcut, moduleName, SettingsResourceLoader.GetString("MouseUtils_LaserPointer_ActivationShortcut/Header")));
+                content.Append(HotkeySettingsToYaml(laserPointerProperties.PenActivationShortcut, moduleName, SettingsResourceLoader.GetString("MouseUtils_LaserPointer_PenActivationShortcut/Header")));
+                content.Append(HotkeySettingsToYaml(laserPointerProperties.PresenterActivationShortcut, moduleName, SettingsResourceLoader.GetString("MouseUtils_LaserPointer_PresenterActivationShortcut/Header")));
+                content.Append(HotkeySettingsToYaml(laserPointerProperties.PresenterStopShortcut, moduleName, SettingsResourceLoader.GetString("MouseUtils_LaserPointer_PresenterStopShortcut/Header")));
+            }
+
             if (enabledModules.MouseHighlighter)
             {
                 content.Append(HotkeySettingsToYaml(SettingsRepository<MouseHighlighterSettings>.GetInstance(settingsUtils).SettingsConfig.Properties.ActivationShortcut, SettingsResourceLoader.GetString("MouseUtils_MouseHighlighter/Header"), SettingsResourceLoader.GetString("MouseHighlighter_ShortDescription")));
