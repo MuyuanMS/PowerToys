@@ -14,6 +14,16 @@ This software incorporates material from third parties.
 - Registry Preview
 - ZoomIt
 
+## Utility: Advanced Paste
+
+### ONNX Runtime
+
+We use the Microsoft.ML.OnnxRuntime.Managed NuGet package for machine learning model inference.
+
+**Source**: <https://github.com/microsoft/onnxruntime>
+
+MIT License
+
 ## Utility: Color Picker
 
 ### Martin Chrzan's Color Picker
