@@ -114,7 +114,10 @@ internal sealed partial class FallbackUpdateManager : IDisposable
                 var pendingCt = cancellationToken;
                 if (!counter.TryClaimOrQueue(
                     MaxInflightPerFallback,
-                    new PendingWork(() => RetryFallbackUpdate(pendingCommand, pendingQuery, pendingCt, counter, FinishOne), pendingCt)))
+                    new PendingWork(
+                        () => RetryFallbackUpdate(pendingCommand, pendingQuery, pendingCt, counter, FinishOne),
+                        pendingCt,
+                        FinishOne)))
                 {
                     continue;
                 }
@@ -218,7 +221,10 @@ internal sealed partial class FallbackUpdateManager : IDisposable
 
             if (!ctr.TryClaimOrQueue(
                 MaxInflightPerFallback,
-                new PendingWork(() => RetryFallbackUpdate(cmd, q, ct, ctr, finishOne), ct)))
+                new PendingWork(
+                    () => RetryFallbackUpdate(cmd, q, ct, ctr, finishOne),
+                    ct,
+                    finishOne)))
             {
                 return;
             }
@@ -256,7 +262,7 @@ internal sealed partial class FallbackUpdateManager : IDisposable
     /// batch that created it, so the pool can skip it at dequeue time when
     /// a newer keystroke has already superseded the query.
     /// </summary>
-    private sealed record PendingWork(Action Work, CancellationToken CancellationToken);
+    private sealed record PendingWork(Action Work, CancellationToken CancellationToken, Action OnCanceled);
 
     /// <summary>
     /// Thread-safe counter for tracking concurrent in-flight calls per command,
@@ -277,33 +283,83 @@ internal sealed partial class FallbackUpdateManager : IDisposable
         /// </summary>
         public bool TryClaimOrQueue(int max, PendingWork pending)
         {
+            List<Action>? canceled = null;
+            var claimed = false;
             lock (_gate)
             {
                 if (_count < max)
                 {
                     _count++;
-                    return true;
+                    claimed = true;
                 }
-
-                _pendingWork.Enqueue(pending);
-                return false;
+                else
+                {
+                    canceled = RemoveCanceledUnsafe();
+                    if (pending.CancellationToken.IsCancellationRequested)
+                    {
+                        (canceled ??= []).Add(pending.OnCanceled);
+                    }
+                    else
+                    {
+                        _pendingWork.Enqueue(pending);
+                    }
+                }
             }
+
+            InvokeCanceled(canceled);
+            return claimed;
         }
 
         public PendingWork? ReleaseAndTakePending()
         {
+            List<Action>? canceled;
+            PendingWork? pending;
             lock (_gate)
             {
                 _count--;
-                return TakePendingUnsafe();
+                canceled = RemoveCanceledUnsafe();
+                pending = TakePendingUnsafe();
             }
+
+            InvokeCanceled(canceled);
+            return pending;
         }
 
         public PendingWork? TakePending()
         {
+            List<Action>? canceled;
+            PendingWork? pending;
             lock (_gate)
             {
-                return TakePendingUnsafe();
+                canceled = RemoveCanceledUnsafe();
+                pending = TakePendingUnsafe();
+            }
+
+            InvokeCanceled(canceled);
+            return pending;
+        }
+
+        private List<Action>? RemoveCanceledUnsafe()
+        {
+            List<Action>? canceled = null;
+            while (_pendingWork.Count > 0 && _pendingWork.Peek().CancellationToken.IsCancellationRequested)
+            {
+                (canceled ??= []).Add(_pendingWork.Dequeue().OnCanceled);
+            }
+
+            return canceled;
+        }
+
+        private static void InvokeCanceled(List<Action>? canceled)
+        {
+            if (canceled is null)
+            {
+                return;
+            }
+
+            foreach (var onCanceled in canceled)
+            {
+                onCanceled();
             }
         }
 

@@ -113,13 +113,13 @@ public sealed partial class MainListPage : DynamicListPage,
     private string? _builtActivationQuery;
     private EventHandler? _searchSettlementChanged;
 
-    internal event EventHandler? SearchSettlementChanged
+    event EventHandler? IActivationSettlementPage.SearchSettlementChanged
     {
         add => _searchSettlementChanged += value;
         remove => _searchSettlementChanged -= value;
     }
 
-    internal bool CurrentFetchIsSettledFor(string query)
+    bool IActivationSettlementPage.CurrentFetchIsSettledFor(string query)
     {
         lock (_tlcManager.TopLevelCommands)
         {
@@ -544,11 +544,14 @@ public sealed partial class MainListPage : DynamicListPage,
     {
         var stopwatch = Stopwatch.StartNew();
 
-        _cancellationTokenSource?.Cancel();
-        _cancellationTokenSource?.Dispose();
-        _cancellationTokenSource = new CancellationTokenSource();
+        var cancellationTokenSource = new CancellationTokenSource();
+        var previousCancellationTokenSource = Interlocked.Exchange(
+            ref _cancellationTokenSource,
+            cancellationTokenSource);
+        previousCancellationTokenSource?.Cancel();
+        previousCancellationTokenSource?.Dispose();
 
-        var token = _cancellationTokenSource.Token;
+        var token = cancellationTokenSource.Token;
         if (token.IsCancellationRequested)
         {
             return;
@@ -1171,8 +1174,9 @@ public sealed partial class MainListPage : DynamicListPage,
 
     public void Dispose()
     {
-        _cancellationTokenSource?.Cancel();
-        _cancellationTokenSource?.Dispose();
+        var cancellationTokenSource = Interlocked.Exchange(ref _cancellationTokenSource, null);
+        cancellationTokenSource?.Cancel();
+        cancellationTokenSource?.Dispose();
         _fallbackUpdateManager.Dispose();
         _searchTelemetry.Dispose();
 
