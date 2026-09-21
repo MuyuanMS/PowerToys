@@ -29,6 +29,7 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             {
                 ViewModel.OnPageLoaded();
                 ClearApiKeyInputs();
+                RefreshApiKeyStatus();
             };
         }
 
@@ -54,8 +55,21 @@ namespace Microsoft.PowerToys.Settings.UI.Views
         {
             if (AzureApiKeyPasswordBox != null)
             {
-                ViewModel.SaveAzureApiKey(AzureApiKeyPasswordBox.Password);
-                AzureApiKeyPasswordBox.Password = string.Empty;
+                if (string.IsNullOrWhiteSpace(AzureApiKeyPasswordBox.Password))
+                {
+                    ShowExistingOrMissingCredential(AzureApiKeyStatusInfoBar, ViewModel.HasAzureApiKey);
+                    return;
+                }
+
+                if (ViewModel.SaveAzureApiKey(AzureApiKeyPasswordBox.Password))
+                {
+                    AzureApiKeyPasswordBox.Password = string.Empty;
+                    ShowCredentialSaved(AzureApiKeyStatusInfoBar);
+                }
+                else
+                {
+                    ShowCredentialSaveError(AzureApiKeyStatusInfoBar);
+                }
             }
         }
 
@@ -66,14 +80,29 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             {
                 AzureApiKeyPasswordBox.Password = string.Empty;
             }
+
+            AzureApiKeyStatusInfoBar.IsOpen = false;
         }
 
         private void SaveAzureVisionApiKey_Click(object sender, RoutedEventArgs e)
         {
             if (AzureVisionApiKeyPasswordBox != null)
             {
-                ViewModel.SaveAzureVisionApiKey(AzureVisionApiKeyPasswordBox.Password);
-                AzureVisionApiKeyPasswordBox.Password = string.Empty;
+                if (string.IsNullOrWhiteSpace(AzureVisionApiKeyPasswordBox.Password))
+                {
+                    ShowExistingOrMissingCredential(AzureVisionApiKeyStatusInfoBar, ViewModel.HasAzureVisionApiKey);
+                    return;
+                }
+
+                if (ViewModel.SaveAzureVisionApiKey(AzureVisionApiKeyPasswordBox.Password))
+                {
+                    AzureVisionApiKeyPasswordBox.Password = string.Empty;
+                    ShowCredentialSaved(AzureVisionApiKeyStatusInfoBar);
+                }
+                else
+                {
+                    ShowCredentialSaveError(AzureVisionApiKeyStatusInfoBar);
+                }
             }
         }
 
@@ -84,14 +113,29 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             {
                 AzureVisionApiKeyPasswordBox.Password = string.Empty;
             }
+
+            AzureVisionApiKeyStatusInfoBar.IsOpen = false;
         }
 
         private void SaveLibreTranslateApiKey_Click(object sender, RoutedEventArgs e)
         {
             if (LibreTranslateApiKeyPasswordBox != null)
             {
-                ViewModel.SaveLibreTranslateApiKey(LibreTranslateApiKeyPasswordBox.Password);
-                LibreTranslateApiKeyPasswordBox.Password = string.Empty;
+                if (string.IsNullOrWhiteSpace(LibreTranslateApiKeyPasswordBox.Password))
+                {
+                    ShowExistingOrMissingCredential(LibreTranslateApiKeyStatusInfoBar, ViewModel.HasLibreTranslateApiKey);
+                    return;
+                }
+
+                if (ViewModel.SaveLibreTranslateApiKey(LibreTranslateApiKeyPasswordBox.Password))
+                {
+                    LibreTranslateApiKeyPasswordBox.Password = string.Empty;
+                    ShowCredentialSaved(LibreTranslateApiKeyStatusInfoBar);
+                }
+                else
+                {
+                    ShowCredentialSaveError(LibreTranslateApiKeyStatusInfoBar);
+                }
             }
         }
 
@@ -102,14 +146,63 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             {
                 LibreTranslateApiKeyPasswordBox.Password = string.Empty;
             }
+
+            LibreTranslateApiKeyStatusInfoBar.IsOpen = false;
         }
 
         public void RefreshEnabledState()
         {
             ViewModel.RefreshEnabledState();
             ClearApiKeyInputs();
+            RefreshApiKeyStatus();
         }
 
         public static Visibility BoolToVisibility(bool value) => value ? Visibility.Visible : Visibility.Collapsed;
+
+        private void RefreshApiKeyStatus()
+        {
+            SetCredentialStatus(AzureApiKeyStatusInfoBar, ViewModel.HasAzureApiKey);
+            SetCredentialStatus(AzureVisionApiKeyStatusInfoBar, ViewModel.HasAzureVisionApiKey);
+            SetCredentialStatus(LibreTranslateApiKeyStatusInfoBar, ViewModel.HasLibreTranslateApiKey);
+        }
+
+        private static void SetCredentialStatus(InfoBar infoBar, bool isSaved)
+        {
+            infoBar.IsOpen = isSaved;
+            if (isSaved)
+            {
+                ShowCredentialSaved(infoBar);
+            }
+        }
+
+        private static void ShowCredentialSaved(InfoBar infoBar)
+        {
+            infoBar.Severity = InfoBarSeverity.Success;
+            infoBar.Title = "Saved securely";
+            infoBar.Message = "The key is stored in Windows Credential Vault.";
+            infoBar.IsOpen = true;
+        }
+
+        private static void ShowCredentialSaveError(InfoBar infoBar)
+        {
+            infoBar.Severity = InfoBarSeverity.Error;
+            infoBar.Title = "Key was not saved";
+            infoBar.Message = "The value remains in the field. Try saving again.";
+            infoBar.IsOpen = true;
+        }
+
+        private static void ShowExistingOrMissingCredential(InfoBar infoBar, bool isSaved)
+        {
+            if (isSaved)
+            {
+                ShowCredentialSaved(infoBar);
+                return;
+            }
+
+            infoBar.Severity = InfoBarSeverity.Warning;
+            infoBar.Title = "Enter a key";
+            infoBar.Message = "Paste a subscription key before selecting Save.";
+            infoBar.IsOpen = true;
+        }
     }
 }

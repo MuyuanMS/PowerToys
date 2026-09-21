@@ -116,24 +116,37 @@
                             <tkcontrols:SettingsCard
                                 Header="Azure Vision Subscription Key"
                                 Description="After Save, this field is cleared and the key remains stored in Windows Credential Vault.">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <PasswordBox
-                                        x:Name="AzureVisionApiKeyPasswordBox"
-                                        AutomationProperties.AutomationId="ScreenTranslatorAzureVisionApiKeyPasswordBox"
-                                        AutomationProperties.Name="Azure Vision Subscription Key"
-                                        PlaceholderText="Enter subscription key"
-                                        Width="260" />
-                                    <Button
-                                        AutomationProperties.AutomationId="ScreenTranslatorSaveAzureVisionApiKeyButton"
-                                        AutomationProperties.Name="Save Azure Vision Key"
-                                        Click="SaveAzureVisionApiKey_Click"
-                                        Content="Save"
-                                        Style="{StaticResource AccentButtonStyle}" />
-                                    <Button
-                                        AutomationProperties.AutomationId="ScreenTranslatorClearAzureVisionApiKeyButton"
-                                        AutomationProperties.Name="Clear Azure Vision Key"
-                                        Click="ClearAzureVisionApiKey_Click"
-                                        Content="Clear" />
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="260" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <PasswordBox
+                                            x:Name="AzureVisionApiKeyPasswordBox"
+                                            AutomationProperties.AutomationId="ScreenTranslatorAzureVisionApiKeyPasswordBox"
+                                            AutomationProperties.Name="Azure Vision Subscription Key"
+                                            PlaceholderText="Enter subscription key" />
+                                        <Button
+                                            Grid.Column="1"
+                                            AutomationProperties.AutomationId="ScreenTranslatorSaveAzureVisionApiKeyButton"
+                                            AutomationProperties.Name="Save Azure Vision Key"
+                                            Click="SaveAzureVisionApiKey_Click"
+                                            Content="Save"
+                                            Style="{StaticResource AccentButtonStyle}" />
+                                        <Button
+                                            Grid.Column="2"
+                                            AutomationProperties.AutomationId="ScreenTranslatorClearAzureVisionApiKeyButton"
+                                            AutomationProperties.Name="Clear Azure Vision Key"
+                                            Click="ClearAzureVisionApiKey_Click"
+                                            Content="Clear" />
+                                    </Grid>
+                                    <InfoBar
+                                        x:Name="AzureVisionApiKeyStatusInfoBar"
+                                        AutomationProperties.AutomationId="ScreenTranslatorAzureVisionApiKeyStatusInfoBar"
+                                        IsClosable="False"
+                                        IsOpen="False" />
                                 </StackPanel>
                             </tkcontrols:SettingsCard>
                         </tkcontrols:SettingsExpander.Items>
@@ -226,26 +239,39 @@
                                 x:Uid="ScreenTranslator_AzureKeyCard"
                                 Header="Azure Subscription Key"
                                 Description="After Save, this field is cleared and the key remains stored in Windows Credential Vault.">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <PasswordBox
-                                        x:Name="AzureApiKeyPasswordBox"
-                                        AutomationProperties.AutomationId="ScreenTranslatorAzureApiKeyPasswordBox"
-                                        AutomationProperties.Name="Azure Subscription Key"
-                                        PlaceholderText="Enter subscription key"
-                                        Width="260" />
-                                    <Button
-                                        x:Name="SaveAzureApiKeyButton"
-                                        AutomationProperties.AutomationId="ScreenTranslatorSaveAzureApiKeyButton"
-                                        AutomationProperties.Name="Save Azure Key"
-                                        Click="SaveAzureApiKey_Click"
-                                        Content="Save"
-                                        Style="{StaticResource AccentButtonStyle}" />
-                                    <Button
-                                        x:Name="ClearAzureApiKeyButton"
-                                        AutomationProperties.AutomationId="ScreenTranslatorClearAzureApiKeyButton"
-                                        AutomationProperties.Name="Clear Azure Key"
-                                        Click="ClearAzureApiKey_Click"
-                                        Content="Clear" />
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="260" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <PasswordBox
+                                            x:Name="AzureApiKeyPasswordBox"
+                                            AutomationProperties.AutomationId="ScreenTranslatorAzureApiKeyPasswordBox"
+                                            AutomationProperties.Name="Azure Subscription Key"
+                                            PlaceholderText="Enter subscription key" />
+                                        <Button
+                                            x:Name="SaveAzureApiKeyButton"
+                                            Grid.Column="1"
+                                            AutomationProperties.AutomationId="ScreenTranslatorSaveAzureApiKeyButton"
+                                            AutomationProperties.Name="Save Azure Key"
+                                            Click="SaveAzureApiKey_Click"
+                                            Content="Save"
+                                            Style="{StaticResource AccentButtonStyle}" />
+                                        <Button
+                                            x:Name="ClearAzureApiKeyButton"
+                                            Grid.Column="2"
+                                            AutomationProperties.AutomationId="ScreenTranslatorClearAzureApiKeyButton"
+                                            AutomationProperties.Name="Clear Azure Key"
+                                            Click="ClearAzureApiKey_Click"
+                                            Content="Clear" />
+                                    </Grid>
+                                    <InfoBar
+                                        x:Name="AzureApiKeyStatusInfoBar"
+                                        AutomationProperties.AutomationId="ScreenTranslatorAzureApiKeyStatusInfoBar"
+                                        IsClosable="False"
+                                        IsOpen="False" />
                                 </StackPanel>
                             </tkcontrols:SettingsCard>
                         </tkcontrols:SettingsExpander.Items>
@@ -274,26 +300,39 @@
                                 x:Uid="ScreenTranslator_LibreTranslateKeyCard"
                                 Header="API Key (Optional)"
                                 Description="Optional for self-hosted instances. After Save, this field is cleared and the key remains stored in Windows Credential Vault.">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <PasswordBox
-                                        x:Name="LibreTranslateApiKeyPasswordBox"
-                                        AutomationProperties.AutomationId="ScreenTranslatorLibreTranslateApiKeyPasswordBox"
-                                        AutomationProperties.Name="LibreTranslate API Key"
-                                        PlaceholderText="Optional API key"
-                                        Width="260" />
-                                    <Button
-                                        x:Name="SaveLibreTranslateApiKeyButton"
-                                        AutomationProperties.AutomationId="ScreenTranslatorSaveLibreTranslateApiKeyButton"
-                                        AutomationProperties.Name="Save LibreTranslate Key"
-                                        Click="SaveLibreTranslateApiKey_Click"
-                                        Content="Save"
-                                        Style="{StaticResource AccentButtonStyle}" />
-                                    <Button
-                                        x:Name="ClearLibreTranslateApiKeyButton"
-                                        AutomationProperties.AutomationId="ScreenTranslatorClearLibreTranslateApiKeyButton"
-                                        AutomationProperties.Name="Clear LibreTranslate Key"
-                                        Click="ClearLibreTranslateApiKey_Click"
-                                        Content="Clear" />
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="260" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <PasswordBox
+                                            x:Name="LibreTranslateApiKeyPasswordBox"
+                                            AutomationProperties.AutomationId="ScreenTranslatorLibreTranslateApiKeyPasswordBox"
+                                            AutomationProperties.Name="LibreTranslate API Key"
+                                            PlaceholderText="Optional API key" />
+                                        <Button
+                                            x:Name="SaveLibreTranslateApiKeyButton"
+                                            Grid.Column="1"
+                                            AutomationProperties.AutomationId="ScreenTranslatorSaveLibreTranslateApiKeyButton"
+                                            AutomationProperties.Name="Save LibreTranslate Key"
+                                            Click="SaveLibreTranslateApiKey_Click"
+                                            Content="Save"
+                                            Style="{StaticResource AccentButtonStyle}" />
+                                        <Button
+                                            x:Name="ClearLibreTranslateApiKeyButton"
+                                            Grid.Column="2"
+                                            AutomationProperties.AutomationId="ScreenTranslatorClearLibreTranslateApiKeyButton"
+                                            AutomationProperties.Name="Clear LibreTranslate Key"
+                                            Click="ClearLibreTranslateApiKey_Click"
+                                            Content="Clear" />
+                                    </Grid>
+                                    <InfoBar
+                                        x:Name="LibreTranslateApiKeyStatusInfoBar"
+                                        AutomationProperties.AutomationId="ScreenTranslatorLibreTranslateApiKeyStatusInfoBar"
+                                        IsClosable="False"
+                                        IsOpen="False" />
                                 </StackPanel>
                             </tkcontrols:SettingsCard>
                         </tkcontrols:SettingsExpander.Items>

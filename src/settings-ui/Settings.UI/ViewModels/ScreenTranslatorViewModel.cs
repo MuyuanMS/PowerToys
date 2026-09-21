@@ -462,10 +462,11 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         public bool HasLibreTranslateApiKey => !string.IsNullOrWhiteSpace(RetrieveCredential(LibreTranslateCredentialResource, LibreTranslateCredentialUsername));
 
-        public void SaveAzureApiKey(string key)
+        public bool SaveAzureApiKey(string key)
         {
-            SaveCredential(AzureCredentialResource, AzureCredentialUsername, key);
+            var saved = SaveCredential(AzureCredentialResource, AzureCredentialUsername, key);
             OnPropertyChanged(nameof(HasAzureApiKey));
+            return saved;
         }
 
         public void RemoveAzureApiKey()
@@ -474,10 +475,11 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             OnPropertyChanged(nameof(HasAzureApiKey));
         }
 
-        public void SaveAzureVisionApiKey(string key)
+        public bool SaveAzureVisionApiKey(string key)
         {
-            SaveCredential(AzureVisionCredentialResource, AzureVisionCredentialUsername, key);
+            var saved = SaveCredential(AzureVisionCredentialResource, AzureVisionCredentialUsername, key);
             OnPropertyChanged(nameof(HasAzureVisionApiKey));
+            return saved;
         }
 
         public void RemoveAzureVisionApiKey()
@@ -486,10 +488,11 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             OnPropertyChanged(nameof(HasAzureVisionApiKey));
         }
 
-        public void SaveLibreTranslateApiKey(string key)
+        public bool SaveLibreTranslateApiKey(string key)
         {
-            SaveCredential(LibreTranslateCredentialResource, LibreTranslateCredentialUsername, key);
+            var saved = SaveCredential(LibreTranslateCredentialResource, LibreTranslateCredentialUsername, key);
             OnPropertyChanged(nameof(HasLibreTranslateApiKey));
+            return saved;
         }
 
         public void RemoveLibreTranslateApiKey()
@@ -513,21 +516,26 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
         }
 
-        private static void SaveCredential(string resource, string username, string secret)
+        private static bool SaveCredential(string resource, string username, string secret)
         {
+            if (string.IsNullOrWhiteSpace(secret))
+            {
+                return false;
+            }
+
             try
             {
                 var vault = new PasswordVault();
                 RemoveCredential(resource, username);
-                if (!string.IsNullOrWhiteSpace(secret))
-                {
-                    var cred = new PasswordCredential(resource, username, secret.Trim());
-                    vault.Add(cred);
-                }
+                var cred = new PasswordCredential(resource, username, secret.Trim());
+                vault.Add(cred);
+
+                return !string.IsNullOrWhiteSpace(RetrieveCredential(resource, username));
             }
             catch (Exception ex)
             {
                 Logger.LogError($"Failed to save credential in PasswordVault: {ex.Message}");
+                return false;
             }
         }
 
