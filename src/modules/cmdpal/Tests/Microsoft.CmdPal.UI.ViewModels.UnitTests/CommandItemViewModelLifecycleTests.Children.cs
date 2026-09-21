@@ -383,6 +383,20 @@ public partial class CommandItemViewModelLifecycleTests
         GC.KeepAlive(context);
     }
 
+    [TestMethod]
+    public void CleanupDuringDetailsSubscription_DetachesSubscription()
+    {
+        var context = new TestPageContext();
+        var details = new TestDetails();
+        var viewModel = new DetailsViewModel(details, new(context));
+        details.BeforeSubscribe = viewModel.SafeCleanup;
+
+        viewModel.InitializeProperties();
+
+        Assert.AreEqual(0, details.SubscriberCount);
+        GC.KeepAlive(context);
+    }
+
     private static CommandItemViewModel CreateDerivedItem(bool listItem, TestPageContext context, out TestCommandItem item, Action readDerivedProperty)
     {
         if (listItem)

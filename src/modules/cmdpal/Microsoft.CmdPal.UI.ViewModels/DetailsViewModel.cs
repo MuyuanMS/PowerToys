@@ -178,12 +178,26 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
             return;
         }
 
-        // Subscribe to PropChanged if the model supports it (only subscribe once)
-        if (!_isSubscribed && model is INotifyPropChanged observable)
+        lock (_lifecycleLock)
         {
-            observable.PropChanged += Model_PropChanged;
-            _observableDetails = observable;
-            _isSubscribed = true;
+            if (_isCleanedUp)
+            {
+                return;
+            }
+
+            // Subscribe to PropChanged if the model supports it (only subscribe once).
+            if (!_isSubscribed && model is INotifyPropChanged observable)
+            {
+                observable.PropChanged += Model_PropChanged;
+                if (_isCleanedUp)
+                {
+                    observable.PropChanged -= Model_PropChanged;
+                    return;
+                }
+
+                _observableDetails = observable;
+                _isSubscribed = true;
+            }
         }
 
         var title = model.Title ?? string.Empty;
@@ -288,11 +302,14 @@ public partial class DetailsViewModel : ExtensionObjectViewModel
             ClearContent();
         }
 
-        if (_isSubscribed && _observableDetails is not null)
+        lock (_lifecycleLock)
         {
-            _observableDetails.PropChanged -= Model_PropChanged;
-            _observableDetails = null;
-            _isSubscribed = false;
+            if (_isSubscribed && _observableDetails is not null)
+            {
+                _observableDetails.PropChanged -= Model_PropChanged;
+                _observableDetails = null;
+                _isSubscribed = false;
+            }
         }
     }
 
