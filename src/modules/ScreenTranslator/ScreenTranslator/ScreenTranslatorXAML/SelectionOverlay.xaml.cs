@@ -339,7 +339,7 @@ public sealed partial class SelectionOverlay : TransparentWindow
                     _freezeCapturedContentByDefault,
                     sourceLanguage,
                     targetLanguage,
-                    (newSource, newTarget) => ProcessCaptureAndTranslateAsync(capturedRegionPhysical, newSource, newTarget),
+                    TranslateLinesAsync,
                     TranslateLineAsync);
             }))
             {
@@ -366,12 +366,24 @@ public sealed partial class SelectionOverlay : TransparentWindow
         string sourceLanguage,
         string targetLanguage)
     {
+        TranslationResult result = await TranslateLinesAsync(
+            new[] { line },
+            sourceLanguage,
+            targetLanguage);
+        return result;
+    }
+
+    private async Task<TranslationResult> TranslateLinesAsync(
+        IReadOnlyList<TranslationLine> lines,
+        string sourceLanguage,
+        string targetLanguage)
+    {
         TranslationResult result = await _translationProvider.TranslateAsync(
-            new TranslationRequest(new[] { line }, sourceLanguage, targetLanguage));
+            new TranslationRequest(lines, sourceLanguage, targetLanguage));
         result = TranslationQualityGuard.ReplaceDegenerateTranslations(result, out int replacementCount);
         if (replacementCount > 0)
         {
-            Logger.LogWarning($"Suppressed a degenerate single-line translation from provider {_translationProvider.ProviderId}.");
+            Logger.LogWarning($"Suppressed {replacementCount} degenerate translation result(s) from provider {_translationProvider.ProviderId}.");
         }
 
         return result;

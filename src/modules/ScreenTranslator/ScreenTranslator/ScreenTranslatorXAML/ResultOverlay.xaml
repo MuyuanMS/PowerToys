@@ -270,7 +270,17 @@
                             <ComboBoxItem x:Uid="CardSourceGerman" Tag="de" />
                             <ComboBoxItem x:Uid="CardSourceSpanish" Tag="es" />
                         </ComboBox>
-                        <FontIcon Glyph="&#xE72A;" VerticalAlignment="Center" />
+                        <Button
+                            x:Name="SwapCardLanguagesButton"
+                            x:Uid="SwapCardLanguagesButton"
+                            AutomationProperties.AutomationId="BtnSwapCardLanguages"
+                            AutomationProperties.Name="Swap source and target languages"
+                            VerticalAlignment="Bottom"
+                            Click="SwapCardLanguagesButton_Click"
+                            Padding="8,4"
+                            ToolTipService.ToolTip="Swap languages">
+                            <FontIcon Glyph="&#xE8AB;" />
+                        </Button>
                         <ComboBox
                             x:Name="CardTargetLanguageComboBox"
                             x:Uid="CardTargetLanguageComboBox"
@@ -419,7 +429,17 @@
                         <ComboBoxItem x:Uid="OverallSourceGerman" Tag="de" />
                         <ComboBoxItem x:Uid="OverallSourceSpanish" Tag="es" />
                     </ComboBox>
-                    <FontIcon Glyph="&#xE72A;" VerticalAlignment="Center" />
+                    <Button
+                        x:Name="SwapOverallLanguagesButton"
+                        x:Uid="SwapOverallLanguagesButton"
+                        AutomationProperties.AutomationId="BtnSwapOverallLanguages"
+                        AutomationProperties.Name="Swap source and target languages"
+                        VerticalAlignment="Bottom"
+                        Click="SwapOverallLanguagesButton_Click"
+                        Padding="8,4"
+                        ToolTipService.ToolTip="Swap languages">
+                        <FontIcon Glyph="&#xE8AB;" />
+                    </Button>
                     <ComboBox
                         x:Name="OverallTargetLanguageComboBox"
                         x:Uid="OverallTargetLanguageComboBox"

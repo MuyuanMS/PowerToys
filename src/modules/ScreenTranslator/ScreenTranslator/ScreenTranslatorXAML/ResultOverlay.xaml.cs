@@ -33,10 +33,7 @@ namespace ScreenTranslator;
 public sealed partial class ResultOverlay : TransparentWindow
 {
     private readonly PhysicalRect _capturedRegion;
-    private readonly IReadOnlyList<TranslatedLine> _lines;
-    private readonly string _sourceLanguage;
-    private readonly string _targetLanguage;
-    private readonly Func<string, string, Task>? _retranslateAll;
+    private readonly Func<IReadOnlyList<TranslationLine>, string, string, Task<TranslationResult>>? _retranslateAll;
     private readonly Func<TranslationLine, string, string, Task<TranslationResult>>? _retranslateLine;
     private readonly IntPtr _hwnd;
     private readonly TextShareService _textShareService = new();
@@ -61,6 +58,9 @@ public sealed partial class ResultOverlay : TransparentWindow
     private readonly DispatcherQueueTimer _windowSwitchTimer;
     private readonly IntPtr _sourceWindow;
     private readonly long _shownTimestamp = Environment.TickCount64;
+    private IReadOnlyList<TranslatedLine> _lines;
+    private string _sourceLanguage;
+    private string _targetLanguage;
     private PhysicalRect _overlayBounds;
     private Border? _dragCard;
     private uint _dragPointerId;
@@ -103,7 +103,7 @@ public sealed partial class ResultOverlay : TransparentWindow
         IntPtr sourceWindow,
         string sourceLanguage,
         string targetLanguage,
-        Func<string, string, Task>? retranslateAll = null,
+        Func<IReadOnlyList<TranslationLine>, string, string, Task<TranslationResult>>? retranslateAll = null,
         Func<TranslationLine, string, string, Task<TranslationResult>>? retranslateLine = null)
     {
         _overlayBounds = screenInfo.WorkingArea;
@@ -1453,7 +1453,51 @@ public sealed partial class ResultOverlay : TransparentWindow
         string sourceLanguage = GetSelectedLanguage(OverallSourceLanguageComboBox, "auto");
         string targetLanguage = GetSelectedLanguage(OverallTargetLanguageComboBox, "en-US");
         CloseContextMenu();
-        await _retranslateAll(sourceLanguage, targetLanguage);
+        ApplyOverallLanguageButton.IsEnabled = false;
+        try
+        {
+            IReadOnlyList<TranslationLine> sourceLines = _lines
+                .Select((line, index) => new TranslationLine(
+                    _sourceTexts[index],
+                    line.BoundingBox,
+                    line.Confidence,
+                    line.PolygonVertices,
+                    line.SourceLineCount))
+                .ToList();
+            TranslationResult result = await _retranslateAll(sourceLines, sourceLanguage, targetLanguage);
+            if (!result.Success || result.Lines.Count != _lines.Count)
+            {
+                Logger.LogWarning($"Failed to retranslate current capture: {result.ErrorMessage}");
+                return;
+            }
+
+            _lines = result.Lines
+                .Select((line, index) => line with
+                {
+                    OverlayBackgroundColorArgb = _lines[index].OverlayBackgroundColorArgb,
+                    OverlayForegroundColorArgb = _lines[index].OverlayForegroundColorArgb,
+                })
+                .ToList();
+            _sourceLanguage = sourceLanguage;
+            _targetLanguage = targetLanguage;
+            ResetCardStateForRetranslation();
+            RenderTranslatedBoxes();
+            PositionToolbar();
+        }
+        finally
+        {
+            ApplyOverallLanguageButton.IsEnabled = true;
+        }
+    }
+
+    private void SwapCardLanguagesButton_Click(object sender, RoutedEventArgs e)
+    {
+        SwapLanguages(CardSourceLanguageComboBox, CardTargetLanguageComboBox);
+    }
+
+    private void SwapOverallLanguagesButton_Click(object sender, RoutedEventArgs e)
+    {
+        SwapLanguages(OverallSourceLanguageComboBox, OverallTargetLanguageComboBox);
     }
 
     private async void ApplyCardLanguageButton_Click(object sender, RoutedEventArgs e)
@@ -1505,6 +1549,31 @@ public sealed partial class ResultOverlay : TransparentWindow
             : fallback;
     }
 
+    private static void SwapLanguages(ComboBox sourceComboBox, ComboBox targetComboBox)
+    {
+        string sourceLanguage = GetSelectedLanguage(sourceComboBox, "auto");
+        string targetLanguage = GetSelectedLanguage(targetComboBox, "en-US");
+        var (newSourceLanguage, newTargetLanguage) =
+            LanguageSelectionHelper.Swap(sourceLanguage, targetLanguage);
+        SelectLanguage(sourceComboBox, newSourceLanguage);
+        SelectLanguage(targetComboBox, newTargetLanguage);
+    }
+
+    private void ResetCardStateForRetranslation()
+    {
+        _initialAppearance.Clear();
+        _translatedTexts.Clear();
+        _sourceTexts.Clear();
+        _textUndo.Clear();
+        _showingOriginalText.Clear();
+        _hiddenLineIndices.Clear();
+        _selectedLineIndex = -1;
+        _contextMenuLineIndex = -1;
+        _contextMenuLine = null;
+        _contextMenuCard = null;
+        SetOriginalAllTextButtonState(showOriginalText: true);
+    }
+
     private void SetOriginalTextButtonState(bool showOriginalText)
     {
         OriginalTextButton.Content = showOriginalText ? "Original" : "Translated";
@@ -1530,8 +1599,8 @@ public sealed partial class ResultOverlay : TransparentWindow
         foreach (object item in comboBox.Items)
         {
             if (item is ComboBoxItem comboBoxItem &&
-                (string.Equals(comboBoxItem.Tag as string, language, StringComparison.OrdinalIgnoreCase) ||
-                 language.StartsWith($"{comboBoxItem.Tag}-", StringComparison.OrdinalIgnoreCase)))
+                comboBoxItem.Tag is string itemLanguage &&
+                LanguageSelectionHelper.AreEquivalent(itemLanguage, language))
             {
                 comboBox.SelectedItem = comboBoxItem;
                 return;

@@ -437,7 +437,7 @@ public static class WindowManager
         bool freezeCapturedContent,
         string sourceLanguage = "auto",
         string targetLanguage = "en-US",
-        Func<string, string, Task>? retranslateAll = null,
+        Func<IReadOnlyList<TranslationLine>, string, string, Task<TranslationResult>>? retranslateAll = null,
         Func<TranslationLine, string, string, Task<TranslationResult>>? retranslateLine = null)
     {
         CloseAllResultOverlays();

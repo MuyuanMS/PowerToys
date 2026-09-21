@@ -378,6 +378,22 @@
     <value>Translate</value>
     <comment>Retranslates the current capture using the chosen languages</comment>
   </data>
+  <data name="SwapCardLanguagesButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Swap source and target languages for this card</value>
+    <comment>Accessible name for swapping the selected card language direction</comment>
+  </data>
+  <data name="SwapCardLanguagesButton.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Swap languages</value>
+    <comment>Tooltip for swapping the selected card language direction</comment>
+  </data>
+  <data name="SwapOverallLanguagesButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Swap source and target languages for this capture</value>
+    <comment>Accessible name for swapping the capture language direction</comment>
+  </data>
+  <data name="SwapOverallLanguagesButton.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Swap languages</value>
+    <comment>Tooltip for swapping the capture language direction</comment>
+  </data>
   <data name="CardSourceLanguageLabel.Text" xml:space="preserve">
     <value>Source Language</value>
     <comment>Labels the source language selector for a card</comment>
