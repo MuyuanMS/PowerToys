@@ -546,10 +546,8 @@ public partial class DockItemViewModel : CommandItemViewModel
         base.FetchProperty(propertyName);
     }
 
-    protected override void UpdateExtendedAttributes(IDictionary<string, object?>? properties)
+    protected override void UpdateDerivedExtendedAttributes(IDictionary<string, object?>? properties)
     {
-        base.UpdateExtendedAttributes(properties);
-
         UpdateLabelWidthConstraints(properties);
         UpdateTabularDigits(properties);
         UpdateTrailingLabelAlignment(properties);
@@ -558,9 +556,18 @@ public partial class DockItemViewModel : CommandItemViewModel
     private void UpdateLabelWidthConstraints(IDictionary<string, object?>? properties)
     {
         var constraints = DockLabelWidthConstraints.FromProperties(properties);
-        if (constraints != LabelWidthConstraints)
+        var changed = false;
+        lock (MoreCommandsLock)
         {
-            LabelWidthConstraints = constraints;
+            if (!IsCleanedUp && constraints != LabelWidthConstraints)
+            {
+                LabelWidthConstraints = constraints;
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
             UpdateProperty(nameof(LabelWidthConstraints));
         }
     }
@@ -569,9 +576,18 @@ public partial class DockItemViewModel : CommandItemViewModel
     {
         var enabled = properties?.TryGetValue(WellKnownExtensionAttributes.DockLabelTabularDigits, out var value) == true &&
                       value is true;
-        if (enabled != UseTabularDigits)
+        var changed = false;
+        lock (MoreCommandsLock)
         {
-            UseTabularDigits = enabled;
+            if (!IsCleanedUp && enabled != UseTabularDigits)
+            {
+                UseTabularDigits = enabled;
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
             UpdateProperty(nameof(UseTabularDigits));
         }
     }
@@ -580,9 +596,18 @@ public partial class DockItemViewModel : CommandItemViewModel
     {
         var enabled = properties?.TryGetValue(WellKnownExtensionAttributes.DockLabelTrailingAlignment, out var value) == true &&
                       value is true;
-        if (enabled != UseTrailingLabelAlignment)
+        var changed = false;
+        lock (MoreCommandsLock)
         {
-            UseTrailingLabelAlignment = enabled;
+            if (!IsCleanedUp && enabled != UseTrailingLabelAlignment)
+            {
+                UseTrailingLabelAlignment = enabled;
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
             UpdateProperty(nameof(UseTrailingLabelAlignment));
         }
     }
