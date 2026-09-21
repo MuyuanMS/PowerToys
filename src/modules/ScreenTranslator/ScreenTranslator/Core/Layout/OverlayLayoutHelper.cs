@@ -19,10 +19,12 @@ public static class OverlayLayoutHelper
     private const double MaxInitialMultilineCardHeightFraction = 0.6;
     private const double TitleSourceLineHeightThreshold = 22.0;
     private const double CompactLabelSourceLineHeightThreshold = 14.0;
+    private const double MaximumCompactLabelFontSize = 18.0;
     private const int MaximumCompactCjkLabelLength = 12;
     private const double MinimumTitleFontSize = 16.0;
     private const double MinimumTitleFontRatio = 0.82;
     private const double CardHorizontalChrome = 14.0;
+    private const double CardVerticalChrome = 6.0;
     private const double NeighborGap = 8.0;
     private const double MinimumUsefulExpansion = 12.0;
 
@@ -49,6 +51,11 @@ public static class OverlayLayoutHelper
         double Left,
         bool IsAdapted,
         bool FitsSingleLine);
+
+    public readonly record struct VerticalCardPlacement(
+        double Top,
+        double MinHeight,
+        bool FitsWithoutOverlap);
 
     /// <summary>
     /// Converts a canonical physical rectangle into DIP (device independent pixel) coordinates relative to a specific screen's top-left.
@@ -149,8 +156,15 @@ public static class OverlayLayoutHelper
             return unchanged;
         }
 
-        bool isRtl = IsStrongRtlText(input.Text);
-        double desiredWidth = measuredDesiredWidth + CardHorizontalChrome;
+        bool isCompactCjkLabel = IsCompactCjkLabel(input);
+        double preferredFontSize = isCompactCjkLabel
+            ? CalculateAdaptiveTitleFontSize(input)
+            : input.FontSize;
+        double preferredMeasuredWidth = isCompactCjkLabel
+            ? measuredReducedWidth
+            : measuredDesiredWidth;
+        double desiredWidth = preferredMeasuredWidth + CardHorizontalChrome;
+        double fittedWidth = measuredReducedWidth + CardHorizontalChrome;
         if (!IsFinitePositive(measuredDesiredWidth) ||
             !IsFinitePositive(measuredReducedWidth))
         {
@@ -159,14 +173,27 @@ public static class OverlayLayoutHelper
 
         if (desiredWidth <= input.InitialWidth)
         {
-            return unchanged with { FitsSingleLine = true };
+            return new AdaptiveCardLayout(
+                input.InitialWidth,
+                input.InitialMinHeight,
+                preferredFontSize,
+                input.SourceBounds.Left,
+                IsAdapted: preferredFontSize < input.FontSize,
+                FitsSingleLine: true);
         }
 
-        double maximumWidth = CalculateMaximumAdaptiveTitleWidth(input);
+        var (_, maximumWidth, expandLeft) = CalculateAdaptiveHorizontalSpan(
+            input,
+            Math.Min(desiredWidth, fittedWidth));
         if (!IsFinitePositive(maximumWidth) ||
             maximumWidth < input.InitialWidth + MinimumUsefulExpansion)
         {
-            return unchanged;
+            return unchanged with
+            {
+                FontSize = preferredFontSize,
+                IsAdapted = preferredFontSize < input.FontSize,
+                FitsSingleLine = desiredWidth <= input.InitialWidth,
+            };
         }
 
         if (desiredWidth <= maximumWidth)
@@ -175,17 +202,16 @@ public static class OverlayLayoutHelper
             return new AdaptiveCardLayout(
                 adaptedWidth,
                 input.InitialMinHeight,
-                input.FontSize,
-                isRtl ? input.SourceBounds.Right - adaptedWidth : input.SourceBounds.Left,
+                preferredFontSize,
+                expandLeft ? input.SourceBounds.Right - adaptedWidth : input.SourceBounds.Left,
                 IsAdapted: true,
                 FitsSingleLine: true);
         }
 
-        double minimumFontSize = CalculateMinimumTitleFontSize(input.FontSize);
-        double fittedWidth = measuredReducedWidth + CardHorizontalChrome;
+        double minimumFontSize = CalculateAdaptiveTitleFontSize(input);
         bool fitsSingleLine = fittedWidth <= maximumWidth + 0.001;
         double finalWidth = fitsSingleLine ? Math.Max(input.InitialWidth, fittedWidth) : maximumWidth;
-        double finalLeft = isRtl
+        double finalLeft = expandLeft
             ? input.SourceBounds.Right - finalWidth
             : input.SourceBounds.Left;
 
@@ -202,7 +228,7 @@ public static class OverlayLayoutHelper
     {
         return input.SourceLineCount == 1 &&
             input.SourceBounds.Width >= input.SourceBounds.Height * 1.5 &&
-            (IsLargeTitle(input) || IsCompactCjkLabel(input)) &&
+            (IsLargeTitle(input) || IsCjkToLatinTranslation(input)) &&
             !string.IsNullOrWhiteSpace(input.Text);
     }
 
@@ -215,13 +241,12 @@ public static class OverlayLayoutHelper
     private static bool IsCompactCjkLabel(AdaptiveCardLayoutInput input)
     {
         if (input.SourceBounds.Height < CompactLabelSourceLineHeightThreshold ||
-            string.IsNullOrWhiteSpace(input.SourceText))
+            !IsCjkToLatinTranslation(input))
         {
             return false;
         }
 
         int sourceCharacterCount = 0;
-        bool hasCjkCharacter = false;
         foreach (char character in input.SourceText)
         {
             if (char.IsWhiteSpace(character) || char.IsPunctuation(character))
@@ -230,12 +255,16 @@ public static class OverlayLayoutHelper
             }
 
             sourceCharacterCount++;
-            hasCjkCharacter |= IsCjkCharacter(character);
         }
 
-        return hasCjkCharacter &&
-            sourceCharacterCount is > 0 and <= MaximumCompactCjkLabelLength &&
-            input.Text.Any(character => character is >= 'A' and <= 'Z' || character is >= 'a' and <= 'z');
+        return sourceCharacterCount is > 0 and <= MaximumCompactCjkLabelLength;
+    }
+
+    private static bool IsCjkToLatinTranslation(AdaptiveCardLayoutInput input)
+    {
+        return !string.IsNullOrWhiteSpace(input.SourceText) &&
+            input.SourceText.Any(IsCjkCharacter) &&
+            input.Text.Any(IsLatinCharacter);
     }
 
     private static bool IsCjkCharacter(char character)
@@ -247,14 +276,93 @@ public static class OverlayLayoutHelper
             character is >= '\uF900' and <= '\uFAFF';
     }
 
+    private static bool IsLatinCharacter(char character)
+    {
+        return character is >= 'A' and <= 'Z' || character is >= 'a' and <= 'z';
+    }
+
     public static double CalculateMaximumAdaptiveTitleWidth(AdaptiveCardLayoutInput input)
+    {
+        return CalculateAdaptiveHorizontalSpan(
+            input,
+            input.InitialWidth + MinimumUsefulExpansion).Width;
+    }
+
+    public static VerticalCardPlacement CalculateNonOverlappingVerticalPlacement(
+        PhysicalRect sourceBounds,
+        IReadOnlyList<PhysicalRect> allLineBounds,
+        int sourceIndex,
+        double cardLeft,
+        double cardWidth,
+        double desiredHeight,
+        double captureTop,
+        double captureBottom)
+    {
+        desiredHeight = Math.Max(sourceBounds.Height, desiredHeight);
+        double cardRight = cardLeft + cardWidth;
+        double upperBoundary = captureTop;
+        double lowerBoundary = captureBottom;
+
+        for (int index = 0; index < allLineBounds.Count; index++)
+        {
+            if (index == sourceIndex)
+            {
+                continue;
+            }
+
+            PhysicalRect candidate = allLineBounds[index];
+            if (!IsValidRegion(candidate) ||
+                !HasMeaningfulHorizontalOverlap(cardLeft, cardRight, candidate))
+            {
+                continue;
+            }
+
+            if (candidate.Bottom <= sourceBounds.Top)
+            {
+                upperBoundary = Math.Max(upperBoundary, candidate.Bottom + NeighborGap);
+            }
+            else if (candidate.Top >= sourceBounds.Bottom)
+            {
+                lowerBoundary = Math.Min(lowerBoundary, candidate.Top - NeighborGap);
+            }
+        }
+
+        double downwardSpace = Math.Max(sourceBounds.Height, lowerBoundary - sourceBounds.Top);
+        if (desiredHeight <= downwardSpace + 0.001)
+        {
+            return new VerticalCardPlacement(sourceBounds.Top, desiredHeight, FitsWithoutOverlap: true);
+        }
+
+        double upwardSpace = Math.Max(sourceBounds.Height, sourceBounds.Bottom - upperBoundary);
+        if (desiredHeight <= upwardSpace + 0.001)
+        {
+            return new VerticalCardPlacement(
+                sourceBounds.Bottom - desiredHeight,
+                desiredHeight,
+                FitsWithoutOverlap: true);
+        }
+
+        bool preferDownward = downwardSpace >= upwardSpace;
+        return new VerticalCardPlacement(
+            preferDownward ? sourceBounds.Top : sourceBounds.Bottom - desiredHeight,
+            desiredHeight,
+            FitsWithoutOverlap: false);
+    }
+
+    public static double CalculateDesiredCardHeight(double textDesiredHeight, double initialMinHeight)
+    {
+        return Math.Max(initialMinHeight, textDesiredHeight + CardVerticalChrome);
+    }
+
+    private static (double Left, double Width, bool ExpandLeft) CalculateAdaptiveHorizontalSpan(
+        AdaptiveCardLayoutInput input,
+        double minimumRequiredWidth)
     {
         bool isRtl = IsStrongRtlText(input.Text);
         double captureWidth = input.CaptureRight - input.CaptureLeft;
         double maximumGeometryWidth = captureWidth * MaxInitialCardWidthFraction;
-        double boundary = isRtl
-            ? Math.Max(input.CaptureLeft, input.OverlayLeft)
-            : Math.Min(input.CaptureRight, input.OverlayRight);
+        double leftBoundary = Math.Max(input.CaptureLeft, input.OverlayLeft);
+        double rightBoundary = Math.Min(input.CaptureRight, input.OverlayRight);
 
         for (int index = 0; index < input.AllLineBounds.Count; index++)
         {
@@ -271,20 +379,31 @@ public static class OverlayLayoutHelper
                 continue;
             }
 
-            if (isRtl && candidate.Right <= input.SourceBounds.Left)
+            if (candidate.Right <= input.SourceBounds.Left)
             {
-                boundary = Math.Max(boundary, candidate.Right + NeighborGap);
+                leftBoundary = Math.Max(leftBoundary, candidate.Right + NeighborGap);
             }
-            else if (!isRtl && candidate.Left >= input.SourceBounds.Right)
+            else if (candidate.Left >= input.SourceBounds.Right)
             {
-                boundary = Math.Min(boundary, candidate.Left - NeighborGap);
+                rightBoundary = Math.Min(rightBoundary, candidate.Left - NeighborGap);
             }
         }
 
-        double availableWidth = isRtl
-            ? input.SourceBounds.Right - boundary
-            : boundary - input.SourceBounds.Left;
-        return Math.Min(availableWidth, maximumGeometryWidth);
+        double leftwardWidth = Math.Min(
+            input.SourceBounds.Right - leftBoundary,
+            maximumGeometryWidth);
+        double rightwardWidth = Math.Min(
+            rightBoundary - input.SourceBounds.Left,
+            maximumGeometryWidth);
+        double preferredWidth = isRtl ? leftwardWidth : rightwardWidth;
+        double alternateWidth = isRtl ? rightwardWidth : leftwardWidth;
+        bool usePreferredDirection = preferredWidth >= minimumRequiredWidth ||
+            (alternateWidth < minimumRequiredWidth && preferredWidth >= alternateWidth);
+        bool expandLeft = usePreferredDirection ? isRtl : !isRtl;
+        double availableWidth = expandLeft ? leftwardWidth : rightwardWidth;
+        double width = availableWidth;
+        double left = expandLeft ? input.SourceBounds.Right - width : input.SourceBounds.Left;
+        return (left, width, expandLeft);
     }
 
     public static double CalculateMinimumTitleFontSize(double fontSize)
@@ -292,6 +411,14 @@ public static class OverlayLayoutHelper
         return Math.Min(
             fontSize,
             Math.Max(MinimumTitleFontSize, fontSize * MinimumTitleFontRatio));
+    }
+
+    public static double CalculateAdaptiveTitleFontSize(AdaptiveCardLayoutInput input)
+    {
+        double minimumFontSize = CalculateMinimumTitleFontSize(input.FontSize);
+        return IsCompactCjkLabel(input)
+            ? Math.Min(minimumFontSize, MaximumCompactLabelFontSize)
+            : minimumFontSize;
     }
 
     public static bool IsStrongRtlText(string text)
@@ -348,6 +475,16 @@ public static class OverlayLayoutHelper
     {
         double overlap = Math.Min(source.Bottom, candidate.Bottom) - Math.Max(source.Top, candidate.Top);
         return overlap >= Math.Min(source.Height, candidate.Height) * 0.25;
+    }
+
+    private static bool HasMeaningfulHorizontalOverlap(
+        double sourceLeft,
+        double sourceRight,
+        PhysicalRect candidate)
+    {
+        double overlap = Math.Min(sourceRight, candidate.Right) - Math.Max(sourceLeft, candidate.Left);
+        double sourceWidth = Math.Max(1.0, sourceRight - sourceLeft);
+        return overlap >= Math.Min(sourceWidth, candidate.Width) * 0.15;
     }
 
     /// <summary>

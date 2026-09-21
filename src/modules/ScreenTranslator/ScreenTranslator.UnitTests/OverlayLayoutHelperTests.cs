@@ -660,6 +660,50 @@ public class OverlayLayoutHelperTests
     }
 
     [TestMethod]
+    public void CalculateAdaptiveInitialCardLayout_CompactChineseHeadingCapsInflatedFont()
+    {
+        PhysicalRect heading = new(744, 710, 172, 34);
+        OverlayLayoutHelper.AdaptiveCardLayout layout = OverlayLayoutHelper.CalculateAdaptiveInitialCardLayout(
+            CreateAdaptiveInput(
+                "Order submission failed",
+                heading,
+                [heading, new PhysicalRect(744, 756, 150, 16)],
+                captureRight: 1600,
+                sourceText: "订单提交失败"),
+            measuredDesiredWidth: 325,
+            measuredReducedWidth: 205);
+
+        Assert.IsTrue(layout.IsAdapted);
+        Assert.IsTrue(layout.FitsSingleLine);
+        Assert.AreEqual(18.0, layout.FontSize, 0.001);
+        Assert.IsTrue(layout.Width > heading.Width);
+    }
+
+    [TestMethod]
+    public void CalculateAdaptiveInitialCardLayout_CompactHeadingKeepsFontCapWhenWidthCannotExpand()
+    {
+        PhysicalRect heading = new(100, 100, 172, 34);
+        OverlayLayoutHelper.AdaptiveCardLayout layout = OverlayLayoutHelper.CalculateAdaptiveInitialCardLayout(
+            CreateAdaptiveInput(
+                "Order submission failed",
+                heading,
+                [
+                    heading,
+                    new PhysicalRect(40, 102, 52, 24),
+                    new PhysicalRect(280, 102, 80, 24),
+                ],
+                captureRight: 400,
+                sourceText: "订单提交失败"),
+            measuredDesiredWidth: 325,
+            measuredReducedWidth: 205);
+
+        Assert.IsTrue(layout.IsAdapted);
+        Assert.IsFalse(layout.FitsSingleLine);
+        Assert.AreEqual(18.0, layout.FontSize, 0.001);
+        Assert.AreEqual(heading.Width, layout.Width, 0.001);
+    }
+
+    [TestMethod]
     public void CalculateAdaptiveInitialCardLayout_CompactLatinBodyLabelRemainsUnchanged()
     {
         PhysicalRect label = new(163, 306, 100, 16);
@@ -696,6 +740,91 @@ public class OverlayLayoutHelperTests
     }
 
     [TestMethod]
+    public void CalculateAdaptiveInitialCardLayout_UsesLargerLeftSpanWhenRightIsBlocked()
+    {
+        PhysicalRect source = new(500, 40, 180, 36);
+        PhysicalRect rightNeighbor = new(710, 42, 120, 24);
+        OverlayLayoutHelper.AdaptiveCardLayout layout = OverlayLayoutHelper.CalculateAdaptiveInitialCardLayout(
+            CreateAdaptiveInput(
+                "Long translated heading",
+                source,
+                [source, rightNeighbor],
+                captureRight: 900,
+                captureLeft: 0,
+                overlayLeft: 0,
+                sourceText: "长标题"),
+            measuredDesiredWidth: 350,
+            measuredReducedWidth: 280);
+
+        Assert.IsTrue(layout.IsAdapted);
+        Assert.IsTrue(layout.Left < source.Left);
+        Assert.IsTrue(layout.Left + layout.Width <= source.Right + 0.001);
+    }
+
+    [TestMethod]
+    public void CalculateNonOverlappingVerticalPlacement_PrefersDownwardSpace()
+    {
+        PhysicalRect source = new(100, 100, 220, 24);
+        OverlayLayoutHelper.VerticalCardPlacement placement =
+            OverlayLayoutHelper.CalculateNonOverlappingVerticalPlacement(
+                source,
+                [source, new PhysicalRect(100, 190, 220, 24)],
+                sourceIndex: 0,
+                cardLeft: 100,
+                cardWidth: 220,
+                desiredHeight: 58,
+                captureTop: 0,
+                captureBottom: 500);
+
+        Assert.IsTrue(placement.FitsWithoutOverlap);
+        Assert.AreEqual(100.0, placement.Top, 0.001);
+        Assert.AreEqual(58.0, placement.MinHeight, 0.001);
+    }
+
+    [TestMethod]
+    public void CalculateNonOverlappingVerticalPlacement_ExpandsUpWhenBottomIsBlocked()
+    {
+        PhysicalRect source = new(100, 100, 220, 24);
+        OverlayLayoutHelper.VerticalCardPlacement placement =
+            OverlayLayoutHelper.CalculateNonOverlappingVerticalPlacement(
+                source,
+                [
+                    source,
+                    new PhysicalRect(100, 20, 220, 20),
+                    new PhysicalRect(100, 130, 220, 24),
+                ],
+                sourceIndex: 0,
+                cardLeft: 100,
+                cardWidth: 220,
+                desiredHeight: 52,
+                captureTop: 0,
+                captureBottom: 500);
+
+        Assert.IsTrue(placement.FitsWithoutOverlap);
+        Assert.AreEqual(72.0, placement.Top, 0.001);
+    }
+
+    [TestMethod]
+    public void CalculateAdaptiveInitialCardLayout_StopsBeforePreviouslyExpandedCard()
+    {
+        PhysicalRect source = new(500, 100, 110, 18);
+        PhysicalRect expandedCard = new(260, 98, 220, 28);
+        OverlayLayoutHelper.AdaptiveCardLayout layout = OverlayLayoutHelper.CalculateAdaptiveInitialCardLayout(
+            CreateAdaptiveInput(
+                "Current processing status",
+                source,
+                [expandedCard, source],
+                captureRight: 900,
+                sourceText: "处理状态",
+                sourceIndex: 1),
+            measuredDesiredWidth: 230,
+            measuredReducedWidth: 190);
+
+        Assert.IsTrue(layout.IsAdapted);
+        Assert.IsTrue(layout.Left >= expandedCard.Right + 8.0);
+    }
+
+    [TestMethod]
     public void FindContainingScreen_IdentifiesCorrectScreen()
     {
         var screens = new List<PhysicalRect>
@@ -721,7 +850,8 @@ public class OverlayLayoutHelperTests
         int sourceLineCount = 1,
         double captureLeft = 0,
         double overlayLeft = 0,
-        string? sourceText = null)
+        string? sourceText = null,
+        int sourceIndex = 0)
     {
         double sourceLineHeight = source.Height / sourceLineCount;
         return new OverlayLayoutHelper.AdaptiveCardLayoutInput(
@@ -729,8 +859,8 @@ public class OverlayLayoutHelperTests
             sourceText ?? text,
             source,
             allBounds,
-            allBounds.Select(bounds => bounds == source ? sourceLineCount : 1).ToList(),
-            SourceIndex: 0,
+            allBounds.Select((bounds, index) => index == sourceIndex ? sourceLineCount : 1).ToList(),
+            sourceIndex,
             sourceLineCount,
             InitialWidth: source.Width,
             InitialMinHeight: source.Height,

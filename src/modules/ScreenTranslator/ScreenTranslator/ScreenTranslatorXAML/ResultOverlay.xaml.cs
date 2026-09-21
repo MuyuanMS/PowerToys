@@ -432,12 +432,13 @@ public sealed partial class ResultOverlay : TransparentWindow
             _overlayBounds,
             _dpiScaleX,
             _dpiScaleY);
-        var (captureLeftDip, _, _, _) = OverlayLayoutHelper.PhysicalToDip(
+        var (captureLeftDip, captureTopDip, _, _) = OverlayLayoutHelper.PhysicalToDip(
             _capturedRegion,
             _overlayBounds,
             _dpiScaleX,
             _dpiScaleY);
         double captureRightDip = captureLeftDip + captureWidthDip;
+        double captureBottomDip = captureTopDip + captureHeightDip;
         double overlayLeftDip = 0;
         double overlayRightDip = _overlayBounds.Width / _dpiScaleX;
         IReadOnlyList<PhysicalRect> lineBoundsDip = _lines
@@ -451,6 +452,8 @@ public sealed partial class ResultOverlay : TransparentWindow
                 return new PhysicalRect(left, top, width, height);
             })
             .ToList();
+        List<PhysicalRect> layoutObstacles = lineBoundsDip.ToList();
+        IReadOnlyList<int> sourceLineCounts = _lines.Select(item => item.SourceLineCount).ToList();
 
         for (int lineIndex = 0; lineIndex < _lines.Count; lineIndex++)
         {
@@ -475,8 +478,8 @@ public sealed partial class ResultOverlay : TransparentWindow
                 line.TranslatedText,
                 line.OriginalText,
                 lineBounds,
-                lineBoundsDip,
-                _lines.Select(item => item.SourceLineCount).ToList(),
+                layoutObstacles,
+                sourceLineCounts,
                 lineIndex,
                 line.SourceLineCount,
                 initialWidth,
@@ -492,7 +495,7 @@ public sealed partial class ResultOverlay : TransparentWindow
                 Text = line.TranslatedText,
                 Foreground = CreateForegroundBrush(line),
                 FontSize = estimatedFontSize,
-                TextWrapping = TextWrapping.Wrap,
+                TextWrapping = TextWrapping.WrapWholeWords,
                 VerticalAlignment = VerticalAlignment.Center,
                 FlowDirection = OverlayLayoutHelper.IsStrongRtlText(line.TranslatedText)
                     ? FlowDirection.RightToLeft
@@ -510,7 +513,7 @@ public sealed partial class ResultOverlay : TransparentWindow
                 textBlock.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
                 measuredDesiredWidth = textBlock.DesiredSize.Width;
 
-                textBlock.FontSize = OverlayLayoutHelper.CalculateMinimumTitleFontSize(estimatedFontSize);
+                textBlock.FontSize = OverlayLayoutHelper.CalculateAdaptiveTitleFontSize(adaptiveInput);
                 textBlock.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
                 measuredReducedWidth = textBlock.DesiredSize.Width;
             }
@@ -523,7 +526,42 @@ public sealed partial class ResultOverlay : TransparentWindow
             textBlock.FontSize = adaptiveLayout.FontSize;
             textBlock.TextWrapping = adaptiveLayout.FitsSingleLine
                 ? TextWrapping.NoWrap
-                : TextWrapping.Wrap;
+                : TextWrapping.WrapWholeWords;
+            double cardContentWidth = Math.Max(1, adaptiveLayout.Width - 14);
+            textBlock.Measure(new Windows.Foundation.Size(cardContentWidth, double.PositiveInfinity));
+            double desiredCardHeight = OverlayLayoutHelper.CalculateDesiredCardHeight(
+                textBlock.DesiredSize.Height,
+                adaptiveLayout.MinHeight);
+            OverlayLayoutHelper.VerticalCardPlacement verticalPlacement =
+                OverlayLayoutHelper.CalculateNonOverlappingVerticalPlacement(
+                    lineBounds,
+                    layoutObstacles,
+                    lineIndex,
+                    adaptiveLayout.Left,
+                    adaptiveLayout.Width,
+                    desiredCardHeight,
+                    captureTopDip,
+                    captureBottomDip);
+
+            while (!verticalPlacement.FitsWithoutOverlap &&
+                   textBlock.TextWrapping != TextWrapping.NoWrap &&
+                   textBlock.FontSize > 9)
+            {
+                textBlock.FontSize = Math.Max(9, textBlock.FontSize - 1);
+                textBlock.Measure(new Windows.Foundation.Size(cardContentWidth, double.PositiveInfinity));
+                desiredCardHeight = OverlayLayoutHelper.CalculateDesiredCardHeight(
+                    textBlock.DesiredSize.Height,
+                    adaptiveLayout.MinHeight);
+                verticalPlacement = OverlayLayoutHelper.CalculateNonOverlappingVerticalPlacement(
+                    lineBounds,
+                    layoutObstacles,
+                    lineIndex,
+                    adaptiveLayout.Left,
+                    adaptiveLayout.Width,
+                    desiredCardHeight,
+                    captureTopDip,
+                    captureBottomDip);
+            }
 
             Border card = new()
             {
@@ -533,7 +571,7 @@ public sealed partial class ResultOverlay : TransparentWindow
                 CornerRadius = new CornerRadius(4),
                 Padding = new Thickness(6, 2, 6, 2),
                 Width = adaptiveLayout.Width,
-                MinHeight = adaptiveLayout.MinHeight,
+                MinHeight = verticalPlacement.MinHeight,
             };
             card.PointerPressed += Card_PointerPressed;
             card.PointerMoved += Card_PointerMoved;
@@ -547,14 +585,19 @@ public sealed partial class ResultOverlay : TransparentWindow
             card.Child = textBlock;
 
             Canvas.SetLeft(card, adaptiveLayout.IsAdapted ? adaptiveLayout.Left : leftDip);
-            Canvas.SetTop(card, topDip);
+            Canvas.SetTop(card, verticalPlacement.Top);
+            layoutObstacles[lineIndex] = new PhysicalRect(
+                adaptiveLayout.IsAdapted ? adaptiveLayout.Left : leftDip,
+                verticalPlacement.Top,
+                adaptiveLayout.Width,
+                verticalPlacement.MinHeight);
             _initialAppearance[lineIndex] = (
                 textBlock.Text,
                 GetBrushColor(card.Background),
                 GetBrushColor(textBlock.Foreground),
-                adaptiveLayout.FontSize,
+                textBlock.FontSize,
                 adaptiveLayout.IsAdapted ? adaptiveLayout.Left : leftDip,
-                topDip,
+                verticalPlacement.Top,
                 card.Width,
                 card.MinHeight);
             _translatedTexts[lineIndex] = line.TranslatedText;
@@ -1148,7 +1191,7 @@ public sealed partial class ResultOverlay : TransparentWindow
             Text = textBlock.Text,
             Foreground = textBlock.Foreground,
             FontSize = textBlock.FontSize,
-            TextWrapping = TextWrapping.Wrap,
+            TextWrapping = TextWrapping.WrapWholeWords,
             AcceptsReturn = true,
             Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0)),
             BorderThickness = new Thickness(0),
@@ -1208,7 +1251,7 @@ public sealed partial class ResultOverlay : TransparentWindow
             Text = _editingTextBox.Text,
             Foreground = _editingTextBox.Foreground,
             FontSize = _editingTextBox.FontSize,
-            TextWrapping = TextWrapping.Wrap,
+            TextWrapping = TextWrapping.WrapWholeWords,
             VerticalAlignment = VerticalAlignment.Center,
         };
         _editingCard.Child = textBlock;
@@ -1241,7 +1284,7 @@ public sealed partial class ResultOverlay : TransparentWindow
             Text = _editingOriginalText,
             Foreground = _editingTextBox.Foreground,
             FontSize = _editingTextBox.FontSize,
-            TextWrapping = TextWrapping.Wrap,
+            TextWrapping = TextWrapping.WrapWholeWords,
             VerticalAlignment = VerticalAlignment.Center,
         };
         _editingCard.Child = textBlock;
@@ -1375,7 +1418,7 @@ public sealed partial class ResultOverlay : TransparentWindow
                 Text = initial.Text,
                 Foreground = new SolidColorBrush(initial.Foreground),
                 FontSize = initial.FontSize,
-                TextWrapping = TextWrapping.Wrap,
+                TextWrapping = TextWrapping.WrapWholeWords,
                 VerticalAlignment = VerticalAlignment.Center,
             };
             card.Child = textBlock;
