@@ -144,6 +144,8 @@ void ReparentCropAndLockWindow::CropAndLock(HWND windowToCrop, RECT cropRect)
     auto targetStyle = GetWindowLongPtrW(m_currentTarget, GWL_STYLE);
     targetStyle |= WS_CHILD;
     SetWindowLongPtrW(m_currentTarget, GWL_STYLE, targetStyle);
+    winrt::check_bool(SetWindowPos(m_currentTarget, nullptr, 0, 0, 0, 0,
+                                  SWP_NOSIZE | SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOACTIVATE));
 
     // ⚠ FIX (client area must not change when the window becomes a child):
     //   A top-level window's client area = window rect minus its non-client ring (caption/border).
