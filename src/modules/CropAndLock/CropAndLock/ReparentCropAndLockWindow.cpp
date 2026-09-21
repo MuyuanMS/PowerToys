@@ -175,8 +175,8 @@ void ReparentCropAndLockWindow::CropAndLock(HWND windowToCrop, RECT cropRect)
     POINT clientOrigin = { 0, 0 };
     winrt::check_bool(GetWindowRect(m_currentTarget, &finalWindowRect));
     winrt::check_bool(ClientToScreen(m_currentTarget, &clientOrigin));
-    auto x = -(cropRect.left + (clientOrigin.x - finalWindowRect.left));
-    auto y = -(cropRect.top + (clientOrigin.y - finalWindowRect.top));
+    auto x = -(cropRect.left - diffX + (clientOrigin.x - finalWindowRect.left));
+    auto y = -(cropRect.top - diffY + (clientOrigin.y - finalWindowRect.top));
     if (0 == SetWindowPos(m_currentTarget, nullptr, static_cast<int>(x), static_cast<int>(y), 0, 0,
                           SWP_NOSIZE | SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOACTIVATE))
     {
