@@ -473,6 +473,7 @@ public sealed partial class ResultOverlay : TransparentWindow
                 line.SourceLineCount);
             OverlayLayoutHelper.AdaptiveCardLayoutInput adaptiveInput = new(
                 line.TranslatedText,
+                line.OriginalText,
                 lineBounds,
                 lineBoundsDip,
                 _lines.Select(item => item.SourceLineCount).ToList(),

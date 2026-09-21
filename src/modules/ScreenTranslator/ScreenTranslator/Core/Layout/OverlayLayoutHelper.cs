@@ -18,6 +18,8 @@ public static class OverlayLayoutHelper
     private const double MaxInitialSingleLineCardHeightFraction = 0.35;
     private const double MaxInitialMultilineCardHeightFraction = 0.6;
     private const double TitleSourceLineHeightThreshold = 22.0;
+    private const double CompactLabelSourceLineHeightThreshold = 14.0;
+    private const int MaximumCompactCjkLabelLength = 12;
     private const double MinimumTitleFontSize = 16.0;
     private const double MinimumTitleFontRatio = 0.82;
     private const double CardHorizontalChrome = 14.0;
@@ -26,6 +28,7 @@ public static class OverlayLayoutHelper
 
     public sealed record AdaptiveCardLayoutInput(
         string Text,
+        string SourceText,
         PhysicalRect SourceBounds,
         IReadOnlyList<PhysicalRect> AllLineBounds,
         IReadOnlyList<int> AllSourceLineCounts,
@@ -198,10 +201,50 @@ public static class OverlayLayoutHelper
     public static bool IsAdaptiveTitleCandidate(AdaptiveCardLayoutInput input)
     {
         return input.SourceLineCount == 1 &&
-            input.SourceBounds.Height >= TitleSourceLineHeightThreshold &&
             input.SourceBounds.Width >= input.SourceBounds.Height * 1.5 &&
-            IsClearlyLargerThanTypicalSingleLine(input) &&
+            (IsLargeTitle(input) || IsCompactCjkLabel(input)) &&
             !string.IsNullOrWhiteSpace(input.Text);
+    }
+
+    private static bool IsLargeTitle(AdaptiveCardLayoutInput input)
+    {
+        return input.SourceBounds.Height >= TitleSourceLineHeightThreshold &&
+            IsClearlyLargerThanTypicalSingleLine(input);
+    }
+
+    private static bool IsCompactCjkLabel(AdaptiveCardLayoutInput input)
+    {
+        if (input.SourceBounds.Height < CompactLabelSourceLineHeightThreshold ||
+            string.IsNullOrWhiteSpace(input.SourceText))
+        {
+            return false;
+        }
+
+        int sourceCharacterCount = 0;
+        bool hasCjkCharacter = false;
+        foreach (char character in input.SourceText)
+        {
+            if (char.IsWhiteSpace(character) || char.IsPunctuation(character))
+            {
+                continue;
+            }
+
+            sourceCharacterCount++;
+            hasCjkCharacter |= IsCjkCharacter(character);
+        }
+
+        return hasCjkCharacter &&
+            sourceCharacterCount is > 0 and <= MaximumCompactCjkLabelLength &&
+            input.Text.Any(character => character is >= 'A' and <= 'Z' || character is >= 'a' and <= 'z');
+    }
+
+    private static bool IsCjkCharacter(char character)
+    {
+        return character is >= '\u3040' and <= '\u30FF' ||
+            character is >= '\u3400' and <= '\u4DBF' ||
+            character is >= '\u4E00' and <= '\u9FFF' ||
+            character is >= '\uAC00' and <= '\uD7AF' ||
+            character is >= '\uF900' and <= '\uFAFF';
     }
 
     public static double CalculateMaximumAdaptiveTitleWidth(AdaptiveCardLayoutInput input)

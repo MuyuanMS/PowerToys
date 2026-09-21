@@ -632,6 +632,48 @@ public class OverlayLayoutHelperTests
     }
 
     [TestMethod]
+    public void CalculateAdaptiveInitialCardLayout_CompactChineseCardHeadingExpands()
+    {
+        PhysicalRect heading = new(163, 306, 100, 16);
+        IReadOnlyList<PhysicalRect> allBounds =
+        [
+            heading,
+            new PhysicalRect(163, 348, 128, 34),
+            new PhysicalRect(163, 405, 170, 14),
+            new PhysicalRect(597, 306, 90, 16),
+        ];
+
+        OverlayLayoutHelper.AdaptiveCardLayout layout = OverlayLayoutHelper.CalculateAdaptiveInitialCardLayout(
+            CreateAdaptiveInput(
+                "Affected orders",
+                heading,
+                allBounds,
+                captureRight: 1600,
+                sourceText: "受影响订单"),
+            measuredDesiredWidth: 118,
+            measuredReducedWidth: 102);
+
+        Assert.IsTrue(layout.IsAdapted);
+        Assert.IsTrue(layout.FitsSingleLine);
+        Assert.IsTrue(layout.Width > heading.Width);
+        Assert.AreEqual(heading.Height, layout.MinHeight, 0.001);
+    }
+
+    [TestMethod]
+    public void CalculateAdaptiveInitialCardLayout_CompactLatinBodyLabelRemainsUnchanged()
+    {
+        PhysicalRect label = new(163, 306, 100, 16);
+        OverlayLayoutHelper.AdaptiveCardLayoutInput input = CreateAdaptiveInput(
+            "Affected orders",
+            label,
+            [label, new PhysicalRect(163, 348, 128, 16)],
+            captureRight: 1600,
+            sourceText: "Affected orders");
+
+        Assert.IsFalse(OverlayLayoutHelper.IsAdaptiveTitleCandidate(input));
+    }
+
+    [TestMethod]
     public void CalculateAdaptiveInitialCardLayout_RtlExpandsLeftAndStopsAtLeftNeighbor()
     {
         PhysicalRect source = new(400, 40, 180, 36);
@@ -678,11 +720,13 @@ public class OverlayLayoutHelperTests
         double captureRight,
         int sourceLineCount = 1,
         double captureLeft = 0,
-        double overlayLeft = 0)
+        double overlayLeft = 0,
+        string? sourceText = null)
     {
         double sourceLineHeight = source.Height / sourceLineCount;
         return new OverlayLayoutHelper.AdaptiveCardLayoutInput(
             text,
+            sourceText ?? text,
             source,
             allBounds,
             allBounds.Select(bounds => bounds == source ? sourceLineCount : 1).ToList(),
