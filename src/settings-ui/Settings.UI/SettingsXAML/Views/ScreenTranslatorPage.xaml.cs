@@ -3,6 +3,8 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Diagnostics;
+using ManagedCommon;
 using Microsoft.PowerToys.Settings.UI.Helpers;
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.PowerToys.Settings.UI.ViewModels;
@@ -82,6 +84,42 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             }
 
             AzureApiKeyStatusInfoBar.IsOpen = false;
+            AzureConnectionStatusInfoBar.IsOpen = false;
+        }
+
+        private async void TestAzureConnectionButton_Click(object sender, RoutedEventArgs e)
+        {
+            TestAzureConnectionButton.IsEnabled = false;
+            AzureConnectionStatusInfoBar.Severity = InfoBarSeverity.Informational;
+            AzureConnectionStatusInfoBar.Title = "Testing Azure Translator";
+            AzureConnectionStatusInfoBar.Message = "Sending a small translation request...";
+            AzureConnectionStatusInfoBar.IsOpen = true;
+
+            var result = await ViewModel.TestAzureTranslatorConnectionAsync();
+            AzureConnectionStatusInfoBar.Severity = result.Success ? InfoBarSeverity.Success : InfoBarSeverity.Error;
+            AzureConnectionStatusInfoBar.Title = result.Success ? "Connection successful" : "Connection failed";
+            AzureConnectionStatusInfoBar.Message = result.Message;
+            TestAzureConnectionButton.IsEnabled = true;
+        }
+
+        private void ViewAzureUsageButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "https://portal.azure.com/#browse/Microsoft.CognitiveServices%2Faccounts",
+                    UseShellExecute = true,
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Unable to open Azure usage in the browser: {ex.Message}");
+                AzureConnectionStatusInfoBar.Severity = InfoBarSeverity.Error;
+                AzureConnectionStatusInfoBar.Title = "Could not open Azure portal";
+                AzureConnectionStatusInfoBar.Message = "Open portal.azure.com and select your Translator resource, then Monitoring > Metrics.";
+                AzureConnectionStatusInfoBar.IsOpen = true;
+            }
         }
 
         private void SaveAzureVisionApiKey_Click(object sender, RoutedEventArgs e)

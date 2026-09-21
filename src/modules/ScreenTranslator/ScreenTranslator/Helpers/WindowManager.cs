@@ -162,7 +162,7 @@ public static class WindowManager
             return new AzureVisionOcrBackend(
                 settings?.Properties?.AzureVisionEndpoint ?? string.Empty,
                 ScreenTranslatorCredentialsVault.GetAzureVisionApiKey(),
-                settings?.Properties?.EnableCloudConsent ?? false);
+                cloudConsentEnabled: true);
         }
 
         return new OcrBackendSelector().GetOrSelectBackendAsync().GetAwaiter().GetResult();
@@ -181,7 +181,6 @@ public static class WindowManager
             settings.Properties.AcpAgentCommand ?? string.Empty,
             settings.Properties.SourceLanguage ?? "auto",
             settings.Properties.TargetLanguage ?? "en-US",
-            settings.Properties.EnableCloudConsent,
             settings.Properties.AzureEndpoint ?? string.Empty,
             settings.Properties.AzureRegion ?? string.Empty,
             settings.Properties.LibreTranslateEndpoint ?? string.Empty);

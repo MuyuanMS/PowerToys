@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using Common.UI;
 using ManagedCommon;
 using Microsoft.PowerToys.Common.UI.Controls.Window;
 using Microsoft.UI.Xaml;
@@ -25,6 +26,7 @@ public sealed partial class ProcessingOverlay : TransparentWindow
     private readonly OSInterop.SubclassProc _subclassProc;
     private bool _subclassed;
     private bool _cancellationRequested;
+    private bool _isShowingError;
     private double _cardLeftDip;
     private double _cardTopDip;
 
@@ -80,10 +82,20 @@ public sealed partial class ProcessingOverlay : TransparentWindow
 
     public void UpdateStatus(string status)
     {
-        if (!_cancellationRequested)
+        if (!_cancellationRequested && !_isShowingError)
         {
             StatusText.Text = status;
         }
+    }
+
+    public void ShowError(string title, string message)
+    {
+        _isShowingError = true;
+        ProcessingContent.Visibility = Visibility.Collapsed;
+        ErrorInfoBar.Title = title;
+        ErrorInfoBar.Message = message;
+        ErrorInfoBar.IsOpen = true;
+        PositionCard();
     }
 
     public void RequestCancellation()
@@ -140,6 +152,17 @@ public sealed partial class ProcessingOverlay : TransparentWindow
     private void CancelButton_Click(object sender, RoutedEventArgs e)
     {
         RequestCancellation();
+    }
+
+    private void ErrorInfoBar_CloseButtonClick(InfoBar sender, object args)
+    {
+        Close();
+    }
+
+    private void OpenSettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        SettingsDeepLink.OpenSettings(SettingsDeepLink.SettingsWindow.ScreenTranslator);
+        Close();
     }
 
     private void ProcessingOverlay_Closed(object sender, WindowEventArgs args)

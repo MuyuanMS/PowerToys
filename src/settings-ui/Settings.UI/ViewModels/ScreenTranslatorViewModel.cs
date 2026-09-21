@@ -6,7 +6,10 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Net.Http;
+using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
 using System.Timers;
 using ManagedCommon;
 using Microsoft.PowerToys.Settings.UI.Helpers;
@@ -310,20 +313,6 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
         }
 
-        public bool EnableCloudConsent
-        {
-            get => _screenTranslatorSettings.Properties.EnableCloudConsent;
-            set
-            {
-                if (_screenTranslatorSettings.Properties.EnableCloudConsent != value)
-                {
-                    _screenTranslatorSettings.Properties.EnableCloudConsent = value;
-                    OnPropertyChanged(nameof(EnableCloudConsent));
-                    SaveAndNotifySettings();
-                }
-            }
-        }
-
         public bool FreezeCapturedContent
         {
             get => _screenTranslatorSettings.Properties.FreezeCapturedContent;
@@ -462,6 +451,63 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         public bool HasLibreTranslateApiKey => !string.IsNullOrWhiteSpace(RetrieveCredential(LibreTranslateCredentialResource, LibreTranslateCredentialUsername));
 
+        public async Task<(bool Success, string Message)> TestAzureTranslatorConnectionAsync()
+        {
+            string apiKey = RetrieveCredential(AzureCredentialResource, AzureCredentialUsername);
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                return (false, "Save an Azure subscription key first.");
+            }
+
+            string endpoint = string.IsNullOrWhiteSpace(AzureEndpoint)
+                ? AzureCredentialResource
+                : AzureEndpoint.Trim().TrimEnd('/');
+            if (!Uri.TryCreate(endpoint, UriKind.Absolute, out Uri endpointUri) ||
+                endpointUri.Scheme != Uri.UriSchemeHttps)
+            {
+                return (false, "Enter a valid HTTPS Azure Translator endpoint.");
+            }
+
+            try
+            {
+                using var client = new HttpClient
+                {
+                    Timeout = TimeSpan.FromSeconds(15),
+                };
+                using var request = new HttpRequestMessage(
+                    HttpMethod.Post,
+                    new Uri(endpointUri, "/translate?api-version=3.0&to=es"))
+                {
+                    Content = new StringContent("[{\"Text\":\"Hello\"}]", Encoding.UTF8, "application/json"),
+                };
+                request.Headers.Add("Ocp-Apim-Subscription-Key", apiKey);
+                if (!string.IsNullOrWhiteSpace(AzureRegion))
+                {
+                    request.Headers.Add("Ocp-Apim-Subscription-Region", AzureRegion.Trim());
+                }
+
+                using HttpResponseMessage response = await client.SendAsync(request);
+                if (response.IsSuccessStatusCode)
+                {
+                    return (true, "Azure Translator responded successfully.");
+                }
+
+                string responseBody = await response.Content.ReadAsStringAsync();
+                return (
+                    false,
+                    $"Azure returned HTTP {(int)response.StatusCode}: {GetAzureErrorMessage(responseBody)}");
+            }
+            catch (TaskCanceledException)
+            {
+                return (false, "Azure Translator did not respond within 15 seconds.");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Azure Translator connection test failed: {ex.Message}");
+                return (false, $"Connection test failed: {ex.Message}");
+            }
+        }
+
         public bool SaveAzureApiKey(string key)
         {
             var saved = SaveCredential(AzureCredentialResource, AzureCredentialUsername, key);
@@ -537,6 +583,29 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 Logger.LogError($"Failed to save credential in PasswordVault: {ex.Message}");
                 return false;
             }
+        }
+
+        private static string GetAzureErrorMessage(string responseBody)
+        {
+            if (string.IsNullOrWhiteSpace(responseBody))
+            {
+                return "No error details were returned.";
+            }
+
+            try
+            {
+                using JsonDocument document = JsonDocument.Parse(responseBody);
+                if (document.RootElement.TryGetProperty("error", out JsonElement error) &&
+                    error.TryGetProperty("message", out JsonElement message))
+                {
+                    return message.GetString() ?? "Unknown Azure error.";
+                }
+            }
+            catch (JsonException)
+            {
+            }
+
+            return responseBody.Length > 200 ? string.Concat(responseBody.AsSpan(0, 200), "...") : responseBody;
         }
 
         private static void RemoveCredential(string resource, string username)

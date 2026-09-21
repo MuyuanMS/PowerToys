@@ -194,18 +194,6 @@
                             SelectedIndex="{x:Bind Path=ViewModel.SelectedProviderIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </tkcontrols:SettingsCard>
 
-                    <!-- Cloud Consent Toggle -->
-                    <tkcontrols:SettingsCard
-                        x:Uid="ScreenTranslator_CloudConsentCard"
-                        Header="Allow Online Translation Services"
-                        Description="Allows sending captured images or text to external OCR and translation APIs. API keys are stored securely in Windows Credential Vault.">
-                        <ToggleSwitch
-                            x:Name="CloudConsentToggleSwitch"
-                            AutomationProperties.AutomationId="ScreenTranslatorCloudConsentToggleSwitch"
-                            AutomationProperties.Name="Allow Online Translation Services"
-                            IsOn="{x:Bind ViewModel.EnableCloudConsent, Mode=TwoWay}" />
-                    </tkcontrols:SettingsCard>
-
                     <!-- Azure AI Translator Settings -->
                     <tkcontrols:SettingsExpander
                         x:Uid="ScreenTranslator_AzureExpander"
@@ -271,6 +259,30 @@
                                         x:Name="AzureApiKeyStatusInfoBar"
                                         AutomationProperties.AutomationId="ScreenTranslatorAzureApiKeyStatusInfoBar"
                                         IsClosable="False"
+                                        IsOpen="False" />
+                                </StackPanel>
+                            </tkcontrols:SettingsCard>
+                            <tkcontrols:SettingsCard
+                                Header="Connection and usage"
+                                Description="Testing sends “Hello” to Azure Translator. For usage, select your Translator resource in Azure and chart TextCharactersTranslated with Sum.">
+                                <StackPanel Spacing="8">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button
+                                            x:Name="TestAzureConnectionButton"
+                                            AutomationProperties.AutomationId="ScreenTranslatorTestAzureConnectionButton"
+                                            AutomationProperties.Name="Test Azure Translator connection"
+                                            Click="TestAzureConnectionButton_Click"
+                                            Content="Test connection" />
+                                        <Button
+                                            AutomationProperties.AutomationId="ScreenTranslatorViewAzureUsageButton"
+                                            AutomationProperties.Name="View Azure Translator usage"
+                                            Click="ViewAzureUsageButton_Click"
+                                            Content="View Azure usage" />
+                                    </StackPanel>
+                                    <InfoBar
+                                        x:Name="AzureConnectionStatusInfoBar"
+                                        AutomationProperties.AutomationId="ScreenTranslatorAzureConnectionStatusInfoBar"
+                                        IsClosable="True"
                                         IsOpen="False" />
                                 </StackPanel>
                             </tkcontrols:SettingsCard>

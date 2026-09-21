@@ -289,6 +289,7 @@ public sealed partial class SelectionOverlay : TransparentWindow
             Logger.LogInfo($"Grouped recognized text into {groupedLines.Count} layout blocks.");
 
             processingOverlay.UpdateStatus("Translating text...");
+            Logger.LogInfo($"Translating {groupedLines.Count} layout blocks with provider {_translationProvider.ProviderId}.");
             TranslationRequest request = new(groupedLines, sourceLanguage, targetLanguage);
             TranslationResult result = await _translationProvider.TranslateAsync(request, cancellationTokenSource.Token);
             result = TranslationQualityGuard.ReplaceDegenerateTranslations(result, out int replacementCount);
@@ -302,43 +303,16 @@ public sealed partial class SelectionOverlay : TransparentWindow
                 Logger.LogWarning($"Translation failed: {result.ErrorMessage}");
                 if (result.Lines.Count == 0 && !string.IsNullOrEmpty(result.ErrorMessage))
                 {
-                    // Surface translation error directly in overlay so user knows why translation did not happen
-                    string errorMessage = BuildTranslationErrorMessage(result.ErrorMessage);
-                    var errorLines = new List<TranslatedLine>
-                    {
-                        new(
-                            OriginalText: "Screen Translator",
-                            TranslatedText: errorMessage,
-                            BoundingBox: capturedRegionPhysical,
-                            Confidence: 1.0,
-                            PolygonVertices: null,
-                            SourceLineCount: 1),
-                    };
-                    errorLines = errorLines.ConvertAll(line => line with
-                    {
-                        OverlayBackgroundColorArgb = 0xFF4A1F1Fu,
-                        OverlayForegroundColorArgb = 0xFFFFFFFFu,
-                    });
-
-                    SoftwareBitmap errorSnapshot = SoftwareBitmap.Copy(capturedBitmap);
-                    if (!_dispatcherQueue.TryEnqueue(() =>
-                    {
-                        WindowManager.ShowResultOverlay(
-                            capturedRegionPhysical,
-                            errorLines,
-                            errorSnapshot,
-                            _freezeCapturedContentByDefault,
-                            sourceLanguage,
-                            targetLanguage,
-                            (newSource, newTarget) => ProcessCaptureAndTranslateAsync(capturedRegionPhysical, newSource, newTarget),
-                            TranslateLineAsync);
-                    }))
-                    {
-                        errorSnapshot.Dispose();
-                    }
-
+                    processingOverlay.ShowError(
+                        "Translation unavailable",
+                        BuildTranslationErrorMessage(result.ErrorMessage));
+                    processingOverlay = null;
                     return;
                 }
+            }
+            else
+            {
+                Logger.LogInfo($"Translation completed with provider {_translationProvider.ProviderId}.");
             }
 
             IReadOnlyList<TranslatedLine> styledLines = await Task.Run(
@@ -407,9 +381,9 @@ public sealed partial class SelectionOverlay : TransparentWindow
             (details.Contains("localhost", StringComparison.OrdinalIgnoreCase) ||
              details.Contains("127.0.0.1", StringComparison.OrdinalIgnoreCase)))
         {
-            return $"Translation unavailable\nProvider: {providerName}\n{details}\nStart the local LibreTranslate service or choose another provider in Screen Translator settings.";
+            return $"Provider: {providerName}\n{details}\nStart the local LibreTranslate service or choose another provider in Screen Translator settings.";
         }
 
-        return $"Translation unavailable\nProvider: {providerName}\n{details}\nCheck Screen Translator settings or choose another provider.";
+        return $"Provider: {providerName}\n{details}\nCheck Screen Translator settings or choose another provider.";
     }
 }
