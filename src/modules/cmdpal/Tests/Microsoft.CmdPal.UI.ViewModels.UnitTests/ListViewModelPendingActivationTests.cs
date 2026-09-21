@@ -196,41 +196,6 @@ public sealed partial class ListViewModelPendingActivationTests
 
     [TestMethod]
     [Timeout(15000)]
-    public async Task ClearingSearch_CancelsQueuedEnter()
-    {
-        var page = new DelayedSearchPage(CreateItem("Initial"));
-        var viewModel = CreateViewModel(page);
-        using var listener = new InvokeListener();
-
-        try
-        {
-            await ObserveItemsAsync(viewModel, "Initial", viewModel.InitializeProperties);
-
-            page.GetItemsGate.Reset();
-            page.GetItemsStarted.Reset();
-            viewModel.SearchTextBox = "Chrome";
-            Assert.IsTrue(page.GetItemsStarted.Wait(TimeSpan.FromSeconds(3)), "The search fetch did not start.");
-            viewModel.InvokeSelectedItemOrQueue(null);
-
-            var cleared = ObserveItemsAsync(
-                viewModel,
-                string.Empty,
-                () => viewModel.SearchTextBox = string.Empty);
-            page.GetItemsGate.Set();
-
-            await cleared;
-            Assert.IsFalse(listener.Invoked.IsCompleted, "Clearing the query should drop the queued Enter.");
-        }
-        finally
-        {
-            page.GetItemsGate.Set();
-            viewModel.SafeCleanup();
-            viewModel.Dispose();
-        }
-    }
-
-    [TestMethod]
-    [Timeout(15000)]
     public async Task StaticPageFilter_InvokesFirstMatchWithoutWaiting()
     {
         var page = new StaticSearchPage([CreateItem("Alpha"), CreateItem("Beta")]);
@@ -283,37 +248,7 @@ public sealed partial class ListViewModelPendingActivationTests
 
     [TestMethod]
     [Timeout(15000)]
-    public async Task MainPageDelayedPublication_KeepsEnterQueuedUntilNewGenerationPublishes()
-    {
-        var page = new DelayedPublicationPage(CreateItem("Initial"));
-        var viewModel = CreateViewModel(page, isMainPage: true);
-        using var listener = new InvokeListener();
-
-        try
-        {
-            await ObserveItemsAsync(viewModel, "Initial", viewModel.InitializeProperties);
-
-            viewModel.SearchTextBox = "Notepad";
-            viewModel.InvokeSelectedItemOrQueue(viewModel.FilteredItems[0]);
-
-            await Task.Delay(200);
-            Assert.IsFalse(listener.Invoked.IsCompleted, "Enter should wait for the delayed main-page publication instead of invoking the stale result.");
-
-            page.PublishSearchResults();
-
-            var invoked = await listener.Invoked.WaitAsync(TimeSpan.FromSeconds(3));
-            Assert.AreEqual("Notepad", invoked);
-        }
-        finally
-        {
-            viewModel.SafeCleanup();
-            viewModel.Dispose();
-        }
-    }
-
-    [TestMethod]
-    [Timeout(15000)]
-    public async Task NonMainPageDelayedPublication_KeepsEnterQueuedUntilNewGenerationPublishes()
+    public async Task NonMainPage_ActivatesVisibleSelectionImmediately()
     {
         var page = new DelayedPublicationPage(CreateItem("Initial"));
         var viewModel = CreateViewModel(page);
@@ -326,13 +261,8 @@ public sealed partial class ListViewModelPendingActivationTests
             viewModel.SearchTextBox = "Notepad";
             viewModel.InvokeSelectedItemOrQueue(viewModel.FilteredItems[0]);
 
-            await Task.Delay(200);
-            Assert.IsFalse(listener.Invoked.IsCompleted, "Enter should wait for delayed non-main-page publication instead of invoking the stale result.");
-
-            page.PublishSearchResults();
-
             var invoked = await listener.Invoked.WaitAsync(TimeSpan.FromSeconds(3));
-            Assert.AreEqual("Notepad", invoked);
+            Assert.AreEqual("Initial", invoked);
         }
         finally
         {

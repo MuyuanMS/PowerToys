@@ -625,7 +625,9 @@ public sealed partial class ListItemsView : UserControl,
             return;
         }
 
-        if (ViewModel?.TryActivateSecondarySelectionNow(ItemView.SelectedItem as ListItemViewModel) == true)
+        var selectedItem = ItemView.SelectedItem as ListItemViewModel;
+        if (ViewModel?.TryActivateSecondarySelectionNow(selectedItem) == true ||
+            selectedItem is { IsInitialized: true, IsInteractive: true, SecondaryCommand: null })
         {
             message.Handled = true;
         }

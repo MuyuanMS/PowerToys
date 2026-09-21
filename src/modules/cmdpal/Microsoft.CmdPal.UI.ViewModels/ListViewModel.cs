@@ -216,10 +216,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
     protected override void OnSearchTextBoxUpdated(string searchTextBox)
     {
         var epoch = Interlocked.Increment(ref _searchEpoch);
-        if (string.IsNullOrEmpty(searchTextBox))
-        {
-            ClearPendingActivation();
-        }
+        ClearPendingActivation();
 
         // Dynamic pages will handler their own filtering. They will tell us if
         // something needs to change, by raising ItemsChanged.
@@ -1026,7 +1023,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
     // Extension pages keep the old Enter behavior: run the visible selection now,
     // and never auto-run a later fetch. Only the home page can queue Enter.
     private bool CanQueueActivation =>
-        _homePage is not null && !string.IsNullOrEmpty(SearchTextBox);
+        _homePage is not null && !string.IsNullOrWhiteSpace(SearchTextBox);
 
     private bool IsActivationReady =>
         Volatile.Read(ref _readySearchEpoch) == Volatile.Read(ref _searchEpoch) &&

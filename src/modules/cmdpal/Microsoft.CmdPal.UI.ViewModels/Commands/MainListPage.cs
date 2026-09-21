@@ -543,9 +543,12 @@ public sealed partial class MainListPage : DynamicListPage,
     {
         var stopwatch = Stopwatch.StartNew();
 
-        _cancellationTokenSource?.Cancel();
-        _cancellationTokenSource?.Dispose();
-        _cancellationTokenSource = new CancellationTokenSource();
+        if (isUserInput || _cancellationTokenSource is null)
+        {
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = new CancellationTokenSource();
+        }
 
         var token = _cancellationTokenSource.Token;
         if (token.IsCancellationRequested)

@@ -1107,11 +1107,10 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         {
             // Ctrl+Enter
             case VirtualKey.Enter when mods.OnlyCtrl:
-                if (GetActiveListViewModel() is { } listForSecondary)
                 {
                     var secondary = new ActivateSecondaryCommandMessage();
                     WeakReferenceMessenger.Default.Send(secondary);
-                    if (!secondary.Handled)
+                    if (!secondary.Handled && GetActiveListViewModel() is { } listForSecondary)
                     {
                         listForSecondary.InvokeSecondaryCommandOrQueue();
                     }
@@ -1121,11 +1120,10 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
             // Enter
             case VirtualKey.Enter when mods.None:
-                if (GetActiveListViewModel() is { } list)
                 {
                     var activate = new ActivateSelectedListItemMessage();
                     WeakReferenceMessenger.Default.Send(activate);
-                    if (!activate.Handled)
+                    if (!activate.Handled && GetActiveListViewModel() is { } list)
                     {
                         list.InvokeSelectedItemOrQueue();
                     }

@@ -109,14 +109,13 @@ internal sealed partial class FallbackUpdateManager : IDisposable
 
                 var command = commands[i];
                 var counter = _inflightFallbacks.GetOrAdd(command.Id, static _ => new InflightCounter());
-                if (!counter.TryClaim(MaxInflightPerFallback))
+                var pendingCommand = command;
+                var pendingQuery = query;
+                var pendingCt = cancellationToken;
+                if (!counter.TryClaimOrQueue(
+                    MaxInflightPerFallback,
+                    new PendingWork(() => RetryFallbackUpdate(pendingCommand, pendingQuery, pendingCt, counter, FinishOne), pendingCt)))
                 {
-                    // At capacity — store this query as a pending retry so it runs
-                    // when one of the in-flight calls finishes. Latest query wins.
-                    var pendingCommand = command;
-                    var pendingQuery = query;
-                    var pendingCt = cancellationToken;
-                    counter.SetPending(() => RetryFallbackUpdate(pendingCommand, pendingQuery, pendingCt, counter, FinishOne), pendingCt);
                     continue;
                 }
 
@@ -174,8 +173,7 @@ internal sealed partial class FallbackUpdateManager : IDisposable
                 }
                 finally
                 {
-                    counter.Release();
-                    DispatchPending(counter.TakePending());
+                    DispatchPending(counter.ReleaseAndTakePending());
                     FinishOne();
                 }
 
@@ -217,11 +215,10 @@ internal sealed partial class FallbackUpdateManager : IDisposable
                 return;
             }
 
-            if (!ctr.TryClaim(MaxInflightPerFallback))
+            if (!ctr.TryClaimOrQueue(
+                MaxInflightPerFallback,
+                new PendingWork(() => RetryFallbackUpdate(cmd, q, ct, ctr, finishOne), ct)))
             {
-                // Still at capacity (a newer worker claimed the freed slot first).
-                // The pending was already consumed from TakePending, so it's dropped here.
-                finishOne();
                 return;
             }
 
@@ -236,8 +233,7 @@ internal sealed partial class FallbackUpdateManager : IDisposable
             }
             finally
             {
-                ctr.Release();
-                DispatchPending(ctr.TakePending());
+                DispatchPending(ctr.ReleaseAndTakePending());
                 finishOne();
             }
 
@@ -267,43 +263,40 @@ internal sealed partial class FallbackUpdateManager : IDisposable
     /// </summary>
     private sealed class InflightCounter
     {
+        private readonly object _gate = new();
         private int _count;
 
         // Latest pending work item. Only one is stored; newer queries overwrite older ones.
         private PendingWork? _pendingWork;
 
         /// <summary>
-        /// Try to claim a slot. Returns true if the count was below
-        /// <paramref name="max"/> and was incremented; false if at capacity.
+        /// Claims a slot, or installs the work as the pending retry while holding
+        /// the same lock used by release. This closes the failed-claim/pending gap.
         /// </summary>
-        public bool TryClaim(int max)
+        public bool TryClaimOrQueue(int max, PendingWork pending)
         {
-            while (true)
+            lock (_gate)
             {
-                var current = Volatile.Read(ref _count);
-                if (current >= max)
+                if (_count < max)
                 {
-                    return false;
-                }
-
-                if (Interlocked.CompareExchange(ref _count, current + 1, current) == current)
-                {
+                    _count++;
                     return true;
                 }
+
+                _pendingWork = pending;
+                return false;
             }
         }
 
-        /// <summary>
-        /// Stores a pending work item to run when the next slot opens.
-        /// Overwrites any previously stored item — latest query always wins.
-        /// </summary>
-        public void SetPending(Action work, CancellationToken ct) => Interlocked.Exchange(ref _pendingWork, new PendingWork(work, ct));
-
-        /// <summary>
-        /// Atomically removes and returns any pending work item, or null if none.
-        /// </summary>
-        public PendingWork? TakePending() => Interlocked.Exchange(ref _pendingWork, null);
-
-        public void Release() => Interlocked.Decrement(ref _count);
+        public PendingWork? ReleaseAndTakePending()
+        {
+            lock (_gate)
+            {
+                _count--;
+                var pending = _pendingWork;
+                _pendingWork = null;
+                return pending;
+            }
+        }
     }
 }
