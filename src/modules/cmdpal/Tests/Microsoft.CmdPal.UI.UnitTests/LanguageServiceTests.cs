@@ -112,6 +112,36 @@ public class LanguageServiceTests
     }
 
     [TestMethod]
+    public void OverrideFailure_ReconcilesSavedLanguageSelection()
+    {
+        var settings = new SettingsModel { Language = "de-DE" };
+        var settingsService = new Mock<ISettingsService>();
+        settingsService.Setup(s => s.Settings).Returns(() => settings);
+        settingsService.Setup(s => s.UpdateSettings(It.IsAny<Func<SettingsModel, SettingsModel>>(), It.IsAny<bool>()))
+            .Callback<Func<SettingsModel, SettingsModel>, bool>((update, _) => settings = update(settings));
+        var languageService = new LanguageService(["en-US"], ["en-US", "de-DE"], isCiBuild: true, setLanguageOverride: tag =>
+        {
+            if (tag == "de-DE")
+            {
+                throw new InvalidOperationException("Language API unavailable");
+            }
+        });
+
+        var languageOverride = languageService.ApplyLanguageOverride(settings.Language);
+        if (!string.Equals(settingsService.Object.Settings.Language, languageOverride, StringComparison.OrdinalIgnoreCase))
+        {
+            settingsService.Object.UpdateSettings(current => current with { Language = languageOverride }, hotReload: false);
+        }
+
+        var page = CreateLanguageSettings(settingsService.Object, languageService);
+
+        Assert.AreEqual(string.Empty, settings.Language);
+        Assert.AreEqual(0, page.LanguageIndex);
+        Assert.IsFalse(page.LanguageChanged);
+        settingsService.Verify(s => s.UpdateSettings(It.IsAny<Func<SettingsModel, SettingsModel>>(), false), Times.Once);
+    }
+
+    [TestMethod]
     public void NoMatchingLanguage_KeepsTheDefaultWithoutFallbackMatching()
     {
         // Windows rejects zh-CN for a zh-Hant reader as a script mismatch. That answer must stand:

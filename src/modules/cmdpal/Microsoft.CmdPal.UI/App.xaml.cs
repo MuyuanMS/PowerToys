@@ -84,6 +84,11 @@ public partial class App : Application, IDisposable
         var settingsService = new SettingsService(persistenceService, appInfoService);
         var languageService = new LanguageService();
         var languageOverride = languageService.ApplyLanguageOverride(settingsService.Settings.Language);
+        if (!string.Equals(settingsService.Settings.Language, languageOverride, StringComparison.OrdinalIgnoreCase))
+        {
+            settingsService.UpdateSettings(settings => settings with { Language = languageOverride }, hotReload: false);
+        }
+
         appInfoService.SetLanguageOverride(languageOverride);
         Services = ConfigureServices(appInfoService, persistenceService, settingsService, languageService);
 

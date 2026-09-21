@@ -90,6 +90,11 @@ function Assert-CultureName {
         return $false
     }
 
+    if (-not $Value.StartsWith('qps-', [StringComparison]::OrdinalIgnoreCase)) {
+        Write-Error "Pseudo-localization culture must start with 'qps-'."
+        return $false
+    }
+
     return $true
 }
 
