@@ -493,6 +493,139 @@ public class OverlayLayoutHelperTests
     }
 
     [TestMethod]
+    public void CalculateAdaptiveInitialCardLayout_ExpandsLongEnglishTitleAndPreservesHeight()
+    {
+        PhysicalRect source = new(80, 40, 180, 36);
+        OverlayLayoutHelper.AdaptiveCardLayout layout = OverlayLayoutHelper.CalculateAdaptiveInitialCardLayout(
+            CreateAdaptiveInput(
+                "Powerful productivity for everyone",
+                source,
+                [source],
+                captureRight: 900),
+            measuredDesiredWidth: 300,
+            measuredReducedWidth: 260);
+
+        Assert.IsTrue(layout.IsAdapted);
+        Assert.IsTrue(layout.FitsSingleLine);
+        Assert.IsTrue(layout.Width > source.Width);
+        Assert.AreEqual(36.0, layout.MinHeight, 0.001);
+        Assert.AreEqual(30.6, layout.FontSize, 0.001);
+        Assert.IsTrue(layout.Width <= 820.0);
+    }
+
+    [TestMethod]
+    public void CalculateAdaptiveInitialCardLayout_RightNeighborLimitsExpansion()
+    {
+        PhysicalRect source = new(80, 40, 180, 36);
+        PhysicalRect neighbor = new(430, 42, 180, 24);
+        OverlayLayoutHelper.AdaptiveCardLayout layout = OverlayLayoutHelper.CalculateAdaptiveInitialCardLayout(
+            CreateAdaptiveInput(
+                "Longer English title",
+                source,
+                [source, neighbor],
+                captureRight: 900),
+            measuredDesiredWidth: 400,
+            measuredReducedWidth: 260);
+
+        Assert.IsTrue(layout.IsAdapted);
+        Assert.IsTrue(layout.Width <= 342.0);
+        Assert.IsTrue(source.Left + layout.Width <= neighbor.Left - 8.0);
+    }
+
+    [TestMethod]
+    public void CalculateAdaptiveInitialCardLayout_InsufficientWidthReducesFontThenWraps()
+    {
+        PhysicalRect source = new(80, 40, 180, 36);
+        OverlayLayoutHelper.AdaptiveCardLayout layout = OverlayLayoutHelper.CalculateAdaptiveInitialCardLayout(
+            CreateAdaptiveInput(
+                "A substantially longer English title that cannot fit",
+                source,
+                [source],
+                captureRight: 355),
+            measuredDesiredWidth: 400,
+            measuredReducedWidth: 300);
+
+        Assert.IsTrue(layout.IsAdapted);
+        Assert.IsFalse(layout.FitsSingleLine);
+        Assert.AreEqual(275.0, layout.Width, 0.001);
+        Assert.AreEqual(25.092, layout.FontSize, 0.001);
+        Assert.AreEqual(36.0, layout.MinHeight, 0.001);
+    }
+
+    [TestMethod]
+    public void CalculateAdaptiveInitialCardLayout_BodyAndMultilineRemainUnchanged()
+    {
+        PhysicalRect body = new(80, 40, 180, 20);
+        OverlayLayoutHelper.AdaptiveCardLayout bodyLayout = OverlayLayoutHelper.CalculateAdaptiveInitialCardLayout(
+            CreateAdaptiveInput("Long body text that would otherwise expand", body, [body], captureRight: 900),
+            measuredDesiredWidth: 300,
+            measuredReducedWidth: 260);
+        PhysicalRect multiline = new(80, 80, 240, 64);
+        OverlayLayoutHelper.AdaptiveCardLayout multilineLayout = OverlayLayoutHelper.CalculateAdaptiveInitialCardLayout(
+            CreateAdaptiveInput(
+                "Long translated multiline group",
+                multiline,
+                [multiline],
+                captureRight: 900,
+                sourceLineCount: 2),
+            measuredDesiredWidth: 300,
+            measuredReducedWidth: 260);
+
+        Assert.IsFalse(bodyLayout.IsAdapted);
+        Assert.AreEqual(body.Width, bodyLayout.Width, 0.001);
+        Assert.IsFalse(multilineLayout.IsAdapted);
+        Assert.AreEqual(multiline.Width, multilineLayout.Width, 0.001);
+    }
+
+    [TestMethod]
+    public void CalculateAdaptiveInitialCardLayout_BodyLinesOfSimilarHeightRemainUnchanged()
+    {
+        PhysicalRect body = new(80, 40, 240, 30);
+        OverlayLayoutHelper.AdaptiveCardLayoutInput input = CreateAdaptiveInput(
+            "A body line",
+            body,
+            [body, new PhysicalRect(80, 80, 240, 28), new PhysicalRect(80, 120, 240, 30)],
+            captureRight: 900);
+
+        Assert.IsFalse(OverlayLayoutHelper.IsAdaptiveTitleCandidate(input));
+    }
+
+    [TestMethod]
+    public void CalculateAdaptiveInitialCardLayout_ClearlyLargerLineQualifiesAsTitle()
+    {
+        PhysicalRect title = new(80, 40, 240, 40);
+        OverlayLayoutHelper.AdaptiveCardLayoutInput input = CreateAdaptiveInput(
+            "A clearly larger title",
+            title,
+            [title, new PhysicalRect(80, 100, 240, 28), new PhysicalRect(80, 140, 240, 30)],
+            captureRight: 900);
+
+        Assert.IsTrue(OverlayLayoutHelper.IsAdaptiveTitleCandidate(input));
+    }
+
+    [TestMethod]
+    public void CalculateAdaptiveInitialCardLayout_RtlExpandsLeftAndStopsAtLeftNeighbor()
+    {
+        PhysicalRect source = new(400, 40, 180, 36);
+        PhysicalRect neighbor = new(180, 42, 120, 24);
+        OverlayLayoutHelper.AdaptiveCardLayout layout = OverlayLayoutHelper.CalculateAdaptiveInitialCardLayout(
+            CreateAdaptiveInput(
+                "عنوان عربي طويل",
+                source,
+                [source, neighbor],
+                captureRight: 900,
+                captureLeft: 0,
+                overlayLeft: 0),
+            measuredDesiredWidth: 400,
+            measuredReducedWidth: 250);
+
+        Assert.IsTrue(layout.IsAdapted);
+        Assert.IsTrue(layout.FitsSingleLine);
+        Assert.AreEqual(264.0, layout.Width, 0.001);
+        Assert.AreEqual(316.0, layout.Left, 0.001);
+    }
+
+    [TestMethod]
     public void FindContainingScreen_IdentifiesCorrectScreen()
     {
         var screens = new List<PhysicalRect>
@@ -508,5 +641,31 @@ public class OverlayLayoutHelperTests
         var screen2 = OverlayLayoutHelper.FindContainingScreen(new PhysicalPoint(2500, 500), screens);
         Assert.IsNotNull(screen2);
         Assert.AreEqual(1920.0, screen2.Value.X);
+    }
+
+    private static OverlayLayoutHelper.AdaptiveCardLayoutInput CreateAdaptiveInput(
+        string text,
+        PhysicalRect source,
+        IReadOnlyList<PhysicalRect> allBounds,
+        double captureRight,
+        int sourceLineCount = 1,
+        double captureLeft = 0,
+        double overlayLeft = 0)
+    {
+        double sourceLineHeight = source.Height / sourceLineCount;
+        return new OverlayLayoutHelper.AdaptiveCardLayoutInput(
+            text,
+            source,
+            allBounds,
+            allBounds.Select(bounds => bounds == source ? sourceLineCount : 1).ToList(),
+            SourceIndex: 0,
+            sourceLineCount,
+            InitialWidth: source.Width,
+            InitialMinHeight: source.Height,
+            FontSize: OverlayLayoutHelper.CalculateEstimatedFontSize(sourceLineHeight),
+            CaptureLeft: captureLeft,
+            captureRight,
+            overlayLeft,
+            OverlayRight: 1000);
     }
 }

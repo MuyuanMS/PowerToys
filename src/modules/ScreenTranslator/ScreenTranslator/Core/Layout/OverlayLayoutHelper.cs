@@ -17,6 +17,35 @@ public static class OverlayLayoutHelper
     private const double MaxInitialCardWidthFraction = 0.9;
     private const double MaxInitialSingleLineCardHeightFraction = 0.35;
     private const double MaxInitialMultilineCardHeightFraction = 0.6;
+    private const double TitleSourceLineHeightThreshold = 28.0;
+    private const double MinimumTitleFontSize = 16.0;
+    private const double MinimumTitleFontRatio = 0.82;
+    private const double CardHorizontalChrome = 14.0;
+    private const double NeighborGap = 8.0;
+    private const double MinimumUsefulExpansion = 12.0;
+
+    public sealed record AdaptiveCardLayoutInput(
+        string Text,
+        PhysicalRect SourceBounds,
+        IReadOnlyList<PhysicalRect> AllLineBounds,
+        IReadOnlyList<int> AllSourceLineCounts,
+        int SourceIndex,
+        int SourceLineCount,
+        double InitialWidth,
+        double InitialMinHeight,
+        double FontSize,
+        double CaptureLeft,
+        double CaptureRight,
+        double OverlayLeft,
+        double OverlayRight);
+
+    public readonly record struct AdaptiveCardLayout(
+        double Width,
+        double MinHeight,
+        double FontSize,
+        double Left,
+        bool IsAdapted,
+        bool FitsSingleLine);
 
     /// <summary>
     /// Converts a canonical physical rectangle into DIP (device independent pixel) coordinates relative to a specific screen's top-left.
@@ -94,6 +123,188 @@ public static class OverlayLayoutHelper
 
         double calculated = heightDip * scaleFactor;
         return Math.Max(minFontSize, Math.Min(maxFontSize, calculated));
+    }
+
+    public static AdaptiveCardLayout CalculateAdaptiveInitialCardLayout(
+        AdaptiveCardLayoutInput input,
+        double measuredDesiredWidth,
+        double measuredReducedWidth)
+    {
+        AdaptiveCardLayout unchanged = new(
+            input.InitialWidth,
+            input.InitialMinHeight,
+            input.FontSize,
+            input.SourceBounds.Left,
+            IsAdapted: false,
+            FitsSingleLine: false);
+
+        if (!IsAdaptiveTitleCandidate(input) ||
+            !IsFinitePositive(input.InitialWidth) ||
+            !IsFinitePositive(input.InitialMinHeight) ||
+            !IsFinitePositive(input.FontSize))
+        {
+            return unchanged;
+        }
+
+        bool isRtl = IsStrongRtlText(input.Text);
+        double desiredWidth = measuredDesiredWidth + CardHorizontalChrome;
+        if (!IsFinitePositive(measuredDesiredWidth) ||
+            !IsFinitePositive(measuredReducedWidth))
+        {
+            return unchanged;
+        }
+
+        if (desiredWidth <= input.InitialWidth)
+        {
+            return unchanged with { FitsSingleLine = true };
+        }
+
+        double maximumWidth = CalculateMaximumAdaptiveTitleWidth(input);
+        if (!IsFinitePositive(maximumWidth) ||
+            maximumWidth < input.InitialWidth + MinimumUsefulExpansion)
+        {
+            return unchanged;
+        }
+
+        if (desiredWidth <= maximumWidth)
+        {
+            double adaptedWidth = Math.Max(input.InitialWidth, desiredWidth);
+            return new AdaptiveCardLayout(
+                adaptedWidth,
+                input.InitialMinHeight,
+                input.FontSize,
+                isRtl ? input.SourceBounds.Right - adaptedWidth : input.SourceBounds.Left,
+                IsAdapted: true,
+                FitsSingleLine: true);
+        }
+
+        double minimumFontSize = CalculateMinimumTitleFontSize(input.FontSize);
+        double fittedWidth = measuredReducedWidth + CardHorizontalChrome;
+        bool fitsSingleLine = fittedWidth <= maximumWidth + 0.001;
+        double finalWidth = fitsSingleLine ? Math.Max(input.InitialWidth, fittedWidth) : maximumWidth;
+        double finalLeft = isRtl
+            ? input.SourceBounds.Right - finalWidth
+            : input.SourceBounds.Left;
+
+        return new AdaptiveCardLayout(
+            finalWidth,
+            input.InitialMinHeight,
+            minimumFontSize,
+            finalLeft,
+            IsAdapted: true,
+            fitsSingleLine);
+    }
+
+    public static bool IsAdaptiveTitleCandidate(AdaptiveCardLayoutInput input)
+    {
+        return input.SourceLineCount == 1 &&
+            input.SourceBounds.Height >= TitleSourceLineHeightThreshold &&
+            input.SourceBounds.Width >= input.SourceBounds.Height * 1.5 &&
+            IsClearlyLargerThanTypicalSingleLine(input) &&
+            !string.IsNullOrWhiteSpace(input.Text);
+    }
+
+    public static double CalculateMaximumAdaptiveTitleWidth(AdaptiveCardLayoutInput input)
+    {
+        bool isRtl = IsStrongRtlText(input.Text);
+        double captureWidth = input.CaptureRight - input.CaptureLeft;
+        double maximumGeometryWidth = captureWidth * MaxInitialCardWidthFraction;
+        double boundary = isRtl
+            ? Math.Max(input.CaptureLeft, input.OverlayLeft)
+            : Math.Min(input.CaptureRight, input.OverlayRight);
+
+        for (int index = 0; index < input.AllLineBounds.Count; index++)
+        {
+            if (index == input.SourceIndex ||
+                index >= input.AllSourceLineCounts.Count ||
+                input.AllSourceLineCounts[index] != 1)
+            {
+                continue;
+            }
+
+            PhysicalRect candidate = input.AllLineBounds[index];
+            if (!IsValidRegion(candidate) || !HasMeaningfulVerticalOverlap(input.SourceBounds, candidate))
+            {
+                continue;
+            }
+
+            if (isRtl && candidate.Right <= input.SourceBounds.Left)
+            {
+                boundary = Math.Max(boundary, candidate.Right + NeighborGap);
+            }
+            else if (!isRtl && candidate.Left >= input.SourceBounds.Right)
+            {
+                boundary = Math.Min(boundary, candidate.Left - NeighborGap);
+            }
+        }
+
+        double availableWidth = isRtl
+            ? input.SourceBounds.Right - boundary
+            : boundary - input.SourceBounds.Left;
+        return Math.Min(availableWidth, maximumGeometryWidth);
+    }
+
+    public static double CalculateMinimumTitleFontSize(double fontSize)
+    {
+        return Math.Min(
+            fontSize,
+            Math.Max(MinimumTitleFontSize, fontSize * MinimumTitleFontRatio));
+    }
+
+    public static bool IsStrongRtlText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return false;
+        }
+
+        foreach (char character in text)
+        {
+            if (character is >= '\u0590' and <= '\u08FF' ||
+                character is >= '\uFB1D' and <= '\uFDFF' ||
+                character is >= '\uFE70' and <= '\uFEFF')
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsClearlyLargerThanTypicalSingleLine(AdaptiveCardLayoutInput input)
+    {
+        if (input.AllLineBounds.Count <= 1)
+        {
+            return true;
+        }
+
+        double[] typicalHeights = input.AllLineBounds
+            .Select((bounds, index) => (bounds, index))
+            .Where(item =>
+                item.index < input.AllSourceLineCounts.Count &&
+                input.AllSourceLineCounts[item.index] == 1 &&
+                IsValidRegion(item.bounds))
+            .Select(item => item.bounds.Height)
+            .OrderBy(height => height)
+            .ToArray();
+        if (typicalHeights.Length <= 1)
+        {
+            return true;
+        }
+
+        double median = typicalHeights[typicalHeights.Length / 2];
+        if (typicalHeights.Length % 2 == 0)
+        {
+            median = (typicalHeights[(typicalHeights.Length / 2) - 1] + median) / 2;
+        }
+
+        return input.SourceBounds.Height >= median * 1.2;
+    }
+
+    private static bool HasMeaningfulVerticalOverlap(PhysicalRect source, PhysicalRect candidate)
+    {
+        double overlap = Math.Min(source.Bottom, candidate.Bottom) - Math.Max(source.Top, candidate.Top);
+        return overlap >= Math.Min(source.Height, candidate.Height) * 0.25;
     }
 
     /// <summary>

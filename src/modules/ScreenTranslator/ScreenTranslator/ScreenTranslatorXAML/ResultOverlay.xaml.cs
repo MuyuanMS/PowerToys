@@ -432,16 +432,36 @@ public sealed partial class ResultOverlay : TransparentWindow
             _overlayBounds,
             _dpiScaleX,
             _dpiScaleY);
+        var (captureLeftDip, _, _, _) = OverlayLayoutHelper.PhysicalToDip(
+            _capturedRegion,
+            _overlayBounds,
+            _dpiScaleX,
+            _dpiScaleY);
+        double captureRightDip = captureLeftDip + captureWidthDip;
+        double overlayLeftDip = 0;
+        double overlayRightDip = _overlayBounds.Width / _dpiScaleX;
+        IReadOnlyList<PhysicalRect> lineBoundsDip = _lines
+            .Select(line =>
+            {
+                var (left, top, width, height) = OverlayLayoutHelper.PhysicalToDip(
+                    line.BoundingBox,
+                    _overlayBounds,
+                    _dpiScaleX,
+                    _dpiScaleY);
+                return new PhysicalRect(left, top, width, height);
+            })
+            .ToList();
+
         for (int lineIndex = 0; lineIndex < _lines.Count; lineIndex++)
         {
             TranslatedLine line = _lines[lineIndex];
             int cardLineIndex = lineIndex;
             TranslatedLine cardLine = line;
-            var (leftDip, topDip, widthDip, heightDip) = OverlayLayoutHelper.PhysicalToDip(
-                line.BoundingBox,
-                _overlayBounds,
-                _dpiScaleX,
-                _dpiScaleY);
+            PhysicalRect lineBounds = lineBoundsDip[lineIndex];
+            double leftDip = lineBounds.Left;
+            double topDip = lineBounds.Top;
+            double widthDip = lineBounds.Width;
+            double heightDip = lineBounds.Height;
 
             double sourceLineHeightDip = heightDip / Math.Max(1, line.SourceLineCount);
             double estimatedFontSize = OverlayLayoutHelper.CalculateEstimatedFontSize(sourceLineHeightDip);
@@ -451,17 +471,20 @@ public sealed partial class ResultOverlay : TransparentWindow
                 captureWidthDip,
                 captureHeightDip,
                 line.SourceLineCount);
-
-            Border card = new()
-            {
-                Background = CreateBackgroundBrush(line),
-                BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"] ?? new SolidColorBrush(Windows.UI.Color.FromArgb(100, 255, 255, 255)),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(4),
-                Padding = new Thickness(6, 2, 6, 2),
-                Width = initialWidth,
-                MinHeight = initialMinHeight,
-            };
+            OverlayLayoutHelper.AdaptiveCardLayoutInput adaptiveInput = new(
+                line.TranslatedText,
+                lineBounds,
+                lineBoundsDip,
+                _lines.Select(item => item.SourceLineCount).ToList(),
+                lineIndex,
+                line.SourceLineCount,
+                initialWidth,
+                initialMinHeight,
+                estimatedFontSize,
+                captureLeftDip,
+                captureRightDip,
+                overlayLeftDip,
+                overlayRightDip);
 
             TextBlock textBlock = new()
             {
@@ -470,6 +493,46 @@ public sealed partial class ResultOverlay : TransparentWindow
                 FontSize = estimatedFontSize,
                 TextWrapping = TextWrapping.Wrap,
                 VerticalAlignment = VerticalAlignment.Center,
+                FlowDirection = OverlayLayoutHelper.IsStrongRtlText(line.TranslatedText)
+                    ? FlowDirection.RightToLeft
+                    : FlowDirection.LeftToRight,
+                TextAlignment = OverlayLayoutHelper.IsStrongRtlText(line.TranslatedText)
+                    ? TextAlignment.Right
+                    : TextAlignment.Left,
+            };
+
+            double measuredDesiredWidth = 0;
+            double measuredReducedWidth = 0;
+            if (OverlayLayoutHelper.IsAdaptiveTitleCandidate(adaptiveInput))
+            {
+                textBlock.TextWrapping = TextWrapping.NoWrap;
+                textBlock.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
+                measuredDesiredWidth = textBlock.DesiredSize.Width;
+
+                textBlock.FontSize = OverlayLayoutHelper.CalculateMinimumTitleFontSize(estimatedFontSize);
+                textBlock.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
+                measuredReducedWidth = textBlock.DesiredSize.Width;
+            }
+
+            OverlayLayoutHelper.AdaptiveCardLayout adaptiveLayout =
+                OverlayLayoutHelper.CalculateAdaptiveInitialCardLayout(
+                    adaptiveInput,
+                    measuredDesiredWidth,
+                    measuredReducedWidth);
+            textBlock.FontSize = adaptiveLayout.FontSize;
+            textBlock.TextWrapping = adaptiveLayout.FitsSingleLine
+                ? TextWrapping.NoWrap
+                : TextWrapping.Wrap;
+
+            Border card = new()
+            {
+                Background = CreateBackgroundBrush(line),
+                BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"] ?? new SolidColorBrush(Windows.UI.Color.FromArgb(100, 255, 255, 255)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 2, 6, 2),
+                Width = adaptiveLayout.Width,
+                MinHeight = adaptiveLayout.MinHeight,
             };
             card.PointerPressed += Card_PointerPressed;
             card.PointerMoved += Card_PointerMoved;
@@ -482,14 +545,14 @@ public sealed partial class ResultOverlay : TransparentWindow
             };
             card.Child = textBlock;
 
-            Canvas.SetLeft(card, leftDip);
+            Canvas.SetLeft(card, adaptiveLayout.IsAdapted ? adaptiveLayout.Left : leftDip);
             Canvas.SetTop(card, topDip);
             _initialAppearance[lineIndex] = (
                 textBlock.Text,
                 GetBrushColor(card.Background),
                 GetBrushColor(textBlock.Foreground),
-                estimatedFontSize,
-                leftDip,
+                adaptiveLayout.FontSize,
+                adaptiveLayout.IsAdapted ? adaptiveLayout.Left : leftDip,
                 topDip,
                 card.Width,
                 card.MinHeight);
