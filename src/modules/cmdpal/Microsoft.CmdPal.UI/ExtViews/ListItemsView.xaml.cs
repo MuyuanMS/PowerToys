@@ -605,26 +605,34 @@ public sealed partial class ListItemsView : UserControl,
 
     public void Receive(ActivateSelectedListItemMessage message)
     {
-        if (ViewModel?.ShowEmptyContent ?? false)
+        if (message.Handled)
         {
-            ViewModel?.InvokeItemCommand.Execute(null);
+            return;
         }
-        else if (ItemView.SelectedItem is ListItemViewModel item)
+
+        // Invoke only when this query's snapshot is safe. Otherwise leave the key
+        // unhandled so the shell can queue it until settlement (GH #48670).
+        if (ViewModel?.TryActivateSelectionNow(ItemView.SelectedItem as ListItemViewModel) == true)
         {
-            ViewModel?.InvokeItemCommand.Execute(item);
+            message.Handled = true;
         }
     }
 
     public void Receive(ActivateSecondaryCommandMessage message)
     {
-        if (ViewModel?.ShowEmptyContent ?? false)
+        if (message.Handled)
         {
-            ViewModel?.InvokeSecondaryCommandCommand.Execute(null);
+            return;
         }
-        else if (ItemView.SelectedItem is ListItemViewModel item)
+
+        var selectedItem = ItemView.SelectedItem as ListItemViewModel;
+        if (ViewModel?.TryActivateSecondarySelectionNow(selectedItem) == true)
         {
-            ViewModel?.InvokeSecondaryCommandCommand.Execute(item);
+            message.Handled = true;
+            return;
         }
+
+        message.SelectedItem = selectedItem;
     }
 
     public void Receive(NavigatePageDownCommand message)

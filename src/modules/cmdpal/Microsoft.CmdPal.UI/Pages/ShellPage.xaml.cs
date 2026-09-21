@@ -1068,7 +1068,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
             return;
         }
 
-        if (ItemActionsAllowed && TryHandleItemAction(e))
+        if (ShouldHandleItemAction(e) && TryHandleItemAction(e))
         {
             return;
         }
@@ -1080,20 +1080,56 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         }
     }
 
-    private static bool TryHandleItemAction(KeyRoutedEventArgs e)
+    /// <summary>
+    /// Compact-collapsed palettes hide the list, so item chords are ignored.
+    /// Enter (and Ctrl+Enter) still need to run — or queue — so a fast
+    /// "type + enter" isn't dropped before results appear (GH #48670).
+    /// </summary>
+    private bool ShouldHandleItemAction(KeyRoutedEventArgs e)
+    {
+        if (ItemActionsAllowed)
+        {
+            return true;
+        }
+
+        if (e.Key != VirtualKey.Enter)
+        {
+            return false;
+        }
+
+        return !string.IsNullOrEmpty(ViewModel.CurrentPage?.SearchTextBox);
+    }
+
+    private bool TryHandleItemAction(KeyRoutedEventArgs e)
     {
         var mods = KeyModifiers.GetCurrent();
         switch (e.Key)
         {
             // Ctrl+Enter
             case VirtualKey.Enter when mods.OnlyCtrl:
-                WeakReferenceMessenger.Default.Send<ActivateSecondaryCommandMessage>();
-                break;
+                {
+                    var secondary = new ActivateSecondaryCommandMessage();
+                    WeakReferenceMessenger.Default.Send(secondary);
+                    if (!secondary.Handled && GetActiveListViewModel() is { } listForSecondary)
+                    {
+                        listForSecondary.InvokeSecondaryCommandOrQueue(secondary.SelectedItem);
+                    }
+
+                    break;
+                }
 
             // Enter
             case VirtualKey.Enter when mods.None:
-                WeakReferenceMessenger.Default.Send<ActivateSelectedListItemMessage>();
-                break;
+                {
+                    var activate = new ActivateSelectedListItemMessage();
+                    WeakReferenceMessenger.Default.Send(activate);
+                    if (!activate.Handled && GetActiveListViewModel() is { } list)
+                    {
+                        list.InvokeSelectedItemOrQueue();
+                    }
+
+                    break;
+                }
 
             // Ctrl+K
             case VirtualKey.K when mods.OnlyCtrl:
@@ -1106,6 +1142,13 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         e.Handled = true;
         return true;
     }
+
+    private ListViewModel? GetActiveListViewModel() => ViewModel.CurrentPage switch
+    {
+        ListViewModel list => list,
+        ParametersPageViewModel parameters => parameters.ActiveListViewModel,
+        _ => null,
+    };
 
     private void ShellPage_OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {

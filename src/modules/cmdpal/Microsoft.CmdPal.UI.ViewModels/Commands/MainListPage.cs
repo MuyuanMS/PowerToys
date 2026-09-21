@@ -32,6 +32,7 @@ namespace Microsoft.CmdPal.UI.ViewModels.MainPage;
 public sealed partial class MainListPage : DynamicListPage,
     IRecipient<ClearSearchMessage>,
     IRecipient<UpdateFallbackItemsMessage>,
+    IActivationSettlementPage,
     IDisposable
 {
     // Throttle for raising items changed events from external sources
@@ -101,6 +102,33 @@ public sealed partial class MainListPage : DynamicListPage,
     private InterlockedBoolean _refreshRequested;
 
     private CancellationTokenSource? _cancellationTokenSource;
+
+    // GH #48670: a queued Enter may run only against a snapshot built after both the
+    // deterministic ranking and this query's global-fallback updates have finished.
+    // Global fallbacks are merged by score, so a title that resolves later can become #1.
+    private int _settlementVersion;
+    private long _activationEpoch;
+    private long _builtEpoch;
+    private string? _activationQuery;
+    private string? _builtActivationQuery;
+    private EventHandler? _searchSettlementChanged;
+
+    event EventHandler? IActivationSettlementPage.SearchSettlementChanged
+    {
+        add => _searchSettlementChanged += value;
+        remove => _searchSettlementChanged -= value;
+    }
+
+    bool IActivationSettlementPage.CurrentFetchIsSettledFor(string query)
+    {
+        lock (_tlcManager.TopLevelCommands)
+        {
+            return _activationEpoch != 0
+                && _builtEpoch == _activationEpoch
+                && _activationQuery == query
+                && _builtActivationQuery == query;
+        }
+    }
 
 #if CMDPAL_FF_MAINPAGE_TIME_RAISE_ITEMS
     private DateTimeOffset _last = DateTimeOffset.UtcNow;
@@ -254,7 +282,7 @@ public sealed partial class MainListPage : DynamicListPage,
                 }
 
                 var currentSearchText = SearchText;
-                UpdateSearchTextCore(currentSearchText, currentSearchText, isUserInput: false);
+                UpdateSearchTextCore(currentSearchText, currentSearchText, isUserInput: false, needsSettlement: false);
             }
             while (_refreshRequested.Value);
         }
@@ -276,7 +304,12 @@ public sealed partial class MainListPage : DynamicListPage,
     {
         lock (_tlcManager.TopLevelCommands)
         {
-            return string.IsNullOrWhiteSpace(SearchText) ? GetDefaultViewItems() : GetSearchViewItems();
+            var builtEpoch = _activationEpoch;
+            var builtQuery = _activationQuery;
+            var items = string.IsNullOrWhiteSpace(SearchText) ? GetDefaultViewItems() : GetSearchViewItems();
+            _builtEpoch = builtEpoch;
+            _builtActivationQuery = builtQuery;
+            return items;
         }
     }
 
@@ -504,21 +537,60 @@ public sealed partial class MainListPage : DynamicListPage,
             WeakReferenceMessenger.Default.Send<ExpandCompactModeMessage>(new(!newWasEmpty));
         }
 
-        UpdateSearchTextCore(oldSearch, newSearch, isUserInput: true);
+        UpdateSearchTextCore(oldSearch, newSearch, isUserInput: true, needsSettlement: true);
     }
 
-    private void UpdateSearchTextCore(string oldSearch, string newSearch, bool isUserInput)
+    private void UpdateSearchTextCore(string oldSearch, string newSearch, bool isUserInput, bool needsSettlement)
     {
         var stopwatch = Stopwatch.StartNew();
 
-        _cancellationTokenSource?.Cancel();
-        _cancellationTokenSource?.Dispose();
-        _cancellationTokenSource = new CancellationTokenSource();
+        var cancellationTokenSource = new CancellationTokenSource();
+        var previousCancellationTokenSource = Interlocked.Exchange(
+            ref _cancellationTokenSource,
+            cancellationTokenSource);
+        previousCancellationTokenSource?.Cancel();
+        previousCancellationTokenSource?.Dispose();
 
-        var token = _cancellationTokenSource.Token;
+        var token = cancellationTokenSource.Token;
         if (token.IsCancellationRequested)
         {
             return;
+        }
+
+        Action? signalRankingPublished = null;
+        Action? signalFallbacksSettled = null;
+        if (needsSettlement)
+        {
+            var version = Interlocked.Increment(ref _settlementVersion);
+            lock (_tlcManager.TopLevelCommands)
+            {
+                _activationQuery = null;
+                _builtActivationQuery = null;
+            }
+
+            // Empty queries are browsed, not activated from a queued Enter.
+            // Non-empty queries settle only after ranking is published AND fallbacks finish.
+            if (!string.IsNullOrWhiteSpace(newSearch))
+            {
+                var gates = 2;
+                var query = newSearch;
+                var settleToken = token;
+                void Signal()
+                {
+                    if (settleToken.IsCancellationRequested || version != Volatile.Read(ref _settlementVersion))
+                    {
+                        return;
+                    }
+
+                    if (Interlocked.Decrement(ref gates) == 0)
+                    {
+                        MarkQuerySettled(query, version);
+                    }
+                }
+
+                signalRankingPublished = Signal;
+                signalFallbacksSettled = Signal;
+            }
         }
 
         // Handle changes to the filter text here
@@ -596,7 +668,7 @@ public sealed partial class MainListPage : DynamicListPage,
                 }
             }
 
-            _fallbackUpdateManager.BeginUpdate(SearchText, [.. specialFallbacks, .. commonFallbacks], token);
+            _fallbackUpdateManager.BeginUpdate(SearchText, [.. specialFallbacks, .. commonFallbacks], token, signalFallbacksSettled);
 
             if (token.IsCancellationRequested)
             {
@@ -823,6 +895,28 @@ public sealed partial class MainListPage : DynamicListPage,
         {
             RequestRefresh(fullRefresh: true);
         }
+
+        signalRankingPublished?.Invoke();
+    }
+
+    private void MarkQuerySettled(string query, int version)
+    {
+        lock (_tlcManager.TopLevelCommands)
+        {
+            if (version != Volatile.Read(ref _settlementVersion) || !string.Equals(SearchText, query, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _activationQuery = query;
+            _activationEpoch++;
+        }
+
+        _searchSettlementChanged?.Invoke(this, EventArgs.Empty);
+
+        // Rebuild so GetItems() observes the settled epoch and the fallback titles
+        // that landed before this gate opened.
+        RequestRefresh(fullRefresh: true, interval: TimeSpan.Zero);
     }
 
     // Materializes a source into a stable, indexable snapshot so scoring can run off the lock.
@@ -1046,7 +1140,7 @@ public sealed partial class MainListPage : DynamicListPage,
         var current = SearchText;
         if (!string.IsNullOrEmpty(current))
         {
-            _ = Task.Run(() => UpdateSearchTextCore(current, current, isUserInput: false));
+            _ = Task.Run(() => UpdateSearchTextCore(current, current, isUserInput: false, needsSettlement: true));
         }
     }
 
@@ -1080,8 +1174,9 @@ public sealed partial class MainListPage : DynamicListPage,
 
     public void Dispose()
     {
-        _cancellationTokenSource?.Cancel();
-        _cancellationTokenSource?.Dispose();
+        var cancellationTokenSource = Interlocked.Exchange(ref _cancellationTokenSource, null);
+        cancellationTokenSource?.Cancel();
+        cancellationTokenSource?.Dispose();
         _fallbackUpdateManager.Dispose();
         _searchTelemetry.Dispose();
 

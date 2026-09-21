@@ -61,11 +61,24 @@ internal sealed partial class FallbackUpdateManager : IDisposable
         _onFallbackChanged = onFallbackChanged;
     }
 
-    internal void BeginUpdate(string query, IReadOnlyList<TopLevelViewModel> commands, CancellationToken cancellationToken)
+    internal void BeginUpdate(string query, IReadOnlyList<TopLevelViewModel> commands, CancellationToken cancellationToken, Action? onBatchCompleted = null)
     {
         if (commands.Count == 0 || string.IsNullOrWhiteSpace(query))
         {
+            onBatchCompleted?.Invoke();
             return;
+        }
+
+        // Each command completes exactly once: either the worker that ran it, or the
+        // pending retry when the in-flight cap deferred it. Settlement waits on this
+        // so a queued activation cannot run against a partial fallback ranking.
+        var remaining = commands.Count;
+        void FinishOne()
+        {
+            if (Interlocked.Decrement(ref remaining) == 0)
+            {
+                onBatchCompleted?.Invoke();
+            }
         }
 
 #if CMDPAL_FF_MAINPAGE_TIME_FALLBACK_UPDATES
@@ -96,14 +109,16 @@ internal sealed partial class FallbackUpdateManager : IDisposable
 
                 var command = commands[i];
                 var counter = _inflightFallbacks.GetOrAdd(command.Id, static _ => new InflightCounter());
-                if (!counter.TryClaim(MaxInflightPerFallback))
+                var pendingCommand = command;
+                var pendingQuery = query;
+                var pendingCt = cancellationToken;
+                if (!counter.TryClaimOrQueue(
+                    MaxInflightPerFallback,
+                    new PendingWork(
+                        () => RetryFallbackUpdate(pendingCommand, pendingQuery, pendingCt, counter, FinishOne),
+                        pendingCt,
+                        FinishOne)))
                 {
-                    // At capacity — store this query as a pending retry so it runs
-                    // when one of the in-flight calls finishes. Latest query wins.
-                    var pendingCommand = command;
-                    var pendingQuery = query;
-                    var pendingCt = cancellationToken;
-                    counter.SetPending(() => RetryFallbackUpdate(pendingCommand, pendingQuery, pendingCt, counter), pendingCt);
                     continue;
                 }
 
@@ -161,8 +176,8 @@ internal sealed partial class FallbackUpdateManager : IDisposable
                 }
                 finally
                 {
-                    counter.Release();
-                    DispatchPending(counter.TakePending());
+                    DispatchPending(counter.ReleaseAndTakePending());
+                    FinishOne();
                 }
 
                 // Guard against a stale refresh if the COM call returned after cancellation.
@@ -173,9 +188,9 @@ internal sealed partial class FallbackUpdateManager : IDisposable
             }
         }
 
-        // Dispatches a pending work item to the dedicated pool. The pending's
-        // own CT is forwarded so the pool can skip it at dequeue time when the
-        // originating query batch has been superseded by a newer keystroke.
+        // Dispatches a pending work item to the dedicated pool. The work itself
+        // observes its cancellation token so it can settle its batch and advance
+        // the per-command queue even after its query has been superseded.
         void DispatchPending(PendingWork? pending)
         {
             if (pending == null)
@@ -183,7 +198,7 @@ internal sealed partial class FallbackUpdateManager : IDisposable
                 return;
             }
 
-            _ = _fallbackThreadPool.QueueAsync(pending.Work, pending.CancellationToken);
+            _ = _fallbackThreadPool.QueueAsync(pending.Work, CancellationToken.None);
         }
 
         for (var i = 0; i < startingWorkers; i++)
@@ -195,17 +210,22 @@ internal sealed partial class FallbackUpdateManager : IDisposable
 
         // One-shot retry for a command that was skipped due to MaxInflightPerFallback.
         // Claims a slot, runs the COM call, releases, and propagates the next pending (if any).
-        void RetryFallbackUpdate(TopLevelViewModel cmd, string q, CancellationToken ct, InflightCounter ctr)
+        void RetryFallbackUpdate(TopLevelViewModel cmd, string q, CancellationToken ct, InflightCounter ctr, Action finishOne)
         {
             if (ct.IsCancellationRequested)
             {
+                finishOne();
+                DispatchPending(ctr.TakePending());
                 return;
             }
 
-            if (!ctr.TryClaim(MaxInflightPerFallback))
+            if (!ctr.TryClaimOrQueue(
+                MaxInflightPerFallback,
+                new PendingWork(
+                    () => RetryFallbackUpdate(cmd, q, ct, ctr, finishOne),
+                    ct,
+                    finishOne)))
             {
-                // Still at capacity (a newer worker claimed the freed slot first).
-                // The pending was already consumed from TakePending, so it's dropped here.
                 return;
             }
 
@@ -220,8 +240,8 @@ internal sealed partial class FallbackUpdateManager : IDisposable
             }
             finally
             {
-                ctr.Release();
-                DispatchPending(ctr.TakePending());
+                DispatchPending(ctr.ReleaseAndTakePending());
+                finishOne();
             }
 
             if (changed && !ct.IsCancellationRequested)
@@ -242,7 +262,7 @@ internal sealed partial class FallbackUpdateManager : IDisposable
     /// batch that created it, so the pool can skip it at dequeue time when
     /// a newer keystroke has already superseded the query.
     /// </summary>
-    private sealed record PendingWork(Action Work, CancellationToken CancellationToken);
+    private sealed record PendingWork(Action Work, CancellationToken CancellationToken, Action OnCanceled);
 
     /// <summary>
     /// Thread-safe counter for tracking concurrent in-flight calls per command,
@@ -250,43 +270,100 @@ internal sealed partial class FallbackUpdateManager : IDisposable
     /// </summary>
     private sealed class InflightCounter
     {
+        private readonly object _gate = new();
         private int _count;
 
-        // Latest pending work item. Only one is stored; newer queries overwrite older ones.
-        private PendingWork? _pendingWork;
+        // Every deferred item retains its own batch completion obligation. Dropping an
+        // older item would leave that batch's settlement callback waiting forever.
+        private readonly Queue<PendingWork> _pendingWork = new();
 
         /// <summary>
-        /// Try to claim a slot. Returns true if the count was below
-        /// <paramref name="max"/> and was incremented; false if at capacity.
+        /// Claims a slot, or installs the work as the pending retry while holding
+        /// the same lock used by release. This closes the failed-claim/pending gap.
         /// </summary>
-        public bool TryClaim(int max)
+        public bool TryClaimOrQueue(int max, PendingWork pending)
         {
-            while (true)
+            List<Action>? canceled = null;
+            var claimed = false;
+            lock (_gate)
             {
-                var current = Volatile.Read(ref _count);
-                if (current >= max)
+                if (_count < max)
                 {
-                    return false;
+                    _count++;
+                    claimed = true;
                 }
+                else
+                {
+                    canceled = RemoveCanceledUnsafe();
+                    if (pending.CancellationToken.IsCancellationRequested)
+                    {
+                        (canceled ??= []).Add(pending.OnCanceled);
+                    }
+                    else
+                    {
+                        _pendingWork.Enqueue(pending);
+                    }
+                }
+            }
 
-                if (Interlocked.CompareExchange(ref _count, current + 1, current) == current)
-                {
-                    return true;
-                }
+            InvokeCanceled(canceled);
+            return claimed;
+        }
+
+        public PendingWork? ReleaseAndTakePending()
+        {
+            List<Action>? canceled;
+            PendingWork? pending;
+            lock (_gate)
+            {
+                _count--;
+                canceled = RemoveCanceledUnsafe();
+                pending = TakePendingUnsafe();
+            }
+
+            InvokeCanceled(canceled);
+            return pending;
+        }
+
+        public PendingWork? TakePending()
+        {
+            List<Action>? canceled;
+            PendingWork? pending;
+            lock (_gate)
+            {
+                canceled = RemoveCanceledUnsafe();
+                pending = TakePendingUnsafe();
+            }
+
+            InvokeCanceled(canceled);
+            return pending;
+        }
+
+        private List<Action>? RemoveCanceledUnsafe()
+        {
+            List<Action>? canceled = null;
+            while (_pendingWork.Count > 0 && _pendingWork.Peek().CancellationToken.IsCancellationRequested)
+            {
+                (canceled ??= []).Add(_pendingWork.Dequeue().OnCanceled);
+            }
+
+            return canceled;
+        }
+
+        private static void InvokeCanceled(List<Action>? canceled)
+        {
+            if (canceled is null)
+            {
+                return;
+            }
+
+            foreach (var onCanceled in canceled)
+            {
+                onCanceled();
             }
         }
 
-        /// <summary>
-        /// Stores a pending work item to run when the next slot opens.
-        /// Overwrites any previously stored item — latest query always wins.
-        /// </summary>
-        public void SetPending(Action work, CancellationToken ct) => Interlocked.Exchange(ref _pendingWork, new PendingWork(work, ct));
-
-        /// <summary>
-        /// Atomically removes and returns any pending work item, or null if none.
-        /// </summary>
-        public PendingWork? TakePending() => Interlocked.Exchange(ref _pendingWork, null);
-
-        public void Release() => Interlocked.Decrement(ref _count);
+        private PendingWork? TakePendingUnsafe() =>
+            _pendingWork.Count > 0 ? _pendingWork.Dequeue() : null;
     }
 }
