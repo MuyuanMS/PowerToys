@@ -44,7 +44,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
     private readonly Lock _fetchStateLock = new();
     private readonly Lock _listLock = new();
     private readonly IContextMenuFactory _contextMenuFactory;
-    private readonly MainListPage? _homePage;
+    private readonly IActivationSettlementPage? _activationSettlementPage;
 
     // Background fetches alone take this lock. Selection, realization, and teardown
     // never acquire it, so installing a coordinator cannot block the UI thread.
@@ -166,10 +166,10 @@ public partial class ListViewModel : PageViewModel, IDisposable
         _model = new(model);
         _contextMenuFactory = contextMenuFactory;
         EmptyContent = new(new(null), PageContext, contextMenuFactory: null);
-        _homePage = model as MainListPage;
-        if (_homePage is not null)
+        _activationSettlementPage = model as IActivationSettlementPage;
+        if (_activationSettlementPage is not null)
         {
-            _homePage.SearchSettlementChanged += OnHomeSearchSettlementChanged;
+            _activationSettlementPage.SearchSettlementChanged += OnHomeSearchSettlementChanged;
         }
     }
 
@@ -1023,12 +1023,12 @@ public partial class ListViewModel : PageViewModel, IDisposable
     // Extension pages keep the old Enter behavior: run the visible selection now,
     // and never auto-run a later fetch. Only the home page can queue Enter.
     private bool CanQueueActivation =>
-        _homePage is not null && !string.IsNullOrWhiteSpace(SearchTextBox);
+        _activationSettlementPage is not null && !string.IsNullOrWhiteSpace(SearchTextBox);
 
     private bool IsActivationReady =>
         Volatile.Read(ref _readySearchEpoch) == Volatile.Read(ref _searchEpoch) &&
         !IsFetching &&
-        _homePage?.CurrentFetchIsSettledFor(SearchTextBox) == true &&
+        _activationSettlementPage?.CurrentFetchIsSettledFor(SearchTextBox) == true &&
         (Volatile.Read(ref _loadingSearchEpoch) == 0 ||
          Volatile.Read(ref _loadingSearchEpoch) != Volatile.Read(ref _searchEpoch) ||
          !ModelIsLoading);
@@ -1839,9 +1839,9 @@ public partial class ListViewModel : PageViewModel, IDisposable
         Filters?.PropertyChanged -= FiltersPropertyChanged;
         Filters?.SafeCleanup();
 
-        if (_homePage is not null)
+        if (_activationSettlementPage is not null)
         {
-            _homePage.SearchSettlementChanged -= OnHomeSearchSettlementChanged;
+            _activationSettlementPage.SearchSettlementChanged -= OnHomeSearchSettlementChanged;
         }
 
         var model = _model.Unsafe;

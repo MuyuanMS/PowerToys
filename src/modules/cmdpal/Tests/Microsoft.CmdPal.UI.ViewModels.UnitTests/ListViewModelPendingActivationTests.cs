@@ -71,6 +71,30 @@ public sealed partial class ListViewModelPendingActivationTests
 
     }
 
+    private sealed partial class SettlementPage(params IListItem[] items) : DynamicListPage, IActivationSettlementPage
+    {
+        private IListItem[] _items = items;
+        private string? _settledQuery;
+
+        public event EventHandler? SearchSettlementChanged;
+
+        public override IListItem[] GetItems() => Volatile.Read(ref _items);
+
+        public override void UpdateSearchText(string oldSearch, string newSearch)
+        {
+            Volatile.Write(ref _items, [CreateItem(newSearch)]);
+            RaiseItemsChanged(1);
+        }
+
+        public bool CurrentFetchIsSettledFor(string query) => query == _settledQuery;
+
+        internal void Settle(string query)
+        {
+            _settledQuery = query;
+            SearchSettlementChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
     private sealed partial class StaticSearchPage(IListItem[] items) : ListPage
     {
         public override IListItem[] GetItems() => items;
@@ -97,13 +121,19 @@ public sealed partial class ListViewModelPendingActivationTests
     private sealed class InvokeListener : IDisposable
     {
         private readonly TaskCompletionSource<string> _invoked = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _invocationCount;
 
         internal Task<string> Invoked => _invoked.Task;
+
+        internal int InvocationCount => Volatile.Read(ref _invocationCount);
 
         internal InvokeListener()
         {
             WeakReferenceMessenger.Default.Register<PerformCommandMessage>(this, (_, message) =>
-                _invoked.TrySetResult(message.Command.Unsafe?.Name ?? string.Empty));
+            {
+                Interlocked.Increment(ref _invocationCount);
+                _invoked.TrySetResult(message.Command.Unsafe?.Name ?? string.Empty);
+            });
         }
 
         public void Dispose() => WeakReferenceMessenger.Default.UnregisterAll(this);
@@ -456,6 +486,37 @@ public sealed partial class ListViewModelPendingActivationTests
 
             await Task.Delay(200);
             Assert.IsFalse(listener.Invoked.IsCompleted, "Ctrl+Enter must not fall back from the selected row to another row's secondary command.");
+        }
+        finally
+        {
+            viewModel.SafeCleanup();
+            viewModel.Dispose();
+        }
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
+    public async Task SettlementPage_EnterWaitsForCurrentQueryAndInvokesOnce()
+    {
+        var page = new SettlementPage(CreateItem("Initial"));
+        var viewModel = CreateViewModel(page);
+        using var listener = new InvokeListener();
+
+        try
+        {
+            await ObserveItemsAsync(viewModel, "Initial", viewModel.InitializeProperties);
+            viewModel.SearchTextBox = "Notepad";
+            await ObserveItemsAsync(viewModel, "Notepad", () => { });
+
+            viewModel.InvokeSelectedItemOrQueue(viewModel.FilteredItems[0]);
+            Assert.IsFalse(listener.Invoked.IsCompleted, "Enter must wait for the current query's settled publication.");
+
+            page.Settle("Notepad");
+
+            var invoked = await listener.Invoked.WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.AreEqual("Notepad", invoked);
+            await Task.Delay(200);
+            Assert.AreEqual(1, listener.InvocationCount, "Settlement must invoke the queued Enter only once.");
         }
         finally
         {

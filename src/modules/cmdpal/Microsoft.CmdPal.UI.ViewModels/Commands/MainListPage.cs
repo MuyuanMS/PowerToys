@@ -32,6 +32,7 @@ namespace Microsoft.CmdPal.UI.ViewModels.MainPage;
 public sealed partial class MainListPage : DynamicListPage,
     IRecipient<ClearSearchMessage>,
     IRecipient<UpdateFallbackItemsMessage>,
+    IActivationSettlementPage,
     IDisposable
 {
     // Throttle for raising items changed events from external sources
