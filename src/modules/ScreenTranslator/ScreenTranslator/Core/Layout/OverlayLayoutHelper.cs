@@ -17,7 +17,7 @@ public static class OverlayLayoutHelper
     private const double MaxInitialCardWidthFraction = 0.9;
     private const double MaxInitialSingleLineCardHeightFraction = 0.35;
     private const double MaxInitialMultilineCardHeightFraction = 0.6;
-    private const double TitleSourceLineHeightThreshold = 28.0;
+    private const double TitleSourceLineHeightThreshold = 22.0;
     private const double MinimumTitleFontSize = 16.0;
     private const double MinimumTitleFontRatio = 0.82;
     private const double CardHorizontalChrome = 14.0;

@@ -604,6 +604,34 @@ public class OverlayLayoutHelperTests
     }
 
     [TestMethod]
+    public void CalculateAdaptiveInitialCardLayout_HighDpiChineseTitleQualifiesAndExpands()
+    {
+        PhysicalRect title = new(135, 72, 140, 24);
+        IReadOnlyList<PhysicalRect> allBounds =
+        [
+            title,
+            new PhysicalRect(135, 36, 190, 14),
+            new PhysicalRect(163, 157, 100, 16),
+            new PhysicalRect(163, 197, 170, 20),
+            new PhysicalRect(163, 405, 170, 14),
+        ];
+
+        OverlayLayoutHelper.AdaptiveCardLayout layout = OverlayLayoutHelper.CalculateAdaptiveInitialCardLayout(
+            CreateAdaptiveInput(
+                "Real-time monitoring",
+                title,
+                allBounds,
+                captureRight: 1600),
+            measuredDesiredWidth: 245,
+            measuredReducedWidth: 205);
+
+        Assert.IsTrue(layout.IsAdapted);
+        Assert.IsTrue(layout.FitsSingleLine);
+        Assert.IsTrue(layout.Width > title.Width);
+        Assert.AreEqual(title.Height, layout.MinHeight, 0.001);
+    }
+
+    [TestMethod]
     public void CalculateAdaptiveInitialCardLayout_RtlExpandsLeftAndStopsAtLeftNeighbor()
     {
         PhysicalRect source = new(400, 40, 180, 36);
