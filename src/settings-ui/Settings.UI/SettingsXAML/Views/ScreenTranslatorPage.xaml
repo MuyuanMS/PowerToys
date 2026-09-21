@@ -115,14 +115,14 @@
                             </tkcontrols:SettingsCard>
                             <tkcontrols:SettingsCard
                                 Header="Azure Vision Subscription Key"
-                                Description="The key is encrypted and stored in Windows Credential Vault.">
+                                Description="After Save, this field is cleared and the key remains stored in Windows Credential Vault.">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <PasswordBox
                                         x:Name="AzureVisionApiKeyPasswordBox"
-                                        MinWidth="260"
                                         AutomationProperties.AutomationId="ScreenTranslatorAzureVisionApiKeyPasswordBox"
                                         AutomationProperties.Name="Azure Vision Subscription Key"
-                                        PlaceholderText="Enter subscription key" />
+                                        PlaceholderText="Enter subscription key"
+                                        Width="260" />
                                     <Button
                                         AutomationProperties.AutomationId="ScreenTranslatorSaveAzureVisionApiKeyButton"
                                         AutomationProperties.Name="Save Azure Vision Key"
@@ -225,14 +225,14 @@
                             <tkcontrols:SettingsCard
                                 x:Uid="ScreenTranslator_AzureKeyCard"
                                 Header="Azure Subscription Key"
-                                Description="API key is encrypted and stored in Windows Credential Vault.">
+                                Description="After Save, this field is cleared and the key remains stored in Windows Credential Vault.">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <PasswordBox
                                         x:Name="AzureApiKeyPasswordBox"
-                                        MinWidth="260"
                                         AutomationProperties.AutomationId="ScreenTranslatorAzureApiKeyPasswordBox"
                                         AutomationProperties.Name="Azure Subscription Key"
-                                        PlaceholderText="Enter subscription key" />
+                                        PlaceholderText="Enter subscription key"
+                                        Width="260" />
                                     <Button
                                         x:Name="SaveAzureApiKeyButton"
                                         AutomationProperties.AutomationId="ScreenTranslatorSaveAzureApiKeyButton"
@@ -273,14 +273,14 @@
                             <tkcontrols:SettingsCard
                                 x:Uid="ScreenTranslator_LibreTranslateKeyCard"
                                 Header="API Key (Optional)"
-                                Description="Optional for self-hosted instances. Stored in Windows Credential Vault.">
+                                Description="Optional for self-hosted instances. After Save, this field is cleared and the key remains stored in Windows Credential Vault.">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <PasswordBox
                                         x:Name="LibreTranslateApiKeyPasswordBox"
-                                        MinWidth="260"
                                         AutomationProperties.AutomationId="ScreenTranslatorLibreTranslateApiKeyPasswordBox"
                                         AutomationProperties.Name="LibreTranslate API Key"
-                                        PlaceholderText="Optional API key" />
+                                        PlaceholderText="Optional API key"
+                                        Width="260" />
                                     <Button
                                         x:Name="SaveLibreTranslateApiKeyButton"
                                         AutomationProperties.AutomationId="ScreenTranslatorSaveLibreTranslateApiKeyButton"
