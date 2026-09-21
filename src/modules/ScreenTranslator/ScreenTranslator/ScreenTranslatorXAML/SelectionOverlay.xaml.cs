@@ -283,6 +283,13 @@ public sealed partial class SelectionOverlay : TransparentWindow
                 return;
             }
 
+            recognizedLines = OverlayLayoutHelper.SanitizeOcrLineGeometry(recognizedLines, capturedRegionPhysical);
+            Logger.LogInfo($"Sanitized recognized text geometry to {recognizedLines.Count} text lines.");
+            if (recognizedLines.Count == 0)
+            {
+                return;
+            }
+
             IReadOnlyList<TranslationLine> groupedLines = OverlayLayoutHelper.GroupAdjacentTextLines(
                 recognizedLines,
                 TextBlockGroupingStrategy.Scored);

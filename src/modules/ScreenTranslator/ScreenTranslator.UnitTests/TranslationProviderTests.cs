@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.PowerToys.Settings.UI.Library;
@@ -297,6 +298,7 @@ public class TranslationProviderTests
         settings.Properties.AcpAgentCommand = "copilot --acp";
         settings.Properties.CurrentScreenShortcut = settings.Properties.DefaultCurrentScreenShortcut;
         settings.Properties.ActiveWindowShortcut = settings.Properties.DefaultActiveWindowShortcut;
+        settings.Properties.ScanTextShortcut = settings.Properties.DefaultScanTextShortcut;
 
         string json = settings.ToJsonString();
         Assert.IsNotNull(json);
@@ -308,11 +310,72 @@ public class TranslationProviderTests
         Assert.IsTrue(json.Contains("copilot --acp"));
         Assert.IsTrue(json.Contains("CurrentScreenShortcut"));
         Assert.IsTrue(json.Contains("ActiveWindowShortcut"));
+        Assert.IsTrue(json.Contains("ScanTextShortcut"));
         Assert.IsTrue(json.Contains("\"FreezeCapturedContent\":true"));
 
         // Verify API key is NOT present in serialized JSON
         Assert.IsFalse(json.Contains("ApiKey", StringComparison.OrdinalIgnoreCase));
         Assert.IsFalse(json.Contains("Password", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public void ScreenTranslatorSettings_ScanTextShortcut_DefaultsToWinAltShiftT()
+    {
+        var settings = new ScreenTranslatorSettings();
+
+        Assert.IsTrue(settings.Properties.ScanTextShortcut.Win);
+        Assert.IsFalse(settings.Properties.ScanTextShortcut.Ctrl);
+        Assert.IsTrue(settings.Properties.ScanTextShortcut.Shift);
+        Assert.IsTrue(settings.Properties.ScanTextShortcut.Alt);
+        Assert.AreEqual(0x54, settings.Properties.ScanTextShortcut.Code);
+    }
+
+    [TestMethod]
+    public void ScreenTranslatorSettings_OlderJsonWithoutScanTextShortcut_UsesDefault()
+    {
+        const string OldSettingsJson = """
+            {
+              "name": "ScreenTranslator",
+              "version": "1",
+              "properties": {
+                "SelectedProvider": "Passthrough"
+              }
+            }
+            """;
+
+        ScreenTranslatorSettings? settings = JsonSerializer.Deserialize<ScreenTranslatorSettings>(OldSettingsJson);
+
+        Assert.IsNotNull(settings);
+        Assert.AreEqual(0x54, settings.Properties.ScanTextShortcut.Code);
+        Assert.IsTrue(settings.Properties.ScanTextShortcut.Win);
+        Assert.IsFalse(settings.Properties.ScanTextShortcut.Ctrl);
+        Assert.IsTrue(settings.Properties.ScanTextShortcut.Shift);
+        Assert.IsTrue(settings.Properties.ScanTextShortcut.Alt);
+    }
+
+    [TestMethod]
+    public void ScreenTranslatorSettings_UpgradesReservedGraphicsResetShortcut()
+    {
+        ScreenTranslatorSettings settings = new();
+        settings.Properties.ScanTextShortcut = new HotkeySettings(true, true, false, true, 0x42);
+
+        Assert.IsTrue(settings.UpgradeSettingsConfiguration());
+        Assert.AreEqual(0x54, settings.Properties.ScanTextShortcut.Code);
+        Assert.IsTrue(settings.Properties.ScanTextShortcut.Win);
+        Assert.IsFalse(settings.Properties.ScanTextShortcut.Ctrl);
+        Assert.IsTrue(settings.Properties.ScanTextShortcut.Alt);
+        Assert.IsTrue(settings.Properties.ScanTextShortcut.Shift);
+    }
+
+    [TestMethod]
+    public void ScreenTranslatorSettings_ExposesAllFourHotkeys()
+    {
+        var settings = new ScreenTranslatorSettings();
+        var accessors = settings.GetAllHotkeyAccessors();
+
+        Assert.HasCount(4, accessors);
+        Assert.AreEqual("ScanText_Shortcut", accessors[3].LocalizationHeaderKey);
+        Assert.AreSame(settings.Properties.ScanTextShortcut, accessors[3].Value);
     }
 
     [TestMethod]
@@ -331,13 +394,11 @@ public class TranslationProviderTests
         var systemLang = WindowsMediaOcrBackend.ResolveLanguage("system");
         var nullLang = WindowsMediaOcrBackend.ResolveLanguage(null);
 
-        // Explicit tag handling
-        var enLang = WindowsMediaOcrBackend.ResolveLanguage("en-US");
-        var unavailableLang = WindowsMediaOcrBackend.ResolveLanguage("zh");
+        // Auto result depends on installed OCR packs, but it must not throw.
+        Assert.IsTrue(autoLang != null || systemLang != null || nullLang != null || !new WindowsMediaOcrBackend().IsAvailable);
 
-        // Result is either English (if supported) or preferred fallback
-        Assert.IsTrue(enLang != null || autoLang != null || systemLang != null || nullLang != null);
-        Assert.IsTrue(unavailableLang != null || !new WindowsMediaOcrBackend().IsAvailable);
+        // Explicit tags must not silently fall back to a different OCR language.
+        Assert.ThrowsException<InvalidOperationException>(() => WindowsMediaOcrBackend.ResolveLanguage("zz-ZZ"));
     }
 
     [TestMethod]

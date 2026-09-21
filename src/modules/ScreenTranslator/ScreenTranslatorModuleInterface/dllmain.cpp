@@ -1,6 +1,7 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
 #include "pch.h"
 
+#include <cmath>
 #include <interface/powertoy_module_interface.h>
 #include "trace.h"
 #include "Generated Files/resource.h"
@@ -46,8 +47,10 @@ namespace
     const wchar_t JSON_KEY_ACTIVATION_SHORTCUT[] = L"ActivationShortcut";
     const wchar_t JSON_KEY_CURRENT_SCREEN_SHORTCUT[] = L"CurrentScreenShortcut";
     const wchar_t JSON_KEY_ACTIVE_WINDOW_SHORTCUT[] = L"ActiveWindowShortcut";
+    const wchar_t JSON_KEY_SCAN_TEXT_SHORTCUT[] = L"ScanTextShortcut";
     const wchar_t CURRENT_SCREEN_EVENT[] = L"Local\\PowerToys_ScreenTranslator_CurrentScreenEvent-4ec42bb8-08cf-4d8c-a799-910c49020b75";
     const wchar_t ACTIVE_WINDOW_EVENT[] = L"Local\\PowerToys_ScreenTranslator_ActiveWindowEvent-a681d2ea-e2d8-430e-9bac-a1339fefd4ac";
+    const wchar_t SCAN_TEXT_EVENT[] = L"Local\\PowerToys_ScreenTranslator_ScanTextEvent-61d415d8-fc8e-4704-b18e-a76e3d7b28c1";
     const wchar_t ACTIVE_WINDOW_SNAPSHOT[] = L"Local\\PowerToys_ScreenTranslator_ActiveWindowSnapshot-7bb7644a-ecaa-4baa-8b79-3df430451f20";
 
 #pragma pack(push, 1)
@@ -78,10 +81,12 @@ private:
     Hotkey m_hotkey;
     Hotkey m_currentScreenHotkey;
     Hotkey m_activeWindowHotkey;
+    Hotkey m_scanTextHotkey;
 
     HANDLE m_hInvokeEvent = nullptr;
     HANDLE m_hCurrentScreenEvent = nullptr;
     HANDLE m_hActiveWindowEvent = nullptr;
+    HANDLE m_hScanTextEvent = nullptr;
     HANDLE m_hTerminateEvent = nullptr;
     HANDLE m_hActiveWindowSnapshot = nullptr;
 
@@ -123,6 +128,12 @@ private:
 
     void parse_hotkey(PowerToysSettings::PowerToyValues& settings)
     {
+        m_scanTextHotkey.win = true;
+        m_scanTextHotkey.ctrl = false;
+        m_scanTextHotkey.alt = true;
+        m_scanTextHotkey.shift = true;
+        m_scanTextHotkey.key = 'T';
+
         auto settingsObject = settings.get_raw_json();
         if (settingsObject.GetView().Size())
         {
@@ -133,20 +144,43 @@ private:
                     try
                     {
                         auto jsonHotkeyObject = properties.GetNamedObject(key);
-                        hotkey.win = jsonHotkeyObject.GetNamedBoolean(JSON_KEY_WIN);
-                        hotkey.alt = jsonHotkeyObject.GetNamedBoolean(JSON_KEY_ALT);
-                        hotkey.shift = jsonHotkeyObject.GetNamedBoolean(JSON_KEY_SHIFT);
-                        hotkey.ctrl = jsonHotkeyObject.GetNamedBoolean(JSON_KEY_CTRL);
-                        hotkey.key = static_cast<unsigned char>(jsonHotkeyObject.GetNamedNumber(JSON_KEY_CODE));
+                        Hotkey parsedHotkey = hotkey;
+                        parsedHotkey.win = jsonHotkeyObject.GetNamedBoolean(JSON_KEY_WIN);
+                        parsedHotkey.alt = jsonHotkeyObject.GetNamedBoolean(JSON_KEY_ALT);
+                        parsedHotkey.shift = jsonHotkeyObject.GetNamedBoolean(JSON_KEY_SHIFT);
+                        parsedHotkey.ctrl = jsonHotkeyObject.GetNamedBoolean(JSON_KEY_CTRL);
+
+                        const double keyCode = jsonHotkeyObject.GetNamedNumber(JSON_KEY_CODE);
+                        if (keyCode < 1 || keyCode > 0xFF || std::trunc(keyCode) != keyCode)
+                        {
+                            throw std::invalid_argument("Invalid shortcut key code");
+                        }
+
+                        parsedHotkey.key = static_cast<unsigned char>(keyCode);
+                        hotkey = parsedHotkey;
                     }
                     catch (...)
                     {
-                        Logger::info(L"ScreenTranslator shortcut setting '{}' is missing; using its default", key);
+                        Logger::info(L"ScreenTranslator shortcut setting '{}' is missing or invalid; using its default", key);
                     }
                 };
                 read_hotkey(JSON_KEY_ACTIVATION_SHORTCUT, m_hotkey);
                 read_hotkey(JSON_KEY_CURRENT_SCREEN_SHORTCUT, m_currentScreenHotkey);
                 read_hotkey(JSON_KEY_ACTIVE_WINDOW_SHORTCUT, m_activeWindowHotkey);
+                read_hotkey(JSON_KEY_SCAN_TEXT_SHORTCUT, m_scanTextHotkey);
+                if (m_scanTextHotkey.win &&
+                    m_scanTextHotkey.ctrl &&
+                    m_scanTextHotkey.shift &&
+                    !m_scanTextHotkey.alt &&
+                    m_scanTextHotkey.key == 'B')
+                {
+                    Logger::info("ScreenTranslator replacing the reserved Windows graphics-reset shortcut with Win+Alt+Shift+T");
+                    m_scanTextHotkey.win = true;
+                    m_scanTextHotkey.ctrl = false;
+                    m_scanTextHotkey.alt = true;
+                    m_scanTextHotkey.shift = true;
+                    m_scanTextHotkey.key = 'T';
+                }
             }
             catch (...)
             {
@@ -247,6 +281,7 @@ public:
         m_hInvokeEvent = CreateDefaultEvent(CommonSharedConstants::SHOW_SCREEN_TRANSLATOR_SHARED_EVENT);
         m_hCurrentScreenEvent = CreateEventW(nullptr, FALSE, FALSE, CURRENT_SCREEN_EVENT);
         m_hActiveWindowEvent = CreateEventW(nullptr, FALSE, FALSE, ACTIVE_WINDOW_EVENT);
+        m_hScanTextEvent = CreateEventW(nullptr, FALSE, FALSE, SCAN_TEXT_EVENT);
         m_hActiveWindowSnapshot = CreateFileMappingW(
             INVALID_HANDLE_VALUE,
             nullptr,
@@ -288,6 +323,11 @@ public:
         {
             CloseHandle(m_hActiveWindowEvent);
             m_hActiveWindowEvent = nullptr;
+        }
+        if (m_hScanTextEvent)
+        {
+            CloseHandle(m_hScanTextEvent);
+            m_hScanTextEvent = nullptr;
         }
         if (m_hActiveWindowSnapshot)
         {
@@ -371,6 +411,10 @@ public:
         {
             ResetEvent(m_hActiveWindowEvent);
         }
+        if (m_hScanTextEvent)
+        {
+            ResetEvent(m_hScanTextEvent);
+        }
         launch_process();
         m_enabled = true;
         Trace::EnableScreenTranslator(true);
@@ -423,6 +467,7 @@ public:
 
             HANDLE eventToSignal = hotkeyId == 1 ? m_hCurrentScreenEvent :
                                    hotkeyId == 2 ? m_hActiveWindowEvent :
+                                   hotkeyId == 3 ? m_hScanTextEvent :
                                                    m_hInvokeEvent;
             if (eventToSignal)
             {
@@ -436,12 +481,13 @@ public:
 
     virtual size_t get_hotkeys(Hotkey* hotkeys, size_t buffer_size) override
     {
-        constexpr size_t hotkeyCount = 3;
+        constexpr size_t hotkeyCount = 4;
         if (hotkeys && buffer_size >= hotkeyCount)
         {
             hotkeys[0] = m_hotkey;
             hotkeys[1] = m_currentScreenHotkey;
             hotkeys[2] = m_activeWindowHotkey;
+            hotkeys[3] = m_scanTextHotkey;
         }
 
         return hotkeyCount;

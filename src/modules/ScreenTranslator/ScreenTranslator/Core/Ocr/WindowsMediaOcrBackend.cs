@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ManagedCommon;
@@ -38,21 +39,6 @@ public sealed class WindowsMediaOcrBackend : IOcrBackend
             return Array.Empty<TranslationLine>();
         }
 
-        Language? language = ResolveLanguage(sourceLanguageTag);
-
-        OcrEngine? engine = language != null
-            ? OcrEngine.TryCreateFromLanguage(language)
-            : (OcrEngine.IsLanguageSupported(new Language("en-US"))
-                ? OcrEngine.TryCreateFromLanguage(new Language("en-US"))
-                : (OcrEngine.AvailableRecognizerLanguages.Count > 0
-                    ? OcrEngine.TryCreateFromLanguage(OcrEngine.AvailableRecognizerLanguages[0])
-                    : null));
-
-        if (engine == null)
-        {
-            throw new InvalidOperationException("Windows OCR could not be created because no supported OCR language is installed.");
-        }
-
         bool convertedLocally = false;
         SoftwareBitmap convertedBitmap;
         if (bitmap.BitmapPixelFormat == BitmapPixelFormat.Bgra8 && bitmap.BitmapAlphaMode == BitmapAlphaMode.Premultiplied)
@@ -67,47 +53,24 @@ public sealed class WindowsMediaOcrBackend : IOcrBackend
 
         try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            OcrResult result = await engine.RecognizeAsync(convertedBitmap);
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (result == null || result.Lines == null || result.Lines.Count == 0)
+            if (IsAutomaticLanguage(sourceLanguageTag))
             {
-                return Array.Empty<TranslationLine>();
+                return await RecognizeAutomaticLanguageAsync(convertedBitmap, capturedRegionPhysical, cancellationToken);
             }
 
-            List<TranslationLine> lines = new();
-
-            foreach (OcrLine ocrLine in result.Lines)
+            Language language = ResolveExplicitLanguage(sourceLanguageTag);
+            OcrEngine? engine = OcrEngine.TryCreateFromLanguage(language);
+            if (engine == null)
             {
-                if (string.IsNullOrWhiteSpace(ocrLine.Text))
-                {
-                    continue;
-                }
-
-                List<PhysicalRect> wordRects = new();
-                foreach (OcrWord word in ocrLine.Words)
-                {
-                    wordRects.Add(new PhysicalRect(
-                        capturedRegionPhysical.X + word.BoundingRect.X,
-                        capturedRegionPhysical.Y + word.BoundingRect.Y,
-                        word.BoundingRect.Width,
-                        word.BoundingRect.Height));
-                }
-
-                PhysicalRect lineBoundingBox = OverlayLayoutHelper.CombineWordRects(wordRects);
-                if (lineBoundingBox.IsEmpty)
-                {
-                    lineBoundingBox = new PhysicalRect(
-                        capturedRegionPhysical.X,
-                        capturedRegionPhysical.Y,
-                        capturedRegionPhysical.Width,
-                        capturedRegionPhysical.Height);
-                }
-
-                lines.Add(new TranslationLine(ocrLine.Text.Trim(), lineBoundingBox, 1.0, null));
+                throw new InvalidOperationException($"Windows OCR could not be created for language '{language.LanguageTag}'.");
             }
 
+            IReadOnlyList<TranslationLine> lines = await RecognizeWithEngineAsync(
+                engine,
+                convertedBitmap,
+                capturedRegionPhysical,
+                cancellationToken);
+            Logger.LogInfo($"Windows OCR selected language '{language.LanguageTag}' for recognition.");
             return lines;
         }
         finally
@@ -119,7 +82,123 @@ public sealed class WindowsMediaOcrBackend : IOcrBackend
         }
     }
 
+    private static async Task<IReadOnlyList<TranslationLine>> RecognizeAutomaticLanguageAsync(
+        SoftwareBitmap bitmap,
+        PhysicalRect capturedRegionPhysical,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<string> candidateTags = GetAutomaticLanguageCandidates();
+        if (candidateTags.Count == 0)
+        {
+            throw new InvalidOperationException("Windows OCR could not be created because no supported OCR language is installed.");
+        }
+
+        List<(string LanguageTag, IReadOnlyList<TranslationLine> Lines, OcrLanguageScore Score)> recognized = new();
+        for (int index = 0; index < candidateTags.Count; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string candidateTag = candidateTags[index];
+            OcrEngine? engine = OcrEngine.TryCreateFromLanguage(new Language(candidateTag));
+            if (engine == null)
+            {
+                continue;
+            }
+
+            IReadOnlyList<TranslationLine> lines = await RecognizeWithEngineAsync(
+                engine,
+                bitmap,
+                capturedRegionPhysical,
+                cancellationToken);
+            OcrLanguageScore score = OcrLanguageSelectionHelper.ScoreRecognizedLines(candidateTag, lines, index);
+            recognized.Add((candidateTag, lines, score));
+        }
+
+        if (recognized.Count == 0)
+        {
+            throw new InvalidOperationException("Windows OCR could not be created because no supported OCR language is installed.");
+        }
+
+        OcrLanguageScore selectedScore = OcrLanguageSelectionHelper.SelectBestScore(
+            recognized.Select(candidate => candidate.Score));
+        var selected = recognized.First(candidate => string.Equals(
+            candidate.LanguageTag,
+            selectedScore.LanguageTag,
+            StringComparison.OrdinalIgnoreCase));
+        Logger.LogInfo(
+            $"Windows OCR selected language '{selected.LanguageTag}' from {recognized.Count} candidate(s) for Auto recognition.");
+        return selected.Lines;
+    }
+
+    private static async Task<IReadOnlyList<TranslationLine>> RecognizeWithEngineAsync(
+        OcrEngine engine,
+        SoftwareBitmap bitmap,
+        PhysicalRect capturedRegionPhysical,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        OcrResult result = await engine.RecognizeAsync(bitmap);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return ConvertResultToLines(result, capturedRegionPhysical);
+    }
+
+    private static IReadOnlyList<TranslationLine> ConvertResultToLines(
+        OcrResult result,
+        PhysicalRect capturedRegionPhysical)
+    {
+        if (result == null || result.Lines == null || result.Lines.Count == 0)
+        {
+            return Array.Empty<TranslationLine>();
+        }
+
+        List<TranslationLine> lines = new();
+
+        for (int lineIndex = 0; lineIndex < result.Lines.Count; lineIndex++)
+        {
+            OcrLine ocrLine = result.Lines[lineIndex];
+            if (string.IsNullOrWhiteSpace(ocrLine.Text))
+            {
+                continue;
+            }
+
+            List<PhysicalRect> wordRects = new();
+            List<RecognizedWord> recognizedWords = new();
+            for (int wordIndex = 0; wordIndex < ocrLine.Words.Count; wordIndex++)
+            {
+                OcrWord word = ocrLine.Words[wordIndex];
+                PhysicalRect wordRect = new(
+                    capturedRegionPhysical.X + word.BoundingRect.X,
+                    capturedRegionPhysical.Y + word.BoundingRect.Y,
+                    word.BoundingRect.Width,
+                    word.BoundingRect.Height);
+                wordRects.Add(wordRect);
+                recognizedWords.Add(new RecognizedWord(word.Text, wordRect, lineIndex, wordIndex));
+            }
+
+            PhysicalRect lineBoundingBox = OverlayLayoutHelper.CombineWordRects(wordRects);
+            if (lineBoundingBox.IsEmpty)
+            {
+                lineBoundingBox = new PhysicalRect(
+                    capturedRegionPhysical.X,
+                    capturedRegionPhysical.Y,
+                    capturedRegionPhysical.Width,
+                    capturedRegionPhysical.Height);
+            }
+
+            lines.Add(new TranslationLine(ocrLine.Text.Trim(), lineBoundingBox, 1.0, null, Words: recognizedWords));
+        }
+
+        return lines;
+    }
+
     public static Language? ResolveLanguage(string? sourceLanguageTag)
+    {
+        return IsAutomaticLanguage(sourceLanguageTag)
+            ? GetPreferredLanguage()
+            : ResolveExplicitLanguage(sourceLanguageTag);
+    }
+
+    private static Language ResolveExplicitLanguage(string? sourceLanguageTag)
     {
         if (!string.IsNullOrWhiteSpace(sourceLanguageTag) &&
             !string.Equals(sourceLanguageTag, "auto", StringComparison.OrdinalIgnoreCase) &&
@@ -133,11 +212,7 @@ public sealed class WindowsMediaOcrBackend : IOcrBackend
                     return requestedLang;
                 }
 
-                Language? fallbackLanguage = GetPreferredLanguage();
-                Logger.LogWarning(
-                    $"Windows OCR language '{sourceLanguageTag}' is not installed. " +
-                    $"Falling back to '{fallbackLanguage?.LanguageTag ?? "the first available OCR language"}' for recognition.");
-                return fallbackLanguage;
+                throw new InvalidOperationException($"Windows OCR language '{sourceLanguageTag}' is not installed.");
             }
             catch (ArgumentException ex)
             {
@@ -145,7 +220,13 @@ public sealed class WindowsMediaOcrBackend : IOcrBackend
             }
         }
 
-        return GetPreferredLanguage();
+        Language? preferred = GetPreferredLanguage();
+        if (preferred != null)
+        {
+            return preferred;
+        }
+
+        throw new InvalidOperationException("Windows OCR could not be created because no supported OCR language is installed.");
     }
 
     public static Language? GetPreferredLanguage()
@@ -171,5 +252,33 @@ public sealed class WindowsMediaOcrBackend : IOcrBackend
         }
 
         return OcrEngine.AvailableRecognizerLanguages.Count > 0 ? OcrEngine.AvailableRecognizerLanguages[0] : null;
+    }
+
+    private static IReadOnlyList<string> GetAutomaticLanguageCandidates()
+    {
+        return OcrLanguageSelectionHelper.GetAutoLanguageCandidates(
+            OcrEngine.AvailableRecognizerLanguages.Select(language => language.LanguageTag),
+            GetUserPreferredLanguageTags());
+    }
+
+    private static IReadOnlyList<string> GetUserPreferredLanguageTags()
+    {
+        try
+        {
+            var userLanguages = Windows.System.UserProfile.GlobalizationPreferences.Languages;
+            return userLanguages?.ToArray() ?? Array.Empty<string>();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Exception querying preferred globalization languages: {ex.Message}");
+            return Array.Empty<string>();
+        }
+    }
+
+    private static bool IsAutomaticLanguage(string? sourceLanguageTag)
+    {
+        return string.IsNullOrWhiteSpace(sourceLanguageTag) ||
+               string.Equals(sourceLanguageTag, "auto", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(sourceLanguageTag, "system", StringComparison.OrdinalIgnoreCase);
     }
 }

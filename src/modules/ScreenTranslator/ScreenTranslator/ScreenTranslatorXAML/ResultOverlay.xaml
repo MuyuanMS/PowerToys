@@ -13,7 +13,7 @@
     IsTitleBarVisible="False"
     mc:Ignorable="d">
 
-    <Grid Background="Transparent">
+    <Grid x:Name="RootGrid" Background="Transparent">
         <Grid.Resources>
             <MenuFlyout x:Name="CardActionMenu">
                 <MenuFlyoutItem

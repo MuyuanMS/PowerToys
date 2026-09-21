@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ManagedCommon;
@@ -12,6 +13,7 @@ using Microsoft.Windows.AI;
 using Microsoft.Windows.AI.Imaging;
 using ScreenTranslator.Core.Translation;
 using Windows.Graphics.Imaging;
+using TranslationRecognizedWord = ScreenTranslator.Core.Translation.RecognizedWord;
 
 namespace ScreenTranslator.Core.Ocr;
 
@@ -120,8 +122,9 @@ public sealed class WindowsAiTextRecognizerOcrBackend : IOcrBackend, IDisposable
 
                     List<TranslationLine> lines = new();
 
-                    foreach (var line in result.Lines)
+                    for (int lineIndex = 0; lineIndex < result.Lines.Length; lineIndex++)
                     {
+                        var line = result.Lines[lineIndex];
                         if (line == null || string.IsNullOrWhiteSpace(line.Text))
                         {
                             continue;
@@ -141,12 +144,38 @@ public sealed class WindowsAiTextRecognizerOcrBackend : IOcrBackend, IDisposable
                         List<PhysicalPoint> polygonVertices = new() { topLeft, topRight, bottomRight, bottomLeft };
 
                         double confidence = CalculateConfidence(line);
+                        List<TranslationRecognizedWord> recognizedWords = new();
+                        if (line.Words != null)
+                        {
+                            for (int wordIndex = 0; wordIndex < line.Words.Length; wordIndex++)
+                            {
+                                var word = line.Words[wordIndex];
+                                if (word == null || string.IsNullOrWhiteSpace(word.Text))
+                                {
+                                    continue;
+                                }
+
+                                PhysicalPoint wordTopLeft = new(capturedRegionPhysical.X + word.BoundingBox.TopLeft.X, capturedRegionPhysical.Y + word.BoundingBox.TopLeft.Y);
+                                PhysicalPoint wordTopRight = new(capturedRegionPhysical.X + word.BoundingBox.TopRight.X, capturedRegionPhysical.Y + word.BoundingBox.TopRight.Y);
+                                PhysicalPoint wordBottomRight = new(capturedRegionPhysical.X + word.BoundingBox.BottomRight.X, capturedRegionPhysical.Y + word.BoundingBox.BottomRight.Y);
+                                PhysicalPoint wordBottomLeft = new(capturedRegionPhysical.X + word.BoundingBox.BottomLeft.X, capturedRegionPhysical.Y + word.BoundingBox.BottomLeft.Y);
+                                List<PhysicalPoint> wordVertices = new() { wordTopLeft, wordTopRight, wordBottomRight, wordBottomLeft };
+                                recognizedWords.Add(new TranslationRecognizedWord(
+                                    word.Text.Trim(),
+                                    GetBounds(wordVertices),
+                                    lineIndex,
+                                    wordIndex,
+                                    Math.Clamp(word.MatchConfidence, 0.0f, 1.0f),
+                                    wordVertices));
+                            }
+                        }
 
                         lines.Add(new TranslationLine(
                             line.Text.Trim(),
                             lineRect,
                             confidence,
-                            polygonVertices));
+                            polygonVertices,
+                            Words: recognizedWords));
                     }
 
                     return lines;
@@ -184,6 +213,15 @@ public sealed class WindowsAiTextRecognizerOcrBackend : IOcrBackend, IDisposable
         }
 
         return Math.Clamp(line.LineStyleConfidence, 0.0f, 1.0f);
+    }
+
+    private static PhysicalRect GetBounds(IReadOnlyList<PhysicalPoint> points)
+    {
+        double minX = points.Min(point => point.X);
+        double minY = points.Min(point => point.Y);
+        double maxX = points.Max(point => point.X);
+        double maxY = points.Max(point => point.Y);
+        return new PhysicalRect(minX, minY, Math.Max(1, maxX - minX), Math.Max(1, maxY - minY));
     }
 
     private void ThrowIfDisposed()

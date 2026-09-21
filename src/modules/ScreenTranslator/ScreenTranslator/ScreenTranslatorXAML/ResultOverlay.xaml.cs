@@ -32,8 +32,6 @@ namespace ScreenTranslator;
 
 public sealed partial class ResultOverlay : TransparentWindow
 {
-    private readonly ScreenInfo _screenInfo;
-    private readonly PhysicalRect _overlayBounds;
     private readonly PhysicalRect _capturedRegion;
     private readonly IReadOnlyList<TranslatedLine> _lines;
     private readonly string _sourceLanguage;
@@ -63,6 +61,7 @@ public sealed partial class ResultOverlay : TransparentWindow
     private readonly DispatcherQueueTimer _windowSwitchTimer;
     private readonly IntPtr _sourceWindow;
     private readonly long _shownTimestamp = Environment.TickCount64;
+    private PhysicalRect _overlayBounds;
     private Border? _dragCard;
     private uint _dragPointerId;
     private Windows.Foundation.Point _dragStart;
@@ -87,10 +86,13 @@ public sealed partial class ResultOverlay : TransparentWindow
     private int _selectedLineIndex = -1;
     private bool _isToolbarDragging;
     private bool _toolbarWasManuallyPositioned;
+    private bool _coordinateSpaceInitialized;
     private uint _toolbarPointerId;
     private Windows.Foundation.Point _toolbarDragStart;
     private Thickness _toolbarDragStartMargin;
     private bool _isContextMenuAboveCard;
+    private double _dpiScaleX;
+    private double _dpiScaleY;
 
     public ResultOverlay(
         ScreenInfo screenInfo,
@@ -104,8 +106,9 @@ public sealed partial class ResultOverlay : TransparentWindow
         Func<string, string, Task>? retranslateAll = null,
         Func<TranslationLine, string, string, Task<TranslationResult>>? retranslateLine = null)
     {
-        _screenInfo = screenInfo;
         _overlayBounds = screenInfo.WorkingArea;
+        _dpiScaleX = screenInfo.DpiScaleX;
+        _dpiScaleY = screenInfo.DpiScaleY;
         _capturedRegion = capturedRegion;
         _lines = lines;
         _sourceLanguage = sourceLanguage;
@@ -116,6 +119,7 @@ public sealed partial class ResultOverlay : TransparentWindow
         DismissOnFocusLost = false;
 
         InitializeComponent();
+        RootGrid.Loaded += RootGrid_Loaded;
         InitializeExternalActionAvailability();
         Closed += (_, _) => _textShareService.Close();
 
@@ -184,15 +188,7 @@ public sealed partial class ResultOverlay : TransparentWindow
             await imageSource.SetBitmapAsync(bitmapSource);
             FrozenBackgroundImage.Source = imageSource;
 
-            var (leftDip, topDip, widthDip, heightDip) = OverlayLayoutHelper.PhysicalToDip(
-                _capturedRegion,
-                _overlayBounds,
-                _screenInfo.DpiScaleX,
-                _screenInfo.DpiScaleY);
-            Canvas.SetLeft(FrozenBackgroundImage, leftDip);
-            Canvas.SetTop(FrozenBackgroundImage, topDip);
-            FrozenBackgroundImage.Width = widthDip;
-            FrozenBackgroundImage.Height = heightDip;
+            PositionFrozenBackground();
             FreezeContentToggleButton.IsChecked = freezeCapturedContent;
             FrozenBackgroundImage.Visibility = freezeCapturedContent ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -206,6 +202,43 @@ public sealed partial class ResultOverlay : TransparentWindow
             convertedSnapshot?.Dispose();
             capturedSnapshot.Dispose();
         }
+    }
+
+    private void RootGrid_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (_coordinateSpaceInitialized)
+        {
+            return;
+        }
+
+        _coordinateSpaceInitialized = true;
+        OverlayCoordinateSpace coordinateSpace = OverlayCoordinateSpaceHelper.GetForClient(
+            _hwnd,
+            RootGrid,
+            _overlayBounds,
+            _dpiScaleX,
+            _dpiScaleY);
+        _overlayBounds = coordinateSpace.Bounds;
+        _dpiScaleX = coordinateSpace.ScaleX;
+        _dpiScaleY = coordinateSpace.ScaleY;
+
+        RenderTranslatedBoxes();
+        PositionFrozenBackground();
+        PositionCaptureRegionOutline();
+        PositionToolbar();
+    }
+
+    private void PositionFrozenBackground()
+    {
+        var (leftDip, topDip, widthDip, heightDip) = OverlayLayoutHelper.PhysicalToDip(
+            _capturedRegion,
+            _overlayBounds,
+            _dpiScaleX,
+            _dpiScaleY);
+        Canvas.SetLeft(FrozenBackgroundImage, leftDip);
+        Canvas.SetTop(FrozenBackgroundImage, topDip);
+        FrozenBackgroundImage.Width = widthDip;
+        FrozenBackgroundImage.Height = heightDip;
     }
 
     private void FreezeContentToggleButton_Click(object sender, RoutedEventArgs e)
@@ -394,6 +427,11 @@ public sealed partial class ResultOverlay : TransparentWindow
 
         _cardHitRegions.Clear();
         _resizeHandles.Clear();
+        var (_, _, captureWidthDip, captureHeightDip) = OverlayLayoutHelper.PhysicalToDip(
+            _capturedRegion,
+            _overlayBounds,
+            _dpiScaleX,
+            _dpiScaleY);
         for (int lineIndex = 0; lineIndex < _lines.Count; lineIndex++)
         {
             TranslatedLine line = _lines[lineIndex];
@@ -402,11 +440,17 @@ public sealed partial class ResultOverlay : TransparentWindow
             var (leftDip, topDip, widthDip, heightDip) = OverlayLayoutHelper.PhysicalToDip(
                 line.BoundingBox,
                 _overlayBounds,
-                _screenInfo.DpiScaleX,
-                _screenInfo.DpiScaleY);
+                _dpiScaleX,
+                _dpiScaleY);
 
             double sourceLineHeightDip = heightDip / Math.Max(1, line.SourceLineCount);
             double estimatedFontSize = OverlayLayoutHelper.CalculateEstimatedFontSize(sourceLineHeightDip);
+            var (initialWidth, initialMinHeight) = OverlayLayoutHelper.CalculateInitialCardSize(
+                widthDip,
+                heightDip,
+                captureWidthDip,
+                captureHeightDip,
+                line.SourceLineCount);
 
             Border card = new()
             {
@@ -415,8 +459,8 @@ public sealed partial class ResultOverlay : TransparentWindow
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(4),
                 Padding = new Thickness(6, 2, 6, 2),
-                Width = Math.Max(24, widthDip),
-                MinHeight = Math.Max(18, heightDip),
+                Width = initialWidth,
+                MinHeight = initialMinHeight,
             };
 
             TextBlock textBlock = new()
@@ -801,8 +845,8 @@ public sealed partial class ResultOverlay : TransparentWindow
 
     private void PositionContextMenu(Border card)
     {
-        double overlayWidth = _overlayBounds.Width / _screenInfo.DpiScaleX;
-        double overlayHeight = _overlayBounds.Height / _screenInfo.DpiScaleY;
+        double overlayWidth = _overlayBounds.Width / _dpiScaleX;
+        double overlayHeight = _overlayBounds.Height / _dpiScaleY;
         CardContextMenu.Measure(new Windows.Foundation.Size(Math.Max(320, overlayWidth - 16), double.PositiveInfinity));
 
         double menuWidth = Math.Max(320, CardContextMenu.DesiredSize.Width);
@@ -828,8 +872,8 @@ public sealed partial class ResultOverlay : TransparentWindow
             return;
         }
 
-        double overlayWidth = _overlayBounds.Width / _screenInfo.DpiScaleX;
-        double overlayHeight = _overlayBounds.Height / _screenInfo.DpiScaleY;
+        double overlayWidth = _overlayBounds.Width / _dpiScaleX;
+        double overlayHeight = _overlayBounds.Height / _dpiScaleY;
         CardDetailMenu.Measure(new Windows.Foundation.Size(Math.Max(320, overlayWidth - 16), double.PositiveInfinity));
 
         double detailWidth = Math.Max(48, CardDetailMenu.DesiredSize.Width);
@@ -1690,11 +1734,11 @@ public sealed partial class ResultOverlay : TransparentWindow
         var (regionLeftDip, regionTopDip, _, _) = OverlayLayoutHelper.PhysicalToDip(
             _capturedRegion,
             _overlayBounds,
-            _screenInfo.DpiScaleX,
-            _screenInfo.DpiScaleY);
+            _dpiScaleX,
+            _dpiScaleY);
 
-        double overlayWidth = _overlayBounds.Width / _screenInfo.DpiScaleX;
-        double overlayHeight = _overlayBounds.Height / _screenInfo.DpiScaleY;
+        double overlayWidth = _overlayBounds.Width / _dpiScaleX;
+        double overlayHeight = _overlayBounds.Height / _dpiScaleY;
         FloatingToolbar.Measure(new Windows.Foundation.Size(Math.Max(320, overlayWidth - 16), double.PositiveInfinity));
         double toolbarWidth = Math.Max(48, FloatingToolbar.DesiredSize.Width);
         double toolbarHeight = Math.Max(48, FloatingToolbar.DesiredSize.Height);
@@ -1765,8 +1809,8 @@ public sealed partial class ResultOverlay : TransparentWindow
             return;
         }
 
-        double overlayWidth = _overlayBounds.Width / _screenInfo.DpiScaleX;
-        double overlayHeight = _overlayBounds.Height / _screenInfo.DpiScaleY;
+        double overlayWidth = _overlayBounds.Width / _dpiScaleX;
+        double overlayHeight = _overlayBounds.Height / _dpiScaleY;
         FloatingToolbar.Measure(new Windows.Foundation.Size(Math.Max(320, overlayWidth - 16), double.PositiveInfinity));
         double maxLeft = Math.Max(8, overlayWidth - Math.Max(48, FloatingToolbar.DesiredSize.Width) - 8);
         double maxTop = Math.Max(8, overlayHeight - Math.Max(48, FloatingToolbar.DesiredSize.Height) - 8);
@@ -1800,8 +1844,8 @@ public sealed partial class ResultOverlay : TransparentWindow
         }
 
         Windows.Foundation.Point current = e.GetCurrentPoint(ResultCanvas).Position;
-        double maxLeft = Math.Max(8, (_overlayBounds.Width / _screenInfo.DpiScaleX) - Math.Max(48, FloatingToolbar.ActualWidth) - 8);
-        double maxTop = Math.Max(8, (_overlayBounds.Height / _screenInfo.DpiScaleY) - Math.Max(48, FloatingToolbar.ActualHeight) - 8);
+        double maxLeft = Math.Max(8, (_overlayBounds.Width / _dpiScaleX) - Math.Max(48, FloatingToolbar.ActualWidth) - 8);
+        double maxTop = Math.Max(8, (_overlayBounds.Height / _dpiScaleY) - Math.Max(48, FloatingToolbar.ActualHeight) - 8);
         double left = Math.Clamp(_toolbarDragStartMargin.Left + current.X - _toolbarDragStart.X, 8, maxLeft);
         double top = Math.Clamp(_toolbarDragStartMargin.Top + current.Y - _toolbarDragStart.Y, 8, maxTop);
         FloatingToolbar.Margin = new Thickness(left, top, 0, 0);
@@ -1842,8 +1886,8 @@ public sealed partial class ResultOverlay : TransparentWindow
         var (leftDip, topDip, widthDip, heightDip) = OverlayLayoutHelper.PhysicalToDip(
             _capturedRegion,
             _overlayBounds,
-            _screenInfo.DpiScaleX,
-            _screenInfo.DpiScaleY);
+            _dpiScaleX,
+            _dpiScaleY);
 
         Canvas.SetLeft(CaptureRegionOutline, leftDip);
         Canvas.SetTop(CaptureRegionOutline, topDip);

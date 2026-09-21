@@ -1,0 +1,117 @@
+<common:TransparentWindow
+    x:Class="ScreenTranslator.BrushSelectionOverlay"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:common="using:Microsoft.PowerToys.Common.UI.Controls.Window"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="ScreenTranslatorBrushSelection"
+    IsAlwaysOnTop="True"
+    IsMaximizable="False"
+    IsMinimizable="False"
+    IsResizable="False"
+    IsTitleBarVisible="False"
+    mc:Ignorable="d">
+
+    <Grid
+        x:Name="RootGrid"
+        Background="Transparent"
+        KeyboardAcceleratorPlacementMode="Hidden">
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="Enter" Invoked="TranslateKeyboardAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Enter" Modifiers="Control" Invoked="TranslateKeyboardAccelerator_Invoked" />
+        </Grid.KeyboardAccelerators>
+
+        <Image
+            x:Name="FrozenBackgroundImage"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            Stretch="Fill" />
+
+        <Canvas
+            x:Name="BrushCanvas"
+            AutomationProperties.AutomationId="CanvasScanTextBrush"
+            AutomationProperties.Name="Scan text brush canvas"
+            Background="Transparent"
+            PointerMoved="BrushCanvas_PointerMoved"
+            PointerPressed="BrushCanvas_PointerPressed"
+            PointerReleased="BrushCanvas_PointerReleased" />
+
+        <Border
+            HorizontalAlignment="Center"
+            VerticalAlignment="Top"
+            Background="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}"
+            BackgroundSizing="InnerBorderEdge"
+            BorderBrush="{ThemeResource SurfaceStrokeColorFlyoutBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource OverlayCornerRadius}"
+            Margin="16"
+            Padding="12">
+            <Grid ColumnSpacing="12" RowSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <ProgressRing
+                    x:Name="OcrProgressRing"
+                    Width="24"
+                    Height="24"
+                    VerticalAlignment="Center"
+                    AutomationProperties.Name="Recognizing text"
+                    IsActive="True" />
+                <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock
+                        x:Name="InstructionTitle"
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        Text="Recognizing text..." />
+                    <TextBlock
+                        x:Name="InstructionText"
+                        MaxWidth="480"
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Text="The screen is frozen while text areas are prepared."
+                        TextWrapping="Wrap" />
+                </StackPanel>
+                <CommandBar
+                    x:Name="SelectionCommandBar"
+                    Grid.Row="1"
+                    Grid.ColumnSpan="2"
+                    HorizontalAlignment="Right"
+                    AutomationProperties.AutomationId="CmdBarScanTextSelectionActions"
+                    AutomationProperties.Name="Scan text selection actions"
+                    Background="Transparent"
+                    DefaultLabelPosition="Right"
+                    IsDynamicOverflowEnabled="False">
+                    <AppBarButton
+                        x:Name="TranslateButton"
+                        AutomationProperties.AutomationId="BtnScanTextTranslate"
+                        AutomationProperties.Name="Translate selected text"
+                        Click="TranslateButton_Click"
+                        Icon="Accept"
+                        IsEnabled="False"
+                        Label="Translate" />
+                    <AppBarButton
+                        x:Name="ClearButton"
+                        AutomationProperties.AutomationId="BtnScanTextClear"
+                        AutomationProperties.Name="Clear selected text"
+                        Click="ClearButton_Click"
+                        Icon="Clear"
+                        IsEnabled="False"
+                        Label="Clear" />
+                    <CommandBar.SecondaryCommands>
+                        <AppBarButton
+                            x:Name="CancelButton"
+                            AutomationProperties.AutomationId="BtnScanTextCancel"
+                            AutomationProperties.Name="Cancel scan text"
+                            Click="CancelButton_Click"
+                            Icon="Cancel"
+                            Label="Cancel" />
+                    </CommandBar.SecondaryCommands>
+                </CommandBar>
+            </Grid>
+        </Border>
+    </Grid>
+</common:TransparentWindow>

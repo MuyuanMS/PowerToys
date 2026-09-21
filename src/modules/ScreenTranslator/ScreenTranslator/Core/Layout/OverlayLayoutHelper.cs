@@ -14,6 +14,10 @@ namespace ScreenTranslator.Core.Layout;
 /// </summary>
 public static class OverlayLayoutHelper
 {
+    private const double MaxInitialCardWidthFraction = 0.9;
+    private const double MaxInitialSingleLineCardHeightFraction = 0.35;
+    private const double MaxInitialMultilineCardHeightFraction = 0.6;
+
     /// <summary>
     /// Converts a canonical physical rectangle into DIP (device independent pixel) coordinates relative to a specific screen's top-left.
     /// </summary>
@@ -433,6 +437,233 @@ public static class OverlayLayoutHelper
         double bottom = Math.Max(top, Math.Min(rect.Bottom, screenBounds.Bottom));
 
         return new PhysicalRect(left, top, Math.Max(0, right - left), Math.Max(0, bottom - top));
+    }
+
+    public static (double Width, double MinHeight) CalculateInitialCardSize(
+        double widthDip,
+        double heightDip,
+        double captureWidthDip,
+        double captureHeightDip,
+        int sourceLineCount)
+    {
+        double safeCaptureWidth = IsFinitePositive(captureWidthDip) ? captureWidthDip : Math.Max(24.0, widthDip);
+        double safeCaptureHeight = IsFinitePositive(captureHeightDip) ? captureHeightDip : Math.Max(18.0, heightDip);
+        double maximumWidth = Math.Max(24.0, safeCaptureWidth * MaxInitialCardWidthFraction);
+        double maximumHeight = Math.Max(
+            18.0,
+            safeCaptureHeight * (sourceLineCount > 1 ? MaxInitialMultilineCardHeightFraction : MaxInitialSingleLineCardHeightFraction));
+
+        return (
+            Math.Min(Math.Max(24.0, IsFinitePositive(widthDip) ? widthDip : 24.0), maximumWidth),
+            Math.Min(Math.Max(18.0, IsFinitePositive(heightDip) ? heightDip : 18.0), maximumHeight));
+    }
+
+    public static IReadOnlyList<TranslationLine> SanitizeOcrLineGeometry(
+        IEnumerable<TranslationLine> lines,
+        PhysicalRect capturedRegion)
+    {
+        if (lines == null)
+        {
+            return Array.Empty<TranslationLine>();
+        }
+
+        List<TranslationLine> sanitized = new();
+        foreach (TranslationLine line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line.Text))
+            {
+                continue;
+            }
+
+            PhysicalRect bounds = SanitizeTextBounds(line.BoundingBox, capturedRegion, line.SourceLineCount);
+            if (bounds.IsEmpty)
+            {
+                continue;
+            }
+
+            IReadOnlyList<RecognizedWord>? words = SanitizeWords(line.Words, capturedRegion);
+            sanitized.Add(line with
+            {
+                BoundingBox = bounds,
+                PolygonVertices = SanitizePolygon(line.PolygonVertices, bounds, capturedRegion),
+                Words = words,
+            });
+        }
+
+        return sanitized;
+    }
+
+    public static IReadOnlyList<TranslatedLine> SanitizeTranslatedLineGeometry(
+        IEnumerable<TranslatedLine> lines,
+        PhysicalRect capturedRegion)
+    {
+        if (lines == null)
+        {
+            return Array.Empty<TranslatedLine>();
+        }
+
+        List<TranslatedLine> sanitized = new();
+        foreach (TranslatedLine line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line.TranslatedText) && string.IsNullOrWhiteSpace(line.OriginalText))
+            {
+                continue;
+            }
+
+            PhysicalRect bounds = SanitizeTextBounds(line.BoundingBox, capturedRegion, line.SourceLineCount);
+            if (bounds.IsEmpty)
+            {
+                continue;
+            }
+
+            sanitized.Add(line with
+            {
+                BoundingBox = bounds,
+                PolygonVertices = SanitizePolygon(line.PolygonVertices, bounds, capturedRegion),
+            });
+        }
+
+        return sanitized;
+    }
+
+    private static IReadOnlyList<RecognizedWord>? SanitizeWords(
+        IReadOnlyList<RecognizedWord>? words,
+        PhysicalRect capturedRegion)
+    {
+        if (words == null || words.Count == 0)
+        {
+            return words;
+        }
+
+        List<RecognizedWord> sanitized = new(words.Count);
+        foreach (RecognizedWord word in words)
+        {
+            PhysicalRect bounds = ClampFiniteIntersection(word.BoundingBox, capturedRegion);
+            if (bounds.IsEmpty)
+            {
+                continue;
+            }
+
+            sanitized.Add(word with
+            {
+                BoundingBox = bounds,
+                PolygonVertices = SanitizePolygon(word.PolygonVertices, bounds, capturedRegion),
+            });
+        }
+
+        return sanitized;
+    }
+
+    private static PhysicalRect SanitizeTextBounds(
+        PhysicalRect bounds,
+        PhysicalRect capturedRegion,
+        int sourceLineCount)
+    {
+        if (!IsValidRegion(capturedRegion))
+        {
+            return bounds;
+        }
+
+        PhysicalRect clamped = ClampFiniteIntersection(bounds, capturedRegion);
+        if (clamped.IsEmpty)
+        {
+            return CreateFallbackTextBounds(bounds, capturedRegion);
+        }
+
+        double area = clamped.Width * clamped.Height;
+        double captureArea = capturedRegion.Width * capturedRegion.Height;
+        bool implausiblyLarge = captureArea > 0 &&
+                                (area > captureArea * 0.75 ||
+                                 (clamped.Width > capturedRegion.Width * 0.95 &&
+                                  clamped.Height > capturedRegion.Height * 0.65));
+        if (!implausiblyLarge)
+        {
+            return clamped;
+        }
+
+        double maximumHeightFraction = sourceLineCount > 1
+            ? MaxInitialMultilineCardHeightFraction
+            : MaxInitialSingleLineCardHeightFraction;
+        double width = Math.Min(clamped.Width, Math.Max(24.0, capturedRegion.Width * MaxInitialCardWidthFraction));
+        double height = Math.Min(clamped.Height, Math.Max(18.0, capturedRegion.Height * maximumHeightFraction));
+        double left = Math.Clamp(clamped.Left, capturedRegion.Left, Math.Max(capturedRegion.Left, capturedRegion.Right - width));
+        double top = Math.Clamp(clamped.Top, capturedRegion.Top, Math.Max(capturedRegion.Top, capturedRegion.Bottom - height));
+        return new PhysicalRect(left, top, width, height);
+    }
+
+    private static PhysicalRect ClampFiniteIntersection(PhysicalRect bounds, PhysicalRect capturedRegion)
+    {
+        if (!IsValidRegion(bounds) || !IsValidRegion(capturedRegion))
+        {
+            return PhysicalRect.Empty;
+        }
+
+        double left = Math.Max(bounds.Left, capturedRegion.Left);
+        double top = Math.Max(bounds.Top, capturedRegion.Top);
+        double right = Math.Min(bounds.Right, capturedRegion.Right);
+        double bottom = Math.Min(bounds.Bottom, capturedRegion.Bottom);
+        if (right <= left || bottom <= top)
+        {
+            return PhysicalRect.Empty;
+        }
+
+        return new PhysicalRect(left, top, right - left, bottom - top);
+    }
+
+    private static PhysicalRect CreateFallbackTextBounds(PhysicalRect originalBounds, PhysicalRect capturedRegion)
+    {
+        if (!IsValidRegion(capturedRegion))
+        {
+            return PhysicalRect.Empty;
+        }
+
+        double width = Math.Min(capturedRegion.Width, Math.Max(24.0, capturedRegion.Width * 0.35));
+        double height = Math.Min(capturedRegion.Height, Math.Max(18.0, capturedRegion.Height * 0.06));
+        double requestedLeft = double.IsFinite(originalBounds.Left) ? originalBounds.Left : capturedRegion.Left;
+        double requestedTop = double.IsFinite(originalBounds.Top) ? originalBounds.Top : capturedRegion.Top;
+        double left = Math.Clamp(requestedLeft, capturedRegion.Left, Math.Max(capturedRegion.Left, capturedRegion.Right - width));
+        double top = Math.Clamp(requestedTop, capturedRegion.Top, Math.Max(capturedRegion.Top, capturedRegion.Bottom - height));
+        return new PhysicalRect(left, top, width, height);
+    }
+
+    private static IReadOnlyList<PhysicalPoint>? SanitizePolygon(
+        IReadOnlyList<PhysicalPoint>? polygon,
+        PhysicalRect bounds,
+        PhysicalRect capturedRegion)
+    {
+        if (polygon == null || polygon.Count == 0)
+        {
+            return CreateRectanglePolygon(bounds);
+        }
+
+        List<PhysicalPoint> points = new(polygon.Count);
+        foreach (PhysicalPoint point in polygon)
+        {
+            if (!double.IsFinite(point.X) || !double.IsFinite(point.Y))
+            {
+                continue;
+            }
+
+            points.Add(new PhysicalPoint(
+                Math.Clamp(point.X, capturedRegion.Left, capturedRegion.Right),
+                Math.Clamp(point.Y, capturedRegion.Top, capturedRegion.Bottom)));
+        }
+
+        return points.Count > 0 ? points : CreateRectanglePolygon(bounds);
+    }
+
+    private static bool IsValidRegion(PhysicalRect rect)
+    {
+        return !rect.IsEmpty &&
+               double.IsFinite(rect.X) &&
+               double.IsFinite(rect.Y) &&
+               double.IsFinite(rect.Width) &&
+               double.IsFinite(rect.Height);
+    }
+
+    private static bool IsFinitePositive(double value)
+    {
+        return double.IsFinite(value) && value > 0;
     }
 
     /// <summary>

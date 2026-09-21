@@ -6,13 +6,10 @@ using System.Collections.Generic;
 
 namespace ScreenTranslator.Core.Translation;
 
-/// <summary>
-/// Represents a recognized text line and its canonical physical bounding geometry.
-/// </summary>
-public sealed record TranslationLine(
+public sealed record RecognizedWord(
     string Text,
     PhysicalRect BoundingBox,
+    int LineIndex,
+    int WordIndex,
     double Confidence = 1.0,
-    IReadOnlyList<PhysicalPoint>? PolygonVertices = null,
-    int SourceLineCount = 1,
-    IReadOnlyList<RecognizedWord>? Words = null);
+    IReadOnlyList<PhysicalPoint>? PolygonVertices = null);

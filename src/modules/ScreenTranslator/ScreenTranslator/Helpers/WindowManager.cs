@@ -23,9 +23,11 @@ public static class WindowManager
         Region,
         CurrentScreen,
         ActiveWindow,
+        ScanText,
     }
 
     private static readonly List<SelectionOverlay> SelectionWindows = new();
+    private static readonly List<BrushSelectionOverlay> BrushSelectionWindows = new();
     private static readonly List<ResultOverlay> ResultWindows = new();
     private static readonly object Lock = new();
     private static ProcessingOverlay? _processingWindow;
@@ -48,6 +50,11 @@ public static class WindowManager
     public static void TranslateActiveWindow()
     {
         LaunchScreenTranslator(CaptureLaunchMode.ActiveWindow);
+    }
+
+    public static void ScanText()
+    {
+        LaunchScreenTranslator(CaptureLaunchMode.ScanText);
     }
 
     private static void LaunchScreenTranslator(CaptureLaunchMode launchMode)
@@ -107,11 +114,45 @@ public static class WindowManager
 
             screens = [FindTargetScreen(_foregroundWindowBounds.Value)];
         }
-        else if (launchMode == CaptureLaunchMode.CurrentScreen)
+        else if (launchMode is CaptureLaunchMode.CurrentScreen or CaptureLaunchMode.ScanText)
         {
             screens = _foregroundWindowBounds.HasValue
                 ? [FindTargetScreen(_foregroundWindowBounds.Value)]
                 : [screens.FirstOrDefault(screen => screen.IsPrimary) ?? screens[0]];
+        }
+
+        if (launchMode == CaptureLaunchMode.ScanText)
+        {
+            ScreenInfo screen = screens[0];
+            SoftwareBitmap? capturedBitmap = Core.Capture.ScreenCaptureHelper.CaptureRegion(screen.Bounds);
+            if (capturedBitmap == null)
+            {
+                Logger.LogWarning("Scan text screen capture returned null.");
+                return;
+            }
+
+            BrushSelectionOverlay overlay = new(
+                screen,
+                capturedBitmap,
+                ocrBackend,
+                provider,
+                sourceLang,
+                targetLang);
+            overlay.Closed += (s, e) =>
+            {
+                lock (Lock)
+                {
+                    BrushSelectionWindows.Remove(overlay);
+                }
+            };
+
+            lock (Lock)
+            {
+                BrushSelectionWindows.Add(overlay);
+            }
+
+            overlay.Show();
+            return;
         }
 
         lock (Lock)
@@ -267,6 +308,28 @@ public static class WindowManager
         }
     }
 
+    public static void CloseAllBrushSelectionOverlays()
+    {
+        BrushSelectionOverlay[] windowsToClose;
+        lock (Lock)
+        {
+            windowsToClose = BrushSelectionWindows.ToArray();
+            BrushSelectionWindows.Clear();
+        }
+
+        foreach (BrushSelectionOverlay window in windowsToClose)
+        {
+            try
+            {
+                window.Close();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning($"Exception closing BrushSelectionOverlay: {ex.Message}");
+            }
+        }
+    }
+
     public static void CloseProcessingOverlay(ProcessingOverlay? overlay, bool cancelOperation = false)
     {
         if (overlay == null)
@@ -334,6 +397,7 @@ public static class WindowManager
     public static void CloseAllOverlays()
     {
         CloseAllSelectionOverlays();
+        CloseAllBrushSelectionOverlays();
         CloseAllResultOverlays();
 
         ProcessingOverlay? processingWindow;
@@ -386,15 +450,22 @@ public static class WindowManager
         }
 
         ScreenInfo targetScreen = FindTargetScreen(capturedRegion);
+        IReadOnlyList<TranslatedLine> sanitizedLines = OverlayLayoutHelper.SanitizeTranslatedLineGeometry(lines, capturedRegion);
+        if (sanitizedLines.Count == 0)
+        {
+            capturedSnapshot.Dispose();
+            Logger.LogInfo("No translated lines with valid geometry to display in ResultOverlay.");
+            return;
+        }
 
-        Logger.LogInfo($"Displaying ResultOverlay on screen {targetScreen.Bounds.X},{targetScreen.Bounds.Y} with {lines.Count} lines.");
+        Logger.LogInfo($"Displaying ResultOverlay on screen {targetScreen.Bounds.X},{targetScreen.Bounds.Y} with {sanitizedLines.Count} lines.");
         ResultOverlay overlay;
         try
         {
             overlay = new ResultOverlay(
                 targetScreen,
                 capturedRegion,
-                lines,
+                sanitizedLines,
                 capturedSnapshot,
                 freezeCapturedContent,
                 _foregroundWindowHandle,

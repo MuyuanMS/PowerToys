@@ -116,6 +116,7 @@ public sealed class AzureVisionOcrBackend : IOcrBackend, IDisposable
         }
 
         List<TranslationLine> lines = new();
+        int lineIndex = 0;
         foreach (JsonElement block in blocks.EnumerateArray())
         {
             if (!block.TryGetProperty("lines", out JsonElement blockLines))
@@ -142,18 +143,43 @@ public sealed class AzureVisionOcrBackend : IOcrBackend, IDisposable
 
                 PhysicalRect bounds = GetBounds(vertices);
                 double confidence = 1.0;
+                List<RecognizedWord> recognizedWords = new();
                 if (line.TryGetProperty("words", out JsonElement words))
                 {
                     double sum = 0;
                     int count = 0;
+                    int wordIndex = 0;
                     foreach (JsonElement word in words.EnumerateArray())
                     {
+                        string wordText = word.TryGetProperty("text", out JsonElement wordTextElement)
+                            ? wordTextElement.GetString() ?? string.Empty
+                            : string.Empty;
+                        double wordConfidence = 1.0;
                         if (word.TryGetProperty("confidence", out JsonElement confidenceElement) &&
                             confidenceElement.TryGetDouble(out double value))
                         {
-                            sum += Math.Clamp(value, 0, 1);
+                            wordConfidence = Math.Clamp(value, 0, 1);
+                            sum += wordConfidence;
                             count++;
                         }
+
+                        if (!string.IsNullOrWhiteSpace(wordText) &&
+                            word.TryGetProperty("boundingPolygon", out JsonElement wordPolygon))
+                        {
+                            List<PhysicalPoint> wordVertices = ParsePolygon(wordPolygon, capturedRegionPhysical);
+                            if (wordVertices.Count > 0)
+                            {
+                                recognizedWords.Add(new RecognizedWord(
+                                    wordText.Trim(),
+                                    GetBounds(wordVertices),
+                                    lineIndex,
+                                    wordIndex,
+                                    wordConfidence,
+                                    wordVertices));
+                            }
+                        }
+
+                        wordIndex++;
                     }
 
                     if (count > 0)
@@ -162,7 +188,8 @@ public sealed class AzureVisionOcrBackend : IOcrBackend, IDisposable
                     }
                 }
 
-                lines.Add(new TranslationLine(text.Trim(), bounds, confidence, vertices));
+                lines.Add(new TranslationLine(text.Trim(), bounds, confidence, vertices, Words: recognizedWords));
+                lineIndex++;
             }
         }
 

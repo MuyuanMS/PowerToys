@@ -50,11 +50,38 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                     () => Properties.ActivationShortcut,
                     value => Properties.ActivationShortcut = value ?? Properties.DefaultActivationShortcut,
                     "Activation_Shortcut"),
+                new HotkeyAccessor(
+                    () => Properties.CurrentScreenShortcut,
+                    value => Properties.CurrentScreenShortcut = value ?? Properties.DefaultCurrentScreenShortcut,
+                    "CurrentScreen_Shortcut"),
+                new HotkeyAccessor(
+                    () => Properties.ActiveWindowShortcut,
+                    value => Properties.ActiveWindowShortcut = value ?? Properties.DefaultActiveWindowShortcut,
+                    "ActiveWindow_Shortcut"),
+                new HotkeyAccessor(
+                    () => Properties.ScanTextShortcut,
+                    value => Properties.ScanTextShortcut = value ?? Properties.DefaultScanTextShortcut,
+                    "ScanText_Shortcut"),
             };
 
             return hotkeyAccessors.ToArray();
         }
 
-        public bool UpgradeSettingsConfiguration() => false;
+        public bool UpgradeSettingsConfiguration()
+        {
+            HotkeySettings shortcut = Properties.ScanTextShortcut;
+            if (shortcut is not null &&
+                shortcut.Win &&
+                shortcut.Ctrl &&
+                shortcut.Shift &&
+                !shortcut.Alt &&
+                shortcut.Code == 0x42)
+            {
+                Properties.ScanTextShortcut = Properties.DefaultScanTextShortcut;
+                return true;
+            }
+
+            return false;
+        }
     }
 }

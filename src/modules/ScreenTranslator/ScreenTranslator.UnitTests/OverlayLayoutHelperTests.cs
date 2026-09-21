@@ -392,6 +392,107 @@ public class OverlayLayoutHelperTests
     }
 
     [TestMethod]
+    public void SanitizeTranslatedLineGeometry_LeavesNormalBoxesUnchanged()
+    {
+        PhysicalRect capture = new(100, 100, 800, 600);
+        var lines = new List<TranslatedLine>
+        {
+            new("Hello", "こんにちは", new PhysicalRect(140, 160, 220, 32), 0.9),
+        };
+
+        IReadOnlyList<TranslatedLine> sanitized = OverlayLayoutHelper.SanitizeTranslatedLineGeometry(lines, capture);
+
+        Assert.HasCount(1, sanitized);
+        Assert.AreEqual(lines[0].BoundingBox, sanitized[0].BoundingBox);
+    }
+
+    [TestMethod]
+    public void SanitizeTranslatedLineGeometry_RepairsNonFiniteBoxes()
+    {
+        PhysicalRect capture = new(100, 100, 800, 600);
+        var lines = new List<TranslatedLine>
+        {
+            new("Broken", "壊れた", new PhysicalRect(double.NaN, 120, double.PositiveInfinity, 40), 0.5),
+        };
+
+        IReadOnlyList<TranslatedLine> sanitized = OverlayLayoutHelper.SanitizeTranslatedLineGeometry(lines, capture);
+
+        Assert.HasCount(1, sanitized);
+        Assert.IsTrue(double.IsFinite(sanitized[0].BoundingBox.Left));
+        Assert.IsTrue(double.IsFinite(sanitized[0].BoundingBox.Width));
+        Assert.IsTrue(capture.Contains(new PhysicalPoint(sanitized[0].BoundingBox.Left, sanitized[0].BoundingBox.Top)));
+        Assert.IsTrue(sanitized[0].BoundingBox.Right <= capture.Right);
+        Assert.IsTrue(sanitized[0].BoundingBox.Bottom <= capture.Bottom);
+    }
+
+    [TestMethod]
+    public void SanitizeTranslatedLineGeometry_ClampsOversizedBoxesToCapture()
+    {
+        PhysicalRect capture = new(100, 100, 800, 600);
+        var lines = new List<TranslatedLine>
+        {
+            new("Huge", "巨大", new PhysicalRect(-500, -400, 4000, 3000), 0.5),
+        };
+
+        IReadOnlyList<TranslatedLine> sanitized = OverlayLayoutHelper.SanitizeTranslatedLineGeometry(lines, capture);
+
+        Assert.HasCount(1, sanitized);
+        Assert.AreEqual(capture.Left, sanitized[0].BoundingBox.Left, 0.001);
+        Assert.AreEqual(capture.Top, sanitized[0].BoundingBox.Top, 0.001);
+        Assert.IsTrue(sanitized[0].BoundingBox.Width <= capture.Width * 0.9);
+        Assert.IsTrue(sanitized[0].BoundingBox.Height <= capture.Height * 0.35);
+    }
+
+    [TestMethod]
+    public void SanitizeOcrLineGeometry_ClampsWordGeometryButKeepsNormalWords()
+    {
+        PhysicalRect capture = new(0, 0, 400, 200);
+        RecognizedWord normal = new("normal", new PhysicalRect(20, 30, 60, 20), 0, 0);
+        RecognizedWord oversized = new("oversized", new PhysicalRect(-10, 40, 450, 30), 0, 1);
+        var lines = new List<TranslationLine>
+        {
+            new("normal oversized", new PhysicalRect(20, 30, 380, 40), 0.9, Words: new[] { normal, oversized }),
+        };
+
+        IReadOnlyList<TranslationLine> sanitized = OverlayLayoutHelper.SanitizeOcrLineGeometry(lines, capture);
+
+        Assert.HasCount(1, sanitized);
+        Assert.IsNotNull(sanitized[0].Words);
+        Assert.HasCount(2, sanitized[0].Words!);
+        Assert.AreEqual(normal.BoundingBox, sanitized[0].Words![0].BoundingBox);
+        Assert.AreEqual(0.0, sanitized[0].Words![1].BoundingBox.Left, 0.001);
+        Assert.AreEqual(400.0, sanitized[0].Words![1].BoundingBox.Right, 0.001);
+    }
+
+    [TestMethod]
+    public void CalculateInitialCardSize_CapsMalformedNearFullscreenDefaults()
+    {
+        var (width, minHeight) = OverlayLayoutHelper.CalculateInitialCardSize(
+            widthDip: 1800,
+            heightDip: 900,
+            captureWidthDip: 1920,
+            captureHeightDip: 1080,
+            sourceLineCount: 1);
+
+        Assert.AreEqual(1728.0, width, 0.001);
+        Assert.AreEqual(378.0, minHeight, 0.001);
+    }
+
+    [TestMethod]
+    public void CalculateInitialCardSize_LeavesNormalBoxesUnchanged()
+    {
+        var (width, minHeight) = OverlayLayoutHelper.CalculateInitialCardSize(
+            widthDip: 240,
+            heightDip: 32,
+            captureWidthDip: 1920,
+            captureHeightDip: 1080,
+            sourceLineCount: 1);
+
+        Assert.AreEqual(240.0, width, 0.001);
+        Assert.AreEqual(32.0, minHeight, 0.001);
+    }
+
+    [TestMethod]
     public void FindContainingScreen_IdentifiesCorrectScreen()
     {
         var screens = new List<PhysicalRect>

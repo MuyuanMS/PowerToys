@@ -192,6 +192,9 @@ internal static class OSInterop
     internal static extern bool ClientToScreen(IntPtr hWnd, ref POINT lpPoint);
 
     [DllImport("user32.dll", SetLastError = true)]
+    internal static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll", SetLastError = true)]
     internal static extern bool GetCursorPos(out POINT lpPoint);
 
     internal delegate IntPtr SubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, IntPtr dwRefData);

@@ -156,7 +156,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         {
             return new Dictionary<string, HotkeySettings[]>
             {
-                [ModuleName] = [ActivationShortcut, CurrentScreenShortcut, ActiveWindowShortcut],
+                [ModuleName] = [ActivationShortcut, CurrentScreenShortcut, ActiveWindowShortcut, ScanTextShortcut],
             };
         }
 
@@ -225,6 +225,21 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 {
                     _screenTranslatorSettings.Properties.ActiveWindowShortcut = value ?? _screenTranslatorSettings.Properties.DefaultActiveWindowShortcut;
                     OnPropertyChanged(nameof(ActiveWindowShortcut));
+                    _settingsUtils.SaveSettings(_screenTranslatorSettings.ToJsonString(), ScreenTranslatorSettings.ModuleName);
+                    NotifySettingsChanged();
+                }
+            }
+        }
+
+        public HotkeySettings ScanTextShortcut
+        {
+            get => _screenTranslatorSettings.Properties.ScanTextShortcut;
+            set
+            {
+                if (_screenTranslatorSettings.Properties.ScanTextShortcut != value)
+                {
+                    _screenTranslatorSettings.Properties.ScanTextShortcut = value ?? _screenTranslatorSettings.Properties.DefaultScanTextShortcut;
+                    OnPropertyChanged(nameof(ScanTextShortcut));
                     _settingsUtils.SaveSettings(_screenTranslatorSettings.ToJsonString(), ScreenTranslatorSettings.ModuleName);
                     NotifySettingsChanged();
                 }

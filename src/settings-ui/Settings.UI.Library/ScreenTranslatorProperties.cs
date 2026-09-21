@@ -20,11 +20,15 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         [CmdConfigureIgnore]
         public HotkeySettings DefaultActiveWindowShortcut => new HotkeySettings(true, true, true, false, 0x54); // Win+Ctrl+Alt+T
 
+        [CmdConfigureIgnore]
+        public HotkeySettings DefaultScanTextShortcut => new HotkeySettings(true, false, true, true, 0x54); // Win+Alt+Shift+T
+
         public ScreenTranslatorProperties()
         {
             ActivationShortcut = DefaultActivationShortcut;
             CurrentScreenShortcut = DefaultCurrentScreenShortcut;
             ActiveWindowShortcut = DefaultActiveWindowShortcut;
+            ScanTextShortcut = DefaultScanTextShortcut;
             SelectedProvider = "Passthrough";
             OcrProvider = "Automatic";
             EnableCloudConsent = false;
@@ -46,6 +50,9 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
         [JsonPropertyName("ActiveWindowShortcut")]
         public HotkeySettings ActiveWindowShortcut { get; set; }
+
+        [JsonPropertyName("ScanTextShortcut")]
+        public HotkeySettings ScanTextShortcut { get; set; }
 
         [JsonPropertyName("SelectedProvider")]
         public string SelectedProvider { get; set; }

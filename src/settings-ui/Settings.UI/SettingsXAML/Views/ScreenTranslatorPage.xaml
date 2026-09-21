@@ -63,6 +63,15 @@
                             AutomationProperties.Name="Translate Active Application Shortcut"
                             HotkeySettings="{x:Bind Path=ViewModel.ActiveWindowShortcut, Mode=TwoWay}" />
                     </tkcontrols:SettingsCard>
+                    <tkcontrols:SettingsCard
+                        Header="Scan text"
+                        Description="Freeze the current monitor, then brush across recognized words to translate one phrase.">
+                        <controls:ShortcutControl
+                            MinWidth="{StaticResource SettingActionControlMinWidth}"
+                            AutomationProperties.AutomationId="ScreenTranslatorScanTextShortcutControl"
+                            AutomationProperties.Name="Scan Text Shortcut"
+                            HotkeySettings="{x:Bind Path=ViewModel.ScanTextShortcut, Mode=TwoWay}" />
+                    </tkcontrols:SettingsCard>
                 </controls:SettingsGroup>
 
                 <controls:SettingsGroup Header="Overlay Appearance" IsEnabled="{x:Bind ViewModel.IsEnabled, Mode=OneWay}">
