@@ -281,7 +281,7 @@ public sealed partial class MainListPage : DynamicListPage,
                 }
 
                 var currentSearchText = SearchText;
-                UpdateSearchTextCore(currentSearchText, currentSearchText, isUserInput: false);
+                UpdateSearchTextCore(currentSearchText, currentSearchText, isUserInput: false, needsSettlement: false);
             }
             while (_refreshRequested.Value);
         }
@@ -536,19 +536,16 @@ public sealed partial class MainListPage : DynamicListPage,
             WeakReferenceMessenger.Default.Send<ExpandCompactModeMessage>(new(!newWasEmpty));
         }
 
-        UpdateSearchTextCore(oldSearch, newSearch, isUserInput: true);
+        UpdateSearchTextCore(oldSearch, newSearch, isUserInput: true, needsSettlement: true);
     }
 
-    private void UpdateSearchTextCore(string oldSearch, string newSearch, bool isUserInput)
+    private void UpdateSearchTextCore(string oldSearch, string newSearch, bool isUserInput, bool needsSettlement)
     {
         var stopwatch = Stopwatch.StartNew();
 
-        if (isUserInput || _cancellationTokenSource is null)
-        {
-            _cancellationTokenSource?.Cancel();
-            _cancellationTokenSource?.Dispose();
-            _cancellationTokenSource = new CancellationTokenSource();
-        }
+        _cancellationTokenSource?.Cancel();
+        _cancellationTokenSource?.Dispose();
+        _cancellationTokenSource = new CancellationTokenSource();
 
         var token = _cancellationTokenSource.Token;
         if (token.IsCancellationRequested)
@@ -558,7 +555,7 @@ public sealed partial class MainListPage : DynamicListPage,
 
         Action? signalRankingPublished = null;
         Action? signalFallbacksSettled = null;
-        if (isUserInput)
+        if (needsSettlement)
         {
             var version = Interlocked.Increment(ref _settlementVersion);
             lock (_tlcManager.TopLevelCommands)
@@ -1139,7 +1136,7 @@ public sealed partial class MainListPage : DynamicListPage,
         var current = SearchText;
         if (!string.IsNullOrEmpty(current))
         {
-            _ = Task.Run(() => UpdateSearchTextCore(current, current, isUserInput: false));
+            _ = Task.Run(() => UpdateSearchTextCore(current, current, isUserInput: false, needsSettlement: true));
         }
     }
 

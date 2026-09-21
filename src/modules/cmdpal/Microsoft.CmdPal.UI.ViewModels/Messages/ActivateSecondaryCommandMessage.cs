@@ -12,4 +12,8 @@ namespace Microsoft.CmdPal.UI.ViewModels.Messages;
 public record ActivateSecondaryCommandMessage
 {
     public bool Handled { get; set; }
+
+    // The list recipient preserves the selected row when it needs the shell to
+    // queue activation, so the fallback cannot select a different first row.
+    public ListItemViewModel? SelectedItem { get; set; }
 }

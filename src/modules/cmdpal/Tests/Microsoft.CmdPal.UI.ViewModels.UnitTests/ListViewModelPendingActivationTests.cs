@@ -437,6 +437,33 @@ public sealed partial class ListViewModelPendingActivationTests
         }
     }
 
+    [TestMethod]
+    [Timeout(15000)]
+    public async Task SecondaryEnterWithoutSecondaryCommand_DoesNotInvokeAnotherRow()
+    {
+        var page = new DelayedSearchPage(CreateItemWithSecondary("First"), CreateItem("Selected"));
+        var viewModel = CreateViewModel(page);
+        using var listener = new InvokeListener();
+
+        try
+        {
+            await ObserveItemsAsync(viewModel, vm => vm.FilteredItems.Count == 2, viewModel.InitializeProperties);
+            viewModel.FilteredItems[0].SlowInitializeProperties();
+            viewModel.FilteredItems[1].SlowInitializeProperties();
+            viewModel.UpdateSelectedItemCommand.Execute(viewModel.FilteredItems[1]);
+
+            viewModel.InvokeSecondaryCommandOrQueue(viewModel.FilteredItems[1]);
+
+            await Task.Delay(200);
+            Assert.IsFalse(listener.Invoked.IsCompleted, "Ctrl+Enter must not fall back from the selected row to another row's secondary command.");
+        }
+        finally
+        {
+            viewModel.SafeCleanup();
+            viewModel.Dispose();
+        }
+    }
+
     private static ListItem CreateItem(string title) =>
         new(new NoOpCommand { Name = title }) { Title = title };
 

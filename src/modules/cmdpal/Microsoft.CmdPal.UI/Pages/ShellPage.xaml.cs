@@ -1112,7 +1112,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
                     WeakReferenceMessenger.Default.Send(secondary);
                     if (!secondary.Handled && GetActiveListViewModel() is { } listForSecondary)
                     {
-                        listForSecondary.InvokeSecondaryCommandOrQueue();
+                        listForSecondary.InvokeSecondaryCommandOrQueue(secondary.SelectedItem);
                     }
 
                     break;

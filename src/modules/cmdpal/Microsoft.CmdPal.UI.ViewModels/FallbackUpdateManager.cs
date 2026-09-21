@@ -185,9 +185,9 @@ internal sealed partial class FallbackUpdateManager : IDisposable
             }
         }
 
-        // Dispatches a pending work item to the dedicated pool. The pending's
-        // own CT is forwarded so the pool can skip it at dequeue time when the
-        // originating query batch has been superseded by a newer keystroke.
+        // Dispatches a pending work item to the dedicated pool. The work itself
+        // observes its cancellation token so it can settle its batch and advance
+        // the per-command queue even after its query has been superseded.
         void DispatchPending(PendingWork? pending)
         {
             if (pending == null)
@@ -195,7 +195,7 @@ internal sealed partial class FallbackUpdateManager : IDisposable
                 return;
             }
 
-            _ = _fallbackThreadPool.QueueAsync(pending.Work, pending.CancellationToken);
+            _ = _fallbackThreadPool.QueueAsync(pending.Work, CancellationToken.None);
         }
 
         for (var i = 0; i < startingWorkers; i++)
@@ -212,6 +212,7 @@ internal sealed partial class FallbackUpdateManager : IDisposable
             if (ct.IsCancellationRequested)
             {
                 finishOne();
+                DispatchPending(ctr.TakePending());
                 return;
             }
 
@@ -266,8 +267,9 @@ internal sealed partial class FallbackUpdateManager : IDisposable
         private readonly object _gate = new();
         private int _count;
 
-        // Latest pending work item. Only one is stored; newer queries overwrite older ones.
-        private PendingWork? _pendingWork;
+        // Every deferred item retains its own batch completion obligation. Dropping an
+        // older item would leave that batch's settlement callback waiting forever.
+        private readonly Queue<PendingWork> _pendingWork = new();
 
         /// <summary>
         /// Claims a slot, or installs the work as the pending retry while holding
@@ -283,7 +285,7 @@ internal sealed partial class FallbackUpdateManager : IDisposable
                     return true;
                 }
 
-                _pendingWork = pending;
+                _pendingWork.Enqueue(pending);
                 return false;
             }
         }
@@ -293,10 +295,19 @@ internal sealed partial class FallbackUpdateManager : IDisposable
             lock (_gate)
             {
                 _count--;
-                var pending = _pendingWork;
-                _pendingWork = null;
-                return pending;
+                return TakePendingUnsafe();
             }
         }
+
+        public PendingWork? TakePending()
+        {
+            lock (_gate)
+            {
+                return TakePendingUnsafe();
+            }
+        }
+
+        private PendingWork? TakePendingUnsafe() =>
+            _pendingWork.Count > 0 ? _pendingWork.Dequeue() : null;
     }
 }

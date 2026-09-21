@@ -626,11 +626,13 @@ public sealed partial class ListItemsView : UserControl,
         }
 
         var selectedItem = ItemView.SelectedItem as ListItemViewModel;
-        if (ViewModel?.TryActivateSecondarySelectionNow(selectedItem) == true ||
-            selectedItem is { IsInitialized: true, IsInteractive: true, SecondaryCommand: null })
+        if (ViewModel?.TryActivateSecondarySelectionNow(selectedItem) == true)
         {
             message.Handled = true;
+            return;
         }
+
+        message.SelectedItem = selectedItem;
     }
 
     public void Receive(NavigatePageDownCommand message)

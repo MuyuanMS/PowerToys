@@ -45,7 +45,7 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
     protected bool IsSelectedInitialized => IsInErrorState || Initialized.HasFlag(InitializedState.SelectionInitialized);
 
-    internal bool IsSelectionInitialized => IsSelectedInitialized;
+    public bool IsSelectionInitialized => IsSelectedInitialized;
 
     public bool IsContextMenuItem { get; protected init; }
 
