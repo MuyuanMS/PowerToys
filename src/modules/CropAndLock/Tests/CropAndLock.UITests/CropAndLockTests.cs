@@ -196,7 +196,16 @@ namespace Microsoft.CropAndLock.UITests
         {
             var keys = PrepareModuleAndReadShortcut(reparent: true);
             PrepareSource(fixture);
+            NativeMethods.Maximize(source!.Window);
+            Assert.IsTrue(
+                WaitHelper.WaitForStable(
+                    () => NativeMethods.IsMaximized(source.Window),
+                    maximized => maximized,
+                    timeoutMS: 10_000,
+                    requiredConsecutiveMatches: 3).Succeeded,
+                "The source did not maximize before cropping.");
             var beforeState = NativeMethods.ReadState(source!.Window);
+            var beforeClientSize = NativeMethods.ClientBounds(source.Window).Size;
             var beforeImage = CaptureStable(source.Window, source.CropBounds, "reparent-source-before");
             var cropped = Crop(keys, ReparentClass);
             AssertCropSize(cropped);
@@ -212,7 +221,7 @@ namespace Microsoft.CropAndLock.UITests
                 requiredConsecutiveMatches: 3);
             Assert.IsTrue(reparented.Succeeded, $"Source was not reparented into the crop: {reparented.LastObservation}.");
             Assert.AreEqual(beforeState.Style | NativeMethods.ChildStyle, reparented.LastObservation.Style, "Reparent changed unrelated source window styles.");
-            Assert.AreEqual(beforeState.Bounds.Size, reparented.LastObservation.Bounds.Size, "Reparent resized the source instead of clipping it.");
+            Assert.AreEqual(beforeClientSize, NativeMethods.ClientBounds(source.Window).Size, "Reparent changed the maximized source client size.");
             AssertPixels(beforeImage, cropped, ClientRegion(cropped), "reparent-output-before");
 
             Step("Typing through the cropped source and verifying its text via Copy");

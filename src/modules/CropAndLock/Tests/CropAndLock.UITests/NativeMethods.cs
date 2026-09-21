@@ -17,6 +17,7 @@ namespace Microsoft.CropAndLock.UITests
         internal const long TopmostStyle = 0x00000008;
 
         private const uint GaRoot = 2;
+        private const int SwMaximize = 3;
         private const uint ProcessQueryLimitedInformation = 0x1000;
         private const int ErrorInsufficientBuffer = 122;
         private const int AppModelErrorNoPackage = 15700;
@@ -46,6 +47,13 @@ namespace Microsoft.CropAndLock.UITests
                 ReadWindowLong(window, GwlExStyle),
                 Rectangle.FromLTRB(left, top, right, bottom));
         }
+
+        internal static void Maximize(IntPtr window)
+        {
+            _ = ShowWindow(window, SwMaximize);
+        }
+
+        internal static bool IsMaximized(IntPtr window) => IsZoomed(window);
 
         // WindowControl/WindowHelper have private equivalents of these raw queries.
         // Keep them local until the shared harness exposes window identity and style snapshots.
@@ -146,6 +154,14 @@ namespace Microsoft.CropAndLock.UITests
 
         [DllImport("user32.dll")]
         internal static extern IntPtr GetParent(IntPtr window);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool ShowWindow(IntPtr window, int command);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsZoomed(IntPtr window);
 
         [DllImport("user32.dll")]
         private static extern IntPtr GetAncestor(IntPtr window, uint flags);
