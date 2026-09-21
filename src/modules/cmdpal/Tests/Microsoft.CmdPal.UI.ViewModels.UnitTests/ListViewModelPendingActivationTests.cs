@@ -69,7 +69,6 @@ public sealed partial class ListViewModelPendingActivationTests
         public override void UpdateSearchText(string oldSearch, string newSearch) =>
             Volatile.Write(ref _items, [CreateItem(newSearch)]);
 
-        internal void PublishSearchResults() => RaiseItemsChanged(_items.Length);
     }
 
     private sealed partial class StaticSearchPage(IListItem[] items) : ListPage
@@ -448,8 +447,8 @@ public sealed partial class ListViewModelPendingActivationTests
             MoreCommands = [new CommandContextItem(new NoOpCommand { Name = $"{title} secondary" })],
         };
 
-    private static ListViewModel CreateViewModel(IListPage page, bool isMainPage = false) =>
-        new(page, TaskScheduler.Default, new TestHost(), CommandProviderContext.Empty, DefaultContextMenuFactory.Instance) { IsMainPage = isMainPage };
+    private static ListViewModel CreateViewModel(IListPage page) =>
+        new(page, TaskScheduler.Default, new TestHost(), CommandProviderContext.Empty, DefaultContextMenuFactory.Instance);
 
     private static async Task ObserveItemsAsync(ListViewModel viewModel, string expectedTitle, Action action) =>
         await ObserveItemsAsync(viewModel, vm => vm.FilteredItems.Count >= 1 && vm.FilteredItems[0].Title == expectedTitle, action);
