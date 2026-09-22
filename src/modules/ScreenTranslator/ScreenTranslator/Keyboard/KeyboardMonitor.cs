@@ -13,8 +13,8 @@ namespace ScreenTranslator.Keyboard;
 public sealed class KeyboardMonitor : IDisposable
 {
     private readonly DispatcherQueue _dispatcherQueue;
+    private readonly KeyboardShortcutRouter _shortcutRouter = new(IsKeyDown);
     private GlobalKeyboardHook? _keyboardHook;
-    private bool _ctrlPressed;
 
     public KeyboardMonitor()
     {
@@ -29,11 +29,7 @@ public sealed class KeyboardMonitor : IDisposable
 
     private void Hook_KeyboardPressed(object? sender, GlobalKeyboardHookEventArgs e)
     {
-        if (e.Key == VirtualKey.Control || e.Key == VirtualKey.LeftControl || e.Key == VirtualKey.RightControl)
-        {
-            _ctrlPressed = e.IsKeyDown;
-        }
-        else if (e.Key == VirtualKey.Z && e.IsKeyDown && _ctrlPressed && !WindowManager.IsEditingResultCard())
+        if (_shortcutRouter.ShouldHandleUndo(e, WindowManager.GetKeyboardShortcutContext()))
         {
             e.Handled = true;
             _dispatcherQueue.TryEnqueue(WindowManager.UndoActiveResultCard);
@@ -52,5 +48,10 @@ public sealed class KeyboardMonitor : IDisposable
         _keyboardHook?.Dispose();
         _keyboardHook = null;
         GC.SuppressFinalize(this);
+    }
+
+    private static bool IsKeyDown(VirtualKey key)
+    {
+        return (OSInterop.GetAsyncKeyState((int)key) & 0x8000) != 0;
     }
 }

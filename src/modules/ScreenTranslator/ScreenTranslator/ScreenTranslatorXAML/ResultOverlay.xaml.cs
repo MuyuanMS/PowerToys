@@ -56,6 +56,7 @@ public sealed partial class ResultOverlay : TransparentWindow
     private readonly Dictionary<int, Stack<(string Source, string Translated, bool ShowingOriginal)>> _textUndo = new();
     private readonly Dictionary<int, List<ResizeHandle>> _resizeHandles = new();
     private readonly HashSet<int> _showingOriginalText = new();
+    private readonly object _keyboardContextLock = new();
 
     private readonly DispatcherQueueTimer _windowSwitchTimer;
     private readonly IntPtr _sourceWindow;
@@ -97,6 +98,7 @@ public sealed partial class ResultOverlay : TransparentWindow
     private double _dpiScaleX;
     private double _dpiScaleY;
     private bool _isClosed;
+    private long _lastKeyboardShortcutInteractionTick;
 
     public ResultOverlay(
         ScreenInfo screenInfo,
@@ -162,6 +164,7 @@ public sealed partial class ResultOverlay : TransparentWindow
         }
 
         Closed += ResultOverlay_Closed;
+        PublishKeyboardShortcutContext(isVisible: true);
         _windowSwitchTimer = DispatcherQueue.CreateTimer();
         _windowSwitchTimer.Interval = TimeSpan.FromMilliseconds(400);
         _windowSwitchTimer.Tick += WindowSwitchTimer_Tick;
@@ -362,6 +365,8 @@ public sealed partial class ResultOverlay : TransparentWindow
     {
         _windowSwitchTimer.Stop();
         ScreenTranslator.Helpers.WindowManager.SetResultCardEditing(false);
+        PublishKeyboardShortcutContext(isVisible: false);
+        ScreenTranslator.Helpers.WindowManager.RemoveResultOverlayKeyboardContext(this);
     }
 
     public void UndoLastTextChange()
@@ -397,6 +402,8 @@ public sealed partial class ResultOverlay : TransparentWindow
         {
             SetOriginalTextButtonState(!showingOriginal);
         }
+
+        PublishKeyboardShortcutContext(isVisible: !_isClosed);
     }
 
     private void PushTextUndo(int lineIndex)
@@ -411,6 +418,7 @@ public sealed partial class ResultOverlay : TransparentWindow
             _sourceTexts[lineIndex],
             _translatedTexts[lineIndex],
             _showingOriginalText.Contains(lineIndex)));
+        PublishKeyboardShortcutContext(isVisible: !_isClosed);
     }
 
     private void HighlightSelectedCard()
@@ -433,6 +441,7 @@ public sealed partial class ResultOverlay : TransparentWindow
         }
 
         UpdateResizeHandles();
+        PublishKeyboardShortcutContext(isVisible: !_isClosed);
     }
 
     private void WindowSwitchTimer_Tick(DispatcherQueueTimer sender, object args)
@@ -516,6 +525,7 @@ public sealed partial class ResultOverlay : TransparentWindow
 
         CardContextMenu.Visibility = Visibility.Collapsed;
         ContextMenuCanvas.IsHitTestVisible = false;
+        PublishKeyboardShortcutContext(isVisible: !_isClosed);
     }
 
     private void CaptureRegionOutlineButton_Click(object sender, RoutedEventArgs e)
@@ -778,6 +788,7 @@ public sealed partial class ResultOverlay : TransparentWindow
 
     private void ShowCardContextMenu(Border card, int lineIndex, TranslatedLine line)
     {
+        MarkKeyboardShortcutInteraction();
         CardActionMenu.Hide();
         _contextMenuLineIndex = lineIndex;
         _contextMenuLine = line;
@@ -836,6 +847,7 @@ public sealed partial class ResultOverlay : TransparentWindow
 
     private void ShowCardActionMenu(Border card, int lineIndex, Windows.Foundation.Point position)
     {
+        MarkKeyboardShortcutInteraction();
         CloseContextMenu();
         _selectedLineIndex = lineIndex;
         HighlightSelectedCard();
@@ -1165,6 +1177,7 @@ public sealed partial class ResultOverlay : TransparentWindow
         CardActionMenu.Hide();
         CloseContextMenu();
         _isInitializingColorPickers = false;
+        PublishKeyboardShortcutContext(isVisible: !_isClosed);
     }
 
     private void MoveCardUpButton_Click(object sender, RoutedEventArgs e)
@@ -1307,6 +1320,7 @@ public sealed partial class ResultOverlay : TransparentWindow
         _editingTextBox.KeyDown += EditingTextBox_KeyDown;
         _editingTextBox.LostFocus += EditingTextBox_LostFocus;
         card.Child = _editingTextBox;
+        PublishKeyboardShortcutContext(isVisible: !_isClosed);
         int exStyle = OSInterop.GetWindowLong(_hwnd, OSInterop.GwlExStyle);
         _ = OSInterop.SetWindowLong(_hwnd, OSInterop.GwlExStyle, exStyle & ~OSInterop.WsExNoActivate);
         TextBox editingTextBox = _editingTextBox;
@@ -1433,6 +1447,7 @@ public sealed partial class ResultOverlay : TransparentWindow
         _editingCard = null;
         _editingOriginalText = string.Empty;
         ScreenTranslator.Helpers.WindowManager.SetResultCardEditing(false);
+        PublishKeyboardShortcutContext(isVisible: !_isClosed);
 
         int exStyle = OSInterop.GetWindowLong(_hwnd, OSInterop.GwlExStyle);
         _ = OSInterop.SetWindowLong(_hwnd, OSInterop.GwlExStyle, exStyle | OSInterop.WsExNoActivate);
@@ -1800,6 +1815,7 @@ public sealed partial class ResultOverlay : TransparentWindow
             return;
         }
 
+        MarkKeyboardShortcutInteraction();
         PointerPoint point = e.GetCurrentPoint(ResultCanvas);
         if (sender is Border selectedCard)
         {
@@ -1818,6 +1834,56 @@ public sealed partial class ResultOverlay : TransparentWindow
         _dragTop = Canvas.GetTop(card);
         card.CapturePointer(e.Pointer);
         e.Handled = true;
+    }
+
+    private void MarkKeyboardShortcutInteraction()
+    {
+        _lastKeyboardShortcutInteractionTick = Environment.TickCount64;
+        PublishKeyboardShortcutContext(isVisible: !_isClosed);
+    }
+
+    private void PublishKeyboardShortcutContext(bool isVisible)
+    {
+        lock (_keyboardContextLock)
+        {
+            bool hasSelectedCard =
+                isVisible &&
+                _selectedLineIndex >= 0 &&
+                _selectedLineIndex < _cardHitRegions.Count &&
+                _cardHitRegions[_selectedLineIndex].Card.Visibility == Visibility.Visible;
+            bool canUndoSelectedCard =
+                hasSelectedCard &&
+                _textUndo.TryGetValue(_selectedLineIndex, out Stack<(string Source, string Translated, bool ShowingOriginal)>? history) &&
+                history.Count > 0;
+            PhysicalRect? selectedCardBounds = hasSelectedCard
+                ? GetCardPhysicalBounds(_cardHitRegions[_selectedLineIndex].Card)
+                : null;
+
+            ScreenTranslator.Helpers.WindowManager.UpdateResultOverlayKeyboardContext(
+                this,
+                new ScreenTranslator.Helpers.WindowManager.ResultOverlayKeyboardContext(
+                    IsVisible: isVisible,
+                    IsEditingResultCard: _editingTextBox is not null,
+                    HasSelectedResultCard: hasSelectedCard,
+                    CanUndoSelectedResultCard: canUndoSelectedCard,
+                    SelectedCardBounds: selectedCardBounds,
+                    OverlayWindowHandle: _hwnd,
+                    LastInteractionTick: _lastKeyboardShortcutInteractionTick));
+        }
+    }
+
+    private PhysicalRect GetCardPhysicalBounds(Border card)
+    {
+        double width = Math.Max(card.ActualWidth, card.Width);
+        double height = Math.Max(card.ActualHeight, card.MinHeight);
+        return OverlayLayoutHelper.DipToPhysical(
+            Canvas.GetLeft(card),
+            Canvas.GetTop(card),
+            width,
+            height,
+            _overlayBounds,
+            _dpiScaleX,
+            _dpiScaleY);
     }
 
     private void Card_PointerMoved(object sender, PointerRoutedEventArgs e)

@@ -168,6 +168,9 @@ internal static class OSInterop
     internal static extern bool IsWindowVisible(IntPtr hWnd);
 
     [DllImport("user32.dll")]
+    internal static extern short GetAsyncKeyState(int vKey);
+
+    [DllImport("user32.dll")]
     internal static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr processId);
 
     [DllImport("user32.dll")]

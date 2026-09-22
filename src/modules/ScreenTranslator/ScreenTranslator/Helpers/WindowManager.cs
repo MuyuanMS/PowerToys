@@ -12,6 +12,7 @@ using Microsoft.PowerToys.Settings.UI.Library.Utilities;
 using ScreenTranslator.Core.Layout;
 using ScreenTranslator.Core.Ocr;
 using ScreenTranslator.Core.Translation;
+using ScreenTranslator.Keyboard;
 using Windows.Graphics.Imaging;
 
 namespace ScreenTranslator.Helpers;
@@ -26,10 +27,21 @@ public static class WindowManager
         ScanText,
     }
 
+    internal readonly record struct ResultOverlayKeyboardContext(
+        bool IsVisible,
+        bool IsEditingResultCard,
+        bool HasSelectedResultCard,
+        bool CanUndoSelectedResultCard,
+        PhysicalRect? SelectedCardBounds,
+        IntPtr OverlayWindowHandle,
+        long LastInteractionTick);
+
     private static readonly List<SelectionOverlay> SelectionWindows = new();
     private static readonly List<BrushSelectionOverlay> BrushSelectionWindows = new();
     private static readonly List<ResultOverlay> ResultWindows = new();
+    private static readonly Dictionary<ResultOverlay, ResultOverlayKeyboardContext> ResultOverlayKeyboardContexts = new();
     private static readonly object Lock = new();
+    private static readonly TimeSpan ResultOverlayShortcutActiveDuration = TimeSpan.FromSeconds(10);
     private static ProcessingOverlay? _processingWindow;
     private static PhysicalRect? _foregroundWindowBounds;
     private static IntPtr _foregroundWindowHandle;
@@ -297,6 +309,10 @@ public static class WindowManager
         {
             windowsToClose = ResultWindows.ToArray();
             ResultWindows.Clear();
+            foreach (ResultOverlay window in windowsToClose)
+            {
+                ResultOverlayKeyboardContexts.Remove(window);
+            }
         }
 
         foreach (var window in windowsToClose)
@@ -424,6 +440,102 @@ public static class WindowManager
         overlay?.UndoLastTextChange();
     }
 
+    public static KeyboardShortcutContext GetKeyboardShortcutContext()
+    {
+        ResultOverlayKeyboardContext? context;
+        lock (Lock)
+        {
+            ResultOverlay? overlay = ResultWindows.Count > 0 ? ResultWindows[^1] : null;
+            context = overlay is not null && ResultOverlayKeyboardContexts.TryGetValue(overlay, out ResultOverlayKeyboardContext value)
+                ? value
+                : null;
+        }
+
+        if (!context.HasValue || !context.Value.IsVisible)
+        {
+            return default;
+        }
+
+        IntPtr foregroundWindow = OSInterop.GetForegroundWindow();
+        bool cursorIsOverSelectedCard =
+            context.Value.SelectedCardBounds.HasValue &&
+            OSInterop.GetCursorPos(out OSInterop.POINT cursorPoint) &&
+            Contains(context.Value.SelectedCardBounds.Value, cursorPoint);
+        bool foregroundBelongsToResultOverlay =
+            IsWindowInOwnerChain(foregroundWindow, context.Value.OverlayWindowHandle) ||
+            (foregroundWindow != IntPtr.Zero &&
+             BelongsToThisProcess(foregroundWindow) &&
+             IsRecentlyInteractedWith(context.Value.LastInteractionTick));
+
+        bool isActive = foregroundBelongsToResultOverlay || cursorIsOverSelectedCard;
+        return new KeyboardShortcutContext(
+            HasVisibleResultOverlay: context.Value.IsVisible,
+            IsResultOverlayActive: isActive,
+            IsEditingResultCard: context.Value.IsEditingResultCard,
+            HasSelectedResultCard: context.Value.HasSelectedResultCard,
+            CanUndoSelectedResultCard: context.Value.CanUndoSelectedResultCard);
+    }
+
+    internal static void UpdateResultOverlayKeyboardContext(ResultOverlay overlay, ResultOverlayKeyboardContext context)
+    {
+        lock (Lock)
+        {
+            if (ResultWindows.Contains(overlay))
+            {
+                ResultOverlayKeyboardContexts[overlay] = context;
+            }
+        }
+    }
+
+    internal static void RemoveResultOverlayKeyboardContext(ResultOverlay overlay)
+    {
+        lock (Lock)
+        {
+            ResultOverlayKeyboardContexts.Remove(overlay);
+        }
+    }
+
+    private static bool IsRecentlyInteractedWith(long lastInteractionTick)
+    {
+        return lastInteractionTick > 0 &&
+               Environment.TickCount64 - lastInteractionTick <= ResultOverlayShortcutActiveDuration.TotalMilliseconds;
+    }
+
+    private static bool IsWindowInOwnerChain(IntPtr windowHandle, IntPtr expectedOwner)
+    {
+        if (windowHandle == IntPtr.Zero || expectedOwner == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        IntPtr current = windowHandle;
+        for (int depth = 0; current != IntPtr.Zero && depth < 8; depth++)
+        {
+            if (current == expectedOwner)
+            {
+                return true;
+            }
+
+            current = OSInterop.GetWindow(current, OSInterop.GwOwner);
+        }
+
+        return false;
+    }
+
+    private static bool Contains(PhysicalRect bounds, OSInterop.POINT point)
+    {
+        return point.X >= bounds.Left &&
+               point.X <= bounds.Right &&
+               point.Y >= bounds.Top &&
+               point.Y <= bounds.Bottom;
+    }
+
+    private static bool BelongsToThisProcess(IntPtr windowHandle)
+    {
+        return OSInterop.GetWindowThreadProcessId(windowHandle, out uint processId) != 0 &&
+               processId == Environment.ProcessId;
+    }
+
     public static bool IsEditingResultCard()
     {
         return _resultCardEditing;
@@ -493,6 +605,7 @@ public static class WindowManager
             lock (Lock)
             {
                 ResultWindows.Remove(overlay);
+                ResultOverlayKeyboardContexts.Remove(overlay);
             }
         };
 
