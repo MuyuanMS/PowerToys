@@ -36,7 +36,15 @@ public sealed class BookmarkPlaceholderPageTests
     [TestMethod]
     public void ResetPlaceholderValues_ClearsAllUniquePlaceholderValues()
     {
-        using var page = CreatePage("https://example.com/{id}/{project}/{id}");
+        var bookmark = new BookmarkData("Test bookmark", "https://example.com/{id}/{project}/{id}");
+        var resolver = new TestBookmarkResolver();
+        var iconLocator = new TestBookmarkIconLocator();
+
+        using var page = new BookmarkPlaceholderPage(
+            bookmark,
+            iconLocator,
+            resolver,
+            new PlaceholderParser());
 
         var parameterOccurrences = page.Parameters.OfType<StringParameterRun>().ToArray();
         Assert.AreEqual(3, parameterOccurrences.Length);
@@ -98,4 +106,5 @@ public sealed class BookmarkPlaceholderPageTests
             new PlaceholderParser(),
             launchBookmark ?? (_ => true));
     }
+
 }
