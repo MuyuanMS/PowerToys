@@ -76,14 +76,6 @@
                     Text="Ask Copilot"
                     Visibility="Collapsed" />
                 <MenuFlyoutItem
-                    x:Name="OpenClickToDoActionItem"
-                    x:Uid="OpenClickToDoActionItem"
-                    AutomationProperties.AutomationId="MenuOpenClickToDo"
-                    Click="OpenClickToDoActionItem_Click"
-                    Icon="View"
-                    Text="Open Click to Do"
-                    Visibility="Collapsed" />
-                <MenuFlyoutItem
                     x:Name="TranslateOriginalOnBingActionItem"
                     x:Uid="TranslateOriginalOnBingActionItem"
                     AutomationProperties.AutomationId="MenuTranslateOriginalOnBing"

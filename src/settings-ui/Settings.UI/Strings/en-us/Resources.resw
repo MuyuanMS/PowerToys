@@ -6680,7 +6680,7 @@ Text uses the current drawing color.</value>
     <value>Target Language</value>
   </data>
   <data name="ScreenTranslator_TargetLanguageCard.Description" xml:space="preserve">
-    <value>Select the language into which detected text should be translated.</value>
+    <value>Select the translation language. With Auto source and an English or Chinese target, Screen Translator automatically translates English to Chinese and Chinese to English.</value>
   </data>
   <data name="ScreenTranslator_ProviderGroup.Header" xml:space="preserve">
     <value>Translation Provider</value>

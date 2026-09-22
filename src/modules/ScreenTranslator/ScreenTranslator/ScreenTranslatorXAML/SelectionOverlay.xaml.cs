@@ -297,13 +297,11 @@ public sealed partial class SelectionOverlay : TransparentWindow
 
             processingOverlay.UpdateStatus("Translating text...");
             Logger.LogInfo($"Translating {groupedLines.Count} layout blocks with provider {_translationProvider.ProviderId}.");
-            TranslationRequest request = new(groupedLines, sourceLanguage, targetLanguage);
-            TranslationResult result = await _translationProvider.TranslateAsync(request, cancellationTokenSource.Token);
-            result = TranslationQualityGuard.ReplaceDegenerateTranslations(result, out int replacementCount);
-            if (replacementCount > 0)
-            {
-                Logger.LogWarning($"Suppressed {replacementCount} degenerate translation result(s) from provider {_translationProvider.ProviderId}.");
-            }
+            TranslationResult result = await TranslateLinesAsync(
+                groupedLines,
+                sourceLanguage,
+                targetLanguage,
+                cancellationTokenSource.Token);
 
             if (!result.Success)
             {
@@ -338,8 +336,8 @@ public sealed partial class SelectionOverlay : TransparentWindow
                     capturedSnapshot,
                     _freezeCapturedContentByDefault,
                     sourceLanguage,
-                    targetLanguage,
-                    TranslateLinesAsync,
+                    result.TargetLanguage ?? targetLanguage,
+                    (lines, newSource, newTarget) => TranslateLinesAsync(lines, newSource, newTarget),
                     TranslateLineAsync);
             }))
             {
@@ -376,17 +374,32 @@ public sealed partial class SelectionOverlay : TransparentWindow
     private async Task<TranslationResult> TranslateLinesAsync(
         IReadOnlyList<TranslationLine> lines,
         string sourceLanguage,
-        string targetLanguage)
+        string targetLanguage,
+        CancellationToken cancellationToken = default)
     {
+        string resolvedTargetLanguage = LanguageSelectionHelper.ResolveAutomaticChineseEnglishTarget(
+            lines,
+            sourceLanguage,
+            targetLanguage);
+        if (!string.Equals(resolvedTargetLanguage, targetLanguage, StringComparison.OrdinalIgnoreCase))
+        {
+            Logger.LogInfo($"Auto language direction selected target '{resolvedTargetLanguage}' instead of '{targetLanguage}'.");
+        }
+
         TranslationResult result = await _translationProvider.TranslateAsync(
-            new TranslationRequest(lines, sourceLanguage, targetLanguage));
+            new TranslationRequest(lines, sourceLanguage, resolvedTargetLanguage),
+            cancellationToken);
         result = TranslationQualityGuard.ReplaceDegenerateTranslations(result, out int replacementCount);
         if (replacementCount > 0)
         {
             Logger.LogWarning($"Suppressed {replacementCount} degenerate translation result(s) from provider {_translationProvider.ProviderId}.");
         }
 
-        return result;
+        return result with
+        {
+            SourceLanguage = sourceLanguage,
+            TargetLanguage = resolvedTargetLanguage,
+        };
     }
 
     private string BuildTranslationErrorMessage(string? errorMessage)

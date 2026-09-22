@@ -754,10 +754,8 @@ public sealed partial class ResultOverlay : TransparentWindow
     private async void InitializeExternalActionAvailability()
     {
         bool copilotAvailable = await IsUriHandlerAvailableAsync(new Uri("ms-copilot://"), "Copilot");
-        bool clickToDoAvailable = await IsUriHandlerAvailableAsync(new Uri("ms-clicktodo://"), "Click to Do");
         AskCopilotActionItem.Visibility = copilotAvailable ? Visibility.Visible : Visibility.Collapsed;
-        OpenClickToDoActionItem.Visibility = clickToDoAvailable ? Visibility.Visible : Visibility.Collapsed;
-        ExternalActionsSeparator.Visibility = copilotAvailable || clickToDoAvailable
+        ExternalActionsSeparator.Visibility = copilotAvailable
             ? Visibility.Visible
             : Visibility.Collapsed;
     }
@@ -848,11 +846,6 @@ public sealed partial class ResultOverlay : TransparentWindow
         {
             Logger.LogError("Unable to open the Windows share dialog.", ex);
         }
-    }
-
-    private async void OpenClickToDoActionItem_Click(object sender, RoutedEventArgs e)
-    {
-        await LaunchUriAsync(new Uri("ms-clicktodo://"), "Click to Do");
     }
 
     private async void AskCopilotActionItem_Click(object sender, RoutedEventArgs e)
@@ -1478,10 +1471,12 @@ public sealed partial class ResultOverlay : TransparentWindow
                     OverlayForegroundColorArgb = _lines[index].OverlayForegroundColorArgb,
                 })
                 .ToList();
-            _sourceLanguage = sourceLanguage;
-            _targetLanguage = targetLanguage;
+            _sourceLanguage = result.SourceLanguage ?? sourceLanguage;
+            _targetLanguage = result.TargetLanguage ?? targetLanguage;
             ResetCardStateForRetranslation();
             RenderTranslatedBoxes();
+            SelectLanguage(OverallSourceLanguageComboBox, _sourceLanguage);
+            SelectLanguage(OverallTargetLanguageComboBox, _targetLanguage);
             PositionToolbar();
         }
         finally

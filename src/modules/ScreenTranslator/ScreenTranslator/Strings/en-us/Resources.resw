@@ -238,10 +238,6 @@
     <value>Ask Copilot</value>
     <comment>Context menu action that copies the displayed card text and opens Microsoft Copilot</comment>
   </data>
-  <data name="OpenClickToDoActionItem.Text" xml:space="preserve">
-    <value>Open Click to Do</value>
-    <comment>Context menu action that launches the Windows Click to Do overlay</comment>
-  </data>
   <data name="ShareTextTitle" xml:space="preserve">
     <value>Screen Translator text</value>
     <comment>Title shown by the Windows share dialog when sharing text from an overlay card</comment>
