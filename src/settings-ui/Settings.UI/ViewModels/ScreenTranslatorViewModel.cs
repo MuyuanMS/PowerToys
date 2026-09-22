@@ -404,6 +404,37 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
         }
 
+        public int SecondaryTargetLanguageIndex
+        {
+            get
+            {
+                string code = _screenTranslatorSettings.Properties.SecondaryTargetLanguage;
+                for (int i = 0; i < SupportedTargetLanguages.Length; i++)
+                {
+                    if (string.Equals(SupportedTargetLanguages[i].Code, code, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return i;
+                    }
+                }
+
+                return 2;
+            }
+
+            set
+            {
+                if (value >= 0 && value < SupportedTargetLanguages.Length)
+                {
+                    string code = SupportedTargetLanguages[value].Code;
+                    if (!string.Equals(_screenTranslatorSettings.Properties.SecondaryTargetLanguage, code, StringComparison.Ordinal))
+                    {
+                        _screenTranslatorSettings.Properties.SecondaryTargetLanguage = code;
+                        OnPropertyChanged(nameof(SecondaryTargetLanguageIndex));
+                        SaveAndNotifySettings();
+                    }
+                }
+            }
+        }
+
         public string AzureEndpoint
         {
             get => _screenTranslatorSettings.Properties.AzureEndpoint;

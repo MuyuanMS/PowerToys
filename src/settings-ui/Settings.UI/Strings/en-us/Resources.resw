@@ -6677,10 +6677,16 @@ Text uses the current drawing color.</value>
     <value>Select the language of on-screen text to recognize.</value>
   </data>
   <data name="ScreenTranslator_TargetLanguageCard.Header" xml:space="preserve">
-    <value>Target Language</value>
+    <value>Primary Translation Language</value>
   </data>
   <data name="ScreenTranslator_TargetLanguageCard.Description" xml:space="preserve">
-    <value>Select the translation language. With Auto source and an English or Chinese target, Screen Translator automatically translates English to Chinese and Chinese to English.</value>
+    <value>Translate into this language unless Auto detects that the source is already in it.</value>
+  </data>
+  <data name="ScreenTranslator_SecondaryTargetLanguageCard.Header" xml:space="preserve">
+    <value>Secondary Translation Language</value>
+  </data>
+  <data name="ScreenTranslator_SecondaryTargetLanguageCard.Description" xml:space="preserve">
+    <value>When Auto detects that the source already matches the primary language, translate into this language instead.</value>
   </data>
   <data name="ScreenTranslator_ProviderGroup.Header" xml:space="preserve">
     <value>Translation Provider</value>

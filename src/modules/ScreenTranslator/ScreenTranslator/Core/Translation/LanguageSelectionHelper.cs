@@ -36,17 +36,22 @@ public static class LanguageSelectionHelper
         return string.Equals(firstBase, secondBase, StringComparison.OrdinalIgnoreCase);
     }
 
-    public static string ResolveAutomaticChineseEnglishTarget(
+    public static string ResolveAutomaticTarget(
         IReadOnlyList<TranslationLine> lines,
         string sourceLanguage,
-        string targetLanguage)
+        string primaryTargetLanguage,
+        string secondaryTargetLanguage)
     {
-        if (!IsAutomatic(sourceLanguage) ||
-            lines == null ||
-            lines.Count == 0 ||
-            !IsChineseEnglishTarget(targetLanguage))
+        if (!IsAutomatic(sourceLanguage))
         {
-            return targetLanguage;
+            return AreEquivalent(sourceLanguage, primaryTargetLanguage)
+                ? secondaryTargetLanguage
+                : primaryTargetLanguage;
+        }
+
+        if (lines == null || lines.Count == 0)
+        {
+            return primaryTargetLanguage;
         }
 
         int hanCount = 0;
@@ -73,35 +78,50 @@ public static class LanguageSelectionHelper
             }
         }
 
-        if (kanaCount > 0 || hangulCount > 0)
+        string? detectedLanguage = DetectDominantLanguage(
+            hanCount,
+            latinCount,
+            kanaCount,
+            hangulCount);
+        return detectedLanguage != null &&
+            AreEquivalent(detectedLanguage, primaryTargetLanguage)
+                ? secondaryTargetLanguage
+                : primaryTargetLanguage;
+    }
+
+    private static string? DetectDominantLanguage(
+        int hanCount,
+        int latinCount,
+        int kanaCount,
+        int hangulCount)
+    {
+        if (kanaCount >= 2 && kanaCount >= hangulCount)
         {
-            return targetLanguage;
+            return "ja";
+        }
+
+        if (hangulCount >= 2)
+        {
+            return "ko";
         }
 
         if (hanCount >= 2 && hanCount * 2 >= latinCount)
         {
-            return "en-US";
+            return "zh";
         }
 
         if (latinCount >= 2 && latinCount > hanCount * 2)
         {
-            return "zh-Hans";
+            return "en";
         }
 
-        return targetLanguage;
+        return null;
     }
 
     private static bool IsAutomatic(string language)
     {
         return string.IsNullOrWhiteSpace(language) ||
             string.Equals(language, "auto", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsChineseEnglishTarget(string language)
-    {
-        string baseLanguage = GetBaseLanguage(language);
-        return string.Equals(baseLanguage, "en", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(baseLanguage, "zh", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsHan(char character)
@@ -113,7 +133,10 @@ public static class LanguageSelectionHelper
 
     private static bool IsLatin(char character)
     {
-        return character is >= 'A' and <= 'Z' || character is >= 'a' and <= 'z';
+        return char.IsLetter(character) &&
+            (character is >= 'A' and <= 'Z' ||
+             character is >= 'a' and <= 'z' ||
+             character is >= '\u00C0' and <= '\u024F');
     }
 
     private static bool IsKana(char character)

@@ -176,15 +176,28 @@
 
                     <tkcontrols:SettingsCard
                         x:Uid="ScreenTranslator_TargetLanguageCard"
-                        Header="Target Language"
-                        Description="Select the language into which detected text should be translated.">
+                        Header="Primary Translation Language"
+                        Description="Translate into this language unless Auto detects that the source is already in it.">
                         <ComboBox
                             x:Name="TargetLanguageComboBox"
                             MinWidth="{StaticResource SettingActionControlMinWidth}"
                             AutomationProperties.AutomationId="ScreenTranslatorTargetLanguageComboBox"
-                            AutomationProperties.Name="Target Language"
+                            AutomationProperties.Name="Primary Translation Language"
                             ItemsSource="{x:Bind Path=ViewModel.AvailableTargetLanguages, Mode=OneWay}"
                             SelectedIndex="{x:Bind Path=ViewModel.TargetLanguageIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </tkcontrols:SettingsCard>
+
+                    <tkcontrols:SettingsCard
+                        x:Uid="ScreenTranslator_SecondaryTargetLanguageCard"
+                        Header="Secondary Translation Language"
+                        Description="When Auto detects that the source already matches the primary language, translate into this language instead.">
+                        <ComboBox
+                            x:Name="SecondaryTargetLanguageComboBox"
+                            MinWidth="{StaticResource SettingActionControlMinWidth}"
+                            AutomationProperties.AutomationId="ScreenTranslatorSecondaryTargetLanguageComboBox"
+                            AutomationProperties.Name="Secondary Translation Language"
+                            ItemsSource="{x:Bind Path=ViewModel.AvailableTargetLanguages, Mode=OneWay}"
+                            SelectedIndex="{x:Bind Path=ViewModel.SecondaryTargetLanguageIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </tkcontrols:SettingsCard>
                 </controls:SettingsGroup>
 

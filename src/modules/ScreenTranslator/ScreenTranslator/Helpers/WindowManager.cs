@@ -100,6 +100,7 @@ public static class WindowManager
         var provider = _translationProvider;
         var sourceLang = settings?.Properties?.SourceLanguage ?? "auto";
         var targetLang = settings?.Properties?.TargetLanguage ?? "en-US";
+        var secondaryTargetLang = settings?.Properties?.SecondaryTargetLanguage ?? "zh-Hans";
         var freezeCapturedContent = settings?.Properties?.FreezeCapturedContent ?? false;
         (_foregroundWindowHandle, _foregroundWindowBounds) = foregroundWindow;
 
@@ -137,7 +138,8 @@ public static class WindowManager
                 ocrBackend,
                 provider,
                 sourceLang,
-                targetLang);
+                targetLang,
+                secondaryTargetLang);
             overlay.Closed += (s, e) =>
             {
                 lock (Lock)
@@ -165,6 +167,7 @@ public static class WindowManager
                     provider,
                     sourceLang,
                     targetLang,
+                    secondaryTargetLang,
                     _foregroundWindowBounds,
                     ocrBackend,
                     freezeCapturedContent,
@@ -222,6 +225,7 @@ public static class WindowManager
             settings.Properties.AcpAgentCommand ?? string.Empty,
             settings.Properties.SourceLanguage ?? "auto",
             settings.Properties.TargetLanguage ?? "en-US",
+            settings.Properties.SecondaryTargetLanguage ?? "zh-Hans",
             settings.Properties.AzureEndpoint ?? string.Empty,
             settings.Properties.AzureRegion ?? string.Empty,
             settings.Properties.LibreTranslateEndpoint ?? string.Empty);
@@ -437,8 +441,9 @@ public static class WindowManager
         bool freezeCapturedContent,
         string sourceLanguage = "auto",
         string targetLanguage = "en-US",
-        Func<IReadOnlyList<TranslationLine>, string, string, Task<TranslationResult>>? retranslateAll = null,
-        Func<TranslationLine, string, string, Task<TranslationResult>>? retranslateLine = null)
+        string secondaryTargetLanguage = "zh-Hans",
+        Func<IReadOnlyList<TranslationLine>, string, string, string, Task<TranslationResult>>? retranslateAll = null,
+        Func<TranslationLine, string, string, string, Task<TranslationResult>>? retranslateLine = null)
     {
         CloseAllResultOverlays();
 
@@ -471,6 +476,7 @@ public static class WindowManager
                 _foregroundWindowHandle,
                 sourceLanguage,
                 targetLanguage,
+                secondaryTargetLanguage,
                 retranslateAll,
                 retranslateLine);
             Logger.LogInfo("ResultOverlay constructed successfully.");

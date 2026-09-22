@@ -41,6 +41,7 @@ public sealed partial class BrushSelectionOverlay : TransparentWindow
     private readonly ITranslationProvider _translationProvider;
     private readonly string _sourceLanguage;
     private readonly string _targetLanguage;
+    private readonly string _secondaryTargetLanguage;
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly List<PhysicalPoint> _currentStrokePoints = new();
     private readonly List<Polyline> _strokeVisuals = new();
@@ -61,7 +62,8 @@ public sealed partial class BrushSelectionOverlay : TransparentWindow
         IOcrBackend ocrBackend,
         ITranslationProvider translationProvider,
         string sourceLanguage,
-        string targetLanguage)
+        string targetLanguage,
+        string secondaryTargetLanguage)
     {
         _screenInfo = screenInfo;
         _capturedRegion = screenInfo.Bounds;
@@ -73,6 +75,7 @@ public sealed partial class BrushSelectionOverlay : TransparentWindow
         _translationProvider = translationProvider;
         _sourceLanguage = sourceLanguage;
         _targetLanguage = targetLanguage;
+        _secondaryTargetLanguage = secondaryTargetLanguage;
 
         InitializeComponent();
         DismissOnFocusLost = false;
@@ -321,9 +324,19 @@ public sealed partial class BrushSelectionOverlay : TransparentWindow
             double confidence = phrase.Words.Average(word => word.Confidence);
             TranslationLine line = new(phrase.Text, phrase.BoundingBox, confidence, SourceLineCount: phrase.Words.Select(word => word.LineIndex).Distinct().Count());
             Logger.LogInfo($"Scan text translating {phrase.Words.Count} selected words with provider {_translationProvider.ProviderId}.");
+            string resolvedTargetLanguage = LanguageSelectionHelper.ResolveAutomaticTarget(
+                new[] { line },
+                _sourceLanguage,
+                _targetLanguage,
+                _secondaryTargetLanguage);
             TranslationResult result = await _translationProvider.TranslateAsync(
-                new TranslationRequest(new[] { line }, _sourceLanguage, _targetLanguage),
+                new TranslationRequest(new[] { line }, _sourceLanguage, resolvedTargetLanguage),
                 _cancellationTokenSource.Token);
+            result = result with
+            {
+                SourceLanguage = _sourceLanguage,
+                TargetLanguage = resolvedTargetLanguage,
+            };
             result = TranslationQualityGuard.ReplaceDegenerateTranslations(result, out int replacementCount);
             if (replacementCount > 0)
             {
@@ -364,7 +377,8 @@ public sealed partial class BrushSelectionOverlay : TransparentWindow
                 resultSnapshot,
                 freezeCapturedContent: true,
                 sourceLanguage: _sourceLanguage,
-                targetLanguage: _targetLanguage);
+                targetLanguage: _targetLanguage,
+                secondaryTargetLanguage: _secondaryTargetLanguage);
         }
         catch (OperationCanceledException)
         {

@@ -277,7 +277,21 @@
                             x:Name="CardTargetLanguageComboBox"
                             x:Uid="CardTargetLanguageComboBox"
                             AutomationProperties.AutomationId="ComboCardTargetLanguage"
-                            Header="To"
+                            Header="Primary"
+                            Width="176">
+                            <ComboBoxItem x:Uid="CardTargetEnglish" Tag="en-US" />
+                            <ComboBoxItem x:Uid="CardTargetChinese" Tag="zh-Hans" />
+                            <ComboBoxItem x:Uid="CardTargetJapanese" Tag="ja" />
+                            <ComboBoxItem x:Uid="CardTargetKorean" Tag="ko" />
+                            <ComboBoxItem x:Uid="CardTargetFrench" Tag="fr" />
+                            <ComboBoxItem x:Uid="CardTargetGerman" Tag="de" />
+                            <ComboBoxItem x:Uid="CardTargetSpanish" Tag="es" />
+                        </ComboBox>
+                        <ComboBox
+                            x:Name="CardSecondaryTargetLanguageComboBox"
+                            x:Uid="CardSecondaryTargetLanguageComboBox"
+                            AutomationProperties.AutomationId="ComboCardSecondaryTargetLanguage"
+                            Header="Secondary"
                             Width="176">
                             <ComboBoxItem x:Uid="CardTargetEnglish" Tag="en-US" />
                             <ComboBoxItem x:Uid="CardTargetChinese" Tag="zh-Hans" />
@@ -436,7 +450,21 @@
                         x:Name="OverallTargetLanguageComboBox"
                         x:Uid="OverallTargetLanguageComboBox"
                         AutomationProperties.AutomationId="ComboOverallTargetLanguage"
-                        Header="To"
+                        Header="Primary"
+                        Width="176">
+                        <ComboBoxItem x:Uid="OverallTargetEnglish" Tag="en-US" />
+                        <ComboBoxItem x:Uid="OverallTargetChinese" Tag="zh-Hans" />
+                        <ComboBoxItem x:Uid="OverallTargetJapanese" Tag="ja" />
+                        <ComboBoxItem x:Uid="OverallTargetKorean" Tag="ko" />
+                        <ComboBoxItem x:Uid="OverallTargetFrench" Tag="fr" />
+                        <ComboBoxItem x:Uid="OverallTargetGerman" Tag="de" />
+                        <ComboBoxItem x:Uid="OverallTargetSpanish" Tag="es" />
+                    </ComboBox>
+                    <ComboBox
+                        x:Name="OverallSecondaryTargetLanguageComboBox"
+                        x:Uid="OverallSecondaryTargetLanguageComboBox"
+                        AutomationProperties.AutomationId="ComboOverallSecondaryTargetLanguage"
+                        Header="Secondary"
                         Width="176">
                         <ComboBoxItem x:Uid="OverallTargetEnglish" Tag="en-US" />
                         <ComboBoxItem x:Uid="OverallTargetChinese" Tag="zh-Hans" />

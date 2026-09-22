@@ -35,6 +35,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             FreezeCapturedContent = false;
             SourceLanguage = "auto";
             TargetLanguage = "en-US";
+            SecondaryTargetLanguage = "zh-Hans";
             AzureEndpoint = "https://api.cognitive.microsofttranslator.com";
             AzureRegion = string.Empty;
             AzureVisionEndpoint = string.Empty;
@@ -71,6 +72,9 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
         [JsonPropertyName("TargetLanguage")]
         public string TargetLanguage { get; set; }
+
+        [JsonPropertyName("SecondaryTargetLanguage")]
+        public string SecondaryTargetLanguage { get; set; }
 
         [JsonPropertyName("AzureEndpoint")]
         public string AzureEndpoint { get; set; }

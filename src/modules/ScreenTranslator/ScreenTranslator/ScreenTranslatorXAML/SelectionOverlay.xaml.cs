@@ -31,6 +31,7 @@ public sealed partial class SelectionOverlay : TransparentWindow
     private readonly IOcrBackend? _ocrBackend;
     private readonly string _sourceLanguage;
     private readonly string _targetLanguage;
+    private readonly string _secondaryTargetLanguage;
     private readonly PhysicalRect? _foregroundWindowBounds;
     private readonly DispatcherQueue _dispatcherQueue;
     private readonly bool _freezeCapturedContentByDefault;
@@ -44,6 +45,7 @@ public sealed partial class SelectionOverlay : TransparentWindow
         ITranslationProvider? translationProvider = null,
         string sourceLanguage = "auto",
         string targetLanguage = "en-US",
+        string secondaryTargetLanguage = "zh-Hans",
         PhysicalRect? foregroundWindowBounds = null,
         IOcrBackend? ocrBackend = null,
         bool freezeCapturedContentByDefault = false,
@@ -54,6 +56,7 @@ public sealed partial class SelectionOverlay : TransparentWindow
         _ocrBackend = ocrBackend;
         _sourceLanguage = sourceLanguage;
         _targetLanguage = targetLanguage;
+        _secondaryTargetLanguage = secondaryTargetLanguage;
         _foregroundWindowBounds = foregroundWindowBounds;
         _freezeCapturedContentByDefault = freezeCapturedContentByDefault;
         _showsSelectionUi = showSelectionUi;
@@ -301,6 +304,7 @@ public sealed partial class SelectionOverlay : TransparentWindow
                 groupedLines,
                 sourceLanguage,
                 targetLanguage,
+                _secondaryTargetLanguage,
                 cancellationTokenSource.Token);
 
             if (!result.Success)
@@ -336,8 +340,9 @@ public sealed partial class SelectionOverlay : TransparentWindow
                     capturedSnapshot,
                     _freezeCapturedContentByDefault,
                     sourceLanguage,
-                    result.TargetLanguage ?? targetLanguage,
-                    (lines, newSource, newTarget) => TranslateLinesAsync(lines, newSource, newTarget),
+                    targetLanguage,
+                    _secondaryTargetLanguage,
+                    (lines, newSource, newTarget, newSecondaryTarget) => TranslateLinesAsync(lines, newSource, newTarget, newSecondaryTarget),
                     TranslateLineAsync);
             }))
             {
@@ -362,12 +367,14 @@ public sealed partial class SelectionOverlay : TransparentWindow
     private async Task<TranslationResult> TranslateLineAsync(
         TranslationLine line,
         string sourceLanguage,
-        string targetLanguage)
+        string targetLanguage,
+        string secondaryTargetLanguage)
     {
         TranslationResult result = await TranslateLinesAsync(
             new[] { line },
             sourceLanguage,
-            targetLanguage);
+            targetLanguage,
+            secondaryTargetLanguage);
         return result;
     }
 
@@ -375,12 +382,15 @@ public sealed partial class SelectionOverlay : TransparentWindow
         IReadOnlyList<TranslationLine> lines,
         string sourceLanguage,
         string targetLanguage,
+        string? secondaryTargetLanguage = null,
         CancellationToken cancellationToken = default)
     {
-        string resolvedTargetLanguage = LanguageSelectionHelper.ResolveAutomaticChineseEnglishTarget(
+        secondaryTargetLanguage ??= _secondaryTargetLanguage;
+        string resolvedTargetLanguage = LanguageSelectionHelper.ResolveAutomaticTarget(
             lines,
             sourceLanguage,
-            targetLanguage);
+            targetLanguage,
+            secondaryTargetLanguage);
         if (!string.Equals(resolvedTargetLanguage, targetLanguage, StringComparison.OrdinalIgnoreCase))
         {
             Logger.LogInfo($"Auto language direction selected target '{resolvedTargetLanguage}' instead of '{targetLanguage}'.");

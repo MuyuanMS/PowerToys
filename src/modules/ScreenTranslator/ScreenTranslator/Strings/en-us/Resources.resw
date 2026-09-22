@@ -399,8 +399,12 @@
     <comment>Header for the selected card source language</comment>
   </data>
   <data name="CardTargetLanguageComboBox.Header" xml:space="preserve">
-    <value>To</value>
-    <comment>Header for the selected card target language</comment>
+    <value>Primary</value>
+    <comment>Header for the selected card primary translation language</comment>
+  </data>
+  <data name="CardSecondaryTargetLanguageComboBox.Header" xml:space="preserve">
+    <value>Secondary</value>
+    <comment>Header for the selected card secondary translation language</comment>
   </data>
   <data name="CardTargetLanguageLabel.Text" xml:space="preserve">
     <value>Target Language</value>
@@ -477,8 +481,12 @@
     <comment>Header for the capture source language</comment>
   </data>
   <data name="OverallTargetLanguageComboBox.Header" xml:space="preserve">
-    <value>To</value>
-    <comment>Header for the capture target language</comment>
+    <value>Primary</value>
+    <comment>Header for the capture primary translation language</comment>
+  </data>
+  <data name="OverallSecondaryTargetLanguageComboBox.Header" xml:space="preserve">
+    <value>Secondary</value>
+    <comment>Header for the capture secondary translation language</comment>
   </data>
   <data name="ProcessingStatus.Text" xml:space="preserve">
     <value>Recognizing text...</value>

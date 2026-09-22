@@ -46,7 +46,7 @@ public class LanguageSelectionHelperTests
     }
 
     [TestMethod]
-    public void ResolveAutomaticChineseEnglishTarget_ChineseTextChoosesEnglish()
+    public void ResolveAutomaticTarget_ChineseTextUsesPrimaryEnglish()
     {
         TranslationLine[] lines =
         [
@@ -54,16 +54,17 @@ public class LanguageSelectionHelperTests
             new("支付失败率上升", new PhysicalRect(0, 30, 140, 20)),
         ];
 
-        string target = LanguageSelectionHelper.ResolveAutomaticChineseEnglishTarget(
+        string target = LanguageSelectionHelper.ResolveAutomaticTarget(
             lines,
             "auto",
+            "en-US",
             "zh-Hans");
 
         Assert.AreEqual("en-US", target);
     }
 
     [TestMethod]
-    public void ResolveAutomaticChineseEnglishTarget_EnglishTextChoosesChinese()
+    public void ResolveAutomaticTarget_EnglishTextUsesSecondaryChinese()
     {
         TranslationLine[] lines =
         [
@@ -71,48 +72,68 @@ public class LanguageSelectionHelperTests
             new("Payment failure rate increased", new PhysicalRect(0, 30, 180, 20)),
         ];
 
-        string target = LanguageSelectionHelper.ResolveAutomaticChineseEnglishTarget(
+        string target = LanguageSelectionHelper.ResolveAutomaticTarget(
             lines,
             "auto",
-            "en-US");
+            "en-US",
+            "zh-Hans");
 
         Assert.AreEqual("zh-Hans", target);
     }
 
     [TestMethod]
-    public void ResolveAutomaticChineseEnglishTarget_ExplicitSourcePreservesTarget()
+    public void ResolveAutomaticTarget_ExplicitSourceDifferentFromPrimaryUsesPrimary()
     {
         TranslationLine[] lines =
         [
             new("Affected orders", new PhysicalRect(0, 0, 100, 20)),
         ];
 
-        string target = LanguageSelectionHelper.ResolveAutomaticChineseEnglishTarget(
+        string target = LanguageSelectionHelper.ResolveAutomaticTarget(
             lines,
-            "en",
-            "en-US");
+            "zh-Hans",
+            "en-US",
+            "fr");
 
         Assert.AreEqual("en-US", target);
     }
 
     [TestMethod]
-    public void ResolveAutomaticChineseEnglishTarget_JapaneseTextPreservesTarget()
+    public void ResolveAutomaticTarget_ExplicitSourceMatchingPrimaryUsesSecondary()
+    {
+        TranslationLine[] lines =
+        [
+            new("Affected orders", new PhysicalRect(0, 0, 100, 20)),
+        ];
+
+        string target = LanguageSelectionHelper.ResolveAutomaticTarget(
+            lines,
+            "en",
+            "en-US",
+            "zh-Hans");
+
+        Assert.AreEqual("zh-Hans", target);
+    }
+
+    [TestMethod]
+    public void ResolveAutomaticTarget_JapaneseTextMatchingPrimaryUsesSecondary()
     {
         TranslationLine[] lines =
         [
             new("注文を確認してください", new PhysicalRect(0, 0, 160, 20)),
         ];
 
-        string target = LanguageSelectionHelper.ResolveAutomaticChineseEnglishTarget(
+        string target = LanguageSelectionHelper.ResolveAutomaticTarget(
             lines,
             "auto",
+            "ja",
             "en-US");
 
         Assert.AreEqual("en-US", target);
     }
 
     [TestMethod]
-    public void ResolveAutomaticChineseEnglishTarget_ChineseDominantMixedTextChoosesEnglish()
+    public void ResolveAutomaticTarget_ChineseDominantMixedTextUsesPrimaryEnglish()
     {
         TranslationLine[] lines =
         [
@@ -120,27 +141,80 @@ public class LanguageSelectionHelperTests
             new("支付失败率上升", new PhysicalRect(0, 30, 140, 20)),
         ];
 
-        string target = LanguageSelectionHelper.ResolveAutomaticChineseEnglishTarget(
+        string target = LanguageSelectionHelper.ResolveAutomaticTarget(
             lines,
             "auto",
+            "en-US",
             "zh-Hans");
 
         Assert.AreEqual("en-US", target);
     }
 
     [TestMethod]
-    public void ResolveAutomaticChineseEnglishTarget_OtherTargetPreservesSelection()
+    public void ResolveAutomaticTarget_EnglishTextUsesConfiguredFrenchSecondary()
     {
         TranslationLine[] lines =
         [
             new("Affected orders", new PhysicalRect(0, 0, 100, 20)),
         ];
 
-        string target = LanguageSelectionHelper.ResolveAutomaticChineseEnglishTarget(
+        string target = LanguageSelectionHelper.ResolveAutomaticTarget(
             lines,
             "auto",
+            "en-US",
             "fr");
 
         Assert.AreEqual("fr", target);
+    }
+
+    [TestMethod]
+    public void ResolveAutomaticTarget_ChinesePrimaryRoutesChineseToEnglishSecondary()
+    {
+        TranslationLine[] lines =
+        [
+            new("受影响订单", new PhysicalRect(0, 0, 100, 20)),
+        ];
+
+        string target = LanguageSelectionHelper.ResolveAutomaticTarget(
+            lines,
+            "auto",
+            "zh-Hans",
+            "en-US");
+
+        Assert.AreEqual("en-US", target);
+    }
+
+    [TestMethod]
+    public void ResolveAutomaticTarget_ChinesePrimaryRoutesEnglishToChinese()
+    {
+        TranslationLine[] lines =
+        [
+            new("Affected orders", new PhysicalRect(0, 0, 100, 20)),
+        ];
+
+        string target = LanguageSelectionHelper.ResolveAutomaticTarget(
+            lines,
+            "auto",
+            "zh-Hans",
+            "en-US");
+
+        Assert.AreEqual("zh-Hans", target);
+    }
+
+    [TestMethod]
+    public void ResolveAutomaticTarget_AmbiguousTextUsesPrimary()
+    {
+        TranslationLine[] lines =
+        [
+            new("12345", new PhysicalRect(0, 0, 100, 20)),
+        ];
+
+        string target = LanguageSelectionHelper.ResolveAutomaticTarget(
+            lines,
+            "auto",
+            "en-US",
+            "zh-Hans");
+
+        Assert.AreEqual("en-US", target);
     }
 }

@@ -287,6 +287,7 @@ public class TranslationProviderTests
         var settings = new ScreenTranslatorSettings();
         settings.Properties.SourceLanguage = "ja-JP";
         settings.Properties.TargetLanguage = "en-US";
+        settings.Properties.SecondaryTargetLanguage = "fr-FR";
         settings.Properties.SelectedProvider = "AzureTranslator";
         settings.Properties.OcrProvider = "AzureVision";
         settings.Properties.EnableCloudConsent = true;
@@ -303,6 +304,7 @@ public class TranslationProviderTests
         string json = settings.ToJsonString();
         Assert.IsNotNull(json);
         Assert.IsTrue(json.Contains("ja-JP"));
+        Assert.IsTrue(json.Contains("SecondaryTargetLanguage"));
         Assert.IsTrue(json.Contains("AzureTranslator"));
         Assert.IsTrue(json.Contains("custom.azure.com"));
         Assert.IsTrue(json.Contains("AzureVision"));
@@ -312,6 +314,9 @@ public class TranslationProviderTests
         Assert.IsTrue(json.Contains("ActiveWindowShortcut"));
         Assert.IsTrue(json.Contains("ScanTextShortcut"));
         Assert.IsTrue(json.Contains("\"FreezeCapturedContent\":true"));
+        ScreenTranslatorSettings? roundTrippedSettings = JsonSerializer.Deserialize<ScreenTranslatorSettings>(json);
+        Assert.IsNotNull(roundTrippedSettings);
+        Assert.AreEqual("fr-FR", roundTrippedSettings.Properties.SecondaryTargetLanguage);
 
         // Verify API key is NOT present in serialized JSON
         Assert.IsFalse(json.Contains("ApiKey", StringComparison.OrdinalIgnoreCase));
@@ -327,6 +332,7 @@ public class TranslationProviderTests
         Assert.IsFalse(settings.Properties.ScanTextShortcut.Ctrl);
         Assert.IsTrue(settings.Properties.ScanTextShortcut.Shift);
         Assert.IsTrue(settings.Properties.ScanTextShortcut.Alt);
+        Assert.AreEqual("zh-Hans", settings.Properties.SecondaryTargetLanguage);
         Assert.AreEqual(0x54, settings.Properties.ScanTextShortcut.Code);
     }
 
@@ -384,6 +390,14 @@ public class TranslationProviderTests
         var settings = new ScreenTranslatorSettings();
 
         Assert.IsFalse(settings.Properties.FreezeCapturedContent);
+    }
+
+    [TestMethod]
+    public void ScreenTranslatorSettings_SecondaryTargetLanguage_DefaultsToChinese()
+    {
+        var settings = new ScreenTranslatorSettings();
+
+        Assert.AreEqual("zh-Hans", settings.Properties.SecondaryTargetLanguage);
     }
 
     [TestMethod]
