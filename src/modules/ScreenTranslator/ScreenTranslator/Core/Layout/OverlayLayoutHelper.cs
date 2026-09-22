@@ -537,6 +537,15 @@ public static class OverlayLayoutHelper
         return combined;
     }
 
+    public static PhysicalRect ResolveOcrLineBounds(
+        PhysicalRect lineBounds,
+        IEnumerable<RecognizedWord> recognizedWords)
+    {
+        PhysicalRect wordBounds = CombineWordRects(
+            recognizedWords?.Select(word => word.BoundingBox) ?? Array.Empty<PhysicalRect>());
+        return wordBounds.IsEmpty ? lineBounds : wordBounds;
+    }
+
     /// <summary>
     /// Groups adjacent OCR lines that form one wrapped text block using the selected provider-neutral strategy.
     /// </summary>

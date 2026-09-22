@@ -1196,15 +1196,39 @@ public sealed partial class ResultOverlay : TransparentWindow
             BorderThickness = new Thickness(0),
             Padding = new Thickness(0),
         };
+        AutomationProperties.SetAutomationId(_editingTextBox, "ScreenTranslatorOverlayTextEditor");
+        AutomationProperties.SetName(_editingTextBox, "Edit translated text");
         _editingTextBox.KeyDown += EditingTextBox_KeyDown;
         _editingTextBox.LostFocus += EditingTextBox_LostFocus;
         card.Child = _editingTextBox;
         int exStyle = OSInterop.GetWindowLong(_hwnd, OSInterop.GwlExStyle);
         _ = OSInterop.SetWindowLong(_hwnd, OSInterop.GwlExStyle, exStyle & ~OSInterop.WsExNoActivate);
+        TextBox editingTextBox = _editingTextBox;
+        if (!DispatcherQueue.TryEnqueue(() => FocusEditingTextBox(editingTextBox)))
+        {
+            Logger.LogError($"Failed to schedule text editing for line {_contextMenuLineIndex}.");
+            CancelEdit();
+        }
+    }
+
+    private void FocusEditingTextBox(TextBox editingTextBox)
+    {
+        if (!ReferenceEquals(_editingTextBox, editingTextBox))
+        {
+            return;
+        }
+
         _ = OSInterop.SetForegroundWindow(_hwnd);
-        _editingTextBox.Focus(FocusState.Programmatic);
-        _editingTextBox.SelectAll();
-        Logger.LogInfo($"Started editing overlay text for line {_contextMenuLineIndex}.");
+        if (editingTextBox.Focus(FocusState.Programmatic))
+        {
+            editingTextBox.SelectAll();
+            Logger.LogInfo($"Started editing overlay text for line {_contextMenuLineIndex}.");
+        }
+        else
+        {
+            Logger.LogWarning($"Could not focus the text editor for line {_contextMenuLineIndex}.");
+            CancelEdit();
+        }
     }
 
     private static void CopyTextToClipboard(string text)

@@ -60,6 +60,21 @@ public class OverlayLayoutHelperTests
     }
 
     [TestMethod]
+    public void ResolveOcrLineBounds_UsesTighterWordGeometry()
+    {
+        PhysicalRect oversizedLineBounds = new(500, 200, 1000, 700);
+        RecognizedWord[] words =
+        [
+            new("Large", new PhysicalRect(520, 230, 80, 30), 0, 0),
+            new("title", new PhysicalRect(610, 230, 70, 30), 0, 1),
+        ];
+
+        PhysicalRect resolved = OverlayLayoutHelper.ResolveOcrLineBounds(oversizedLineBounds, words);
+
+        Assert.AreEqual(new PhysicalRect(520, 230, 160, 30), resolved);
+    }
+
+    [TestMethod]
     public void DipToPhysical_RoundTripsAccurately()
     {
         PhysicalRect screenBounds = new(1920, 0, 3840, 2160);

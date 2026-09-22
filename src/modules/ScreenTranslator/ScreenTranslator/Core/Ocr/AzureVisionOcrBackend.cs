@@ -10,6 +10,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using ScreenTranslator.Core.Layout;
 using ScreenTranslator.Core.Translation;
 using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
@@ -186,6 +187,19 @@ public sealed class AzureVisionOcrBackend : IOcrBackend, IDisposable
                     {
                         confidence = sum / count;
                     }
+                }
+
+                PhysicalRect resolvedBounds = OverlayLayoutHelper.ResolveOcrLineBounds(bounds, recognizedWords);
+                if (resolvedBounds != bounds)
+                {
+                    bounds = resolvedBounds;
+                    vertices =
+                    [
+                        new PhysicalPoint(bounds.Left, bounds.Top),
+                        new PhysicalPoint(bounds.Right, bounds.Top),
+                        new PhysicalPoint(bounds.Right, bounds.Bottom),
+                        new PhysicalPoint(bounds.Left, bounds.Bottom),
+                    ];
                 }
 
                 lines.Add(new TranslationLine(text.Trim(), bounds, confidence, vertices, Words: recognizedWords));
