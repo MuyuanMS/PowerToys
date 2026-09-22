@@ -465,6 +465,53 @@ public class OverlayLayoutHelperTests
     }
 
     [TestMethod]
+    public void SanitizeOcrLineGeometry_RemovesArtificialSpacesBetweenChineseCharacters()
+    {
+        PhysicalRect capture = new(0, 0, 400, 200);
+        var lines = new List<TranslationLine>
+        {
+            new("订 单 提 交 failed", new PhysicalRect(20, 30, 180, 24)),
+        };
+
+        IReadOnlyList<TranslationLine> sanitized = OverlayLayoutHelper.SanitizeOcrLineGeometry(lines, capture);
+
+        Assert.HasCount(1, sanitized);
+        Assert.AreEqual("订单提交 failed", sanitized[0].Text);
+    }
+
+    [TestMethod]
+    public void SanitizeOcrLineGeometry_SkipsTextWithoutLetters()
+    {
+        PhysicalRect capture = new(0, 0, 400, 200);
+        var lines = new List<TranslationLine>
+        {
+            new("38.6%", new PhysicalRect(20, 30, 80, 24)),
+            new("$1,234.50", new PhysicalRect(20, 60, 100, 24)),
+            new("Order 38.6%", new PhysicalRect(20, 90, 140, 24)),
+        };
+
+        IReadOnlyList<TranslationLine> sanitized = OverlayLayoutHelper.SanitizeOcrLineGeometry(lines, capture);
+
+        Assert.HasCount(1, sanitized);
+        Assert.AreEqual("Order 38.6%", sanitized[0].Text);
+    }
+
+    [TestMethod]
+    public void GroupAdjacentTextLines_MergesChineseLinesWithoutAddingSpace()
+    {
+        var lines = new List<TranslationLine>
+        {
+            new("订单提交", new PhysicalRect(20, 20, 100, 24)),
+            new("失败", new PhysicalRect(20, 45, 50, 24)),
+        };
+
+        IReadOnlyList<TranslationLine> grouped = OverlayLayoutHelper.GroupAdjacentTextLines(lines);
+
+        Assert.HasCount(1, grouped);
+        Assert.AreEqual("订单提交失败", grouped[0].Text);
+    }
+
+    [TestMethod]
     public void CalculateInitialCardSize_CapsMalformedNearFullscreenDefaults()
     {
         var (width, minHeight) = OverlayLayoutHelper.CalculateInitialCardSize(

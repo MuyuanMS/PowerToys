@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using ScreenTranslator.Core.Translation;
 
 namespace ScreenTranslator.Core.Layout;
@@ -730,7 +731,8 @@ public static class OverlayLayoutHelper
         const string closingPunctuation = ".,;:!?%)]}";
         const string openingPunctuation = "([{";
         bool omitSpace = closingPunctuation.Contains(right[0]) ||
-                         openingPunctuation.Contains(left[^1]);
+                         openingPunctuation.Contains(left[^1]) ||
+                         (IsCjkTextCharacter(left[^1]) && IsCjkTextCharacter(right[0]));
 
         return omitSpace ? left + right : left + " " + right;
     }
@@ -793,8 +795,9 @@ public static class OverlayLayoutHelper
             }
         }
 
+        string mergedText = textParts.Aggregate(string.Empty, JoinSameBaselineText);
         return new TranslationLine(
-            string.Join(" ", textParts),
+            mergedText,
             bounds,
             confidenceTotal / group.Count,
             CreateRectanglePolygon(bounds),
@@ -861,7 +864,8 @@ public static class OverlayLayoutHelper
         List<TranslationLine> sanitized = new();
         foreach (TranslationLine line in lines)
         {
-            if (string.IsNullOrWhiteSpace(line.Text))
+            string normalizedText = NormalizeRecognizedText(line.Text);
+            if (string.IsNullOrWhiteSpace(normalizedText) || !normalizedText.Any(char.IsLetter))
             {
                 continue;
             }
@@ -872,9 +876,13 @@ public static class OverlayLayoutHelper
                 continue;
             }
 
-            IReadOnlyList<RecognizedWord>? words = SanitizeWords(line.Words, capturedRegion);
+            IReadOnlyList<RecognizedWord>? words = SanitizeWords(line.Words, capturedRegion)?
+                .Select(word => word with { Text = NormalizeRecognizedText(word.Text) })
+                .Where(word => !string.IsNullOrWhiteSpace(word.Text))
+                .ToList();
             sanitized.Add(line with
             {
+                Text = normalizedText,
                 BoundingBox = bounds,
                 PolygonVertices = SanitizePolygon(line.PolygonVertices, bounds, capturedRegion),
                 Words = words,
@@ -882,6 +890,53 @@ public static class OverlayLayoutHelper
         }
 
         return sanitized;
+    }
+
+    internal static string NormalizeRecognizedText(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        StringBuilder normalized = new(text.Length);
+        for (int index = 0; index < text.Length; index++)
+        {
+            char character = text[index];
+            if (!char.IsWhiteSpace(character))
+            {
+                normalized.Append(character);
+                continue;
+            }
+
+            char? previous = normalized.Length > 0 ? normalized[^1] : null;
+            int nextIndex = index + 1;
+            while (nextIndex < text.Length && char.IsWhiteSpace(text[nextIndex]))
+            {
+                nextIndex++;
+            }
+
+            char? next = nextIndex < text.Length ? text[nextIndex] : null;
+            if (previous.HasValue &&
+                next.HasValue &&
+                !(IsCjkTextCharacter(previous.Value) && IsCjkTextCharacter(next.Value)) &&
+                normalized[^1] != ' ')
+            {
+                normalized.Append(' ');
+            }
+
+            index = nextIndex - 1;
+        }
+
+        return normalized.ToString().Trim();
+    }
+
+    private static bool IsCjkTextCharacter(char character)
+    {
+        return character is >= '\u3040' and <= '\u30FF' ||
+            character is >= '\u3400' and <= '\u9FFF' ||
+            character is >= '\uAC00' and <= '\uD7AF' ||
+            character is >= '\uF900' and <= '\uFAFF';
     }
 
     public static IReadOnlyList<TranslatedLine> SanitizeTranslatedLineGeometry(
