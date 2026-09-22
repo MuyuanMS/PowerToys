@@ -59,6 +59,19 @@ public sealed class WindowsMediaOcrBackend : IOcrBackend
             }
 
             Language language = ResolveExplicitLanguage(sourceLanguageTag);
+            IReadOnlyList<string> relatedCjkCandidates = OcrLanguageSelectionHelper.GetRelatedCjkLanguageCandidates(
+                OcrEngine.AvailableRecognizerLanguages.Select(candidate => candidate.LanguageTag),
+                language.LanguageTag);
+            if (relatedCjkCandidates.Count > 1)
+            {
+                return await RecognizeBestLanguageAsync(
+                    convertedBitmap,
+                    capturedRegionPhysical,
+                    relatedCjkCandidates,
+                    $"preferred CJK language '{language.LanguageTag}'",
+                    cancellationToken);
+            }
+
             OcrEngine? engine = OcrEngine.TryCreateFromLanguage(language);
             if (engine == null)
             {
@@ -69,6 +82,7 @@ public sealed class WindowsMediaOcrBackend : IOcrBackend
                 engine,
                 convertedBitmap,
                 capturedRegionPhysical,
+                language.LanguageTag,
                 cancellationToken);
             Logger.LogInfo($"Windows OCR selected language '{language.LanguageTag}' for recognition.");
             return lines;
@@ -93,6 +107,21 @@ public sealed class WindowsMediaOcrBackend : IOcrBackend
             throw new InvalidOperationException("Windows OCR could not be created because no supported OCR language is installed.");
         }
 
+        return await RecognizeBestLanguageAsync(
+            bitmap,
+            capturedRegionPhysical,
+            candidateTags,
+            "Auto recognition",
+            cancellationToken);
+    }
+
+    private static async Task<IReadOnlyList<TranslationLine>> RecognizeBestLanguageAsync(
+        SoftwareBitmap bitmap,
+        PhysicalRect capturedRegionPhysical,
+        IReadOnlyList<string> candidateTags,
+        string selectionReason,
+        CancellationToken cancellationToken)
+    {
         List<(string LanguageTag, IReadOnlyList<TranslationLine> Lines, OcrLanguageScore Score)> recognized = new();
         for (int index = 0; index < candidateTags.Count; index++)
         {
@@ -108,6 +137,7 @@ public sealed class WindowsMediaOcrBackend : IOcrBackend
                 engine,
                 bitmap,
                 capturedRegionPhysical,
+                candidateTag,
                 cancellationToken);
             OcrLanguageScore score = OcrLanguageSelectionHelper.ScoreRecognizedLines(candidateTag, lines, index);
             recognized.Add((candidateTag, lines, score));
@@ -125,7 +155,7 @@ public sealed class WindowsMediaOcrBackend : IOcrBackend
             selectedScore.LanguageTag,
             StringComparison.OrdinalIgnoreCase));
         Logger.LogInfo(
-            $"Windows OCR selected language '{selected.LanguageTag}' from {recognized.Count} candidate(s) for Auto recognition.");
+            $"Windows OCR selected language '{selected.LanguageTag}' from {recognized.Count} candidate(s) for {selectionReason}.");
         return selected.Lines;
     }
 
@@ -133,18 +163,20 @@ public sealed class WindowsMediaOcrBackend : IOcrBackend
         OcrEngine engine,
         SoftwareBitmap bitmap,
         PhysicalRect capturedRegionPhysical,
+        string languageTag,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         OcrResult result = await engine.RecognizeAsync(bitmap);
         cancellationToken.ThrowIfCancellationRequested();
 
-        return ConvertResultToLines(result, capturedRegionPhysical);
+        return ConvertResultToLines(result, capturedRegionPhysical, languageTag);
     }
 
     private static IReadOnlyList<TranslationLine> ConvertResultToLines(
         OcrResult result,
-        PhysicalRect capturedRegionPhysical)
+        PhysicalRect capturedRegionPhysical,
+        string languageTag)
     {
         if (result == null || result.Lines == null || result.Lines.Count == 0)
         {
@@ -185,7 +217,13 @@ public sealed class WindowsMediaOcrBackend : IOcrBackend
                     capturedRegionPhysical.Height);
             }
 
-            lines.Add(new TranslationLine(ocrLine.Text.Trim(), lineBoundingBox, 1.0, null, Words: recognizedWords));
+            lines.Add(new TranslationLine(
+                ocrLine.Text.Trim(),
+                lineBoundingBox,
+                1.0,
+                null,
+                Words: recognizedWords,
+                RecognizedLanguageTag: languageTag));
         }
 
         return lines;

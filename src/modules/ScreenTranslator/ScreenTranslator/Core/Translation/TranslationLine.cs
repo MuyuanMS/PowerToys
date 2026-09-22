@@ -15,4 +15,5 @@ public sealed record TranslationLine(
     double Confidence = 1.0,
     IReadOnlyList<PhysicalPoint>? PolygonVertices = null,
     int SourceLineCount = 1,
-    IReadOnlyList<RecognizedWord>? Words = null);
+    IReadOnlyList<RecognizedWord>? Words = null,
+    string? RecognizedLanguageTag = null);

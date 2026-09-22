@@ -55,6 +55,7 @@ public sealed partial class BrushSelectionOverlay : TransparentWindow
     private bool _initialized;
     private bool _isBrushing;
     private bool _isBusy = true;
+    private string _recognizedSourceLanguage;
 
     public BrushSelectionOverlay(
         ScreenInfo screenInfo,
@@ -74,6 +75,7 @@ public sealed partial class BrushSelectionOverlay : TransparentWindow
         _ocrBackend = ocrBackend;
         _translationProvider = translationProvider;
         _sourceLanguage = sourceLanguage;
+        _recognizedSourceLanguage = sourceLanguage;
         _targetLanguage = targetLanguage;
         _secondaryTargetLanguage = secondaryTargetLanguage;
 
@@ -141,6 +143,9 @@ public sealed partial class BrushSelectionOverlay : TransparentWindow
                 _sourceLanguage,
                 _cancellationTokenSource.Token);
             recognizedLines = OverlayLayoutHelper.SanitizeOcrLineGeometry(recognizedLines, _capturedRegion);
+            _recognizedSourceLanguage = LanguageSelectionHelper.ResolveOcrAwareSourceLanguage(
+                recognizedLines,
+                _sourceLanguage);
             _selectableWords = BrushPhraseBuilder.GetSelectableWords(recognizedLines);
             _selectionAccumulator = new BrushSelectionAccumulator(_selectableWords);
             Logger.LogInfo($"Scan text recognized {recognizedLines.Count} lines and {_selectableWords.Count} selectable words.");
@@ -326,15 +331,15 @@ public sealed partial class BrushSelectionOverlay : TransparentWindow
             Logger.LogInfo($"Scan text translating {phrase.Words.Count} selected words with provider {_translationProvider.ProviderId}.");
             string resolvedTargetLanguage = LanguageSelectionHelper.ResolveAutomaticTarget(
                 new[] { line },
-                _sourceLanguage,
+                _recognizedSourceLanguage,
                 _targetLanguage,
                 _secondaryTargetLanguage);
             TranslationResult result = await _translationProvider.TranslateAsync(
-                new TranslationRequest(new[] { line }, _sourceLanguage, resolvedTargetLanguage),
+                new TranslationRequest(new[] { line }, _recognizedSourceLanguage, resolvedTargetLanguage),
                 _cancellationTokenSource.Token);
             result = result with
             {
-                SourceLanguage = _sourceLanguage,
+                SourceLanguage = _recognizedSourceLanguage,
                 TargetLanguage = resolvedTargetLanguage,
             };
             result = TranslationQualityGuard.ReplaceDegenerateTranslations(result, out int replacementCount);
@@ -376,7 +381,7 @@ public sealed partial class BrushSelectionOverlay : TransparentWindow
                 styledLines,
                 resultSnapshot,
                 freezeCapturedContent: true,
-                sourceLanguage: _sourceLanguage,
+                sourceLanguage: _recognizedSourceLanguage,
                 targetLanguage: _targetLanguage,
                 secondaryTargetLanguage: _secondaryTargetLanguage);
         }

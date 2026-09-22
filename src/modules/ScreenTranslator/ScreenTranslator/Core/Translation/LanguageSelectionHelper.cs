@@ -89,6 +89,25 @@ public static class LanguageSelectionHelper
                 : primaryTargetLanguage;
     }
 
+    public static string ResolveOcrAwareSourceLanguage(
+        IReadOnlyList<TranslationLine> lines,
+        string configuredSourceLanguage)
+    {
+        if (IsAutomatic(configuredSourceLanguage) || lines == null)
+        {
+            return configuredSourceLanguage;
+        }
+
+        string? recognizedLanguage = lines
+            .Select(line => line.RecognizedLanguageTag)
+            .FirstOrDefault(tag => !string.IsNullOrWhiteSpace(tag));
+        return recognizedLanguage != null &&
+            IsCjkLanguage(configuredSourceLanguage) &&
+            IsCjkLanguage(recognizedLanguage)
+                ? recognizedLanguage
+                : configuredSourceLanguage;
+    }
+
     private static string? DetectDominantLanguage(
         int hanCount,
         int latinCount,
@@ -122,6 +141,11 @@ public static class LanguageSelectionHelper
     {
         return string.IsNullOrWhiteSpace(language) ||
             string.Equals(language, "auto", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsCjkLanguage(string language)
+    {
+        return GetBaseLanguage(language).ToLowerInvariant() is "ja" or "zh" or "ko";
     }
 
     private static bool IsHan(char character)

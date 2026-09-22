@@ -713,7 +713,8 @@ public static class OverlayLayoutHelper
             bounds,
             confidenceTotal / group.Count,
             CreateRectanglePolygon(bounds),
-            group.Max(line => Math.Max(1, line.SourceLineCount)));
+            group.Max(line => Math.Max(1, line.SourceLineCount)),
+            RecognizedLanguageTag: group.Select(line => line.RecognizedLanguageTag).FirstOrDefault(tag => !string.IsNullOrWhiteSpace(tag)));
     }
 
     private static string JoinSameBaselineText(string left, string right)
@@ -801,7 +802,8 @@ public static class OverlayLayoutHelper
             bounds,
             confidenceTotal / group.Count,
             CreateRectanglePolygon(bounds),
-            sourceLineCount);
+            sourceLineCount,
+            RecognizedLanguageTag: group.Select(line => line.RecognizedLanguageTag).FirstOrDefault(tag => !string.IsNullOrWhiteSpace(tag)));
     }
 
     private static IReadOnlyList<PhysicalPoint> CreateRectanglePolygon(PhysicalRect bounds)

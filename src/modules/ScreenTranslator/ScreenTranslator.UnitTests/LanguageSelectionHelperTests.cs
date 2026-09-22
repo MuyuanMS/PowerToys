@@ -217,4 +217,36 @@ public class LanguageSelectionHelperTests
 
         Assert.AreEqual("en-US", target);
     }
+
+    [TestMethod]
+    public void ResolveOcrAwareSourceLanguage_UsesDetectedJapaneseForConfiguredChinese()
+    {
+        TranslationLine[] lines =
+        [
+            new(
+                "カタカナとひらがな",
+                new PhysicalRect(0, 0, 160, 20),
+                RecognizedLanguageTag: "ja-JP"),
+        ];
+
+        string source = LanguageSelectionHelper.ResolveOcrAwareSourceLanguage(lines, "zh-Hans");
+
+        Assert.AreEqual("ja-JP", source);
+    }
+
+    [TestMethod]
+    public void ResolveOcrAwareSourceLanguage_DoesNotOverrideNonCjkSource()
+    {
+        TranslationLine[] lines =
+        [
+            new(
+                "カタカナ",
+                new PhysicalRect(0, 0, 100, 20),
+                RecognizedLanguageTag: "ja-JP"),
+        ];
+
+        string source = LanguageSelectionHelper.ResolveOcrAwareSourceLanguage(lines, "en-US");
+
+        Assert.AreEqual("en-US", source);
+    }
 }

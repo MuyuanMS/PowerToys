@@ -82,6 +82,29 @@ public static class OcrLanguageSelectionHelper
         return candidates;
     }
 
+    public static IReadOnlyList<string> GetRelatedCjkLanguageCandidates(
+        IEnumerable<string> installedLanguageTags,
+        string requestedLanguageTag)
+    {
+        List<string> installed = installedLanguageTags?
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Select(tag => tag.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList() ?? new List<string>();
+        string? requested = ResolveInstalledTag(installed, requestedLanguageTag);
+        if (requested == null || !IsCjkLanguage(requested))
+        {
+            return Array.Empty<string>();
+        }
+
+        return installed
+            .Where(IsCjkLanguage)
+            .OrderBy(tag => string.Equals(tag, requested, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(tag => Array.FindIndex(PriorityLanguageTags, priority =>
+                string.Equals(GetPrimaryLanguage(priority), GetPrimaryLanguage(tag), StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+    }
+
     public static OcrLanguageScore ScoreRecognizedLines(
         string languageTag,
         IReadOnlyList<TranslationLine> lines,
@@ -232,6 +255,12 @@ public static class OcrLanguageSelectionHelper
     {
         int separator = languageTag.IndexOfAny(LanguageTagSeparators);
         return (separator > 0 ? languageTag[..separator] : languageTag).ToLowerInvariant();
+    }
+
+    private static bool IsCjkLanguage(string languageTag)
+    {
+        string primary = GetPrimaryLanguage(languageTag);
+        return primary is "ja" or "zh" or "ko";
     }
 
     private static bool IsLatin(char character)

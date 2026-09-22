@@ -297,12 +297,19 @@ public sealed partial class SelectionOverlay : TransparentWindow
                 recognizedLines,
                 TextBlockGroupingStrategy.Scored);
             Logger.LogInfo($"Grouped recognized text into {groupedLines.Count} layout blocks.");
+            string effectiveSourceLanguage = LanguageSelectionHelper.ResolveOcrAwareSourceLanguage(
+                groupedLines,
+                sourceLanguage);
+            if (!string.Equals(effectiveSourceLanguage, sourceLanguage, StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.LogInfo($"OCR detected '{effectiveSourceLanguage}' instead of configured CJK source '{sourceLanguage}'.");
+            }
 
             processingOverlay.UpdateStatus("Translating text...");
             Logger.LogInfo($"Translating {groupedLines.Count} layout blocks with provider {_translationProvider.ProviderId}.");
             TranslationResult result = await TranslateLinesAsync(
                 groupedLines,
-                sourceLanguage,
+                effectiveSourceLanguage,
                 targetLanguage,
                 _secondaryTargetLanguage,
                 cancellationTokenSource.Token);
@@ -339,7 +346,7 @@ public sealed partial class SelectionOverlay : TransparentWindow
                     styledLines,
                     capturedSnapshot,
                     _freezeCapturedContentByDefault,
-                    sourceLanguage,
+                    effectiveSourceLanguage,
                     targetLanguage,
                     _secondaryTargetLanguage,
                     (lines, newSource, newTarget, newSecondaryTarget) => TranslateLinesAsync(lines, newSource, newTarget, newSecondaryTarget),

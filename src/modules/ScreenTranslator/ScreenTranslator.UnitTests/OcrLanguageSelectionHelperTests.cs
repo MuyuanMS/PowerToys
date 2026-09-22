@@ -14,6 +14,7 @@ public class OcrLanguageSelectionHelperTests
 {
     private static readonly string[] ExpectedPreferredThenPriorityCandidates = { "fr-FR", "ja-JP", "zh-Hans", "ko-KR" };
     private static readonly string[] ExpectedBoundedPreferredCandidates = { "fr-FR", "de-DE", "es-ES" };
+    private static readonly string[] ExpectedRelatedCjkCandidates = { "zh-Hans", "ja-JP", "ko-KR" };
 
     [TestMethod]
     public void ScoreRecognizedLines_FavorsJapaneseForPlausibleJapaneseText()
@@ -62,6 +63,28 @@ public class OcrLanguageSelectionHelperTests
     }
 
     [TestMethod]
+    public void SelectBestScore_PrefersJapaneseWhenChineseRecognizerDropsKana()
+    {
+        var japaneseLines = new List<TranslationLine>
+        {
+            new("カタカナとひらがな東京", new PhysicalRect(0, 0, 220, 24), 0.9),
+        };
+        var chineseLines = new List<TranslationLine>
+        {
+            new("東京", new PhysicalRect(0, 0, 60, 24), 0.9),
+        };
+
+        OcrLanguageScore selected = OcrLanguageSelectionHelper.SelectBestScore(
+            new[]
+            {
+                OcrLanguageSelectionHelper.ScoreRecognizedLines("zh-Hans", chineseLines, 0),
+                OcrLanguageSelectionHelper.ScoreRecognizedLines("ja-JP", japaneseLines, 1),
+            });
+
+        Assert.AreEqual("ja-JP", selected.LanguageTag);
+    }
+
+    [TestMethod]
     public void GetAutoLanguageCandidates_OrdersPreferredThenPriorityAndDeduplicates()
     {
         string[] installed = { "en-US", "ja-JP", "zh-Hans", "ko-KR", "fr-FR" };
@@ -101,5 +124,19 @@ public class OcrLanguageSelectionHelperTests
             preferred);
 
         CollectionAssert.AreEqual(installed, new List<string>(candidates));
+    }
+
+    [TestMethod]
+    public void GetRelatedCjkLanguageCandidates_PutsRequestedLanguageFirst()
+    {
+        string[] installed = { "en-US", "zh-Hans", "ja-JP", "ko-KR" };
+
+        IReadOnlyList<string> candidates = OcrLanguageSelectionHelper.GetRelatedCjkLanguageCandidates(
+            installed,
+            "zh-Hans");
+
+        CollectionAssert.AreEqual(
+            ExpectedRelatedCjkCandidates,
+            new List<string>(candidates));
     }
 }
