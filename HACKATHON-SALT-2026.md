@@ -9,36 +9,46 @@ This branch combines four experimental projects for the September 2026 booth:
 
 The integration branch is `muyuanli/hackathonsalt2026`.
 
-## Automated x64 Debug setup
+## Automated dependency setup
 
 Prerequisites:
 
-- Windows x64 in a local interactive session; do not test the virtual display through RDP.
-- Visual Studio with the PowerToys native and managed build prerequisites.
-- Git and the .NET 10 SDK.
-- Exit any installed or development PowerToys instance before launching this build.
+- Windows x64 or ARM64.
+- Git.
+- For `-Build`: Visual Studio with the PowerToys native and managed build prerequisites, plus the .NET 10 SDK.
 
 From the repository root:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\build\prepare-hackathon-salt-2026.ps1 -InstallRust -StageZoomItDriver
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\build\prepare-hackathon-salt-2026.ps1 -InstallRust
 ```
 
 The script:
 
 1. Installs/selects Rust 1.93 through `rustup`.
 2. Clones `shuaiyuanxx/mxc` branch `codex/try-run-policy-bridge` and checks out the required commit `3eef7d60ce35d4d0ba568ddd0a9108beadb35b9a`.
-3. Downloads and verifies the pinned ZoomIt virtual-display driver package.
-4. Requests one UAC approval to stage the signed driver INF. This does not create a display device or change Windows security settings.
-5. Restores the isolated PowerScripts projects.
-6. Builds only the affected projects, Runner, and Settings for x64 Debug.
 
-Add `-IncludeWslc` to build Try Run with its optional WSLC image helper. WSL 2.9.9 or newer must already be installed and compatible; the script does not enable Windows features or update WSL.
-
-After closing other PowerToys instances, the script can launch the integrated build:
+It does **not** build PowerToys by default. To run the targeted Debug build, specify the platform explicitly:
 
 ```powershell
-.\tools\build\prepare-hackathon-salt-2026.ps1 -LaunchPowerToys
+.\tools\build\prepare-hackathon-salt-2026.ps1 -Build -Platform x64
+.\tools\build\prepare-hackathon-salt-2026.ps1 -Build -Platform ARM64
+```
+
+The build option restores the isolated PowerScripts projects and builds only the affected projects, Runner, and Settings. Add `-IncludeWslc` to build Try Run with its optional WSLC image helper. WSL 2.9.9 or newer must already be installed and compatible; the script does not enable Windows features or update WSL.
+
+The experimental ZoomIt virtual-display driver is currently **x64-only**. On an x64 machine, prepare and stage it with:
+
+```powershell
+.\tools\build\prepare-hackathon-salt-2026.ps1 -PrepareZoomItDriver -StageZoomItDriver
+```
+
+This requests one UAC approval to stage the signed driver INF. It does not create a display device or change Windows security settings.
+
+After closing other PowerToys instances, the script can launch an existing Debug build:
+
+```powershell
+.\tools\build\prepare-hackathon-salt-2026.ps1 -LaunchPowerToys -Platform x64
 ```
 
 MXC is stored by default under:
@@ -77,6 +87,8 @@ Build Try Run with the pinned checkout:
 The remaining affected projects are listed in `tools\build\prepare-hackathon-salt-2026.ps1`.
 
 ## Booth testing
+
+The booth build validated for this branch is x64 Debug. The script forwards `-Platform ARM64` to the targeted PowerToys builds, but that combination has not been booth-validated. The ZoomIt virtual-display-driver experiment is unavailable on ARM64.
 
 ### ZoomIt virtual region mirror
 

@@ -3,21 +3,24 @@
 
 <#
 .SYNOPSIS
-Prepares and builds the PowerToys Hackathon SALT 2026 integration branch.
+Prepares dependencies for the PowerToys Hackathon SALT 2026 integration branch.
 
 .DESCRIPTION
 Pins Shawn's MXC fork and Rust toolchain, prepares the ZoomIt virtual-display
-driver, restores the isolated PowerScripts prototype, and builds the affected
-x64 Debug projects. Use -StageZoomItDriver to request the one required UAC
-prompt and -LaunchPowerToys to start the completed build.
+driver when requested, and can optionally build the affected Debug projects.
+Use -Build to compile, -StageZoomItDriver to request the required UAC prompt,
+and -LaunchPowerToys to start an existing build.
 #>
 [CmdletBinding()]
 param(
     [string] $MxcRoot = (Join-Path $env:LOCALAPPDATA 'PowerToysHackathonDependencies\mxc'),
+    [ValidateSet('x64', 'ARM64')]
+    [string] $Platform = 'x64',
     [switch] $InstallRust,
+    [switch] $PrepareZoomItDriver,
     [switch] $StageZoomItDriver,
     [switch] $IncludeWslc,
-    [switch] $SkipBuild,
+    [switch] $Build,
     [switch] $LaunchPowerToys
 )
 
@@ -66,8 +69,14 @@ function Initialize-Rust {
             throw "rustup is required. Re-run with -InstallRust or install it from https://rustup.rs/."
         }
 
+        $rustTarget = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq [System.Runtime.InteropServices.Architecture]::Arm64) {
+            'aarch64-pc-windows-msvc'
+        } else {
+            'x86_64-pc-windows-msvc'
+        }
         $rustupInstaller = Join-Path $env:TEMP 'rustup-init.exe'
-        Invoke-WebRequest -Uri 'https://win.rustup.rs/x86_64' -OutFile $rustupInstaller -UseBasicParsing
+        $rustupUri = "https://static.rust-lang.org/rustup/dist/$rustTarget/rustup-init.exe"
+        Invoke-WebRequest -Uri $rustupUri -OutFile $rustupInstaller -UseBasicParsing
         Invoke-NativeCommand $rustupInstaller '-y' '--profile' 'minimal' '--default-toolchain' $rustToolchain
         $env:PATH = "$cargoBin;$env:PATH"
     }
@@ -144,7 +153,7 @@ function Build-Directory {
     )
 
     Write-Host "`n=== Building $Path ===" -ForegroundColor Cyan
-    & $buildScript -Platform x64 -Configuration Debug -Path $Path @ExtraArguments
+    & $buildScript -Platform $Platform -Configuration Debug -Path $Path @ExtraArguments
     if ($LASTEXITCODE -ne 0) {
         throw "Build failed for $Path."
     }
@@ -206,7 +215,7 @@ function Start-HackathonPowerToys {
         throw "PowerToys is already running. Exit it before using -LaunchPowerToys. Running paths: $paths"
     }
 
-    $powerToysPath = Join-Path $repoRoot 'x64\Debug\PowerToys.exe'
+    $powerToysPath = Join-Path $repoRoot "$Platform\Debug\PowerToys.exe"
     if (-not (Test-Path $powerToysPath -PathType Leaf)) {
         throw "The Debug runner was not found at $powerToysPath."
     }
@@ -221,12 +230,15 @@ function Start-HackathonPowerToys {
 }
 
 Assert-Command git
-Assert-Command dotnet
 Initialize-Rust
 Initialize-Mxc
-Prepare-ZoomItDriver
 
-if (-not $SkipBuild) {
+if ($PrepareZoomItDriver -or $StageZoomItDriver) {
+    Prepare-ZoomItDriver
+}
+
+if ($Build) {
+    Assert-Command dotnet
     Build-HackathonProjects
 }
 
@@ -235,5 +247,7 @@ if ($LaunchPowerToys) {
 }
 
 Write-Host "`nHackathon SALT 2026 setup completed." -ForegroundColor Green
-Write-Host "PowerToys Debug output: $(Join-Path $repoRoot 'x64\Debug')"
+if ($Build -or $LaunchPowerToys) {
+    Write-Host "PowerToys Debug output: $(Join-Path $repoRoot "$Platform\Debug")"
+}
 Write-Host "Pinned MXC checkout: $MxcRoot"
