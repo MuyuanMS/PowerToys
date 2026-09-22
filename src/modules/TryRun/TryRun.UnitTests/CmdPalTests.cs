@@ -37,9 +37,10 @@ public sealed class CmdPalTests
         var provider = new TryRunCommandsProvider();
         Assert.AreEqual("com.microsoft.powertoys.tryrun.development", provider.Id);
         var commands = provider.TopLevelCommands();
-        Assert.AreEqual(2, commands.Length);
+        Assert.AreEqual(3, commands.Length);
         Assert.AreEqual("Try Run", commands[0].Title);
         Assert.AreEqual("Try Run a file", commands[1].Title);
+        Assert.AreEqual("Try Run with a saved policy", commands[2].Title);
         var page = (IDynamicListPage)commands[1].Command;
         page.SearchText = "\"C:\\a folder\\脚本.ps1\"";
         Assert.AreEqual("C:\\a folder\\脚本.ps1", page.GetItems().Single().Subtitle);
