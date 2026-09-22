@@ -83,6 +83,8 @@ namespace KeyboardManagerEditorUI.Pages
 
         public ObservableCollection<ProgramShortcut> ProgramShortcuts { get; } = new();
 
+        public ObservableCollection<PowerScriptShortcut> PowerScriptShortcuts { get; } = new();
+
         public ObservableCollection<URLShortcut> UrlShortcuts { get; } = new();
 
         // Backing (unfiltered) source lists. The bound collections above are views onto these.
@@ -225,6 +227,7 @@ namespace KeyboardManagerEditorUI.Pages
                 TextMapping,
                 ProgramShortcut,
                 UrlShortcut,
+                PowerScriptShortcut,
             }
 
             public ItemType Type { get; set; }
@@ -440,6 +443,31 @@ namespace KeyboardManagerEditorUI.Pages
             await ShowRemappingDialog();
         }
 
+        private async void PowerScriptShortcutsList_ItemClick(object sender, ItemClickEventArgs e)
+        {
+            if (e.ClickedItem is not PowerScriptShortcut powerScriptShortcut)
+            {
+                return;
+            }
+
+            _isEditMode = true;
+            _editingItem = new EditingItem
+            {
+                Type = EditingItem.ItemType.PowerScriptShortcut,
+                Item = powerScriptShortcut,
+                OriginalTriggerKeys = powerScriptShortcut.Shortcut.ToList(),
+                AppName = powerScriptShortcut.AppName,
+                IsAllApps = true,
+            };
+
+            UnifiedMappingControl.Reset();
+            UnifiedMappingControl.SetTriggerKeys(powerScriptShortcut.Shortcut.ToList());
+            UnifiedMappingControl.SetActionType(UnifiedMappingControl.ActionType.PowerScript);
+            UnifiedMappingControl.SelectPowerScript(powerScriptShortcut.ScriptId);
+            RemappingDialog.Title = ResourceHelper.GetString("RemappingDialog_TitleEdit");
+            await ShowRemappingDialog();
+        }
+
         private async System.Threading.Tasks.Task ShowRemappingDialog()
         {
             RemappingDialog.PrimaryButtonClick += RemappingDialog_PrimaryButtonClick;
@@ -563,6 +591,10 @@ namespace KeyboardManagerEditorUI.Pages
                     triggerKeys, UnifiedMappingControl.GetProgramPath(), isAppSpecific, appName, _mappingService!, _isEditMode, editingId),
                 UnifiedMappingControl.ActionType.Disable => ValidationHelper.ValidateDisableMapping(
                     triggerKeys, isAppSpecific, appName, _mappingService!, _isEditMode, editingId),
+                UnifiedMappingControl.ActionType.PowerScript => UnifiedMappingControl.GetSelectedPowerScript() is null
+                    ? ValidationErrorType.EmptyProgramPath
+                    : ValidationHelper.ValidateAppMapping(
+                        triggerKeys, PowerScriptsCatalog.ResolveHostPath() ?? string.Empty, isAppSpecific, appName, _mappingService!, _isEditMode, editingId),
                 _ => ValidationErrorType.NoError,
             };
         }
@@ -634,6 +666,15 @@ namespace KeyboardManagerEditorUI.Pages
                     return false;
                 }
 
+                if (UnifiedMappingControl.CurrentActionType == UnifiedMappingControl.ActionType.PowerScript)
+                {
+                    var script = UnifiedMappingControl.GetSelectedPowerScript();
+                    if (script != null)
+                    {
+                        PowerScriptsCatalog.ApproveTrust(script.Id);
+                    }
+                }
+
                 KeyboardMappingService previousService = _mappingService;
                 _mappingService = candidateService;
                 candidateService = null;
@@ -701,6 +742,24 @@ namespace KeyboardManagerEditorUI.Pages
                     mapping.IfRunningAction = UnifiedMappingControl.GetIfRunningAction();
                     mapping.Visibility = UnifiedMappingControl.GetVisibility();
                     mapping.Elevation = UnifiedMappingControl.GetElevationLevel();
+                    break;
+
+                case UnifiedMappingControl.ActionType.PowerScript:
+                    var script = UnifiedMappingControl.GetSelectedPowerScript();
+                    string hostPath = PowerScriptsCatalog.ResolveHostPath() ?? string.Empty;
+                    if (script == null || string.IsNullOrEmpty(hostPath))
+                    {
+                        return null;
+                    }
+
+                    mapping.OperationType = ShortcutOperationType.RunProgram;
+                    mapping.ProgramPath = hostPath;
+                    mapping.ProgramArgs = $"run {script.Id} --no-consent";
+                    mapping.StartInDirectory = string.Empty;
+                    mapping.IfRunningAction = ProgramAlreadyRunningAction.StartAnother;
+                    mapping.Visibility = StartWindowType.Hidden;
+                    mapping.Elevation = ElevationLevel.NonElevated;
+                    mapping.TargetApp = string.Empty;
                     break;
 
                 case UnifiedMappingControl.ActionType.Disable:
@@ -831,6 +890,240 @@ namespace KeyboardManagerEditorUI.Pages
         {
             string originalKeysString = string.Join(";", originalKeys.Select(k => _mappingService!.GetKeyCodeFromName(k).ToString(CultureInfo.InvariantCulture)));
             return _mappingService!.DeleteShortcutMapping(originalKeysString, targetApp);
+        }
+
+        private bool SaveKeyOrShortcutMapping(List<string> triggerKeys)
+        {
+            List<string> actionKeys = UnifiedMappingControl.GetActionKeys();
+            if (actionKeys == null || actionKeys.Count == 0)
+            {
+                return false;
+            }
+
+            return RemappingHelper.SaveMapping(
+                _mappingService!,
+                triggerKeys,
+                actionKeys,
+                UnifiedMappingControl.GetIsAppSpecific(),
+                UnifiedMappingControl.GetAppName());
+        }
+
+        private bool SaveDisableMapping(List<string> triggerKeys)
+        {
+            bool isAppSpecific = UnifiedMappingControl.GetIsAppSpecific();
+            string appName = UnifiedMappingControl.GetAppName();
+
+            string originalKeysString = string.Join(
+                ";",
+                triggerKeys.Select(k => _mappingService!.GetKeyCodeFromName(k).ToString(System.Globalization.CultureInfo.InvariantCulture)));
+
+            var shortcutKeyMapping = new ShortcutKeyMapping
+            {
+                OperationType = ShortcutOperationType.RemapShortcut,
+                OriginalKeys = originalKeysString,
+                TargetKeys = VkDisabledString,
+                TargetApp = isAppSpecific ? appName : string.Empty,
+            };
+
+            if (triggerKeys.Count == 1)
+            {
+                int originalKey = _mappingService!.GetKeyCodeFromName(triggerKeys[0]);
+                if (originalKey == 0)
+                {
+                    return false;
+                }
+
+                shortcutKeyMapping.OriginalKeys = originalKey.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                _mappingService.AddSingleKeyMapping(originalKey, VkDisabled);
+            }
+            else
+            {
+                _mappingService!.AddShortcutMapping(
+                    originalKeysString,
+                    VkDisabledString,
+                    isAppSpecific ? appName : string.Empty);
+            }
+
+            SettingsManager.AddShortcutKeyMappingToSettings(shortcutKeyMapping);
+            return _mappingService.SaveSettings();
+        }
+
+        private bool SaveTextMapping(List<string> triggerKeys)
+        {
+            string textContent = UnifiedMappingControl.GetTextContent();
+            bool isAppSpecific = UnifiedMappingControl.GetIsAppSpecific();
+            string appName = UnifiedMappingControl.GetAppName();
+
+            if (string.IsNullOrEmpty(textContent))
+            {
+                return false;
+            }
+
+            return triggerKeys.Count == 1
+                ? SaveSingleKeyToTextMapping(triggerKeys[0], textContent, isAppSpecific, appName)
+                : SaveShortcutToTextMapping(triggerKeys, textContent, isAppSpecific, appName);
+        }
+
+        private bool SaveSingleKeyToTextMapping(string keyName, string textContent, bool isAppSpecific, string appName)
+        {
+            int originalKey = _mappingService!.GetKeyCodeFromName(keyName);
+            if (originalKey == 0)
+            {
+                return false;
+            }
+
+            var shortcutKeyMapping = new ShortcutKeyMapping
+            {
+                OperationType = ShortcutOperationType.RemapText,
+                OriginalKeys = originalKey.ToString(CultureInfo.InvariantCulture),
+                TargetKeys = textContent,
+                TargetText = textContent,
+                TargetApp = isAppSpecific ? appName : string.Empty,
+            };
+
+            bool saved = _mappingService.AddSingleKeyToTextMapping(originalKey, textContent);
+            if (saved)
+            {
+                _mappingService.SaveSettings();
+                SettingsManager.AddShortcutKeyMappingToSettings(shortcutKeyMapping);
+            }
+
+            return saved;
+        }
+
+        private bool SaveShortcutToTextMapping(List<string> triggerKeys, string textContent, bool isAppSpecific, string appName)
+        {
+            string originalKeysString = string.Join(";", triggerKeys.Select(k => _mappingService!.GetKeyCodeFromName(k).ToString(CultureInfo.InvariantCulture)));
+
+            var shortcutKeyMapping = new ShortcutKeyMapping
+            {
+                OperationType = ShortcutOperationType.RemapText,
+                OriginalKeys = originalKeysString,
+                TargetKeys = textContent,
+                TargetText = textContent,
+                TargetApp = isAppSpecific ? appName : string.Empty,
+            };
+
+            bool saved = isAppSpecific && !string.IsNullOrEmpty(appName)
+                ? _mappingService!.AddShortcutMapping(originalKeysString, textContent, appName, ShortcutOperationType.RemapText)
+                : _mappingService!.AddShortcutMapping(originalKeysString, textContent, operationType: ShortcutOperationType.RemapText);
+
+            if (saved)
+            {
+                _mappingService.SaveSettings();
+                SettingsManager.AddShortcutKeyMappingToSettings(shortcutKeyMapping);
+            }
+
+            return saved;
+        }
+
+        private bool SaveUrlMapping(List<string> triggerKeys)
+        {
+            string url = UnifiedMappingControl.GetUrl();
+            if (string.IsNullOrEmpty(url))
+            {
+                return false;
+            }
+
+            string originalKeysString = string.Join(";", triggerKeys.Select(k => _mappingService!.GetKeyCodeFromName(k).ToString(CultureInfo.InvariantCulture)));
+
+            var shortcutKeyMapping = new ShortcutKeyMapping
+            {
+                OperationType = ShortcutOperationType.OpenUri,
+                OriginalKeys = originalKeysString,
+                TargetKeys = originalKeysString,
+                UriToOpen = url,
+                TargetApp = UnifiedMappingControl.GetIsAppSpecific() ? UnifiedMappingControl.GetAppName() : string.Empty,
+            };
+
+            bool saved = _mappingService!.AddShortcutMapping(shortcutKeyMapping);
+            if (saved)
+            {
+                _mappingService.SaveSettings();
+                SettingsManager.AddShortcutKeyMappingToSettings(shortcutKeyMapping);
+            }
+
+            return saved;
+        }
+
+        private bool SaveProgramMapping(List<string> triggerKeys)
+        {
+            string programPath = UnifiedMappingControl.GetProgramPath();
+            if (string.IsNullOrEmpty(programPath))
+            {
+                return false;
+            }
+
+            string originalKeysString = string.Join(";", triggerKeys.Select(k => _mappingService!.GetKeyCodeFromName(k).ToString(CultureInfo.InvariantCulture)));
+
+            var shortcutKeyMapping = new ShortcutKeyMapping
+            {
+                OperationType = ShortcutOperationType.RunProgram,
+                OriginalKeys = originalKeysString,
+                TargetKeys = originalKeysString,
+                ProgramPath = programPath,
+                ProgramArgs = UnifiedMappingControl.GetProgramArgs(),
+                StartInDirectory = UnifiedMappingControl.GetStartInDirectory(),
+                IfRunningAction = UnifiedMappingControl.GetIfRunningAction(),
+                Visibility = UnifiedMappingControl.GetVisibility(),
+                Elevation = UnifiedMappingControl.GetElevationLevel(),
+                TargetApp = UnifiedMappingControl.GetIsAppSpecific() ? UnifiedMappingControl.GetAppName() : string.Empty,
+            };
+
+            bool saved = _mappingService!.AddShortcutMapping(shortcutKeyMapping);
+            if (saved)
+            {
+                _mappingService.SaveSettings();
+                SettingsManager.AddShortcutKeyMappingToSettings(shortcutKeyMapping);
+            }
+
+            return saved;
+        }
+
+        private bool SavePowerScriptMapping(List<string> triggerKeys)
+        {
+            var script = UnifiedMappingControl.GetSelectedPowerScript();
+            if (script is null)
+            {
+                return false;
+            }
+
+            string hostPath = PowerScriptsCatalog.ResolveHostPath() ?? string.Empty;
+            if (string.IsNullOrEmpty(hostPath))
+            {
+                return false;
+            }
+
+            string originalKeysString = string.Join(";", triggerKeys.Select(k => _mappingService!.GetKeyCodeFromName(k).ToString(CultureInfo.InvariantCulture)));
+
+            // Persisted as a "Run Program" mapping (the engine's execution primitive) but presented in
+            // the editor as a dedicated PowerScript action. Assigning the hotkey is explicit consent,
+            // so we record trust below and run non-interactively (--no-consent) — the engine launches
+            // the Host hidden, where a consent dialog could not be reliably shown.
+            var shortcutKeyMapping = new ShortcutKeyMapping
+            {
+                OperationType = ShortcutOperationType.RunProgram,
+                OriginalKeys = originalKeysString,
+                TargetKeys = originalKeysString,
+                ProgramPath = hostPath,
+                ProgramArgs = $"run {script.Id} --no-consent",
+                StartInDirectory = string.Empty,
+                IfRunningAction = ProgramAlreadyRunningAction.StartAnother,
+                Visibility = StartWindowType.Hidden,
+                Elevation = ElevationLevel.NonElevated,
+                TargetApp = string.Empty,
+            };
+
+            bool saved = _mappingService!.AddShortcutMapping(shortcutKeyMapping);
+            if (saved)
+            {
+                // Record trust for the script's current content so the engine can run it silently.
+                PowerScriptsCatalog.ApproveTrust(script.Id);
+                _mappingService.SaveSettings();
+                SettingsManager.AddShortcutKeyMappingToSettings(shortcutKeyMapping);
+            }
+
+            return saved;
         }
 
         #endregion
@@ -1059,6 +1352,7 @@ namespace KeyboardManagerEditorUI.Pages
             LoadRemappings();
             LoadTextMappings();
             LoadProgramShortcuts();
+            LoadPowerScriptShortcuts();
             LoadUrlShortcuts();
             RefreshAppFilterOptions();
             ApplyFilter();
@@ -1066,8 +1360,8 @@ namespace KeyboardManagerEditorUI.Pages
 
         private void UpdateHasAnyMappings()
         {
-            bool hasData = _allRemappings.Count > 0 || _allDisabled.Count > 0 || _allTextMappings.Count > 0 || _allProgramShortcuts.Count > 0 || _allUrlShortcuts.Count > 0;
-            bool hasVisible = RemappingList.Count > 0 || DisabledList.Count > 0 || TextMappings.Count > 0 || ProgramShortcuts.Count > 0 || UrlShortcuts.Count > 0;
+            bool hasData = _allRemappings.Count > 0 || _allDisabled.Count > 0 || _allTextMappings.Count > 0 || _allProgramShortcuts.Count > 0 || PowerScriptShortcuts.Count > 0 || _allUrlShortcuts.Count > 0;
+            bool hasVisible = RemappingList.Count > 0 || DisabledList.Count > 0 || TextMappings.Count > 0 || ProgramShortcuts.Count > 0 || PowerScriptShortcuts.Count > 0 || UrlShortcuts.Count > 0;
 
             HasAnyData = hasData;
             MappingState = !hasData ? "Empty" : (hasVisible ? "HasMappings" : "NoResults");
@@ -1181,6 +1475,14 @@ namespace KeyboardManagerEditorUI.Pages
                 }
 
                 ShortcutKeyMapping mapping = shortcutSettings.Shortcut;
+
+                // PowerScript hotkeys are stored as Run-Program mappings but shown in their own
+                // dedicated section, so skip them here.
+                if (PowerScriptsCatalog.IsPowerScriptProgramPath(mapping.ProgramPath))
+                {
+                    continue;
+                }
+
                 var originalKeyNames = ParseKeyCodes(mapping.OriginalKeys);
 
                 _allProgramShortcuts.Add(new ProgramShortcut
@@ -1198,6 +1500,47 @@ namespace KeyboardManagerEditorUI.Pages
                     Visibility = mapping.Visibility.ToString(),
                     TriggerKeyCodes = ParseVkCodes(mapping.OriginalKeys),
                     SearchableText = BuildSearchableText(originalKeyNames.Append(mapping.ProgramPath).Append(mapping.ProgramArgs).Append(mapping.TargetApp ?? string.Empty)),
+                });
+            }
+        }
+
+        private void LoadPowerScriptShortcuts()
+        {
+            SettingsManager.EditorSettings.ShortcutsByOperationType.TryGetValue(ShortcutOperationType.RunProgram, out var remapShortcutIds);
+
+            PowerScriptShortcuts.Clear();
+
+            if (remapShortcutIds == null)
+            {
+                return;
+            }
+
+            foreach (var id in remapShortcutIds)
+            {
+                ShortcutSettings shortcutSettings = SettingsManager.EditorSettings.ShortcutSettingsDictionary[id];
+                ShortcutKeyMapping mapping = shortcutSettings.Shortcut;
+
+                if (!PowerScriptsCatalog.IsPowerScriptProgramPath(mapping.ProgramPath))
+                {
+                    continue;
+                }
+
+                var scriptId = PowerScriptsCatalog.ParseScriptId(mapping.ProgramArgs);
+                if (string.IsNullOrEmpty(scriptId))
+                {
+                    continue;
+                }
+
+                var originalKeyNames = ParseKeyCodes(mapping.OriginalKeys);
+
+                PowerScriptShortcuts.Add(new PowerScriptShortcut
+                {
+                    Shortcut = originalKeyNames,
+                    ScriptId = scriptId,
+                    ScriptName = PowerScriptsCatalog.GetScriptName(scriptId),
+                    IsActive = shortcutSettings.IsActive,
+                    Id = shortcutSettings.Id,
+                    AppName = mapping.TargetApp ?? string.Empty,
                 });
             }
         }

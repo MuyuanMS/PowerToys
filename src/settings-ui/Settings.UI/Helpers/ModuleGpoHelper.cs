@@ -63,6 +63,7 @@ namespace Microsoft.PowerToys.Settings.UI.Helpers
                 ModuleType.AlwaysOnTop => typeof(AlwaysOnTopPage),
                 ModuleType.AutoHideCursor => typeof(MouseUtilsPage),
                 ModuleType.Awake => typeof(AwakePage),
+                ModuleType.PowerScripts => typeof(PowerScriptsPage),
                 ModuleType.CmdPal => typeof(CmdPalPage),
                 ModuleType.ColorPicker => typeof(ColorPickerPage),
                 ModuleType.CropAndLock => typeof(CropAndLockPage),

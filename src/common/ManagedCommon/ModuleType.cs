@@ -41,6 +41,7 @@ namespace ManagedCommon
         Workspaces,
         GrabAndMove,
         ZoomIt,
+        PowerScripts,
         GeneralSettings,
         TryRun,
     }

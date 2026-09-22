@@ -43,6 +43,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Helpers
                 ModuleType.PowerLauncher => "ms-appx:///Assets/Settings/Icons/PowerToysRun.png",
                 ModuleType.GeneralSettings => "ms-appx:///Assets/Settings/Icons/PowerToys.png",
                 ModuleType.TryRun => "ms-appx:///Assets/Settings/Icons/PowerToys.png",
+                ModuleType.PowerScripts => "ms-appx:///Assets/Settings/Icons/PowerToys.png",
                 _ => $"ms-appx:///Assets/Settings/Icons/{moduleType}.png",
             };
         }
@@ -87,6 +88,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Helpers
                 ModuleType.Workspaces => generalSettingsConfig.Enabled.Workspaces,
                 ModuleType.GrabAndMove => generalSettingsConfig.Enabled.GrabAndMove,
                 ModuleType.ZoomIt => generalSettingsConfig.Enabled.ZoomIt,
+                ModuleType.PowerScripts => generalSettingsConfig.Enabled.PowerScripts,
                 ModuleType.GeneralSettings => generalSettingsConfig.EnableQuickAccess,
                 _ => false,
             };
@@ -132,6 +134,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Helpers
                 case ModuleType.Workspaces: generalSettingsConfig.Enabled.Workspaces = isEnabled; break;
                 case ModuleType.GrabAndMove: generalSettingsConfig.Enabled.GrabAndMove = isEnabled; break;
                 case ModuleType.ZoomIt: generalSettingsConfig.Enabled.ZoomIt = isEnabled; break;
+                case ModuleType.PowerScripts: generalSettingsConfig.Enabled.PowerScripts = isEnabled; break;
                 case ModuleType.GeneralSettings: generalSettingsConfig.EnableQuickAccess = isEnabled; break;
             }
         }
@@ -180,6 +183,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Helpers
                 ModuleType.Workspaces => WorkspacesSettings.ModuleName,
                 ModuleType.GrabAndMove => GrabAndMoveSettings.ModuleName,
                 ModuleType.ZoomIt => ZoomItSettings.ModuleName,
+                ModuleType.PowerScripts => "PowerScripts", // Prototype: no dedicated settings class
                 _ => moduleType.ToString(),
             };
         }

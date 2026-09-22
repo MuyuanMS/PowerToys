@@ -364,6 +364,13 @@ namespace AdvancedPaste.ViewModels
                 _ => string.Empty,
             };
 
+        // Enumerates user-authored PowerScripts that opt into the Advanced Paste surface, so they appear
+        // alongside the built-in paste actions. Each script's own transform contract decides which
+        // clipboard formats enable it, and disabling PowerScripts hides them all.
+        private IEnumerable<PasteFormat> CreatePowerScriptPasteFormats() =>
+            PowerScriptsService.GetAdvancedPasteScripts()
+                               .Select(script => PasteFormat.CreatePowerScriptFormat(script.Id, script.Name, script.SupportedFormats, AvailableClipboardFormats));
+
         private void UpdateAIProviderActiveFlags()
         {
             var providers = _userSettings?.PasteAIConfiguration?.Providers;
@@ -431,7 +438,8 @@ namespace AdvancedPaste.ViewModels
 
             UpdateFormats(StandardPasteFormats, Enum.GetValues<PasteFormats>()
                                                     .Where(format => PasteFormat.MetadataDict[format].IsCoreAction || _userSettings.AdditionalActions.Contains(format))
-                                                    .Select(CreateStandardPasteFormat));
+                                                    .Select(CreateStandardPasteFormat)
+                                                    .Concat(CreatePowerScriptPasteFormats()));
 
             UpdateFormats(
                 CustomActionPasteFormats,
