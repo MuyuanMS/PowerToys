@@ -5,6 +5,7 @@
     xmlns:controls="using:Microsoft.PowerToys.Settings.UI.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:local="using:Microsoft.PowerToys.Settings.UI.Helpers"
+    xmlns:models="using:Microsoft.PowerToys.Settings.UI.Library"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:tkcontrols="using:CommunityToolkit.WinUI.Controls"
     xmlns:ui="using:CommunityToolkit.WinUI"
@@ -171,7 +172,15 @@
                             AutomationProperties.AutomationId="ScreenTranslatorSourceLanguageComboBox"
                             AutomationProperties.Name="Source Language"
                             ItemsSource="{x:Bind Path=ViewModel.AvailableSourceLanguages, Mode=OneWay}"
-                            SelectedIndex="{x:Bind Path=ViewModel.SourceLanguageIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            SelectedIndex="{x:Bind Path=ViewModel.SourceLanguageIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="models:ScreenTranslatorLanguageOption">
+                                    <TextBlock
+                                        Opacity="{x:Bind Opacity}"
+                                        Text="{x:Bind DisplayName}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
                     </tkcontrols:SettingsCard>
 
                     <tkcontrols:SettingsCard
@@ -183,6 +192,7 @@
                             MinWidth="{StaticResource SettingActionControlMinWidth}"
                             AutomationProperties.AutomationId="ScreenTranslatorTargetLanguageComboBox"
                             AutomationProperties.Name="Primary Translation Language"
+                            DisplayMemberPath="DisplayName"
                             ItemsSource="{x:Bind Path=ViewModel.AvailableTargetLanguages, Mode=OneWay}"
                             SelectedIndex="{x:Bind Path=ViewModel.TargetLanguageIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </tkcontrols:SettingsCard>
@@ -196,6 +206,7 @@
                             MinWidth="{StaticResource SettingActionControlMinWidth}"
                             AutomationProperties.AutomationId="ScreenTranslatorSecondaryTargetLanguageComboBox"
                             AutomationProperties.Name="Secondary Translation Language"
+                            DisplayMemberPath="DisplayName"
                             ItemsSource="{x:Bind Path=ViewModel.AvailableTargetLanguages, Mode=OneWay}"
                             SelectedIndex="{x:Bind Path=ViewModel.SecondaryTargetLanguageIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </tkcontrols:SettingsCard>

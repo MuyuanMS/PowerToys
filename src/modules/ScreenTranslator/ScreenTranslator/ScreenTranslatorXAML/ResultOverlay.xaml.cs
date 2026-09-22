@@ -9,6 +9,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using ManagedCommon;
 using Microsoft.PowerToys.Common.UI.Controls.Window;
+using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.UI;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Input;
@@ -26,6 +27,7 @@ using ScreenTranslator.Helpers;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Graphics;
 using Windows.Graphics.Imaging;
+using Windows.Media.Ocr;
 using WinUIEx;
 
 namespace ScreenTranslator;
@@ -94,6 +96,7 @@ public sealed partial class ResultOverlay : TransparentWindow
     private bool _isContextMenuAboveCard;
     private double _dpiScaleX;
     private double _dpiScaleY;
+    private bool _isClosed;
 
     public ResultOverlay(
         ScreenInfo screenInfo,
@@ -125,6 +128,7 @@ public sealed partial class ResultOverlay : TransparentWindow
         RootGrid.Loaded += RootGrid_Loaded;
         InitializeExternalActionAvailability();
         Closed += (_, _) => _textShareService.Close();
+        Closed += (_, _) => _isClosed = true;
 
         _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
 
@@ -166,10 +170,112 @@ public sealed partial class ResultOverlay : TransparentWindow
         RenderTranslatedBoxes();
         PositionCaptureRegionOutline();
         PositionToolbar();
+        InitializeLanguageSelectors();
         SelectLanguage(OverallSourceLanguageComboBox, sourceLanguage);
         SelectLanguage(OverallTargetLanguageComboBox, targetLanguage);
         SelectLanguage(OverallSecondaryTargetLanguageComboBox, secondaryTargetLanguage);
         _ = InitializeFrozenBackgroundAsync(capturedSnapshot, freezeCapturedContent);
+    }
+
+    private void InitializeLanguageSelectors()
+    {
+        ScreenTranslatorSettings? settings = null;
+        try
+        {
+            settings = SettingsUtils.Default.GetSettingsOrDefault<ScreenTranslatorSettings>("ScreenTranslator");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Failed to load language catalog settings: {ex.Message}");
+        }
+
+        IReadOnlyList<ScreenTranslatorLanguageOption> fallback =
+            ScreenTranslatorLanguageCatalog.CreateSystemFallback();
+        ApplyLanguageCatalog(fallback, IsCloudOcrEnabled(settings));
+        _ = RefreshLanguageSelectorsAsync(settings);
+    }
+
+    private async Task RefreshLanguageSelectorsAsync(ScreenTranslatorSettings? settings)
+    {
+        IReadOnlyList<ScreenTranslatorLanguageOption> languages =
+            await ScreenTranslatorLanguageCatalog.GetTranslationLanguagesAsync(
+                settings?.Properties?.SelectedProvider ?? "Passthrough",
+                settings?.Properties?.AzureEndpoint,
+                settings?.Properties?.LibreTranslateEndpoint);
+        if (!_isClosed)
+        {
+            ApplyLanguageCatalog(languages, IsCloudOcrEnabled(settings));
+        }
+    }
+
+    private void ApplyLanguageCatalog(
+        IReadOnlyList<ScreenTranslatorLanguageOption> translationLanguages,
+        bool cloudOcrEnabled)
+    {
+        IReadOnlyList<ScreenTranslatorLanguageOption> sourceLanguages =
+            ScreenTranslatorLanguageCatalog.CreateSourceOptions(
+                translationLanguages,
+                cloudOcrEnabled,
+                OcrEngine.AvailableRecognizerLanguages.Select(language => language.LanguageTag));
+
+        PopulateLanguageComboBox(OverallSourceLanguageComboBox, sourceLanguages, _sourceLanguage);
+        PopulateLanguageComboBox(CardSourceLanguageComboBox, sourceLanguages, _sourceLanguage);
+        PopulateLanguageComboBox(OverallTargetLanguageComboBox, translationLanguages, _targetLanguage);
+        PopulateLanguageComboBox(CardTargetLanguageComboBox, translationLanguages, _targetLanguage);
+        PopulateLanguageComboBox(
+            OverallSecondaryTargetLanguageComboBox,
+            translationLanguages,
+            _secondaryTargetLanguage);
+        PopulateLanguageComboBox(
+            CardSecondaryTargetLanguageComboBox,
+            translationLanguages,
+            _secondaryTargetLanguage);
+    }
+
+    private static void PopulateLanguageComboBox(
+        ComboBox comboBox,
+        IEnumerable<ScreenTranslatorLanguageOption> languages,
+        string selectedLanguage)
+    {
+        comboBox.Items.Clear();
+        foreach (ScreenTranslatorLanguageOption language in languages)
+        {
+            ComboBoxItem item = new()
+            {
+                Content = language.DisplayName,
+                Tag = language.Code,
+                IsEnabled = language.IsEnabled,
+            };
+            if (!language.IsEnabled)
+            {
+                ToolTipService.SetToolTip(item, "Install this Windows OCR language or use Azure Vision OCR.");
+            }
+
+            comboBox.Items.Add(item);
+        }
+
+        SelectLanguage(comboBox, selectedLanguage);
+        if (comboBox.SelectedIndex < 0)
+        {
+            SelectLanguage(comboBox, "auto");
+        }
+
+        if (comboBox.SelectedIndex < 0)
+        {
+            comboBox.SelectedIndex = comboBox.Items
+                .OfType<ComboBoxItem>()
+                .Select((item, index) => (item, index))
+                .FirstOrDefault(entry => entry.item.IsEnabled)
+                .index;
+        }
+    }
+
+    private static bool IsCloudOcrEnabled(ScreenTranslatorSettings? settings)
+    {
+        return string.Equals(
+            settings?.Properties?.OcrProvider,
+            "AzureVision",
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task InitializeFrozenBackgroundAsync(SoftwareBitmap capturedSnapshot, bool freezeCapturedContent)

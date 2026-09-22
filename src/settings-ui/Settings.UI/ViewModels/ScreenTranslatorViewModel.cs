@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -17,6 +18,7 @@ using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.PowerToys.Settings.UI.Library.Helpers;
 using Microsoft.PowerToys.Settings.UI.Library.Interfaces;
 using Microsoft.PowerToys.Settings.UI.SerializationContext;
+using Windows.Media.Ocr;
 using Windows.Security.Credentials;
 
 namespace Microsoft.PowerToys.Settings.UI.ViewModels
@@ -57,30 +59,10 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         public static readonly string[] ProviderKeys = ["Passthrough", "AzureTranslator", "LibreTranslate", "AcpAgent"];
 
-        public static readonly (string Code, string DisplayName)[] SupportedSourceLanguages =
-        [
-            ("auto", "Auto-detect / System"),
-            ("ja-JP", "Japanese (ja-JP)"),
-            ("zh-Hans", "Chinese Simplified (zh-Hans)"),
-            ("zh-Hant", "Chinese Traditional (zh-Hant)"),
-            ("en-US", "English (en-US)"),
-            ("ko-KR", "Korean (ko-KR)"),
-            ("fr-FR", "French (fr-FR)"),
-            ("de-DE", "German (de-DE)"),
-            ("es-ES", "Spanish (es-ES)"),
-        ];
+        private IReadOnlyList<ScreenTranslatorLanguageOption> _translationLanguages =
+            ScreenTranslatorLanguageCatalog.CreateSystemFallback();
 
-        public static readonly (string Code, string DisplayName)[] SupportedTargetLanguages =
-        [
-            ("en-US", "English (en-US)"),
-            ("ja-JP", "Japanese (ja-JP)"),
-            ("zh-Hans", "Chinese Simplified (zh-Hans)"),
-            ("zh-Hant", "Chinese Traditional (zh-Hant)"),
-            ("ko-KR", "Korean (ko-KR)"),
-            ("fr-FR", "French (fr-FR)"),
-            ("de-DE", "German (de-DE)"),
-            ("es-ES", "Spanish (es-ES)"),
-        ];
+        private System.Threading.CancellationTokenSource _languageCatalogCancellation;
 
         public ObservableCollection<string> AvailableProviders { get; } = new ObservableCollection<string>
         {
@@ -97,9 +79,9 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             "Azure AI Vision OCR (Cloud)",
         };
 
-        public ObservableCollection<string> AvailableSourceLanguages { get; } = new ObservableCollection<string>();
+        public ObservableCollection<ScreenTranslatorLanguageOption> AvailableSourceLanguages { get; } = new();
 
-        public ObservableCollection<string> AvailableTargetLanguages { get; } = new ObservableCollection<string>();
+        public ObservableCollection<ScreenTranslatorLanguageOption> AvailableTargetLanguages { get; } = new();
 
         public ScreenTranslatorViewModel(
             SettingsUtils settingsUtils,
@@ -127,17 +109,57 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         private void InitializeLanguageLists()
         {
-            AvailableSourceLanguages.Clear();
-            foreach (var lang in SupportedSourceLanguages)
+            ApplyLanguageCatalog(_translationLanguages);
+        }
+
+        public async Task RefreshLanguageCatalogAsync()
+        {
+            _languageCatalogCancellation?.Cancel();
+            _languageCatalogCancellation?.Dispose();
+            _languageCatalogCancellation = new System.Threading.CancellationTokenSource();
+            System.Threading.CancellationToken cancellationToken = _languageCatalogCancellation.Token;
+            try
             {
-                AvailableSourceLanguages.Add(lang.DisplayName);
+                IReadOnlyList<ScreenTranslatorLanguageOption> languages =
+                    await ScreenTranslatorLanguageCatalog.GetTranslationLanguagesAsync(
+                        _screenTranslatorSettings.Properties.SelectedProvider,
+                        _screenTranslatorSettings.Properties.AzureEndpoint,
+                        _screenTranslatorSettings.Properties.LibreTranslateEndpoint,
+                        cancellationToken: cancellationToken);
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    _translationLanguages = languages;
+                    ApplyLanguageCatalog(languages);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        private void ApplyLanguageCatalog(IReadOnlyList<ScreenTranslatorLanguageOption> languages)
+        {
+            AvailableTargetLanguages.Clear();
+            foreach (ScreenTranslatorLanguageOption language in languages)
+            {
+                AvailableTargetLanguages.Add(language);
             }
 
-            AvailableTargetLanguages.Clear();
-            foreach (var lang in SupportedTargetLanguages)
+            AvailableSourceLanguages.Clear();
+            bool cloudOcrEnabled = IsAzureVisionOcrSelected;
+            IEnumerable<string> installedOcrLanguages = OcrEngine.AvailableRecognizerLanguages
+                .Select(language => language.LanguageTag);
+            foreach (ScreenTranslatorLanguageOption language in ScreenTranslatorLanguageCatalog.CreateSourceOptions(
+                languages,
+                cloudOcrEnabled,
+                installedOcrLanguages))
             {
-                AvailableTargetLanguages.Add(lang.DisplayName);
+                AvailableSourceLanguages.Add(language);
             }
+
+            OnPropertyChanged(nameof(SourceLanguageIndex));
+            OnPropertyChanged(nameof(TargetLanguageIndex));
+            OnPropertyChanged(nameof(SecondaryTargetLanguageIndex));
         }
 
         private void InitializeEnabledValue()
@@ -275,6 +297,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                         OnPropertyChanged(nameof(IsLibreTranslateProviderSelected));
                         OnPropertyChanged(nameof(IsAcpAgentProviderSelected));
                         SaveAndNotifySettings();
+                        _ = RefreshLanguageCatalogAsync();
                     }
                 }
             }
@@ -304,6 +327,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                     OnPropertyChanged(nameof(SelectedOcrProviderIndex));
                     OnPropertyChanged(nameof(IsAzureVisionOcrSelected));
                     SaveAndNotifySettings();
+                    ApplyLanguageCatalog(_translationLanguages);
                 }
             }
         }
@@ -347,9 +371,9 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             get
             {
                 string code = _screenTranslatorSettings.Properties.SourceLanguage;
-                for (int i = 0; i < SupportedSourceLanguages.Length; i++)
+                for (int i = 0; i < AvailableSourceLanguages.Count; i++)
                 {
-                    if (string.Equals(SupportedSourceLanguages[i].Code, code, StringComparison.OrdinalIgnoreCase))
+                    if (ScreenTranslatorLanguageCatalog.AreEquivalentLanguageTags(AvailableSourceLanguages[i].Code, code))
                     {
                         return i;
                     }
@@ -360,9 +384,15 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
             set
             {
-                if (value >= 0 && value < SupportedSourceLanguages.Length)
+                if (value >= 0 && value < AvailableSourceLanguages.Count && !AvailableSourceLanguages[value].IsEnabled)
                 {
-                    string code = SupportedSourceLanguages[value].Code;
+                    OnPropertyChanged(nameof(SourceLanguageIndex));
+                    return;
+                }
+
+                if (value >= 0 && value < AvailableSourceLanguages.Count)
+                {
+                    string code = AvailableSourceLanguages[value].Code;
                     if (!string.Equals(_screenTranslatorSettings.Properties.SourceLanguage, code, StringComparison.Ordinal))
                     {
                         _screenTranslatorSettings.Properties.SourceLanguage = code;
@@ -378,9 +408,9 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             get
             {
                 string code = _screenTranslatorSettings.Properties.TargetLanguage;
-                for (int i = 0; i < SupportedTargetLanguages.Length; i++)
+                for (int i = 0; i < AvailableTargetLanguages.Count; i++)
                 {
-                    if (string.Equals(SupportedTargetLanguages[i].Code, code, StringComparison.OrdinalIgnoreCase))
+                    if (ScreenTranslatorLanguageCatalog.AreEquivalentLanguageTags(AvailableTargetLanguages[i].Code, code))
                     {
                         return i;
                     }
@@ -391,9 +421,9 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
             set
             {
-                if (value >= 0 && value < SupportedTargetLanguages.Length)
+                if (value >= 0 && value < AvailableTargetLanguages.Count)
                 {
-                    string code = SupportedTargetLanguages[value].Code;
+                    string code = AvailableTargetLanguages[value].Code;
                     if (!string.Equals(_screenTranslatorSettings.Properties.TargetLanguage, code, StringComparison.Ordinal))
                     {
                         _screenTranslatorSettings.Properties.TargetLanguage = code;
@@ -409,22 +439,22 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             get
             {
                 string code = _screenTranslatorSettings.Properties.SecondaryTargetLanguage;
-                for (int i = 0; i < SupportedTargetLanguages.Length; i++)
+                for (int i = 0; i < AvailableTargetLanguages.Count; i++)
                 {
-                    if (string.Equals(SupportedTargetLanguages[i].Code, code, StringComparison.OrdinalIgnoreCase))
+                    if (ScreenTranslatorLanguageCatalog.AreEquivalentLanguageTags(AvailableTargetLanguages[i].Code, code))
                     {
                         return i;
                     }
                 }
 
-                return 2;
+                return FindLanguageIndex(AvailableTargetLanguages, "zh-Hans");
             }
 
             set
             {
-                if (value >= 0 && value < SupportedTargetLanguages.Length)
+                if (value >= 0 && value < AvailableTargetLanguages.Count)
                 {
-                    string code = SupportedTargetLanguages[value].Code;
+                    string code = AvailableTargetLanguages[value].Code;
                     if (!string.Equals(_screenTranslatorSettings.Properties.SecondaryTargetLanguage, code, StringComparison.Ordinal))
                     {
                         _screenTranslatorSettings.Properties.SecondaryTargetLanguage = code;
@@ -433,6 +463,23 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                     }
                 }
             }
+        }
+
+        private static int FindLanguageIndex(
+            IReadOnlyList<ScreenTranslatorLanguageOption> languages,
+            string languageCode)
+        {
+            for (int index = 0; index < languages.Count; index++)
+            {
+                if (ScreenTranslatorLanguageCatalog.AreEquivalentLanguageTags(
+                    languages[index].Code,
+                    languageCode))
+                {
+                    return index;
+                }
+            }
+
+            return 0;
         }
 
         public string AzureEndpoint
@@ -724,6 +771,8 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 if (disposing)
                 {
                     _delayedTimer?.Dispose();
+                    _languageCatalogCancellation?.Cancel();
+                    _languageCatalogCancellation?.Dispose();
                 }
 
                 _disposed = true;
