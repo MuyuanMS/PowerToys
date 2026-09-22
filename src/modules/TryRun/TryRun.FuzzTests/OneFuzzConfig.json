@@ -1,0 +1,80 @@
+{
+  "configVersion": 3,
+  "entries": [
+    {
+      "fuzzer": {
+        "$type": "libfuzzerDotNet",
+        "dll": "TryRun.FuzzTests.dll",
+        "class": "PowerToys.TryRun.FuzzTests.CmdPalHandoffFuzzer",
+        "method": "FuzzTarget",
+        "FuzzingTargetBinaries": ["TryRun.Core.dll"]
+      },
+      "skip": true,
+      "rebootAfterSetup": false,
+      "oneFuzzJobs": [
+        { "projectName": "PowerToys", "targetName": "TryRun-cmdpal-handoff" }
+      ],
+      "jobDependencies": ["TryRun.FuzzTests.dll", "TryRun.FuzzTests.pdb", "TryRun.Core.dll"]
+    },
+    {
+      "fuzzer": {
+        "$type": "libfuzzerDotNet",
+        "dll": "TryRun.FuzzTests.dll",
+        "class": "PowerToys.TryRun.FuzzTests.IsolationReportFuzzer",
+        "method": "FuzzTarget",
+        "FuzzingTargetBinaries": ["TryRun.Core.dll"]
+      },
+      "skip": true,
+      "rebootAfterSetup": false,
+      "oneFuzzJobs": [
+        { "projectName": "PowerToys", "targetName": "TryRun-isolation-reports" }
+      ],
+      "jobDependencies": ["TryRun.FuzzTests.dll", "TryRun.FuzzTests.pdb", "TryRun.Core.dll"]
+    },
+    {
+      "fuzzer": {
+        "$type": "libfuzzerDotNet",
+        "dll": "TryRun.FuzzTests.dll",
+        "class": "PowerToys.TryRun.FuzzTests.RequestFuzzer",
+        "method": "FuzzTarget",
+        "FuzzingTargetBinaries": ["TryRun.Core.dll"]
+      },
+      "skip": true,
+      "rebootAfterSetup": false,
+      "oneFuzzJobs": [
+        { "projectName": "PowerToys", "targetName": "TryRun-request-parser" }
+      ],
+      "jobDependencies": ["TryRun.FuzzTests.dll", "TryRun.FuzzTests.pdb", "TryRun.Core.dll"]
+    },
+    {
+      "fuzzer": {
+        "$type": "libfuzzerDotNet",
+        "dll": "TryRun.FuzzTests.dll",
+        "class": "PowerToys.TryRun.FuzzTests.WorkspaceFuzzer",
+        "method": "FuzzTarget",
+        "FuzzingTargetBinaries": ["TryRun.Core.dll"]
+      },
+      "skip": true,
+      "rebootAfterSetup": false,
+      "oneFuzzJobs": [
+        { "projectName": "PowerToys", "targetName": "TryRun-workspace-paths-preview" }
+      ],
+      "jobDependencies": ["TryRun.FuzzTests.dll", "TryRun.FuzzTests.pdb", "TryRun.Core.dll"]
+    },
+    {
+      "fuzzer": {
+        "$type": "libfuzzerDotNet",
+        "dll": "TryRun.FuzzTests.dll",
+        "class": "PowerToys.TryRun.FuzzTests.WorkspaceFuzzer",
+        "method": "FileRoundTrip",
+        "FuzzingTargetBinaries": ["TryRun.Core.dll"]
+      },
+      "skip": true,
+      "rebootAfterSetup": false,
+      "oneFuzzJobs": [
+        { "projectName": "PowerToys", "targetName": "TryRun-file-round-trip" }
+      ],
+      "jobDependencies": ["TryRun.FuzzTests.dll", "TryRun.FuzzTests.pdb", "TryRun.Core.dll"]
+    }
+  ]
+}

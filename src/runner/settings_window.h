@@ -39,6 +39,7 @@ enum class ESettingsWindowNames
     PowerDisplay,
     GrabAndMove,
     ScreenTranslator,
+    TryRun,
 };
 
 std::string ESettingsWindowNames_to_string(ESettingsWindowNames value);

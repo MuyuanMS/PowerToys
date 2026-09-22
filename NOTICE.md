@@ -12,7 +12,48 @@ This software incorporates material from third parties.
 - Peek
 - PowerDisplay
 - Registry Preview
+- Try Run (experimental developer prototype)
 - ZoomIt
+
+## Utility: Try Run (experimental developer prototype)
+
+### Microsoft eXecution Container (MXC)
+
+**Source**: <https://github.com/microsoft/mxc>
+
+The optional developer execution worker links the C# SDK and native libraries
+from MXC revision `3eef7d60ce35d4d0ba568ddd0a9108beadb35b9a`. These are not included
+in the PowerToys installer. Production redistribution also requires an inventory
+and review of the native build's transitive dependencies and their notices.
+
+The optional WSLC-enabled developer build also stages `wxc-exec.exe` and
+`wxc-wslc-daemon.exe` from the same MXC revision, plus `wslcsdk.dll` from
+Microsoft.WSL.Containers 2.9.9 (MIT, copyright Microsoft Corporation), obtained
+and hash-verified by MXC's build. Source: <https://github.com/microsoft/WSL>.
+Container images are prepared separately by the user and are not redistributed
+with PowerToys.
+
+MIT License
+
+Copyright (c) Microsoft Corporation.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ## Utility: Color Picker
 

@@ -828,6 +828,8 @@ std::string ESettingsWindowNames_to_string(ESettingsWindowNames value)
         return "GrabAndMove";
     case ESettingsWindowNames::ScreenTranslator:
         return "ScreenTranslator";
+    case ESettingsWindowNames::TryRun:
+        return "TryRun";
     default:
     {
         Logger::error(L"Can't convert ESettingsWindowNames value={} to string", static_cast<int>(value));
@@ -978,6 +980,10 @@ ESettingsWindowNames ESettingsWindowNames_from_string(std::string value)
     else if (value == "ScreenTranslator")
     {
         return ESettingsWindowNames::ScreenTranslator;
+    }
+    else if (value == "TryRun")
+    {
+        return ESettingsWindowNames::TryRun;
     }
     else
     {

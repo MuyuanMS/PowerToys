@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="$(RepoRoot)src\Common.Dotnet.props" />
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsTestProject>true</IsTestProject>
+    <EnableMSTestRunner>false</EnableMSTestRunner>
+    <RootNamespace>PowerToys.TryRun.UnitTests</RootNamespace>
+    <OutputPath>$(RepoRoot)$(Platform)\$(Configuration)\tests\TryRun.UnitTests\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="..\policy-coverage.json" Link="policy-coverage.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\mxc-version.txt" Link="mxc-version.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(MxcRoot)\schemas\dev\mxc-config.schema.0.9.0-alpha.json" Link="mxc-contract.schema.json" CopyToOutputDirectory="PreserveNewest" Condition="'$(MxcRoot)' != ''" />
+    <PackageReference Include="MSTest" />
+    <ProjectReference Include="..\TryRun.Core\TryRun.Core.csproj" />
+    <ProjectReference Include="..\TryRun.CmdPal\TryRun.CmdPal.csproj" />
+    <ProjectReference Include="..\TryRun\TryRun.csproj" />
+    <ProjectReference Include="..\TryRun.Explorer\TryRun.Explorer.csproj" />
+    <ProjectReference Include="..\TryRun.FuzzTests\TryRun.FuzzTests.csproj" />
+  </ItemGroup>
+</Project>
