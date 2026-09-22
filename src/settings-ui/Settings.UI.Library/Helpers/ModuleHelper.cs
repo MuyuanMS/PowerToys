@@ -16,6 +16,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Helpers
                 ModuleType.PowerAccent => "QuickAccent/ModuleTitle",
                 ModuleType.PowerOCR => "TextExtractor/ModuleTitle",
                 ModuleType.AutoHideCursor => "MouseUtils_AutoHideCursor/Header",
+                ModuleType.ScreenTranslator => "ScreenTranslator/ModuleTitle",
                 ModuleType.FindMyMouse => "MouseUtils_FindMyMouse/Header",
                 ModuleType.MouseHighlighter => "MouseUtils_MouseHighlighter/Header",
                 ModuleType.MouseJump => "MouseUtils_MouseJump/Header",
@@ -35,6 +36,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Helpers
                 ModuleType.AutoHideCursor => "ms-appx:///Assets/Settings/Icons/MouseUtils.png",
                 ModuleType.Workspaces => "ms-appx:///Assets/Settings/Icons/Workspaces.png",
                 ModuleType.PowerOCR => "ms-appx:///Assets/Settings/Icons/TextExtractor.png",
+                ModuleType.ScreenTranslator => "ms-appx:///Assets/Settings/Icons/TextExtractor.png",
                 ModuleType.PowerAccent => "ms-appx:///Assets/Settings/Icons/QuickAccent.png",
                 ModuleType.MousePointerCrosshairs => "ms-appx:///Assets/Settings/Icons/MouseCrosshairs.png",
                 ModuleType.MeasureTool => "ms-appx:///Assets/Settings/Icons/ScreenRuler.png",
@@ -78,6 +80,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Helpers
                 ModuleType.MeasureTool => generalSettingsConfig.Enabled.MeasureTool,
                 ModuleType.ShortcutGuide => generalSettingsConfig.Enabled.ShortcutGuide,
                 ModuleType.PowerOCR => generalSettingsConfig.Enabled.PowerOcr,
+                ModuleType.ScreenTranslator => generalSettingsConfig.Enabled.ScreenTranslator,
                 ModuleType.PowerDisplay => generalSettingsConfig.Enabled.PowerDisplay,
                 ModuleType.Workspaces => generalSettingsConfig.Enabled.Workspaces,
                 ModuleType.GrabAndMove => generalSettingsConfig.Enabled.GrabAndMove,
@@ -121,6 +124,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Helpers
                 case ModuleType.MeasureTool: generalSettingsConfig.Enabled.MeasureTool = isEnabled; break;
                 case ModuleType.ShortcutGuide: generalSettingsConfig.Enabled.ShortcutGuide = isEnabled; break;
                 case ModuleType.PowerOCR: generalSettingsConfig.Enabled.PowerOcr = isEnabled; break;
+                case ModuleType.ScreenTranslator: generalSettingsConfig.Enabled.ScreenTranslator = isEnabled; break;
                 case ModuleType.PowerDisplay: generalSettingsConfig.Enabled.PowerDisplay = isEnabled; break;
                 case ModuleType.Workspaces: generalSettingsConfig.Enabled.Workspaces = isEnabled; break;
                 case ModuleType.GrabAndMove: generalSettingsConfig.Enabled.GrabAndMove = isEnabled; break;
@@ -168,6 +172,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library.Helpers
                 ModuleType.MeasureTool => MeasureToolSettings.ModuleName,
                 ModuleType.ShortcutGuide => ShortcutGuideSettings.ModuleName,
                 ModuleType.PowerOCR => PowerOcrSettings.ModuleName,
+                ModuleType.ScreenTranslator => ScreenTranslatorSettings.ModuleName,
                 ModuleType.Workspaces => WorkspacesSettings.ModuleName,
                 ModuleType.GrabAndMove => GrabAndMoveSettings.ModuleName,
                 ModuleType.ZoomIt => ZoomItSettings.ModuleName,

@@ -43,6 +43,7 @@ namespace Common.UI
             NewPlus,
             CmdPal,
             ZoomIt,
+            ScreenTranslator,
         }
 
         private static string SettingsWindowNameToString(SettingsWindow value)
@@ -109,6 +110,8 @@ namespace Common.UI
                     return "CmdPal";
                 case SettingsWindow.ZoomIt:
                     return "ZoomIt";
+                case SettingsWindow.ScreenTranslator:
+                    return "ScreenTranslator";
                 default:
                     {
                         return string.Empty;
