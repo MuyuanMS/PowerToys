@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.Collections.Generic;
 
 namespace KeyboardManagerEditorUI.Helpers
@@ -27,5 +28,11 @@ namespace KeyboardManagerEditorUI.Helpers
         public string Id { get; set; } = string.Empty;
 
         public string AppName { get; set; } = string.Empty;
+
+        public bool IsAllApps { get; set; } = true;
+
+        public IReadOnlyList<int> TriggerKeyCodes { get; set; } = Array.Empty<int>();
+
+        public string SearchableText { get; set; } = string.Empty;
     }
 }
