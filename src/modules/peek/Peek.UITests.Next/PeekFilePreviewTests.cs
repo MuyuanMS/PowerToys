@@ -296,6 +296,55 @@ public class PeekFilePreviewTests : UITestBase
             "The default program did not open the ZIP archive after pressing Enter.");
     }
 
+    [TestMethod("Peek.ShortcutPreview.ToggleTarget")]
+    [TestCategory("Shortcut preview")]
+    public void TestShortcutPreviewTogglesBetweenTargetAndShortcut()
+    {
+        var testDirectory = Directory.CreateTempSubdirectory("PeekShortcutPreview");
+        var targetPath = Path.Combine(testDirectory.FullName, "target.txt");
+        var shortcutPath = Path.Combine(testDirectory.FullName, "shortcut.lnk");
+        File.WriteAllText(targetPath, "shortcut preview target");
+
+        var shellType = Type.GetTypeFromProgID("WScript.Shell");
+        Assert.IsNotNull(shellType, "The Windows Script Host COM server is required to create shortcuts for this test.");
+        dynamic shell = Activator.CreateInstance(shellType);
+        dynamic shortcut = shell.CreateShortcut(shortcutPath);
+        shortcut.TargetPath = targetPath;
+        shortcut.Save();
+
+        try
+        {
+            var peekWindow = OpenPeekWindow(shortcutPath);
+
+            Assert.IsTrue(
+                TitleMatchesName(peekWindow.WindowTitle, Path.GetFileName(targetPath)),
+                $"Peek should show the shortcut target by default, but the title was '{peekWindow.WindowTitle}'.");
+
+            var toggleButton = peekWindow.Find<Button>(By.AccessibilityId("ShortcutPreviewButton"), 5_000);
+            toggleButton.Invoke();
+            Assert.IsTrue(
+                SpinWait.SpinUntil(
+                    () => TitleMatchesName(peekWindow.WindowTitle, Path.GetFileName(shortcutPath)),
+                    5_000),
+                $"Peek should show the shortcut after toggling, but the title was '{peekWindow.WindowTitle}'.");
+
+            toggleButton.Invoke();
+            Assert.IsTrue(
+                SpinWait.SpinUntil(
+                    () => TitleMatchesName(peekWindow.WindowTitle, Path.GetFileName(targetPath)),
+                    5_000),
+                $"Peek should return to the target after toggling back, but the title was '{peekWindow.WindowTitle}'.");
+        }
+        finally
+        {
+            CloseTestWindows();
+            if (Directory.Exists(testDirectory.FullName))
+            {
+                Directory.Delete(testDirectory.FullName, recursive: true);
+            }
+        }
+    }
+
     [TestMethod("Peek.FileNavigation.SwitchFilesWithArrowKeys")]
     [TestCategory("File Navigation")]
     public void TestSwitchFilesWithArrowKeys()
