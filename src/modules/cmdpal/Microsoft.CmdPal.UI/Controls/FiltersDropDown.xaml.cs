@@ -87,6 +87,7 @@ public sealed partial class FiltersDropDown : UserControl,
     public bool IsFilterVisible => ViewModel?.ShouldShowFilters ?? false;
 
     private static readonly string _defaultFilterText = ResourceLoaderInstance.GetString("FiltersDropDown_DefaultText");
+    private static readonly string _filterAccessKey = ResourceLoaderInstance.GetString("FiltersDropDown/AccessKey");
 
     public FiltersDropDown()
     {
@@ -348,7 +349,7 @@ public sealed partial class FiltersDropDown : UserControl,
     private void FilterFlyout_Closed(object sender, object e)
     {
         _isDropDownOpen = false;
-        FilterDropDownButton.AccessKey = "F";
+        FilterDropDownButton.AccessKey = _filterAccessKey;
         _pendingSearchText = null;
         FilterSearchBox.Text = string.Empty;
     }

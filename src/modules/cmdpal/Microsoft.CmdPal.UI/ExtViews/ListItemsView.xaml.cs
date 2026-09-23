@@ -225,7 +225,7 @@ public sealed partial class ListItemsView : UserControl,
             return;
         }
 
-        var targets = NumberedItemShortcuts.GetTargets(viewModel.FilteredItems, static item => item.IsInteractive);
+        var targets = GetNumberedShortcutTargets(viewModel);
         if (shortcut.Index >= targets.Count)
         {
             return;
@@ -1155,6 +1155,112 @@ public sealed partial class ListItemsView : UserControl,
     private void NumberedShortcutCueScrollViewer_ViewChanged(object? sender, ScrollViewerViewChangedEventArgs e) =>
         QueueNumberedShortcutCueUpdate();
 
+    private IReadOnlyList<ListItemViewModel> GetNumberedShortcutTargets(ListViewModel viewModel)
+    {
+        if (!ShowNumberedShortcutCues)
+        {
+            return NumberedItemShortcuts.GetTargets(viewModel.FilteredItems, static item => item.IsInteractive);
+        }
+
+        if (!_isLoaded)
+        {
+            return [];
+        }
+
+        EnsureNumberedShortcutCueTracking();
+        if (ItemView.ItemsPanelRoot is not { } panel)
+        {
+            return [];
+        }
+
+        var targets = new List<ListItemViewModel>(NumberedItemShortcuts.ShortcutCount);
+        foreach (var child in panel.Children)
+        {
+            if (child is not SelectorItem container ||
+                ItemView.ItemFromContainer(container) is not ListItemViewModel item ||
+                !item.IsInteractive ||
+                !TryGetVisibleNumberedShortcutContainer(item, out _))
+            {
+                continue;
+            }
+
+            targets.Add(item);
+            if (targets.Count == NumberedItemShortcuts.ShortcutCount)
+            {
+                break;
+            }
+        }
+
+        return targets;
+    }
+
+    private bool TryGetVisibleNumberedShortcutContainer(ListItemViewModel item, out SelectorItem? container)
+    {
+        container = null;
+        var itemView = ItemView;
+        if (itemView.ContainerFromItem(item) is not SelectorItem { IsLoaded: true, Content: ListItemViewModel containerItem, ActualWidth: > 0, ActualHeight: > 0 } candidate ||
+            !ReferenceEquals(containerItem, item))
+        {
+            return false;
+        }
+
+        if (_numberedShortcutCueScrollViewer is null ||
+            !ReferenceEquals(_numberedShortcutCueTrackedView, itemView))
+        {
+            var currentScrollViewer = FindScrollViewer(itemView);
+            if (ReferenceEquals(_numberedShortcutCueTrackedView, itemView))
+            {
+                AttachNumberedShortcutCueScrollViewer(currentScrollViewer);
+            }
+            else
+            {
+                if (!IsVisibleInScrollViewer(candidate, currentScrollViewer))
+                {
+                    return false;
+                }
+
+                container = candidate;
+                return true;
+            }
+        }
+
+        var scrollViewer = _numberedShortcutCueScrollViewer;
+        if (!IsVisibleInScrollViewer(candidate, scrollViewer))
+        {
+            return false;
+        }
+
+        container = candidate;
+        return true;
+    }
+
+    private static bool IsVisibleInScrollViewer(SelectorItem candidate, ScrollViewer? scrollViewer)
+    {
+        if (scrollViewer is null || scrollViewer.ViewportWidth <= 0 || scrollViewer.ViewportHeight <= 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            var transform = candidate.TransformToVisual(scrollViewer);
+            var topLeft = transform.TransformPoint(default);
+            var bottomRight = transform.TransformPoint(new Point(candidate.ActualWidth, candidate.ActualHeight));
+            if (bottomRight.X <= 0 || bottomRight.Y <= 0 ||
+                topLeft.X >= scrollViewer.ViewportWidth ||
+                topLeft.Y >= scrollViewer.ViewportHeight)
+            {
+                return false;
+            }
+
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
     private void UpdateNumberedShortcutCues()
     {
         if (!_areNumberedShortcutCuesVisible || !ShowNumberedShortcutCues || ViewModel is null)
@@ -1174,17 +1280,13 @@ public sealed partial class ListItemsView : UserControl,
         }
 
         ClearNumberedShortcutAccelerators();
+        var targets = GetNumberedShortcutTargets(ViewModel);
         var cueIndex = 0;
-        foreach (var item in ViewModel.FilteredItems)
+        foreach (var item in targets)
         {
-            if (!item.IsInteractive)
-            {
-                continue;
-            }
-
             var cue = _numberedShortcutCues![cueIndex];
-            if (itemView.ContainerFromItem(item) is SelectorItem container &&
-                container.ContentTemplateRoot is FrameworkElement anchor)
+            if (TryGetVisibleNumberedShortcutContainer(item, out var container) &&
+                container?.ContentTemplateRoot is FrameworkElement anchor)
             {
                 SetNumberedShortcutAccelerator(container, cueIndex);
                 PositionNumberedShortcutCue(cue, anchor, itemView);
