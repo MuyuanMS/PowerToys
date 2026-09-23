@@ -1204,12 +1204,38 @@ public sealed partial class ListItemsView : UserControl,
             return false;
         }
 
-        if (_numberedShortcutCueScrollViewer is null)
+        if (_numberedShortcutCueScrollViewer is null ||
+            !ReferenceEquals(_numberedShortcutCueTrackedView, itemView))
         {
-            AttachNumberedShortcutCueScrollViewer(FindScrollViewer(itemView));
+            var currentScrollViewer = FindScrollViewer(itemView);
+            if (ReferenceEquals(_numberedShortcutCueTrackedView, itemView))
+            {
+                AttachNumberedShortcutCueScrollViewer(currentScrollViewer);
+            }
+            else
+            {
+                if (!IsVisibleInScrollViewer(candidate, currentScrollViewer))
+                {
+                    return false;
+                }
+
+                container = candidate;
+                return true;
+            }
         }
 
         var scrollViewer = _numberedShortcutCueScrollViewer;
+        if (!IsVisibleInScrollViewer(candidate, scrollViewer))
+        {
+            return false;
+        }
+
+        container = candidate;
+        return true;
+    }
+
+    private static bool IsVisibleInScrollViewer(SelectorItem candidate, ScrollViewer? scrollViewer)
+    {
         if (scrollViewer is null || scrollViewer.ViewportWidth <= 0 || scrollViewer.ViewportHeight <= 0)
         {
             return false;
@@ -1227,7 +1253,6 @@ public sealed partial class ListItemsView : UserControl,
                 return false;
             }
 
-            container = candidate;
             return true;
         }
         catch (ArgumentException)
