@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Globalization;
 using System.IO;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -82,7 +83,7 @@ namespace Peek.Common.UnitTests
             var targetResult = ShortcutHelper.TryGetTargetPath(shortcutPath);
 
             Assert.IsNotNull(targetResult);
-            Assert.AreEqual(targetPath, targetResult, true);
+            Assert.AreEqual(targetPath, targetResult, true, CultureInfo.InvariantCulture);
         }
 
         /// <summary>
@@ -101,7 +102,7 @@ namespace Peek.Common.UnitTests
             var targetResult = ShortcutHelper.TryGetTargetPath(shortcutPath);
 
             Assert.IsNotNull(targetResult);
-            Assert.AreEqual(targetPath, targetResult, true);
+            Assert.AreEqual(targetPath, targetResult, true, CultureInfo.InvariantCulture);
         }
 
         /// <summary>
@@ -121,7 +122,7 @@ namespace Peek.Common.UnitTests
             var targetResult = ShortcutHelper.TryGetTargetPath(secondShortcutPath);
 
             Assert.IsNotNull(targetResult);
-            Assert.AreEqual(targetPath, targetResult, true);
+            Assert.AreEqual(targetPath, targetResult, true, CultureInfo.InvariantCulture);
         }
 
         /// <summary>
