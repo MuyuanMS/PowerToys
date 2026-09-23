@@ -1168,10 +1168,30 @@ public sealed partial class ListItemsView : UserControl,
         }
 
         EnsureNumberedShortcutCueTracking();
-        return NumberedItemShortcuts.GetTargets(
-            viewModel.FilteredItems,
-            static item => item.IsInteractive,
-            item => TryGetVisibleNumberedShortcutContainer(item, out _));
+        if (ItemView.ItemsPanelRoot is not { } panel)
+        {
+            return [];
+        }
+
+        var targets = new List<ListItemViewModel>(NumberedItemShortcuts.ShortcutCount);
+        foreach (var child in panel.Children)
+        {
+            if (child is not SelectorItem container ||
+                ItemView.ItemFromContainer(container) is not ListItemViewModel item ||
+                !item.IsInteractive ||
+                !TryGetVisibleNumberedShortcutContainer(item, out _))
+            {
+                continue;
+            }
+
+            targets.Add(item);
+            if (targets.Count == NumberedItemShortcuts.ShortcutCount)
+            {
+                break;
+            }
+        }
+
+        return targets;
     }
 
     private bool TryGetVisibleNumberedShortcutContainer(ListItemViewModel item, out SelectorItem? container)
