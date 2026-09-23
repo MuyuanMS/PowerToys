@@ -1,7 +1,9 @@
-﻿// Copyright (c) Microsoft Corporation
+// Copyright (c) Microsoft Corporation
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Globalization;
+using System.IO;
 using System.Net.Http;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -40,6 +42,10 @@ namespace Microsoft.PowerToys.PreviewHandler.Svg
         /// WebView2 Environment
         /// </summary>
         private CoreWebView2Environment _webView2Environment;
+
+        private FileStream _cacheLease;
+
+        private string _transientFilePath = string.Empty;
 
         /// <summary>
         /// Name of the virtual host
@@ -106,7 +112,7 @@ namespace Microsoft.PowerToys.PreviewHandler.Svg
                 return;
             }
 
-            CleanupWebView2UserDataFolder();
+            EnsureWebView2UserDataFolder();
 
             string svgData = null;
             bool blocked = false;
@@ -251,21 +257,46 @@ namespace Microsoft.PowerToys.PreviewHandler.Svg
                     _browser.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
                     _browser.CoreWebView2.WebResourceRequested += CoreWebView2_BlockExternalResources;
 
-                    string generatedPreview = _previewGenerator.GeneratePreview(svgData);
+                    var settings = new SvgHTMLPreviewGenerator.SettingsSnapshot(
+                        _settings.ColorMode,
+                        _settings.SolidColor,
+                        _settings.ThemeColor,
+                        _settings.CheckeredShade);
+                    var cacheKey = SvgPreviewCacheHelper.BuildCacheKey(
+                        "v2",
+                        VirtualHostName,
+                        svgData,
+                        settings.ColorMode.ToString(CultureInfo.InvariantCulture),
+                        settings.ThemeColor.ToArgb().ToString(CultureInfo.InvariantCulture),
+                        settings.SolidColor.ToArgb().ToString(CultureInfo.InvariantCulture),
+                        settings.CheckeredShade.ToString(CultureInfo.InvariantCulture));
 
-                    // WebView2.NavigateToString() limitation
-                    // See https://learn.microsoft.com/dotnet/api/microsoft.web.webview2.core.corewebview2.navigatetostring?view=webview2-dotnet-1.0.864.35#remarks
-                    // While testing the limit, it turned out it is ~1.5MB, so to be on a safe side we go for 1.5m bytes
-                    if (generatedPreview.Length > 1_500_000)
+                    var cacheFolder = SvgPreviewCacheHelper.GetCacheFolderPath(_webView2UserDataFolder);
+                    if (SvgPreviewCacheHelper.TryGetCacheFile(cacheFolder, cacheKey, out var cacheFilePath, out var cacheLease))
                     {
-                        string filename = _webView2UserDataFolder + "\\" + Guid.NewGuid().ToString() + ".html";
-                        File.WriteAllText(filename, generatedPreview);
-                        _localFileURI = new Uri(filename);
+                        TrackCacheResources(cacheLease, string.Empty);
+                        _localFileURI = new Uri(cacheFilePath);
                         _browser.Source = _localFileURI;
                     }
                     else
                     {
-                        _browser.NavigateToString(generatedPreview);
+                        string generatedPreview = _previewGenerator.GeneratePreview(svgData, settings);
+                        if (SvgPreviewCacheHelper.TryWriteCacheFileAtomic(cacheFolder, cacheKey, generatedPreview, out cacheFilePath, out cacheLease))
+                        {
+                            TrackCacheResources(cacheLease, string.Empty);
+                            _localFileURI = new Uri(cacheFilePath);
+                            _browser.Source = _localFileURI;
+                        }
+                        else if (SvgPreviewCacheHelper.TryWriteTransientFile(_webView2UserDataFolder, generatedPreview, out var transientFilePath))
+                        {
+                            TrackCacheResources(null, transientFilePath);
+                            _localFileURI = new Uri(transientFilePath);
+                            _browser.Source = _localFileURI;
+                        }
+                        else
+                        {
+                            _browser.NavigateToString(generatedPreview);
+                        }
                     }
 
                     Controls.Add(_browser);
@@ -316,23 +347,43 @@ namespace Microsoft.PowerToys.PreviewHandler.Svg
         }
 
         /// <summary>
-        /// Cleanup the previously created tmp html files from svg files bigger than 2MB.
+        /// Ensures the WebView2 user-data and SVG preview cache folders exist.
         /// </summary>
-        private void CleanupWebView2UserDataFolder()
+        private void EnsureWebView2UserDataFolder()
         {
-            try
-            {
-                // Cleanup temp dir
-                var dir = new DirectoryInfo(_webView2UserDataFolder);
+            SvgPreviewCacheHelper.EnsureCacheFolder(_webView2UserDataFolder);
+        }
 
-                foreach (var file in dir.EnumerateFiles("*.html"))
-                {
-                    file.Delete();
-                }
-            }
-            catch (Exception)
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
             {
+                ReleaseCacheResources();
             }
+
+            base.Dispose(disposing);
+        }
+
+        private void TrackCacheResources(FileStream cacheLease, string transientFilePath)
+        {
+            ReleaseCacheResources();
+            _cacheLease = cacheLease;
+            _transientFilePath = transientFilePath;
+            _browser.NavigationCompleted += Browser_NavigationCompleted;
+        }
+
+        private void Browser_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs args)
+        {
+            _browser.NavigationCompleted -= Browser_NavigationCompleted;
+            ReleaseCacheResources();
+        }
+
+        private void ReleaseCacheResources()
+        {
+            _cacheLease?.Dispose();
+            _cacheLease = null;
+            SvgPreviewCacheHelper.DeleteTransientFile(_transientFilePath);
+            _transientFilePath = string.Empty;
         }
     }
 }
