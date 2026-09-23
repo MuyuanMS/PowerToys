@@ -27,6 +27,8 @@ public class IconPathConverterTests
         var bitmap = prepared.SoftwareBitmap;
         Assert.IsTrue(bitmap.PixelWidth > 0);
         Assert.IsTrue(bitmap.PixelHeight > 0);
+        Assert.AreEqual(32, bitmap.PixelWidth);
+        Assert.AreEqual(32, bitmap.PixelHeight);
         Assert.AreEqual(BitmapPixelFormat.Bgra8, bitmap.BitmapPixelFormat);
         Assert.AreEqual(BitmapAlphaMode.Premultiplied, bitmap.BitmapAlphaMode);
 

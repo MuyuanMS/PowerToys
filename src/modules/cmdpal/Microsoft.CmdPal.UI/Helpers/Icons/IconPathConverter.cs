@@ -137,13 +137,15 @@ internal static partial class IconPathConverter
         nint iconHandle = 0;
         try
         {
+            var requestedSize = (uint)Math.Clamp(targetSize, 0, ushort.MaxValue);
+            var packedIconSize = requestedSize | (requestedSize << 16);
             _ = NativeMethods.SHDefExtractIcon(
                 iconReference.Path,
                 iconReference.Index,
                 0,
                 out iconHandle,
                 0,
-                (uint)targetSize);
+                packedIconSize);
             if (iconHandle == 0)
             {
                 return null;
