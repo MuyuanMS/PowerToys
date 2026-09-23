@@ -239,10 +239,10 @@ public:
                 archSubdir = L"ARM64";
 #endif
                 auto msix = package::FindMsixFile(installationFolder + L"\\WinUI3Apps\\CmdPal\\AppPackages\\Microsoft.CmdPal.UI_0.0.1.0_Debug_Test\\", false);
-                auto dependencies = package::FindMsixFile(installationFolder + L"\\WinUI3Apps\\CmdPal\\AppPackages\\Microsoft.CmdPal.UI_0.0.1.0_Debug_Test\\Dependencies\\" + archSubdir + L"\\", true);
+                std::vector<std::wstring> dependencies;
 #else
                 auto msix = package::FindMsixFile(installationFolder + L"\\WinUI3Apps\\CmdPal\\", false);
-                auto dependencies = package::FindMsixFile(installationFolder + L"\\WinUI3Apps\\CmdPal\\Dependencies\\", true);
+                std::vector<std::wstring> dependencies;
 #endif
 
                 if (!msix.empty())
