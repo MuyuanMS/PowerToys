@@ -319,10 +319,10 @@ public class WorkspacesEditingPageTests : WorkspacesUiAutomationBase
         Thread.Sleep(1000);
 
         // Verify we're back at main list
-        Assert.IsTrue(Has<Custom>("WorkspacesList"), "Should return to main list after saving");
+        Assert.IsTrue(Has<Element>("WorkspacesList"), "Should return to main list after saving");
 
         // Verify workspace was renamed
-        var workspacesList = Find<Custom>("WorkspacesList");
+        var workspacesList = Find<Element>("WorkspacesList");
         var renamedWorkspace = workspacesList.Find<Custom>(By.Name(newName), timeoutMS: 2000);
         Assert.IsNotNull(renamedWorkspace, "Workspace should be renamed in the list");
     }
@@ -345,11 +345,11 @@ public class WorkspacesEditingPageTests : WorkspacesUiAutomationBase
         Thread.Sleep(1000);
 
         // Verify returned to main list without saving
-        Assert.IsTrue(Has<Custom>("WorkspacesList"), "Should return to main list");
+        Assert.IsTrue(Has<Element>("WorkspacesList"), "Should return to main list");
 
         // Go back to editing
-        var workspacesList = Find<Custom>("WorkspacesList");
-        var workspace = workspacesList.FindAll<Custom>(By.ClassName("WorkspaceItem"))[0];
+        var workspacesList = Find<Element>("WorkspacesList");
+        var workspace = workspacesList.FindAll<Element>(By.AccessibilityId("WorkspaceItem"))[0];
         workspace.Click();
         Thread.Sleep(1000);
 
@@ -366,7 +366,7 @@ public class WorkspacesEditingPageTests : WorkspacesUiAutomationBase
         Thread.Sleep(1000);
 
         // Verify saved
-        workspacesList = Find<Custom>("WorkspacesList");
+        workspacesList = Find<Element>("WorkspacesList");
         var savedWorkspace = workspacesList.Find<Custom>(By.Name(tempName), timeoutMS: 2000);
         Assert.IsNotNull(savedWorkspace, "Workspace should be saved with new name");
     }
@@ -404,10 +404,10 @@ public class WorkspacesEditingPageTests : WorkspacesUiAutomationBase
         }
 
         // Verify returned to main list
-        Assert.IsTrue(Has<Custom>("WorkspacesList"), "Should return to main list");
+        Assert.IsTrue(Has<Element>("WorkspacesList"), "Should return to main list");
 
         // Verify changes weren't saved
-        var workspacesList = Find<Custom>("WorkspacesList");
+        var workspacesList = Find<Element>("WorkspacesList");
         var unsavedWorkspace = workspacesList.Find<Custom>(By.Name(originalName + "_unsaved"), timeoutMS: 1000);
         Assert.IsNull(unsavedWorkspace, "Unsaved changes should not persist");
     }
@@ -556,19 +556,19 @@ public class WorkspacesEditingPageTests : WorkspacesUiAutomationBase
     private void NavigateToEditingPage()
     {
         // Ensure we have at least one workspace
-        if (!Has<Custom>("WorkspacesList", timeoutMS: 1000))
+        if (!Has<Element>("WorkspacesList", timeoutMS: 1000))
         {
             CreateTestWorkspace();
         }
 
         // Click on first workspace to edit
-        var workspacesList = Find<Custom>("WorkspacesList");
-        var workspaceItems = workspacesList.FindAll<Custom>(By.ClassName("WorkspaceItem"));
+        var workspacesList = Find<Element>("WorkspacesList");
+        var workspaceItems = workspacesList.FindAll<Element>(By.AccessibilityId("WorkspaceItem"));
 
         if (workspaceItems.Count == 0)
         {
             CreateTestWorkspace();
-            workspaceItems = workspacesList.FindAll<Custom>(By.ClassName("WorkspaceItem"));
+            workspaceItems = workspacesList.FindAll<Element>(By.AccessibilityId("WorkspaceItem"));
         }
 
         workspaceItems[0].Click();
