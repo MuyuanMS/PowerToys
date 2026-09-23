@@ -314,7 +314,7 @@ public class PeekFilePreviewTests : UITestBase
 
         try
         {
-            var peekWindow = OpenPeekWindow(shortcutPath);
+            var peekWindow = OpenPeekWindow(shortcutPath, targetPath);
 
             Assert.IsTrue(
                 SpinWait.SpinUntil(
@@ -324,18 +324,15 @@ public class PeekFilePreviewTests : UITestBase
 
             var toggleButton = peekWindow.Find<Button>(By.AccessibilityId("ShortcutPreviewButton"), 5_000);
             toggleButton.Invoke();
-            Assert.IsTrue(
-                SpinWait.SpinUntil(
-                    () => TitleMatchesName(peekWindow.WindowTitle, Path.GetFileName(shortcutPath)),
-                    5_000),
-                $"Peek should show the shortcut after toggling, but the title was '{peekWindow.WindowTitle}'.");
+            var shortcutWindow = WaitForPeekWindow(shortcutPath, PeekWindowTimeoutMS);
+            Assert.IsNotNull(shortcutWindow, "Peek should show the shortcut after toggling.");
+            peekWindow = shortcutWindow;
 
+            toggleButton = peekWindow.Find<Button>(By.AccessibilityId("ShortcutPreviewButton"), 5_000);
             toggleButton.Invoke();
-            Assert.IsTrue(
-                SpinWait.SpinUntil(
-                    () => TitleMatchesName(peekWindow.WindowTitle, Path.GetFileName(targetPath)),
-                    5_000),
-                $"Peek should return to the target after toggling back, but the title was '{peekWindow.WindowTitle}'.");
+            var targetWindow = WaitForPeekWindow(targetPath, PeekWindowTimeoutMS);
+            Assert.IsNotNull(targetWindow, "Peek should return to the target after toggling back.");
+            peekWindow = targetWindow;
         }
         finally
         {
@@ -406,7 +403,7 @@ public class PeekFilePreviewTests : UITestBase
             $"Peek should visit every selected file and no unselected files. Visited: {string.Join(", ", visitedNames)}.");
     }
 
-    private Session OpenPeekWindow(string filePath)
+    private Session OpenPeekWindow(string filePath, string? expectedPreviewPath = null)
     {
         OpenExplorerAndSelect(filePath);
 
@@ -414,7 +411,7 @@ public class PeekFilePreviewTests : UITestBase
         {
             try
             {
-                var peekWindow = SendPeekHotkeyWithRetry(filePath);
+                var peekWindow = SendPeekHotkeyWithRetry(expectedPreviewPath ?? filePath);
                 EnsurePeekReady(peekWindow);
                 return peekWindow;
             }
