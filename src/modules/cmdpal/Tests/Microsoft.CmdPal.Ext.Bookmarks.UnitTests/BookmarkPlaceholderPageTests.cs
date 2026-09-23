@@ -106,5 +106,4 @@ public sealed class BookmarkPlaceholderPageTests
             new PlaceholderParser(),
             launchBookmark ?? (_ => true));
     }
-
 }
