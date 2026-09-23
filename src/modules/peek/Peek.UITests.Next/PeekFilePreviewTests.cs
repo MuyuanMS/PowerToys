@@ -317,7 +317,9 @@ public class PeekFilePreviewTests : UITestBase
             var peekWindow = OpenPeekWindow(shortcutPath);
 
             Assert.IsTrue(
-                TitleMatchesName(peekWindow.WindowTitle, Path.GetFileName(targetPath)),
+                SpinWait.SpinUntil(
+                    () => TitleMatchesName(peekWindow.WindowTitle, Path.GetFileName(targetPath)),
+                    5_000),
                 $"Peek should show the shortcut target by default, but the title was '{peekWindow.WindowTitle}'.");
 
             var toggleButton = peekWindow.Find<Button>(By.AccessibilityId("ShortcutPreviewButton"), 5_000);
