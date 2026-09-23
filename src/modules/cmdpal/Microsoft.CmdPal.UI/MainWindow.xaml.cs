@@ -29,6 +29,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
 using Windows.ApplicationModel.Activation;
+using Windows.ApplicationModel.Core;
 using Windows.Foundation;
 using Windows.Graphics;
 using Windows.System;
@@ -84,6 +85,7 @@ public sealed partial class MainWindow : WindowEx,
     private bool _allowBreakthroughShortcut;
     private bool _suppressDpiChange;
     private bool _themeServiceInitialized;
+    private bool _isRestarting;
 
     // The snapshot of settings last consumed by HotReloadSettings. Used to skip redundant
     // hot-reloads when a SettingsChanged notification touches settings this window doesn't
@@ -1169,6 +1171,66 @@ public sealed partial class MainWindow : WindowEx,
 
     internal void MainWindow_Closed(object sender, WindowEventArgs args)
     {
+        SaveWindowPosition();
+
+        var extensionServices = App.Current.Services.GetServices<IExtensionService>();
+        foreach (var extensionService in extensionServices)
+        {
+            extensionService.SignalStopAsync();
+        }
+
+        App.Current.Services.GetService<TrayIconService>()!.Destroy();
+
+        // WinUI bug is causing a crash on shutdown when FailFastOnErrors is set to true (#51773592).
+        // Workaround by turning it off before shutdown.
+        App.Current.DebugSettings.FailFastOnErrors = false;
+        _localKeyboardListener.Dispose();
+        DisposeAcrylic();
+
+        _keyboardListener.Stop();
+        Environment.Exit(0);
+    }
+
+    internal async Task<AppRestartFailureReason> RestartAsync()
+    {
+        if (_isRestarting)
+        {
+            return AppRestartFailureReason.RestartPending;
+        }
+
+        SaveWindowPosition();
+        var services = App.Current.Services;
+        var trayIcon = services.GetRequiredService<TrayIconService>();
+        _isRestarting = true;
+        try
+        {
+            try
+            {
+                await Task.Run(() => Task.WhenAll(services.GetServices<IExtensionService>().Select(service => service.SignalStopAsync())))
+                    .WaitAsync(TimeSpan.FromSeconds(5));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Failed to stop extensions before restarting Command Palette", ex);
+            }
+
+            trayIcon.Destroy();
+            _keyboardListener.Stop();
+            return AppInstance.Restart("--settings");
+        }
+        finally
+        {
+            _isRestarting = false;
+
+            // A successful restart terminates this process. Restore services if it returns or throws.
+            _keyboardListener.Start();
+            trayIcon.SetupTrayIcon();
+            WeakReferenceMessenger.Default.Send<ReloadCommandsMessage>();
+        }
+    }
+
+    private void SaveWindowPosition()
+    {
         var serviceProvider = App.Current.Services;
 
         if (!_isLoadedFromDock)
@@ -1187,23 +1249,6 @@ public sealed partial class MainWindow : WindowEx,
                 settingsService.UpdateSettings(s => s with { LastWindowPosition = _currentWindowPosition });
             }
         }
-
-        var extensionServices = serviceProvider.GetServices<IExtensionService>();
-        foreach (var extensionService in extensionServices)
-        {
-            extensionService.SignalStopAsync();
-        }
-
-        App.Current.Services.GetService<TrayIconService>()!.Destroy();
-
-        // WinUI bug is causing a crash on shutdown when FailFastOnErrors is set to true (#51773592).
-        // Workaround by turning it off before shutdown.
-        App.Current.DebugSettings.FailFastOnErrors = false;
-        _localKeyboardListener.Dispose();
-        DisposeAcrylic();
-
-        _keyboardListener.Stop();
-        Environment.Exit(0);
     }
 
     private void DisposeAcrylic()
@@ -1468,33 +1513,47 @@ public sealed partial class MainWindow : WindowEx,
                 return;
             }
 
+            // AppLifecycle can supply arguments alone or a full command line. Parse every token as an
+            // argument so the first switch gets normal quoting rules; an executable path will not match.
+            if (activatedEventArgs.Kind == ExtendedActivationKind.Launch &&
+                activatedEventArgs.Data is ILaunchActivatedEventArgs launchArgs &&
+                CommandLineParser.ParseArguments(launchArgs.Arguments).Contains("--settings", StringComparer.Ordinal))
+            {
+                WeakReferenceMessenger.Default.Send(new OpenSettingsMessage());
+                return;
+            }
+
             if (activatedEventArgs.Kind == ExtendedActivationKind.Protocol)
             {
                 if (activatedEventArgs.Data is IProtocolActivatedEventArgs protocolArgs &&
                     _protocolActivation.TryParse(protocolArgs.Uri, out var route))
                 {
-                    switch (route)
+                    switch (CmdPalProtocolPolicy.Evaluate(route))
                     {
-                        case CmdPalProtocolRoute.Background:
-                            // we're running, we don't want to activate our window. bail
+                        case CmdPalProtocolAction.RunInBackground:
+                            // We're running, but this route intentionally does not activate a window.
                             return;
 
-                        case CmdPalProtocolRoute.OpenSettings openSettings:
+                        case CmdPalProtocolAction.OpenSettings openSettings:
                             WeakReferenceMessenger.Default.Send(openSettings.Message);
                             return;
 
-                        case CmdPalProtocolRoute.Reload:
+                        case CmdPalProtocolAction.RequestConsent requestConsent:
                             var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
-                            if (settings?.AllowExternalReload == true)
+                            if (settings.EnableExternalCommandLinks)
                             {
-                                Logger.LogInfo("External Reload triggered");
-                                WeakReferenceMessenger.Default.Send<ReloadCommandsMessage>(new());
+                                WeakReferenceMessenger.Default.Send(new ExternalCommandLinkRequestedMessage(requestConsent.Route));
                             }
                             else
                             {
-                                Logger.LogInfo("External Reload is disabled");
+                                Logger.LogInfo("External command links are disabled");
                             }
 
+                            return;
+
+                        case CmdPalProtocolAction.Reject:
+                        default:
+                            Logger.LogWarning("Ignoring an unsupported CmdPal protocol route.");
                             return;
                     }
                 }
