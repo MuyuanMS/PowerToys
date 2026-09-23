@@ -193,7 +193,7 @@ internal sealed partial class IconLoaderService : IIconLoaderService
         if (!string.IsNullOrEmpty(iconString))
         {
             var dispatcherEnqueuedAt = diagnostics?.BeginDispatcherWait(
-                IconLoadDiagnostics.ClassifyStringMaterialization(iconString)) ?? 0;
+                IconDispatcherMaterializationKind.Unknown) ?? 0;
             try
             {
                 return await _dispatcherQueue
