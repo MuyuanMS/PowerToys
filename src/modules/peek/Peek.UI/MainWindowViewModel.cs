@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -89,6 +90,8 @@ namespace Peek.UI
         /// </summary>
         private string? _shortcutTargetPath;
 
+        private int _shortcutResolutionVersion;
+
         /// <summary>
         /// Work around missing navigation when peeking from CLI.
         /// TODO: Implement navigation when peeking from CLI.
@@ -97,7 +100,7 @@ namespace Peek.UI
 
         partial void OnCurrentItemChanged(IFileSystemItem? value)
         {
-            UpdateShortcutTarget(value);
+            _ = UpdateShortcutTargetAsync(value);
         }
 
         partial void OnPreviewItemChanged(IFileSystemItem? value)
@@ -131,9 +134,22 @@ namespace Peek.UI
         /// Resolves the target of the shortcut that has been selected and starts following it.
         /// </summary>
         /// <param name="item">The selected item.</param>
-        private void UpdateShortcutTarget(IFileSystemItem? item)
+        private async Task UpdateShortcutTargetAsync(IFileSystemItem? item)
         {
-            _shortcutTargetPath = ShortcutHelper.TryGetTargetPath(item?.Path);
+            int resolutionVersion = Interlocked.Increment(ref _shortcutResolutionVersion);
+            _shortcutTargetPath = null;
+            ShortcutName = string.Empty;
+            IsPreviewingShortcutTarget = false;
+            UpdatePreviewItem();
+
+            string? targetPath = await Task.Run(() => ShortcutHelper.TryGetTargetPath(item?.Path));
+            if (resolutionVersion != Volatile.Read(ref _shortcutResolutionVersion) ||
+                !ReferenceEquals(CurrentItem, item))
+            {
+                return;
+            }
+
+            _shortcutTargetPath = targetPath;
             ShortcutName = item != null && _shortcutTargetPath != null ? item.Name : string.Empty;
 
             // Follow the shortcut by default. The title bar button switches back to the shortcut.
