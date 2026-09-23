@@ -87,7 +87,7 @@ public sealed partial class FiltersDropDown : UserControl,
     public bool IsFilterVisible => ViewModel?.ShouldShowFilters ?? false;
 
     private static readonly string _defaultFilterText = ResourceLoaderInstance.GetString("FiltersDropDown_DefaultText");
-    private static readonly string _filterAccessKey = ResourceLoaderInstance.GetString("FiltersDropDown.AccessKey");
+    private static readonly string _filterAccessKey = ResourceLoaderInstance.GetString("FiltersDropDown/AccessKey");
 
     public FiltersDropDown()
     {
