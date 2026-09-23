@@ -167,6 +167,7 @@
                     <VisualState.Setters>
                         <Setter Target="LaunchAppButton_Text.Visibility" Value="Collapsed" />
                         <Setter Target="LaunchAppButton.Visibility" Value="Collapsed" />
+                        <Setter Target="ShortcutPreviewButton_Text.Visibility" Value="Collapsed" />
                     </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>
