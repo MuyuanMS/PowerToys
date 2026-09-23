@@ -1356,7 +1356,7 @@ UINT __stdcall InstallCmdPalPackageCA(MSIHANDLE hInstall)
     try
     {
         auto msix = package::FindMsixFile(installationFolder + L"\\WinUI3Apps\\CmdPal\\", false);
-        auto dependencies = package::FindMsixFile(installationFolder + L"\\WinUI3Apps\\CmdPal\\Dependencies\\", true);
+        std::vector<std::wstring> dependencies;
 
         if (!msix.empty())
         {
