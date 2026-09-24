@@ -72,12 +72,8 @@ internal sealed class IconLoadMeasurement
 
     public void Rejected()
     {
-        if (Session.IsStopped)
-        {
-            return;
-        }
-
-        if (!PublishEnqueueState(EnqueueState.Rejected))
+        var published = PublishEnqueueState(EnqueueState.Rejected);
+        if (Session.IsStopped || !published)
         {
             return;
         }

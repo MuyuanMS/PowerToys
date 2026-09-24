@@ -642,6 +642,31 @@ public class IconLoadDiagnosticsTests
     }
 
     [TestMethod]
+    public async Task StoppedSessionRejectionReleasesWorkerWaitingForEnqueueCommit()
+    {
+        IconLoadDiagnostics.Start();
+        var load = IconLoadDiagnostics.CreateLoad(
+            default,
+            "bitmap.png",
+            hasStream: false,
+            width: 20,
+            height: 20,
+            scale: 1.0);
+
+        Assert.IsNotNull(load);
+        var workerStart = load.WorkerStartingAsync().AsTask();
+
+        var report = IconLoadDiagnostics.StopAndCreateReport();
+
+        load.Rejected();
+        Assert.IsFalse(await workerStart.WaitAsync(TimeSpan.FromSeconds(5)));
+
+        Assert.IsNotNull(report);
+        StringAssert.Contains(report.Text, "Created: 1");
+        StringAssert.Contains(report.Text, "Active at stop: 0");
+    }
+
+    [TestMethod]
     public void CreatingLoadAfterStopDoesNotThrow()
     {
         IconLoadDiagnostics.Start();
