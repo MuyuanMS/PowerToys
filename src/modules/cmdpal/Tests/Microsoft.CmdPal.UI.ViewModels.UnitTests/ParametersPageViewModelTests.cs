@@ -139,7 +139,8 @@ public partial class ParametersPageViewModelTests
 
         try
         {
-            vm.InitializeProperties();
+            await vm.InitializeAsync();
+            await Task.Delay(50);
             var stringParameterVm = vm.Items.OfType<StringParameterRunViewModel>().Single();
 
             stringParameterVm.SetTextFromUi("latest value");
@@ -188,7 +189,8 @@ public partial class ParametersPageViewModelTests
 
         try
         {
-            vm.InitializeProperties();
+            await vm.InitializeAsync();
+            await Task.Delay(50);
             var stringParameterVm = vm.Items.OfType<StringParameterRunViewModel>().Single();
 
             stringParameterVm.SetTextFromUi("latest value");
