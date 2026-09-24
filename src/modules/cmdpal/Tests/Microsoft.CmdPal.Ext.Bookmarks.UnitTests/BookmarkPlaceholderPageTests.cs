@@ -20,6 +20,7 @@ namespace Microsoft.CmdPal.Ext.Bookmarks.UnitTests;
 public sealed class BookmarkPlaceholderPageTests
 {
     private static readonly string[] EmptyPlaceholderValues = { string.Empty, string.Empty };
+    private static readonly string[] PopulatedPlaceholderValues = { "42", "PowerToys" };
 
     [TestMethod]
     public void LaunchWithCurrentValues_SuccessfulLaunch_ClearsPlaceholderValuesAndSubtitle()
@@ -49,7 +50,7 @@ public sealed class BookmarkPlaceholderPageTests
 
         Assert.AreEqual(CommandResultKind.KeepOpen, result.Kind);
         CollectionAssert.AreEqual(
-            new[] { "42", "PowerToys" },
+            PopulatedPlaceholderValues,
             parameters.Select(parameter => parameter.Text).ToArray());
         Assert.AreEqual(expectedSubtitle, page.Command.Subtitle);
     }
