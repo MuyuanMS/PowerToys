@@ -126,18 +126,22 @@ namespace CommonLibTest
                 { "customTrayTimes": { "Morning": 30 } }
                 """);
             var customActions = JsonSerializer.Deserialize<AdvancedPasteCustomActions>("""
-                { "value": [] }
+                { "value": [{ "id": 7, "name": "Translate", "prompt": "Translate this text" }] }
                 """);
             var shortcutConflicts = JsonSerializer.Deserialize<ShortcutConflictProperties>("""
-                { "ignored_shortcuts": [] }
+                { "ignored_shortcuts": [{ "win": true, "code": 65 }] }
                 """);
 
             Assert.IsNotNull(awake);
             Assert.AreEqual(30u, awake.CustomTrayTimes["Morning"]);
             Assert.IsNotNull(customActions);
-            Assert.IsEmpty(customActions.Value);
+            Assert.HasCount(1, customActions.Value);
+            Assert.AreEqual(7, customActions.Value[0].Id);
+            Assert.AreEqual("Translate", customActions.Value[0].Name);
             Assert.IsNotNull(shortcutConflicts);
-            Assert.IsEmpty(shortcutConflicts.IgnoredShortcuts);
+            Assert.HasCount(1, shortcutConflicts.IgnoredShortcuts);
+            Assert.IsTrue(shortcutConflicts.IgnoredShortcuts[0].Win);
+            Assert.AreEqual(65, shortcutConflicts.IgnoredShortcuts[0].Code);
         }
 
         [TestMethod]
