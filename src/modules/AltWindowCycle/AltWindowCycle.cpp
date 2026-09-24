@@ -905,11 +905,11 @@ void Switcher::InstallEscapeHook()
     g_pointerMovePosted.store(false, std::memory_order_relaxed);
     if (!g_escapeHook)
     {
-        g_escapeHook = SetWindowsHookExW(WH_KEYBOARD_LL, EscapeHookProc, nullptr, 0);
+        g_escapeHook = SetWindowsHookExW(WH_KEYBOARD_LL, EscapeHookProc, hinst, 0);
     }
     if (!g_mouseHook)
     {
-        g_mouseHook = SetWindowsHookExW(WH_MOUSE_LL, MouseHookProc, nullptr, 0);
+        g_mouseHook = SetWindowsHookExW(WH_MOUSE_LL, MouseHookProc, hinst, 0);
     }
 }
 
