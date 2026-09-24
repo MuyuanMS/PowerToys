@@ -746,7 +746,6 @@ HORZRES
 HORZSIZE
 Hostbackdropbrush
 hostfxr
-hostpolicy
 hostsfileeditor
 hotfixes
 hotkeycontrol

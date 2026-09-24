@@ -39,16 +39,15 @@
 
 
             "PowerToys.ColorPicker.dll",
-            "WinUI3Apps\\PowerToys.ColorPickerUI.dll",
-            "WinUI3Apps\\PowerToys.ColorPickerUI.exe",
+            "PowerToys.ColorPickerUI.dll",
+            "PowerToys.ColorPickerUI.exe",
 
             "PowerToys.CropAndLockModuleInterface.dll",
             "PowerToys.CropAndLock.exe",
 
             "PowerToys.PowerOCRModuleInterface.dll",
-            "WinUI3Apps\\PowerToys.PowerOCR.Core.dll",
-            "WinUI3Apps\\PowerToys.PowerOCR.dll",
-            "WinUI3Apps\\PowerToys.PowerOCR.exe",
+            "PowerToys.PowerOCR.dll",
+            "PowerToys.PowerOCR.exe",
 
             "PowerToys.AdvancedPasteModuleInterface.dll",
             "WinUI3Apps\\PowerToys.AdvancedPaste.exe",
@@ -196,8 +195,6 @@
 
             "PowerToys.FindMyMouse.dll",
             "PowerToys.MouseHighlighter.dll",
-            "PowerToys.AutoHideCursor.dll",
-            "PowerToys.AutoHideCursor.exe",
             "PowerToys.MouseJump.dll",
             "PowerToys.MouseJump.Common.dll",
             "WinUI3Apps\\PowerToys.MouseJump.HotKeys.dll",

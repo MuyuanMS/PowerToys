@@ -114,7 +114,7 @@ internal sealed partial class LocalKeyboardListener : IDisposable
     {
         try
         {
-            if (nCode == PInvoke.HC_ACTION && IsKeyDownHook(lParam))
+            if (nCode >= 0 && IsKeyDownHook(lParam))
             {
                 InvokeKeyDown((VirtualKey)wParam.Value);
             }

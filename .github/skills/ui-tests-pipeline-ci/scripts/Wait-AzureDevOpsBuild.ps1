@@ -133,16 +133,6 @@ namespace PowerToys.UiTests.Ci
                     }
                 }
             )
-            $builds = @(
-                foreach ($response in $responses)
-                {
-                    ConvertTo-AzDevOpsBuildSnapshot `
-                        -Build $response.Build `
-                        -RequestedId $response.RequestedId `
-                        -ExpectedBranch $ExpectedBranch `
-                        -ExpectedSourceVersion $expectedSourceVersionNormalized
-                }
-            )
             $consecutiveErrors = 0
         }
         catch
@@ -177,6 +167,16 @@ namespace PowerToys.UiTests.Ci
             continue
         }
 
+        $builds = @(
+            foreach ($response in $responses)
+            {
+                ConvertTo-AzDevOpsBuildSnapshot `
+                    -Build $response.Build `
+                    -RequestedId $response.RequestedId `
+                    -ExpectedBranch $ExpectedBranch `
+                    -ExpectedSourceVersion $expectedSourceVersionNormalized
+            }
+        )
         $lastBuilds = $builds
 
         if (@($builds | Where-Object Status -NE 'completed').Count -eq 0)

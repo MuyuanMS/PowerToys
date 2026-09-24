@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation
+﻿// Copyright (c) Microsoft Corporation
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -6,8 +6,6 @@ using System;
 using System.Globalization;
 using Microsoft.CmdPal.Ext.TimeDate;
 using Microsoft.CmdPal.Ext.TimeDate.Helpers;
-using Microsoft.CmdPal.Ext.TimeDate.Pages;
-using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -21,7 +19,6 @@ public class NowDockBandTests
 
     private CultureInfo _originalCulture = null!;
     private CultureInfo _originalUiCulture = null!;
-    private ClockUpdateService _clockUpdateService = null!;
     private NowDockBand? _band;
 
     [TestInitialize]
@@ -31,7 +28,6 @@ public class NowDockBandTests
         _originalUiCulture = CultureInfo.CurrentUICulture;
         CultureInfo.CurrentCulture = new CultureInfo("en-US", false);
         CultureInfo.CurrentUICulture = new CultureInfo("en-US", false);
-        _clockUpdateService = new ClockUpdateService(() => FixedTime, enableTimer: false);
     }
 
     [TestCleanup]
@@ -39,15 +35,18 @@ public class NowDockBandTests
     {
         _band?.Dispose();
         _band = null;
-        _clockUpdateService.Dispose();
         CultureInfo.CurrentCulture = _originalCulture;
         CultureInfo.CurrentUICulture = _originalUiCulture;
     }
 
+    // The week number follows the 'First week of the year' and 'First day of the
+    // week' settings, shared with the search results.
+    private static string FixedTimeWeek(Settings settings) => TimeAndDateHelper.GetWeekOfYear(FixedTime, settings).ToString(CultureInfo.CurrentCulture);
+
     [TestMethod]
     public void Constructor_TitleIsSetImmediately()
     {
-        _band = CreateBand();
+        _band = new NowDockBand(new Settings(), clock: () => FixedTime);
 
         Assert.AreEqual("2:05 PM", _band.Title);
         Assert.IsFalse(string.IsNullOrEmpty(_band.Subtitle));
@@ -56,7 +55,7 @@ public class NowDockBandTests
     [TestMethod]
     public void UpdateText_LongTimeFormat_TitleContainsSeconds()
     {
-        _band = CreateBand(titleFormat: "T");
+        _band = new NowDockBand(new Settings(dockClockWithSecond: true), clock: () => FixedTime);
 
         _band.UpdateText();
 
@@ -66,7 +65,7 @@ public class NowDockBandTests
     [TestMethod]
     public void UpdateText_ShortDateFormat_SubtitleIsShortDate()
     {
-        _band = CreateBand();
+        _band = new NowDockBand(new Settings(), clock: () => FixedTime);
 
         _band.UpdateText();
 
@@ -74,98 +73,43 @@ public class NowDockBandTests
     }
 
     [TestMethod]
-    public void UpdateText_CopyCommandsUpdated()
+    public void UpdateText_FiresOnUpdatedCallback()
     {
-        _band = CreateBand();
+        var callbackFired = false;
+        _band = new NowDockBand(new Settings(), onUpdated: () => callbackFired = true, clock: () => FixedTime);
+
+        callbackFired = false; // reset — constructor already fired it once during synchronous UpdateText()
 
         _band.UpdateText();
 
-        Assert.AreEqual(_band.Title, _band.CopyTitleCommand.Text);
-        Assert.AreEqual(_band.Subtitle, _band.CopySubtitleCommand.Text);
-        StringAssert.StartsWith(_band.CopyTitleCommand.Name, "Copy time (");
-        StringAssert.StartsWith(_band.CopySubtitleCommand.Name, "Copy date (");
+        Assert.IsTrue(callbackFired);
     }
 
     [TestMethod]
-    public void Constructor_OptionalCopyFormatAddsCurrentFormattedCopyCommand()
+    public void UpdateText_CallbackFiredAfterAssignments()
     {
-        _band = CreateBand(copyFormat: "s");
+        var titleAtCallback = string.Empty;
+        _band = new NowDockBand(
+            new Settings(),
+            onUpdated: () => titleAtCallback = _band?.Title ?? string.Empty,
+            clock: () => FixedTime);
 
-        Assert.IsNotNull(_band.CopyCustomFormatCommand);
-        Assert.AreEqual("2025-07-01T14:05:32", _band.CopyCustomFormatCommand.GetCurrentText());
-        StringAssert.StartsWith(_band.CopyCustomFormatCommand.Name, "Copy ISO 8601");
+        titleAtCallback = string.Empty; // reset after construction callback
+
+        _band.UpdateText();
+
+        Assert.IsFalse(string.IsNullOrEmpty(titleAtCallback), "Title should be assigned before callback fires");
     }
 
     [TestMethod]
-    public void Constructor_NoCopyFormatOmitsCustomCopyCommand()
+    public void UpdateText_CopyCommandsUpdated()
     {
-        _band = CreateBand();
+        _band = new NowDockBand(new Settings(), clock: () => FixedTime);
 
-        Assert.IsNull(_band.CopyCustomFormatCommand);
-    }
+        _band.UpdateText();
 
-    [TestMethod]
-    public void UpdateSettings_AddsAndRemovesOptionalCopyCommand()
-    {
-        var settings = new TestDockClockSettings();
-        _band = new NowDockBand(settings, new NoOpCommand(), _clockUpdateService, () => FixedTime);
-
-        settings.SetDockClockFormats("t", "d", "s");
-        _band.UpdateSettings(settings);
-        Assert.IsNotNull(_band.CopyCustomFormatCommand);
-
-        settings.SetDockClockFormats("t", "d", string.Empty);
-        _band.UpdateSettings(settings);
-        Assert.IsNull(_band.CopyCustomFormatCommand);
-    }
-
-    [TestMethod]
-    public void Tick_ReadsClockOnce()
-    {
-        var clockReads = 0;
-        _band = CreateBand(
-            titleFormat: "T",
-            clock: () =>
-            {
-                clockReads++;
-                return FixedTime;
-            });
-        _band.StartUpdating();
-        var readsBeforeTick = clockReads;
-
-        _clockUpdateService.DispatchTick(FixedTime.AddSeconds(1));
-
-        Assert.AreEqual(readsBeforeTick + 1, clockReads);
-    }
-
-    [TestMethod]
-    public void DisposeDuringStartDoesNotLeaveSubscription()
-    {
-        var clockReads = 0;
-        var disposeOnRead = false;
-
-        // This single-threaded reentrancy covers Subscribe/UpdateText ordering;
-        // _lifecycleLock is still required when StartUpdating and Dispose run on different threads
-        _band = CreateBand(
-            titleFormat: "T",
-            clock: () =>
-            {
-                clockReads++;
-                if (disposeOnRead)
-                {
-                    disposeOnRead = false;
-                    _band!.Dispose();
-                }
-
-                return FixedTime;
-            });
-        disposeOnRead = true;
-
-        _band.StartUpdating();
-        var readsAfterStart = clockReads;
-        _clockUpdateService.DispatchTick(FixedTime.AddSeconds(1));
-
-        Assert.AreEqual(readsAfterStart, clockReads);
+        Assert.AreEqual(_band.Title, _band.CopyTimeCommand.Text);
+        Assert.AreEqual(_band.Subtitle, _band.CopyDateCommand.Text);
     }
 
     [DataTestMethod]
@@ -178,7 +122,7 @@ public class NowDockBandTests
         CultureInfo.CurrentCulture = new CultureInfo(cultureName, false);
         CultureInfo.CurrentUICulture = new CultureInfo(cultureName, false);
 
-        _band = CreateBand();
+        _band = new NowDockBand(new Settings(), clock: () => FixedTime);
 
         Assert.IsFalse(string.IsNullOrEmpty(_band.Title), $"Title should be non-empty for culture '{cultureName}'");
         Assert.IsFalse(string.IsNullOrEmpty(_band.Subtitle), $"Subtitle should be non-empty for culture '{cultureName}'");
@@ -187,13 +131,13 @@ public class NowDockBandTests
     [TestMethod]
     public void UpdateSettings_EnablingSeconds_TitleIncludesSeconds()
     {
-        var settings = new TestDockClockSettings();
-        _band = new NowDockBand(settings, new NoOpCommand(), _clockUpdateService, clock: () => FixedTime);
+        var settings = new Settings(dockClockWithSecond: false);
+        _band = new NowDockBand(settings, clock: () => FixedTime);
 
         Assert.AreEqual("2:05 PM", _band.Title, "Precondition: seconds hidden by default");
 
-        settings.SetDockClockFormats("T", "d", string.Empty);
-        _band.UpdateSettings(settings);
+        settings.DockClockWithSecond = true;
+        _band.UpdateSettings();
 
         Assert.AreEqual("2:05:32 PM", _band.Title, "Title should update live to include seconds");
     }
@@ -201,121 +145,238 @@ public class NowDockBandTests
     [TestMethod]
     public void UpdateSettings_DisablingSeconds_TitleDropsSeconds()
     {
-        var settings = new TestDockClockSettings(titleFormat: "T");
-        _band = new NowDockBand(settings, new NoOpCommand(), _clockUpdateService, clock: () => FixedTime);
+        var settings = new Settings(dockClockWithSecond: true);
+        _band = new NowDockBand(settings, clock: () => FixedTime);
 
         Assert.AreEqual("2:05:32 PM", _band.Title, "Precondition: seconds shown");
 
-        settings.SetDockClockFormats("t", "d", string.Empty);
-        _band.UpdateSettings(settings);
+        settings.DockClockWithSecond = false;
+        _band.UpdateSettings();
 
         Assert.AreEqual("2:05 PM", _band.Title, "Title should update live to drop seconds");
     }
 
     [TestMethod]
-    public void UpdateSettings_WeekRulesRefreshFormattedTitleSubtitleAndCopyText()
+    public void UpdateSettings_NoChange_FiresNoCallback()
     {
-        var time = new DateTime(2012, 12, 31, 14, 5, 32);
-        var settings = new TestDockClockSettings("WOY", "IWYR-\\WIWOY-IDOW", "\\WWOY")
-        {
-            FirstWeekOfYear = 0,
-            FirstDayOfWeek = 0,
-        };
-        _band = new NowDockBand(settings, new NoOpCommand(), _clockUpdateService, () => time);
+        var callbackCount = 0;
+        _band = new NowDockBand(new Settings(dockClockWithSecond: false), onUpdated: () => callbackCount++, clock: () => FixedTime);
 
-        Assert.AreEqual("53", _band.Title);
-        Assert.AreEqual("2013-W01-1", _band.Subtitle);
-        Assert.IsNotNull(_band.CopyCustomFormatCommand);
-        Assert.AreEqual("W53", _band.CopyCustomFormatCommand.GetCurrentText());
+        callbackCount = 0; // reset after construction callback
 
-        settings.FirstWeekOfYear = 2;
-        settings.FirstDayOfWeek = 1;
-        _band.UpdateSettings(settings);
+        _band.UpdateSettings();
 
-        Assert.AreEqual("1", _band.Title);
-        Assert.AreEqual("2013-W01-1", _band.Subtitle);
-        Assert.AreEqual(_band.Title, _band.CopyTitleCommand.Text);
-        Assert.AreEqual(_band.Subtitle, _band.CopySubtitleCommand.Text);
-        Assert.IsNotNull(_band.CopyCustomFormatCommand);
-        Assert.AreEqual("W1", _band.CopyCustomFormatCommand.GetCurrentText());
+        Assert.AreEqual(0, callbackCount, "A no-op settings change should not refresh the band");
     }
 
     [TestMethod]
-    public void ClockTicks_ReachTheBandOnlyBetweenStartAndStopUpdating()
+    public void UpdateSettings_ChangedDateMode_RefreshesTheSubtitle()
     {
-        var now = FixedTime;
-        _band = CreateBand(titleFormat: "T", clock: () => now);
+        var settings = new Settings(clockBandDateMode: 0);
+        _band = new NowDockBand(settings, clock: () => FixedTime);
 
-        Assert.AreEqual("2:05:32 PM", _band.Title, "Precondition: the title is set at construction");
+        Assert.AreEqual("7/1/2025", _band.Subtitle, "Precondition: system date only");
 
-        // Bands are constructed for every clock, pinned or not, so an unrendered
-        // band must stay off the shared clock cadence.
-        now = FixedTime.AddSeconds(5);
-        _clockUpdateService.DispatchTick(now);
-        Assert.AreEqual("2:05:32 PM", _band.Title, "An unrendered band should ignore clock ticks");
+        settings.ClockBandDateMode = 1;
+        _band.UpdateSettings();
 
-        _band.StartUpdating();
-        Assert.AreEqual("2:05:37 PM", _band.Title, "StartUpdating should refresh the stale title immediately");
-
-        now = FixedTime.AddSeconds(9);
-        _clockUpdateService.DispatchTick(now);
-        Assert.AreEqual("2:05:41 PM", _band.Title, "A rendered band should follow clock ticks");
-
-        _band.StopUpdating();
-        now = FixedTime.AddSeconds(20);
-        _clockUpdateService.DispatchTick(now);
-        Assert.AreEqual("2:05:41 PM", _band.Title, "A band should stop ticking once it is no longer rendered");
+        StringAssert.Contains(_band.Subtitle, FixedTimeWeek(settings));
     }
 
     [TestMethod]
-    public void OnLoadDockBandItem_RenderingTheBandDrivesItsSubscription()
+    public void SystemDateModeShowsOnlyTheDate()
     {
-        var now = FixedTime;
-        _band = CreateBand(titleFormat: "T", clock: () => now);
-        var bandItem = new OnLoadDockBandItem([_band], "test.band", "Test band", _band.StartUpdating, _band.StopUpdating);
-        var page = (IListPage)bandItem.Command!;
+        var settings = new Settings(clockBandDateMode: 0);
 
-        static void Handler(object sender, IItemsChangedEventArgs args)
-        {
-        }
+        _band = new NowDockBand(settings, clock: () => FixedTime);
 
-        // CmdPal signals that a band is on screen purely by attaching and
-        // detaching an items-changed handler on the band's page.
-        now = FixedTime.AddSeconds(5);
-        page.ItemsChanged += Handler;
-        Assert.AreEqual("2:05:37 PM", _band.Title, "Rendering the band should start its updates");
-
-        now = FixedTime.AddSeconds(9);
-        _clockUpdateService.DispatchTick(now);
-        Assert.AreEqual("2:05:41 PM", _band.Title, "A rendered band should follow clock ticks");
-
-        page.ItemsChanged -= Handler;
-        now = FixedTime.AddSeconds(20);
-        _clockUpdateService.DispatchTick(now);
-        Assert.AreEqual("2:05:41 PM", _band.Title, "Dropping the band should stop its updates");
+        Assert.AreEqual("7/1/2025", _band.Subtitle);
+        Assert.AreEqual(2, _band.MoreCommands.Length);
     }
 
-    private NowDockBand CreateBand(string titleFormat = "t", string copyFormat = "", Func<DateTime>? clock = null)
+    [TestMethod]
+    public void WeekNumberModeAppendsTheWeekNumber()
     {
-        var settings = new TestDockClockSettings(titleFormat, copyFormat: copyFormat);
-        return new NowDockBand(settings, new NoOpCommand(), _clockUpdateService, clock ?? (() => FixedTime));
+        var settings = new Settings(clockBandDateMode: 1);
+
+        _band = new NowDockBand(settings, clock: () => FixedTime);
+
+        StringAssert.Contains(_band.Subtitle, FixedTimeWeek(settings));
+        Assert.AreEqual(3, _band.MoreCommands.Length);
     }
 
-    private sealed class TestDockClockSettings(string titleFormat = "t", string subtitleFormat = "d", string copyFormat = "") : Settings, IDockClockSettings
+    [TestMethod]
+    public void WeekNumberModeUsesIsoWeekNumbersWithIsoSettings()
     {
-        public string DockClockTitleFormat { get; private set; } = titleFormat;
+        // First four-day week + Monday = ISO 8601
+        var settings = new Settings(firstWeekOfYear: 2, firstDayOfWeek: 1, clockBandDateMode: 1);
 
-        public string DockClockSubtitleFormat { get; private set; } = subtitleFormat;
+        _band = new NowDockBand(settings, clock: () => FixedTime);
 
-        public string DockClockCopyFormat { get; private set; } = copyFormat;
+        StringAssert.Contains(_band.Subtitle, ISOWeek.GetWeekOfYear(FixedTime).ToString(CultureInfo.CurrentCulture));
+    }
 
-        public string DockClockClickAction => "default";
+    [TestMethod]
+    public void WeekNumberModeRespectsCustomFirstWeekAndFirstDaySettings()
+    {
+        // First day rule and Monday
+        var settings = new Settings(firstWeekOfYear: 0, firstDayOfWeek: 1, clockBandDateMode: 1);
 
-        public void SetDockClockFormats(string titleFormat, string subtitleFormat, string copyFormat)
-        {
-            DockClockTitleFormat = titleFormat;
-            DockClockSubtitleFormat = subtitleFormat;
-            DockClockCopyFormat = copyFormat;
-        }
+        _band = new NowDockBand(settings, clock: () => FixedTime);
+
+        var expectedWeek = CultureInfo.CurrentCulture.Calendar.GetWeekOfYear(
+            FixedTime,
+            CalendarWeekRule.FirstDay,
+            DayOfWeek.Monday);
+        StringAssert.Contains(_band.Subtitle, expectedWeek.ToString(CultureInfo.CurrentCulture));
+    }
+
+    [TestMethod]
+    public void UsWeekSettingsAppendTheUsWeekNumber()
+    {
+        // Week 1 contains January 1st, weeks start on Sunday (Excel WEEKNUM option 1)
+        var settings = new Settings(firstWeekOfYear: 0, firstDayOfWeek: 0, clockBandDateMode: 1);
+
+        _band = new NowDockBand(settings, clock: () => FixedTime);
+
+        var expectedWeek = CultureInfo.CurrentCulture.Calendar.GetWeekOfYear(
+            FixedTime,
+            CalendarWeekRule.FirstDay,
+            DayOfWeek.Sunday);
+        StringAssert.Contains(_band.Subtitle, expectedWeek.ToString(CultureInfo.CurrentCulture));
+        Assert.AreEqual(3, _band.MoreCommands.Length);
+    }
+
+    [TestMethod]
+    public void IsoWeekDateModeShowsTheIsoWeekDate()
+    {
+        // US style calculation settings; the ISO week date entry is always ISO
+        // 8601 compliant, and the copy command carries the ISO week number.
+        var settings = new Settings(firstWeekOfYear: 0, firstDayOfWeek: 0, clockBandDateMode: 2);
+
+        _band = new NowDockBand(settings, clock: () => FixedTime);
+
+        Assert.AreEqual("2025-W27-2", _band.Subtitle);
+        Assert.AreEqual(3, _band.MoreCommands.Length);
+        var copyWeekItem = _band.MoreCommands[2] as CommandContextItem;
+        Assert.IsNotNull(copyWeekItem);
+        var copyWeekCommand = copyWeekItem.Command as CopyTextCommand;
+        Assert.IsNotNull(copyWeekCommand);
+        Assert.AreEqual(ISOWeek.GetWeekOfYear(FixedTime).ToString(CultureInfo.CurrentCulture), copyWeekCommand.Text);
+    }
+
+    [TestMethod]
+    public void CustomFormatModeOverridesTheDateLine()
+    {
+        var settings = new Settings(clockBandDateMode: 3, customDateFormatInClockBand: "yyyy-MM-dd");
+
+        _band = new NowDockBand(settings, clock: () => FixedTime);
+
+        Assert.AreEqual("2025-07-01", _band.Subtitle);
+    }
+
+    [TestMethod]
+    public void CustomFormatModeRendersTheIsoWeekDateThroughTheIsoTokens()
+    {
+        // The ISO tokens are always ISO 8601, independent of the first week and
+        // first day settings (which are US style here).
+        var settings = new Settings(firstWeekOfYear: 0, firstDayOfWeek: 0, clockBandDateMode: 3, customDateFormatInClockBand: "IWYR-\\WIWOY-IDOW");
+
+        _band = new NowDockBand(settings, clock: () => FixedTime);
+
+        Assert.AreEqual("2025-W27-2", _band.Subtitle);
+        Assert.AreEqual(2, _band.MoreCommands.Length);
+    }
+
+    [TestMethod]
+    public void CustomFormatModeSupportsWeekOfYearPlaceholder()
+    {
+        // ISO first week/first day settings feed the WOY placeholder
+        var settings = new Settings(firstWeekOfYear: 2, firstDayOfWeek: 1, clockBandDateMode: 3, customDateFormatInClockBand: "\\W WOY");
+
+        _band = new NowDockBand(settings, clock: () => FixedTime);
+
+        Assert.AreEqual($"W {FixedTimeWeek(settings)}", _band.Subtitle);
+    }
+
+    [TestMethod]
+    public void CustomFormatModeWithEmptyFormatFallsBackToDefaultDate()
+    {
+        var settings = new Settings(clockBandDateMode: 3, customDateFormatInClockBand: string.Empty);
+
+        _band = new NowDockBand(settings, clock: () => FixedTime);
+
+        Assert.AreEqual("7/1/2025", _band.Subtitle);
+    }
+
+    [TestMethod]
+    public void CustomFormatModeShowsInvalidFormatsAsRawText()
+    {
+        // An unclosed literal quote is an invalid .NET date format; the dock shows
+        // the raw pattern so the user can see their format is broken (same
+        // recovery as the custom format search results).
+        var settings = new Settings(clockBandDateMode: 3, customDateFormatInClockBand: "'unclosed");
+
+        _band = new NowDockBand(settings, clock: () => FixedTime);
+
+        Assert.AreEqual("'unclosed", _band.Subtitle);
+    }
+
+    [TestMethod]
+    public void CustomFormatModeSupportsSingleTokenFormats()
+    {
+        // 'IDOW' alone replaces to a lone digit, which is not a valid .NET date
+        // format on its own; the recovery keeps the replaced value.
+        // FixedTime is a Tuesday, ISO day 2.
+        var settings = new Settings(clockBandDateMode: 3, customDateFormatInClockBand: "IDOW");
+
+        _band = new NowDockBand(settings, clock: () => FixedTime);
+
+        Assert.AreEqual("2", _band.Subtitle);
+    }
+
+    [TestMethod]
+    public void CustomFormatModeRendersUnrecognizedLettersLiterally()
+    {
+        // 'W' is no date format specifier and is copied to the output unchanged, so
+        // a German user can write '\KW WOY' to get 'KW 27' without escaping the W.
+        var settings = new Settings(firstWeekOfYear: 2, firstDayOfWeek: 1, clockBandDateMode: 3, customDateFormatInClockBand: "dd.MM \\KW WOY");
+
+        _band = new NowDockBand(settings, clock: () => FixedTime);
+
+        StringAssert.Contains(_band.Subtitle, "KW ");
+        StringAssert.Contains(_band.Subtitle, FixedTimeWeek(settings));
+    }
+
+    [TestMethod]
+    public void ClickOpensNotificationCenterByDefault()
+    {
+        _band = new NowDockBand(new Settings(), clock: () => FixedTime);
+
+        Assert.IsInstanceOfType(_band.Command, typeof(OpenUrlCommand));
+    }
+
+    [TestMethod]
+    public void ClickDoesNothingWhenNotificationCenterSettingIsDisabled()
+    {
+        var settings = new Settings(clockBandOpensNotificationCenter: false);
+
+        _band = new NowDockBand(settings, clock: () => FixedTime);
+
+        Assert.IsInstanceOfType(_band.Command, typeof(NoOpCommand));
+    }
+
+    [TestMethod]
+    public void CopyWeekNumberCommandHoldsWeekNumber()
+    {
+        var settings = new Settings(clockBandDateMode: 1);
+
+        _band = new NowDockBand(settings, clock: () => FixedTime);
+
+        var copyWeekItem = _band.MoreCommands[2] as CommandContextItem;
+        Assert.IsNotNull(copyWeekItem);
+        var copyWeekCommand = copyWeekItem.Command as CopyTextCommand;
+        Assert.IsNotNull(copyWeekCommand);
+        Assert.AreEqual(FixedTimeWeek(settings), copyWeekCommand.Text);
     }
 }

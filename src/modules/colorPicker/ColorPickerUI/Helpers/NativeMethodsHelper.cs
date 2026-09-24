@@ -3,7 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Runtime.InteropServices;
-using Windows.Foundation;
+using System.Windows;
 
 namespace ColorPicker.Helpers
 {

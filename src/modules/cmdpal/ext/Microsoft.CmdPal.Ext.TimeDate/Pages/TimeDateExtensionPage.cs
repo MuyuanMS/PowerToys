@@ -10,14 +10,11 @@ using Microsoft.CommandPalette.Extensions.Toolkit;
 
 namespace Microsoft.CmdPal.Ext.TimeDate.Pages;
 
-internal sealed partial class TimeDateExtensionPage : DynamicListPage, IDisposable
+internal sealed partial class TimeDateExtensionPage : DynamicListPage
 {
     private readonly ISettingsInterface _settingsManager;
-    private readonly CustomClockListPage _customClockListPage;
 
-    internal CustomClockListPage CustomClockListPage => _customClockListPage;
-
-    public TimeDateExtensionPage(ISettingsInterface settingsManager, CustomClockManager customClockManager, ClockUpdateService clockUpdateService)
+    public TimeDateExtensionPage(ISettingsInterface settingsManager)
     {
         Icon = Icons.TimeDateExtIcon;
         Title = Resources.Microsoft_plugin_timedate_main_page_title;
@@ -25,7 +22,6 @@ internal sealed partial class TimeDateExtensionPage : DynamicListPage, IDisposab
         PlaceholderText = Resources.Microsoft_plugin_timedate_placeholder_text;
         Id = BuiltInCommandIds.TimeDate;
         _settingsManager = settingsManager;
-        _customClockListPage = new CustomClockListPage(customClockManager, settingsManager, clockUpdateService);
         ShowDetails = true;
     }
 
@@ -33,8 +29,7 @@ internal sealed partial class TimeDateExtensionPage : DynamicListPage, IDisposab
     {
         try
         {
-            var results = TimeDateCalculator.ExecuteSearch(_settingsManager, SearchText);
-            return [.. results];
+            return [.. TimeDateCalculator.ExecuteSearch(_settingsManager, SearchText)];
         }
         catch (Exception)
         {
@@ -52,6 +47,4 @@ internal sealed partial class TimeDateExtensionPage : DynamicListPage, IDisposab
         SetSearchNoUpdate(newSearch);
         RaiseItemsChanged(-2);
     }
-
-    public void Dispose() => _customClockListPage.Dispose();
 }

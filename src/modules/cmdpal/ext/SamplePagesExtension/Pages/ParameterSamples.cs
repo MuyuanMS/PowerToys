@@ -193,10 +193,8 @@ public sealed partial class CreateNoteParametersPage : ParametersPage
 
     public override IconInfo Icon => new("\uE70B"); // QuickNote
 
-    public CreateNoteParametersPage(IGridProperties? gridProperties = null)
+    public CreateNoteParametersPage()
     {
-        _selectFolderPage.GridProperties = gridProperties;
-
         _titleParameter = new StringParameterRun()
         {
             PlaceholderText = "Note title",

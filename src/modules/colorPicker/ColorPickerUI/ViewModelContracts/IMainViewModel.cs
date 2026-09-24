@@ -1,10 +1,8 @@
-// Copyright (c) Microsoft Corporation
+﻿// Copyright (c) Microsoft Corporation
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System;
-
-using Microsoft.UI.Xaml.Media;
+using System.Windows.Media;
 
 namespace ColorPicker.ViewModelContracts
 {
@@ -30,11 +28,6 @@ namespace ColorPicker.ViewModelContracts
         /// </summary>
         bool ShowColorName { get; }
 
-        /// <summary>
-        /// Registers the overlay window's native handle. WinUI 3 has no
-        /// <c>HwndSource</c>; callers obtain the HWND via
-        /// <c>WinRT.Interop.WindowNative.GetWindowHandle(window)</c> and pass it here.
-        /// </summary>
-        void RegisterWindowHandle(IntPtr hwnd);
+        void RegisterWindowHandle(System.Windows.Interop.HwndSource hwndSource);
     }
 }

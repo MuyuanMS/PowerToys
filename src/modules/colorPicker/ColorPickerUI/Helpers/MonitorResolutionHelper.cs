@@ -7,7 +7,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
-using Windows.Foundation;
+using System.Windows;
+using System.Windows.Media;
 
 using static ColorPicker.NativeMethods;
 
@@ -21,18 +22,23 @@ namespace ColorPicker.Helpers
         {
             var info = new MonitorInfoEx();
             GetMonitorInfo(new HandleRef(null, monitor), info);
-            Bounds = new Windows.Foundation.Rect(
+            Bounds = new System.Windows.Rect(
                 info.rcMonitor.left,
                 info.rcMonitor.top,
                 info.rcMonitor.right - info.rcMonitor.left,
                 info.rcMonitor.bottom - info.rcMonitor.top);
-            WorkingArea = new Windows.Foundation.Rect(
+            WorkingArea = new System.Windows.Rect(
                 info.rcWork.left,
                 info.rcWork.top,
                 info.rcWork.right - info.rcWork.left,
                 info.rcWork.bottom - info.rcWork.top);
             IsPrimary = (info.dwFlags & MonitorinfofPrimary) != 0;
             Name = new string(info.szDevice).TrimEnd((char)0);
+        }
+
+        public static DpiScale GetCurrentMonitorDpi()
+        {
+            return VisualTreeHelper.GetDpi(Application.Current.MainWindow);
         }
 
         public static IEnumerable<MonitorResolutionHelper> AllMonitors
@@ -46,9 +52,9 @@ namespace ColorPicker.Helpers
             }
         }
 
-        public Windows.Foundation.Rect Bounds { get; private set; }
+        public System.Windows.Rect Bounds { get; private set; }
 
-        public Windows.Foundation.Rect WorkingArea { get; private set; }
+        public System.Windows.Rect WorkingArea { get; private set; }
 
         public string Name { get; private set; }
 

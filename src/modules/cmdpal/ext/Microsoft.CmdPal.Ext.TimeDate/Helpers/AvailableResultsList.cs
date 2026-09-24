@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 using ManagedCommon;
 
 namespace Microsoft.CmdPal.Ext.TimeDate.Helpers;
@@ -18,19 +19,19 @@ internal static class AvailableResultsList
     /// <param name="timeLongFormat">Required for UnitTest: Show time in long format</param>
     /// <param name="dateLongFormat">Required for UnitTest: Show date in long format</param>
     /// <param name="timestamp">Use custom <see cref="DateTime"/> object to calculate results instead of the system date/time</param>
-    /// <param name="firstWeekOfYear">Required for UnitTest: Use custom first week of the year instead of the configured setting.</param>
-    /// <param name="firstDayOfWeek">Required for UnitTest: Use custom first day of the week instead of the configured setting.</param>
+    /// <param name="firstWeekOfYear">Required for UnitTest: Use custom first week of the year instead of the plugin setting.</param>
+    /// <param name="firstDayOfWeek">Required for UnitTest: Use custom first day of the week instead the plugin setting.</param>
     /// <returns>List of results</returns>
-    internal static List<AvailableResult> GetList(bool isKeywordSearch, ISettingsInterface settings, bool? timeLongFormat = null, bool? dateLongFormat = null, DateTime? timestamp = null, CalendarWeekRule? firstWeekOfYear = null, DayOfWeek? firstDayOfWeek = null, DateTimeOffset? currentTime = null)
+    internal static List<AvailableResult> GetList(bool isKeywordSearch, ISettingsInterface settings, bool? timeLongFormat = null, bool? dateLongFormat = null, DateTime? timestamp = null, CalendarWeekRule? firstWeekOfYear = null, DayOfWeek? firstDayOfWeek = null)
     {
         var results = new List<AvailableResult>();
         var calendar = CultureInfo.CurrentCulture.Calendar;
 
         var timeExtended = timeLongFormat ?? settings.TimeWithSecond;
         var dateExtended = dateLongFormat ?? settings.DateWithWeekday;
-        var isSystemDateTime = timestamp is null && currentTime is null;
-        var dateTimeNow = timestamp ?? currentTime?.DateTime ?? DateTime.Now;
-        var dateTimeNowUtc = currentTime?.UtcDateTime ?? dateTimeNow.ToUniversalTime();
+        var isSystemDateTime = timestamp is null;
+        var dateTimeNow = timestamp ?? DateTime.Now;
+        var dateTimeNowUtc = dateTimeNow.ToUniversalTime();
         var firstWeekRule = firstWeekOfYear ?? TimeAndDateHelper.GetCalendarWeekRule(settings.FirstWeekOfYear);
         var firstDayOfTheWeek = firstDayOfWeek ?? TimeAndDateHelper.GetFirstDayOfWeek(settings.FirstDayOfWeek);
 
@@ -81,12 +82,12 @@ internal static class AvailableResultsList
             var eraShort = DateTimeFormatInfo.CurrentInfo.GetAbbreviatedEraName(calendar.GetEra(dateTimeNow));
 
             // Custom formats
-            var formatTime = currentTime ?? new DateTimeOffset(dateTimeNow);
             foreach (var f in settings.CustomFormats)
             {
                 var formatParts = f.Split("=", 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                 var formatSyntax = formatParts.Length == 2 ? formatParts[1] : string.Empty;
                 var searchTags = ResultHelper.SelectStringFromResources(isSystemDateTime, "Microsoft_plugin_timedate_SearchTagCustom");
+                var dtObject = dateTimeNow;
 
                 // If Length = 0 then empty string.
                 if (formatParts.Length >= 1)
@@ -99,12 +100,32 @@ internal static class AvailableResultsList
                             throw new FormatException("Format syntax part after equal sign is missing.");
                         }
 
+                        var containsCustomSyntax = TimeAndDateHelper.StringContainsCustomFormatSyntax(formatSyntax);
                         if (formatSyntax.StartsWith("UTC:", StringComparison.InvariantCulture))
                         {
                             searchTags = ResultHelper.SelectStringFromResources(isSystemDateTime, "Microsoft_plugin_timedate_SearchTagCustomUtc");
+                            dtObject = dateTimeNowUtc;
                         }
 
-                        var value = CustomClockDisplay.Format(formatTime, formatSyntax, settings);
+                        // Get formatted date
+                        var value = TimeAndDateHelper.ConvertToCustomFormat(dtObject, unixTimestamp, unixTimestampMilliseconds, weekOfYear, eraShort, Regex.Replace(formatSyntax, "^UTC:", string.Empty), firstWeekRule, firstDayOfTheWeek);
+                        try
+                        {
+                            value = dtObject.ToString(value, CultureInfo.CurrentCulture);
+                        }
+                        catch (Exception ex)
+                        {
+                            if (!containsCustomSyntax)
+                            {
+                                Logger.LogError($"Unable to format date time with format: {value}. Error: {ex.Message}");
+                                throw;
+                            }
+                            else
+                            {
+                                // Do not fail as we have custom format syntax. Instead fix backslashes.
+                                value = Regex.Replace(value, @"(?<!\\)\\", string.Empty).Replace("\\\\", "\\");
+                            }
+                        }
 
                         // Add result
                         results.Add(new AvailableResult()
@@ -305,7 +326,7 @@ internal static class AvailableResultsList
             {
                 results.Add(new AvailableResult()
                 {
-                    Value = (currentTime?.ToFileTime() ?? dateTimeNow.ToFileTime()).ToString(CultureInfo.CurrentCulture),
+                    Value = dateTimeNow.ToFileTime().ToString(CultureInfo.CurrentCulture),
                     Label = Resources.Microsoft_plugin_timedate_WindowsFileTime,
                     AlternativeSearchTag = ResultHelper.SelectStringFromResources(isSystemDateTime, "Microsoft_plugin_timedate_SearchTagFormat"),
                     IconType = ResultIconType.DateTime,
@@ -348,7 +369,7 @@ internal static class AvailableResultsList
                 },
                 new AvailableResult()
                 {
-                    Value = currentTime?.ToString("yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture) ?? dateTimeNow.ToString("yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture),
+                    Value = dateTimeNow.ToString("yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture),
                     Label = Resources.Microsoft_plugin_timedate_Iso8601Zone,
                     AlternativeSearchTag = ResultHelper.SelectStringFromResources(isSystemDateTime, "Microsoft_plugin_timedate_SearchTagFormat"),
                     IconType = ResultIconType.DateTime,
@@ -362,7 +383,7 @@ internal static class AvailableResultsList
                 },
                 new AvailableResult()
                 {
-                    Value = currentTime?.ToString("R", CultureInfo.InvariantCulture) ?? dateTimeNow.ToString("R"),
+                    Value = dateTimeNow.ToString("R"),
                     Label = Resources.Microsoft_plugin_timedate_Rfc1123,
                     AlternativeSearchTag = ResultHelper.SelectStringFromResources(isSystemDateTime, "Microsoft_plugin_timedate_SearchTagFormat"),
                     IconType = ResultIconType.DateTime,

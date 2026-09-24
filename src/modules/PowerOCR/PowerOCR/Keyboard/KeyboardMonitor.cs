@@ -1,22 +1,23 @@
-// Copyright (c) Microsoft Corporation
+﻿// Copyright (c) Microsoft Corporation
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.Composition;
 
 using Microsoft.PowerToys.Settings.UI.Library.Utilities;
-using PowerOCR.Services;
 using PowerOCR.Settings;
+using PowerOCR.Utilities;
 
 using static PowerOCR.OSInterop;
 
 namespace PowerOCR.Keyboard;
 
-internal sealed partial class KeyboardMonitor : IDisposable
+[Export(typeof(KeyboardMonitor))]
+public class KeyboardMonitor : IDisposable
 {
     private readonly IUserSettings _userSettings;
-    private readonly IActivationService _activationService;
     private List<string> _previouslyPressedKeys = new List<string>();
 
     private List<string> _activationKeys = new List<string>();
@@ -24,10 +25,10 @@ internal sealed partial class KeyboardMonitor : IDisposable
     private bool disposedValue;
     private bool _activationShortcutPressed;
 
-    public KeyboardMonitor(IUserSettings userSettings, IActivationService activationService)
+    [ImportingConstructor]
+    public KeyboardMonitor(IUserSettings userSettings)
     {
         _userSettings = userSettings;
-        _activationService = activationService;
         _userSettings.ActivationShortcut.PropertyChanged -= ActivationShortcut_PropertyChanged;
         _userSettings.ActivationShortcut.PropertyChanged += ActivationShortcut_PropertyChanged;
         SetActivationKeys();
@@ -100,7 +101,7 @@ internal sealed partial class KeyboardMonitor : IDisposable
             {
                 _activationShortcutPressed = true;
                 e.Handled = true;
-                _activationService.RequestActivation();
+                WindowUtilities.LaunchOCROverlayOnEveryScreen();
             }
         }
     }
@@ -146,7 +147,7 @@ internal sealed partial class KeyboardMonitor : IDisposable
         }
     }
 
-    private void Dispose(bool disposing)
+    protected virtual void Dispose(bool disposing)
     {
         if (!disposedValue)
         {

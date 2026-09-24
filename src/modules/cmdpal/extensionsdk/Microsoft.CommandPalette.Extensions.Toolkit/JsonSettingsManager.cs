@@ -42,7 +42,6 @@ public abstract class JsonSettingsManager
             if (JsonNode.Parse(jsonContent) is JsonObject savedSettings)
             {
                 Settings.Update(jsonContent);
-                LoadAdditionalSettings(savedSettings);
             }
             else
             {
@@ -81,7 +80,6 @@ public abstract class JsonSettingsManager
                         savedSettings[item.Key] = item.Value is not null ? item.Value.DeepClone() : null;
                     }
 
-                    SaveAdditionalSettings(savedSettings);
                     var serialized = savedSettings.ToJsonString(_serializerOptions);
                     File.WriteAllText(FilePath, serialized);
                 }
@@ -99,13 +97,5 @@ public abstract class JsonSettingsManager
         {
             ExtensionHost.LogMessage(new LogMessage() { Message = ex.ToString() });
         }
-    }
-
-    protected virtual void LoadAdditionalSettings(JsonObject settings)
-    {
-    }
-
-    protected virtual void SaveAdditionalSettings(JsonObject settings)
-    {
     }
 }

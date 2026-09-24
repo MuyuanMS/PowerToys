@@ -38,7 +38,6 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             ViewModel = new MouseUtilsViewModel(
                 settingsUtils,
                 SettingsRepository<GeneralSettings>.GetInstance(settingsUtils),
-                SettingsRepository<AutoHideCursorSettings>.GetInstance(settingsUtils),
                 SettingsRepository<FindMyMouseSettings>.GetInstance(settingsUtils),
                 SettingsRepository<MouseHighlighterSettings>.GetInstance(settingsUtils),
                 SettingsRepository<MouseJumpSettings>.GetInstance(settingsUtils),

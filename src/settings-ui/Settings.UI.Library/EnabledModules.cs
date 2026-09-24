@@ -529,22 +529,6 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             }
         }
 
-        private bool autoHideCursor; // defaulting to off
-
-        [JsonPropertyName("AutoHideCursor")]
-        public bool AutoHideCursor
-        {
-            get => autoHideCursor;
-            set
-            {
-                if (autoHideCursor != value)
-                {
-                    LogTelemetryEvent(value);
-                    autoHideCursor = value;
-                }
-            }
-        }
-
         private bool cursorWrap; // defaulting to off
 
         [JsonPropertyName("CursorWrap")]

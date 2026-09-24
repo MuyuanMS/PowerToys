@@ -65,12 +65,7 @@ internal sealed partial class RemoteDesktopListPage : DynamicListPage
 
     public override IListItem[] GetItems()
     {
-        var query = SearchText?.Trim() ?? string.Empty;
-        var allConnections = _rdpConnectionsManager.Connections;
-
-        var connections = string.IsNullOrWhiteSpace(query)
-            ? allConnections.ToArray()
-            : ListHelpers.FilterList(allConnections, query, (s, i) => ListHelpers.ScoreListItem(s, i)).ToArray();
+        var connections = _rdpConnectionsManager.Connections.ToArray();
 
         if (_arbitraryHostItem is null)
         {
