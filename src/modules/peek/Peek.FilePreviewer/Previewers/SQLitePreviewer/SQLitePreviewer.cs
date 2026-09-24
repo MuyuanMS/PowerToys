@@ -69,7 +69,18 @@ namespace Peek.FilePreviewer.Previewers.SqlitePreviewer
                 bufferSize: 16,
                 useAsync: true))
             {
-                int bytesRead = await stream.ReadAsync(header.AsMemory(), cancellationToken);
+                int bytesRead = 0;
+                while (bytesRead < header.Length)
+                {
+                    int read = await stream.ReadAsync(header.AsMemory(bytesRead), cancellationToken);
+                    if (read == 0)
+                    {
+                        break;
+                    }
+
+                    bytesRead += read;
+                }
+
                 if (bytesRead != header.Length ||
                     System.Text.Encoding.ASCII.GetString(header) != "SQLite format 3\0")
                 {

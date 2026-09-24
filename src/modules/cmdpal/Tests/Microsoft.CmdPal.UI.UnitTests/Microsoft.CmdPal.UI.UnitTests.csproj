@@ -18,7 +18,6 @@
   <ItemGroup>
     <PackageReference Include="Moq" />
     <PackageReference Include="MSTest" />
-    <PackageReference Include="System.Drawing.Common" />
   </ItemGroup>
 
   <ItemGroup>
