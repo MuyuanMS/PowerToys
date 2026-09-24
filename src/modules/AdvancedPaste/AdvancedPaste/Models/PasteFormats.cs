@@ -84,6 +84,17 @@ public enum PasteFormats
 
     [PasteFormatMetadata(
         IsCoreAction = false,
+        ResourceId = "PasteAsJpgFile",
+        IconGlyph = "\uE8B9",
+        RequiresAIService = false,
+        CanPreview = false,
+        SupportedClipboardFormats = ClipboardFormat.Image,
+        IPCKey = AdvancedPastePasteAsFileAction.PropertyNames.PasteAsJpgFile,
+        KernelFunctionDescription = "Takes an image in the clipboard and transforms it to a JPG (JPEG) file.")]
+    PasteAsJpgFile = 12,
+
+    [PasteFormatMetadata(
+        IsCoreAction = false,
         ResourceId = "PasteAsHtmlFile",
         IconGlyph = "\uF6FA",
         RequiresAIService = false,
@@ -91,7 +102,7 @@ public enum PasteFormats
         SupportedClipboardFormats = ClipboardFormat.Html,
         IPCKey = AdvancedPastePasteAsFileAction.PropertyNames.PasteAsHtmlFile,
         KernelFunctionDescription = "Takes HTML data in the clipboard and transforms it to an HTML file.")]
-    PasteAsHtmlFile,
+    PasteAsHtmlFile = 7,
 
     [PasteFormatMetadata(
         IsCoreAction = false,
@@ -102,7 +113,7 @@ public enum PasteFormats
         SupportedClipboardFormats = ClipboardFormat.Audio | ClipboardFormat.Video,
         IPCKey = AdvancedPasteTranscodeAction.PropertyNames.TranscodeToMp3,
         KernelFunctionDescription = "Takes an audio or video file in the clipboard and transcodes it to MP3.")]
-    TranscodeToMp3,
+    TranscodeToMp3 = 8,
 
     [PasteFormatMetadata(
         IsCoreAction = false,
@@ -113,7 +124,7 @@ public enum PasteFormats
         SupportedClipboardFormats = ClipboardFormat.Video,
         IPCKey = AdvancedPasteTranscodeAction.PropertyNames.TranscodeToMp4,
         KernelFunctionDescription = "Takes a video file in the clipboard and transcodes it to MP4 (H.264/AAC).")]
-    TranscodeToMp4,
+    TranscodeToMp4 = 9,
 
     [PasteFormatMetadata(
         IsCoreAction = false,
@@ -122,7 +133,7 @@ public enum PasteFormats
         CanPreview = true,
         SupportedClipboardFormats = ClipboardFormat.Text | ClipboardFormat.Html | ClipboardFormat.Audio | ClipboardFormat.Video | ClipboardFormat.Image,
         RequiresPrompt = true)]
-    KernelQuery,
+    KernelQuery = 10,
 
     [PasteFormatMetadata(
         IsCoreAction = false,
@@ -132,5 +143,5 @@ public enum PasteFormats
         SupportedClipboardFormats = ClipboardFormat.Text | ClipboardFormat.Image,
         KernelFunctionDescription = "Takes user instructions and applies them to the current clipboard content (text or image). Use this function for image analysis, description, or transformation tasks beyond simple OCR.",
         RequiresPrompt = true)]
-    CustomTextTransformation,
+    CustomTextTransformation = 11,
 }
