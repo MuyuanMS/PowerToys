@@ -47,7 +47,7 @@ public class CachedIconSourceProviderTests
         IconLoadDiagnostics.Start();
         var loader = new ControllableIconLoader();
         var provider = new CachedIconSourceProvider(loader, new Size(20, 20), cacheSize: 16);
-        var icon = new IconDataViewModel { Icon = "test" };
+        var icon = new IconDataViewModel(new IconData("test"));
         var firstRequest = IconLoadDiagnostics.BeginRequest(IconRequestReason.SourceChanged, 1.0);
         var first = provider.GetIconSource(icon, 1.0, firstRequest);
         var secondRequest = IconLoadDiagnostics.BeginRequest(IconRequestReason.SourceChanged, 1.0);
