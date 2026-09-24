@@ -277,7 +277,7 @@ void KeyboardManager::LoadDeviceProfiles()
                 }
             }
 
-            if (obj.HasKey(L"cycleHotkey"))
+            if (json::has(obj, L"cycleHotkey", json::JsonValueType::Object))
             {
                 const auto hotkey = obj.GetNamedObject(L"cycleHotkey");
                 hotkeyVk = static_cast<UINT>(hotkey.GetNamedNumber(L"code", 0));

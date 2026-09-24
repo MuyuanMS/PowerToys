@@ -357,6 +357,7 @@ namespace KeyboardManagerEditorUI.Pages
                 if (!ProfileManager.SetActiveProfile(profile))
                 {
                     Logger.LogWarning($"Failed to switch to profile '{profile}'");
+                    LoadProfiles();
                     return;
                 }
 
