@@ -54,6 +54,7 @@ private:
     std::thread m_thread;
     std::atomic<DWORD> m_threadId{ 0 };
     std::atomic_bool m_started{ false };
+    std::atomic_bool m_stopRequested{ false };
 
     // Manual-reset event the worker sets once its message queue exists (after CreateWindowExW),
     // or once it has bailed out. Stop() waits on it before PostThreadMessageW so WM_QUIT is never

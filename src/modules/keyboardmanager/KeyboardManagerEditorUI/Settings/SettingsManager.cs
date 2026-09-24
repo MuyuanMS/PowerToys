@@ -287,17 +287,18 @@ namespace KeyboardManagerEditorUI.Settings
                 changed |= settings.ProfileDictionary.Remove(profile);
             }
 
+            if (string.Equals(settings.ActiveProfile, profileName, StringComparison.OrdinalIgnoreCase))
+            {
+                settings.ActiveProfile = string.Empty;
+                changed = true;
+            }
+
             if (!changed)
             {
                 return false;
             }
 
             settings.ProfileDictionary = BuildProfileIndex(settings);
-            if (string.Equals(settings.ActiveProfile, profileName, StringComparison.OrdinalIgnoreCase))
-            {
-                settings.ActiveProfile = string.Empty;
-            }
-
             return true;
         }
 

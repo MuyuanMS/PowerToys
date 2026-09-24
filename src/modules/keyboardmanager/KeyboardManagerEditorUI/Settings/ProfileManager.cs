@@ -26,6 +26,7 @@ namespace KeyboardManagerEditorUI.Settings
 
         // Named event the KBM engine waits on; signaling it makes the engine reload its settings.
         private const string SettingsChangedEventName = "PowerToys_KeyboardManager_Event_Settings";
+        private const string SettingsWriteMutexName = @"Local\PowerToys_KeyboardManager_Settings_Write";
 
         // A valid but empty engine config, used when creating a fresh profile.
         private const string EmptyConfigJson =
@@ -192,20 +193,23 @@ namespace KeyboardManagerEditorUI.Settings
 
             try
             {
-                if (!File.Exists(ConfigPath(profile)))
+                return WithSettingsLock(() =>
                 {
-                    Logger.LogWarning($"ProfileManager.SetActiveProfile: '{profile}.json' does not exist");
-                    return false;
-                }
+                    if (!File.Exists(ConfigPath(profile)))
+                    {
+                        Logger.LogWarning($"ProfileManager.SetActiveProfile: '{profile}.json' does not exist");
+                        return false;
+                    }
 
-                JsonObject root = (ReadSettingsRoot() as JsonObject) ?? CreateDefaultSettingsRoot();
-                JsonObject properties = EnsureObject(root, "properties");
-                SetValueProperty(properties, "activeConfiguration", profile);
-                AddToConfigurationList(properties, profile);
-                WriteSettingsRoot(root);
+                    JsonObject root = (ReadSettingsRoot() as JsonObject) ?? CreateDefaultSettingsRoot();
+                    JsonObject properties = EnsureObject(root, "properties");
+                    SetValueProperty(properties, "activeConfiguration", profile);
+                    AddToConfigurationList(properties, profile);
+                    WriteSettingsRoot(root);
 
-                SignalEngineReload();
-                return true;
+                    SignalEngineReload();
+                    return true;
+                });
             }
             catch (Exception ex)
             {
@@ -229,27 +233,30 @@ namespace KeyboardManagerEditorUI.Settings
 
             try
             {
-                string target = ConfigPath(profile);
-                if (File.Exists(target))
+                return WithSettingsLock(() =>
                 {
-                    Logger.LogWarning($"ProfileManager.CreateProfile: '{profile}' already exists");
-                    return false;
-                }
+                    string target = ConfigPath(profile);
+                    if (File.Exists(target))
+                    {
+                        Logger.LogWarning($"ProfileManager.CreateProfile: '{profile}' already exists");
+                        return false;
+                    }
 
-                if (copyFromActive && File.Exists(ConfigPath(GetActiveProfile())))
-                {
-                    File.Copy(ConfigPath(GetActiveProfile()), target, overwrite: false);
-                }
-                else
-                {
-                    File.WriteAllText(target, EmptyConfigJson);
-                }
+                    if (copyFromActive && File.Exists(ConfigPath(GetActiveProfile())))
+                    {
+                        File.Copy(ConfigPath(GetActiveProfile()), target, overwrite: false);
+                    }
+                    else
+                    {
+                        File.WriteAllText(target, EmptyConfigJson);
+                    }
 
-                JsonObject root = (ReadSettingsRoot() as JsonObject) ?? CreateDefaultSettingsRoot();
-                JsonObject properties = EnsureObject(root, "properties");
-                AddToConfigurationList(properties, profile);
-                WriteSettingsRoot(root);
-                return true;
+                    JsonObject root = (ReadSettingsRoot() as JsonObject) ?? CreateDefaultSettingsRoot();
+                    JsonObject properties = EnsureObject(root, "properties");
+                    AddToConfigurationList(properties, profile);
+                    WriteSettingsRoot(root);
+                    return true;
+                });
             }
             catch (Exception ex)
             {
@@ -272,42 +279,46 @@ namespace KeyboardManagerEditorUI.Settings
 
             try
             {
-                bool wasActive = GetActiveProfile().Equals(profile, StringComparison.OrdinalIgnoreCase);
-
-                // Abort before touching any other store if the config file can't be removed:
-                // otherwise we'd unregister the profile while its {name}.json stays on disk, and
-                // the directory scan in GetProfiles() would resurrect it on the next refresh.
-                if (!TryDeleteFile(ConfigPath(profile)))
+                return WithSettingsLock(() =>
                 {
-                    return false;
-                }
+                    bool wasActive = GetActiveProfile().Equals(profile, StringComparison.OrdinalIgnoreCase);
 
-                SettingsManager.RemoveProfileMembership(profile);
+                    if (!DeviceProfileManager.RemoveAssignmentsForProfile(profile))
+                    {
+                        return false;
+                    }
 
-                // Drop any keyboard->profile assignments for the deleted profile so auto-switch
-                // never targets a profile that no longer exists.
-                DeviceProfileManager.RemoveAssignmentsForProfile(profile);
+                    // Abort before touching any other store if the config file can't be removed:
+                    // otherwise we'd unregister the profile while its {name}.json stays on disk, and
+                    // the directory scan in GetProfiles() would resurrect it on the next refresh.
+                    if (!TryDeleteFile(ConfigPath(profile)))
+                    {
+                        return false;
+                    }
 
-                // Drop the display-name metadata for the deleted id so a later profile that happens
-                // to reuse the id doesn't inherit a stale name.
-                ProfileMetadataManager.Remove(profile);
+                    SettingsManager.RemoveProfileMembership(profile);
 
-                JsonObject root = (ReadSettingsRoot() as JsonObject) ?? CreateDefaultSettingsRoot();
-                JsonObject properties = EnsureObject(root, "properties");
-                RemoveFromConfigurationList(properties, profile);
-                if (wasActive)
-                {
-                    SetValueProperty(properties, "activeConfiguration", DefaultProfile);
-                }
+                    // Drop the display-name metadata for the deleted id so a later profile that happens
+                    // to reuse the id doesn't inherit a stale name.
+                    ProfileMetadataManager.Remove(profile);
 
-                WriteSettingsRoot(root);
+                    JsonObject root = (ReadSettingsRoot() as JsonObject) ?? CreateDefaultSettingsRoot();
+                    JsonObject properties = EnsureObject(root, "properties");
+                    RemoveFromConfigurationList(properties, profile);
+                    if (wasActive)
+                    {
+                        SetValueProperty(properties, "activeConfiguration", DefaultProfile);
+                    }
 
-                if (wasActive)
-                {
-                    SignalEngineReload();
-                }
+                    WriteSettingsRoot(root);
 
-                return true;
+                    if (wasActive)
+                    {
+                        SignalEngineReload();
+                    }
+
+                    return true;
+                });
             }
             catch (Exception ex)
             {
@@ -372,7 +383,37 @@ namespace KeyboardManagerEditorUI.Settings
         private static void WriteSettingsRoot(JsonNode root)
         {
             Directory.CreateDirectory(_settingsDirectory);
-            File.WriteAllText(SettingsJsonPath, root.ToJsonString(new JsonSerializerOptions { WriteIndented = false }));
+            string temporaryPath = SettingsJsonPath + "." + Environment.ProcessId + "." + Environment.CurrentManagedThreadId + ".tmp";
+            try
+            {
+                File.WriteAllText(temporaryPath, root.ToJsonString(new JsonSerializerOptions { WriteIndented = false }));
+                File.Move(temporaryPath, SettingsJsonPath, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath))
+                {
+                    File.Delete(temporaryPath);
+                }
+            }
+        }
+
+        private static T WithSettingsLock<T>(Func<T> action)
+        {
+            using var mutex = new Mutex(false, SettingsWriteMutexName);
+            if (!mutex.WaitOne(TimeSpan.FromSeconds(10)))
+            {
+                throw new TimeoutException("Timed out waiting for the Keyboard Manager settings write lock.");
+            }
+
+            try
+            {
+                return action();
+            }
+            finally
+            {
+                mutex.ReleaseMutex();
+            }
         }
 
         private static JsonObject EnsureObject(JsonObject parent, string key)

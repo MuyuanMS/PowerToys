@@ -83,7 +83,7 @@ namespace KeyboardManagerEditorUI.Settings
                 };
 
                 Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
-                File.WriteAllText(_filePath, JsonSerializer.Serialize(file, _jsonOptions));
+                WriteAtomically(file);
 
                 ProfileManager.SignalEngineReload();
                 return true;
@@ -101,11 +101,11 @@ namespace KeyboardManagerEditorUI.Settings
         /// so no keyboard is left mapped to a profile that no longer exists (which would otherwise
         /// make auto-switch write a nonexistent profile into activeConfiguration on the next keystroke).
         /// </summary>
-        public static void RemoveAssignmentsForProfile(string profile)
+        public static bool RemoveAssignmentsForProfile(string profile)
         {
             if (string.IsNullOrEmpty(profile))
             {
-                return;
+                return true;
             }
 
             try
@@ -114,16 +114,35 @@ namespace KeyboardManagerEditorUI.Settings
                 int removed = file.Map.RemoveAll(e => string.Equals(e.Profile, profile, StringComparison.Ordinal));
                 if (removed == 0)
                 {
-                    return;
+                    return true;
                 }
 
-                Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
-                File.WriteAllText(_filePath, JsonSerializer.Serialize(file, _jsonOptions));
+                WriteAtomically(file);
                 ProfileManager.SignalEngineReload();
+                return true;
             }
             catch (Exception ex)
             {
                 Logger.LogError($"Failed to prune deviceProfiles.json for '{profile}': {ex.Message}");
+                return false;
+            }
+        }
+
+        private static void WriteAtomically(DeviceProfilesFile file)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+            string temporaryPath = _filePath + "." + Environment.ProcessId + "." + Environment.CurrentManagedThreadId + ".tmp";
+            try
+            {
+                File.WriteAllText(temporaryPath, JsonSerializer.Serialize(file, _jsonOptions));
+                File.Move(temporaryPath, _filePath, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath))
+                {
+                    File.Delete(temporaryPath);
+                }
             }
         }
 

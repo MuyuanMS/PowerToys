@@ -62,6 +62,7 @@ namespace KeyboardManagerEditorUI.Interop
             public uint Time;
             public int PtX;
             public int PtY;
+            public uint LPrivate;
         }
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -120,6 +121,7 @@ namespace KeyboardManagerEditorUI.Interop
 
         private Thread? _thread;
         private uint _threadId;
+        private volatile bool _stopRequested;
 
         public RawInputWatcher(Action<DetectedKeyboard> onKeyboard)
         {
@@ -135,6 +137,7 @@ namespace KeyboardManagerEditorUI.Interop
             }
 
             _workerReady.Reset();
+            _stopRequested = false;
             _thread = new Thread(ThreadMain) { IsBackground = true, Name = "KbmRawInputWatcher" };
             _thread.Start();
         }
@@ -148,6 +151,7 @@ namespace KeyboardManagerEditorUI.Interop
             }
 
             _thread = null;
+            _stopRequested = true;
 
             // Wait until the worker has a message queue before posting WM_QUIT. The bounded wait
             // guards against a worker that died before signalling (it would still have exited, so
@@ -205,6 +209,13 @@ namespace KeyboardManagerEditorUI.Interop
             // The window now exists, so this thread has a message queue and PostThreadMessageW
             // from Stop() will be delivered. Safe to let Stop() proceed.
             _workerReady.Set();
+
+            if (_stopRequested)
+            {
+                DestroyWindow(hwnd);
+                UnregisterClassW(className, wc.HInstance);
+                return;
+            }
 
             while (GetMessageW(out NativeMessage msg, IntPtr.Zero, 0, 0) > 0)
             {

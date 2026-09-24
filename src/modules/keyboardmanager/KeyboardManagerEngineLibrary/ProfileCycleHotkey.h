@@ -45,8 +45,8 @@ private:
     std::atomic<HWND> m_hwnd{ nullptr };
     std::atomic<DWORD> m_threadId{ 0 };
     std::atomic_bool m_started{ false };
-    std::atomic<UINT> m_pendingModifiers{ 0 };
-    std::atomic<UINT> m_pendingVk{ 0 };
+    std::atomic_bool m_stopRequested{ false };
+    std::atomic<uint64_t> m_pendingHotkey{ 0 };
     bool m_registered = false; // listener-thread only
 
     // Manual-reset event the worker sets once its message queue exists (after CreateWindowExW),

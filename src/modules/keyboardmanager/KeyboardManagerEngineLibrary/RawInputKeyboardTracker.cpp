@@ -64,6 +64,7 @@ void RawInputKeyboardTracker::Start()
         ResetEvent(m_readyEvent);
     }
 
+    m_stopRequested.store(false);
     m_thread = std::thread([this] { ThreadMain(); });
 }
 
@@ -73,6 +74,8 @@ void RawInputKeyboardTracker::Stop()
     {
         return;
     }
+
+    m_stopRequested.store(true);
 
     // Wait until the worker has created its message queue before posting WM_QUIT; otherwise the
     // post can be lost and join() would block forever. Bounded so a worker that died before
@@ -204,6 +207,13 @@ void RawInputKeyboardTracker::ThreadMain()
     if (m_readyEvent != nullptr)
     {
         SetEvent(m_readyEvent);
+    }
+
+    if (m_stopRequested.load())
+    {
+        DestroyWindow(hwnd);
+        UnregisterClassW(RawInputWindowClassName, wc.hInstance);
+        return;
     }
 
     Logger::trace(L"RawInputKeyboardTracker: listening for raw keyboard input");

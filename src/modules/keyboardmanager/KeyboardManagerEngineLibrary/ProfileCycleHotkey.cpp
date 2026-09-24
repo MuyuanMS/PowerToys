@@ -37,6 +37,7 @@ void ProfileCycleHotkey::Start()
         ResetEvent(m_readyEvent);
     }
 
+    m_stopRequested.store(false);
     m_thread = std::thread([this] { ThreadMain(); });
 }
 
@@ -46,6 +47,8 @@ void ProfileCycleHotkey::Stop()
     {
         return;
     }
+
+    m_stopRequested.store(true);
 
     // Wait until the worker has created its message queue before posting WM_QUIT; otherwise the
     // post can be lost and join() would block forever. Bounded so a worker that died before
@@ -72,8 +75,7 @@ void ProfileCycleHotkey::Stop()
 
 void ProfileCycleHotkey::Update(UINT modifiers, UINT vk)
 {
-    m_pendingModifiers.store(modifiers);
-    m_pendingVk.store(vk);
+    m_pendingHotkey.store((static_cast<uint64_t>(modifiers) << 32) | vk);
 
     // If the window exists, apply on its thread; otherwise ThreadMain applies it after creation.
     const HWND hwnd = m_hwnd.load();
@@ -119,17 +121,19 @@ void ProfileCycleHotkey::ApplyPendingRegistration(HWND hwnd)
         m_registered = false;
     }
 
-    const UINT vk = m_pendingVk.load();
+    const uint64_t hotkey = m_pendingHotkey.load();
+    const UINT vk = static_cast<UINT>(hotkey);
     if (vk == 0)
     {
         return; // hotkey disabled
     }
 
     // MOD_NOREPEAT: holding the chord fires once, not repeatedly.
-    if (RegisterHotKey(hwnd, HotkeyId, m_pendingModifiers.load() | MOD_NOREPEAT, vk))
+    const UINT modifiers = static_cast<UINT>(hotkey >> 32);
+    if (RegisterHotKey(hwnd, HotkeyId, modifiers | MOD_NOREPEAT, vk))
     {
         m_registered = true;
-        Logger::trace(L"ProfileCycleHotkey: registered (modifiers=0x{:x}, vk=0x{:x})", m_pendingModifiers.load(), vk);
+        Logger::trace(L"ProfileCycleHotkey: registered (modifiers=0x{:x}, vk=0x{:x})", modifiers, vk);
     }
     else
     {
@@ -168,6 +172,14 @@ void ProfileCycleHotkey::ThreadMain()
     if (m_readyEvent != nullptr)
     {
         SetEvent(m_readyEvent);
+    }
+
+    if (m_stopRequested.load())
+    {
+        m_hwnd.store(nullptr);
+        DestroyWindow(hwnd);
+        UnregisterClassW(HotkeyWindowClassName, wc.hInstance);
+        return;
     }
 
     MSG msg;

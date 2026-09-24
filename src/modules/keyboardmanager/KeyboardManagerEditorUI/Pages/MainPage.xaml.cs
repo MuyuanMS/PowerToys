@@ -561,7 +561,7 @@ namespace KeyboardManagerEditorUI.Pages
             }
             finally
             {
-                _autoSwitchWatcher.Stop();
+                _autoSwitchWatcher.Dispose();
                 _autoSwitchWatcher = null;
             }
 
