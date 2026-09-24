@@ -19,9 +19,9 @@ internal sealed class AdaptiveCache<TKey, TValue>
     private readonly int _capacity;
     private readonly double _decayFactor;
     private readonly TimeSpan _decayInterval;
+    private readonly Action<TKey, TValue, AdaptiveCacheRemovalReason, int, int>? _removalCallback;
 
     private readonly ConcurrentDictionary<TKey, CacheEntry> _map;
-    private readonly ConcurrentStack<CacheEntry> _pool = [];
     private readonly WaitCallback _maintenanceCallback;
 
     // ConcurrentDictionary.Count acquires every stripe lock. Keep an approximate count so
@@ -33,11 +33,16 @@ internal sealed class AdaptiveCache<TKey, TValue>
 
     internal int ApproximateCount => Volatile.Read(ref _entryCount);
 
-    public AdaptiveCache(int capacity = 384, TimeSpan? decayInterval = null, double decayFactor = 0.5)
+    public AdaptiveCache(
+        int capacity = 384,
+        TimeSpan? decayInterval = null,
+        double decayFactor = 0.5,
+        Action<TKey, TValue, AdaptiveCacheRemovalReason, int, int>? removalCallback = null)
     {
         _capacity = capacity;
         _decayInterval = decayInterval ?? TimeSpan.FromMinutes(5);
         _decayFactor = decayFactor;
+        _removalCallback = removalCallback;
         _map = new ConcurrentDictionary<TKey, CacheEntry>(Environment.ProcessorCount, capacity);
 
         _maintenanceCallback = static state =>
@@ -62,29 +67,19 @@ internal sealed class AdaptiveCache<TKey, TValue>
             return entry.Value!;
         }
 
-        if (!_pool.TryPop(out var newEntry))
-        {
-            newEntry = new CacheEntry();
-        }
-
         var value = factory(key, arg);
         var tick = Interlocked.Increment(ref _currentTick);
+        var newEntry = new CacheEntry();
         newEntry.Initialize(key, value, 1.0, tick);
 
         if (_map.TryAdd(key, newEntry))
         {
             Interlocked.Increment(ref _entryCount);
         }
-        else
+        else if (_map.TryGetValue(key, out var existing))
         {
-            newEntry.Clear();
-            _pool.Push(newEntry);
-
-            if (_map.TryGetValue(key, out var existing))
-            {
-                existing.Update(tick);
-                return existing.Value!;
-            }
+            existing.Update(tick);
+            return existing.Value!;
         }
 
         if (ShouldMaintenanceRun())
@@ -110,30 +105,34 @@ internal sealed class AdaptiveCache<TKey, TValue>
 
     public void Add(TKey key, TValue value)
     {
-        var tick = Interlocked.Increment(ref _currentTick);
-
-        if (_map.TryGetValue(key, out var existing))
+        while (true)
         {
-            existing.Update(tick);
-            existing.SetValue(value);
-            return;
-        }
+            var tick = Interlocked.Increment(ref _currentTick);
+            var newEntry = new CacheEntry();
 
-        if (!_pool.TryPop(out var newEntry))
-        {
-            newEntry = new CacheEntry();
-        }
+            if (_map.TryGetValue(key, out var existing))
+            {
+                newEntry.Initialize(key, value, existing.GetFrequency() + 1.0, tick);
+                if (_map.TryUpdate(key, newEntry, existing))
+                {
+                    _removalCallback?.Invoke(
+                        key,
+                        existing.Value,
+                        AdaptiveCacheRemovalReason.Replaced,
+                        ApproximateCount,
+                        _capacity);
+                    break;
+                }
 
-        newEntry.Initialize(key, value, 1.0, tick);
+                continue;
+            }
 
-        if (_map.TryAdd(key, newEntry))
-        {
-            Interlocked.Increment(ref _entryCount);
-        }
-        else
-        {
-            newEntry.Clear();
-            _pool.Push(newEntry);
+            newEntry.Initialize(key, value, 1.0, tick);
+            if (_map.TryAdd(key, newEntry))
+            {
+                Interlocked.Increment(ref _entryCount);
+                break;
+            }
         }
 
         if (ShouldMaintenanceRun())
@@ -142,13 +141,14 @@ internal sealed class AdaptiveCache<TKey, TValue>
         }
     }
 
-    public bool TryRemove(TKey key)
+    public bool TryRemove(TKey key) => TryRemove(key, AdaptiveCacheRemovalReason.Explicit);
+
+    private bool TryRemove(TKey key, AdaptiveCacheRemovalReason reason)
     {
         if (_map.TryRemove(key, out var evicted))
         {
             Interlocked.Decrement(ref _entryCount);
-            evicted.Clear();
-            _pool.Push(evicted);
+            _removalCallback?.Invoke(key, evicted.Value, reason, ApproximateCount, _capacity);
             return true;
         }
 
@@ -161,7 +161,7 @@ internal sealed class AdaptiveCache<TKey, TValue>
         // while Keys snapshots under every stripe lock.
         foreach (var (key, _) in _map)
         {
-            TryRemove(key);
+            TryRemove(key, AdaptiveCacheRemovalReason.Clear);
         }
 
         Interlocked.Exchange(ref _currentTick, 0);
@@ -200,11 +200,27 @@ internal sealed class AdaptiveCache<TKey, TValue>
 
             var score = CalculateScore(entry, currentTick);
 
-            if (score < 0.1 || ApproximateCount > _capacity)
+            var overCapacity = ApproximateCount > _capacity;
+            if (score < 0.1 || overCapacity)
             {
-                TryRemove(key);
+                TryRemove(
+                    key,
+                    entry,
+                    overCapacity ? AdaptiveCacheRemovalReason.Capacity : AdaptiveCacheRemovalReason.LowScore);
             }
         }
+    }
+
+    private bool TryRemove(TKey key, CacheEntry expectedEntry, AdaptiveCacheRemovalReason reason)
+    {
+        if (((ICollection<KeyValuePair<TKey, CacheEntry>>)_map).Remove(new KeyValuePair<TKey, CacheEntry>(key, expectedEntry)))
+        {
+            Interlocked.Decrement(ref _entryCount);
+            _removalCallback?.Invoke(key, expectedEntry.Value, reason, ApproximateCount, _capacity);
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -226,7 +242,7 @@ internal sealed class AdaptiveCache<TKey, TValue>
     }
 
     /// <summary>
-    /// Represents a single pooled entry in the cache, containing the value and
+    /// Represents a single entry in the cache, containing the value and
     /// atomic metadata for adaptive eviction logic.
     /// </summary>
     private sealed class CacheEntry
@@ -237,7 +253,7 @@ internal sealed class AdaptiveCache<TKey, TValue>
         public TKey Key { get; private set; } = default!;
 
         /// <summary>
-        /// Gets the cached value. This reference is cleared on eviction to allow GC collection.
+        /// Gets the cached value. The entry is removed from the map on eviction to allow GC collection.
         /// </summary>
         public TValue Value { get; private set; } = default!;
 
@@ -262,17 +278,6 @@ internal sealed class AdaptiveCache<TKey, TValue>
             Value = value;
             _frequencyBits = BitConverter.DoubleToInt64Bits(frequency);
             _lastAccessTick = lastAccessTick;
-        }
-
-        public void SetValue(TValue value)
-        {
-            Value = value;
-        }
-
-        public void Clear()
-        {
-            Key = default!;
-            Value = default!;
         }
 
         public void Update(long tick)

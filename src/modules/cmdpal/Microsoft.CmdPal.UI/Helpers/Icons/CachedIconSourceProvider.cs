@@ -2,7 +2,6 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using Microsoft.CmdPal.UI.ViewModels;
 using Microsoft.UI.Xaml.Controls;
@@ -13,15 +12,21 @@ namespace Microsoft.CmdPal.UI.Helpers;
 internal sealed class CachedIconSourceProvider : IIconSourceProvider
 {
     private readonly AdaptiveCache<IconCacheKey, Task<IconSource?>> _cache;
-    private readonly ConcurrentDictionary<IconCacheKey, Task<IconSource?>> _inFlight = new();
+    private readonly object _inFlightLock = new();
+    private readonly Dictionary<IconCacheKey, InFlightLoad> _inFlight = [];
     private readonly Size _iconSize;
+    private readonly int _cacheSize;
     private readonly IIconLoaderService _loader;
 
     public CachedIconSourceProvider(IIconLoaderService loader, Size iconSize, int cacheSize)
     {
         _loader = loader;
         _iconSize = iconSize;
-        _cache = new AdaptiveCache<IconCacheKey, Task<IconSource?>>(cacheSize, TimeSpan.FromMinutes(60));
+        _cacheSize = cacheSize;
+        _cache = new AdaptiveCache<IconCacheKey, Task<IconSource?>>(
+            cacheSize,
+            TimeSpan.FromMinutes(60),
+            removalCallback: OnCacheEntryRemoved);
     }
 
     public CachedIconSourceProvider(IIconLoaderService loader, int iconSize, int cacheSize)
@@ -35,10 +40,12 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
 
         if (_cache.TryGet(key, out var existingTask))
         {
+            IconLoadDiagnostics.RecordCacheLookup(_iconSize, _cacheSize, hit: true, _cache.ApproximateCount);
             diagnostics.RecordProviderResolution(IconProviderResolution.CacheHit, existingTask);
             return existingTask;
         }
 
+        IconLoadDiagnostics.RecordCacheLookup(_iconSize, _cacheSize, hit: false, _cache.ApproximateCount);
         return GetOrCreateSlowPath(key, icon, scale, diagnostics);
     }
 
@@ -50,16 +57,40 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
     {
         var tcs = new TaskCompletionSource<IconSource?>(TaskCreationOptions.RunContinuationsAsynchronously);
         var task = tcs.Task;
+        var streamReference = icon.Data?.Unsafe;
+        IconLoadMeasurement? loadDiagnostics;
+        InFlightLoad? pending;
 
-        var pending = _inFlight.GetOrAdd(key, task);
-        if (!ReferenceEquals(pending, task))
+        lock (_inFlightLock)
         {
-            diagnostics.RecordProviderResolution(IconProviderResolution.InFlight, pending);
-            return pending;
+            if (_inFlight.TryGetValue(key, out pending))
+            {
+                diagnostics.RecordProviderResolution(IconProviderResolution.InFlight, pending.Diagnostics);
+                return pending.Task;
+            }
+
+            try
+            {
+                loadDiagnostics = IconLoadDiagnostics.CreateLoad(
+                    diagnostics,
+                    icon.Icon,
+                    streamReference is not null,
+                    _iconSize.Width,
+                    _iconSize.Height,
+                    scale);
+                loadDiagnostics?.RegisterTask(task);
+            }
+            catch (Exception ex)
+            {
+                tcs.TrySetException(ex);
+                return task;
+            }
+
+            pending = new InFlightLoad(task, loadDiagnostics);
+            _inFlight.Add(key, pending);
         }
 
-        IconLoadMeasurement? loadDiagnostics = null;
-
+        var newLoad = pending!;
         _ = task.ContinueWith(
             completed =>
             {
@@ -68,11 +99,21 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
                     if (completed.IsCompletedSuccessfully)
                     {
                         _cache.Add(key, completed);
+                        IconLoadDiagnostics.RecordCacheEntryAdded(
+                            _iconSize,
+                            _cacheSize,
+                            _cache.ApproximateCount);
                     }
                 }
                 finally
                 {
-                    _inFlight.TryRemove(new KeyValuePair<IconCacheKey, Task<IconSource?>>(key, completed));
+                    lock (_inFlightLock)
+                    {
+                        if (_inFlight.TryGetValue(key, out var current) && ReferenceEquals(current, newLoad))
+                        {
+                            _inFlight.Remove(key);
+                        }
+                    }
                 }
             },
             CancellationToken.None,
@@ -81,15 +122,6 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
 
         try
         {
-            var streamReference = icon.Data?.Unsafe;
-            loadDiagnostics = IconLoadDiagnostics.CreateLoad(
-                diagnostics,
-                icon.Icon,
-                streamReference is not null,
-                _iconSize.Width,
-                _iconSize.Height,
-                scale);
-            loadDiagnostics?.RegisterTask(task);
             diagnostics.RecordProviderResolution(IconProviderResolution.NewLoad, loadDiagnostics);
 
             if (!_loader.TryEnqueueLoad(
@@ -112,6 +144,24 @@ internal sealed class CachedIconSourceProvider : IIconSourceProvider
         }
 
         return task;
+    }
+
+    private sealed record InFlightLoad(Task<IconSource?> Task, IconLoadMeasurement? Diagnostics);
+
+    private void OnCacheEntryRemoved(
+        IconCacheKey key,
+        Task<IconSource?> task,
+        AdaptiveCacheRemovalReason reason,
+        int remainingCount,
+        int capacity)
+    {
+        _ = key;
+        _ = task;
+        IconLoadDiagnostics.RecordCacheEntryRemoved(
+            _iconSize,
+            capacity,
+            remainingCount,
+            reason);
     }
 
     private readonly struct IconCacheKey : IEquatable<IconCacheKey>
