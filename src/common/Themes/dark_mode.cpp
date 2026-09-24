@@ -20,11 +20,11 @@ namespace
     };
 
     using fnSetPreferredAppMode = PreferredAppMode(WINAPI*)(PreferredAppMode appMode);
-    using fnShouldAppsUseDarkMode = bool(WINAPI*)();
+    using fnRefreshImmersiveColorPolicyState = void(WINAPI*)();
     using fnFlushMenuThemes = void(WINAPI*)();
 
     fnSetPreferredAppMode pSetPreferredAppMode = nullptr;
-    fnShouldAppsUseDarkMode pShouldAppsUseDarkMode = nullptr;
+    fnRefreshImmersiveColorPolicyState pRefreshImmersiveColorPolicyState = nullptr;
     fnFlushMenuThemes pFlushMenuThemes = nullptr;
 
     std::once_flag init_flag;
@@ -46,10 +46,10 @@ namespace
             return;
         }
 
+        pRefreshImmersiveColorPolicyState = reinterpret_cast<fnRefreshImmersiveColorPolicyState>(
+            GetProcAddress(hUxTheme, MAKEINTRESOURCEA(104)));
         pSetPreferredAppMode = reinterpret_cast<fnSetPreferredAppMode>(
             GetProcAddress(hUxTheme, MAKEINTRESOURCEA(135)));
-        pShouldAppsUseDarkMode = reinterpret_cast<fnShouldAppsUseDarkMode>(
-            GetProcAddress(hUxTheme, MAKEINTRESOURCEA(132)));
         pFlushMenuThemes = reinterpret_cast<fnFlushMenuThemes>(
             GetProcAddress(hUxTheme, MAKEINTRESOURCEA(136)));
     }
@@ -79,16 +79,16 @@ void DarkMode::Initialize()
 
 void DarkMode::Refresh()
 {
-    Initialize();
+    std::call_once(init_flag, LoadOrdinals);
+    if (pRefreshImmersiveColorPolicyState)
+    {
+        pRefreshImmersiveColorPolicyState();
+    }
+    ApplyPreferredAppMode();
 }
 
 bool DarkMode::IsDarkModeEnabled()
 {
-    if (pShouldAppsUseDarkMode)
-    {
-        return pShouldAppsUseDarkMode();
-    }
-
     return ThemeHelpers::GetSystemTheme() == Theme::Dark;
 }
 
