@@ -170,15 +170,7 @@ public sealed partial class CommandBarViewModel : ObservableObject,
             return ContextKeybindingResult.Unhandled;
         }
 
-        if (SelectedItem is ParametersPageViewModel parametersPage)
-        {
-            parametersPage.SubmitCommand(command);
-        }
-        else
-        {
-            WeakReferenceMessenger.Default.Send<PerformCommandMessage>(new(command.Command.Model, command.Model));
-        }
-
+        WeakReferenceMessenger.Default.Send<PerformCommandMessage>(new(command.Command.Model, command.Model));
         if (command.HasMoreCommands)
         {
             return ContextKeybindingResult.KeepOpen;

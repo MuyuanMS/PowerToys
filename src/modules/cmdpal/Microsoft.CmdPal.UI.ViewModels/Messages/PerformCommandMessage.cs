@@ -30,12 +30,6 @@ public record PerformCommandMessage
     public Action? OnBeforeShowConfirmation { get; set; }
 
     /// <summary>
-    /// Optional callback raised after an invokable command completes, including
-    /// when it throws. The result kind is null when invocation did not return one.
-    /// </summary>
-    public Action<CommandResultKind?>? OnInvocationCompleted { get; set; }
-
-    /// <summary>
     /// When set, and the command turns out to be a page, the main window is
     /// summoned before navigating. Used by senders that run while the palette
     /// is hidden (for example the toast's action button).

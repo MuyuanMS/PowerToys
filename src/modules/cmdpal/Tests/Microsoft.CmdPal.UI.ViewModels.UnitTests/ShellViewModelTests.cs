@@ -180,32 +180,7 @@ public partial class ShellViewModelTests
     }
 
     [TestMethod]
-    public void PerformCommand_CompletesInvocationCallbackForNullCommand()
-    {
-        var viewModel = CreateViewModel();
-        var completed = false;
-
-        try
-        {
-            viewModel.Receive(new PerformCommandMessage(new ExtensionObject<ICommand>(null))
-            {
-                OnInvocationCompleted = result =>
-                {
-                    Assert.IsNull(result);
-                    completed = true;
-                },
-            });
-
-            Assert.IsTrue(completed);
-        }
-        finally
-        {
-            WeakReferenceMessenger.Default.UnregisterAll(viewModel);
-        }
-    }
-
-    [TestMethod]
-    public void PerformCommand_CountsPageNavigationOnceAfterShowingWindowAndCompletesInvocationCallback()
+    public void PerformCommand_CountsPageNavigationOnceAfterShowingWindow()
     {
         var viewModel = CreateViewModel();
         var recipient = new object();
@@ -217,17 +192,9 @@ public partial class ShellViewModelTests
 
         try
         {
-            viewModel.Receive(new PerformCommandMessage(new ExtensionObject<ICommand>(new TestPage()))
-            {
-                ShowWindowIfPage = true,
-                OnInvocationCompleted = result =>
-                {
-                    Assert.IsNull(result);
-                    events.Add("callback");
-                },
-            });
+            viewModel.Receive(new PerformCommandMessage(new ExtensionObject<ICommand>(new TestPage())) { ShowWindowIfPage = true });
 
-            string[] expected = ["show", "started", "completed", "navigate", "callback"];
+            string[] expected = ["show", "started", "completed", "navigate"];
             CollectionAssert.AreEqual(expected, events);
         }
         finally

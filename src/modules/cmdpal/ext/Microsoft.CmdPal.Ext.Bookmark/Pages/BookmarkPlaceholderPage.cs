@@ -19,23 +19,15 @@ internal sealed partial class BookmarkPlaceholderPage : ParametersPage, IDisposa
     private readonly Dictionary<string, StringParameterRun> _placeholderRuns;
     private readonly ListItem _commandItem;
     private readonly SupersedingAsyncValueGate<IIconInfo?> _iconReloadGate;
-    private readonly Func<Classification, bool> _launchBookmark;
 
     public BookmarkPlaceholderPage(BookmarkData bookmarkData, IBookmarkIconLocator iconLocator, IBookmarkResolver resolver, IPlaceholderParser placeholderParser)
-        : this(bookmarkData, iconLocator, resolver, placeholderParser, classification => CommandLauncher.Launch(classification))
-    {
-    }
-
-    internal BookmarkPlaceholderPage(BookmarkData bookmarkData, IBookmarkIconLocator iconLocator, IBookmarkResolver resolver, IPlaceholderParser placeholderParser, Func<Classification, bool> launchBookmark)
     {
         ArgumentNullException.ThrowIfNull(bookmarkData);
         ArgumentNullException.ThrowIfNull(resolver);
         ArgumentNullException.ThrowIfNull(placeholderParser);
-        ArgumentNullException.ThrowIfNull(launchBookmark);
 
         _bookmarkData = bookmarkData;
         _resolver = resolver;
-        _launchBookmark = launchBookmark;
 
         // Cache the original bookmark's classification — it doesn't depend on
         // placeholder values, and we need it on every keystroke to know how to
@@ -118,7 +110,7 @@ internal sealed partial class BookmarkPlaceholderPage : ParametersPage, IDisposa
         // Re-classify the final target — adding placeholder values may change
         // what kind of command this is (e.g. a path that needs different launch).
         var classification = _resolver.ClassifyOrUnknown(target);
-        var success = _launchBookmark(classification);
+        var success = CommandLauncher.Launch(classification);
         if (success)
         {
             ResetPlaceholderValues();

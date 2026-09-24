@@ -280,35 +280,31 @@ public partial class ShellViewModel : ObservableObject,
 
         var navigationToken = newCts.Token;
 
-        AppExtensionHost? host = null;
-        var invocationCompletionHandled = false;
+        var command = message.Command.Unsafe;
+        if (command is null)
+        {
+            return;
+        }
+
+        // Determine whether this is the root/home page navigation BEFORE
+        // computing providerContext. When navigating back to the root page we
+        // must use an empty provider context so that home-page list items don't
+        // inherit a pinning-capable context left over from the previous sub-page
+        // (which can happen e.g. when the window is hidden while on a sub-page).
+        // isMainPage must be evaluated here; if it were moved inside the
+        // "if (command is IPage)" block below, it would be too late to affect
+        // the providerContext that is passed to the new page view-model.
+        var isMainPage = command == _rootPage;
+
+        var host = _appHostService.GetHostForCommand(message.Context, CurrentPage.ExtensionHost);
+        var providerContext = isMainPage
+            ? CommandProviderContext.Empty
+            : _appHostService.GetProviderContextForCommand(message.Context, CurrentPage.ProviderContext);
+
+        _rootPageService.OnPerformCommand(message.Context, CurrentPage.IsRootPage, host);
+
         try
         {
-            var command = message.Command.Unsafe;
-            if (command is null)
-            {
-                message.OnInvocationCompleted?.Invoke(null);
-                invocationCompletionHandled = true;
-                return;
-            }
-
-            // Determine whether this is the root/home page navigation BEFORE
-            // computing providerContext. When navigating back to the root page we
-            // must use an empty provider context so that home-page list items don't
-            // inherit a pinning-capable context left over from the previous sub-page
-            // (which can happen e.g. when the window is hidden while on a sub-page).
-            // isMainPage must be evaluated here; if it were moved inside the
-            // "if (command is IPage)" block below, it would be too late to affect
-            // the providerContext that is passed to the new page view-model.
-            var isMainPage = command == _rootPage;
-
-            host = _appHostService.GetHostForCommand(message.Context, CurrentPage.ExtensionHost);
-            var providerContext = isMainPage
-                ? CommandProviderContext.Empty
-                : _appHostService.GetProviderContextForCommand(message.Context, CurrentPage.ProviderContext);
-
-            _rootPageService.OnPerformCommand(message.Context, CurrentPage.IsRootPage, host);
-
             if (command is IPage page)
             {
                 CoreLogger.LogDebug($"Navigating to page");
@@ -367,30 +363,17 @@ public partial class ShellViewModel : ObservableObject,
 
                 // Note: Originally we set our page back in the ViewModel here, but that now happens in response to the Frame navigating triggered from the above
                 // See RootFrame_Navigated event handler.
-                message.OnInvocationCompleted?.Invoke(null);
-                invocationCompletionHandled = true;
             }
             else if (command is IInvokableCommand invokable)
             {
                 CoreLogger.LogDebug($"Invoking command");
 
                 WeakReferenceMessenger.Default.Send<TelemetryBeginInvokeMessage>();
-                invocationCompletionHandled = true;
                 StartInvoke(message, invokable, host);
-            }
-            else
-            {
-                message.OnInvocationCompleted?.Invoke(null);
-                invocationCompletionHandled = true;
             }
         }
         catch (Exception ex)
         {
-            if (!invocationCompletionHandled)
-            {
-                message.OnInvocationCompleted?.Invoke(null);
-            }
-
             // TODO: It would be better to do this as a page exception, rather
             // than a silent log message.
             host?.Log(ex.Message);
@@ -400,14 +383,11 @@ public partial class ShellViewModel : ObservableObject,
     private void StartInvoke(PerformCommandMessage message, IInvokableCommand invokable, AppExtensionHost? host)
     {
         // TODO GH #525 This needs more better locking.
-        Action<CommandResultKind?>? rejectedInvocationCallback = null;
         lock (_invokeLock)
         {
             if (_handleInvokeTask is not null)
             {
-                // Release senders that use this callback to track submission
-                // state when the invocation is rejected.
-                rejectedInvocationCallback = message.OnInvocationCompleted;
+                // do nothing - a command is already doing a thing
             }
             else
             {
@@ -419,8 +399,6 @@ public partial class ShellViewModel : ObservableObject,
                 });
             }
         }
-
-        rejectedInvocationCallback?.Invoke(null);
     }
 
     private void SafeHandleInvokeCommandSynchronous(PerformCommandMessage message, IInvokableCommand invokable, AppExtensionHost? host)
@@ -435,32 +413,25 @@ public partial class ShellViewModel : ObservableObject,
 
         try
         {
-            ICommandResult? result = null;
+            ICommandResult? result;
             try
             {
-                try
-                {
-                    // Call out to extension process.
-                    // * May fail!
-                    // * May never return!
-                    result = invokable.Invoke(message.Context);
-                    success = true;
-                }
-                finally
-                {
-                    // Report the invocation outcome before processing its result.
-                    stopwatch.Stop();
-                    WeakReferenceMessenger.Default.Send<TelemetryExtensionInvokedMessage>(
-                        new(extensionId, commandId, commandName, success, (ulong)stopwatch.ElapsedMilliseconds));
-                }
-
-                // But if it did succeed, we need to handle the result.
-                UnsafeHandleCommandResult(result, message.OnBeforeShowConfirmation);
+                // Call out to extension process.
+                // * May fail!
+                // * May never return!
+                result = invokable.Invoke(message.Context);
+                success = true;
             }
             finally
             {
-                message.OnInvocationCompleted?.Invoke(result?.Kind);
+                // Report the invocation outcome before processing its result.
+                stopwatch.Stop();
+                WeakReferenceMessenger.Default.Send<TelemetryExtensionInvokedMessage>(
+                    new(extensionId, commandId, commandName, success, (ulong)stopwatch.ElapsedMilliseconds));
             }
+
+            // But if it did succeed, we need to handle the result.
+            UnsafeHandleCommandResult(result, message.OnBeforeShowConfirmation);
 
             _handleInvokeTask = null;
         }
