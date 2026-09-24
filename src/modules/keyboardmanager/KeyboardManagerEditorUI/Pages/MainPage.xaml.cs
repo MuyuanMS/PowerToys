@@ -812,9 +812,6 @@ namespace KeyboardManagerEditorUI.Pages
                 !entry.Key.Equals(replacingId, StringComparison.OrdinalIgnoreCase) &&
                 KeyboardManagerInterop.AreShortcutsEqual(entry.Value.Shortcut.OriginalKeys, replacementMapping.OriginalKeys) &&
 
-                // An Always and an Alone remap of the same key are distinct (separate engine tables),
-                // so only treat it as a duplicate when the condition matches too.
-                entry.Value.Shortcut.Condition == replacementMapping.Condition &&
                 (string.IsNullOrEmpty(entry.Value.Shortcut.TargetApp) ||
                  string.IsNullOrEmpty(replacementMapping.TargetApp) ||
                  entry.Value.Shortcut.TargetApp.Equals(replacementMapping.TargetApp, StringComparison.OrdinalIgnoreCase)));
