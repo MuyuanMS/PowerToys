@@ -19,6 +19,8 @@ namespace Microsoft.CmdPal.Ext.Bookmarks.UnitTests;
 [TestClass]
 public sealed class BookmarkPlaceholderPageTests
 {
+    private static readonly string[] EmptyPlaceholderValues = { string.Empty, string.Empty };
+
     [TestMethod]
     public void LaunchWithCurrentValues_SuccessfulLaunch_ClearsPlaceholderValuesAndSubtitle()
     {
@@ -30,7 +32,7 @@ public sealed class BookmarkPlaceholderPageTests
 
         Assert.AreEqual(CommandResultKind.Dismiss, result.Kind);
         CollectionAssert.AreEqual(
-            new[] { string.Empty, string.Empty },
+            EmptyPlaceholderValues,
             parameters.Select(parameter => parameter.Text).ToArray());
         Assert.AreEqual(string.Empty, page.Command.Subtitle);
     }
@@ -79,7 +81,7 @@ public sealed class BookmarkPlaceholderPageTests
     {
         Assert.IsInstanceOfType(page.Command.Command, typeof(IInvokableCommand));
         var command = (IInvokableCommand)page.Command.Command!;
-        return (CommandResult)command.Invoke();
+        return (CommandResult)command.Invoke(null);
     }
 
     private sealed class StubBookmarkResolver : IBookmarkResolver
