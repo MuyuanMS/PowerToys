@@ -47,28 +47,7 @@ namespace Peek.FilePreviewer.Previewers.SqlitePreviewer
 
         public static bool IsItemSupported(IFileSystemItem item)
         {
-            if (!_supportedFileTypes.Contains(item.Extension.ToLowerInvariant()))
-            {
-                return false;
-            }
-
-            try
-            {
-                using var stream = System.IO.File.OpenRead(item.Path);
-                var buffer = new byte[16];
-                int bytesRead = stream.Read(buffer, 0, 16);
-                if (bytesRead == 16)
-                {
-                    var header = System.Text.Encoding.ASCII.GetString(buffer);
-                    return header == "SQLite format 3\0";
-                }
-            }
-            catch
-            {
-                // Ignored
-            }
-
-            return false;
+            return _supportedFileTypes.Contains(item.Extension.ToLowerInvariant());
         }
 
         public Task<PreviewSize> GetPreviewSizeAsync(CancellationToken cancellationToken)
@@ -80,6 +59,23 @@ namespace Peek.FilePreviewer.Previewers.SqlitePreviewer
         public async Task LoadPreviewAsync(CancellationToken cancellationToken)
         {
             State = PreviewState.Loading;
+
+            var header = new byte[16];
+            await using (var stream = new System.IO.FileStream(
+                Item.Path,
+                System.IO.FileMode.Open,
+                System.IO.FileAccess.Read,
+                System.IO.FileShare.ReadWrite,
+                bufferSize: 16,
+                useAsync: true))
+            {
+                int bytesRead = await stream.ReadAsync(header.AsMemory(), cancellationToken);
+                if (bytesRead != header.Length ||
+                    System.Text.Encoding.ASCII.GetString(header) != "SQLite format 3\0")
+                {
+                    throw new System.IO.InvalidDataException("The file is not a SQLite database.");
+                }
+            }
 
             var connectionString = new SqliteConnectionStringBuilder
             {
