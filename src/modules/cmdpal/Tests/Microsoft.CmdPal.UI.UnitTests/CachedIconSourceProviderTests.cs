@@ -50,7 +50,7 @@ public class CachedIconSourceProviderTests
         {
             var loader = new ControllableIconLoader();
             var provider = new CachedIconSourceProvider(loader, new Size(20, 20), cacheSize: 16);
-            var icon = new IconDataViewModel { Icon = "test" };
+            var icon = CreateIcon();
             var requests = new ConcurrentBag<(Task<IconSource?> Task, IconRequestMeasurement Diagnostics)>();
 
             Parallel.For(

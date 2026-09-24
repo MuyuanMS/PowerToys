@@ -5,6 +5,8 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Tracing;
+using System.Reflection;
+using System.Threading.Tasks;
 using Microsoft.CmdPal.UI.Controls;
 using Microsoft.CmdPal.UI.Helpers;
 using Microsoft.UI.Dispatching;
@@ -218,9 +220,9 @@ public class IconLoadDiagnosticsTests
     {
         IconLoadDiagnostics.Start();
         var size = new global::Windows.Foundation.Size(20, 20);
-        IconLoadDiagnostics.RecordCacheLookup(size, capacity: 16, hit: false);
+        IconLoadDiagnostics.RecordCacheLookup(size, capacity: 16, hit: false, entryCount: 0);
         IconLoadDiagnostics.RecordCacheEntryAdded(size, capacity: 16, entryCount: 1);
-        IconLoadDiagnostics.RecordCacheLookup(size, capacity: 16, hit: true);
+        IconLoadDiagnostics.RecordCacheLookup(size, capacity: 16, hit: true, entryCount: 1);
         IconLoadDiagnostics.RecordCacheEntryRemoved(
             size,
             capacity: 16,
@@ -331,6 +333,66 @@ public class IconLoadDiagnosticsTests
         StringAssert.Contains(
             report.Text,
             $"    Speculative{Environment.NewLine}      Low-priority dispatcher wait: count=1");
+    }
+
+    [TestMethod]
+    public void StringMaterializationClassificationMatchesIconConverterBranches()
+    {
+        Assert.AreEqual(
+            IconDispatcherMaterializationKind.Binary,
+            IconLoadDiagnostics.ClassifyStringMaterialization(@"C:\Windows\System32\shell32.dll,10"));
+        Assert.AreEqual(
+            IconDispatcherMaterializationKind.BitmapUri,
+            IconLoadDiagnostics.ClassifyStringMaterialization(@"C:\Windows\System32\shell32.dll,invalid"));
+        Assert.AreEqual(
+            IconDispatcherMaterializationKind.SvgUri,
+            IconLoadDiagnostics.ClassifyStringMaterialization("https://contoso.test/icon.svg"));
+        Assert.AreEqual(
+            IconDispatcherMaterializationKind.BitmapUri,
+            IconLoadDiagnostics.ClassifyStringMaterialization("https://contoso.test/icon.png"));
+        Assert.AreEqual(
+            IconDispatcherMaterializationKind.Glyph,
+            IconLoadDiagnostics.ClassifyStringMaterialization("\uE700"));
+        Assert.AreEqual(
+            IconDispatcherMaterializationKind.Glyph,
+            IconLoadDiagnostics.ClassifyStringMaterialization("  <svg viewBox=\"0 0 16 16\" />"));
+    }
+
+    [TestMethod]
+    public void DispatcherOutlierReportCountsAllSamplesButRetainsOnlyTopTen()
+    {
+        IconLoadDiagnostics.Start();
+        for (var i = 0; i < 12; i++)
+        {
+            var request = IconLoadDiagnostics.BeginRequest(IconRequestReason.SourceChanged, 1.0);
+            var load = IconLoadDiagnostics.CreateLoad(
+                request,
+                $"bitmap{i}.png",
+                hasStream: false,
+                width: 20,
+                height: 20,
+                scale: 1.0);
+
+            Assert.IsNotNull(load);
+            request.RecordProviderResolution(IconProviderResolution.NewLoad, load);
+            load.Enqueued(IconLoadPriority.Low);
+            StartWorker(load);
+            var dispatcherEnqueuedAt = load.BeginDispatcherWait(IconDispatcherMaterializationKind.BitmapUri);
+            var dispatcherStartedAt = load.DispatcherStarted(dispatcherEnqueuedAt);
+            load.DispatcherUiSliceCompleted(
+                Stopwatch.GetTimestamp() - (Stopwatch.Frequency / (20 + i)),
+                IconDispatcherUiSliceKind.SynchronousCallback);
+            load.DispatcherCompleted(dispatcherStartedAt);
+            load.SetResult(null);
+            load.Complete();
+            request.Complete(IconRequestStatus.Empty);
+        }
+
+        var report = IconLoadDiagnostics.StopAndCreateReport();
+
+        Assert.IsNotNull(report);
+        StringAssert.Contains(report.Text, "Samples captured: 12");
+        Assert.AreEqual(10, CountOccurrences(report.Text, "    Load "));
     }
 
     [TestMethod]
@@ -707,6 +769,35 @@ public class IconLoadDiagnosticsTests
         Assert.IsNotNull(report);
         StringAssert.Contains(report.Text, "Active at stop: 0");
         StringAssert.Contains(report.Text, "Enqueue to completion: no samples");
+    }
+
+    [TestMethod]
+    public async Task CreateReportWaitsForInFlightMutationsAndRejectsLateOnes()
+    {
+        var session = new IconLoadDiagnosticsSession(1);
+        var mutation = session.TryEnterMutationScope();
+        Assert.IsTrue(mutation.IsActive);
+
+        var reportTask = Task.Run(() => session.CreateReport());
+        await Task.Delay(100);
+        Assert.IsFalse(reportTask.IsCompleted);
+        Assert.IsTrue(GetPrivateLong(session, "_managedAllocatedBytesStopped") > 0);
+
+        mutation.Dispose();
+
+        var report = await reportTask;
+        Assert.IsNotNull(report);
+        Assert.IsTrue(report.EndedUtc >= report.StartedUtc);
+
+        using var lateMutation = session.TryEnterMutationScope();
+        Assert.IsFalse(lateMutation.IsActive);
+    }
+
+    private static long GetPrivateLong(IconLoadDiagnosticsSession session, string fieldName)
+    {
+        var field = typeof(IconLoadDiagnosticsSession).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(field);
+        return (long)field.GetValue(session)!;
     }
 
     [TestMethod]

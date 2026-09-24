@@ -26,6 +26,8 @@ internal static class IconLoadDiagnostics
 
     public static bool IsRecording => Volatile.Read(ref _activeSession) is not null;
 
+    public static bool IsEnabled => IsRecording || IconLoadEventSource.Log.IsEnabled();
+
     public static long? ActiveSessionId => Volatile.Read(ref _activeSession)?.Id;
 
     public static IReadOnlyList<IconLoadDiagnosticsReport> GetReports()
@@ -106,9 +108,9 @@ internal static class IconLoadDiagnostics
         return session.CreateLoad(ClassifyInput(iconString, hasStream), width, height, scale);
     }
 
-    internal static void RecordCacheLookup(Size iconSize, int capacity, bool hit)
+    internal static void RecordCacheLookup(Size iconSize, int capacity, bool hit, int entryCount)
     {
-        GetCurrentSession()?.RecordCacheLookup(iconSize, capacity, hit);
+        GetCurrentSession()?.RecordCacheLookup(iconSize, capacity, hit, entryCount);
     }
 
     internal static void RecordCacheEntryAdded(Size iconSize, int capacity, int entryCount)
@@ -148,7 +150,14 @@ internal static class IconLoadDiagnostics
 
     internal static void OnEtwDisabled()
     {
-        Interlocked.Exchange(ref _etwSession, null)?.Stop();
+        var session = Interlocked.Exchange(ref _etwSession, null);
+        if (session is not null)
+        {
+            ThreadPool.QueueUserWorkItem(
+                static state => ((IconLoadDiagnosticsSession)state!).Stop(),
+                session,
+                preferLocal: false);
+        }
     }
 
     private static IconLoadDiagnosticsSession? GetCurrentSession()
@@ -175,11 +184,19 @@ internal static class IconLoadDiagnostics
         var etwSession = Volatile.Read(ref _etwSession);
         if (etwSession is null)
         {
-            var candidate = new IconLoadDiagnosticsSession(Interlocked.Increment(ref _nextSessionId));
+            var candidate = new IconLoadDiagnosticsSession(
+                Interlocked.Increment(ref _nextSessionId),
+                retainCompletedLoadDemandStates: false);
             etwSession = Interlocked.CompareExchange(ref _etwSession, candidate, null);
             if (etwSession is null)
             {
                 etwSession = candidate;
+                if (!IconLoadEventSource.Log.IsEnabled() &&
+                    ReferenceEquals(Interlocked.CompareExchange(ref _etwSession, null, candidate), candidate))
+                {
+                    candidate.Stop();
+                    return null;
+                }
             }
             else
             {
@@ -264,5 +281,35 @@ internal static class IconLoadDiagnostics
         {
             return IconLoadResultKind.Other;
         }
+    }
+
+    internal static IconDispatcherMaterializationKind ClassifyStringMaterialization(string iconString)
+    {
+        var path = iconString.AsSpan();
+        var comma = path.IndexOf(',');
+        if (comma >= 0)
+        {
+            path = path[..comma];
+        }
+
+        if ((path.EndsWith(".exe", StringComparison.Ordinal)
+                || path.EndsWith(".dll", StringComparison.Ordinal)
+                || path.EndsWith(".lnk", StringComparison.Ordinal))
+            && (comma < 0 || int.TryParse(iconString.AsSpan()[(comma + 1)..], out _)))
+        {
+            return IconDispatcherMaterializationKind.Binary;
+        }
+
+        if (Uri.TryCreate(iconString, UriKind.Absolute, out var uri) && uri.AbsolutePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+        {
+            return IconDispatcherMaterializationKind.SvgUri;
+        }
+
+        if (Uri.TryCreate(iconString, UriKind.Absolute, out _))
+        {
+            return IconDispatcherMaterializationKind.BitmapUri;
+        }
+
+        return IconDispatcherMaterializationKind.Glyph;
     }
 }
