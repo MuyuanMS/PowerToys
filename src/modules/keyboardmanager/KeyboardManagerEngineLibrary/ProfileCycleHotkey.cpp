@@ -11,60 +11,54 @@ namespace
 ProfileCycleHotkey::ProfileCycleHotkey(Callback callback) :
     m_callback(std::move(callback))
 {
+    m_readyEvent = CreateEventW(nullptr, TRUE /* manual reset */, FALSE, nullptr);
 }
 
 ProfileCycleHotkey::~ProfileCycleHotkey()
 {
     Stop();
+    if (m_readyEvent != nullptr)
+    {
+        CloseHandle(m_readyEvent);
+        m_readyEvent = nullptr;
+    }
 }
 
 void ProfileCycleHotkey::Start()
 {
-    std::lock_guard<std::mutex> lifecycleLock(m_lifecycleMutex);
-
     bool expected = false;
     if (!m_started.compare_exchange_strong(expected, true))
     {
         return;
     }
 
+    if (m_readyEvent != nullptr)
     {
-        std::lock_guard<std::mutex> lock(m_startMutex);
-        m_startupComplete = false;
-        m_startupFailed = false;
+        ResetEvent(m_readyEvent);
     }
 
     m_thread = std::thread([this] { ThreadMain(); });
-
-    std::unique_lock<std::mutex> lock(m_startMutex);
-    m_startCv.wait(lock, [this] { return m_startupComplete; });
-    if (m_startupFailed)
-    {
-        lock.unlock();
-        if (m_thread.joinable())
-        {
-            m_thread.join();
-        }
-
-        m_started.store(false);
-        m_threadId.store(0);
-        m_hwnd.store(nullptr);
-    }
 }
 
 void ProfileCycleHotkey::Stop()
 {
-    std::lock_guard<std::mutex> lifecycleLock(m_lifecycleMutex);
-
     if (!m_started.exchange(false))
     {
         return;
     }
 
-    const DWORD threadId = m_threadId.load();
-    if (threadId != 0 && !PostThreadMessageW(threadId, WM_QUIT, 0, 0))
+    // Wait until the worker has created its message queue before posting WM_QUIT; otherwise the
+    // post can be lost and join() would block forever. Bounded so a worker that died before
+    // signalling still lets Stop() proceed.
+    if (m_readyEvent != nullptr)
     {
-        Logger::error(L"ProfileCycleHotkey: failed to post WM_QUIT ({})", GetLastError());
+        WaitForSingleObject(m_readyEvent, 5000);
+    }
+
+    const DWORD threadId = m_threadId.load();
+    if (threadId != 0)
+    {
+        PostThreadMessageW(threadId, WM_QUIT, 0, 0);
     }
 
     if (m_thread.joinable())
@@ -158,14 +152,23 @@ void ProfileCycleHotkey::ThreadMain()
     if (hwnd == nullptr)
     {
         Logger::error(L"ProfileCycleHotkey: CreateWindow failed ({})", GetLastError());
-        SignalStartup(true);
         UnregisterClassW(HotkeyWindowClassName, wc.hInstance);
+        if (m_readyEvent != nullptr)
+        {
+            SetEvent(m_readyEvent);
+        }
         return;
     }
 
     m_hwnd.store(hwnd);
     ApplyPendingRegistration(hwnd);
-    SignalStartup(false);
+
+    // The window exists, so this thread now has a message queue and Stop()'s PostThreadMessageW
+    // will be delivered. Let Stop() proceed.
+    if (m_readyEvent != nullptr)
+    {
+        SetEvent(m_readyEvent);
+    }
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0) > 0)
@@ -183,15 +186,4 @@ void ProfileCycleHotkey::ThreadMain()
     m_hwnd.store(nullptr);
     DestroyWindow(hwnd);
     UnregisterClassW(HotkeyWindowClassName, wc.hInstance);
-}
-
-void ProfileCycleHotkey::SignalStartup(bool failed)
-{
-    {
-        std::lock_guard<std::mutex> lock(m_startMutex);
-        m_startupFailed = failed;
-        m_startupComplete = true;
-    }
-
-    m_startCv.notify_one();
 }

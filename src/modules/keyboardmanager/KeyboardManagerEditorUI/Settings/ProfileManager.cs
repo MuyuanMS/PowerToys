@@ -13,15 +13,6 @@ using ManagedCommon;
 
 namespace KeyboardManagerEditorUI.Settings
 {
-    internal enum ProfileCreationResult
-    {
-        Success,
-        InvalidName,
-        ReservedName,
-        AlreadyExists,
-        WriteFailed,
-    }
-
     /// <summary>
     /// Manages Keyboard Manager profiles. Each profile is one engine config file "{name}.json"
     /// in the Keyboard Manager folder; the active profile is recorded in settings.json under
@@ -32,7 +23,6 @@ namespace KeyboardManagerEditorUI.Settings
     internal static class ProfileManager
     {
         private const string DefaultProfile = "default";
-        private const string ReservedDeviceProfiles = "deviceProfiles";
 
         // Named event the KBM engine waits on; signaling it makes the engine reload its settings.
         private const string SettingsChangedEventName = "PowerToys_KeyboardManager_Event_Settings";
@@ -56,6 +46,18 @@ namespace KeyboardManagerEditorUI.Settings
         public static string SettingsDirectory => _settingsDirectory;
 
         private static string ConfigPath(string profile) => Path.Combine(_settingsDirectory, profile + ".json");
+
+        // Files that live in the save folder but are NOT remap-profile configs and must never
+        // be surfaced as selectable profiles: the module settings, the editor's per-profile
+        // caches ("editorSettings*"), the device->profile auto-switch map ("deviceProfiles"),
+        // and dotted backups like "default.backup-...". Kept in one place so the discovery scan
+        // and the name validator can never drift apart.
+        private static bool IsReservedConfigStem(string stem) =>
+            stem.Contains('.') ||
+            stem.Equals("settings", StringComparison.OrdinalIgnoreCase) ||
+            stem.StartsWith("editorSettings", StringComparison.OrdinalIgnoreCase) ||
+            stem.Equals("deviceProfiles", StringComparison.OrdinalIgnoreCase) ||
+            stem.Equals("profileMetadata", StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
         /// Returns the known profile names. Reads "keyboardConfigurations" from settings.json and
@@ -93,8 +95,8 @@ namespace KeyboardManagerEditorUI.Settings
                     {
                         string stem = Path.GetFileNameWithoutExtension(file);
 
-                        // Skip settings.json, editor caches, the auto-switch sidecar, and backups like "default.backup-...".
-                        if (!IsProfileConfigFile(file))
+                        // Skip settings.json, editor caches, the device map, and dotted backups.
+                        if (IsReservedConfigStem(stem))
                         {
                             continue;
                         }
@@ -117,6 +119,49 @@ namespace KeyboardManagerEditorUI.Settings
             }
 
             return names;
+        }
+
+        /// <summary>
+        /// A profile as the UI should present it: <see cref="Id"/> is the stable identity (the config
+        /// filename stem, used in activeConfiguration / keyboardConfigurations / mapping membership /
+        /// device assignments), and <see cref="DisplayName"/> is the editable label shown to the user
+        /// (equal to the id until it has been renamed).
+        /// </summary>
+        public readonly record struct ProfileInfo(string Id, string DisplayName);
+
+        /// <summary>
+        /// Returns the known profiles as (id, display name) pairs, in the same order as
+        /// <see cref="GetProfiles"/>. The display name falls back to the id when none has been set.
+        /// </summary>
+        public static IReadOnlyList<ProfileInfo> GetProfilesWithDisplayNames()
+        {
+            var result = new List<ProfileInfo>();
+            foreach (string id in GetProfiles())
+            {
+                result.Add(new ProfileInfo(id, ProfileMetadataManager.GetDisplayName(id)));
+            }
+
+            return result;
+        }
+
+        /// <summary>Gets the editable display name for a profile id (falls back to the id itself).</summary>
+        public static string GetDisplayName(string id) => ProfileMetadataManager.GetDisplayName(id);
+
+        /// <summary>
+        /// Renames a profile by changing only its display name. The profile's id (its {id}.json file
+        /// and every reference in settings.json / mapping membership / device assignments) is left
+        /// untouched, so a rename can never orphan a config or silently break auto-switching — the cost
+        /// that made a filename-based rename risky. The new name is a free-form label; it need not be a
+        /// valid filename because it is never used as one. Returns false for a blank name.
+        /// </summary>
+        public static bool RenameProfile(string id, string newDisplayName)
+        {
+            if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(newDisplayName))
+            {
+                return false;
+            }
+
+            return ProfileMetadataManager.SetDisplayName(id, newDisplayName.Trim());
         }
 
         /// <summary>Gets the active profile name (defaults to "default").</summary>
@@ -147,20 +192,13 @@ namespace KeyboardManagerEditorUI.Settings
 
             try
             {
-                using FileStream? transactionLock = SettingsManager.TryAcquireMappingTransactionLock();
-                if (transactionLock == null)
-                {
-                    Logger.LogError("ProfileManager.SetActiveProfile: could not acquire settings transaction lock");
-                    return false;
-                }
-
                 if (!File.Exists(ConfigPath(profile)))
                 {
                     Logger.LogWarning($"ProfileManager.SetActiveProfile: '{profile}.json' does not exist");
                     return false;
                 }
 
-                JsonObject root = ReadSettingsRootForUpdate();
+                JsonObject root = (ReadSettingsRoot() as JsonObject) ?? CreateDefaultSettingsRoot();
                 JsonObject properties = EnsureObject(root, "properties");
                 SetValueProperty(properties, "activeConfiguration", profile);
                 AddToConfigurationList(properties, profile);
@@ -181,30 +219,21 @@ namespace KeyboardManagerEditorUI.Settings
         /// registers it in settings.json. Does not switch to it. Returns false on invalid name or if
         /// a profile with that name already exists.
         /// </summary>
-        public static ProfileCreationResult CreateProfile(string profile, bool copyFromActive)
+        public static bool CreateProfile(string profile, bool copyFromActive)
         {
-            ProfileCreationResult validationResult = ValidateProfileName(profile);
-            if (validationResult != ProfileCreationResult.Success)
+            if (!IsValidProfileName(profile))
             {
                 Logger.LogWarning($"ProfileManager.CreateProfile: invalid name '{profile}'");
-                return validationResult;
+                return false;
             }
 
-            string? target = null;
             try
             {
-                using FileStream? transactionLock = SettingsManager.TryAcquireMappingTransactionLock();
-                if (transactionLock == null)
-                {
-                    Logger.LogError("ProfileManager.CreateProfile: could not acquire settings transaction lock");
-                    return ProfileCreationResult.WriteFailed;
-                }
-
-                target = ConfigPath(profile);
+                string target = ConfigPath(profile);
                 if (File.Exists(target))
                 {
                     Logger.LogWarning($"ProfileManager.CreateProfile: '{profile}' already exists");
-                    return ProfileCreationResult.AlreadyExists;
+                    return false;
                 }
 
                 if (copyFromActive && File.Exists(ConfigPath(GetActiveProfile())))
@@ -216,21 +245,16 @@ namespace KeyboardManagerEditorUI.Settings
                     File.WriteAllText(target, EmptyConfigJson);
                 }
 
-                JsonObject root = ReadSettingsRootForUpdate();
+                JsonObject root = (ReadSettingsRoot() as JsonObject) ?? CreateDefaultSettingsRoot();
                 JsonObject properties = EnsureObject(root, "properties");
                 AddToConfigurationList(properties, profile);
                 WriteSettingsRoot(root);
-                return ProfileCreationResult.Success;
+                return true;
             }
             catch (Exception ex)
             {
                 Logger.LogError($"ProfileManager.CreateProfile('{profile}'): {ex.Message}");
-                if (!string.IsNullOrEmpty(target))
-                {
-                    TryDeleteFile(target);
-                }
-
-                return ProfileCreationResult.WriteFailed;
+                return false;
             }
         }
 
@@ -248,32 +272,27 @@ namespace KeyboardManagerEditorUI.Settings
 
             try
             {
-                using FileStream? transactionLock = SettingsManager.TryAcquireMappingTransactionLock();
-                if (transactionLock == null)
-                {
-                    Logger.LogError("ProfileManager.DeleteProfile: could not acquire settings transaction lock");
-                    return false;
-                }
-
                 bool wasActive = GetActiveProfile().Equals(profile, StringComparison.OrdinalIgnoreCase);
 
-                if (!DeviceProfileManager.RemoveAssignmentsForProfile(profile))
-                {
-                    return false;
-                }
-
+                // Abort before touching any other store if the config file can't be removed:
+                // otherwise we'd unregister the profile while its {name}.json stays on disk, and
+                // the directory scan in GetProfiles() would resurrect it on the next refresh.
                 if (!TryDeleteFile(ConfigPath(profile)))
                 {
                     return false;
                 }
 
-                if (!SettingsManager.RemoveProfileMembership(profile))
-                {
-                    Logger.LogError($"ProfileManager.DeleteProfile('{profile}'): could not persist editor membership cleanup");
-                    return false;
-                }
+                SettingsManager.RemoveProfileMembership(profile);
 
-                JsonObject root = ReadSettingsRootForUpdate();
+                // Drop any keyboard->profile assignments for the deleted profile so auto-switch
+                // never targets a profile that no longer exists.
+                DeviceProfileManager.RemoveAssignmentsForProfile(profile);
+
+                // Drop the display-name metadata for the deleted id so a later profile that happens
+                // to reuse the id doesn't inherit a stale name.
+                ProfileMetadataManager.Remove(profile);
+
+                JsonObject root = (ReadSettingsRoot() as JsonObject) ?? CreateDefaultSettingsRoot();
                 JsonObject properties = EnsureObject(root, "properties");
                 RemoveFromConfigurationList(properties, profile);
                 if (wasActive)
@@ -283,7 +302,11 @@ namespace KeyboardManagerEditorUI.Settings
 
                 WriteSettingsRoot(root);
 
-                SignalEngineReload();
+                if (wasActive)
+                {
+                    SignalEngineReload();
+                }
+
                 return true;
             }
             catch (Exception ex)
@@ -314,52 +337,26 @@ namespace KeyboardManagerEditorUI.Settings
             }
         }
 
-        internal static ProfileCreationResult ValidateProfileName(string profile)
+        private static bool IsValidProfileName(string profile)
         {
             if (string.IsNullOrWhiteSpace(profile))
             {
-                return ProfileCreationResult.InvalidName;
+                return false;
             }
 
-            if (profile.Equals("settings", StringComparison.OrdinalIgnoreCase) ||
-                profile.Equals(ReservedDeviceProfiles, StringComparison.OrdinalIgnoreCase) ||
-                profile.StartsWith("editorSettings", StringComparison.OrdinalIgnoreCase))
+            // Reject reserved names (settings / editor caches / device map / dotted backups)
+            // and any name with filesystem-invalid characters.
+            if (profile.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || IsReservedConfigStem(profile))
             {
-                return ProfileCreationResult.ReservedName;
+                return false;
             }
 
-            // Dots are reserved to distinguish backups / editor caches from profile configs.
-            if (profile.Contains('.') || profile.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
-            {
-                return ProfileCreationResult.InvalidName;
-            }
-
-            return ProfileCreationResult.Success;
-        }
-
-        internal static bool IsProfileConfigFile(string path)
-        {
-            string stem = Path.GetFileNameWithoutExtension(path);
-            return !stem.Equals("settings", StringComparison.OrdinalIgnoreCase) &&
-                   !stem.Equals(ReservedDeviceProfiles, StringComparison.OrdinalIgnoreCase) &&
-                   !stem.StartsWith("editorSettings", StringComparison.OrdinalIgnoreCase) &&
-                   !stem.Contains('.');
+            return true;
         }
 
         private static JsonNode? ReadSettingsRoot()
         {
             return File.Exists(SettingsJsonPath) ? JsonNode.Parse(File.ReadAllText(SettingsJsonPath)) : null;
-        }
-
-        private static JsonObject ReadSettingsRootForUpdate()
-        {
-            if (!File.Exists(SettingsJsonPath))
-            {
-                return CreateDefaultSettingsRoot();
-            }
-
-            return JsonNode.Parse(File.ReadAllText(SettingsJsonPath)) as JsonObject
-                   ?? throw new InvalidDataException("settings.json does not contain a JSON object");
         }
 
         private static JsonObject CreateDefaultSettingsRoot()
@@ -375,16 +372,7 @@ namespace KeyboardManagerEditorUI.Settings
         private static void WriteSettingsRoot(JsonNode root)
         {
             Directory.CreateDirectory(_settingsDirectory);
-            string temporaryPath = Path.Combine(_settingsDirectory, $"settings.{Guid.NewGuid():N}.tmp");
-            try
-            {
-                File.WriteAllText(temporaryPath, root.ToJsonString(new JsonSerializerOptions { WriteIndented = false }));
-                File.Move(temporaryPath, SettingsJsonPath, overwrite: true);
-            }
-            finally
-            {
-                TryDeleteFile(temporaryPath);
-            }
+            File.WriteAllText(SettingsJsonPath, root.ToJsonString(new JsonSerializerOptions { WriteIndented = false }));
         }
 
         private static JsonObject EnsureObject(JsonObject parent, string key)
@@ -435,6 +423,9 @@ namespace KeyboardManagerEditorUI.Settings
             }
         }
 
+        // Returns true when the file is gone after the call (deleted, or never existed);
+        // false when a delete was attempted but failed (e.g. the file is locked), so callers
+        // can abort before unregistering a profile whose config is still on disk.
         private static bool TryDeleteFile(string path)
         {
             try

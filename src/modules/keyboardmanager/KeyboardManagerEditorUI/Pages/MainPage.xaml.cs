@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation
+// Copyright (c) Microsoft Corporation
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -46,8 +46,6 @@ namespace KeyboardManagerEditorUI.Pages
         private bool _isServiceRunning = true;
         private bool _isUpdatingToggle;
         private bool _suppressProfileSelection;
-        private bool _profileRefreshPending;
-        private bool _remappingDialogOpen;
         private RawInputWatcher? _autoSwitchWatcher;
         private ObservableCollection<KeyboardAssignmentRow>? _keyboardRows;
         private List<string> _autoSwitchProfiles = new();
@@ -404,12 +402,11 @@ namespace KeyboardManagerEditorUI.Pages
 
                 _settingsWatcher = new FileSystemWatcher(dir, "settings.json")
                 {
-                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName,
+                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size,
                     EnableRaisingEvents = true,
                 };
                 _settingsWatcher.Changed += OnSettingsFileChanged;
                 _settingsWatcher.Created += OnSettingsFileChanged;
-                _settingsWatcher.Renamed += OnSettingsFileChanged;
             }
             catch (Exception ex)
             {
@@ -435,12 +432,6 @@ namespace KeyboardManagerEditorUI.Pages
         {
             if (_mappingService == null || _disposed)
             {
-                return;
-            }
-
-            if (_remappingDialogOpen)
-            {
-                _profileRefreshPending = true;
                 return;
             }
 
@@ -477,31 +468,28 @@ namespace KeyboardManagerEditorUI.Pages
         {
             NewProfileNameBox.Text = string.Empty;
             CopyCurrentProfileCheckBox.IsChecked = false;
-            NewProfileErrorText.Visibility = Visibility.Collapsed;
 
-            while (await NewProfileDialog.ShowAsync() == ContentDialogResult.Primary)
+            if (await NewProfileDialog.ShowAsync() != ContentDialogResult.Primary)
             {
-                string name = NewProfileNameBox.Text.Trim();
-                ProfileCreationResult result = ProfileManager.CreateProfile(name, CopyCurrentProfileCheckBox.IsChecked == true);
-                if (result == ProfileCreationResult.Success)
-                {
-                    LoadProfiles();
+                return;
+            }
 
-                    // Selecting the new profile triggers the switch through SelectionChanged.
-                    ProfileSelector.SelectedItem = name;
-                    return;
-                }
+            string name = NewProfileNameBox.Text.Trim();
+            if (string.IsNullOrEmpty(name))
+            {
+                return;
+            }
 
-                string resourceKey = result switch
-                {
-                    ProfileCreationResult.InvalidName => "NewProfileError_InvalidName",
-                    ProfileCreationResult.ReservedName => "NewProfileError_ReservedName",
-                    ProfileCreationResult.AlreadyExists => "NewProfileError_AlreadyExists",
-                    _ => "NewProfileError_WriteFailed",
-                };
-                NewProfileErrorText.Text = ResourceHelper.GetString(resourceKey);
-                NewProfileErrorText.Visibility = Visibility.Visible;
-                Logger.LogWarning($"Could not create profile '{name}': {result}");
+            if (ProfileManager.CreateProfile(name, CopyCurrentProfileCheckBox.IsChecked == true))
+            {
+                LoadProfiles();
+
+                // Selecting the new profile triggers the switch through SelectionChanged.
+                ProfileSelector.SelectedItem = name;
+            }
+            else
+            {
+                Logger.LogWarning($"Could not create profile '{name}' (invalid name or already exists)");
             }
         }
 
@@ -785,25 +773,17 @@ namespace KeyboardManagerEditorUI.Pages
 
         private async System.Threading.Tasks.Task ShowRemappingDialog()
         {
-            _remappingDialogOpen = true;
             RemappingDialog.PrimaryButtonClick += RemappingDialog_PrimaryButtonClick;
             UnifiedMappingControl.ValidationStateChanged += UnifiedMappingControl_ValidationStateChanged;
             RemappingDialog.IsPrimaryButtonEnabled = UnifiedMappingControl.IsInputComplete();
 
             await RemappingDialog.ShowAsync();
 
-            _remappingDialogOpen = false;
             RemappingDialog.PrimaryButtonClick -= RemappingDialog_PrimaryButtonClick;
             UnifiedMappingControl.ValidationStateChanged -= UnifiedMappingControl_ValidationStateChanged;
             _isEditMode = false;
             _editingItem = null;
             KeyboardHookHelper.Instance.CleanupHook();
-
-            if (_profileRefreshPending && !_disposed)
-            {
-                _profileRefreshPending = false;
-                RefreshActiveProfileFromDisk();
-            }
         }
 
         private void UnifiedMappingControl_ValidationStateChanged(object? sender, EventArgs e)
@@ -839,15 +819,6 @@ namespace KeyboardManagerEditorUI.Pages
 
         private void RemappingDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
         {
-            if (_profileRefreshPending)
-            {
-                args.Cancel = true;
-                UnifiedMappingControl.ShowValidationError(
-                    ResourceHelper.GetString("Error_Generic_Title"),
-                    ResourceHelper.GetString("Error_Generic_Message"));
-                return;
-            }
-
             UnifiedMappingControl.HideValidationMessage();
 
             if (_mappingService == null)
@@ -906,23 +877,20 @@ namespace KeyboardManagerEditorUI.Pages
         {
             bool isAppSpecific = UnifiedMappingControl.GetIsAppSpecific();
             string appName = UnifiedMappingControl.GetAppName();
-
-            // Identify the row being edited (any mapping type) so validation can exclude it by identity
-            // instead of a count tolerance — its Id is its key in ShortcutSettingsDictionary.
-            string? editingId = _isEditMode ? (_editingItem?.Item as IToggleableShortcut)?.Id : null;
+            Remapping? editingRemapping = _isEditMode && _editingItem?.Item is Remapping r ? r : null;
 
             return actionType switch
             {
                 UnifiedMappingControl.ActionType.KeyOrShortcut => ValidationHelper.ValidateKeyMapping(
-                    triggerKeys, UnifiedMappingControl.GetActionKeys(), isAppSpecific, appName, _mappingService!, _isEditMode, editingId),
+                    triggerKeys, UnifiedMappingControl.GetActionKeys(), isAppSpecific, appName, _mappingService!, _isEditMode, editingRemapping),
                 UnifiedMappingControl.ActionType.Text => ValidationHelper.ValidateTextMapping(
-                    triggerKeys, UnifiedMappingControl.GetTextContent(), isAppSpecific, appName, _mappingService!, _isEditMode, editingId),
+                    triggerKeys, UnifiedMappingControl.GetTextContent(), isAppSpecific, appName, _mappingService!, _isEditMode),
                 UnifiedMappingControl.ActionType.OpenUrl => ValidationHelper.ValidateUrlMapping(
-                    triggerKeys, UnifiedMappingControl.GetUrl(), isAppSpecific, appName, _mappingService!, _isEditMode, editingId),
+                    triggerKeys, UnifiedMappingControl.GetUrl(), isAppSpecific, appName, _mappingService!, _isEditMode),
                 UnifiedMappingControl.ActionType.OpenApp => ValidationHelper.ValidateAppMapping(
-                    triggerKeys, UnifiedMappingControl.GetProgramPath(), isAppSpecific, appName, _mappingService!, _isEditMode, editingId),
+                    triggerKeys, UnifiedMappingControl.GetProgramPath(), isAppSpecific, appName, _mappingService!, _isEditMode),
                 UnifiedMappingControl.ActionType.Disable => ValidationHelper.ValidateDisableMapping(
-                    triggerKeys, isAppSpecific, appName, _mappingService!, _isEditMode, editingId),
+                    triggerKeys, isAppSpecific, appName, _mappingService!, _isEditMode, editingRemapping),
                 _ => ValidationErrorType.NoError,
             };
         }
@@ -1435,7 +1403,6 @@ namespace KeyboardManagerEditorUI.Pages
 
         private void LoadRemappings()
         {
-            string currentProfile = ProfileManager.GetActiveProfile();
             // Clear first so switching to a profile with no remaps empties the list
             // (rather than leaving the previous profile's entries on screen).
             RemappingList.Clear();
@@ -1451,10 +1418,11 @@ namespace KeyboardManagerEditorUI.Pages
                 return;
             }
 
+            string? activeProfile = SettingsManager.ResolveActiveProfileForFiltering();
             foreach (var id in remapShortcutIds)
             {
                 if (!SettingsManager.EditorSettings.ShortcutSettingsDictionary.TryGetValue(id, out ShortcutSettings? shortcutSettings) ||
-                    !SettingsManager.IsMappingInActiveProfile(shortcutSettings, currentProfile))
+                    !SettingsManager.IsMappingInActiveProfile(shortcutSettings, activeProfile))
                 {
                     continue;
                 }
@@ -1493,7 +1461,6 @@ namespace KeyboardManagerEditorUI.Pages
 
         private void LoadTextMappings()
         {
-            string currentProfile = ProfileManager.GetActiveProfile();
             TextMappings.Clear();
 
             SettingsManager.EditorSettings.ShortcutsByOperationType.TryGetValue(ShortcutOperationType.RemapText, out var remapShortcutIds);
@@ -1505,10 +1472,11 @@ namespace KeyboardManagerEditorUI.Pages
                 return;
             }
 
+            string? activeProfile = SettingsManager.ResolveActiveProfileForFiltering();
             foreach (var id in remapShortcutIds)
             {
                 if (!SettingsManager.EditorSettings.ShortcutSettingsDictionary.TryGetValue(id, out ShortcutSettings? shortcutSettings) ||
-                    !SettingsManager.IsMappingInActiveProfile(shortcutSettings, currentProfile))
+                    !SettingsManager.IsMappingInActiveProfile(shortcutSettings, activeProfile))
                 {
                     continue;
                 }
@@ -1532,7 +1500,6 @@ namespace KeyboardManagerEditorUI.Pages
 
         private void LoadProgramShortcuts()
         {
-            string currentProfile = ProfileManager.GetActiveProfile();
             ProgramShortcuts.Clear();
 
             SettingsManager.EditorSettings.ShortcutsByOperationType.TryGetValue(ShortcutOperationType.RunProgram, out var remapShortcutIds);
@@ -1544,10 +1511,11 @@ namespace KeyboardManagerEditorUI.Pages
                 return;
             }
 
+            string? activeProfile = SettingsManager.ResolveActiveProfileForFiltering();
             foreach (var id in remapShortcutIds)
             {
                 if (!SettingsManager.EditorSettings.ShortcutSettingsDictionary.TryGetValue(id, out ShortcutSettings? shortcutSettings) ||
-                    !SettingsManager.IsMappingInActiveProfile(shortcutSettings, currentProfile))
+                    !SettingsManager.IsMappingInActiveProfile(shortcutSettings, activeProfile))
                 {
                     continue;
                 }
@@ -1576,7 +1544,6 @@ namespace KeyboardManagerEditorUI.Pages
 
         private void LoadUrlShortcuts()
         {
-            string currentProfile = ProfileManager.GetActiveProfile();
             UrlShortcuts.Clear();
 
             SettingsManager.EditorSettings.ShortcutsByOperationType.TryGetValue(ShortcutOperationType.OpenUri, out var remapShortcutIds);
@@ -1588,10 +1555,11 @@ namespace KeyboardManagerEditorUI.Pages
                 return;
             }
 
+            string? activeProfile = SettingsManager.ResolveActiveProfileForFiltering();
             foreach (var id in remapShortcutIds)
             {
                 if (!SettingsManager.EditorSettings.ShortcutSettingsDictionary.TryGetValue(id, out ShortcutSettings? shortcutSettings) ||
-                    !SettingsManager.IsMappingInActiveProfile(shortcutSettings, currentProfile))
+                    !SettingsManager.IsMappingInActiveProfile(shortcutSettings, activeProfile))
                 {
                     continue;
                 }
@@ -1987,7 +1955,6 @@ namespace KeyboardManagerEditorUI.Pages
                     _settingsWatcher.EnableRaisingEvents = false;
                     _settingsWatcher.Changed -= OnSettingsFileChanged;
                     _settingsWatcher.Created -= OnSettingsFileChanged;
-                    _settingsWatcher.Renamed -= OnSettingsFileChanged;
                     _settingsWatcher.Dispose();
                     _settingsWatcher = null;
                 }

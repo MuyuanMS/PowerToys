@@ -82,7 +82,9 @@ namespace KeyboardManagerEditorUI.Settings
                     CycleHotkey = Load().CycleHotkey, // preserve the engine's hotkey definition
                 };
 
-                Write(file);
+                Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+                File.WriteAllText(_filePath, JsonSerializer.Serialize(file, _jsonOptions));
+
                 ProfileManager.SignalEngineReload();
                 return true;
             }
@@ -94,36 +96,34 @@ namespace KeyboardManagerEditorUI.Settings
         }
 
         /// <summary>
-        /// Removes any assignments that point at <paramref name="profile"/>. Returns false only
-        /// when the file could not be read or written.
+        /// Removes every keyboard assignment that points at <paramref name="profile"/> and, if any
+        /// were removed, rewrites the file and signals the engine. Called when a profile is deleted
+        /// so no keyboard is left mapped to a profile that no longer exists (which would otherwise
+        /// make auto-switch write a nonexistent profile into activeConfiguration on the next keystroke).
         /// </summary>
-        public static bool RemoveAssignmentsForProfile(string profile)
+        public static void RemoveAssignmentsForProfile(string profile)
         {
-            if (string.IsNullOrWhiteSpace(profile))
+            if (string.IsNullOrEmpty(profile))
             {
-                return true;
+                return;
             }
 
             try
             {
-                if (!File.Exists(_filePath))
+                DeviceProfilesFile file = Load();
+                int removed = file.Map.RemoveAll(e => string.Equals(e.Profile, profile, StringComparison.Ordinal));
+                if (removed == 0)
                 {
-                    return true;
+                    return;
                 }
 
-                DeviceProfilesFile file = JsonSerializer.Deserialize<DeviceProfilesFile>(File.ReadAllText(_filePath), _jsonOptions)
-                                          ?? throw new InvalidDataException("deviceProfiles.json does not contain a valid object");
-                file.Map = file.Map
-                    .Where(entry => !string.Equals(entry.Profile, profile, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-
-                Write(file);
-                return true;
+                Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+                File.WriteAllText(_filePath, JsonSerializer.Serialize(file, _jsonOptions));
+                ProfileManager.SignalEngineReload();
             }
             catch (Exception ex)
             {
-                Logger.LogError("Failed to update deviceProfiles.json after deleting a profile: " + ex.Message);
-                return false;
+                Logger.LogError($"Failed to prune deviceProfiles.json for '{profile}': {ex.Message}");
             }
         }
 
@@ -143,30 +143,6 @@ namespace KeyboardManagerEditorUI.Settings
             }
 
             return new DeviceProfilesFile();
-        }
-
-        private static void Write(DeviceProfilesFile file)
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
-            string temporaryPath = _filePath + $".{Guid.NewGuid():N}.tmp";
-            try
-            {
-                File.WriteAllText(temporaryPath, JsonSerializer.Serialize(file, _jsonOptions));
-                File.Move(temporaryPath, _filePath, overwrite: true);
-            }
-            finally
-            {
-                try
-                {
-                    File.Delete(temporaryPath);
-                }
-                catch (IOException)
-                {
-                }
-                catch (UnauthorizedAccessException)
-                {
-                }
-            }
         }
     }
 }

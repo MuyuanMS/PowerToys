@@ -23,8 +23,6 @@ public:
     ~KeyboardManager()
     {
         // Stop the worker threads first so they can't call back into a half-destroyed object.
-        settingsEventWaiter.stop();
-
         if (rawInputTracker)
         {
             rawInputTracker->Stop();
@@ -106,8 +104,7 @@ private:
 
     // Make the given profile active by writing settings.json + signaling the settings-changed
     // event, so the existing reload path applies it (avoids a second thread mutating `state`).
-    bool SwitchActiveProfile(const std::wstring& profile);
-    bool SwitchActiveProfileLocked(const std::wstring& profile);
+    void SwitchActiveProfile(const std::wstring& profile);
 
     // Advance to the next profile in settings.json's keyboardConfigurations list (hotkey action).
     void CycleActiveProfile();
@@ -125,11 +122,16 @@ private:
     std::wstring activeProfileName;
     std::mutex activeProfileMutex;
 
-    // Tracker-thread-only auto-switch policy state.
+    // Tracker-thread-only auto-switch hysteresis state.
     std::wstring pendingTarget;
     int pendingCount = 0;
+
+    // The profile a switch was last requested for, while waiting for the reload to apply it
+    // (dedupes repeated SwitchActiveProfile calls during the async reload window). Guarded by
+    // activeProfileMutex because LoadSettings clears it when any reload completes — otherwise an
+    // external profile change (manual picker / cycle hotkey / editor) would leave a stale request
+    // that permanently blocks auto-switching back to that profile.
     std::wstring requestedProfile;
-    std::mutex autoSwitchPolicyMutex;
 
     // Last keyboard seen, logged on change to help discover device paths for the profile map.
     std::wstring lastSeenDevice;

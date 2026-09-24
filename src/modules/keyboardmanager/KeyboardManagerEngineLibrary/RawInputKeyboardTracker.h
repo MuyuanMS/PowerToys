@@ -1,9 +1,7 @@
 #pragma once
 
 #include <atomic>
-#include <condition_variable>
 #include <functional>
-#include <mutex>
 #include <string>
 #include <thread>
 
@@ -21,8 +19,8 @@ class RawInputKeyboardTracker
 public:
     struct KeyEvent
     {
-        // RIDI_DEVICENAME device interface path: the exact per-physical-device identity we match
-        // against the device->profile map. Empty when injected.
+        // RIDI_DEVICENAME device interface path: stable, unique per physical device, and the
+        // identity key we match against the device->profile map. Empty when injected.
         std::wstring devicePath;
         USHORT vkey = 0;
         bool keyDown = false;
@@ -51,15 +49,15 @@ private:
 
     void ThreadMain();
     void HandleRawInput(HRAWINPUT hRawInput);
-    void SignalStartup(bool failed);
 
     Callback m_callback;
     std::thread m_thread;
     std::atomic<DWORD> m_threadId{ 0 };
     std::atomic_bool m_started{ false };
-    std::mutex m_lifecycleMutex;
-    std::mutex m_startMutex;
-    std::condition_variable m_startCv;
-    bool m_startupComplete = false;
-    bool m_startupFailed = false;
+
+    // Manual-reset event the worker sets once its message queue exists (after CreateWindowExW),
+    // or once it has bailed out. Stop() waits on it before PostThreadMessageW so WM_QUIT is never
+    // posted to a thread whose message queue does not exist yet (which would lose the quit and
+    // block join() forever). Signalled on every worker exit path so Stop() can never hang.
+    HANDLE m_readyEvent{ nullptr };
 };

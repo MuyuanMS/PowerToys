@@ -131,55 +131,6 @@ namespace KeyboardManagerEditorUI.UnitTests
             Assert.AreEqual(0, keys.Count);
         }
 
-        [TestMethod]
-        public void NormalizeDevicePath_ShouldPreserveExactRawInputIdentity()
-        {
-            const string devicePath = @"\\?\HID#VID_046D&PID_C31C#7&1F5D3E79&0&0000#{4d36e96b-e325-11ce-bfc1-08002be10318}";
-
-            Assert.AreEqual(devicePath, RawInputDeviceEnumerator.NormalizeDevicePath(devicePath));
-        }
-
-        [DataTestMethod]
-        [DataRow("settings")]
-        [DataRow("deviceProfiles")]
-        [DataRow("editorSettings")]
-        [DataRow("editorSettings.cache")]
-        public void ValidateProfileName_ShouldRejectReservedNames(string profile)
-        {
-            Assert.AreEqual(ProfileCreationResult.ReservedName, ProfileManager.ValidateProfileName(profile));
-        }
-
-        [DataTestMethod]
-        [DataRow("settings.json")]
-        [DataRow("deviceProfiles.json")]
-        [DataRow("editorSettings.json")]
-        [DataRow("default.backup-1.json")]
-        public void IsProfileConfigFile_ShouldExcludeSidecarsAndBackups(string file)
-        {
-            Assert.IsFalse(ProfileManager.IsProfileConfigFile(file));
-        }
-
-        [DataTestMethod]
-        [DataRow("default.json")]
-        [DataRow("work.json")]
-        public void IsProfileConfigFile_ShouldIncludeProfiles(string file)
-        {
-            Assert.IsTrue(ProfileManager.IsProfileConfigFile(file));
-        }
-
-        [TestMethod]
-        public void IsMappingInActiveProfile_ShouldUseProvidedProfileSnapshot()
-        {
-            var mapping = new ShortcutSettings
-            {
-                Shortcut = CreateMapping(ShortcutOperationType.RemapShortcut, "65", "66"),
-                Profiles = new List<string> { "profile-two" },
-            };
-
-            Assert.IsTrue(SettingsManager.IsMappingInActiveProfile(mapping, "profile-two"));
-            Assert.IsFalse(SettingsManager.IsMappingInActiveProfile(mapping, "profile-one"));
-        }
-
         // Test GetModifierSortOrder returns correct values
         [TestMethod]
         public void GetModifierSortOrder_ShouldReturnCorrectOrder_ForAllModifierTypes()
@@ -600,6 +551,67 @@ namespace KeyboardManagerEditorUI.UnitTests
             Assert.IsTrue(settings.ShortcutSettingsDictionary["legacy-id"].IsActive);
             CollectionAssert.AreEqual(new List<string> { "default" }, settings.ShortcutSettingsDictionary["legacy-id"].Profiles);
             CollectionAssert.AreEqual(new List<string> { "legacy-id" }, settings.ProfileDictionary["default"]);
+        }
+
+        [TestMethod]
+        public void ApplyProfileMembershipRemoval_ShouldDeleteOwnMappingKeepSharedAndLeaveUntagged()
+        {
+            var ownMapping = CreateMapping(ShortcutOperationType.RemapShortcut, "65", "66");
+            var sharedMapping = CreateMapping(ShortcutOperationType.RemapShortcut, "67", "68");
+            var legacyMapping = CreateMapping(ShortcutOperationType.RemapText, "69", "legacy");
+            var settings = CreateEditorSettings(
+                ("own-id", ownMapping, true),
+                ("shared-id", sharedMapping, true),
+                ("legacy-id", legacyMapping, true));
+
+            // "own-id" belongs only to the deleted profile; "shared-id" is in two profiles;
+            // "legacy-id" carries no profile at all (predates profiles).
+            settings.ShortcutSettingsDictionary["own-id"].Profiles.Add("gone");
+            settings.ShortcutSettingsDictionary["shared-id"].Profiles.AddRange(new List<string> { "gone", "keep" });
+            settings.ProfileDictionary["gone"] = new List<string> { "own-id", "shared-id" };
+            settings.ProfileDictionary["keep"] = new List<string> { "shared-id" };
+            settings.ActiveProfile = "gone";
+
+            Assert.IsTrue(SettingsManager.ApplyProfileMembershipRemoval(settings, "gone"));
+
+            // The profile-only mapping is gone from both indexes.
+            Assert.IsFalse(settings.ShortcutSettingsDictionary.ContainsKey("own-id"));
+            CollectionAssert.AreEqual(
+                new List<string> { "shared-id" },
+                settings.ShortcutsByOperationType[ShortcutOperationType.RemapShortcut]);
+
+            // The shared mapping stays, keeping only its remaining membership.
+            Assert.IsTrue(settings.ShortcutSettingsDictionary.ContainsKey("shared-id"));
+            CollectionAssert.AreEqual(new List<string> { "keep" }, settings.ShortcutSettingsDictionary["shared-id"].Profiles);
+
+            // The untagged legacy mapping is untouched.
+            Assert.IsTrue(settings.ShortcutSettingsDictionary.ContainsKey("legacy-id"));
+            Assert.AreEqual(0, settings.ShortcutSettingsDictionary["legacy-id"].Profiles.Count);
+            CollectionAssert.AreEqual(
+                new List<string> { "legacy-id" },
+                settings.ShortcutsByOperationType[ShortcutOperationType.RemapText]);
+
+            // The deleted profile is gone from the rebuilt index; the survivor is intact.
+            Assert.IsFalse(settings.ProfileDictionary.ContainsKey("gone"));
+            CollectionAssert.AreEqual(new List<string> { "shared-id" }, settings.ProfileDictionary["keep"]);
+
+            // The active profile pointed at the deleted one, so it is cleared.
+            Assert.AreEqual(string.Empty, settings.ActiveProfile);
+        }
+
+        [TestMethod]
+        public void ApplyProfileMembershipRemoval_ShouldReportNoChangeWhenProfileAbsent()
+        {
+            var mapping = CreateMapping(ShortcutOperationType.RemapShortcut, "65", "66");
+            var settings = CreateEditorSettings(("mapping-id", mapping, true));
+            settings.ShortcutSettingsDictionary["mapping-id"].Profiles.Add("keep");
+            settings.ProfileDictionary["keep"] = new List<string> { "mapping-id" };
+            settings.ActiveProfile = "keep";
+
+            Assert.IsFalse(SettingsManager.ApplyProfileMembershipRemoval(settings, "never-existed"));
+            Assert.IsTrue(settings.ShortcutSettingsDictionary.ContainsKey("mapping-id"));
+            CollectionAssert.AreEqual(new List<string> { "keep" }, settings.ShortcutSettingsDictionary["mapping-id"].Profiles);
+            Assert.AreEqual("keep", settings.ActiveProfile);
         }
 
         private static EditorSettings CreateEditorSettings(string mappingId, ShortcutOperationType operationType, string originalKeys, string targetKeys) =>

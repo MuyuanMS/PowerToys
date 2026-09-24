@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation
+// Copyright (c) Microsoft Corporation
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -11,8 +11,8 @@ namespace KeyboardManagerEditorUI.Interop
 {
     /// <summary>
     /// Enumerates connected keyboards using Raw Input (no window required). Mirrors the engine's
-    /// identity model: device paths retain the complete Raw Input identity and are de-duplicated,
-    /// so the list matches what the engine writes into the device→profile map.
+    /// identity model: device paths are normalized to the stable prefix (up to the 2nd '#') and
+    /// de-duplicated, so the list matches what the engine writes into the device→profile map.
     /// </summary>
     internal static class RawInputDeviceEnumerator
     {
@@ -47,12 +47,32 @@ namespace KeyboardManagerEditorUI.Interop
         private static extern bool HidD_GetProductString(IntPtr hidDeviceObject, IntPtr buffer, uint bufferLength);
 
         /// <summary>
-        /// Preserves the RIDI_DEVICENAME returned by Raw Input so the UI and engine both use the
-        /// exact same per-physical-device identifier.
+        /// Normalizes a RIDI_DEVICENAME to the stable prefix (everything before the 2nd '#'),
+        /// dropping the instance id that some virtual keyboards churn. Must match the engine's
+        /// NormalizeDevicePath so the UI and the engine agree on device identity.
         /// </summary>
+        /// <remarks>
+        /// Known and intentional limitation: the instance-id segment we drop is also the only thing
+        /// that distinguishes two keyboards of the SAME model, so such a pair normalizes to one
+        /// identity and shares a single profile assignment. This is the MVP trade-off — the churn
+        /// the normalization fixes is common, a second identical keyboard is rare — and is recorded
+        /// in SPEC §7. Per-instance identity for identical models is deferred, not overlooked.
+        /// </remarks>
         public static string NormalizeDevicePath(string path)
         {
-            return path;
+            if (string.IsNullOrEmpty(path))
+            {
+                return path;
+            }
+
+            int first = path.IndexOf('#', StringComparison.Ordinal);
+            if (first < 0)
+            {
+                return path;
+            }
+
+            int second = path.IndexOf('#', first + 1);
+            return second < 0 ? path : path.Substring(0, second);
         }
 
         public static List<DetectedKeyboard> EnumerateKeyboards()

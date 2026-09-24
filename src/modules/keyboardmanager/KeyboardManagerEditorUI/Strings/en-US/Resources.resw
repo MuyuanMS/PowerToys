@@ -619,10 +619,10 @@
   <data name="NewProfileBtn.AutomationProperties.Name" xml:space="preserve">
     <value>Create a new profile</value>
   </data>
-  <data name="DeleteProfileBtn.AutomationProperties.Name" xml:space="preserve">
+  <data name="DeleteProfileBtnTooltip.Text" xml:space="preserve">
     <value>Delete the current profile</value>
   </data>
-  <data name="DeleteProfileBtnTooltip.Text" xml:space="preserve">
+  <data name="DeleteProfileBtn.AutomationProperties.Name" xml:space="preserve">
     <value>Delete the current profile</value>
   </data>
   <data name="NewProfileDialog.Title" xml:space="preserve">
@@ -639,18 +639,6 @@
   </data>
   <data name="NewProfileNameBox.PlaceholderText" xml:space="preserve">
     <value>e.g., Mac keyboard</value>
-  </data>
-  <data name="NewProfileError_InvalidName" xml:space="preserve">
-    <value>Enter a profile name without periods or invalid file-name characters.</value>
-  </data>
-  <data name="NewProfileError_ReservedName" xml:space="preserve">
-    <value>This name is reserved by Keyboard Manager. Choose another name.</value>
-  </data>
-  <data name="NewProfileError_AlreadyExists" xml:space="preserve">
-    <value>A profile with this name already exists.</value>
-  </data>
-  <data name="NewProfileError_WriteFailed" xml:space="preserve">
-    <value>Keyboard Manager could not save this profile. Check that the settings folder is writable and try again.</value>
   </data>
   <data name="CopyCurrentProfileCheckBox.Content" xml:space="preserve">
     <value>Start from a copy of the current profile</value>

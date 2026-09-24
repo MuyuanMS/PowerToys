@@ -62,7 +62,6 @@ namespace KeyboardManagerEditorUI.Interop
             public uint Time;
             public int PtX;
             public int PtY;
-            public uint LPrivate;
         }
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -111,11 +110,16 @@ namespace KeyboardManagerEditorUI.Interop
 
         private readonly Action<DetectedKeyboard> _onKeyboard;
         private readonly WndProcDelegate _wndProc;
-        private readonly ManualResetEventSlim _startupReady = new(false);
-        private readonly object _lifecycleLock = new();
+
+        // Set by the worker once it has published its thread id AND created its message queue
+        // (which CreateWindowExW does), or once it has bailed out. Stop() waits on this before
+        // posting WM_QUIT so the quit is never sent to a thread that has no queue yet — otherwise
+        // PostThreadMessageW is skipped/lost and Join() blocks forever if the dialog is dismissed
+        // immediately after Start(). It is also set on every early-exit path so Stop() can't hang.
+        private readonly ManualResetEventSlim _workerReady = new(false);
+
         private Thread? _thread;
         private uint _threadId;
-        private bool _startupFailed;
 
         public RawInputWatcher(Action<DetectedKeyboard> onKeyboard)
         {
@@ -125,111 +129,91 @@ namespace KeyboardManagerEditorUI.Interop
 
         public void Start()
         {
-            lock (_lifecycleLock)
+            if (_thread != null)
             {
-                if (_thread != null)
-                {
-                    return;
-                }
-
-                _startupFailed = false;
-                _startupReady.Reset();
-
-                _thread = new Thread(ThreadMain) { IsBackground = true, Name = "KbmRawInputWatcher" };
-                _thread.Start();
-                _startupReady.Wait();
-
-                if (_startupFailed)
-                {
-                    Thread? thread = _thread;
-                    _thread = null;
-                    thread?.Join();
-                }
+                return;
             }
+
+            _workerReady.Reset();
+            _thread = new Thread(ThreadMain) { IsBackground = true, Name = "KbmRawInputWatcher" };
+            _thread.Start();
         }
 
         public void Stop()
         {
-            lock (_lifecycleLock)
+            Thread? thread = _thread;
+            if (thread == null)
             {
-                Thread? thread = _thread;
-                if (thread == null)
-                {
-                    return;
-                }
-
-                _thread = null;
-                if (_threadId != 0 && !PostThreadMessageW(_threadId, WmQuit, IntPtr.Zero, IntPtr.Zero))
-                {
-                    Logger.LogError($"RawInputWatcher: failed to post WM_QUIT ({Marshal.GetLastWin32Error()})");
-                }
-
-                thread.Join();
-                _threadId = 0;
+                return;
             }
+
+            _thread = null;
+
+            // Wait until the worker has a message queue before posting WM_QUIT. The bounded wait
+            // guards against a worker that died before signalling (it would still have exited, so
+            // Join returns); it is not the normal path.
+            _workerReady.Wait(TimeSpan.FromSeconds(5));
+            if (_threadId != 0)
+            {
+                PostThreadMessageW(_threadId, WmQuit, IntPtr.Zero, IntPtr.Zero);
+            }
+
+            thread.Join();
+            _threadId = 0;
         }
 
-        public void Dispose() => Stop();
+        public void Dispose()
+        {
+            Stop();
+            _workerReady.Dispose();
+        }
 
         private void ThreadMain()
         {
-            IntPtr hwnd = IntPtr.Zero;
-            try
+            _threadId = GetCurrentThreadId();
+            const string className = "KbmEditorRawInputWatcher";
+
+            var wc = new WndClass
             {
-                _threadId = GetCurrentThreadId();
-                const string className = "KbmEditorRawInputWatcher";
+                LpfnWndProc = Marshal.GetFunctionPointerForDelegate(_wndProc),
+                HInstance = GetModuleHandleW(null),
+                LpszClassName = className,
+            };
+            RegisterClassW(ref wc);
 
-                var wc = new WndClass
-                {
-                    LpfnWndProc = Marshal.GetFunctionPointerForDelegate(_wndProc),
-                    HInstance = GetModuleHandleW(null),
-                    LpszClassName = className,
-                };
-                RegisterClassW(ref wc);
-
-                hwnd = CreateWindowExW(0, className, string.Empty, 0, 0, 0, 0, 0, IntPtr.Zero, IntPtr.Zero, wc.HInstance, IntPtr.Zero);
-                if (hwnd == IntPtr.Zero)
-                {
-                    Logger.LogError("RawInputWatcher: CreateWindow failed");
-                    _startupFailed = true;
-                    _startupReady.Set();
-                    return;
-                }
-
-                var devices = new[]
-                {
-                    new RawInputDevice { UsUsagePage = 0x01, UsUsage = 0x06, DwFlags = RidevInputSink, HwndTarget = hwnd },
-                };
-                if (!RegisterRawInputDevices(devices, 1, (uint)Marshal.SizeOf<RawInputDevice>()))
-                {
-                    Logger.LogError("RawInputWatcher: RegisterRawInputDevices failed");
-                    _startupFailed = true;
-                    _startupReady.Set();
-                    return;
-                }
-
-                _startupReady.Set();
-
-                while (GetMessageW(out NativeMessage msg, IntPtr.Zero, 0, 0) > 0)
-                {
-                    TranslateMessage(ref msg);
-                    DispatchMessageW(ref msg);
-                }
-            }
-            catch (Exception ex)
+            IntPtr hwnd = CreateWindowExW(0, className, string.Empty, 0, 0, 0, 0, 0, IntPtr.Zero, IntPtr.Zero, wc.HInstance, IntPtr.Zero);
+            if (hwnd == IntPtr.Zero)
             {
-                Logger.LogError($"RawInputWatcher: thread failed: {ex.Message}");
-                _startupFailed = true;
-                _startupReady.Set();
+                Logger.LogError("RawInputWatcher: CreateWindow failed");
+                _workerReady.Set();
+                return;
             }
-            finally
+
+            var devices = new[]
             {
-                if (hwnd != IntPtr.Zero)
-                {
-                    DestroyWindow(hwnd);
-                    UnregisterClassW("KbmEditorRawInputWatcher", GetModuleHandleW(null));
-                }
+                new RawInputDevice { UsUsagePage = 0x01, UsUsage = 0x06, DwFlags = RidevInputSink, HwndTarget = hwnd },
+            };
+            if (!RegisterRawInputDevices(devices, 1, (uint)Marshal.SizeOf<RawInputDevice>()))
+            {
+                Logger.LogError("RawInputWatcher: RegisterRawInputDevices failed");
+                DestroyWindow(hwnd);
+                UnregisterClassW(className, wc.HInstance);
+                _workerReady.Set();
+                return;
             }
+
+            // The window now exists, so this thread has a message queue and PostThreadMessageW
+            // from Stop() will be delivered. Safe to let Stop() proceed.
+            _workerReady.Set();
+
+            while (GetMessageW(out NativeMessage msg, IntPtr.Zero, 0, 0) > 0)
+            {
+                TranslateMessage(ref msg);
+                DispatchMessageW(ref msg);
+            }
+
+            DestroyWindow(hwnd);
+            UnregisterClassW(className, wc.HInstance);
         }
 
         private IntPtr WndProc(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam)
