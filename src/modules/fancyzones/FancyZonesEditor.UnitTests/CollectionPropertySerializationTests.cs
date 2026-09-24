@@ -57,10 +57,10 @@ public class CollectionPropertySerializationTests
             }
             """;
 
-        Assert.IsNotNull(JsonSerializer.Deserialize(canvasInfoJson, FancyZonesJsonContext.Default.CanvasInfoWrapper).Zones);
+        Assert.IsNotNull(JsonSerializer.Deserialize(canvasInfoJson, FancyZonesJsonContext.Default.CanvasInfoWrapper)!.Zones);
 
         var gridInfo = JsonSerializer.Deserialize(gridInfoJson, FancyZonesJsonContext.Default.GridInfoWrapper);
-        Assert.IsNotNull(gridInfo.RowsPercentage);
+        Assert.IsNotNull(gridInfo!.RowsPercentage);
         Assert.IsNotNull(gridInfo.ColumnsPercentage);
     }
 }
