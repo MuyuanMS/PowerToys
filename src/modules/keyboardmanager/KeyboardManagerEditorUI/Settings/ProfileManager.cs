@@ -195,6 +195,11 @@ namespace KeyboardManagerEditorUI.Settings
             {
                 return WithSettingsLock(() =>
                 {
+                    if (profile.Equals(DefaultProfile, StringComparison.OrdinalIgnoreCase))
+                    {
+                        EnsureDefaultProfileExists();
+                    }
+
                     if (!File.Exists(ConfigPath(profile)))
                     {
                         Logger.LogWarning($"ProfileManager.SetActiveProfile: '{profile}.json' does not exist");
@@ -326,6 +331,7 @@ namespace KeyboardManagerEditorUI.Settings
                     RemoveFromConfigurationList(properties, profile);
                     if (wasActive)
                     {
+                        EnsureDefaultProfileExists();
                         SetValueProperty(properties, "activeConfiguration", DefaultProfile);
                     }
 
@@ -414,6 +420,22 @@ namespace KeyboardManagerEditorUI.Settings
                 {
                     File.Delete(temporaryPath);
                 }
+            }
+        }
+
+        private static void EnsureDefaultProfileExists()
+        {
+            try
+            {
+                string path = ConfigPath(DefaultProfile);
+                if (!File.Exists(path))
+                {
+                    File.WriteAllText(path, EmptyConfigJson);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"ProfileManager.EnsureDefaultProfileExists: {ex.Message}");
             }
         }
 

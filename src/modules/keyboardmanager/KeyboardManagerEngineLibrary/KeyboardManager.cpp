@@ -358,6 +358,7 @@ void KeyboardManager::CycleActiveProfile()
 {
     try
     {
+        std::lock_guard<std::mutex> lock(switchProfileMutex);
         const auto path = PTSettingsHelper::get_module_save_folder_location(moduleName) + L"\\settings.json";
         auto parsed = json::from_file(path);
         if (!parsed.has_value())
@@ -395,7 +396,7 @@ void KeyboardManager::CycleActiveProfile()
 
         const std::wstring& next = profiles[(currentIndex + 1) % profiles.size()];
         Logger::trace(L"CycleActiveProfile: '{}' -> '{}'", current, next);
-        if (SwitchActiveProfile(next))
+        if (SwitchActiveProfileLocked(next))
         {
             // Audible feedback that the profile changed (no UI surface in the engine).
             MessageBeep(MB_OK);
@@ -411,7 +412,11 @@ bool KeyboardManager::SwitchActiveProfile(const std::wstring& profile)
 {
     // Tracker thread and hotkey thread can both land here; serialize the read-modify-write.
     std::lock_guard<std::mutex> lock(switchProfileMutex);
+    return SwitchActiveProfileLocked(profile);
+}
 
+bool KeyboardManager::SwitchActiveProfileLocked(const std::wstring& profile)
+{
     HANDLE settingsMutex = CreateMutexW(nullptr, FALSE, SettingsWriteMutexName);
     const DWORD waitResult = settingsMutex == nullptr ? WAIT_FAILED : WaitForSingleObject(settingsMutex, 10000);
     if (settingsMutex == nullptr || (waitResult != WAIT_OBJECT_0 && waitResult != WAIT_ABANDONED))
