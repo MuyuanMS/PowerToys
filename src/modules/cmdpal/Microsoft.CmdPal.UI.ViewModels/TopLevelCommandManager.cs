@@ -36,6 +36,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
 
     private readonly List<CommandProviderWrapper> _commandProviders = [];
     private readonly Lock _commandProvidersLock = new();
+    private readonly Dictionary<string, TaskCompletionSource> _providerLoadCompletions = new(StringComparer.Ordinal);
 
     // watch out: if you add code that locks CommandProviders, be sure to always
     // lock CommandProviders before locking DockBands, or you will cause a
@@ -471,11 +472,25 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     private async Task<RegisterAndLoadSummary> RegisterAndLoadCommandsAsync(IEnumerable<CommandProviderWrapper> wrappers, CancellationToken ct)
     {
         var wrapperList = wrappers.ToList();
+        RegisterCommandProviders(wrapperList);
+
+        return await LoadRegisteredCommandsAsync(wrapperList, ct).ConfigureAwait(false);
+    }
+
+    private void RegisterCommandProviders(List<CommandProviderWrapper> wrappers)
+    {
         lock (_commandProvidersLock)
         {
-            _commandProviders.AddRange(wrapperList);
+            _commandProviders.AddRange(wrappers);
+            foreach (var wrapper in wrappers)
+            {
+                _providerLoadCompletions[wrapper.ProviderId] = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
         }
+    }
 
+    private async Task<RegisterAndLoadSummary> LoadRegisteredCommandsAsync(List<CommandProviderWrapper> wrapperList, CancellationToken ct)
+    {
         // Load the commands from the providers in parallel
         var loadResults = await Task.WhenAll(wrapperList.Select(w => TryLoadCommandsAsync(w, ct))).ConfigureAwait(false);
 
@@ -547,6 +562,26 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     {
         var sw = Stopwatch.StartNew();
         var loadTask = LoadTopLevelCommandsFromProvider(wrapper);
+        TaskCompletionSource loadCompletion;
+        lock (_commandProvidersLock)
+        {
+            if (!_providerLoadCompletions.TryGetValue(wrapper.ProviderId, out var existingCompletion))
+            {
+                loadCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                _providerLoadCompletions[wrapper.ProviderId] = loadCompletion;
+            }
+            else
+            {
+                loadCompletion = existingCompletion;
+            }
+        }
+
+        _ = loadTask.ContinueWith(
+            _ => loadCompletion.TrySetResult(),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
         try
         {
             var result = await loadTask.WaitAsync(CommandLoadTimeout, ct).ConfigureAwait(false);
@@ -621,13 +656,14 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     private void ExtensionService_OnProviderAdded(IExtensionService sender, IEnumerable<CommandProviderWrapper> wrappers)
     {
         var ct = _currentExtensionLoadCancellationToken;
+        var wrapperList = wrappers.ToList();
+        RegisterCommandProviders(wrapperList);
 
         _ = Task.Run(
             async () =>
             {
-                await RegisterAndLoadCommandsAsync(wrappers, ct).ConfigureAwait(false);
-            },
-            ct);
+                await LoadRegisteredCommandsAsync(wrapperList, ct).ConfigureAwait(false);
+            });
     }
 
     private void ExtensionService_OnProviderRemoved(IExtensionService sender, IEnumerable<CommandProviderWrapper> removedWrappers)
@@ -879,6 +915,23 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         finally
         {
             PropertyChanged -= handler;
+        }
+    }
+
+    /// <summary>Waits for a provider's full load, including a continuation that outlives the global loading phase.</summary>
+    public async Task WaitForProviderLoadAsync(string providerId, CancellationToken cancellationToken = default)
+    {
+        Task? loadTask;
+        lock (_commandProvidersLock)
+        {
+            loadTask = _providerLoadCompletions.TryGetValue(providerId, out var completion)
+                ? completion.Task
+                : null;
+        }
+
+        if (loadTask is not null)
+        {
+            await loadTask.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 

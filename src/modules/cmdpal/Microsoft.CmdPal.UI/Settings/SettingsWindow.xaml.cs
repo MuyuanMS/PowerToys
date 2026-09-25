@@ -379,6 +379,8 @@ public sealed partial class SettingsWindow : WindowEx,
                 await _topLevelCommandManager.WaitForCurrentLoadAsync(cancellation.Token);
             }
 
+            await _topLevelCommandManager.WaitForProviderLoadAsync(providerId, cancellation.Token);
+
             cancellation.Token.ThrowIfCancellationRequested();
             if (!ReferenceEquals(_extensionSettingsNavigationCts, cancellation))
             {

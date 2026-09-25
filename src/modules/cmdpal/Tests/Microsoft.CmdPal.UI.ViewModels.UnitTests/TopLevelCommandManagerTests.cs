@@ -47,6 +47,38 @@ public partial class TopLevelCommandManagerTests
     }
 
     [TestMethod]
+    public async Task WaitForProviderLoadAsync_WaitsForLateProviderAfterGlobalLoadCompletes()
+    {
+        using var services = CreateServices();
+        using var loadStarted = new ManualResetEventSlim();
+        using var completeLoad = new ManualResetEventSlim();
+        var provider = new TestCommandProvider(TestCommandProvider.NestedCommandId)
+        {
+            OnTopLevelCommands = () =>
+            {
+                loadStarted.Set();
+                Assert.IsTrue(completeLoad.Wait(TimeSpan.FromSeconds(5)));
+                return [];
+            },
+        };
+        var wrapper = new CommandProviderWrapper(provider, TaskScheduler.Default);
+        var extensionService = new Mock<IExtensionService>();
+        extensionService
+            .Setup(service => service.LoadProvidersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        using var manager = new TopLevelCommandManager(services, [extensionService.Object]);
+        await manager.LoadExternalProvidersAsync();
+
+        extensionService.Raise(service => service.OnProviderAdded += null, extensionService.Object, [wrapper]);
+        var waitTask = manager.WaitForProviderLoadAsync(provider.Id);
+
+        Assert.IsTrue(loadStarted.Wait(TimeSpan.FromSeconds(5)));
+        Assert.IsFalse(waitTask.IsCompleted);
+        completeLoad.Set();
+        await waitTask.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [TestMethod]
     public async Task ResolveCommandAsync_UsesProviderLookupForNestedCommand()
     {
         using var services = CreateServices();
@@ -317,6 +349,8 @@ public partial class TopLevelCommandManagerTests
 
         public Action? OnLookup { get; set; }
 
+        public Func<ICommandItem[]>? OnTopLevelCommands { get; init; }
+
         public TestCommandProvider(string resolvedCommandId, ICommandItem? resolvedItem = null)
         {
             Id = "test-provider";
@@ -328,7 +362,7 @@ public partial class TopLevelCommandManagerTests
             });
         }
 
-        public override ICommandItem[] TopLevelCommands() => IncludeTopLevelCommand ? [_resolvedItem] : [];
+        public override ICommandItem[] TopLevelCommands() => OnTopLevelCommands?.Invoke() ?? (IncludeTopLevelCommand ? [_resolvedItem] : []);
 
         public override ICommandItem? GetCommandItem(string id)
         {

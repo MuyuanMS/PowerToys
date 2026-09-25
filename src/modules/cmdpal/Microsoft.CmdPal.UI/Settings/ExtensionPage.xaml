@@ -95,7 +95,9 @@
                                         <ComboBoxItem x:Uid="Settings_ExtensionPage_SearchWeight_Higher" />
                                     </ComboBox>
                                 </controls:SettingsCard>
-                                <StackPanel local:SettingsPageTarget.Id="commands">
+                                <StackPanel
+                                    local:SettingsPageTarget.Id="commands"
+                                    Spacing="{StaticResource SettingsCardSpacing}">
                                     <TextBlock x:Uid="ExtensionCommandsHeader" Style="{StaticResource SettingsSectionHeaderTextBlockStyle}" />
                                     <ItemsRepeater
                                         ItemsSource="{x:Bind ViewModel.TopLevelCommands, Mode=OneWay}"
@@ -150,6 +152,7 @@
 
                                 <StackPanel
                                     local:SettingsPageTarget.Id="fallbacks"
+                                    Spacing="{StaticResource SettingsCardSpacing}"
                                     Visibility="{x:Bind ViewModel.HasFallbackCommands}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -225,6 +228,7 @@
 
                                 <StackPanel
                                     local:SettingsPageTarget.Id="settings"
+                                    Spacing="{StaticResource SettingsCardSpacing}"
                                     Visibility="{x:Bind ViewModel.HasSettings}">
                                     <TextBlock x:Uid="ExtensionSettingsHeader" Style="{StaticResource SettingsSectionHeaderTextBlockStyle}" />
 
