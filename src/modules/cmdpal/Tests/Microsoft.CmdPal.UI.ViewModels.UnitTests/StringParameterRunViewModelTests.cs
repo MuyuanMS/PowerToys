@@ -19,6 +19,7 @@ public sealed class StringParameterRunViewModelTests
     public void ModelReset_CancelsPendingUiWrite()
     {
         var model = new StringParameterRun();
+        model.Text = "previous";
         var scheduler = new QueuedTaskScheduler();
         var context = new TestPageContext();
         using var viewModel = new StringParameterRunViewModel(
