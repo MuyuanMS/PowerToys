@@ -31,6 +31,33 @@ public class BasicTests : CommandPaletteTestBase
     }
 
     [TestMethod]
+    public void KeyboardNavigationThenSingleClickOnlySelectsItemTest()
+    {
+        OpenSettingsWindow();
+        this.Find<NavigationViewItem>("Appearance").Click();
+        var singleClickToggle = this.Find<ToggleSwitch>(By.AccessibilityId("CmdPal_AppearancePage_SingleClickActivates"));
+        var originalSetting = singleClickToggle.IsOn;
+
+        try
+        {
+            singleClickToggle.Toggle(false);
+            this.Find<Button>(By.AccessibilityId("CmdPal_AppearancePage_OpenCommandPalette")).Click();
+
+            SetSearchBox("files");
+            SendKeys(Key.Down);
+            this.Find<NavigationViewItem>("Search files").Click();
+
+            Assert.IsNotNull(this.Find<NavigationViewItem>("Search files"), "A single click after keyboard navigation must not open the selected page.");
+        }
+        finally
+        {
+            OpenSettingsWindow();
+            this.Find<NavigationViewItem>("Appearance").Click();
+            this.Find<ToggleSwitch>(By.AccessibilityId("CmdPal_AppearancePage_SingleClickActivates")).Toggle(originalSetting);
+        }
+    }
+
+    [TestMethod]
     public void BasicCalculatorTest()
     {
         SetSearchBox("calculator");
