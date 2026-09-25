@@ -314,25 +314,25 @@ public class PeekFilePreviewTests : UITestBase
 
         try
         {
-            var peekWindow = OpenPeekWindow(shortcutPath, targetPath);
+            var peekWindow = OpenPeekWindow(shortcutPath);
 
             Assert.IsTrue(
                 SpinWait.SpinUntil(
-                    () => TitleMatchesName(peekWindow.WindowTitle, Path.GetFileName(targetPath)),
+                    () => TitleMatchesName(peekWindow.WindowTitle, Path.GetFileName(shortcutPath)),
                     5_000),
-                $"Peek should show the shortcut target by default, but the title was '{peekWindow.WindowTitle}'.");
+                $"Peek should show the shortcut by default, but the title was '{peekWindow.WindowTitle}'.");
 
-            var toggleButton = peekWindow.Find<Button>(By.AccessibilityId("ShortcutPreviewButton"), 5_000);
+            var toggleButton = peekWindow.Find<HyperlinkButton>(By.AccessibilityId("ShortcutTargetPeekButton"), 5_000);
             toggleButton.Invoke();
-            var shortcutWindow = WaitForPeekWindow(shortcutPath, PeekWindowTimeoutMS);
-            Assert.IsNotNull(shortcutWindow, "Peek should show the shortcut after toggling.");
-            peekWindow = shortcutWindow;
+            var targetWindow = WaitForPeekWindow(targetPath, PeekWindowTimeoutMS);
+            Assert.IsNotNull(targetWindow, "Peek should show the shortcut target after following the link.");
+            peekWindow = targetWindow;
 
             toggleButton = peekWindow.Find<Button>(By.AccessibilityId("ShortcutPreviewButton"), 5_000);
             toggleButton.Invoke();
-            var targetWindow = WaitForPeekWindow(targetPath, PeekWindowTimeoutMS);
-            Assert.IsNotNull(targetWindow, "Peek should return to the target after toggling back.");
-            peekWindow = targetWindow;
+            var shortcutWindow = WaitForPeekWindow(shortcutPath, PeekWindowTimeoutMS);
+            Assert.IsNotNull(shortcutWindow, "Peek should return to the shortcut after toggling back.");
+            peekWindow = shortcutWindow;
         }
         finally
         {
@@ -403,7 +403,7 @@ public class PeekFilePreviewTests : UITestBase
             $"Peek should visit every selected file and no unselected files. Visited: {string.Join(", ", visitedNames)}.");
     }
 
-    private Session OpenPeekWindow(string filePath, string? expectedPreviewPath = null)
+    private Session OpenPeekWindow(string filePath)
     {
         OpenExplorerAndSelect(filePath);
 
@@ -411,7 +411,7 @@ public class PeekFilePreviewTests : UITestBase
         {
             try
             {
-                var peekWindow = SendPeekHotkeyWithRetry(expectedPreviewPath ?? filePath);
+                var peekWindow = SendPeekHotkeyWithRetry(filePath);
                 EnsurePeekReady(peekWindow);
                 return peekWindow;
             }

@@ -152,11 +152,13 @@ namespace Peek.UI
         {
             int resolutionVersion = Interlocked.Increment(ref _shortcutResolutionVersion);
             _shortcutTargetPath = null;
+            _previewedShortcutTargetPath = null;
             ShortcutName = string.Empty;
             IsPreviewingShortcutTarget = false;
             UpdatePreviewItem();
 
             string? targetPath = await Task.Run(() => ShortcutHelper.TryGetTargetPath(item?.Path));
+
             if (resolutionVersion != Volatile.Read(ref _shortcutResolutionVersion) ||
                 !ReferenceEquals(CurrentItem, item))
             {
@@ -166,10 +168,6 @@ namespace Peek.UI
             _shortcutTargetPath = targetPath;
             ShortcutName = item != null && _shortcutTargetPath != null ? item.Name : string.Empty;
 
-            // The selected item is always previewed first, so that its own information - such as the
-            // properties of a shortcut - is never hidden. Its target is one click away.
-            _previewedShortcutTargetPath = null;
-            IsPreviewingShortcutTarget = false;
             UpdatePreviewItem();
         }
 

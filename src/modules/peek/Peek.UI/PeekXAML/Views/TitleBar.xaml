@@ -106,6 +106,7 @@
 
             <Button
                 x:Name="ShortcutButton"
+                AutomationProperties.AutomationId="ShortcutPreviewButton"
                 VerticalAlignment="Center"
                 Command="{x:Bind ShortcutButtonCommand, Mode=OneWay}"
                 Style="{StaticResource SubtleButtonStyle}"
@@ -167,7 +168,7 @@
                     <VisualState.Setters>
                         <Setter Target="LaunchAppButton_Text.Visibility" Value="Collapsed" />
                         <Setter Target="LaunchAppButton.Visibility" Value="Collapsed" />
-                        <Setter Target="ShortcutPreviewButton_Text.Visibility" Value="Collapsed" />
+                        <Setter Target="ShortcutButton_Text.Visibility" Value="Collapsed" />
                     </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>
