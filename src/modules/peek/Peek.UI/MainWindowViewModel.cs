@@ -98,6 +98,8 @@ namespace Peek.UI
         /// </summary>
         private string? _previewedShortcutTargetPath;
 
+        private bool _previewedShortcutTargetIsFolder;
+
         /// <summary>
         /// Work around missing navigation when peeking from CLI.
         /// TODO: Implement navigation when peeking from CLI.
@@ -121,14 +123,33 @@ namespace Peek.UI
         /// </summary>
         /// <param name="targetPath">The target path stored in the shortcut.</param>
         [RelayCommand]
-        private void PeekShortcutTarget(string? targetPath)
+        private async Task PeekShortcutTargetAsync(string? targetPath)
         {
-            if (string.IsNullOrEmpty(targetPath) || !ShortcutHelper.TargetExists(targetPath))
+            if (string.IsNullOrEmpty(targetPath) ||
+                !string.Equals(_shortcutTargetPath, targetPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            IFileSystemItem? item = CurrentItem;
+            int resolutionVersion = Volatile.Read(ref _shortcutResolutionVersion);
+            (bool targetExists, bool isFolder) = await Task.Run(
+                () =>
+                {
+                    bool isFolder = Directory.Exists(targetPath);
+                    return (isFolder || File.Exists(targetPath), isFolder);
+                });
+
+            if (!targetExists ||
+                resolutionVersion != Volatile.Read(ref _shortcutResolutionVersion) ||
+                !ReferenceEquals(CurrentItem, item) ||
+                !string.Equals(_shortcutTargetPath, targetPath, StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
 
             _previewedShortcutTargetPath = targetPath;
+            _previewedShortcutTargetIsFolder = isFolder;
             IsPreviewingShortcutTarget = true;
             UpdatePreviewItem();
         }
@@ -140,6 +161,7 @@ namespace Peek.UI
         private void ShowSelectedItem()
         {
             _previewedShortcutTargetPath = null;
+            _previewedShortcutTargetIsFolder = false;
             IsPreviewingShortcutTarget = false;
             UpdatePreviewItem();
         }
@@ -153,6 +175,7 @@ namespace Peek.UI
             int resolutionVersion = Interlocked.Increment(ref _shortcutResolutionVersion);
             _shortcutTargetPath = null;
             _previewedShortcutTargetPath = null;
+            _previewedShortcutTargetIsFolder = false;
             ShortcutName = string.Empty;
             IsPreviewingShortcutTarget = false;
             UpdatePreviewItem();
@@ -177,7 +200,7 @@ namespace Peek.UI
         private void UpdatePreviewItem()
         {
             PreviewItem = _previewedShortcutTargetPath != null
-                ? CreateItem(_previewedShortcutTargetPath)
+                ? CreateItem(_previewedShortcutTargetPath, _previewedShortcutTargetIsFolder)
                 : CurrentItem;
         }
 
@@ -187,7 +210,7 @@ namespace Peek.UI
         /// </summary>
         /// <param name="path">The path of a file or folder.</param>
         /// <returns>The item for the path.</returns>
-        private static IFileSystemItem CreateItem(string path)
+        private static IFileSystemItem CreateItem(string path, bool isFolder)
         {
             // Shortcuts to a drive root have no file name of their own.
             string name = Path.GetFileName(path);
@@ -196,7 +219,7 @@ namespace Peek.UI
                 name = path;
             }
 
-            return Directory.Exists(path)
+            return isFolder
                 ? new FolderItem(path, name, path)
                 : new FileItem(path, name);
         }

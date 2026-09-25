@@ -76,11 +76,13 @@ namespace Peek.FilePreviewer.Previewers
         {
             try
             {
-                (string? shortcutTarget, bool canPeekShortcutTarget) = await Task.Run(() =>
-                {
-                    string? targetPath = ShortcutHelper.TryGetTargetPath(Item.Path);
-                    return (targetPath, ShortcutHelper.TargetExists(targetPath));
-                }, cancellationToken);
+                (string? shortcutTarget, bool canPeekShortcutTarget) = await Task.Run(
+                    () =>
+                    {
+                        string? targetPath = ShortcutHelper.TryGetTargetPath(Item.Path);
+                        return (targetPath, ShortcutHelper.TargetExists(targetPath));
+                    },
+                    cancellationToken);
 
                 await Dispatcher.RunOnUiThread(async () =>
                 {

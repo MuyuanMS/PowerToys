@@ -112,7 +112,7 @@ namespace Peek.UI.Views
             TitleBarRootContainer.SizeChanged += TitleBarRootContainer_SizeChanged;
 
             LaunchAppButton.RegisterPropertyChangedCallback(VisibilityProperty, ButtonVisibilityChangedCallback);
-            ShortcutPreviewButton.RegisterPropertyChangedCallback(VisibilityProperty, ButtonVisibilityChangedCallback);
+            ShortcutButton.RegisterPropertyChangedCallback(VisibilityProperty, ButtonVisibilityChangedCallback);
         }
 
         public IFileSystemItem Item
