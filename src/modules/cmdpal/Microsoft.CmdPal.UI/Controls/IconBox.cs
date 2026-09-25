@@ -77,15 +77,17 @@ public partial class IconBox : ContentControl
     {
         add
         {
-            var hadHandler = _sourceRequested is not null;
+            var previousSourceRequested = _sourceRequested;
             _sourceRequested += value;
 
-            if (!hadHandler && _sourceRequested is not null)
+            if (Equals(previousSourceRequested, _sourceRequested))
             {
-                RequestRefresh(IconRequestReason.HandlerAttached);
+                return;
             }
+
+            RequestRefresh(IconRequestReason.HandlerAttached);
 #if DEBUG
-            else if (value is not null)
+            if (previousSourceRequested is not null)
             {
                 Logger.LogWarning("There shouldn't be more than one handler for IconBox.SourceRequested");
             }
@@ -94,12 +96,22 @@ public partial class IconBox : ContentControl
 
         remove
         {
+            var previousSourceRequested = _sourceRequested;
             _sourceRequested -= value;
+
+            if (Equals(previousSourceRequested, _sourceRequested))
+            {
+                return;
+            }
 
             if (_sourceRequested is null)
             {
                 AdvanceRequestVersion();
                 MarkRefreshPending(IconRequestReason.None);
+            }
+            else
+            {
+                RequestRefresh(IconRequestReason.HandlerAttached);
             }
         }
     }

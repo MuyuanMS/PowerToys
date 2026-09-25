@@ -65,6 +65,29 @@ public class IconRefreshStateTests
     }
 
     [TestMethod]
+    public void HandlerChangeAfterDispatchQueuesReplacement()
+    {
+        var state = default(IconRefreshState);
+        state.Request(hasSource: true, reason: IconRequestReason.SourceChanged);
+
+        Assert.IsTrue(state.TryConsume(
+            isLoaded: true,
+            hasSource: true,
+            hasHandler: true,
+            out _));
+
+        state.Request(hasSource: true, reason: IconRequestReason.HandlerAttached);
+
+        Assert.IsTrue(state.TryConsume(
+            isLoaded: true,
+            hasSource: true,
+            hasHandler: true,
+            out var reason));
+        Assert.AreEqual(IconRequestReason.HandlerAttached, reason);
+        Assert.IsFalse(state.TryConsume(isLoaded: true, hasSource: true, hasHandler: true, out _));
+    }
+
+    [TestMethod]
     public void ClearingSourceDiscardsPendingReasons()
     {
         var state = default(IconRefreshState);
