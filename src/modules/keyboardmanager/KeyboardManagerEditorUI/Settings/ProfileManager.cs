@@ -283,17 +283,17 @@ namespace KeyboardManagerEditorUI.Settings
                 {
                     bool wasActive = GetActiveProfile().Equals(profile, StringComparison.OrdinalIgnoreCase);
 
-                    if (!DeviceProfileManager.RemoveAssignmentsForProfile(profile))
-                    {
-                        return false;
-                    }
-
                     // Abort before touching any other store if the config file can't be removed:
                     // otherwise we'd unregister the profile while its {name}.json stays on disk, and
                     // the directory scan in GetProfiles() would resurrect it on the next refresh.
                     if (!TryDeleteFile(ConfigPath(profile)))
                     {
                         return false;
+                    }
+
+                    if (!DeviceProfileManager.RemoveAssignmentsForProfile(profile))
+                    {
+                        Logger.LogWarning($"ProfileManager.DeleteProfile('{profile}'): device assignment cleanup did not complete.");
                     }
 
                     SettingsManager.RemoveProfileMembership(profile);

@@ -403,11 +403,12 @@ namespace KeyboardManagerEditorUI.Pages
 
                 _settingsWatcher = new FileSystemWatcher(dir, "settings.json")
                 {
-                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size,
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
                     EnableRaisingEvents = true,
                 };
                 _settingsWatcher.Changed += OnSettingsFileChanged;
                 _settingsWatcher.Created += OnSettingsFileChanged;
+                _settingsWatcher.Renamed += OnSettingsFileChanged;
             }
             catch (Exception ex)
             {
