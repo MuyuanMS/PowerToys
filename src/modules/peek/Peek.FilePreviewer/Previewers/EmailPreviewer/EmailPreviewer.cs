@@ -44,7 +44,7 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
 
         public bool CustomContextMenu => false;
 
-        public bool AllowExternalImages => true;
+        public bool AllowExternalImages => false;
 
         public static bool IsItemSupported(IFileSystemItem item) => SupportedFileTypes.Contains(item.Extension);
 

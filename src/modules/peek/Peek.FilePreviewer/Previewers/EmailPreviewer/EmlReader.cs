@@ -4,8 +4,10 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net.Mail;
 
 namespace Peek.FilePreviewer.Previewers.EmailPreviewer
 {
@@ -23,7 +25,11 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
             AddAddresses(message.To, EmlMimeParser.GetHeader(root.Headers, "To"));
             AddAddresses(message.Cc, EmlMimeParser.GetHeader(root.Headers, "Cc"));
             AddAddresses(message.Bcc, EmlMimeParser.GetHeader(root.Headers, "Bcc"));
-            if (DateTimeOffset.TryParse(EmlMimeParser.GetHeader(root.Headers, "Date"), out DateTimeOffset date))
+            if (DateTimeOffset.TryParse(
+                EmlMimeParser.GetHeader(root.Headers, "Date"),
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AllowWhiteSpaces,
+                out DateTimeOffset date))
             {
                 message.Date = date;
             }
@@ -62,7 +68,16 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
         {
             if (!string.IsNullOrWhiteSpace(value))
             {
-                destination.AddRange(value.Split(',').Select(address => EmlContentDecoder.DecodeHeader(address.Trim())).Where(address => address.Length > 0));
+                try
+                {
+                    MailAddressCollection addresses = new();
+                    addresses.Add(value);
+                    destination.AddRange(addresses.Select(address => EmlContentDecoder.DecodeHeader(address.ToString())));
+                }
+                catch (FormatException)
+                {
+                    destination.AddRange(value.Split(',').Select(address => EmlContentDecoder.DecodeHeader(address.Trim())).Where(address => address.Length > 0));
+                }
             }
         }
     }

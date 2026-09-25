@@ -11,6 +11,11 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
 {
     internal static class EmlContentDecoder
     {
+        static EmlContentDecoder()
+        {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        }
+
         public static string DecodeBody(EmlMimePart part)
         {
             byte[] decoded = DecodeTransferEncoding(part.Body, EmlMimeParser.GetHeader(part.Headers, "Content-Transfer-Encoding"));

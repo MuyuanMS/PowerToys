@@ -14,23 +14,44 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
     internal sealed class MsgStorage : IDisposable
     {
         private MsgStorageInterop.IStorage? _storage;
+        private Encoding _ansiEncoding;
 
-        private MsgStorage(MsgStorageInterop.IStorage storage)
+        private MsgStorage(MsgStorageInterop.IStorage storage, Encoding? ansiEncoding = null)
         {
             _storage = storage;
+            _ansiEncoding = ansiEncoding ?? Encoding.Latin1;
         }
 
         public static MsgStorage Open(string path)
         {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             int result = MsgStorageInterop.StgOpenStorage(path, null, MsgStorageInterop.ReadMode, IntPtr.Zero, 0, out MsgStorageInterop.IStorage storage);
             Marshal.ThrowExceptionForHR(result);
-            return new MsgStorage(storage);
+            MsgStorage message = new(storage);
+            int codePage = message.ReadInt32("3FFD");
+            if (codePage <= 0)
+            {
+                codePage = message.ReadInt32("3FDE");
+            }
+
+            if (codePage > 0)
+            {
+                try
+                {
+                    message._ansiEncoding = Encoding.GetEncoding(codePage);
+                }
+                catch (ArgumentException)
+                {
+                }
+            }
+
+            return message;
         }
 
         public MsgStorage OpenStorage(string name)
         {
             GetStorage().OpenStorage(name, null, MsgStorageInterop.ReadMode, IntPtr.Zero, 0, out MsgStorageInterop.IStorage storage);
-            return new MsgStorage(storage);
+            return new MsgStorage(storage, _ansiEncoding);
         }
 
         public IEnumerable<string> EnumerateStorages(string prefix)
@@ -68,7 +89,7 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
             }
 
             byte[]? ansi = ReadStream($"__substg1.0_{propertyId}001E");
-            return ansi == null ? string.Empty : Encoding.Latin1.GetString(ansi).TrimEnd('\0');
+            return ansi == null ? string.Empty : _ansiEncoding.GetString(ansi).TrimEnd('\0');
         }
 
         public byte[]? ReadStream(string name)
