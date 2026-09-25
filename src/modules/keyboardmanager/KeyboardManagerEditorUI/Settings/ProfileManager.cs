@@ -251,11 +251,30 @@ namespace KeyboardManagerEditorUI.Settings
                         File.WriteAllText(target, EmptyConfigJson);
                     }
 
-                    JsonObject root = (ReadSettingsRoot() as JsonObject) ?? CreateDefaultSettingsRoot();
-                    JsonObject properties = EnsureObject(root, "properties");
-                    AddToConfigurationList(properties, profile);
-                    WriteSettingsRoot(root);
-                    return true;
+                    try
+                    {
+                        JsonObject root = (ReadSettingsRoot() as JsonObject) ?? CreateDefaultSettingsRoot();
+                        JsonObject properties = EnsureObject(root, "properties");
+                        AddToConfigurationList(properties, profile);
+                        WriteSettingsRoot(root);
+                        return true;
+                    }
+                    catch
+                    {
+                        try
+                        {
+                            if (File.Exists(target))
+                            {
+                                File.Delete(target);
+                            }
+                        }
+                        catch (Exception rollbackException)
+                        {
+                            Logger.LogWarning($"ProfileManager.CreateProfile('{profile}'): failed to remove unregistered config: {rollbackException.Message}");
+                        }
+
+                        throw;
+                    }
                 });
             }
             catch (Exception ex)
@@ -401,18 +420,31 @@ namespace KeyboardManagerEditorUI.Settings
         private static T WithSettingsLock<T>(Func<T> action)
         {
             using var mutex = new Mutex(false, SettingsWriteMutexName);
-            if (!mutex.WaitOne(TimeSpan.FromSeconds(10)))
-            {
-                throw new TimeoutException("Timed out waiting for the Keyboard Manager settings write lock.");
-            }
-
+            bool acquired = false;
             try
             {
+                try
+                {
+                    acquired = mutex.WaitOne(TimeSpan.FromSeconds(10));
+                }
+                catch (AbandonedMutexException)
+                {
+                    acquired = true;
+                }
+
+                if (!acquired)
+                {
+                    throw new TimeoutException("Timed out waiting for the Keyboard Manager settings write lock.");
+                }
+
                 return action();
             }
             finally
             {
-                mutex.ReleaseMutex();
+                if (acquired)
+                {
+                    mutex.ReleaseMutex();
+                }
             }
         }
 

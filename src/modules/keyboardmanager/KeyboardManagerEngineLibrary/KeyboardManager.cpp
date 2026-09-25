@@ -413,7 +413,8 @@ bool KeyboardManager::SwitchActiveProfile(const std::wstring& profile)
     std::lock_guard<std::mutex> lock(switchProfileMutex);
 
     HANDLE settingsMutex = CreateMutexW(nullptr, FALSE, SettingsWriteMutexName);
-    if (settingsMutex == nullptr || WaitForSingleObject(settingsMutex, 10000) != WAIT_OBJECT_0)
+    const DWORD waitResult = settingsMutex == nullptr ? WAIT_FAILED : WaitForSingleObject(settingsMutex, 10000);
+    if (settingsMutex == nullptr || (waitResult != WAIT_OBJECT_0 && waitResult != WAIT_ABANDONED))
     {
         if (settingsMutex != nullptr)
         {
@@ -423,7 +424,7 @@ bool KeyboardManager::SwitchActiveProfile(const std::wstring& profile)
         Logger::error(L"Auto-switch: failed to acquire settings write lock");
         return false;
     }
-
+    // WAIT_ABANDONED also grants ownership, so the common cleanup below must release it.
     bool writeSucceeded = false;
     try
     {

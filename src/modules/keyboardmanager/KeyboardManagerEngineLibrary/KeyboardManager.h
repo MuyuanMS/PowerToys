@@ -22,6 +22,9 @@ public:
 
     ~KeyboardManager()
     {
+        // Join the settings listener before destroying the state its callback reads.
+        settingsEventWaiter.stop();
+
         // Stop the worker threads first so they can't call back into a half-destroyed object.
         if (rawInputTracker)
         {
