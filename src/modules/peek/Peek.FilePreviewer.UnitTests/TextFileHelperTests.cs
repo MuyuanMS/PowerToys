@@ -117,6 +117,22 @@ namespace Peek.FilePreviewer.UnitTests
         }
 
         [TestMethod]
+        public async Task IsTextFile_ShortBomlessUtf16Le_ShouldReturnTrue()
+        {
+            File.WriteAllBytes(_tempFilePath, new UnicodeEncoding(bigEndian: false, byteOrderMark: false).GetBytes("abc"));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_NonLatinBomlessUtf16Le_ShouldReturnTrue()
+        {
+            File.WriteAllBytes(_tempFilePath, new UnicodeEncoding(bigEndian: false, byteOrderMark: false).GetBytes("你好a"));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
         public async Task IsTextFile_Utf32LeWithoutBom_ShouldReturnTrue()
         {
             File.WriteAllText(_tempFilePath, "Text without a UTF-32LE BOM", new UTF32Encoding(bigEndian: false, byteOrderMark: false));

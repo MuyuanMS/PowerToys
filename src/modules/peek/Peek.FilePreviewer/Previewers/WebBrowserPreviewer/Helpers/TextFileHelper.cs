@@ -141,7 +141,7 @@ namespace Peek.FilePreviewer.Previewers
         private static bool HasExpectedNullPattern(byte[] buffer, int bytesRead, int unitSize, int textByteIndex, int[] requiredNullByteIndexes)
         {
             int unitCount = bytesRead / unitSize;
-            if (unitCount < 4)
+            if (unitCount < 2)
             {
                 return false;
             }
@@ -165,8 +165,8 @@ namespace Peek.FilePreviewer.Previewers
                 }
             }
 
-            return requiredNullCounts.All(count => count >= unitCount * 0.8) &&
-                textNulls <= unitCount * 0.2;
+            return requiredNullCounts.All(count => count * 5 >= unitCount) &&
+                textNulls * 5 <= unitCount;
         }
     }
 }
