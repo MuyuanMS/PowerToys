@@ -32,6 +32,7 @@ BOOL APIENTRY DllMain(HMODULE /*hModule*/, DWORD ul_reason_for_call, LPVOID /*lp
 
 namespace
 {
+    const wchar_t SettingsWriteMutexName[] = L"Local\\PowerToys_KeyboardManager_Settings_Write";
     const wchar_t JSON_KEY_PROPERTIES[] = L"properties";
     const wchar_t JSON_KEY_WIN[] = L"win";
     const wchar_t JSON_KEY_ALT[] = L"alt";
@@ -40,6 +41,78 @@ namespace
     const wchar_t JSON_KEY_CODE[] = L"code";
     const wchar_t JSON_KEY_EDITOR_SHORTCUT[] = L"EditorShortcut";
     const wchar_t JSON_KEY_USE_NEW_EDITOR[] = L"useNewEditor";
+    const wchar_t* const ProfileSettingNames[] = { L"activeConfiguration", L"keyboardConfigurations" };
+
+    class ScopedSettingsWriteMutex
+    {
+    public:
+        ScopedSettingsWriteMutex()
+        {
+            _handle = CreateMutexW(nullptr, FALSE, SettingsWriteMutexName);
+            if (_handle == nullptr)
+            {
+                return;
+            }
+
+            const DWORD waitResult = WaitForSingleObject(_handle, 10000);
+            _acquired = waitResult == WAIT_OBJECT_0 || waitResult == WAIT_ABANDONED;
+            if (!_acquired)
+            {
+                CloseHandle(_handle);
+                _handle = nullptr;
+            }
+        }
+
+        ~ScopedSettingsWriteMutex()
+        {
+            if (_acquired)
+            {
+                ReleaseMutex(_handle);
+            }
+
+            if (_handle != nullptr)
+            {
+                CloseHandle(_handle);
+            }
+        }
+
+        ScopedSettingsWriteMutex(const ScopedSettingsWriteMutex&) = delete;
+        ScopedSettingsWriteMutex& operator=(const ScopedSettingsWriteMutex&) = delete;
+
+        explicit operator bool() const
+        {
+            return _acquired;
+        }
+
+    private:
+        HANDLE _handle = nullptr;
+        bool _acquired = false;
+    };
+
+    void PreserveLatestProfileSettings(PowerToysSettings::PowerToyValues& values)
+    {
+        auto latest = PowerToysSettings::PowerToyValues::load_from_settings_file(KeyboardManagerConstants::ModuleName);
+        const auto latestRoot = latest.get_raw_json();
+        const auto incomingRoot = values.get_raw_json();
+        if (!incomingRoot.HasKey(JSON_KEY_PROPERTIES))
+        {
+            return;
+        }
+
+        auto incomingProperties = incomingRoot.GetNamedObject(JSON_KEY_PROPERTIES);
+        const auto latestProperties = latestRoot.GetNamedObject(JSON_KEY_PROPERTIES, json::JsonObject{});
+        for (const auto& settingName : ProfileSettingNames)
+        {
+            if (latestProperties.HasKey(settingName))
+            {
+                incomingProperties.SetNamedValue(settingName, latestProperties.GetNamedValue(settingName));
+            }
+            else
+            {
+                incomingProperties.Remove(settingName);
+            }
+        }
+    }
 }
 
 // Implement the PowerToy Module Interface and all the required methods.
@@ -321,6 +394,15 @@ public:
                 PowerToysSettings::PowerToyValues::from_json_string(config, get_key());
             parse_hotkey(values);
 
+            ScopedSettingsWriteMutex settingsWriteLock;
+            if (!settingsWriteLock)
+            {
+                Logger::error(L"Failed to acquire the Keyboard Manager settings write lock");
+                return;
+            }
+
+            PreserveLatestProfileSettings(values);
+
             // If you don't need to do any custom processing of the settings, proceed
             // to persists the values calling:
             values.save_to_settings_file();
@@ -522,4 +604,3 @@ extern "C" __declspec(dllexport) PowertoyModuleIface* __cdecl powertoy_create()
 {
     return new KeyboardManager();
 }
-
