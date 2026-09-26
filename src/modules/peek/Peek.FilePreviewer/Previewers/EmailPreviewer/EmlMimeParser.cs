@@ -13,8 +13,17 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
 {
     internal static class EmlMimeParser
     {
-        public static EmlMimePart Parse(byte[] data)
+        private const int MaxMimeDepth = 32;
+
+        public static EmlMimePart Parse(byte[] data) => Parse(data, 0);
+
+        private static EmlMimePart Parse(byte[] data, int depth)
         {
+            if (depth > MaxMimeDepth)
+            {
+                throw new InvalidDataException("The email exceeds the maximum MIME nesting depth.");
+            }
+
             int separator = FindHeaderSeparator(data, out int separatorLength);
             if (separator < 0)
             {
@@ -31,7 +40,7 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
             {
                 foreach (byte[] child in SplitMultipart(body, boundary))
                 {
-                    part.Children.Add(Parse(child));
+                    part.Children.Add(Parse(child, depth + 1));
                 }
             }
 

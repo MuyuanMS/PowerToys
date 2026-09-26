@@ -8,6 +8,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Mail;
+using ManagedCommon;
 
 namespace Peek.FilePreviewer.Previewers.EmailPreviewer
 {
@@ -51,7 +52,17 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
             string contentId = EmlMimeParser.GetHeader(part.Headers, "Content-ID").Trim().Trim('<', '>');
             if (part.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(contentId))
             {
-                byte[] data = EmlContentDecoder.DecodeTransferEncoding(part.Body, EmlMimeParser.GetHeader(part.Headers, "Content-Transfer-Encoding"));
+                byte[] data;
+                try
+                {
+                    data = EmlContentDecoder.DecodeTransferEncoding(part.Body, EmlMimeParser.GetHeader(part.Headers, "Content-Transfer-Encoding"));
+                }
+                catch (FormatException)
+                {
+                    Logger.LogWarning("Skipping a malformed inline email image.");
+                    return;
+                }
+
                 if (data.Length > 0)
                 {
                     message.InlineImages[contentId] = new EmailInlineImage(part.ContentType, data);

@@ -14,13 +14,17 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
 {
     internal sealed class MsgStorage : IDisposable
     {
+        private const int MessagePropertyHeaderSize = 32;
+        private const int ChildPropertyHeaderSize = 8;
         private MsgStorageInterop.IStorage? _storage;
+        private readonly int _propertyHeaderSize;
         private Encoding _ansiEncoding;
 
-        private MsgStorage(MsgStorageInterop.IStorage storage, Encoding? ansiEncoding = null)
+        private MsgStorage(MsgStorageInterop.IStorage storage, Encoding? ansiEncoding = null, int propertyHeaderSize = MessagePropertyHeaderSize)
         {
             _storage = storage;
             _ansiEncoding = ansiEncoding ?? Encoding.Latin1;
+            _propertyHeaderSize = propertyHeaderSize;
         }
 
         public static MsgStorage Open(string path)
@@ -52,7 +56,7 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
         public MsgStorage OpenStorage(string name)
         {
             GetStorage().OpenStorage(name, null, MsgStorageInterop.ReadMode, IntPtr.Zero, 0, out MsgStorageInterop.IStorage storage);
-            return new MsgStorage(storage, _ansiEncoding);
+            return new MsgStorage(storage, _ansiEncoding, ChildPropertyHeaderSize);
         }
 
         public IEnumerable<string> EnumerateStorages(string prefix)
@@ -90,7 +94,7 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
             }
 
             uint tag = ((uint)ushort.Parse(propertyId, NumberStyles.HexNumber, CultureInfo.InvariantCulture) << 16) | 0x0003;
-            for (int offset = 32; offset + 16 <= properties.Length; offset += 16)
+            for (int offset = _propertyHeaderSize; offset + 16 <= properties.Length; offset += 16)
             {
                 if (BitConverter.ToUInt32(properties, offset) == tag)
                 {
