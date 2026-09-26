@@ -36,7 +36,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
 
     private readonly List<CommandProviderWrapper> _commandProviders = [];
     private readonly Lock _commandProvidersLock = new();
-    private readonly Dictionary<string, TaskCompletionSource> _providerLoadCompletions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (CommandProviderWrapper Wrapper, TaskCompletionSource Completion)> _providerLoadCompletions = new(StringComparer.Ordinal);
 
     // watch out: if you add code that locks CommandProviders, be sure to always
     // lock CommandProviders before locking DockBands, or you will cause a
@@ -335,9 +335,9 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             lock (_commandProvidersLock)
             {
                 _commandProviders.Clear();
-                foreach (var completion in _providerLoadCompletions.Values)
+                foreach (var entry in _providerLoadCompletions.Values)
                 {
-                    completion.TrySetResult();
+                    entry.Completion.TrySetResult();
                 }
 
                 _providerLoadCompletions.Clear();
@@ -492,10 +492,10 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             {
                 if (_providerLoadCompletions.TryGetValue(wrapper.ProviderId, out var previous))
                 {
-                    previous.TrySetResult();
+                    previous.Completion.TrySetResult();
                 }
 
-                _providerLoadCompletions[wrapper.ProviderId] = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                _providerLoadCompletions[wrapper.ProviderId] = (wrapper, new(TaskCreationOptions.RunContinuationsAsynchronously));
             }
         }
     }
@@ -505,9 +505,10 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         lock (_commandProvidersLock)
         {
             if (_commandProviders.Contains(wrapper) &&
-                _providerLoadCompletions.TryGetValue(wrapper.ProviderId, out var completion))
+                _providerLoadCompletions.TryGetValue(wrapper.ProviderId, out var entry) &&
+                ReferenceEquals(entry.Wrapper, wrapper))
             {
-                completion.TrySetResult();
+                entry.Completion.TrySetResult();
             }
         }
     }
@@ -719,9 +720,9 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
                     _commandProviders.RemoveAll(w => removedProviderIds.Contains(w.ProviderId));
                     foreach (var providerId in removedProviderIds)
                     {
-                        if (_providerLoadCompletions.Remove(providerId, out var completion))
+                        if (_providerLoadCompletions.Remove(providerId, out var entry))
                         {
-                            completion.TrySetResult();
+                            entry.Completion.TrySetResult();
                         }
                     }
                 }
@@ -946,8 +947,8 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         Task? loadTask;
         lock (_commandProvidersLock)
         {
-            loadTask = _providerLoadCompletions.TryGetValue(providerId, out var completion)
-                ? completion.Task
+            loadTask = _providerLoadCompletions.TryGetValue(providerId, out var entry)
+                ? entry.Completion.Task
                 : null;
         }
 
@@ -1094,9 +1095,9 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         _extensionLoadCts.Cancel();
         lock (_commandProvidersLock)
         {
-            foreach (var completion in _providerLoadCompletions.Values)
+            foreach (var entry in _providerLoadCompletions.Values)
             {
-                completion.TrySetResult();
+                entry.Completion.TrySetResult();
             }
 
             _providerLoadCompletions.Clear();

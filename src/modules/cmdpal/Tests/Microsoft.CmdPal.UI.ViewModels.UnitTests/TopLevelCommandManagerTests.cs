@@ -69,7 +69,7 @@ public partial class TopLevelCommandManagerTests
         using var manager = new TopLevelCommandManager(services, [extensionService.Object]);
         await manager.LoadExternalProvidersAsync();
 
-        extensionService.Raise(service => service.OnProviderAdded += null, extensionService.Object, [wrapper]);
+        extensionService.Raise(service => service.OnProviderAdded += null, extensionService.Object, new[] { wrapper });
         var waitTask = manager.WaitForProviderLoadAsync(provider.Id);
 
         Assert.IsTrue(loadStarted.Wait(TimeSpan.FromSeconds(5)));
@@ -103,12 +103,12 @@ public partial class TopLevelCommandManagerTests
 
         try
         {
-            extensionService.Raise(service => service.OnProviderAdded += null, extensionService.Object, [wrapper]);
+            extensionService.Raise(service => service.OnProviderAdded += null, extensionService.Object, new[] { wrapper });
             var waitTask = manager.WaitForProviderLoadAsync(provider.Id);
             Assert.IsTrue(loadStarted.Wait(TimeSpan.FromSeconds(5)));
             Assert.IsFalse(waitTask.IsCompleted);
 
-            extensionService.Raise(service => service.OnProviderRemoved += null, extensionService.Object, [wrapper]);
+            extensionService.Raise(service => service.OnProviderRemoved += null, extensionService.Object, new[] { wrapper });
             await waitTask.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.IsNull(manager.LookupProvider(provider.Id));
         }
@@ -143,7 +143,7 @@ public partial class TopLevelCommandManagerTests
 
         try
         {
-            extensionService.Raise(service => service.OnProviderAdded += null, extensionService.Object, [wrapper]);
+            extensionService.Raise(service => service.OnProviderAdded += null, extensionService.Object, new[] { wrapper });
             var waitTask = manager.WaitForProviderLoadAsync(provider.Id);
             Assert.IsTrue(loadStarted.Wait(TimeSpan.FromSeconds(5)));
             Assert.IsFalse(waitTask.IsCompleted);
@@ -154,6 +154,66 @@ public partial class TopLevelCommandManagerTests
         finally
         {
             completeLoad.Set();
+        }
+    }
+
+    [TestMethod]
+    public async Task WaitForProviderLoadAsync_OldWrapperDoesNotCompleteReplacementWait()
+    {
+        using var services = CreateServices();
+        using var oldStarted = new ManualResetEventSlim();
+        using var newStarted = new ManualResetEventSlim();
+        using var releaseOld = new ManualResetEventSlim();
+        using var releaseNew = new ManualResetEventSlim();
+        var original = new CommandProviderWrapper(
+            new TestCommandProvider(TestCommandProvider.NestedCommandId)
+            {
+                OnTopLevelCommands = () =>
+                {
+                    oldStarted.Set();
+                    releaseOld.Wait(TimeSpan.FromSeconds(10));
+                    return [];
+                },
+            },
+            TaskScheduler.Default);
+        var replacement = new CommandProviderWrapper(
+            new TestCommandProvider(TestCommandProvider.NestedCommandId)
+            {
+                OnTopLevelCommands = () =>
+                {
+                    newStarted.Set();
+                    releaseNew.Wait(TimeSpan.FromSeconds(10));
+                    return [];
+                },
+            },
+            TaskScheduler.Default);
+        var extensionService = new Mock<IExtensionService>();
+        extensionService
+            .Setup(service => service.LoadProvidersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        using var manager = new TopLevelCommandManager(services, [extensionService.Object]);
+        await manager.LoadExternalProvidersAsync();
+
+        try
+        {
+            extensionService.Raise(service => service.OnProviderAdded += null, extensionService.Object, new[] { original });
+            Assert.IsTrue(oldStarted.Wait(TimeSpan.FromSeconds(5)));
+            extensionService.Raise(service => service.OnProviderAdded += null, extensionService.Object, new[] { replacement });
+            Assert.IsTrue(newStarted.Wait(TimeSpan.FromSeconds(5)));
+            var waitTask = manager.WaitForProviderLoadAsync(original.ProviderId);
+            Assert.IsFalse(waitTask.IsCompleted);
+
+            releaseOld.Set();
+            Assert.IsTrue(SpinWait.SpinUntil(() => original.Id != string.Empty, TimeSpan.FromSeconds(5)));
+            Assert.IsFalse(waitTask.IsCompleted);
+
+            releaseNew.Set();
+            await waitTask.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            releaseOld.Set();
+            releaseNew.Set();
         }
     }
 
