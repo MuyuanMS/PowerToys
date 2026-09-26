@@ -184,6 +184,17 @@ namespace Peek.FilePreviewer.UnitTests
         }
 
         [TestMethod]
+        public async Task Read_PredominantlyNonLatinBomlessUtf16LeFile_ShouldDecodeCorrectly()
+        {
+            const string expected = "你好世界和平a";
+            File.WriteAllText(_tempFilePath, expected, new UnicodeEncoding(bigEndian: false, byteOrderMark: false));
+
+            string content = await ReadHelper.Read(_tempFilePath);
+
+            Assert.AreEqual(expected, content);
+        }
+
+        [TestMethod]
         public async Task Read_BomlessUtf32BeFile_ShouldDecodeCorrectly()
         {
             string expected = "Plain text café";

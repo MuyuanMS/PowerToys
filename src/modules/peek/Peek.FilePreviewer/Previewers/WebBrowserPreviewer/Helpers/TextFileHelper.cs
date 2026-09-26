@@ -3,6 +3,8 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -135,7 +137,7 @@ namespace Peek.FilePreviewer.Previewers
                 return Encoding.BigEndianUnicode;
             }
 
-            return null;
+            return TryDetectBomlessUtf16WithValidatedText(buffer, bytesRead);
         }
 
         private static bool HasExpectedNullPattern(byte[] buffer, int bytesRead, int unitSize, int textByteIndex, int[] requiredNullByteIndexes)
@@ -165,8 +167,95 @@ namespace Peek.FilePreviewer.Previewers
                 }
             }
 
-            return requiredNullCounts.All(count => count * 5 >= unitCount) &&
-                textNulls * 5 <= unitCount;
+            return requiredNullCounts.All(count => count * 10 >= unitCount * 3) &&
+                textNulls * 10 <= unitCount * 3;
+        }
+
+        private static Encoding? TryDetectBomlessUtf16WithValidatedText(byte[] buffer, int bytesRead)
+        {
+            if (bytesRead < 6 || bytesRead % 2 != 0)
+            {
+                return null;
+            }
+
+            int littleEndianNulls = 0;
+            int bigEndianNulls = 0;
+            for (int offset = 0; offset < bytesRead; offset += 2)
+            {
+                if (buffer[offset + 1] == 0)
+                {
+                    littleEndianNulls++;
+                }
+
+                if (buffer[offset] == 0)
+                {
+                    bigEndianNulls++;
+                }
+            }
+
+            if (littleEndianNulls > bigEndianNulls &&
+                IsPlausibleBomlessUtf16Text(buffer, bytesRead, bigEndian: false))
+            {
+                return Encoding.Unicode;
+            }
+
+            if (bigEndianNulls > littleEndianNulls &&
+                IsPlausibleBomlessUtf16Text(buffer, bytesRead, bigEndian: true))
+            {
+                return Encoding.BigEndianUnicode;
+            }
+
+            return null;
+        }
+
+        private static bool IsPlausibleBomlessUtf16Text(byte[] buffer, int bytesRead, bool bigEndian)
+        {
+            bool hasNonAsciiByte = false;
+            for (int index = 0; index < bytesRead; index++)
+            {
+                byte value = buffer[index];
+                if (value != 0 && (value < 0x20 || value > 0x7E))
+                {
+                    hasNonAsciiByte = true;
+                    break;
+                }
+            }
+
+            if (!hasNonAsciiByte)
+            {
+                return false;
+            }
+
+            string text;
+            try
+            {
+                text = new UnicodeEncoding(bigEndian, byteOrderMark: false, throwOnInvalidBytes: true)
+                    .GetString(buffer, 0, bytesRead);
+            }
+            catch (DecoderFallbackException)
+            {
+                return false;
+            }
+
+            var distinctRunes = new HashSet<Rune>();
+            foreach (Rune rune in text.EnumerateRunes())
+            {
+                UnicodeCategory category = Rune.GetUnicodeCategory(rune);
+                bool isTextRune = Rune.IsLetterOrDigit(rune) ||
+                    Rune.IsWhiteSpace(rune) ||
+                    Rune.IsPunctuation(rune) ||
+                    Rune.IsSymbol(rune) ||
+                    category is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.EnclosingMark or UnicodeCategory.Format;
+                if (!isTextRune)
+                {
+                    return false;
+                }
+
+                distinctRunes.Add(rune);
+            }
+
+            // Sparse NULs alone are ambiguous; require a varied valid decoding to avoid mistaking ASCII or binary data for UTF-16.
+            return distinctRunes.Count >= 3;
         }
     }
 }
