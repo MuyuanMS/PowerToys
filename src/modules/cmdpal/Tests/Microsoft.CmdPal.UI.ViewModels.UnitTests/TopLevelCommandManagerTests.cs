@@ -5,6 +5,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.CmdPal.Common.Services;
 using Microsoft.CmdPal.UI.ViewModels.Services;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
@@ -43,6 +44,177 @@ public partial class TopLevelCommandManagerTests
         var waitTask = manager.WaitForCurrentLoadAsync();
 
         Assert.IsTrue(waitTask.IsCompletedSuccessfully);
+    }
+
+    [TestMethod]
+    public async Task WaitForProviderLoadAsync_WaitsForLateProviderAfterGlobalLoadCompletes()
+    {
+        using var services = CreateServices();
+        using var loadStarted = new ManualResetEventSlim();
+        using var completeLoad = new ManualResetEventSlim();
+        var provider = new TestCommandProvider(TestCommandProvider.NestedCommandId)
+        {
+            OnTopLevelCommands = () =>
+            {
+                loadStarted.Set();
+                Assert.IsTrue(completeLoad.Wait(TimeSpan.FromSeconds(5)));
+                return [];
+            },
+        };
+        var wrapper = new CommandProviderWrapper(provider, TaskScheduler.Default);
+        var extensionService = new Mock<IExtensionService>();
+        extensionService
+            .Setup(service => service.LoadProvidersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        using var manager = new TopLevelCommandManager(services, [extensionService.Object]);
+        await manager.LoadExternalProvidersAsync();
+
+        extensionService.Raise(service => service.OnProviderAdded += null, extensionService.Object, new[] { wrapper });
+        var waitTask = manager.WaitForProviderLoadAsync(provider.Id);
+
+        Assert.IsTrue(loadStarted.Wait(TimeSpan.FromSeconds(5)));
+        Assert.IsFalse(waitTask.IsCompleted);
+        completeLoad.Set();
+        await waitTask.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [TestMethod]
+    public async Task WaitForProviderLoadAsync_CompletesAfterProviderIsRemovedDuringLoad()
+    {
+        using var services = CreateServices();
+        using var loadStarted = new ManualResetEventSlim();
+        using var completeLoad = new ManualResetEventSlim();
+        var provider = new TestCommandProvider(TestCommandProvider.NestedCommandId)
+        {
+            OnTopLevelCommands = () =>
+            {
+                loadStarted.Set();
+                completeLoad.Wait(TimeSpan.FromSeconds(10));
+                return [];
+            },
+        };
+        var wrapper = new CommandProviderWrapper(provider, TaskScheduler.Default);
+        var extensionService = new Mock<IExtensionService>();
+        extensionService
+            .Setup(service => service.LoadProvidersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        using var manager = new TopLevelCommandManager(services, [extensionService.Object]);
+        await manager.LoadExternalProvidersAsync();
+
+        try
+        {
+            extensionService.Raise(service => service.OnProviderAdded += null, extensionService.Object, new[] { wrapper });
+            var waitTask = manager.WaitForProviderLoadAsync(provider.Id);
+            Assert.IsTrue(loadStarted.Wait(TimeSpan.FromSeconds(5)));
+            Assert.IsFalse(waitTask.IsCompleted);
+
+            extensionService.Raise(service => service.OnProviderRemoved += null, extensionService.Object, new[] { wrapper });
+            await waitTask.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.IsNull(manager.LookupProvider(provider.Id));
+        }
+        finally
+        {
+            completeLoad.Set();
+        }
+    }
+
+    [TestMethod]
+    public async Task WaitForProviderLoadAsync_CompletesAfterProviderLoadIsCancelled()
+    {
+        using var services = CreateServices();
+        using var loadStarted = new ManualResetEventSlim();
+        using var completeLoad = new ManualResetEventSlim();
+        var provider = new TestCommandProvider(TestCommandProvider.NestedCommandId)
+        {
+            OnTopLevelCommands = () =>
+            {
+                loadStarted.Set();
+                completeLoad.Wait(TimeSpan.FromSeconds(10));
+                return [];
+            },
+        };
+        var wrapper = new CommandProviderWrapper(provider, TaskScheduler.Default);
+        var extensionService = new Mock<IExtensionService>();
+        extensionService
+            .Setup(service => service.LoadProvidersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        using var manager = new TopLevelCommandManager(services, [extensionService.Object]);
+        await manager.LoadExternalProvidersAsync();
+
+        try
+        {
+            extensionService.Raise(service => service.OnProviderAdded += null, extensionService.Object, new[] { wrapper });
+            var waitTask = manager.WaitForProviderLoadAsync(provider.Id);
+            Assert.IsTrue(loadStarted.Wait(TimeSpan.FromSeconds(5)));
+            Assert.IsFalse(waitTask.IsCompleted);
+
+            await manager.ReloadAllCommandsAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            await waitTask.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            completeLoad.Set();
+        }
+    }
+
+    [TestMethod]
+    public async Task WaitForProviderLoadAsync_OldWrapperDoesNotCompleteReplacementWait()
+    {
+        using var services = CreateServices();
+        using var oldStarted = new ManualResetEventSlim();
+        using var newStarted = new ManualResetEventSlim();
+        using var releaseOld = new ManualResetEventSlim();
+        using var releaseNew = new ManualResetEventSlim();
+        var original = new CommandProviderWrapper(
+            new TestCommandProvider(TestCommandProvider.NestedCommandId)
+            {
+                OnTopLevelCommands = () =>
+                {
+                    oldStarted.Set();
+                    releaseOld.Wait(TimeSpan.FromSeconds(10));
+                    return [];
+                },
+            },
+            TaskScheduler.Default);
+        var replacement = new CommandProviderWrapper(
+            new TestCommandProvider(TestCommandProvider.NestedCommandId)
+            {
+                OnTopLevelCommands = () =>
+                {
+                    newStarted.Set();
+                    releaseNew.Wait(TimeSpan.FromSeconds(10));
+                    return [];
+                },
+            },
+            TaskScheduler.Default);
+        var extensionService = new Mock<IExtensionService>();
+        extensionService
+            .Setup(service => service.LoadProvidersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        using var manager = new TopLevelCommandManager(services, [extensionService.Object]);
+        await manager.LoadExternalProvidersAsync();
+
+        try
+        {
+            extensionService.Raise(service => service.OnProviderAdded += null, extensionService.Object, new[] { original });
+            Assert.IsTrue(oldStarted.Wait(TimeSpan.FromSeconds(5)));
+            extensionService.Raise(service => service.OnProviderAdded += null, extensionService.Object, new[] { replacement });
+            Assert.IsTrue(newStarted.Wait(TimeSpan.FromSeconds(5)));
+            var waitTask = manager.WaitForProviderLoadAsync(original.ProviderId);
+            Assert.IsFalse(waitTask.IsCompleted);
+
+            releaseOld.Set();
+            Assert.IsTrue(SpinWait.SpinUntil(() => original.Id != string.Empty, TimeSpan.FromSeconds(5)));
+            Assert.IsFalse(waitTask.IsCompleted);
+
+            releaseNew.Set();
+            await waitTask.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            releaseOld.Set();
+            releaseNew.Set();
+        }
     }
 
     [TestMethod]
@@ -251,6 +423,35 @@ public partial class TopLevelCommandManagerTests
         item.VerifyRemove(commandItem => commandItem.PropChanged -= It.IsAny<TypedEventHandler<object, IPropChangedEventArgs>>(), Times.Exactly(2));
     }
 
+    [TestMethod]
+    public async Task ProviderSettingsViewModel_ExposesExternalProviderId()
+    {
+        using var services = CreateServices();
+        const string extensionProviderId = "external-provider";
+        var provider = new TestCommandProvider(TestCommandProvider.NestedCommandId);
+        var extension = new Mock<IExtensionWrapper>();
+        extension.SetupGet(wrapper => wrapper.ExtensionUniqueId).Returns(extensionProviderId);
+        extension.Setup(wrapper => wrapper.IsRunning()).Returns(true);
+        extension.Setup(wrapper => wrapper.GetExtensionObject()).Returns(new TestExtension(provider));
+
+        var wrapper = new CommandProviderWrapper(
+            extension.Object,
+            TaskScheduler.Default,
+            Mock.Of<ICommandProviderCache>());
+        var viewModel = new ProviderSettingsViewModel(
+            wrapper,
+            new ProviderSettings(),
+            Mock.Of<ISettingsService>());
+
+        Assert.AreEqual(string.Empty, viewModel.Id);
+        Assert.AreEqual(extensionProviderId, viewModel.ProviderId);
+
+        await wrapper.LoadTopLevelCommands(services);
+
+        Assert.AreEqual(provider.Id, viewModel.Id);
+        Assert.AreEqual(extensionProviderId, viewModel.ProviderId);
+    }
+
     private static ServiceProvider CreateServices()
     {
         var settings = new SettingsModel();
@@ -287,6 +488,8 @@ public partial class TopLevelCommandManagerTests
 
         public Action? OnLookup { get; set; }
 
+        public Func<ICommandItem[]>? OnTopLevelCommands { get; init; }
+
         public TestCommandProvider(string resolvedCommandId, ICommandItem? resolvedItem = null)
         {
             Id = "test-provider";
@@ -298,13 +501,22 @@ public partial class TopLevelCommandManagerTests
             });
         }
 
-        public override ICommandItem[] TopLevelCommands() => IncludeTopLevelCommand ? [_resolvedItem] : [];
+        public override ICommandItem[] TopLevelCommands() => OnTopLevelCommands?.Invoke() ?? (IncludeTopLevelCommand ? [_resolvedItem] : []);
 
         public override ICommandItem? GetCommandItem(string id)
         {
             Interlocked.Increment(ref _lookupCount);
             OnLookup?.Invoke();
             return id == NestedCommandId ? _resolvedItem : null;
+        }
+    }
+
+    private sealed partial class TestExtension(ICommandProvider provider) : IExtension
+    {
+        public object GetProvider(ProviderType providerType) => provider;
+
+        public void Dispose()
+        {
         }
     }
 }

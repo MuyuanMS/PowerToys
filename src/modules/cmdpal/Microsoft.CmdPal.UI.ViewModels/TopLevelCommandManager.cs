@@ -36,6 +36,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
 
     private readonly List<CommandProviderWrapper> _commandProviders = [];
     private readonly Lock _commandProvidersLock = new();
+    private readonly Dictionary<string, (CommandProviderWrapper Wrapper, TaskCompletionSource Completion)> _providerLoadCompletions = new(StringComparer.Ordinal);
 
     // watch out: if you add code that locks CommandProviders, be sure to always
     // lock CommandProviders before locking DockBands, or you will cause a
@@ -334,6 +335,12 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             lock (_commandProvidersLock)
             {
                 _commandProviders.Clear();
+                foreach (var entry in _providerLoadCompletions.Values)
+                {
+                    entry.Completion.TrySetResult();
+                }
+
+                _providerLoadCompletions.Clear();
             }
 
             foreach (var item in removedTopLevel)
@@ -471,11 +478,43 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     private async Task<RegisterAndLoadSummary> RegisterAndLoadCommandsAsync(IEnumerable<CommandProviderWrapper> wrappers, CancellationToken ct)
     {
         var wrapperList = wrappers.ToList();
+        RegisterCommandProviders(wrapperList);
+
+        return await LoadRegisteredCommandsAsync(wrapperList, ct).ConfigureAwait(false);
+    }
+
+    private void RegisterCommandProviders(List<CommandProviderWrapper> wrappers)
+    {
         lock (_commandProvidersLock)
         {
-            _commandProviders.AddRange(wrapperList);
-        }
+            _commandProviders.AddRange(wrappers);
+            foreach (var wrapper in wrappers)
+            {
+                if (_providerLoadCompletions.TryGetValue(wrapper.ProviderId, out var previous))
+                {
+                    previous.Completion.TrySetResult();
+                }
 
+                _providerLoadCompletions[wrapper.ProviderId] = (wrapper, new(TaskCreationOptions.RunContinuationsAsynchronously));
+            }
+        }
+    }
+
+    private void CompleteProviderLoad(CommandProviderWrapper wrapper)
+    {
+        lock (_commandProvidersLock)
+        {
+            if (_commandProviders.Contains(wrapper) &&
+                _providerLoadCompletions.TryGetValue(wrapper.ProviderId, out var entry) &&
+                ReferenceEquals(entry.Wrapper, wrapper))
+            {
+                entry.Completion.TrySetResult();
+            }
+        }
+    }
+
+    private async Task<RegisterAndLoadSummary> LoadRegisteredCommandsAsync(List<CommandProviderWrapper> wrapperList, CancellationToken ct)
+    {
         // Load the commands from the providers in parallel
         var loadResults = await Task.WhenAll(wrapperList.Select(w => TryLoadCommandsAsync(w, ct))).ConfigureAwait(false);
 
@@ -537,6 +576,14 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             if (r.IsTimedOut)
             {
                 _ = AppendCommandsWhenReadyAsync(r.Wrapper, r.PendingLoadTask, r.Stopwatch, ct);
+            }
+        }
+
+        foreach (var r in loadResults)
+        {
+            if (!r.IsTimedOut)
+            {
+                CompleteProviderLoad(r.Wrapper);
             }
         }
 
@@ -616,18 +663,23 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         {
             Logger.LogError($"Background loading of commands and bands from {wrapper.ExtensionHost?.Extension?.PackageFullName ?? wrapper.DisplayName} failed after {sw.ElapsedMilliseconds} ms: {ex}");
         }
+        finally
+        {
+            CompleteProviderLoad(wrapper);
+        }
     }
 
     private void ExtensionService_OnProviderAdded(IExtensionService sender, IEnumerable<CommandProviderWrapper> wrappers)
     {
         var ct = _currentExtensionLoadCancellationToken;
+        var wrapperList = wrappers.ToList();
+        RegisterCommandProviders(wrapperList);
 
         _ = Task.Run(
             async () =>
             {
-                await RegisterAndLoadCommandsAsync(wrappers, ct).ConfigureAwait(false);
-            },
-            ct);
+                await LoadRegisteredCommandsAsync(wrapperList, ct).ConfigureAwait(false);
+            });
     }
 
     private void ExtensionService_OnProviderRemoved(IExtensionService sender, IEnumerable<CommandProviderWrapper> removedWrappers)
@@ -666,6 +718,13 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
                 lock (_commandProvidersLock)
                 {
                     _commandProviders.RemoveAll(w => removedProviderIds.Contains(w.ProviderId));
+                    foreach (var providerId in removedProviderIds)
+                    {
+                        if (_providerLoadCompletions.Remove(providerId, out var entry))
+                        {
+                            entry.Completion.TrySetResult();
+                        }
+                    }
                 }
 
                 await Task.Factory.StartNew(
@@ -882,6 +941,23 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         }
     }
 
+    /// <summary>Waits for a provider's full load, including a continuation that outlives the global loading phase.</summary>
+    public async Task WaitForProviderLoadAsync(string providerId, CancellationToken cancellationToken = default)
+    {
+        Task? loadTask;
+        lock (_commandProvidersLock)
+        {
+            loadTask = _providerLoadCompletions.TryGetValue(providerId, out var entry)
+                ? entry.Completion.Task
+                : null;
+        }
+
+        if (loadTask is not null)
+        {
+            await loadTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     public TopLevelViewModel? LookupDockBand(string id)
     {
         lock (_dockBandsLock)
@@ -1017,6 +1093,16 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         }
 
         _extensionLoadCts.Cancel();
+        lock (_commandProvidersLock)
+        {
+            foreach (var entry in _providerLoadCompletions.Values)
+            {
+                entry.Completion.TrySetResult();
+            }
+
+            _providerLoadCompletions.Clear();
+        }
+
         _extensionLoadCts.Dispose();
         _reloadCommandsGate.Dispose();
         GC.SuppressFinalize(this);
