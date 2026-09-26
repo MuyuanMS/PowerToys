@@ -83,15 +83,12 @@
                 </ToolTipService.ToolTip>
             </TextBlock>
 
-            <Grid
-                ColumnSpacing="8"
+            <!--  The shortcut target and the link that previews it form their own block so the link
+                  sits on the line below the target path instead of trailing it.  -->
+            <StackPanel
+                Spacing="4"
                 Visibility="{x:Bind conv:VisibilityConverter.Convert(Source.HasShortcutTarget), Mode=OneWay}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
                 <TextBlock
-                    Grid.Column="0"
                     VerticalAlignment="Center"
                     Text="{x:Bind FormatShortcutTarget(Source.ShortcutTarget), Mode=OneWay}"
                     TextTrimming="CharacterEllipsis">
@@ -101,7 +98,8 @@
                 </TextBlock>
                 <HyperlinkButton
                     x:Name="ShortcutTargetPeekButton"
-                    Grid.Column="1"
+                    Padding="0"
+                    HorizontalAlignment="Left"
                     VerticalAlignment="Center"
                     AutomationProperties.AutomationId="ShortcutTargetPeekButton"
                     Command="{x:Bind Source.PeekShortcutTargetCommand, Mode=OneWay}"
@@ -112,7 +110,7 @@
                         <ToolTip Content="{x:Bind PeekTargetToolTip}" />
                     </ToolTipService.ToolTip>
                 </HyperlinkButton>
-            </Grid>
+            </StackPanel>
         </StackPanel>
     </Grid>
 </UserControl>
