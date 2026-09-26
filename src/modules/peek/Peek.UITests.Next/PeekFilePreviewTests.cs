@@ -344,6 +344,50 @@ public class PeekFilePreviewTests : UITestBase
         }
     }
 
+    [TestMethod("Peek.ShortcutPreview.NestedTarget")]
+    [TestCategory("Shortcut preview")]
+    public void TestNestedShortcutCanOpenItsTarget()
+    {
+        var testDirectory = Directory.CreateTempSubdirectory("PeekNestedShortcut");
+        var targetPath = Path.Combine(testDirectory.FullName, "target.txt");
+        var innerPath = Path.Combine(testDirectory.FullName, "inner.lnk");
+        var outerPath = Path.Combine(testDirectory.FullName, "outer.lnk");
+        File.WriteAllText(targetPath, "nested shortcut target");
+
+        var shellType = Type.GetTypeFromProgID("WScript.Shell");
+        Assert.IsNotNull(shellType, "The Windows Script Host COM server is required to create shortcuts for this test.");
+        dynamic shell = Activator.CreateInstance(shellType);
+        dynamic inner = shell.CreateShortcut(innerPath);
+        inner.TargetPath = targetPath;
+        inner.Save();
+        dynamic outer = shell.CreateShortcut(outerPath);
+        outer.TargetPath = innerPath;
+        outer.Save();
+
+        try
+        {
+            var peekWindow = OpenPeekWindow(outerPath);
+            peekWindow.Find<HyperlinkButton>(By.AccessibilityId("ShortcutTargetPeekButton"), 5_000).Invoke();
+
+            var innerWindow = WaitForPeekWindow(innerPath, PeekWindowTimeoutMS);
+            Assert.IsNotNull(innerWindow, "Peek should show the nested shortcut.");
+            innerWindow.Find<HyperlinkButton>(By.AccessibilityId("ShortcutTargetPeekButton"), 5_000).Invoke();
+
+            var targetWindow = WaitForPeekWindow(targetPath, PeekWindowTimeoutMS);
+            Assert.IsNotNull(targetWindow, "Peek should follow the nested shortcut to its target.");
+            targetWindow.Find<Button>(By.AccessibilityId("ShortcutPreviewButton"), 5_000).Invoke();
+            Assert.IsNotNull(WaitForPeekWindow(outerPath, PeekWindowTimeoutMS), "Peek should return to the selected shortcut.");
+        }
+        finally
+        {
+            CloseTestWindows();
+            if (Directory.Exists(testDirectory.FullName))
+            {
+                Directory.Delete(testDirectory.FullName, recursive: true);
+            }
+        }
+    }
+
     [TestMethod("Peek.FileNavigation.SwitchFilesWithArrowKeys")]
     [TestCategory("File Navigation")]
     public void TestSwitchFilesWithArrowKeys()

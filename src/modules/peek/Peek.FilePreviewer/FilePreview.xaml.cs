@@ -61,7 +61,7 @@ namespace Peek.FilePreviewer
                 nameof(PeekShortcutTargetCommand),
                 typeof(ICommand),
                 typeof(FilePreview),
-                new PropertyMetadata(null));
+                new PropertyMetadata(null, (d, e) => ((FilePreview)d).OnPeekShortcutTargetCommandChanged()));
 
         [ObservableProperty]
         private int numberOfFiles;
@@ -163,10 +163,22 @@ namespace Peek.FilePreviewer
             set => SetValue(ShowFilePreviewTooltipProperty, value);
         }
 
-        public ICommand PeekShortcutTargetCommand
+        public ICommand? PeekShortcutTargetCommand
         {
-            get => (ICommand)GetValue(PeekShortcutTargetCommandProperty);
+            get => (ICommand?)GetValue(PeekShortcutTargetCommandProperty);
             set => SetValue(PeekShortcutTargetCommandProperty, value);
+        }
+
+        private void OnPeekShortcutTargetCommandChanged()
+        {
+            if (Previewer is IUnsupportedFilePreviewer unsupportedFilePreviewer)
+            {
+                unsupportedFilePreviewer.PeekShortcutTargetCommand = PeekShortcutTargetCommand;
+                if (unsupportedFilePreviewer.Preview is { } preview)
+                {
+                    preview.PeekShortcutTargetCommand = PeekShortcutTargetCommand;
+                }
+            }
         }
 
         private void OnShowFilePreviewTooltipChanged()

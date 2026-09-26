@@ -92,6 +92,8 @@ namespace Peek.UI
 
         private int _shortcutResolutionVersion;
 
+        private readonly HashSet<string> _visitedShortcutPaths = new(StringComparer.OrdinalIgnoreCase);
+
         /// <summary>
         /// The target path that is currently previewed instead of <see cref="CurrentItem"/>, or null
         /// when the selected item itself is previewed.
@@ -125,29 +127,40 @@ namespace Peek.UI
         [RelayCommand]
         private async Task PeekShortcutTargetAsync(string? targetPath)
         {
-            if (string.IsNullOrEmpty(targetPath) ||
-                !string.Equals(_shortcutTargetPath, targetPath, StringComparison.OrdinalIgnoreCase))
+            IFileSystemItem? previewItem = PreviewItem;
+            if (string.IsNullOrEmpty(targetPath) || previewItem == null ||
+                !ShortcutHelper.IsShortcut(previewItem.Path) ||
+                _visitedShortcutPaths.Contains(targetPath))
             {
                 return;
             }
 
             IFileSystemItem? item = CurrentItem;
             int resolutionVersion = Volatile.Read(ref _shortcutResolutionVersion);
-            (bool targetExists, bool isFolder) = await Task.Run(
+            (string? actualTarget, bool targetExists, bool isFolder) = await Task.Run(
                 () =>
                 {
+                    string? actualTarget = ShortcutHelper.TryGetTargetPath(previewItem.Path);
+                    if (!string.Equals(actualTarget, targetPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return (actualTarget, false, false);
+                    }
+
                     bool isFolder = Directory.Exists(targetPath);
-                    return (isFolder || File.Exists(targetPath), isFolder);
+                    return (actualTarget, isFolder || File.Exists(targetPath), isFolder);
                 });
 
             if (!targetExists ||
+                !string.Equals(actualTarget, targetPath, StringComparison.OrdinalIgnoreCase) ||
                 resolutionVersion != Volatile.Read(ref _shortcutResolutionVersion) ||
                 !ReferenceEquals(CurrentItem, item) ||
-                !string.Equals(_shortcutTargetPath, targetPath, StringComparison.OrdinalIgnoreCase))
+                !ReferenceEquals(PreviewItem, previewItem) ||
+                _visitedShortcutPaths.Contains(targetPath))
             {
                 return;
             }
 
+            _visitedShortcutPaths.Add(previewItem.Path);
             _previewedShortcutTargetPath = targetPath;
             _previewedShortcutTargetIsFolder = isFolder;
             IsPreviewingShortcutTarget = true;
@@ -160,6 +173,7 @@ namespace Peek.UI
         [RelayCommand]
         private void ShowSelectedItem()
         {
+            _visitedShortcutPaths.Clear();
             _previewedShortcutTargetPath = null;
             _previewedShortcutTargetIsFolder = false;
             IsPreviewingShortcutTarget = false;
@@ -173,6 +187,7 @@ namespace Peek.UI
         private async Task UpdateShortcutTargetAsync(IFileSystemItem? item)
         {
             int resolutionVersion = Interlocked.Increment(ref _shortcutResolutionVersion);
+            _visitedShortcutPaths.Clear();
             _shortcutTargetPath = null;
             _previewedShortcutTargetPath = null;
             _previewedShortcutTargetIsFolder = false;

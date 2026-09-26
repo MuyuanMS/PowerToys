@@ -65,7 +65,9 @@ namespace Peek.Common.Helpers
             // can store environment variables and paths relative to the shortcut.
             targetPath = Environment.ExpandEnvironmentVariables(targetPath);
 
-            if (!Path.IsPathRooted(targetPath))
+            if (!targetPath.StartsWith("::", StringComparison.Ordinal) &&
+                !targetPath.StartsWith("shell:", StringComparison.OrdinalIgnoreCase) &&
+                !Path.IsPathRooted(targetPath))
             {
                 string? shortcutDirectory = Path.GetDirectoryName(shortcutPath);
 
