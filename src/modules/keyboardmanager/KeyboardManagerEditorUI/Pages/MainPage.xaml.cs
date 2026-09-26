@@ -416,11 +416,12 @@ namespace KeyboardManagerEditorUI.Pages
                 _settingsWatcher = new FileSystemWatcher(dir, "settings.json")
                 {
                     NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName,
-                    EnableRaisingEvents = true,
                 };
                 _settingsWatcher.Changed += OnSettingsFileChanged;
                 _settingsWatcher.Created += OnSettingsFileChanged;
                 _settingsWatcher.Renamed += OnSettingsFileChanged;
+                _settingsWatcher.EnableRaisingEvents = true;
+                RefreshActiveProfileFromDisk();
             }
             catch (Exception ex)
             {

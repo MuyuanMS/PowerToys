@@ -142,19 +142,18 @@ KeyboardManager::KeyboardManager()
 
     editorIsRunningEvent = CreateEvent(nullptr, true, false, KeyboardManagerConstants::EditorWindowEventName.c_str());
 
-    // Start detecting which physical keyboard is being typed on (for per-keyboard profile switching).
+    // Create callback targets before the settings waiter starts, but keep workers inactive until
+    // the waiter can receive every profile-change notification they produce.
     rawInputTracker = std::make_unique<RawInputKeyboardTracker>(
         [this](const RawInputKeyboardTracker::KeyEvent& keyEvent) { OnRawKeyEvent(keyEvent); });
-    rawInputTracker->Start();
 
-    // Global profile-cycle hotkey. Re-read the config so the definition parsed before this object
-    // existed is applied (LoadDeviceProfiles guards on the pointer).
+    // Global profile-cycle hotkey. Load its definition before starting its worker.
     profileCycleHotkey = std::make_unique<ProfileCycleHotkey>([this] { CycleActiveProfile(); });
-    profileCycleHotkey->Start();
     LoadDeviceProfiles();
 
-    // Initialize every callback target before the settings thread can call back into this object.
     settingsEventWaiter.start(KeyboardManagerConstants::SettingsEventName, changeSettingsCallback);
+    rawInputTracker->Start();
+    profileCycleHotkey->Start();
 }
 
 void KeyboardManager::OnRawKeyEvent(const RawInputKeyboardTracker::KeyEvent& keyEvent)
@@ -435,6 +434,26 @@ bool KeyboardManager::SwitchActiveProfileLocked(const std::wstring& profile)
     bool writeSucceeded = false;
     try
     {
+        if (profile != KeyboardManagerConstants::DefaultConfiguration)
+        {
+            const auto configPath = PTSettingsHelper::get_module_save_folder_location(moduleName) + L"\\" + profile + L".json";
+            std::error_code ec;
+            if (!std::filesystem::exists(configPath, ec))
+            {
+                Logger::error(L"Switch: refusing to activate profile '{}' — its config file is missing", profile);
+                {
+                    std::lock_guard<std::mutex> activeLock(activeProfileMutex);
+                    if (requestedProfile == profile)
+                    {
+                        requestedProfile.clear();
+                    }
+                }
+                ReleaseMutex(settingsMutex);
+                CloseHandle(settingsMutex);
+                return false;
+            }
+        }
+
         const auto path = PTSettingsHelper::get_module_save_folder_location(moduleName) + L"\\settings.json";
         auto parsed = json::from_file(path);
         if (!parsed.has_value())
