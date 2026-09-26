@@ -19,12 +19,17 @@ internal sealed partial class FallbackWindowWalkerItem : FallbackCommandItem
     // UpdateQuery runs on every keystroke. Enumerating windows costs a round trip per window,
     // so reuse one snapshot while the user is typing.
     private static readonly TimeSpan SnapshotLifetime = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan IconLoadDelay = TimeSpan.FromMilliseconds(50);
+    private static readonly SemaphoreSlim IconLoadGate = new(1, 1);
 
     private readonly NoOpCommand _emptyCommand = new();
     private readonly Lock _updateLock = new();
-    private List<Window> _windows = [];
+    private readonly Lock _iconLoadLock = new();
+    private List<WindowSearchEntry> _windows = [];
     private long _snapshotTimestamp;
+    private long _queryGeneration;
     private WindowWalkerListItem? _currentItem;
+    private CancellationTokenSource? _iconLoadCancellationTokenSource;
 
     public FallbackWindowWalkerItem()
         : base(Resources.windowwalker_fallback_title, _id)
@@ -37,8 +42,14 @@ internal sealed partial class FallbackWindowWalkerItem : FallbackCommandItem
 
     public override void UpdateQuery(string query)
     {
+        var queryGeneration = Interlocked.Increment(ref _queryGeneration);
         lock (_updateLock)
         {
+            if (!IsCurrentQuery(queryGeneration))
+            {
+                return;
+            }
+
             if (string.IsNullOrWhiteSpace(query) || query.Trim().Length < WindowMatcher.MinimumQueryLength)
             {
                 Clear();
@@ -46,24 +57,43 @@ internal sealed partial class FallbackWindowWalkerItem : FallbackCommandItem
             }
 
             var windows = GetWindows();
-            var index = WindowMatcher.FindBestMatch(windows, query, static w => w.Title, static w => w.Process.Name);
+            if (!IsCurrentQuery(queryGeneration))
+            {
+                return;
+            }
+
+            var index = WindowMatcher.FindBestMatch(windows, query, static w => w.Title, static w => w.ProcessName);
+            if (!IsCurrentQuery(queryGeneration))
+            {
+                return;
+            }
+
             if (index < 0)
             {
                 Clear();
                 return;
             }
 
-            ShowWindow(windows[index]);
+            ShowWindow(windows[index].Window);
         }
     }
 
-    private List<Window> GetWindows()
+    private bool IsCurrentQuery(long queryGeneration) => queryGeneration == Volatile.Read(ref _queryGeneration);
+
+    private List<WindowSearchEntry> GetWindows()
     {
         if (_snapshotTimestamp == 0 || Stopwatch.GetElapsedTime(_snapshotTimestamp) >= SnapshotLifetime)
         {
             WindowWalkerCommandsProvider.VirtualDesktopHelperInstance.UpdateDesktopList();
             OpenWindows.Instance.UpdateOpenWindowsList(CancellationToken.None);
-            _windows = OpenWindows.Instance.Windows;
+            var windows = OpenWindows.Instance.Windows;
+            var snapshot = new List<WindowSearchEntry>(windows.Count);
+            foreach (var window in windows)
+            {
+                snapshot.Add(new WindowSearchEntry(window, window.Title, window.Process.Name));
+            }
+
+            _windows = snapshot;
             _snapshotTimestamp = Stopwatch.GetTimestamp();
         }
 
@@ -81,8 +111,11 @@ internal sealed partial class FallbackWindowWalkerItem : FallbackCommandItem
         {
             item = ResultHelper.CreateResult(window);
             _currentItem = item;
-            Icon = Icons.GenericAppIcon;
-            _ = Task.Run(() => LoadIcon(item));
+        }
+
+        if (item.NeedsIconLoad)
+        {
+            QueueIconLoad(item);
         }
 
         Command = item.Command;
@@ -91,20 +124,69 @@ internal sealed partial class FallbackWindowWalkerItem : FallbackCommandItem
         MoreCommands = item.MoreCommands;
     }
 
-    private void LoadIcon(WindowWalkerListItem item)
+    private void QueueIconLoad(WindowWalkerListItem item)
     {
-        if (item.NeedsIconLoad)
+        Icon = Icons.GenericAppIcon;
+
+        CancellationTokenSource cancellationTokenSource;
+        CancellationTokenSource? previousCancellationTokenSource;
+        lock (_iconLoadLock)
         {
-            item.LoadIcon();
+            previousCancellationTokenSource = _iconLoadCancellationTokenSource;
+            cancellationTokenSource = new CancellationTokenSource();
+            _iconLoadCancellationTokenSource = cancellationTokenSource;
         }
 
-        // The query may have moved on to another window while the icon was loading.
-        lock (_updateLock)
+        previousCancellationTokenSource?.Cancel();
+        _ = Task.Run(() => LoadIconAsync(item, cancellationTokenSource));
+    }
+
+    private async Task LoadIconAsync(WindowWalkerListItem item, CancellationTokenSource cancellationTokenSource)
+    {
+        var cancellationToken = cancellationTokenSource.Token;
+        try
         {
-            if (ReferenceEquals(_currentItem, item))
+            await Task.Delay(IconLoadDelay, cancellationToken).ConfigureAwait(false);
+            await IconLoadGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
             {
-                Icon = item.Command?.Icon;
+                lock (_updateLock)
+                {
+                    if (!ReferenceEquals(_currentItem, item) || !item.NeedsIconLoad)
+                    {
+                        return;
+                    }
+                }
+
+                item.LoadIcon();
+
+                lock (_updateLock)
+                {
+                    if (ReferenceEquals(_currentItem, item))
+                    {
+                        Icon = item.Command?.Icon;
+                    }
+                }
             }
+            finally
+            {
+                IconLoadGate.Release();
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            lock (_iconLoadLock)
+            {
+                if (ReferenceEquals(_iconLoadCancellationTokenSource, cancellationTokenSource))
+                {
+                    _iconLoadCancellationTokenSource = null;
+                }
+            }
+
+            cancellationTokenSource.Dispose();
         }
     }
 
@@ -116,5 +198,16 @@ internal sealed partial class FallbackWindowWalkerItem : FallbackCommandItem
         Subtitle = string.Empty;
         MoreCommands = [];
         Icon = Icons.WindowWalkerIcon;
+
+        CancellationTokenSource? cancellationTokenSource;
+        lock (_iconLoadLock)
+        {
+            cancellationTokenSource = _iconLoadCancellationTokenSource;
+            _iconLoadCancellationTokenSource = null;
+        }
+
+        cancellationTokenSource?.Cancel();
     }
+
+    private sealed record WindowSearchEntry(Window Window, string Title, string? ProcessName);
 }

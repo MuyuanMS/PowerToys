@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
+using System.Threading;
 using ManagedCsWin32;
 using Microsoft.Win32;
 
@@ -44,6 +45,8 @@ public class VirtualDesktopHelper
     /// The order and list in the registry is always up to date
     /// </summary>
     private readonly List<Guid> _availableDesktops = [];
+
+    private readonly Lock _desktopListLock = new();
 
     /// <summary>
     /// Id of the current visible Desktop.
@@ -87,45 +90,48 @@ public class VirtualDesktopHelper
     /// <remarks>If we cannot read from registry, we set the list/guid to empty values.</remarks>
     public void UpdateDesktopList()
     {
-        var userSessionId = Process.GetCurrentProcess().SessionId;
-        var registrySessionVirtualDesktops = $"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\SessionInfo\\{userSessionId}\\VirtualDesktops"; // Windows 10
-        var registryExplorerVirtualDesktops = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\VirtualDesktops"; // Windows 11
-
-        // List of all desktops
-        using var virtualDesktopKey = Registry.CurrentUser.OpenSubKey(registryExplorerVirtualDesktops, false);
-        if (virtualDesktopKey is not null)
+        lock (_desktopListLock)
         {
-            var allDeskValue = (byte[]?)virtualDesktopKey.GetValue("VirtualDesktopIDs", null) ?? [];
+            var userSessionId = Process.GetCurrentProcess().SessionId;
+            var registrySessionVirtualDesktops = $"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\SessionInfo\\{userSessionId}\\VirtualDesktops"; // Windows 10
+            var registryExplorerVirtualDesktops = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\VirtualDesktops"; // Windows 11
 
-            // We clear only, if we can read from registry. Otherwise, we keep the existing values.
-            _availableDesktops.Clear();
-
-            // Each guid has a length of 16 elements
-            var numberOfDesktops = allDeskValue.Length / 16;
-            for (var i = 0; i < numberOfDesktops; i++)
+            // List of all desktops
+            using var virtualDesktopKey = Registry.CurrentUser.OpenSubKey(registryExplorerVirtualDesktops, false);
+            if (virtualDesktopKey is not null)
             {
-                var guidArray = new byte[16];
-                Array.ConstrainedCopy(allDeskValue, i * 16, guidArray, 0, 16);
-                _availableDesktops.Add(new Guid(guidArray));
+                var allDeskValue = (byte[]?)virtualDesktopKey.GetValue("VirtualDesktopIDs", null) ?? [];
+
+                // We clear only, if we can read from registry. Otherwise, we keep the existing values.
+                _availableDesktops.Clear();
+
+                // Each guid has a length of 16 elements
+                var numberOfDesktops = allDeskValue.Length / 16;
+                for (var i = 0; i < numberOfDesktops; i++)
+                {
+                    var guidArray = new byte[16];
+                    Array.ConstrainedCopy(allDeskValue, i * 16, guidArray, 0, 16);
+                    _availableDesktops.Add(new Guid(guidArray));
+                }
             }
-        }
 
-        // Guid for current desktop
-        var virtualDesktopsKeyName = _isWindowsEleven ? registryExplorerVirtualDesktops : registrySessionVirtualDesktops;
-        using var virtualDesktopsKey = Registry.CurrentUser.OpenSubKey(virtualDesktopsKeyName, false);
-        if (virtualDesktopsKey is not null)
-        {
-            var currentVirtualDesktopValue = virtualDesktopsKey.GetValue("CurrentVirtualDesktop", null);
-            if (currentVirtualDesktopValue is not null)
+            // Guid for current desktop
+            var virtualDesktopsKeyName = _isWindowsEleven ? registryExplorerVirtualDesktops : registrySessionVirtualDesktops;
+            using var virtualDesktopsKey = Registry.CurrentUser.OpenSubKey(virtualDesktopsKeyName, false);
+            if (virtualDesktopsKey is not null)
             {
-                _currentDesktop = new Guid((byte[])currentVirtualDesktopValue);
-            }
-            else
-            {
-                // The registry value is missing when the user hasn't switched the desktop at least one time before reading the registry. In this case we can set it to desktop one.
-                // We can only set it to desktop one, if we have at least one desktop in the desktops list. Otherwise, we keep the existing value.
-                ExtensionHost.LogMessage(new LogMessage { Message = "VirtualDesktopHelper.UpdateDesktopList() failed to read the id for the current desktop form registry." });
-                _currentDesktop = _availableDesktops.Count >= 1 ? _availableDesktops[0] : _currentDesktop;
+                var currentVirtualDesktopValue = virtualDesktopsKey.GetValue("CurrentVirtualDesktop", null);
+                if (currentVirtualDesktopValue is not null)
+                {
+                    _currentDesktop = new Guid((byte[])currentVirtualDesktopValue);
+                }
+                else
+                {
+                    // The registry value is missing when the user hasn't switched the desktop at least one time before reading the registry. In this case we can set it to desktop one.
+                    // We can only set it to desktop one, if we have at least one desktop in the desktops list. Otherwise, we keep the existing value.
+                    ExtensionHost.LogMessage(new LogMessage { Message = "VirtualDesktopHelper.UpdateDesktopList() failed to read the id for the current desktop form registry." });
+                    _currentDesktop = _availableDesktops.Count >= 1 ? _availableDesktops[0] : _currentDesktop;
+                }
             }
         }
     }
@@ -141,7 +147,10 @@ public class VirtualDesktopHelper
             UpdateDesktopList();
         }
 
-        return _availableDesktops;
+        lock (_desktopListLock)
+        {
+            return [.. _availableDesktops];
+        }
     }
 
     /// <summary>
@@ -155,8 +164,14 @@ public class VirtualDesktopHelper
             UpdateDesktopList();
         }
 
-        var list = new List<VDesktop>();
-        foreach (var d in _availableDesktops)
+        List<Guid> desktopIds;
+        lock (_desktopListLock)
+        {
+            desktopIds = [.. _availableDesktops];
+        }
+
+        var list = new List<VDesktop>(desktopIds.Count);
+        foreach (var d in desktopIds)
         {
             list.Add(CreateVDesktopInstance(d));
         }
@@ -175,7 +190,10 @@ public class VirtualDesktopHelper
             UpdateDesktopList();
         }
 
-        return _availableDesktops.Count;
+        lock (_desktopListLock)
+        {
+            return _availableDesktops.Count;
+        }
     }
 
     /// <summary>
@@ -189,7 +207,10 @@ public class VirtualDesktopHelper
             UpdateDesktopList();
         }
 
-        return _currentDesktop;
+        lock (_desktopListLock)
+        {
+            return _currentDesktop;
+        }
     }
 
     /// <summary>
@@ -203,7 +224,13 @@ public class VirtualDesktopHelper
             UpdateDesktopList();
         }
 
-        return CreateVDesktopInstance(_currentDesktop);
+        Guid currentDesktop;
+        lock (_desktopListLock)
+        {
+            currentDesktop = _currentDesktop;
+        }
+
+        return CreateVDesktopInstance(currentDesktop);
     }
 
     /// <summary>
@@ -218,7 +245,10 @@ public class VirtualDesktopHelper
             UpdateDesktopList();
         }
 
-        return _currentDesktop == desktop;
+        lock (_desktopListLock)
+        {
+            return _currentDesktop == desktop;
+        }
     }
 
     /// <summary>
@@ -234,7 +264,10 @@ public class VirtualDesktopHelper
         }
 
         // Adding +1 because index starts with zero and humans start counting with one.
-        return _availableDesktops.IndexOf(desktop) + 1;
+        lock (_desktopListLock)
+        {
+            return _availableDesktops.IndexOf(desktop) + 1;
+        }
     }
 
     /// <summary>
@@ -434,20 +467,21 @@ public class VirtualDesktopHelper
             return false;
         }
 
-        if (GetDesktopIdList().Count == 0 || GetWindowDesktopAssignmentType(hWindow, windowDesktop) == VirtualDesktopAssignmentType.Unknown || GetWindowDesktopAssignmentType(hWindow, windowDesktop) == VirtualDesktopAssignmentType.NotAssigned)
+        var desktopIds = GetDesktopIdList();
+        if (desktopIds.Count == 0 || GetWindowDesktopAssignmentType(hWindow, windowDesktop) == VirtualDesktopAssignmentType.Unknown || GetWindowDesktopAssignmentType(hWindow, windowDesktop) == VirtualDesktopAssignmentType.NotAssigned)
         {
             ExtensionHost.LogMessage(new LogMessage { Message = $"VirtualDesktopHelper.MoveWindowOneDesktopLeft() failed when moving the window ({hWindow}) one desktop left: We can't find the target desktop. This can happen if the desktop list is empty or if the window isn't assigned to a specific desktop." });
             return false;
         }
 
-        var windowDesktopNumber = GetDesktopIdList().IndexOf(windowDesktop);
+        var windowDesktopNumber = desktopIds.IndexOf(windowDesktop);
         if (windowDesktopNumber == 1)
         {
             ExtensionHost.LogMessage(new LogMessage { Message = $"VirtualDesktopHelper.MoveWindowOneDesktopLeft() failed when moving the window ({hWindow}) one desktop left: The window is on the first desktop." });
             return false;
         }
 
-        var newDesktop = _availableDesktops[windowDesktopNumber - 1];
+        var newDesktop = desktopIds[windowDesktopNumber - 1];
         return MoveWindowToDesktop(hWindow, ref newDesktop);
     }
 
@@ -465,20 +499,21 @@ public class VirtualDesktopHelper
             return false;
         }
 
-        if (GetDesktopIdList().Count == 0 || GetWindowDesktopAssignmentType(hWindow, windowDesktop) == VirtualDesktopAssignmentType.Unknown || GetWindowDesktopAssignmentType(hWindow, windowDesktop) == VirtualDesktopAssignmentType.NotAssigned)
+        var desktopIds = GetDesktopIdList();
+        if (desktopIds.Count == 0 || GetWindowDesktopAssignmentType(hWindow, windowDesktop) == VirtualDesktopAssignmentType.Unknown || GetWindowDesktopAssignmentType(hWindow, windowDesktop) == VirtualDesktopAssignmentType.NotAssigned)
         {
             ExtensionHost.LogMessage(new LogMessage { Message = $"VirtualDesktopHelper.MoveWindowOneDesktopRight() failed when moving the window ({hWindow}) one desktop right: We can't find the target desktop. This can happen if the desktop list is empty or if the window isn't assigned to a specific desktop." });
             return false;
         }
 
-        var windowDesktopNumber = GetDesktopIdList().IndexOf(windowDesktop);
-        if (windowDesktopNumber == GetDesktopCount())
+        var windowDesktopNumber = desktopIds.IndexOf(windowDesktop);
+        if (windowDesktopNumber == desktopIds.Count)
         {
             ExtensionHost.LogMessage(new LogMessage { Message = $"VirtualDesktopHelper.MoveWindowOneDesktopRight() failed when moving the window ({hWindow}) one desktop right: The window is on the last desktop." });
             return false;
         }
 
-        var newDesktop = _availableDesktops[windowDesktopNumber + 1];
+        var newDesktop = desktopIds[windowDesktopNumber + 1];
         return MoveWindowToDesktop(hWindow, ref newDesktop);
     }
 
