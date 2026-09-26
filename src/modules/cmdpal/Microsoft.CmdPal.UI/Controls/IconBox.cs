@@ -77,17 +77,15 @@ public partial class IconBox : ContentControl
     {
         add
         {
-            var previousSourceRequested = _sourceRequested;
+            var hadHandler = _sourceRequested is not null;
             _sourceRequested += value;
 
-            if (Equals(previousSourceRequested, _sourceRequested))
+            if (!hadHandler && _sourceRequested is not null)
             {
-                return;
+                RequestRefresh(IconRequestReason.HandlerAttached);
             }
-
-            RequestRefresh(IconRequestReason.HandlerAttached);
 #if DEBUG
-            if (previousSourceRequested is not null)
+            else if (value is not null)
             {
                 Logger.LogWarning("There shouldn't be more than one handler for IconBox.SourceRequested");
             }
@@ -96,22 +94,12 @@ public partial class IconBox : ContentControl
 
         remove
         {
-            var previousSourceRequested = _sourceRequested;
             _sourceRequested -= value;
-
-            if (Equals(previousSourceRequested, _sourceRequested))
-            {
-                return;
-            }
 
             if (_sourceRequested is null)
             {
                 AdvanceRequestVersion();
                 MarkRefreshPending(IconRequestReason.None);
-            }
-            else
-            {
-                RequestRefresh(IconRequestReason.HandlerAttached);
             }
         }
     }
@@ -449,7 +437,7 @@ public partial class IconBox : ContentControl
                 ? iconBox._lastScale
                 : (iconBox.XamlRoot?.RasterizationScale > 0 ? iconBox.XamlRoot.RasterizationScale : 1.0);
 
-            diagnostics = IconLoadDiagnostics.IsRecording || IconLoadEventSource.Log.IsEnabled()
+            diagnostics = IconLoadDiagnostics.IsRecording
                 ? IconLoadDiagnostics.BeginRequest(reason, scale, iconBox.GetDiagnosticOrigin())
                 : default;
             iconBox.TrackActiveRequest(requestVersion, diagnostics);
@@ -465,9 +453,7 @@ public partial class IconBox : ContentControl
             // list virtualization situation, it's very possible we
             // may have already been set to a new icon before we
             // even got back from the await.
-            if (requestVersion != iconBox._requestVersion ||
-                !ReferenceEquals(sourceKey, iconBox.SourceKey) ||
-                !ReferenceEquals(sourceRequested, iconBox._sourceRequested))
+            if (requestVersion != iconBox._requestVersion || !ReferenceEquals(sourceKey, iconBox.SourceKey))
             {
                 // If the requested icon has changed, then just bail
                 diagnostics.Complete(IconRequestStatus.Stale, eventArgs.Value);
