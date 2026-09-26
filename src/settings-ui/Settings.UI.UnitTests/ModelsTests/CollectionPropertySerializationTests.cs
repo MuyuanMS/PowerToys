@@ -5,6 +5,7 @@
 using System.Text.Json;
 
 using Microsoft.PowerToys.Settings.UI.Library;
+using Microsoft.PowerToys.Settings.UI.Library.HotkeyConflicts;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace CommonLibTest
@@ -116,6 +117,99 @@ namespace CommonLibTest
             Assert.IsTrue(upgraded.Properties.VisibleColorFormats["HEX"].Key);
             Assert.IsFalse(upgraded.Properties.VisibleColorFormats["RGB"].Key);
             Assert.AreEqual("HEX", upgraded.Properties.CopiedColorRepresentation);
+        }
+
+        [TestMethod]
+        public void SettingsCollectionsDeserializeInitOnlyProperties()
+        {
+            var awake = JsonSerializer.Deserialize<AwakeProperties>("""
+                { "customTrayTimes": { "Morning": 30 } }
+                """);
+            var customActions = JsonSerializer.Deserialize<AdvancedPasteCustomActions>("""
+                { "value": [{ "id": 7, "name": "Translate", "prompt": "Translate this text" }] }
+                """);
+            var shortcutConflicts = JsonSerializer.Deserialize<ShortcutConflictProperties>("""
+                { "ignored_shortcuts": [{ "win": true, "code": 65 }] }
+                """);
+
+            Assert.IsNotNull(awake);
+            Assert.AreEqual(30u, awake.CustomTrayTimes["Morning"]);
+            Assert.IsNotNull(customActions);
+            Assert.HasCount(1, customActions.Value);
+            Assert.AreEqual(7, customActions.Value[0].Id);
+            Assert.AreEqual("Translate", customActions.Value[0].Name);
+            Assert.IsNotNull(shortcutConflicts);
+            Assert.HasCount(1, shortcutConflicts.IgnoredShortcuts);
+            Assert.IsTrue(shortcutConflicts.IgnoredShortcuts[0].Win);
+            Assert.AreEqual(65, shortcutConflicts.IgnoredShortcuts[0].Code);
+        }
+
+        [TestMethod]
+        public void AwakeSettingsMissingCustomTrayTimesKeepsDefaultAndCanClone()
+        {
+            const string json = """
+                {
+                  "name": "Awake",
+                  "properties": {
+                    "mode": 1,
+                    "keepDisplayOn": true
+                  }
+                }
+                """;
+
+            var settings = JsonSerializer.Deserialize(json, SettingsSerializationContext.Default.AwakeSettings);
+
+            Assert.IsNotNull(settings);
+            Assert.IsEmpty(settings.Properties.CustomTrayTimes);
+
+            var clone = (AwakeSettings)settings.Clone();
+            Assert.IsEmpty(clone.Properties.CustomTrayTimes);
+        }
+
+        [TestMethod]
+        public void AwakeSettingsNullCustomTrayTimesNormalizesToEmpty()
+        {
+            const string json = """
+                {
+                  "name": "Awake",
+                  "properties": {
+                    "customTrayTimes": null
+                  }
+                }
+                """;
+
+            var settings = JsonSerializer.Deserialize(json, SettingsSerializationContext.Default.AwakeSettings);
+
+            Assert.IsNotNull(settings);
+            Assert.IsEmpty(settings.Properties.CustomTrayTimes);
+        }
+
+        [TestMethod]
+        public void HotkeyConflictCollectionsDeserializeInitOnlyProperties()
+        {
+            var allConflicts = JsonSerializer.Deserialize<AllHotkeyConflictsData>("""
+                { "InAppConflicts": [], "SystemConflicts": [] }
+                """);
+            var moduleConflicts = JsonSerializer.Deserialize<ModuleConflictsData>("""
+                { "InAppConflicts": [], "SystemConflicts": [] }
+                """);
+            var group = JsonSerializer.Deserialize<HotkeyConflictGroupData>("""
+                { "Modules": [] }
+                """);
+            var info = JsonSerializer.Deserialize<HotkeyConflictInfo>("""
+                { "AllConflictingModules": ["FancyZones:1"] }
+                """);
+
+            Assert.IsNotNull(allConflicts);
+            Assert.IsEmpty(allConflicts.InAppConflicts);
+            Assert.IsEmpty(allConflicts.SystemConflicts);
+            Assert.IsNotNull(moduleConflicts);
+            Assert.IsEmpty(moduleConflicts.InAppConflicts);
+            Assert.IsEmpty(moduleConflicts.SystemConflicts);
+            Assert.IsNotNull(group);
+            Assert.IsEmpty(group.Modules);
+            Assert.IsNotNull(info);
+            CollectionAssert.Contains(info.AllConflictingModules, "FancyZones:1");
         }
     }
 }
