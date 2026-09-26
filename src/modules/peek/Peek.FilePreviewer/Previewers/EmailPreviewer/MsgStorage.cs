@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
@@ -77,7 +78,27 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
         public int ReadInt32(string propertyId)
         {
             byte[]? bytes = ReadStream($"__substg1.0_{propertyId}0003");
-            return bytes?.Length >= sizeof(int) ? BitConverter.ToInt32(bytes, 0) : 0;
+            if (bytes?.Length >= sizeof(int))
+            {
+                return BitConverter.ToInt32(bytes, 0);
+            }
+
+            byte[]? properties = ReadStream("__properties_version1.0");
+            if (properties == null)
+            {
+                return 0;
+            }
+
+            uint tag = ((uint)ushort.Parse(propertyId, NumberStyles.HexNumber, CultureInfo.InvariantCulture) << 16) | 0x0003;
+            for (int offset = 32; offset + 16 <= properties.Length; offset += 16)
+            {
+                if (BitConverter.ToUInt32(properties, offset) == tag)
+                {
+                    return BitConverter.ToInt32(properties, offset + 8);
+                }
+            }
+
+            return 0;
         }
 
         public Encoding GetHtmlEncoding()
