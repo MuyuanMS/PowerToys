@@ -46,7 +46,7 @@ internal static class IconPathParser
         var hasSign = signPosition >= 0;
         var unsignedText = hasSign ? text[(signPosition + 1)..] : text;
         var result = ParseNativeUnsignedLong(unsignedText);
-        if (result == UnsignedConversionError || result > int.MaxValue)
+        if (result == UnsignedConversionError)
         {
             return SignedConversionError;
         }

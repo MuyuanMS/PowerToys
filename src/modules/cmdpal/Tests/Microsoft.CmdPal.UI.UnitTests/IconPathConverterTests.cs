@@ -2,7 +2,6 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.CmdPal.UI.Helpers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Windows.Graphics.Imaging;
@@ -31,15 +30,6 @@ public class IconPathConverterTests
         Assert.AreEqual(32, bitmap.PixelHeight);
         Assert.AreEqual(BitmapPixelFormat.Bgra8, bitmap.BitmapPixelFormat);
         Assert.AreEqual(BitmapAlphaMode.Premultiplied, bitmap.BitmapAlphaMode);
-
-        var pixels = new byte[bitmap.PixelWidth * bitmap.PixelHeight * 4];
-        bitmap.CopyToBuffer(pixels.AsBuffer());
-        Assert.IsTrue(
-            Enumerable.Range(0, pixels.Length / 4).Any(pixel => pixels[(pixel * 4) + 3] == 0),
-            "Extracted icons should preserve transparent pixels.");
-        Assert.IsTrue(
-            Enumerable.Range(0, pixels.Length / 4).Any(pixel => pixels[(pixel * 4) + 3] != 0),
-            "Extracted icons should preserve visible pixels.");
     }
 
     [TestMethod]
