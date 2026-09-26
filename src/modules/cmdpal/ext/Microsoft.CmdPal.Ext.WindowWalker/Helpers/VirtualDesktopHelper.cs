@@ -475,7 +475,7 @@ public class VirtualDesktopHelper
         }
 
         var windowDesktopNumber = desktopIds.IndexOf(windowDesktop);
-        if (windowDesktopNumber == 1)
+        if (windowDesktopNumber <= 0)
         {
             ExtensionHost.LogMessage(new LogMessage { Message = $"VirtualDesktopHelper.MoveWindowOneDesktopLeft() failed when moving the window ({hWindow}) one desktop left: The window is on the first desktop." });
             return false;
@@ -507,7 +507,7 @@ public class VirtualDesktopHelper
         }
 
         var windowDesktopNumber = desktopIds.IndexOf(windowDesktop);
-        if (windowDesktopNumber == desktopIds.Count)
+        if (windowDesktopNumber < 0 || windowDesktopNumber >= desktopIds.Count - 1)
         {
             ExtensionHost.LogMessage(new LogMessage { Message = $"VirtualDesktopHelper.MoveWindowOneDesktopRight() failed when moving the window ({hWindow}) one desktop right: The window is on the last desktop." });
             return false;
