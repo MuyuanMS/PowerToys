@@ -7,9 +7,11 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using ManagedCommon;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
@@ -41,6 +43,8 @@ namespace Peek.UI
         /// </summary>
         private readonly HashSet<int> _deletedItemIndexes = [];
 
+        private readonly HashSet<string> _visitedShortcutPaths = new(StringComparer.OrdinalIgnoreCase);
+
         private static readonly string _defaultWindowTitle = ResourceLoaderInstance.ResourceLoader.GetString("AppTitle/Title");
 
         /// <summary>
@@ -63,6 +67,42 @@ namespace Peek.UI
         private IFileSystemItem? _currentItem;
 
         /// <summary>
+        /// The item whose content is previewed. While a shortcut is followed, this is the target
+        /// of <see cref="CurrentItem"/> instead of the shortcut itself.
+        /// </summary>
+        [ObservableProperty]
+        private IFileSystemItem? _previewItem;
+
+        /// <summary>
+        /// The name of the shortcut that <see cref="PreviewItem"/> was resolved from, or an empty
+        /// string when the previewed item is not the target of a shortcut.
+        /// </summary>
+        [ObservableProperty]
+        private string _shortcutName = string.Empty;
+
+        /// <summary>
+        /// Whether the preview shows the target of <see cref="CurrentItem"/>.
+        /// </summary>
+        [ObservableProperty]
+        private bool _isPreviewingShortcutTarget;
+
+        /// <summary>
+        /// The target path of the shortcut that <see cref="CurrentItem"/> points to, or null when
+        /// the current item is not a shortcut or it stores no target.
+        /// </summary>
+        private string? _shortcutTargetPath;
+
+        private int _shortcutResolutionVersion;
+
+        /// <summary>
+        /// The target path that is currently previewed instead of <see cref="CurrentItem"/>, or null
+        /// when the selected item itself is previewed.
+        /// </summary>
+        private string? _previewedShortcutTargetPath;
+
+        private bool _previewedShortcutTargetIsFolder;
+
+        /// <summary>
         /// Work around missing navigation when peeking from CLI.
         /// TODO: Implement navigation when peeking from CLI.
         /// </summary>
@@ -70,9 +110,133 @@ namespace Peek.UI
 
         partial void OnCurrentItemChanged(IFileSystemItem? value)
         {
+            _ = UpdateShortcutTargetAsync(value);
+        }
+
+        partial void OnPreviewItemChanged(IFileSystemItem? value)
+        {
             WindowTitle = value != null
                 ? ReadableStringHelper.FormatResourceString("WindowTitle", value.Name)
                 : _defaultWindowTitle;
+        }
+
+        /// <summary>
+        /// Previews the target of the shortcut that is currently shown.
+        /// </summary>
+        /// <param name="targetPath">The target path stored in the shortcut.</param>
+        [RelayCommand]
+        private async Task PeekShortcutTargetAsync(string? targetPath)
+        {
+            IFileSystemItem? previewItem = PreviewItem;
+            if (string.IsNullOrEmpty(targetPath) || previewItem == null ||
+                !ShortcutHelper.IsShortcut(previewItem.Path) ||
+                _visitedShortcutPaths.Contains(targetPath))
+            {
+                return;
+            }
+
+            IFileSystemItem? item = CurrentItem;
+            int resolutionVersion = Volatile.Read(ref _shortcutResolutionVersion);
+            (string? actualTarget, bool targetExists, bool isFolder) = await Task.Run(
+                () =>
+                {
+                    string? actualTarget = ShortcutHelper.TryGetTargetPath(previewItem.Path);
+                    if (!string.Equals(actualTarget, targetPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return (actualTarget, false, false);
+                    }
+
+                    bool isFolder = Directory.Exists(targetPath);
+                    return (actualTarget, isFolder || File.Exists(targetPath), isFolder);
+                });
+
+            if (!targetExists ||
+                !string.Equals(actualTarget, targetPath, StringComparison.OrdinalIgnoreCase) ||
+                resolutionVersion != Volatile.Read(ref _shortcutResolutionVersion) ||
+                !ReferenceEquals(CurrentItem, item) ||
+                !ReferenceEquals(PreviewItem, previewItem) ||
+                _visitedShortcutPaths.Contains(targetPath))
+            {
+                return;
+            }
+
+            _visitedShortcutPaths.Add(previewItem.Path);
+            _previewedShortcutTargetPath = targetPath;
+            _previewedShortcutTargetIsFolder = isFolder;
+            IsPreviewingShortcutTarget = true;
+            UpdatePreviewItem();
+        }
+
+        /// <summary>
+        /// Goes back to previewing the item that was selected in File Explorer.
+        /// </summary>
+        [RelayCommand]
+        private void ShowSelectedItem()
+        {
+            _visitedShortcutPaths.Clear();
+            _previewedShortcutTargetPath = null;
+            _previewedShortcutTargetIsFolder = false;
+            IsPreviewingShortcutTarget = false;
+            UpdatePreviewItem();
+        }
+
+        /// <summary>
+        /// Resolves the target of the shortcut that has been selected.
+        /// </summary>
+        /// <param name="item">The selected item.</param>
+        private async Task UpdateShortcutTargetAsync(IFileSystemItem? item)
+        {
+            int resolutionVersion = Interlocked.Increment(ref _shortcutResolutionVersion);
+            _visitedShortcutPaths.Clear();
+            _shortcutTargetPath = null;
+            _previewedShortcutTargetPath = null;
+            _previewedShortcutTargetIsFolder = false;
+            ShortcutName = string.Empty;
+            IsPreviewingShortcutTarget = false;
+            UpdatePreviewItem();
+
+            string? targetPath = await Task.Run(() => ShortcutHelper.TryGetTargetPath(item?.Path));
+
+            if (resolutionVersion != Volatile.Read(ref _shortcutResolutionVersion) ||
+                !ReferenceEquals(CurrentItem, item))
+            {
+                return;
+            }
+
+            _shortcutTargetPath = targetPath;
+            ShortcutName = item != null && _shortcutTargetPath != null ? item.Name : string.Empty;
+
+            UpdatePreviewItem();
+        }
+
+        /// <summary>
+        /// Updates the item handed to the previewers.
+        /// </summary>
+        private void UpdatePreviewItem()
+        {
+            PreviewItem = _previewedShortcutTargetPath != null
+                ? CreateItem(_previewedShortcutTargetPath, _previewedShortcutTargetIsFolder)
+                : CurrentItem;
+        }
+
+        /// <summary>
+        /// Creates the item that represents a path, so that files and folders are previewed by the
+        /// matching previewer.
+        /// </summary>
+        /// <param name="path">The path of a file or folder.</param>
+        /// <returns>The item for the path.</returns>
+        private static IFileSystemItem CreateItem(string path, bool isFolder)
+        {
+            // Shortcuts to a drive root have no file name of their own.
+            string name = Path.GetFileName(path);
+            if (string.IsNullOrEmpty(name))
+            {
+                name = path;
+            }
+
+            return isFolder
+                ? new FolderItem(path, name, path)
+                : new FileItem(path, name);
         }
 
         [ObservableProperty]

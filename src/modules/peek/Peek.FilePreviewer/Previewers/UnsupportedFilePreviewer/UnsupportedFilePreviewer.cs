@@ -8,6 +8,7 @@ using System.IO;
 using System.IO.Enumeration;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Input;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using ManagedCommon;
@@ -65,6 +66,9 @@ namespace Peek.FilePreviewer.Previewers
 
         private DispatcherQueue Dispatcher { get; }
 
+        /// <inheritdoc/>
+        public ICommand? PeekShortcutTargetCommand { get; set; }
+
         public Task<PreviewSize> GetPreviewSizeAsync(CancellationToken cancellationToken) =>
             Task.FromResult(new PreviewSize { MonitorSize = new Size(680, 500), UseEffectivePixels = true });
 
@@ -72,11 +76,22 @@ namespace Peek.FilePreviewer.Previewers
         {
             try
             {
+                (string? shortcutTarget, bool canPeekShortcutTarget) = await Task.Run(
+                    () =>
+                    {
+                        string? targetPath = ShortcutHelper.TryGetTargetPath(Item.Path);
+                        return (targetPath, ShortcutHelper.CanOfferTargetPreview(targetPath));
+                    },
+                    cancellationToken);
+
                 await Dispatcher.RunOnUiThread(async () =>
                 {
                     Preview.FileName = Item.Name;
                     Preview.DateModified = Item.DateModified?.ToString(CultureInfo.CurrentCulture);
                     Preview.IsFolder = Item is FolderItem;
+                    Preview.ShortcutTarget = shortcutTarget;
+                    Preview.CanPeekShortcutTarget = canPeekShortcutTarget;
+                    Preview.PeekShortcutTargetCommand = PeekShortcutTargetCommand;
 
                     State = PreviewState.Loaded;
 

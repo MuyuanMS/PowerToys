@@ -7,6 +7,7 @@ using System.Globalization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Input;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using ManagedCommon;
@@ -54,6 +55,13 @@ namespace Peek.FilePreviewer
                 typeof(bool),
                 typeof(FilePreview),
                 new PropertyMetadata(true, (d, e) => ((FilePreview)d).OnShowFilePreviewTooltipChanged()));
+
+        public static readonly DependencyProperty PeekShortcutTargetCommandProperty =
+            DependencyProperty.Register(
+                nameof(PeekShortcutTargetCommand),
+                typeof(ICommand),
+                typeof(FilePreview),
+                new PropertyMetadata(null, (d, e) => ((FilePreview)d).OnPeekShortcutTargetCommandChanged()));
 
         [ObservableProperty]
         private int numberOfFiles;
@@ -153,6 +161,24 @@ namespace Peek.FilePreviewer
         {
             get => (bool)GetValue(ShowFilePreviewTooltipProperty);
             set => SetValue(ShowFilePreviewTooltipProperty, value);
+        }
+
+        public ICommand? PeekShortcutTargetCommand
+        {
+            get => (ICommand?)GetValue(PeekShortcutTargetCommandProperty);
+            set => SetValue(PeekShortcutTargetCommandProperty, value);
+        }
+
+        private void OnPeekShortcutTargetCommandChanged()
+        {
+            if (Previewer is IUnsupportedFilePreviewer unsupportedFilePreviewer)
+            {
+                unsupportedFilePreviewer.PeekShortcutTargetCommand = PeekShortcutTargetCommand;
+                if (unsupportedFilePreviewer.Preview is { } preview)
+                {
+                    preview.PeekShortcutTargetCommand = PeekShortcutTargetCommand;
+                }
+            }
         }
 
         private void OnShowFilePreviewTooltipChanged()
@@ -262,6 +288,11 @@ namespace Peek.FilePreviewer
             if (Previewer is IImagePreviewer imagePreviewer)
             {
                 imagePreviewer.ScalingFactor = ScalingFactor;
+            }
+
+            if (Previewer is IUnsupportedFilePreviewer unsupportedFilePreviewer)
+            {
+                unsupportedFilePreviewer.PeekShortcutTargetCommand = PeekShortcutTargetCommand;
             }
 
             await UpdatePreviewAsync(_cancellationTokenSource.Token);
