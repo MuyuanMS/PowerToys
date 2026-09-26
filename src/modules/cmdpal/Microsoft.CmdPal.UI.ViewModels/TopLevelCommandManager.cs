@@ -485,17 +485,67 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
 
     private void RegisterCommandProviders(List<CommandProviderWrapper> wrappers)
     {
+        var replacedProviderIds = new HashSet<string>(StringComparer.Ordinal);
         lock (_commandProvidersLock)
         {
-            _commandProviders.AddRange(wrappers);
             foreach (var wrapper in wrappers)
             {
+                _commandProviders.RemoveAll(existing =>
+                {
+                    if (existing.ProviderId != wrapper.ProviderId || ReferenceEquals(existing, wrapper))
+                    {
+                        return false;
+                    }
+
+                    replacedProviderIds.Add(existing.ProviderId);
+                    return true;
+                });
+
                 if (_providerLoadCompletions.TryGetValue(wrapper.ProviderId, out var previous))
                 {
                     previous.Completion.TrySetResult();
                 }
 
                 _providerLoadCompletions[wrapper.ProviderId] = (wrapper, new(TaskCreationOptions.RunContinuationsAsynchronously));
+            }
+
+            _commandProviders.AddRange(wrappers);
+        }
+
+        foreach (var providerId in replacedProviderIds)
+        {
+            List<TopLevelViewModel> commandsToRemove;
+            lock (TopLevelCommands)
+            {
+                commandsToRemove = TopLevelCommands
+                    .Where(command => command.CommandProviderId == providerId)
+                    .ToList();
+                foreach (var command in commandsToRemove)
+                {
+                    TopLevelCommands.Remove(command);
+                }
+            }
+
+            List<TopLevelViewModel> bandsToRemove;
+            lock (_dockBandsLock)
+            {
+                bandsToRemove = DockBands
+                    .Where(band => band.CommandProviderId == providerId)
+                    .ToList();
+                foreach (var band in bandsToRemove)
+                {
+                    DockBands.Remove(band);
+                }
+            }
+
+            foreach (var command in commandsToRemove)
+            {
+                command.Cleanup();
+            }
+
+            foreach (var band in bandsToRemove)
+            {
+                band.Cleanup();
             }
         }
     }
@@ -531,20 +581,40 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
                 var commands = r.TopLevelObjectSets.Commands;
                 if (commands is not null)
                 {
-                    foreach (var c in commands)
+                    if (IsCurrentProvider(r.Wrapper))
                     {
-                        commandsToAdd.Add(c);
-                        totalCommands++;
+                        foreach (var c in commands)
+                        {
+                            commandsToAdd.Add(c);
+                            totalCommands++;
+                        }
+                    }
+                    else
+                    {
+                        foreach (var command in commands)
+                        {
+                            command.Cleanup();
+                        }
                     }
                 }
 
                 var bands = r.TopLevelObjectSets.DockBands;
                 if (bands is not null)
                 {
-                    foreach (var b in bands)
+                    if (IsCurrentProvider(r.Wrapper))
                     {
-                        dockBandsToAdd.Add(b);
-                        totalDockBands++;
+                        foreach (var b in bands)
+                        {
+                            dockBandsToAdd.Add(b);
+                            totalDockBands++;
+                        }
+                    }
+                    else
+                    {
+                        foreach (var band in bands)
+                        {
+                            band.Cleanup();
+                        }
                     }
                 }
             }
@@ -619,6 +689,15 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         }
     }
 
+    private bool IsCurrentProvider(CommandProviderWrapper wrapper)
+    {
+        lock (_commandProvidersLock)
+        {
+            return _providerLoadCompletions.TryGetValue(wrapper.ProviderId, out var entry) &&
+                ReferenceEquals(entry.Wrapper, wrapper);
+        }
+    }
+
     private async Task AppendCommandsWhenReadyAsync(
         CommandProviderWrapper wrapper,
         Task<TopLevelObjectSets> loadTask,
@@ -632,11 +711,21 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             var commands = topLevelObjectSets.Commands;
             if (commands is not null)
             {
-                lock (TopLevelCommands)
+                if (IsCurrentProvider(wrapper))
                 {
-                    foreach (var c in commands)
+                    lock (TopLevelCommands)
                     {
-                        TopLevelCommands.Add(c);
+                        foreach (var c in commands)
+                        {
+                            TopLevelCommands.Add(c);
+                        }
+                    }
+                }
+                else
+                {
+                    foreach (var command in commands)
+                    {
+                        command.Cleanup();
                     }
                 }
             }
@@ -644,11 +733,21 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             var dockBands = topLevelObjectSets.DockBands;
             if (dockBands is not null)
             {
-                lock (_dockBandsLock)
+                if (IsCurrentProvider(wrapper))
+                {
+                    lock (_dockBandsLock)
+                    {
+                        foreach (var band in dockBands)
+                        {
+                            DockBands.Add(band);
+                        }
+                    }
+                }
+                else
                 {
                     foreach (var band in dockBands)
                     {
-                        DockBands.Add(band);
+                        band.Cleanup();
                     }
                 }
             }
@@ -944,17 +1043,32 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     /// <summary>Waits for a provider's full load, including a continuation that outlives the global loading phase.</summary>
     public async Task WaitForProviderLoadAsync(string providerId, CancellationToken cancellationToken = default)
     {
-        Task? loadTask;
-        lock (_commandProvidersLock)
+        while (true)
         {
-            loadTask = _providerLoadCompletions.TryGetValue(providerId, out var entry)
-                ? entry.Completion.Task
-                : null;
-        }
+            (CommandProviderWrapper Wrapper, TaskCompletionSource Completion)? entry;
+            lock (_commandProvidersLock)
+            {
+                entry = _providerLoadCompletions.TryGetValue(providerId, out var current)
+                    ? current
+                    : null;
+            }
 
-        if (loadTask is not null)
-        {
-            await loadTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (entry is null)
+            {
+                return;
+            }
+
+            await entry.Value.Completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+            lock (_commandProvidersLock)
+            {
+                if (_providerLoadCompletions.TryGetValue(providerId, out var current) &&
+                    ReferenceEquals(current.Wrapper, entry.Value.Wrapper) &&
+                    ReferenceEquals(current.Completion, entry.Value.Completion))
+                {
+                    return;
+                }
+            }
         }
     }
 
