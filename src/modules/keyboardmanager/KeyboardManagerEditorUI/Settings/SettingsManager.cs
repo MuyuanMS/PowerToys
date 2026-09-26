@@ -503,13 +503,15 @@ namespace KeyboardManagerEditorUI.Settings
             return shortcutSettingsChanged;
         }
 
-        public static bool TryCommitShortcutKeyMapping(ShortcutKeyMapping shortcutKeyMapping, string? replacingId)
+        public static bool TryCommitShortcutKeyMapping(ShortcutKeyMapping shortcutKeyMapping, string? replacingId, string? profileName = null)
         {
             try
             {
                 EditorSettings updatedSettings = CloneSettings();
 
-                if (!TryApplyShortcutKeyMapping(updatedSettings, shortcutKeyMapping, replacingId, CurrentProfileName))
+                // Attribute the mapping to the profile captured when the edit was built, not the live
+                // active profile, which may have changed after the native mapping was saved.
+                if (!TryApplyShortcutKeyMapping(updatedSettings, shortcutKeyMapping, replacingId, profileName ?? CurrentProfileName))
                 {
                     return false;
                 }

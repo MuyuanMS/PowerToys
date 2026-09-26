@@ -380,7 +380,7 @@ namespace KeyboardManagerEditorUI.Pages
             {
                 replacement = new KeyboardMappingService();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is InvalidOperationException or DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
             {
                 Logger.LogError("Failed to rebuild mapping service for active profile: " + ex.Message);
                 return;
@@ -415,11 +415,12 @@ namespace KeyboardManagerEditorUI.Pages
 
                 _settingsWatcher = new FileSystemWatcher(dir, "settings.json")
                 {
-                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size,
+                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName,
                     EnableRaisingEvents = true,
                 };
                 _settingsWatcher.Changed += OnSettingsFileChanged;
                 _settingsWatcher.Created += OnSettingsFileChanged;
+                _settingsWatcher.Renamed += OnSettingsFileChanged;
             }
             catch (Exception ex)
             {
@@ -979,7 +980,7 @@ namespace KeyboardManagerEditorUI.Pages
                     return false;
                 }
 
-                if (!SettingsManager.TryCommitShortcutKeyMapping(replacementMapping, replacingId))
+                if (!SettingsManager.TryCommitShortcutKeyMapping(replacementMapping, replacingId, candidateService.ConfigurationName))
                 {
                     RestoreOriginalMappingSettings(originalService);
                     return false;
@@ -1978,6 +1979,7 @@ namespace KeyboardManagerEditorUI.Pages
                     _settingsWatcher.EnableRaisingEvents = false;
                     _settingsWatcher.Changed -= OnSettingsFileChanged;
                     _settingsWatcher.Created -= OnSettingsFileChanged;
+                    _settingsWatcher.Renamed -= OnSettingsFileChanged;
                     _settingsWatcher.Dispose();
                     _settingsWatcher = null;
                 }
