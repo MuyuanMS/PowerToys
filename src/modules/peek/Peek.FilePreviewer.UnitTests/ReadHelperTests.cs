@@ -216,5 +216,16 @@ namespace Peek.FilePreviewer.UnitTests
 
             Assert.AreEqual(expected, content);
         }
+
+        [TestMethod]
+        public async Task Read_BomlessUtf16SupplementaryCharacters_ShouldDecodeCorrectly()
+        {
+            const string expected = "\U0001F600\U0001F600\U0001F600";
+            File.WriteAllBytes(_tempFilePath, new UnicodeEncoding(bigEndian: false, byteOrderMark: false).GetBytes(expected));
+
+            string content = await ReadHelper.Read(_tempFilePath);
+
+            Assert.AreEqual(expected, content);
+        }
     }
 }

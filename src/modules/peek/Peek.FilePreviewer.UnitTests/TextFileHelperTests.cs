@@ -166,6 +166,15 @@ namespace Peek.FilePreviewer.UnitTests
         }
 
         [TestMethod]
+        public async Task IsTextFile_BomlessUtf16SupplementaryCharacters_ShouldReturnTrue()
+        {
+            const string expected = "\U0001F600\U0001F600\U0001F600";
+            File.WriteAllBytes(_tempFilePath, new UnicodeEncoding(bigEndian: false, byteOrderMark: false).GetBytes(expected));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
         public async Task IsTextFile_FileExceedsMaxSize_ShouldReturnFalse()
         {
             byte[] buffer = new byte[ReadHelper.MaxReadableFileSizeBytes + 1];
@@ -238,6 +247,14 @@ namespace Peek.FilePreviewer.UnitTests
         public async Task IsTextFile_AsciiContentWithEmbeddedNul_ShouldReturnFalse()
         {
             File.WriteAllBytes(_tempFilePath, Encoding.ASCII.GetBytes("abcdef\0ghi"));
+
+            Assert.IsFalse(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_ControlHeavyBinary_ShouldReturnFalse()
+        {
+            File.WriteAllBytes(_tempFilePath, [0x01, 0x00, 0x02, 0x00]);
 
             Assert.IsFalse(await TextFileHelper.IsTextFileAsync(_tempFilePath));
         }
