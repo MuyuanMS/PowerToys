@@ -175,7 +175,7 @@ namespace KeyboardManagerEditorUI.Interop
         private void ThreadMain()
         {
             _threadId = GetCurrentThreadId();
-            const string className = "KbmEditorRawInputWatcher";
+            string className = $"KbmEditorRawInputWatcher_{Guid.NewGuid():N}";
 
             var wc = new WndClass
             {
@@ -183,12 +183,18 @@ namespace KeyboardManagerEditorUI.Interop
                 HInstance = GetModuleHandleW(null),
                 LpszClassName = className,
             };
-            RegisterClassW(ref wc);
+            if (RegisterClassW(ref wc) == 0)
+            {
+                Logger.LogError($"RawInputWatcher: RegisterClass failed: {Marshal.GetLastWin32Error()}");
+                _workerReady.Set();
+                return;
+            }
 
             IntPtr hwnd = CreateWindowExW(0, className, string.Empty, 0, 0, 0, 0, 0, IntPtr.Zero, IntPtr.Zero, wc.HInstance, IntPtr.Zero);
             if (hwnd == IntPtr.Zero)
             {
                 Logger.LogError("RawInputWatcher: CreateWindow failed");
+                UnregisterClassW(className, wc.HInstance);
                 _workerReady.Set();
                 return;
             }

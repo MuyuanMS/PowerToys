@@ -682,4 +682,10 @@
   <data name="AutoSwitchIdentifyHint.Title" xml:space="preserve">
     <value>Press a key on a keyboard to highlight its row (and add it if it isn't listed).</value>
   </data>
+  <data name="AutoSwitch_SaveFailed_Title" xml:space="preserve">
+    <value>Save failed</value>
+  </data>
+  <data name="AutoSwitch_SaveFailed_Message" xml:space="preserve">
+    <value>Failed to save keyboard assignments. Please try again.</value>
+  </data>
 </root>

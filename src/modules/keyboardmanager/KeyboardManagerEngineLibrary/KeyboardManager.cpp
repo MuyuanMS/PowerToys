@@ -141,7 +141,6 @@ KeyboardManager::KeyboardManager()
     };
 
     editorIsRunningEvent = CreateEvent(nullptr, true, false, KeyboardManagerConstants::EditorWindowEventName.c_str());
-    settingsEventWaiter.start(KeyboardManagerConstants::SettingsEventName, changeSettingsCallback);
 
     // Start detecting which physical keyboard is being typed on (for per-keyboard profile switching).
     rawInputTracker = std::make_unique<RawInputKeyboardTracker>(
@@ -153,6 +152,9 @@ KeyboardManager::KeyboardManager()
     profileCycleHotkey = std::make_unique<ProfileCycleHotkey>([this] { CycleActiveProfile(); });
     profileCycleHotkey->Start();
     LoadDeviceProfiles();
+
+    // Initialize every callback target before the settings thread can call back into this object.
+    settingsEventWaiter.start(KeyboardManagerConstants::SettingsEventName, changeSettingsCallback);
 }
 
 void KeyboardManager::OnRawKeyEvent(const RawInputKeyboardTracker::KeyEvent& keyEvent)

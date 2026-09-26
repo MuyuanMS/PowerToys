@@ -375,8 +375,20 @@ namespace KeyboardManagerEditorUI.Pages
         // list shows this profile's remappings and only those.
         private void RebuildForActiveProfile()
         {
-            _mappingService?.Dispose();
-            _mappingService = new KeyboardMappingService();
+            KeyboardMappingService replacement;
+            try
+            {
+                replacement = new KeyboardMappingService();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Failed to rebuild mapping service for active profile: " + ex.Message);
+                return;
+            }
+
+            KeyboardMappingService? previous = _mappingService;
+            _mappingService = replacement;
+            previous?.Dispose();
             SettingsManager.ReloadForActiveProfile();
             LoadAllMappings();
         }
@@ -574,7 +586,17 @@ namespace KeyboardManagerEditorUI.Pages
                 .Where(r => !string.Equals(r.SelectedProfile, _notAssignedLabel, StringComparison.Ordinal))
                 .Select(r => new DeviceAssignment { Device = r.DevicePath, Profile = r.SelectedProfile, Name = r.DisplayName });
 
-            DeviceProfileManager.Save(AutoSwitchToggle.IsOn, toSave);
+            if (!DeviceProfileManager.Save(AutoSwitchToggle.IsOn, toSave))
+            {
+                var saveErrorDialog = new ContentDialog
+                {
+                    Title = ResourceHelper.GetString("AutoSwitch_SaveFailed_Title"),
+                    Content = ResourceHelper.GetString("AutoSwitch_SaveFailed_Message"),
+                    CloseButtonText = ResourceHelper.GetString("AutoSwitchDialog.CloseButtonText"),
+                    XamlRoot = XamlRoot,
+                };
+                await saveErrorDialog.ShowAsync();
+            }
         }
 
         // Runs on the Raw Input watcher thread; marshal to the UI thread before touching rows.
