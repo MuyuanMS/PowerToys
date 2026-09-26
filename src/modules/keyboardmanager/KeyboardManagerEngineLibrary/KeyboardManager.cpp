@@ -434,24 +434,21 @@ bool KeyboardManager::SwitchActiveProfileLocked(const std::wstring& profile)
     bool writeSucceeded = false;
     try
     {
-        if (profile != KeyboardManagerConstants::DefaultConfiguration)
+        const auto configPath = PTSettingsHelper::get_module_save_folder_location(moduleName) + L"\\" + profile + L".json";
+        std::error_code ec;
+        if (!std::filesystem::exists(configPath, ec))
         {
-            const auto configPath = PTSettingsHelper::get_module_save_folder_location(moduleName) + L"\\" + profile + L".json";
-            std::error_code ec;
-            if (!std::filesystem::exists(configPath, ec))
+            Logger::error(L"Switch: refusing to activate profile '{}' — its config file is missing", profile);
             {
-                Logger::error(L"Switch: refusing to activate profile '{}' — its config file is missing", profile);
+                std::lock_guard<std::mutex> activeLock(activeProfileMutex);
+                if (requestedProfile == profile)
                 {
-                    std::lock_guard<std::mutex> activeLock(activeProfileMutex);
-                    if (requestedProfile == profile)
-                    {
-                        requestedProfile.clear();
-                    }
+                    requestedProfile.clear();
                 }
-                ReleaseMutex(settingsMutex);
-                CloseHandle(settingsMutex);
-                return false;
             }
+            ReleaseMutex(settingsMutex);
+            CloseHandle(settingsMutex);
+            return false;
         }
 
         const auto path = PTSettingsHelper::get_module_save_folder_location(moduleName) + L"\\settings.json";

@@ -76,7 +76,7 @@ namespace KeyboardManagerEditorUI.Settings
                     foreach (JsonNode? item in configs)
                     {
                         string? name = item?.GetValue<string>();
-                        if (!string.IsNullOrEmpty(name) && !names.Contains(name))
+                        if (!string.IsNullOrEmpty(name) && IsValidProfileName(name) && !names.Contains(name))
                         {
                             names.Add(name);
                         }
@@ -296,7 +296,7 @@ namespace KeyboardManagerEditorUI.Settings
         /// </summary>
         public static bool DeleteProfile(string profile)
         {
-            if (string.IsNullOrWhiteSpace(profile) || profile.Equals(DefaultProfile, StringComparison.OrdinalIgnoreCase))
+            if (!IsValidProfileName(profile) || profile.Equals(DefaultProfile, StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }

@@ -1318,7 +1318,7 @@ namespace KeyboardManagerEditorUI.Pages
                 ? SettingsManager.TryRemoveShortcutKeyMapping(mappingId)
                 : ExecuteMappingTransaction(
                     candidate => DeleteMapping(candidate, settings.Shortcut),
-                    () => SettingsManager.TryRemoveShortcutKeyMapping(mappingId));
+                    candidate => SettingsManager.TryRemoveShortcutKeyMapping(mappingId, candidate.ConfigurationName));
         }
 
         private bool SetMappingActiveStateTransaction(string mappingId, bool isActive)
@@ -1341,12 +1341,12 @@ namespace KeyboardManagerEditorUI.Pages
 
             return ExecuteMappingTransaction(
                 candidate => isActive ? AddMapping(candidate, settings.Shortcut) : DeleteMapping(candidate, settings.Shortcut),
-                () => SettingsManager.TrySetShortcutKeyMappingActiveState(mappingId, isActive));
+                candidate => SettingsManager.TrySetShortcutKeyMappingActiveState(mappingId, isActive, candidate.ConfigurationName));
         }
 
         private bool ExecuteMappingTransaction(
             Func<KeyboardMappingService, bool> updateCandidate,
-            Func<bool> commitMetadata)
+            Func<KeyboardMappingService, bool> commitMetadata)
         {
             if (_mappingService == null)
             {
@@ -1374,7 +1374,7 @@ namespace KeyboardManagerEditorUI.Pages
                     return false;
                 }
 
-                if (!commitMetadata())
+                if (!commitMetadata(candidateService))
                 {
                     RestoreOriginalMappingSettings(originalService);
                     return false;

@@ -596,12 +596,12 @@ namespace KeyboardManagerEditorUI.Settings
             return true;
         }
 
-        public static bool TryRemoveShortcutKeyMapping(string guid)
+        public static bool TryRemoveShortcutKeyMapping(string guid, string? profileName = null)
         {
             try
             {
                 EditorSettings updatedSettings = CloneSettings();
-                if (!TryApplyShortcutKeyMappingRemoval(updatedSettings, guid, CurrentProfileName) ||
+                if (!TryApplyShortcutKeyMappingRemoval(updatedSettings, guid, profileName ?? CurrentProfileName) ||
                     !WriteSettings(updatedSettings))
                 {
                     return false;
@@ -652,7 +652,7 @@ namespace KeyboardManagerEditorUI.Settings
             return true;
         }
 
-        public static bool TrySetShortcutKeyMappingActiveState(string guid, bool isActive)
+        public static bool TrySetShortcutKeyMappingActiveState(string guid, bool isActive, string? profileName = null)
         {
             try
             {
@@ -661,7 +661,7 @@ namespace KeyboardManagerEditorUI.Settings
                         updatedSettings,
                         guid,
                         isActive,
-                        CurrentProfileName) ||
+                        profileName ?? CurrentProfileName) ||
                     !WriteSettings(updatedSettings))
                 {
                     return false;
