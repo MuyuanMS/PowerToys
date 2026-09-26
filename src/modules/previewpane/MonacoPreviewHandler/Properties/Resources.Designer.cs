@@ -126,5 +126,15 @@ namespace Microsoft.PowerToys.PreviewHandler.Monaco.Properties {
                 return ResourceManager.GetString("Access_Denied_Exception_Message", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string for an error when WebView2 fails to initialize due to a COM resource conflict.
+        /// </summary>
+        internal static string WebView2_Initialization_Error {
+            get
+            {
+                return ResourceManager.GetString("WebView2_Initialization_Error", resourceCulture);
+            }
+        }
     }
 }
