@@ -24,18 +24,18 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
             AddHeader(headers, "Date", message.Date?.ToString("f", CultureInfo.CurrentCulture) ?? string.Empty);
 
             string body = message.IsBodyHtml ? ResolveInlineImages(SanitizeHtml(message.Body), message) : $"<pre>{WebUtility.HtmlEncode(message.Body)}</pre>";
+            string frame = WebUtility.HtmlEncode(body);
             return $$"""
                 <!doctype html>
                 <html><head><meta charset="utf-8"><meta name="color-scheme" content="light dark">
                 <style>
                 :root { font-family: "Segoe UI", sans-serif; color-scheme: light dark; }
-                body { margin: 0; padding: 24px; overflow-wrap: anywhere; }
-                .headers { display: grid; grid-template-columns: max-content 1fr; gap: 7px 14px; padding-bottom: 18px; border-bottom: 1px solid GrayText; }
+                body { display: flex; flex-direction: column; box-sizing: border-box; height: 100vh; margin: 0; padding: 24px; overflow-wrap: anywhere; }
+                .headers { display: grid; flex-shrink: 0; grid-template-columns: max-content 1fr; gap: 7px 14px; padding-bottom: 18px; border-bottom: 1px solid GrayText; }
                 .label { color: GrayText; font-weight: 600; }
-                .body { margin-top: 20px; }
-                pre { margin: 0; white-space: pre-wrap; font: inherit; }
-                img { max-width: 100%; height: auto; }
-                </style></head><body><section class="headers">{{headers}}</section><main class="body">{{body}}</main></body></html>
+                .body { flex: 1; min-height: 0; margin-top: 20px; }
+                .body-frame { width: 100%; height: 100%; border: 0; }
+                </style></head><body><section class="headers">{{headers}}</section><main class="body"><iframe class="body-frame" sandbox="" srcdoc="{{frame}}"></iframe></main></body></html>
                 """;
         }
 
