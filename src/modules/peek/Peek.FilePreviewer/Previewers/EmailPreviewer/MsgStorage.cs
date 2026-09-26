@@ -16,8 +16,8 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
     {
         private const int MessagePropertyHeaderSize = 32;
         private const int ChildPropertyHeaderSize = 8;
-        private MsgStorageInterop.IStorage? _storage;
         private readonly int _propertyHeaderSize;
+        private MsgStorageInterop.IStorage? _storage;
         private Encoding _ansiEncoding;
 
         private MsgStorage(MsgStorageInterop.IStorage storage, Encoding? ansiEncoding = null, int propertyHeaderSize = MessagePropertyHeaderSize)
