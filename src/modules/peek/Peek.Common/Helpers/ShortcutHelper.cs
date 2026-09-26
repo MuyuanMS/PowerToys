@@ -61,10 +61,6 @@ namespace Peek.Common.Helpers
                 return null;
             }
 
-            // Shortcuts to files under the Windows directory and shortcuts created by installers
-            // can store environment variables and paths relative to the shortcut.
-            targetPath = Environment.ExpandEnvironmentVariables(targetPath);
-
             if (!targetPath.StartsWith("::", StringComparison.Ordinal) &&
                 !targetPath.StartsWith("shell:", StringComparison.OrdinalIgnoreCase) &&
                 !Path.IsPathRooted(targetPath))
@@ -89,6 +85,13 @@ namespace Peek.Common.Helpers
 
             return targetPath;
         }
+
+        /// <summary>
+        /// Offers remote targets without checking their existence until the user chooses to open them.
+        /// </summary>
+        public static bool CanOfferTargetPreview(string? targetPath) =>
+            !string.IsNullOrEmpty(targetPath) &&
+            (targetPath.StartsWith(@"\\", StringComparison.Ordinal) || TargetExists(targetPath));
 
         /// <summary>
         /// Determines whether the resolved target of a shortcut exists.

@@ -87,6 +87,19 @@ namespace Peek.Common.UnitTests
             Assert.IsTrue(ShortcutHelper.TargetExists(targetResult));
         }
 
+        [TestMethod]
+        public void TryGetTargetPath_LiteralEnvironmentVariableName_ShouldPreserveTargetPath()
+        {
+            string targetDirectory = Path.Combine(testDirectory, "%TEMP%");
+            Directory.CreateDirectory(targetDirectory);
+            string targetPath = Path.Combine(targetDirectory, "target-file.txt");
+            File.WriteAllText(targetPath, "target");
+
+            string shortcutPath = CreateShortcut("literal-percent-path.lnk", targetPath);
+
+            Assert.AreEqual(targetPath, ShortcutHelper.TryGetTargetPath(shortcutPath), true, CultureInfo.InvariantCulture);
+        }
+
         /// <summary>
         /// Product code: ShortcutHelper.TryGetTargetPath(string)
         /// What: Verifies the target of a shortcut to a folder is resolved

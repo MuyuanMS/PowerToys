@@ -80,7 +80,7 @@ namespace Peek.FilePreviewer.Previewers
                     () =>
                     {
                         string? targetPath = ShortcutHelper.TryGetTargetPath(Item.Path);
-                        return (targetPath, ShortcutHelper.TargetExists(targetPath));
+                        return (targetPath, ShortcutHelper.CanOfferTargetPreview(targetPath));
                     },
                     cancellationToken);
 
