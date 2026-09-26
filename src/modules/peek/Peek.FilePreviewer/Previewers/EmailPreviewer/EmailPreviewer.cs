@@ -64,8 +64,18 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
 
                 Directory.CreateDirectory(TempFolderPath.Path);
                 string tempFile = Path.Combine(TempFolderPath.Path, $"{Guid.NewGuid():N}.html");
-                await File.WriteAllTextAsync(tempFile, EmailHtmlRenderer.Render(message), cancellationToken);
                 _tempFile = tempFile;
+                try
+                {
+                    await File.WriteAllTextAsync(tempFile, EmailHtmlRenderer.Render(message), cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+                catch
+                {
+                    File.Delete(tempFile);
+                    _tempFile = null;
+                    throw;
+                }
 
                 await _dispatcher.RunOnUiThread(() => Preview = new Uri(tempFile));
             }

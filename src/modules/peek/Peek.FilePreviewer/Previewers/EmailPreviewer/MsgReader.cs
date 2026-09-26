@@ -23,7 +23,7 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
             byte[]? html = storage.ReadStream("__substg1.0_10130102");
             if (html?.Length > 0)
             {
-                message.Body = DecodeHtml(html);
+                message.Body = DecodeHtml(html, storage.GetHtmlEncoding());
                 message.IsBodyHtml = true;
             }
             else
@@ -66,14 +66,19 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
             return string.IsNullOrWhiteSpace(name) ? address : string.IsNullOrWhiteSpace(address) || name.Contains(address, StringComparison.OrdinalIgnoreCase) ? name : $"{name} <{address}>";
         }
 
-        private static string DecodeHtml(byte[] bytes)
+        private static string DecodeHtml(byte[] bytes, Encoding encoding)
         {
             if (bytes.Length >= 2 && ((bytes[0] == 0xFF && bytes[1] == 0xFE) || bytes[1] == 0))
             {
                 return Encoding.Unicode.GetString(bytes).Trim('\0', '\uFEFF');
             }
 
-            return Encoding.UTF8.GetString(bytes).Trim('\0', '\uFEFF');
+            if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF)
+            {
+                return Encoding.BigEndianUnicode.GetString(bytes).Trim('\0', '\uFEFF');
+            }
+
+            return encoding.GetString(bytes).Trim('\0', '\uFEFF');
         }
     }
 }

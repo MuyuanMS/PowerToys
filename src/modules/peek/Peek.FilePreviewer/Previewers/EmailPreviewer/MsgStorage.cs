@@ -80,6 +80,28 @@ namespace Peek.FilePreviewer.Previewers.EmailPreviewer
             return bytes?.Length >= sizeof(int) ? BitConverter.ToInt32(bytes, 0) : 0;
         }
 
+        public Encoding GetHtmlEncoding()
+        {
+            int codePage = ReadInt32("3FDE");
+            if (codePage <= 0)
+            {
+                codePage = ReadInt32("3FFD");
+            }
+
+            if (codePage > 0)
+            {
+                try
+                {
+                    return Encoding.GetEncoding(codePage);
+                }
+                catch (ArgumentException)
+                {
+                }
+            }
+
+            return Encoding.UTF8;
+        }
+
         public string ReadString(string propertyId)
         {
             byte[]? unicode = ReadStream($"__substg1.0_{propertyId}001F");
