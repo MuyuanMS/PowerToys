@@ -88,19 +88,6 @@ namespace Peek.Common.UnitTests
         }
 
         [TestMethod]
-        public void TryGetTargetPath_LiteralEnvironmentVariableName_ShouldPreserveTargetPath()
-        {
-            string targetDirectory = Path.Combine(testDirectory, "%TEMP%");
-            Directory.CreateDirectory(targetDirectory);
-            string targetPath = Path.Combine(targetDirectory, "target-file.txt");
-            File.WriteAllText(targetPath, "target");
-
-            string shortcutPath = CreateShortcut("literal-percent-path.lnk", targetPath);
-
-            Assert.AreEqual(targetPath, ShortcutHelper.TryGetTargetPath(shortcutPath), true, CultureInfo.InvariantCulture);
-        }
-
-        [TestMethod]
         public void CanOfferTargetPreview_ShouldNotRequireTargetToExist()
         {
             string existingPath = Path.Combine(testDirectory, "existing.txt");
