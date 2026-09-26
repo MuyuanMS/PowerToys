@@ -43,6 +43,8 @@ namespace Peek.UI
         /// </summary>
         private readonly HashSet<int> _deletedItemIndexes = [];
 
+        private readonly HashSet<string> _visitedShortcutPaths = new(StringComparer.OrdinalIgnoreCase);
+
         private static readonly string _defaultWindowTitle = ResourceLoaderInstance.ResourceLoader.GetString("AppTitle/Title");
 
         /// <summary>
@@ -91,8 +93,6 @@ namespace Peek.UI
         private string? _shortcutTargetPath;
 
         private int _shortcutResolutionVersion;
-
-        private readonly HashSet<string> _visitedShortcutPaths = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// The target path that is currently previewed instead of <see cref="CurrentItem"/>, or null

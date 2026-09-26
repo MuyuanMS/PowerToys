@@ -322,7 +322,7 @@ public class PeekFilePreviewTests : UITestBase
                     5_000),
                 $"Peek should show the shortcut by default, but the title was '{peekWindow.WindowTitle}'.");
 
-            var toggleButton = peekWindow.Find<HyperlinkButton>(By.AccessibilityId("ShortcutTargetPeekButton"), 5_000);
+            var toggleButton = peekWindow.Find<Element>(By.AccessibilityId("ShortcutTargetPeekButton"), 5_000);
             toggleButton.Invoke();
             var targetWindow = WaitForPeekWindow(targetPath, PeekWindowTimeoutMS);
             Assert.IsNotNull(targetWindow, "Peek should show the shortcut target after following the link.");
@@ -367,11 +367,11 @@ public class PeekFilePreviewTests : UITestBase
         try
         {
             var peekWindow = OpenPeekWindow(outerPath);
-            peekWindow.Find<HyperlinkButton>(By.AccessibilityId("ShortcutTargetPeekButton"), 5_000).Invoke();
+            peekWindow.Find<Element>(By.AccessibilityId("ShortcutTargetPeekButton"), 5_000).Invoke();
 
             var innerWindow = WaitForPeekWindow(innerPath, PeekWindowTimeoutMS);
             Assert.IsNotNull(innerWindow, "Peek should show the nested shortcut.");
-            innerWindow.Find<HyperlinkButton>(By.AccessibilityId("ShortcutTargetPeekButton"), 5_000).Invoke();
+            innerWindow.Find<Element>(By.AccessibilityId("ShortcutTargetPeekButton"), 5_000).Invoke();
 
             var targetWindow = WaitForPeekWindow(targetPath, PeekWindowTimeoutMS);
             Assert.IsNotNull(targetWindow, "Peek should follow the nested shortcut to its target.");

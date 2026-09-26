@@ -87,11 +87,10 @@ namespace Peek.Common.Helpers
         }
 
         /// <summary>
-        /// Offers remote targets without checking their existence until the user chooses to open them.
+        /// Offers a target without accessing the file system until the user chooses to open it.
         /// </summary>
         public static bool CanOfferTargetPreview(string? targetPath) =>
-            !string.IsNullOrEmpty(targetPath) &&
-            (targetPath.StartsWith(@"\\", StringComparison.Ordinal) || TargetExists(targetPath));
+            !string.IsNullOrEmpty(targetPath);
 
         /// <summary>
         /// Determines whether the resolved target of a shortcut exists.

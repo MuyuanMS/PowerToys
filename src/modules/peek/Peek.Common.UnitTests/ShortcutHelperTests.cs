@@ -100,6 +100,19 @@ namespace Peek.Common.UnitTests
             Assert.AreEqual(targetPath, ShortcutHelper.TryGetTargetPath(shortcutPath), true, CultureInfo.InvariantCulture);
         }
 
+        [TestMethod]
+        public void CanOfferTargetPreview_ShouldNotRequireTargetToExist()
+        {
+            string existingPath = Path.Combine(testDirectory, "existing.txt");
+            File.WriteAllText(existingPath, "target");
+
+            Assert.IsTrue(ShortcutHelper.CanOfferTargetPreview(existingPath));
+            Assert.IsTrue(ShortcutHelper.CanOfferTargetPreview(Path.Combine(testDirectory, "missing.txt")));
+            Assert.IsTrue(ShortcutHelper.CanOfferTargetPreview(@"\\unreachable.example.invalid\share\target.txt"));
+            Assert.IsFalse(ShortcutHelper.CanOfferTargetPreview(null));
+            Assert.IsFalse(ShortcutHelper.CanOfferTargetPreview(string.Empty));
+        }
+
         /// <summary>
         /// Product code: ShortcutHelper.TryGetTargetPath(string)
         /// What: Verifies the target of a shortcut to a folder is resolved
