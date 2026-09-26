@@ -157,6 +157,15 @@ namespace Peek.FilePreviewer.UnitTests
         }
 
         [TestMethod]
+        public async Task IsTextFile_BomlessUtf32SupplementaryCharacters_ShouldReturnTrue()
+        {
+            const string expected = "\U0001F600\U0001F600\U0001F600";
+            File.WriteAllBytes(_tempFilePath, new UTF32Encoding(bigEndian: false, byteOrderMark: false).GetBytes(expected));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
         public async Task IsTextFile_FileExceedsMaxSize_ShouldReturnFalse()
         {
             byte[] buffer = new byte[ReadHelper.MaxReadableFileSizeBytes + 1];

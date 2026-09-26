@@ -203,6 +203,18 @@ namespace Peek.FilePreviewer.UnitTests
             string content = await ReadHelper.Read(_tempFilePath);
 
             Assert.AreEqual(expected, content);
+            Assert.AreEqual(expected, content);
+        }
+
+        [TestMethod]
+        public async Task Read_BomlessUtf32SupplementaryCharacters_ShouldDecodeCorrectly()
+        {
+            const string expected = "\U0001F600\U0001F600\U0001F600";
+            File.WriteAllBytes(_tempFilePath, new UTF32Encoding(bigEndian: false, byteOrderMark: false).GetBytes(expected));
+
+            string content = await ReadHelper.Read(_tempFilePath);
+
+            Assert.AreEqual(expected, content);
         }
     }
 }

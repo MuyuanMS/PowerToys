@@ -127,6 +127,12 @@ namespace Peek.FilePreviewer.Previewers
                 return new UTF32Encoding(bigEndian: true, byteOrderMark: false);
             }
 
+            Encoding? utf32Encoding = TryDetectBomlessUtf32WithValidatedText(buffer, bytesRead);
+            if (utf32Encoding != null)
+            {
+                return utf32Encoding;
+            }
+
             if (HasExpectedNullPattern(buffer, bytesRead, unitSize: 2, textByteIndex: 0, requiredNullByteIndexes: [1]))
             {
                 return Encoding.Unicode;
@@ -138,6 +144,50 @@ namespace Peek.FilePreviewer.Previewers
             }
 
             return TryDetectBomlessUtf16WithValidatedText(buffer, bytesRead);
+        }
+
+        private static Encoding? TryDetectBomlessUtf32WithValidatedText(byte[] buffer, int bytesRead)
+        {
+            if (bytesRead < 8 || bytesRead % 4 != 0)
+            {
+                return null;
+            }
+
+            bool isLittleEndianText = IsPlausibleBomlessUtf32Text(buffer, bytesRead, bigEndian: false);
+            bool isBigEndianText = IsPlausibleBomlessUtf32Text(buffer, bytesRead, bigEndian: true);
+            if (isLittleEndianText == isBigEndianText)
+            {
+                return null;
+            }
+
+            return new UTF32Encoding(bigEndian: isBigEndianText, byteOrderMark: false);
+        }
+
+        private static bool IsPlausibleBomlessUtf32Text(byte[] buffer, int bytesRead, bool bigEndian)
+        {
+            string text;
+            try
+            {
+                text = new UTF32Encoding(bigEndian, byteOrderMark: false, throwOnInvalidCharacters: true)
+                    .GetString(buffer, 0, bytesRead);
+            }
+            catch (DecoderFallbackException)
+            {
+                return false;
+            }
+
+            int runeCount = 0;
+            foreach (Rune rune in text.EnumerateRunes())
+            {
+                if (!IsTextRune(rune))
+                {
+                    return false;
+                }
+
+                runeCount++;
+            }
+
+            return runeCount >= 2;
         }
 
         private static bool HasExpectedNullPattern(byte[] buffer, int bytesRead, int unitSize, int textByteIndex, int[] requiredNullByteIndexes)
@@ -240,13 +290,7 @@ namespace Peek.FilePreviewer.Previewers
             var distinctRunes = new HashSet<Rune>();
             foreach (Rune rune in text.EnumerateRunes())
             {
-                UnicodeCategory category = Rune.GetUnicodeCategory(rune);
-                bool isTextRune = Rune.IsLetterOrDigit(rune) ||
-                    Rune.IsWhiteSpace(rune) ||
-                    Rune.IsPunctuation(rune) ||
-                    Rune.IsSymbol(rune) ||
-                    category is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.EnclosingMark or UnicodeCategory.Format;
-                if (!isTextRune)
+                if (!IsTextRune(rune))
                 {
                     return false;
                 }
@@ -256,6 +300,16 @@ namespace Peek.FilePreviewer.Previewers
 
             // Sparse NULs alone are ambiguous; require a varied valid decoding to avoid mistaking ASCII or binary data for UTF-16.
             return distinctRunes.Count >= 3;
+        }
+
+        private static bool IsTextRune(Rune rune)
+        {
+            UnicodeCategory category = Rune.GetUnicodeCategory(rune);
+            return Rune.IsLetterOrDigit(rune) ||
+                Rune.IsWhiteSpace(rune) ||
+                Rune.IsPunctuation(rune) ||
+                Rune.IsSymbol(rune) ||
+                category is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.EnclosingMark or UnicodeCategory.Format;
         }
     }
 }
