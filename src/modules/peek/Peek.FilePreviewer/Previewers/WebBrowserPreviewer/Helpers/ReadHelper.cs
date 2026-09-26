@@ -19,12 +19,6 @@ namespace Peek.FilePreviewer.Previewers
         // can cause a large memory spike. The user-configurable limit lives in Peek preview settings.
         public const long MaxReadableFileSizeBytes = 10 * 1024 * 1024; // 10 MB
 
-        // Prefix size fed to the charset detector. Sampling keeps detection (and its scan) bounded
-        // regardless of file size; a file that is plain ASCII for its first CharsetSampleSizeBytes but
-        // carries non-ASCII content only later could be mis-detected, a trade-off that matches how
-        // editors and tools like git sniff encoding.
-        private const int CharsetSampleSizeBytes = 64 * 1024;
-
         public static async Task<string> Read(string path, long maxReadableFileSizeBytes = MaxReadableFileSizeBytes, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -35,16 +29,23 @@ namespace Peek.FilePreviewer.Previewers
                 throw new InvalidOperationException($"File '{path}' exceeds the maximum previewable size of {maxReadableFileSizeBytes} bytes.");
             }
 
-            // Detect the charset from a bounded prefix of the same file stream handle.
-            int sampleSize = (int)Math.Min(fs.Length, CharsetSampleSizeBytes);
+            int sampleSize = (int)Math.Min(fs.Length, TextFileHelper.SampleSize);
             var sample = new byte[sampleSize];
             int sampleRead = await fs.ReadAtLeastAsync(sample, sampleSize, throwOnEndOfStream: false, cancellationToken).ConfigureAwait(false);
+            Encoding? bomlessUnicodeEncoding = TextFileHelper.TryDetectBomlessUnicodeEncoding(sample, sampleRead);
+            fs.Position = 0;
 
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-            DetectionResult result = CharsetDetector.DetectFromBytes(sampleRead == sample.Length ? sample : sample[..sampleRead]);
-
-            // Check if the detected encoding is not null; otherwise, default to UTF-8
-            Encoding encodingToUse = result.Detected?.Encoding ?? Encoding.UTF8;
+            Encoding encodingToUse;
+            if (bomlessUnicodeEncoding != null)
+            {
+                encodingToUse = bomlessUnicodeEncoding;
+            }
+            else
+            {
+                DetectionResult result = await CharsetDetector.DetectFromStreamAsync(fs, maxReadableFileSizeBytes, cancellationToken).ConfigureAwait(false);
+                encodingToUse = result.Detected?.Encoding ?? Encoding.UTF8;
+            }
 
             // Rewind and decode incrementally so the raw bytes are never buffered in full. The decoded text is still accumulated
             // into a single string, so peak memory scales with the file size, bounded by maxReadableFileSizeBytes.

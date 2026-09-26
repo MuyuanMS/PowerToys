@@ -101,6 +101,38 @@ namespace Peek.FilePreviewer.UnitTests
         }
 
         [TestMethod]
+        public async Task IsTextFile_Utf16LeWithoutBom_ShouldReturnTrue()
+        {
+            File.WriteAllText(_tempFilePath, "Text without a UTF-16LE BOM", new UnicodeEncoding(bigEndian: false, byteOrderMark: false));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_Utf16BeWithoutBom_ShouldReturnTrue()
+        {
+            File.WriteAllText(_tempFilePath, "Text without a UTF-16BE BOM", new UnicodeEncoding(bigEndian: true, byteOrderMark: false));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_Utf32LeWithoutBom_ShouldReturnTrue()
+        {
+            File.WriteAllText(_tempFilePath, "Text without a UTF-32LE BOM", new UTF32Encoding(bigEndian: false, byteOrderMark: false));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_Utf32BeWithoutBom_ShouldReturnTrue()
+        {
+            File.WriteAllText(_tempFilePath, "Text without a UTF-32BE BOM", new UTF32Encoding(bigEndian: true, byteOrderMark: false));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
         public async Task IsTextFile_FileExceedsMaxSize_ShouldReturnFalse()
         {
             byte[] buffer = new byte[ReadHelper.MaxReadableFileSizeBytes + 1];
