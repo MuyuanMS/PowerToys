@@ -112,7 +112,7 @@ namespace KeyboardManagerEditorUI.Settings
             try
             {
                 DeviceProfilesFile file = LoadForUpdate();
-                int removed = file.Map.RemoveAll(e => string.Equals(e.Profile, profile, StringComparison.Ordinal));
+                int removed = file.Map.RemoveAll(e => string.Equals(e.Profile, profile, StringComparison.OrdinalIgnoreCase));
                 if (removed == 0)
                 {
                     return true;

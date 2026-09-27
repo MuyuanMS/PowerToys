@@ -27,6 +27,52 @@ namespace
 {
     const wchar_t* const SettingsWriteMutexName = L"Local\\PowerToys_KeyboardManager_Settings_Write";
 
+    class ScopedSettingsWriteMutex
+    {
+    public:
+        ScopedSettingsWriteMutex()
+        {
+            _handle = CreateMutexW(nullptr, FALSE, SettingsWriteMutexName);
+            if (_handle == nullptr)
+            {
+                return;
+            }
+
+            const DWORD waitResult = WaitForSingleObject(_handle, 10000);
+            _acquired = waitResult == WAIT_OBJECT_0 || waitResult == WAIT_ABANDONED;
+            if (!_acquired)
+            {
+                CloseHandle(_handle);
+                _handle = nullptr;
+            }
+        }
+
+        ~ScopedSettingsWriteMutex()
+        {
+            if (_acquired)
+            {
+                ReleaseMutex(_handle);
+            }
+
+            if (_handle != nullptr)
+            {
+                CloseHandle(_handle);
+            }
+        }
+
+        ScopedSettingsWriteMutex(const ScopedSettingsWriteMutex&) = delete;
+        ScopedSettingsWriteMutex& operator=(const ScopedSettingsWriteMutex&) = delete;
+
+        explicit operator bool() const
+        {
+            return _acquired;
+        }
+
+    private:
+        HANDLE _handle = nullptr;
+        bool _acquired = false;
+    };
+
     bool WriteJsonAtomically(const std::wstring& filePath, const json::JsonObject& object)
     {
         const std::wstring temporaryPath = filePath + L"." + std::to_wstring(GetCurrentProcessId()) + L"." + std::to_wstring(GetCurrentThreadId()) + L".tmp";
@@ -360,6 +406,13 @@ void KeyboardManager::CycleActiveProfile()
     try
     {
         std::lock_guard<std::mutex> lock(switchProfileMutex);
+        ScopedSettingsWriteMutex settingsWriteMutex;
+        if (!settingsWriteMutex)
+        {
+            Logger::error(L"CycleActiveProfile: failed to acquire settings write lock");
+            return;
+        }
+
         const auto path = PTSettingsHelper::get_module_save_folder_location(moduleName) + L"\\settings.json";
         auto parsed = json::from_file(path);
         if (!parsed.has_value())
@@ -413,24 +466,18 @@ bool KeyboardManager::SwitchActiveProfile(const std::wstring& profile)
 {
     // Tracker thread and hotkey thread can both land here; serialize the read-modify-write.
     std::lock_guard<std::mutex> lock(switchProfileMutex);
+    ScopedSettingsWriteMutex settingsWriteMutex;
+    if (!settingsWriteMutex)
+    {
+        Logger::error(L"Auto-switch: failed to acquire settings write lock");
+        return false;
+    }
+
     return SwitchActiveProfileLocked(profile);
 }
 
 bool KeyboardManager::SwitchActiveProfileLocked(const std::wstring& profile)
 {
-    HANDLE settingsMutex = CreateMutexW(nullptr, FALSE, SettingsWriteMutexName);
-    const DWORD waitResult = settingsMutex == nullptr ? WAIT_FAILED : WaitForSingleObject(settingsMutex, 10000);
-    if (settingsMutex == nullptr || (waitResult != WAIT_OBJECT_0 && waitResult != WAIT_ABANDONED))
-    {
-        if (settingsMutex != nullptr)
-        {
-            CloseHandle(settingsMutex);
-        }
-
-        Logger::error(L"Auto-switch: failed to acquire settings write lock");
-        return false;
-    }
-    // WAIT_ABANDONED also grants ownership, so the common cleanup below must release it.
     bool writeSucceeded = false;
     try
     {
@@ -446,8 +493,6 @@ bool KeyboardManager::SwitchActiveProfileLocked(const std::wstring& profile)
                     requestedProfile.clear();
                 }
             }
-            ReleaseMutex(settingsMutex);
-            CloseHandle(settingsMutex);
             return false;
         }
 
@@ -460,8 +505,6 @@ bool KeyboardManager::SwitchActiveProfileLocked(const std::wstring& profile)
             // keyboardConfigurations). Abort and leave the file untouched, matching
             // CycleActiveProfile. The next keystroke retries the switch.
             Logger::error(L"Auto-switch: settings.json unreadable; leaving it untouched");
-            ReleaseMutex(settingsMutex);
-            CloseHandle(settingsMutex);
             return false;
         }
 
@@ -503,8 +546,6 @@ bool KeyboardManager::SwitchActiveProfileLocked(const std::wstring& profile)
     {
         Logger::error(L"Failed to write activeConfiguration for auto-switch");
     }
-    ReleaseMutex(settingsMutex);
-    CloseHandle(settingsMutex);
 
     if (!writeSucceeded)
     {

@@ -76,7 +76,7 @@ namespace KeyboardManagerEditorUI.Settings
                     foreach (JsonNode? item in configs)
                     {
                         string? name = item?.GetValue<string>();
-                        if (!string.IsNullOrEmpty(name) && IsValidProfileName(name) && !names.Contains(name))
+                        if (!string.IsNullOrEmpty(name) && IsValidProfileName(name) && !names.Contains(name, StringComparer.OrdinalIgnoreCase))
                         {
                             names.Add(name);
                         }
@@ -102,7 +102,7 @@ namespace KeyboardManagerEditorUI.Settings
                             continue;
                         }
 
-                        if (!names.Contains(stem))
+                        if (!names.Contains(stem, StringComparer.OrdinalIgnoreCase))
                         {
                             names.Add(stem);
                         }
@@ -114,7 +114,7 @@ namespace KeyboardManagerEditorUI.Settings
                 Logger.LogWarning($"ProfileManager.GetProfiles: failed scanning config files: {ex.Message}");
             }
 
-            if (!names.Contains(DefaultProfile))
+            if (!names.Contains(DefaultProfile, StringComparer.OrdinalIgnoreCase))
             {
                 names.Insert(0, DefaultProfile);
             }
@@ -496,7 +496,7 @@ namespace KeyboardManagerEditorUI.Settings
                 holder["value"] = array;
             }
 
-            if (!array.Any(n => string.Equals(n?.GetValue<string>(), profile, StringComparison.Ordinal)))
+            if (!array.Any(n => string.Equals(n?.GetValue<string>(), profile, StringComparison.OrdinalIgnoreCase)))
             {
                 array.Add(profile);
             }
@@ -511,7 +511,7 @@ namespace KeyboardManagerEditorUI.Settings
 
             for (int i = array.Count - 1; i >= 0; i--)
             {
-                if (string.Equals(array[i]?.GetValue<string>(), profile, StringComparison.Ordinal))
+                if (string.Equals(array[i]?.GetValue<string>(), profile, StringComparison.OrdinalIgnoreCase))
                 {
                     array.RemoveAt(i);
                 }
