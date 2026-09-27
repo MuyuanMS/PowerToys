@@ -505,6 +505,14 @@ namespace KeyboardManagerEditorUI.Pages
             else
             {
                 Logger.LogWarning($"Could not create profile '{name}' (invalid name or already exists)");
+                var createErrorDialog = new ContentDialog
+                {
+                    Title = ResourceHelper.GetString("NewProfileCreateFailed_Title"),
+                    Content = ResourceHelper.GetString("NewProfileCreateFailed_Message"),
+                    CloseButtonText = ResourceHelper.GetString("NewProfileCreateFailed_CloseButtonText"),
+                    XamlRoot = XamlRoot,
+                };
+                await createErrorDialog.ShowAsync();
             }
         }
 

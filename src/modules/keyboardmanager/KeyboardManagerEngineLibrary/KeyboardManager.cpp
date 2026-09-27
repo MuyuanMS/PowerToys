@@ -232,10 +232,9 @@ void KeyboardManager::OnRawKeyEvent(const RawInputKeyboardTracker::KeyEvent& key
     }
 
     // A physical keystroke whose device path can't be resolved (observed on Surface Type Cover
-    // right after idle, when its KIP device node re-enumerates). Log it so drops are visible.
+    // right after idle, when its KIP device node re-enumerates) cannot be mapped safely.
     if (keyEvent.devicePath.empty())
     {
-        Logger::trace(L"[autosw] keydown vk=0x{:x} with unresolvable device — skipped", keyEvent.vkey);
         return;
     }
 
