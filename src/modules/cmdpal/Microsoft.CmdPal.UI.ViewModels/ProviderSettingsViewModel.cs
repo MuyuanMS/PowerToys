@@ -60,6 +60,8 @@ public partial class ProviderSettingsViewModel : ObservableObject
     /// <summary>Provider key used by command links and persisted settings.</summary>
     public string ProviderId => _provider.ProviderId;
 
+    internal bool IsBackedBy(CommandProviderWrapper provider) => ReferenceEquals(_provider, provider);
+
     public string ExtensionName => _provider.Extension?.ExtensionDisplayName ?? Resources.builtin_extension_name;
 
     public string ExtensionSubtext

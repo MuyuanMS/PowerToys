@@ -486,6 +486,8 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     private void RegisterCommandProviders(List<CommandProviderWrapper> wrappers)
     {
         var replacedProviderIds = new HashSet<string>(StringComparer.Ordinal);
+        List<TopLevelViewModel> commandsToRemove = [];
+        List<TopLevelViewModel> bandsToRemove = [];
         lock (_commandProvidersLock)
         {
             foreach (var wrapper in wrappers)
@@ -510,15 +512,11 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             }
 
             _commandProviders.AddRange(wrappers);
-        }
 
-        foreach (var providerId in replacedProviderIds)
-        {
-            List<TopLevelViewModel> commandsToRemove;
             lock (TopLevelCommands)
             {
                 commandsToRemove = TopLevelCommands
-                    .Where(command => command.CommandProviderId == providerId)
+                    .Where(command => replacedProviderIds.Contains(command.CommandProviderId))
                     .ToList();
                 foreach (var command in commandsToRemove)
                 {
@@ -526,27 +524,26 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
                 }
             }
 
-            List<TopLevelViewModel> bandsToRemove;
             lock (_dockBandsLock)
             {
                 bandsToRemove = DockBands
-                    .Where(band => band.CommandProviderId == providerId)
+                    .Where(band => replacedProviderIds.Contains(band.CommandProviderId))
                     .ToList();
                 foreach (var band in bandsToRemove)
                 {
                     DockBands.Remove(band);
                 }
             }
+        }
 
-            foreach (var command in commandsToRemove)
-            {
-                command.Cleanup();
-            }
+        foreach (var command in commandsToRemove)
+        {
+            command.Cleanup();
+        }
 
-            foreach (var band in bandsToRemove)
-            {
-                band.Cleanup();
-            }
+        foreach (var band in bandsToRemove)
+        {
+            band.Cleanup();
         }
     }
 
@@ -571,8 +568,9 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         var totalCommands = 0;
         var totalDockBands = 0;
         var timedOut = new List<CommandLoadResult>();
-        List<TopLevelViewModel> commandsToAdd = [];
-        List<TopLevelViewModel> dockBandsToAdd = [];
+        List<(CommandProviderWrapper Wrapper, ICollection<TopLevelViewModel> Items)> commandsToAdd = [];
+        List<(CommandProviderWrapper Wrapper, ICollection<TopLevelViewModel> Items)> dockBandsToAdd = [];
+        List<TopLevelViewModel> staleItems = [];
 
         foreach (var r in loadResults)
         {
@@ -581,41 +579,13 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
                 var commands = r.TopLevelObjectSets.Commands;
                 if (commands is not null)
                 {
-                    if (IsCurrentProvider(r.Wrapper))
-                    {
-                        foreach (var c in commands)
-                        {
-                            commandsToAdd.Add(c);
-                            totalCommands++;
-                        }
-                    }
-                    else
-                    {
-                        foreach (var command in commands)
-                        {
-                            command.Cleanup();
-                        }
-                    }
+                    commandsToAdd.Add((r.Wrapper, commands));
                 }
 
                 var bands = r.TopLevelObjectSets.DockBands;
                 if (bands is not null)
                 {
-                    if (IsCurrentProvider(r.Wrapper))
-                    {
-                        foreach (var b in bands)
-                        {
-                            dockBandsToAdd.Add(b);
-                            totalDockBands++;
-                        }
-                    }
-                    else
-                    {
-                        foreach (var band in bands)
-                        {
-                            band.Cleanup();
-                        }
-                    }
+                    dockBandsToAdd.Add((r.Wrapper, bands));
                 }
             }
             else if (r.IsTimedOut)
@@ -624,20 +594,50 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             }
         }
 
-        lock (TopLevelCommands)
+        lock (_commandProvidersLock)
         {
-            foreach (var c in commandsToAdd)
+            lock (TopLevelCommands)
             {
-                TopLevelCommands.Add(c);
+                foreach (var (wrapper, items) in commandsToAdd)
+                {
+                    if (IsCurrentProviderLocked(wrapper))
+                    {
+                        foreach (var command in items)
+                        {
+                            TopLevelCommands.Add(command);
+                            totalCommands++;
+                        }
+                    }
+                    else
+                    {
+                        staleItems.AddRange(items);
+                    }
+                }
+            }
+
+            lock (_dockBandsLock)
+            {
+                foreach (var (wrapper, items) in dockBandsToAdd)
+                {
+                    if (IsCurrentProviderLocked(wrapper))
+                    {
+                        foreach (var band in items)
+                        {
+                            DockBands.Add(band);
+                            totalDockBands++;
+                        }
+                    }
+                    else
+                    {
+                        staleItems.AddRange(items);
+                    }
+                }
             }
         }
 
-        lock (_dockBandsLock)
+        foreach (var staleItem in staleItems)
         {
-            foreach (var b in dockBandsToAdd)
-            {
-                DockBands.Add(b);
-            }
+            staleItem.Cleanup();
         }
 
         // Fire background continuations for timed-out loads outside the lock
@@ -689,13 +689,10 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         }
     }
 
-    private bool IsCurrentProvider(CommandProviderWrapper wrapper)
+    private bool IsCurrentProviderLocked(CommandProviderWrapper wrapper)
     {
-        lock (_commandProvidersLock)
-        {
-            return _providerLoadCompletions.TryGetValue(wrapper.ProviderId, out var entry) &&
-                ReferenceEquals(entry.Wrapper, wrapper);
-        }
+        return _providerLoadCompletions.TryGetValue(wrapper.ProviderId, out var entry) &&
+            ReferenceEquals(entry.Wrapper, wrapper);
     }
 
     private async Task AppendCommandsWhenReadyAsync(
@@ -709,41 +706,48 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             var topLevelObjectSets = await loadTask.WaitAsync(BackgroundCommandLoadTimeout, ct).ConfigureAwait(false);
 
             var commands = topLevelObjectSets.Commands;
-            if (commands is not null)
+            var dockBands = topLevelObjectSets.DockBands;
+            var isCurrentProvider = false;
+            lock (_commandProvidersLock)
             {
-                if (IsCurrentProvider(wrapper))
+                if (IsCurrentProviderLocked(wrapper))
                 {
-                    lock (TopLevelCommands)
+                    isCurrentProvider = true;
+                    if (commands is not null)
                     {
-                        foreach (var c in commands)
+                        lock (TopLevelCommands)
                         {
-                            TopLevelCommands.Add(c);
+                            foreach (var command in commands)
+                            {
+                                TopLevelCommands.Add(command);
+                            }
+                        }
+                    }
+
+                    if (dockBands is not null)
+                    {
+                        lock (_dockBandsLock)
+                        {
+                            foreach (var band in dockBands)
+                            {
+                                DockBands.Add(band);
+                            }
                         }
                     }
                 }
-                else
+            }
+
+            if (!isCurrentProvider)
+            {
+                if (commands is not null)
                 {
                     foreach (var command in commands)
                     {
                         command.Cleanup();
                     }
                 }
-            }
 
-            var dockBands = topLevelObjectSets.DockBands;
-            if (dockBands is not null)
-            {
-                if (IsCurrentProvider(wrapper))
-                {
-                    lock (_dockBandsLock)
-                    {
-                        foreach (var band in dockBands)
-                        {
-                            DockBands.Add(band);
-                        }
-                    }
-                }
-                else
+                if (dockBands is not null)
                 {
                     foreach (var band in dockBands)
                     {
@@ -783,45 +787,66 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
 
     private void ExtensionService_OnProviderRemoved(IExtensionService sender, IEnumerable<CommandProviderWrapper> removedWrappers)
     {
+        var removedWrapperList = removedWrappers.ToList();
+
         // When we get a provider removal event, hop off to a BG thread
         _ = Task.Run(
             async () =>
             {
-                var removedProviderIds = new HashSet<string>(removedWrappers.Select(w => w.ProviderId));
+                var removedProviderIds = new HashSet<string>(StringComparer.Ordinal);
 
                 List<TopLevelViewModel> commandsToRemove = [];
                 List<TopLevelViewModel> bandsToRemove = [];
 
-                lock (TopLevelCommands)
-                {
-                    foreach (var command in TopLevelCommands)
-                    {
-                        if (removedProviderIds.Contains(command.CommandProviderId))
-                        {
-                            commandsToRemove.Add(command);
-                        }
-                    }
-                }
-
-                lock (_dockBandsLock)
-                {
-                    foreach (var band in DockBands)
-                    {
-                        if (removedProviderIds.Contains(band.CommandProviderId))
-                        {
-                            bandsToRemove.Add(band);
-                        }
-                    }
-                }
-
                 lock (_commandProvidersLock)
                 {
-                    _commandProviders.RemoveAll(w => removedProviderIds.Contains(w.ProviderId));
-                    foreach (var providerId in removedProviderIds)
+                    foreach (var removedWrapper in removedWrapperList)
                     {
-                        if (_providerLoadCompletions.Remove(providerId, out var entry))
+                        var currentWrapper = _commandProviders.FirstOrDefault(wrapper => wrapper.ProviderId == removedWrapper.ProviderId);
+                        if (currentWrapper is not null && !IsSameProviderInstance(currentWrapper, removedWrapper))
+                        {
+                            continue;
+                        }
+
+                        if (_providerLoadCompletions.TryGetValue(removedWrapper.ProviderId, out var entry) &&
+                            (currentWrapper is null
+                                ? !IsSameProviderInstance(entry.Wrapper, removedWrapper)
+                                : !ReferenceEquals(entry.Wrapper, currentWrapper)))
+                        {
+                            continue;
+                        }
+
+                        removedProviderIds.Add(removedWrapper.ProviderId);
+                        if (currentWrapper is not null)
+                        {
+                            _commandProviders.Remove(currentWrapper);
+                        }
+
+                        if (_providerLoadCompletions.Remove(removedWrapper.ProviderId, out entry))
                         {
                             entry.Completion.TrySetResult();
+                        }
+                    }
+
+                    lock (TopLevelCommands)
+                    {
+                        commandsToRemove = TopLevelCommands
+                            .Where(command => removedProviderIds.Contains(command.CommandProviderId))
+                            .ToList();
+                        foreach (var command in commandsToRemove)
+                        {
+                            TopLevelCommands.Remove(command);
+                        }
+                    }
+
+                    lock (_dockBandsLock)
+                    {
+                        bandsToRemove = DockBands
+                            .Where(band => removedProviderIds.Contains(band.CommandProviderId))
+                            .ToList();
+                        foreach (var band in bandsToRemove)
+                        {
+                            DockBands.Remove(band);
                         }
                     }
                 }
@@ -829,28 +854,6 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
                 await Task.Factory.StartNew(
                 () =>
                 {
-                    lock (TopLevelCommands)
-                    {
-                        if (commandsToRemove.Count != 0)
-                        {
-                            foreach (var deleted in commandsToRemove)
-                            {
-                                TopLevelCommands.Remove(deleted);
-                            }
-                        }
-                    }
-
-                    lock (_dockBandsLock)
-                    {
-                        if (bandsToRemove.Count != 0)
-                        {
-                            foreach (var deleted in bandsToRemove)
-                            {
-                                DockBands.Remove(deleted);
-                            }
-                        }
-                    }
-
                     foreach (var deleted in commandsToRemove)
                     {
                         deleted.Cleanup();
@@ -865,6 +868,12 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
                 TaskCreationOptions.None,
                 _taskScheduler);
             });
+    }
+
+    private static bool IsSameProviderInstance(CommandProviderWrapper current, CommandProviderWrapper removed)
+    {
+        return ReferenceEquals(current, removed) ||
+            (current.Extension is not null && ReferenceEquals(current.Extension, removed.Extension));
     }
 
     public TopLevelViewModel? LookupCommand(string id)

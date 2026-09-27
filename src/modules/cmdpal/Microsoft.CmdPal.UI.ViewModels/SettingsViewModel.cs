@@ -473,17 +473,17 @@ public partial class SettingsViewModel : INotifyPropertyChanged,
     /// <summary>Returns settings for a loaded provider, adding a late provider to this view model.</summary>
     public ProviderSettingsViewModel? FindOrAddCommandProvider(string providerId)
     {
-        var existing = CommandProviders.FirstOrDefault(provider =>
-            string.Equals(provider.ProviderId, providerId, StringComparison.Ordinal));
-        if (existing is not null)
-        {
-            return existing;
-        }
-
         var provider = _topLevelCommandManager.LookupProvider(providerId);
         if (provider is null)
         {
             return null;
+        }
+
+        var existing = CommandProviders.FirstOrDefault(settings =>
+            string.Equals(settings.ProviderId, providerId, StringComparison.Ordinal));
+        if (existing?.IsBackedBy(provider) == true)
+        {
+            return existing;
         }
 
         var currentSettings = _settingsService.Settings;
@@ -500,6 +500,37 @@ public partial class SettingsViewModel : INotifyPropertyChanged,
         }
 
         var providerViewModel = new ProviderSettingsViewModel(provider, providerSettings, _settingsService);
+        if (existing is not null)
+        {
+            CommandProviders.Remove(existing);
+            foreach (var oldFallback in existing.FallbackCommands)
+            {
+                var index = FallbackRankings.IndexOf(oldFallback);
+                if (index < 0)
+                {
+                    continue;
+                }
+
+                var replacement = providerViewModel.FallbackCommands.FirstOrDefault(item => item.Id == oldFallback.Id);
+                if (replacement is null)
+                {
+                    FallbackRankings.RemoveAt(index);
+                }
+                else
+                {
+                    FallbackRankings[index] = replacement;
+                }
+            }
+
+            foreach (var newFallback in providerViewModel.FallbackCommands)
+            {
+                if (!FallbackRankings.Any(item => item.Id == newFallback.Id))
+                {
+                    FallbackRankings.Add(newFallback);
+                }
+            }
+        }
+
         CommandProviders.Add(providerViewModel);
         return providerViewModel;
     }
