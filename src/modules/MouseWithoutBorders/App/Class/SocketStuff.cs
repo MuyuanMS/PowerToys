@@ -954,7 +954,7 @@ namespace MouseWithoutBorders.Class
                 {
                     host = null;
 
-                    UpdateTcpSockets(dummyTcp, SocketStatus.HostNotFound);
+                    UpdateTcpSockets(dummyTcp, useName2IP ? SocketStatus.NA : SocketStatus.HostNotFound);
 
                     Common.ShowToolTip(e.Message + ": " + machineName, 10000, ToolTipIcon.Warning, Setting.Values.ShowClipNetStatus);
 

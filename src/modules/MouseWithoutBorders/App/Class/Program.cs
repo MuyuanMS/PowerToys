@@ -273,15 +273,19 @@ namespace MouseWithoutBorders.Class
 
             void GenerateNewKey();
 
-            void ConnectToMachine(string machineName, string securityKey);
+            Task ConnectToMachineAsync(string machineName, string securityKey);
 
-            void RestoreSecurityKey(string previousSecurityKey);
+            Task RestorePreviousConnectionAsync();
 
             Task<MachineSocketState[]> RequestMachineSocketStateAsync();
         }
 
         private sealed class SettingsSyncHelper : ISettingsSyncHelper
         {
+            private static readonly object ConnectionSnapshotLock = new();
+            private static string previousSecurityKey;
+            private static string[] previousMachineMatrix;
+
             public Task<ISettingsSyncHelper.MachineSocketState[]> RequestMachineSocketStateAsync()
             {
                 var machineStates = new Dictionary<string, SocketStatus>();
@@ -303,44 +307,74 @@ namespace MouseWithoutBorders.Class
                 return Task.FromResult(machineStates.Select((state) => new ISettingsSyncHelper.MachineSocketState { Name = state.Key, Status = state.Value }).ToArray());
             }
 
-            public void ConnectToMachine(string pcName, string securityKey)
+            public Task ConnectToMachineAsync(string pcName, string securityKey)
             {
-                Setting.Values.PauseInstantSaving = true;
-
-                MachineStuff.ClearComputerMatrix();
-                Setting.Values.MyKey = securityKey;
-                Encryption.MyKey = securityKey;
-                Encryption.MagicNumber = Encryption.Get24BitHash(Encryption.MyKey);
-                MachineStuff.MachineMatrix = new string[MachineStuff.MAX_MACHINE] { pcName.Trim().ToUpper(CultureInfo.CurrentCulture), Common.MachineName.Trim(), string.Empty, string.Empty };
-
-                string[] machines = MachineStuff.MachineMatrix;
-                MachineStuff.MachinePool.Initialize(machines);
-                MachineStuff.UpdateMachinePoolStringSetting();
-
-                SocketStuff.InvalidKeyFound = false;
-                InitAndCleanup.ReopenSocketDueToReadError = true;
-                Common.ReopenSockets(true);
-                MachineStuff.SendMachineMatrix();
-
-                Setting.Values.PauseInstantSaving = false;
-                Setting.Values.SaveSettings();
-            }
-
-            public void RestoreSecurityKey(string previousSecurityKey)
-            {
-                if (string.IsNullOrEmpty(previousSecurityKey) || Setting.Values.MyKey == previousSecurityKey)
+                lock (ConnectionSnapshotLock)
                 {
-                    return;
+                    previousSecurityKey = Setting.Values.MyKey;
+                    previousMachineMatrix = (string[])MachineStuff.MachineMatrix.Clone();
+                    Setting.Values.PauseInstantSaving = true;
+                    try
+                    {
+                        MachineStuff.ClearComputerMatrix();
+                        Setting.Values.MyKey = securityKey;
+                        Encryption.MyKey = securityKey;
+                        Encryption.MagicNumber = Encryption.Get24BitHash(Encryption.MyKey);
+                        MachineStuff.MachineMatrix = new string[MachineStuff.MAX_MACHINE] { pcName.Trim().ToUpper(CultureInfo.CurrentCulture), Common.MachineName.Trim(), string.Empty, string.Empty };
+
+                        string[] machines = MachineStuff.MachineMatrix;
+                        MachineStuff.MachinePool.Initialize(machines);
+                        MachineStuff.UpdateMachinePoolStringSetting();
+
+                        SocketStuff.InvalidKeyFound = false;
+                        InitAndCleanup.ReopenSocketDueToReadError = true;
+                        Common.ReopenSockets(true);
+                        MachineStuff.SendMachineMatrix();
+                    }
+                    finally
+                    {
+                        Setting.Values.PauseInstantSaving = false;
+                        Setting.Values.SaveSettings();
+                    }
                 }
 
-                Setting.Values.PauseInstantSaving = true;
+                return Task.CompletedTask;
+            }
 
-                Setting.Values.MyKey = previousSecurityKey;
-                Encryption.MyKey = previousSecurityKey;
-                Encryption.MagicNumber = Encryption.Get24BitHash(Encryption.MyKey);
+            public Task RestorePreviousConnectionAsync()
+            {
+                lock (ConnectionSnapshotLock)
+                {
+                    if (previousMachineMatrix == null)
+                    {
+                        throw new InvalidOperationException("No previous connection configuration is available to restore.");
+                    }
 
-                Setting.Values.PauseInstantSaving = false;
-                Setting.Values.SaveSettings();
+                    Setting.Values.PauseInstantSaving = true;
+                    try
+                    {
+                        Setting.Values.MyKey = previousSecurityKey;
+                        Encryption.MyKey = previousSecurityKey;
+                        Encryption.MagicNumber = Encryption.Get24BitHash(Encryption.MyKey);
+                        MachineStuff.MachineMatrix = previousMachineMatrix;
+                        MachineStuff.MachinePool.Initialize(previousMachineMatrix);
+                        MachineStuff.UpdateMachinePoolStringSetting();
+                        SocketStuff.InvalidKeyFound = false;
+                        InitAndCleanup.ReopenSocketDueToReadError = true;
+                        Common.ReopenSockets(true);
+                        MachineStuff.SendMachineMatrix();
+                    }
+                    finally
+                    {
+                        Setting.Values.PauseInstantSaving = false;
+                        Setting.Values.SaveSettings();
+                    }
+
+                    previousMachineMatrix = null;
+                    previousSecurityKey = null;
+
+                    return Task.CompletedTask;
+                }
             }
 
             public void GenerateNewKey()

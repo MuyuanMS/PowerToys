@@ -190,12 +190,12 @@ namespace Microsoft.PowerToys.Settings.UI.Views
         private async Task Connect()
         {
             var emptyFields = new List<TextBox>();
-            if (ConnectSecurityKeyTextBox.Text.Length == 0)
+            if (string.IsNullOrWhiteSpace(ConnectSecurityKeyTextBox.Text))
             {
                 emptyFields.Add(ConnectSecurityKeyTextBox);
             }
 
-            if (ConnectPCNameTextBox.Text.Length == 0)
+            if (string.IsNullOrWhiteSpace(ConnectPCNameTextBox.Text))
             {
                 emptyFields.Add(ConnectPCNameTextBox);
             }
@@ -209,7 +209,7 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             ClearFieldError(ConnectPCNameTextBox);
             ClearFieldError(ConnectSecurityKeyTextBox);
 
-            string pcName = ConnectPCNameTextBox.Text;
+            string pcName = ConnectPCNameTextBox.Text.Trim();
             string securityKey = ConnectSecurityKeyTextBox.Text.Trim();
 
             // Fields are cleared only once ViewModel confirms the connection succeeded

@@ -24,4 +24,13 @@ public sealed class IpcSerializationCompatibilityTests
 
         Assert.AreEqual("""{"Name":"PC","Status":9}""", JsonConvert.SerializeObject(state));
     }
+
+    [TestMethod]
+    public void ConnectionRpcMethodsReturnCompletionTasks()
+    {
+        var contract = typeof(Program).GetNestedType("ISettingsSyncHelper", BindingFlags.NonPublic);
+
+        Assert.AreEqual(typeof(Task), contract!.GetMethod("ConnectToMachineAsync")!.ReturnType);
+        Assert.AreEqual(typeof(Task), contract.GetMethod("RestorePreviousConnectionAsync")!.ReturnType);
+    }
 }

@@ -52,7 +52,9 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         private DateTime _pendingConnectStartTimeUtc;
 
-        private string _pendingConnectPreviousSecurityKey;
+        private bool _pendingConnectNeedsRestore;
+
+        private static readonly TimeSpan ConnectionTimeout = TimeSpan.FromSeconds(65);
 
         private bool _disposed;
 
@@ -367,9 +369,9 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
             void GenerateNewKey();
 
-            void ConnectToMachine(string machineName, string securityKey);
+            Task ConnectToMachineAsync(string machineName, string securityKey);
 
-            void RestoreSecurityKey(string previousSecurityKey);
+            Task RestorePreviousConnectionAsync();
 
             Task<MachineSocketState[]> RequestMachineSocketStateAsync();
         }
@@ -528,38 +530,43 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
             lock (_connectPendingLock)
             {
-                _pendingConnectMachineName = pcName;
-                _pendingConnectStartTimeUtc = DateTime.UtcNow;
-                _pendingConnectPreviousSecurityKey = SecurityKey;
+                _pendingConnectMachineName = null;
+                _pendingConnectNeedsRestore = false;
             }
 
-            using (await _ipcSemaphore.EnterAsync())
+            try
             {
-                using (var syncHelper = await GetSettingsSyncHelperAsync())
+                using (await _ipcSemaphore.EnterAsync())
                 {
-                    if (syncHelper == null)
+                    using (var syncHelper = await GetSettingsSyncHelperAsync())
                     {
-                        ClearPendingConnect();
-                        lock (_connectPendingLock)
+                        if (syncHelper == null)
                         {
-                            // ConnectToMachine was never invoked, so the local key was never touched.
-                            _pendingConnectPreviousSecurityKey = null;
+                            ClearPendingConnect();
+                            ReportConnectionFailure(null, wasSubmitted: false);
+                            return;
                         }
 
-                        _uiDispatcherQueue.TryEnqueue(DispatcherQueuePriority.Normal, () =>
+                        lock (_connectPendingLock)
                         {
-                            IsConnecting = false;
-                            var message = ResourceLoaderInstance.ResourceLoader.GetString("MouseWithoutBorders_ConnectErrorModuleUnreachable");
-                            ConnectionErrorMessage = message;
-                            ShowConnectionError = true;
-                            ConnectionFailed?.Invoke(this, new ConnectFailedEventArgs(ConnectFailureTarget.PcName, message));
-                        });
-                        return;
-                    }
+                            _pendingConnectNeedsRestore = true;
+                        }
 
-                    syncHelper.Endpoint?.ConnectToMachine(pcName, securityKey);
-                    await syncHelper.Stream.FlushAsync();
+                        await syncHelper.Endpoint.ConnectToMachineAsync(pcName, securityKey);
+                        lock (_connectPendingLock)
+                        {
+                            _pendingConnectMachineName = pcName;
+                            _pendingConnectStartTimeUtc = DateTime.UtcNow;
+                        }
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Couldn't submit Mouse Without Borders connection request: {ex}");
+                ClearPendingConnect();
+                await RestorePreviousConnectionIfNeededAsync();
+                ReportConnectionFailure(null);
             }
         }
 
@@ -571,18 +578,18 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
         }
 
-        private async Task RestorePreviousSecurityKeyIfNeededAsync()
+        private async Task<bool> RestorePreviousConnectionIfNeededAsync()
         {
-            string previousKey;
+            bool needsRestore;
             lock (_connectPendingLock)
             {
-                previousKey = _pendingConnectPreviousSecurityKey;
-                _pendingConnectPreviousSecurityKey = null;
+                needsRestore = _pendingConnectNeedsRestore;
+                _pendingConnectNeedsRestore = false;
             }
 
-            if (string.IsNullOrEmpty(previousKey))
+            if (!needsRestore)
             {
-                return;
+                return true;
             }
 
             try
@@ -591,22 +598,39 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 {
                     using (var syncHelper = await GetSettingsSyncHelperAsync())
                     {
-                        syncHelper?.Endpoint?.RestoreSecurityKey(previousKey);
-                        var task = syncHelper?.Stream.FlushAsync();
-                        if (task != null)
+                        if (syncHelper == null)
                         {
-                            await task;
+                            throw new InvalidOperationException("Mouse Without Borders module is unavailable for connection rollback.");
                         }
+
+                        await syncHelper.Endpoint.RestorePreviousConnectionAsync();
                     }
                 }
+
+                return true;
             }
             catch (Exception ex)
             {
-                // This is invoked fire-and-forget from CheckPendingConnectStatus, so make sure a failure
-                // here (e.g. the pipe breaking mid-flush) is logged instead of becoming an unobserved
-                // task exception.
-                Logger.LogError($"Couldn't restore the previous security key after a failed connect attempt: {ex}");
+                Logger.LogError($"Couldn't restore the previous connection after a failed connect attempt: {ex}");
+                return false;
             }
+        }
+
+        private void ReportConnectionFailure(SocketStatus? status, bool wasSubmitted = true)
+        {
+            _uiDispatcherQueue.TryEnqueue(DispatcherQueuePriority.Normal, () =>
+            {
+                IsConnecting = false;
+                var message = status.HasValue
+                    ? GetConnectionErrorMessage(status.Value)
+                    : ResourceLoaderInstance.ResourceLoader.GetString(wasSubmitted
+                        ? "MouseWithoutBorders_ConnectErrorModuleDisconnected"
+                        : "MouseWithoutBorders_ConnectErrorModuleUnreachable");
+                ConnectionErrorMessage = message;
+                ShowConnectionError = true;
+                var target = status == SocketStatus.InvalidKey ? ConnectFailureTarget.SecurityKey : ConnectFailureTarget.PcName;
+                ConnectionFailed?.Invoke(this, new ConnectFailedEventArgs(target, message));
+            });
         }
 
         private static string GetConnectionErrorMessage(SocketStatus status)
@@ -691,7 +715,6 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                         catch (Exception ex)
                         {
                             Logger.LogInfo($"Poll ISettingsSyncHelper.MachineSocketState error: {ex}");
-                            continue;
                         }
 
                         if (states != null)
@@ -717,7 +740,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                             }
                         }
 
-                        CheckPendingConnectStatus(states);
+                        await CheckPendingConnectStatusAsync(states);
 
                         Thread.Sleep(500);
                     }
@@ -725,7 +748,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 _cancellationTokenSource.Token);
         }
 
-        private void CheckPendingConnectStatus(Dictionary<string, ISettingsSyncHelper.MachineSocketState> states)
+        private async Task CheckPendingConnectStatusAsync(Dictionary<string, ISettingsSyncHelper.MachineSocketState> states)
         {
             string pendingName;
             DateTime pendingStartTimeUtc;
@@ -752,7 +775,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 ClearPendingConnect();
                 lock (_connectPendingLock)
                 {
-                    _pendingConnectPreviousSecurityKey = null;
+                    _pendingConnectNeedsRestore = false;
                 }
 
                 _uiDispatcherQueue.TryEnqueue(DispatcherQueuePriority.Normal, () =>
@@ -765,35 +788,19 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
             else if (pendingStatus is SocketStatus.Error or SocketStatus.ForceClosed or SocketStatus.InvalidKey or SocketStatus.Timeout or SocketStatus.SendError or SocketStatus.HostNotFound)
             {
-                var failedStatus = pendingStatus.Value;
                 ClearPendingConnect();
-                _ = RestorePreviousSecurityKeyIfNeededAsync();
-                _uiDispatcherQueue.TryEnqueue(DispatcherQueuePriority.Normal, () =>
-                {
-                    IsConnecting = false;
-                    var message = GetConnectionErrorMessage(failedStatus);
-                    ConnectionErrorMessage = message;
-                    ShowConnectionError = true;
-                    var target = failedStatus == SocketStatus.InvalidKey ? ConnectFailureTarget.SecurityKey : ConnectFailureTarget.PcName;
-                    ConnectionFailed?.Invoke(this, new ConnectFailedEventArgs(target, message));
-                });
+                var restored = await RestorePreviousConnectionIfNeededAsync();
+                ReportConnectionFailure(restored ? pendingStatus : null);
             }
-            else if (DateTime.UtcNow - pendingStartTimeUtc > TimeSpan.FromSeconds(8))
+            else if (DateTime.UtcNow - pendingStartTimeUtc > ConnectionTimeout)
             {
                 ClearPendingConnect();
-                _ = RestorePreviousSecurityKeyIfNeededAsync();
-                _uiDispatcherQueue.TryEnqueue(DispatcherQueuePriority.Normal, () =>
-                {
-                    IsConnecting = false;
-                    var message = GetConnectionErrorMessage(SocketStatus.Timeout);
-                    ConnectionErrorMessage = message;
-                    ShowConnectionError = true;
-                    ConnectionFailed?.Invoke(this, new ConnectFailedEventArgs(ConnectFailureTarget.PcName, message));
-                });
+                var restored = await RestorePreviousConnectionIfNeededAsync();
+                ReportConnectionFailure(restored && states != null ? SocketStatus.Timeout : null);
             }
             else
             {
-                var elapsedRatio = (DateTime.UtcNow - pendingStartTimeUtc).TotalMilliseconds / 8000.0;
+                var elapsedRatio = (DateTime.UtcNow - pendingStartTimeUtc).TotalMilliseconds / ConnectionTimeout.TotalMilliseconds;
                 var estimatedPercent = (int)Math.Min(90, Math.Max(10, elapsedRatio * 90));
                 var statusText = GetConnectingStatusText(pendingStatus);
                 _uiDispatcherQueue.TryEnqueue(DispatcherQueuePriority.Normal, () =>
