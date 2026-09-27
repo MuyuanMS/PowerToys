@@ -72,6 +72,7 @@ namespace KeyboardManagerEditorUI.Settings
         {
             try
             {
+                DeviceProfilesFile existing = LoadForUpdate();
                 var file = new DeviceProfilesFile
                 {
                     AutoSwitchEnabled = autoSwitchEnabled,
@@ -79,7 +80,7 @@ namespace KeyboardManagerEditorUI.Settings
                         .Where(a => !string.IsNullOrEmpty(a.Device) && !string.IsNullOrEmpty(a.Profile))
                         .Select(a => new DeviceProfileEntry { Device = a.Device, Profile = a.Profile, Name = a.Name })
                         .ToList(),
-                    CycleHotkey = Load().CycleHotkey, // preserve the engine's hotkey definition
+                    CycleHotkey = existing.CycleHotkey,
                 };
 
                 Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
@@ -110,7 +111,7 @@ namespace KeyboardManagerEditorUI.Settings
 
             try
             {
-                DeviceProfilesFile file = Load();
+                DeviceProfilesFile file = LoadForUpdate();
                 int removed = file.Map.RemoveAll(e => string.Equals(e.Profile, profile, StringComparison.Ordinal));
                 if (removed == 0)
                 {
@@ -125,6 +126,23 @@ namespace KeyboardManagerEditorUI.Settings
             {
                 Logger.LogError($"Failed to prune deviceProfiles.json for '{profile}': {ex.Message}");
                 return false;
+            }
+        }
+
+        private static DeviceProfilesFile LoadForUpdate()
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<DeviceProfilesFile>(File.ReadAllText(_filePath), _jsonOptions)
+                       ?? throw new JsonException("deviceProfiles.json contained null.");
+            }
+            catch (FileNotFoundException)
+            {
+                return new DeviceProfilesFile();
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return new DeviceProfilesFile();
             }
         }
 

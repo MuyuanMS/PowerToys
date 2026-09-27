@@ -1303,6 +1303,7 @@ namespace KeyboardManagerEditorUI.Pages
 
         private bool DeleteMappingTransaction(string mappingId)
         {
+            string? displayedProfile = _mappingService?.ConfigurationName;
             using FileStream? transactionLock = SettingsManager.TryAcquireMappingTransactionLock();
             if (transactionLock == null || !SettingsManager.TryReloadSettings())
             {
@@ -1315,7 +1316,8 @@ namespace KeyboardManagerEditorUI.Pages
             }
 
             return !settings.IsActive
-                ? SettingsManager.TryRemoveShortcutKeyMapping(mappingId)
+                ? !string.IsNullOrWhiteSpace(displayedProfile) &&
+                    SettingsManager.TryRemoveShortcutKeyMapping(mappingId, displayedProfile)
                 : ExecuteMappingTransaction(
                     candidate => DeleteMapping(candidate, settings.Shortcut),
                     candidate => SettingsManager.TryRemoveShortcutKeyMapping(mappingId, candidate.ConfigurationName));
