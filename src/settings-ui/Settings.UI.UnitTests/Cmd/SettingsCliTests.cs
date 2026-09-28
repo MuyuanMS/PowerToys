@@ -122,7 +122,7 @@ public class SettingsCliTests
     [TestMethod]
     public void TestSetModuleEnabledRejectsWhenSettingsAreLocked()
     {
-        Assert.ThrowsException<InvalidOperationException>(() =>
+        Assert.ThrowsException<IOException>(() =>
             SettingsCliHelper.SetModuleEnabled(
                 "FancyZones",
                 enabled: false,
