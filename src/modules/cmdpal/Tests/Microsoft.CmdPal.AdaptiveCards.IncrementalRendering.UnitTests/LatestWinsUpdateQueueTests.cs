@@ -74,6 +74,37 @@ public sealed class LatestWinsUpdateQueueTests
     }
 
     [TestMethod]
+    public async Task ProcessorCancellationCancelsActiveUpdateAndRunsPendingUpdate()
+    {
+        var firstStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirst = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var processed = new List<int>();
+        var queue = new LatestWinsUpdateQueue<int>(async update =>
+        {
+            if (update == 1)
+            {
+                firstStarted.TrySetResult();
+                await releaseFirst.Task;
+                throw new OperationCanceledException();
+            }
+
+            processed.Add(update);
+        });
+
+        var first = queue.EnqueueAsync(1);
+        await firstStarted.Task;
+        var pending = queue.EnqueueAsync(2);
+        releaseFirst.TrySetResult();
+
+        await Assert.ThrowsExactlyAsync<TaskCanceledException>(async () => await first);
+        await pending;
+        Assert.HasCount(1, processed);
+        Assert.AreEqual(2, processed[0]);
+    }
+
+    [TestMethod]
     public async Task ProcessorFailureDoesNotStopNewestPendingUpdate()
     {
         var processed = new List<int>();

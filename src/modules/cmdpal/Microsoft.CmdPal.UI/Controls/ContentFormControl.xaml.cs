@@ -135,7 +135,15 @@ public sealed partial class ContentFormControl : UserControl
         try
         {
             await _cardUpdater.UpdateAsync(card);
-            AttachRenderedCard(_cardUpdater.RenderedCard);
+            var renderedCard = _cardUpdater.RenderedCard;
+            var retainedRoot = ReferenceEquals(_attachedRenderedCard, renderedCard)
+                ? renderedCard?.FrameworkElement as FrameworkElement
+                : null;
+            AttachRenderedCard(renderedCard);
+            if (retainedRoot is not null)
+            {
+                FixToggleAccessibilityNames(retainedRoot);
+            }
         }
         catch (OperationCanceledException)
         {
