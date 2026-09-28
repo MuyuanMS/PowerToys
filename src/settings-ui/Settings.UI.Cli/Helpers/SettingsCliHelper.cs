@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
@@ -119,10 +120,17 @@ internal static class SettingsCliHelper
         string moduleName,
         bool enabled,
         SettingsUtils? settingsUtils = null,
-        Func<string, bool?>? gpoEnabledStateProvider = null)
+        Func<string, bool?>? gpoEnabledStateProvider = null,
+        Func<bool>? runnerIsRunningProvider = null)
     {
         settingsUtils ??= SettingsUtils.Default;
         gpoEnabledStateProvider ??= GetModuleGpoEnabledState;
+        runnerIsRunningProvider ??= IsRunnerRunning;
+        if (runnerIsRunningProvider())
+        {
+            throw new InvalidOperationException("PowerToys is running. Exit PowerToys before changing module state so Runner cannot overwrite the CLI update when it shuts down.");
+        }
+
         var moduleEntry = GetModuleEntry(moduleName, settingsUtils, gpoEnabledStateProvider);
 
         CheckModuleGpoLock(moduleEntry.ModuleName, gpoEnabledStateProvider);
@@ -176,6 +184,24 @@ internal static class SettingsCliHelper
             GpoRuleConfigured.Disabled => false,
             _ => null,
         };
+    }
+
+    private static bool IsRunnerRunning()
+    {
+        using var currentProcess = Process.GetCurrentProcess();
+        var currentSessionId = currentProcess.SessionId;
+        var processes = Process.GetProcessesByName("PowerToys");
+        try
+        {
+            return processes.Any(process => process.SessionId == currentSessionId);
+        }
+        finally
+        {
+            foreach (var process in processes)
+            {
+                process.Dispose();
+            }
+        }
     }
 
     private sealed record ModuleEntry(string ModuleName, bool Enabled);

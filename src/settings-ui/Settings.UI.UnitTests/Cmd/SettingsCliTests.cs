@@ -100,6 +100,18 @@ public class SettingsCliTests
                 _ => null));
     }
 
+    [TestMethod]
+    public void TestSetModuleEnabledRejectsWhenRunnerIsRunning()
+    {
+        Assert.ThrowsException<InvalidOperationException>(() =>
+            SettingsCliHelper.SetModuleEnabled(
+                "FancyZones",
+                enabled: false,
+                settingsUtils,
+                _ => null,
+                () => true));
+    }
+
     [DataTestMethod]
     [DataRow("enable")]
     [DataRow("disable")]
