@@ -36,6 +36,7 @@ public class SettingsCliTests
         Assert.IsTrue(modules.Count > 0);
         Assert.IsTrue(modules.ContainsKey("FancyZones"));
         Assert.IsTrue(modules.ContainsKey("AlwaysOnTop"));
+        Assert.IsFalse(settingsUtils.SettingsExists());
     }
 
     [TestMethod]
