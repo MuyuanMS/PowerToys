@@ -321,7 +321,7 @@ public static partial class ClipboardHelper
         thread.Start();
         thread.Join();
 
-        if (exception is not null)
+        if (!succeeded && exception is not null)
         {
             throw exception;
         }
