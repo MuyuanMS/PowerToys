@@ -126,8 +126,8 @@ namespace
                     running = false;
                 }
 
-                // Ignored injected input still wakes the hook thread. Do not require a quiet
-                // message queue to evaluate the physical-input idle deadline.
+                // Input and posted messages can keep the hook thread awake. Do not require a
+                // quiet message queue to evaluate the idle deadline.
                 if (running && m_error == ERROR_SUCCESS)
                 {
                     QueueAction(m_state.OnTimer(GetTickCount64(), GetCursorPosition()));

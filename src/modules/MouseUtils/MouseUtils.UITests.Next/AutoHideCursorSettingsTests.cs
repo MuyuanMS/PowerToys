@@ -212,7 +212,8 @@ public class AutoHideCursorSettingsTests : UITestBase
 
             Assert.IsTrue(
                 SpinWait.SpinUntil(
-                    () => injectedPairs > 20 && (!floodMessageQueue || postedMessages > 256),
+                    () => Volatile.Read(ref injectedPairs) > 20 &&
+                          (!floodMessageQueue || Volatile.Read(ref postedMessages) > 256),
                     5_000),
                 "The injected-input workload did not reach the expected volume.");
             stopInput.Cancel();
