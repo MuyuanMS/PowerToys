@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using AdaptiveCards.ObjectModel.WinUI3;
 using AdaptiveCards.Rendering.WinUI3;
 using Microsoft.UI.Dispatching;
@@ -60,6 +61,52 @@ public sealed class IncrementalAdaptiveCardUpdaterTests
             Assert.IsNull(updater.RenderedCard);
             Assert.IsNull(host.Child);
         });
+    }
+
+    [TestMethod]
+    public async Task UnsupportedCardChangeReplacesRootAndRetainsNewCard()
+    {
+        await RunOnDedicatedDispatcherAsync(async () =>
+        {
+            var host = new Border();
+            var updater = new IncrementalAdaptiveCardUpdater(new AdaptiveCardRenderer(), host);
+            var initial = ParseCard("""{"type":"AdaptiveCard","version":"1.5","body":[{"type":"TextBlock","text":"hello"}]}""");
+            var withAction = ParseCard("""{"type":"AdaptiveCard","version":"1.5","body":[{"type":"TextBlock","text":"hello"}],"actions":[{"type":"Action.Submit","title":"Submit"}]}""");
+
+            await updater.UpdateAsync(initial);
+            var firstRoot = host.Child;
+            await updater.UpdateAsync(withAction);
+
+            Assert.AreNotSame(firstRoot, host.Child);
+            Assert.AreSame(withAction, updater.Card);
+            Assert.AreSame(host.Child, updater.RenderedCard?.FrameworkElement);
+        });
+    }
+
+    [TestMethod]
+    public void JsonSnapshotFailureDisablesIncrementalUpdate()
+    {
+        var snapshot = IncrementalAdaptiveCardUpdater.TryCreateSnapshot(
+            () => throw new JsonException("Test snapshot failure"));
+
+        Assert.IsNull(snapshot);
+    }
+
+    [TestMethod]
+    public void ComSnapshotFailureDisablesIncrementalUpdate()
+    {
+        var snapshot = IncrementalAdaptiveCardUpdater.TryCreateSnapshot(
+            () => throw Marshal.GetExceptionForHR(unchecked((int)0x80004005))!);
+
+        Assert.IsNull(snapshot);
+    }
+
+    [TestMethod]
+    public void UnexpectedSnapshotFailureIsNotSuppressed()
+    {
+        Assert.ThrowsExactly<InvalidOperationException>(() =>
+            IncrementalAdaptiveCardUpdater.TryCreateSnapshot(
+                () => throw new InvalidOperationException("Test failure")));
     }
 
     private static AdaptiveCard ParseCard(string json)
