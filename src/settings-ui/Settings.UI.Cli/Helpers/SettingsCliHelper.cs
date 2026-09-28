@@ -4,7 +4,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
@@ -121,19 +121,16 @@ internal static class SettingsCliHelper
         bool enabled,
         SettingsUtils? settingsUtils = null,
         Func<string, bool?>? gpoEnabledStateProvider = null,
-        Func<bool>? runnerIsRunningProvider = null)
+        Func<IDisposable>? settingsLockProvider = null)
     {
         settingsUtils ??= SettingsUtils.Default;
         gpoEnabledStateProvider ??= GetModuleGpoEnabledState;
-        runnerIsRunningProvider ??= IsRunnerRunning;
+        settingsLockProvider ??= () => AcquireSettingsFileLock(settingsUtils);
         var moduleEntry = GetModuleEntry(moduleName, settingsUtils, gpoEnabledStateProvider);
 
         CheckModuleGpoLock(moduleEntry.ModuleName, gpoEnabledStateProvider);
 
-        if (runnerIsRunningProvider())
-        {
-            throw new InvalidOperationException("PowerToys is running. Exit PowerToys before changing module state so Runner cannot overwrite the CLI update when it shuts down.");
-        }
+        using var settingsLock = settingsLockProvider();
 
         SetSettingCommandLineCommand.ExecuteAndThrowOnSaveFailure(
             $"GeneralSettings.Enabled.{moduleEntry.ModuleName}",
@@ -186,21 +183,19 @@ internal static class SettingsCliHelper
         };
     }
 
-    private static bool IsRunnerRunning()
+    private static IDisposable AcquireSettingsFileLock(SettingsUtils settingsUtils)
     {
-        using var currentProcess = Process.GetCurrentProcess();
-        var currentSessionId = currentProcess.SessionId;
-        var processes = Process.GetProcessesByName("PowerToys");
         try
         {
-            return processes.Any(process => process.SessionId == currentSessionId);
+            return new FileStream(
+                settingsUtils.GetSettingsFilePath() + ".cli-lock",
+                FileMode.OpenOrCreate,
+                FileAccess.ReadWrite,
+                FileShare.None);
         }
-        finally
+        catch (IOException ex)
         {
-            foreach (var process in processes)
-            {
-                process.Dispose();
-            }
+            throw new InvalidOperationException("PowerToys is starting or running. Retry the command after PowerToys exits.", ex);
         }
     }
 

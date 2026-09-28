@@ -48,13 +48,13 @@ public class SettingsCliTests
     [TestMethod]
     public void TestSetModuleEnabled()
     {
-        var disabledState = SettingsCliHelper.SetModuleEnabled("FancyZones", enabled: false, settingsUtils, _ => null, () => false);
+        var disabledState = SettingsCliHelper.SetModuleEnabled("FancyZones", enabled: false, settingsUtils, _ => null, () => EmptyDisposable.Instance);
         Assert.IsFalse(disabledState.Enabled);
 
         var modulesAfterDisable = SettingsCliHelper.GetModulesAndStatus(settingsUtils, _ => null);
         Assert.IsFalse(modulesAfterDisable["FancyZones"]);
 
-        var enabledState = SettingsCliHelper.SetModuleEnabled("FancyZones", enabled: true, settingsUtils, _ => null, () => false);
+        var enabledState = SettingsCliHelper.SetModuleEnabled("FancyZones", enabled: true, settingsUtils, _ => null, () => EmptyDisposable.Instance);
         Assert.IsTrue(enabledState.Enabled);
     }
 
@@ -79,14 +79,14 @@ public class SettingsCliTests
                 enabled: true,
                 settingsUtils,
                 _ => false,
-                () => false));
+                () => EmptyDisposable.Instance));
         Assert.ThrowsException<InvalidOperationException>(() =>
             SettingsCliHelper.SetModuleEnabled(
                 "FancyZones",
                 enabled: false,
                 settingsUtils,
                 _ => true,
-                () => false));
+                () => EmptyDisposable.Instance));
     }
 
     [TestMethod]
@@ -100,11 +100,11 @@ public class SettingsCliTests
                 enabled: false,
                 failingSettingsUtils,
                 _ => null,
-                () => false));
+                () => EmptyDisposable.Instance));
     }
 
     [TestMethod]
-    public void TestSetModuleEnabledRejectsWhenRunnerIsRunning()
+    public void TestSetModuleEnabledRejectsWhenSettingsAreLocked()
     {
         Assert.ThrowsException<InvalidOperationException>(() =>
             SettingsCliHelper.SetModuleEnabled(
@@ -112,7 +112,16 @@ public class SettingsCliTests
                 enabled: false,
                 settingsUtils,
                 _ => null,
-                () => true));
+                () => throw new IOException("Settings lock is held.")));
+    }
+
+    private sealed class EmptyDisposable : IDisposable
+    {
+        public static EmptyDisposable Instance { get; } = new();
+
+        public void Dispose()
+        {
+        }
     }
 
     [DataTestMethod]
