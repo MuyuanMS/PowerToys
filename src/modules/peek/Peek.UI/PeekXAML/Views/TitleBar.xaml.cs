@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
+using System.Windows.Input;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -57,6 +58,27 @@ namespace Peek.UI.Views
                typeof(TitleBar),
                new PropertyMetadata(null, (d, e) => ((TitleBar)d).OnNumberOfFilesPropertyChanged()));
 
+        public static readonly DependencyProperty ShortcutNameProperty =
+            DependencyProperty.Register(
+                nameof(ShortcutName),
+                typeof(string),
+                typeof(TitleBar),
+                new PropertyMetadata(string.Empty, (d, e) => ((TitleBar)d).OnShortcutPropertyChanged()));
+
+        public static readonly DependencyProperty IsPreviewingShortcutTargetProperty =
+            DependencyProperty.Register(
+                nameof(IsPreviewingShortcutTarget),
+                typeof(bool),
+                typeof(TitleBar),
+                new PropertyMetadata(false, (d, e) => ((TitleBar)d).OnShortcutPropertyChanged()));
+
+        public static readonly DependencyProperty ShowSelectedItemCommandProperty =
+            DependencyProperty.Register(
+                nameof(ShowSelectedItemCommand),
+                typeof(ICommand),
+                typeof(TitleBar),
+                new PropertyMetadata(null, (d, e) => ((TitleBar)d).OnShortcutPropertyChanged()));
+
         [ObservableProperty]
         private string openWithAppText = ResourceLoaderInstance.ResourceLoader.GetString("LaunchAppButton_OpenWith_Text");
 
@@ -75,12 +97,22 @@ namespace Peek.UI.Views
         [ObservableProperty]
         private bool pinned = false;
 
+        [ObservableProperty]
+        private Visibility shortcutButtonVisibility = Visibility.Collapsed;
+
+        [ObservableProperty]
+        private string shortcutButtonToolTip = string.Empty;
+
+        [ObservableProperty]
+        private ICommand? shortcutButtonCommand;
+
         public TitleBar()
         {
             InitializeComponent();
             TitleBarRootContainer.SizeChanged += TitleBarRootContainer_SizeChanged;
 
-            LaunchAppButton.RegisterPropertyChangedCallback(VisibilityProperty, LaunchAppButtonVisibilityChangedCallback);
+            LaunchAppButton.RegisterPropertyChangedCallback(VisibilityProperty, ButtonVisibilityChangedCallback);
+            ShortcutButton.RegisterPropertyChangedCallback(VisibilityProperty, ButtonVisibilityChangedCallback);
         }
 
         public IFileSystemItem Item
@@ -106,6 +138,26 @@ namespace Peek.UI.Views
             get => (int)GetValue(NumberOfFilesProperty);
             set => SetValue(NumberOfFilesProperty, value);
         }
+
+        public string ShortcutName
+        {
+            get => (string)GetValue(ShortcutNameProperty);
+            set => SetValue(ShortcutNameProperty, value);
+        }
+
+        public bool IsPreviewingShortcutTarget
+        {
+            get => (bool)GetValue(IsPreviewingShortcutTargetProperty);
+            set => SetValue(IsPreviewingShortcutTargetProperty, value);
+        }
+
+        public ICommand ShowSelectedItemCommand
+        {
+            get => (ICommand)GetValue(ShowSelectedItemCommandProperty);
+            set => SetValue(ShowSelectedItemCommandProperty, value);
+        }
+
+        public string ShortcutButtonText => ResourceLoaderInstance.ResourceLoader.GetString("ShortcutButton_Text");
 
         private Window? MainWindow { get; set; }
 
@@ -255,6 +307,20 @@ namespace Peek.UI.Views
             FileName = Item?.Name ?? string.Empty;
         }
 
+        /// <summary>
+        /// Keeps the shortcut toggle in sync with the item that is being previewed.
+        /// </summary>
+        private void OnShortcutPropertyChanged()
+        {
+            // The button is only shown while a target is previewed: it takes the user back to the
+            // shortcut that was selected in File Explorer.
+            bool isVisible = IsPreviewingShortcutTarget && !string.IsNullOrEmpty(ShortcutName);
+
+            ShortcutButtonVisibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+            ShortcutButtonToolTip = ReadableStringHelper.FormatResourceString("ShortcutButton_ToolTip", ShortcutName);
+            ShortcutButtonCommand = ShowSelectedItemCommand;
+        }
+
         private void OnFileIndexPropertyChanged()
         {
             UpdateFileCountText();
@@ -305,7 +371,7 @@ namespace Peek.UI.Views
         /// <summary>
         /// Ensure the drag region of the title bar is updated when the visibility of the launch app button changes.
         /// </summary>
-        private async void LaunchAppButtonVisibilityChangedCallback(DependencyObject sender, DependencyProperty dp)
+        private async void ButtonVisibilityChangedCallback(DependencyObject sender, DependencyProperty dp)
         {
             // Ensure the ActualWidth is updated
             await Task.Delay(100);
