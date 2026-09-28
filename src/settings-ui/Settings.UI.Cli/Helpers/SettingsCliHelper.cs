@@ -126,14 +126,14 @@ internal static class SettingsCliHelper
         settingsUtils ??= SettingsUtils.Default;
         gpoEnabledStateProvider ??= GetModuleGpoEnabledState;
         runnerIsRunningProvider ??= IsRunnerRunning;
+        var moduleEntry = GetModuleEntry(moduleName, settingsUtils, gpoEnabledStateProvider);
+
+        CheckModuleGpoLock(moduleEntry.ModuleName, gpoEnabledStateProvider);
+
         if (runnerIsRunningProvider())
         {
             throw new InvalidOperationException("PowerToys is running. Exit PowerToys before changing module state so Runner cannot overwrite the CLI update when it shuts down.");
         }
-
-        var moduleEntry = GetModuleEntry(moduleName, settingsUtils, gpoEnabledStateProvider);
-
-        CheckModuleGpoLock(moduleEntry.ModuleName, gpoEnabledStateProvider);
 
         SetSettingCommandLineCommand.ExecuteAndThrowOnSaveFailure(
             $"GeneralSettings.Enabled.{moduleEntry.ModuleName}",

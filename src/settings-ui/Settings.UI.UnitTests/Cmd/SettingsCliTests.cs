@@ -48,13 +48,13 @@ public class SettingsCliTests
     [TestMethod]
     public void TestSetModuleEnabled()
     {
-        var disabledState = SettingsCliHelper.SetModuleEnabled("FancyZones", enabled: false, settingsUtils, _ => null);
+        var disabledState = SettingsCliHelper.SetModuleEnabled("FancyZones", enabled: false, settingsUtils, _ => null, () => false);
         Assert.IsFalse(disabledState.Enabled);
 
         var modulesAfterDisable = SettingsCliHelper.GetModulesAndStatus(settingsUtils, _ => null);
         Assert.IsFalse(modulesAfterDisable["FancyZones"]);
 
-        var enabledState = SettingsCliHelper.SetModuleEnabled("FancyZones", enabled: true, settingsUtils, _ => null);
+        var enabledState = SettingsCliHelper.SetModuleEnabled("FancyZones", enabled: true, settingsUtils, _ => null, () => false);
         Assert.IsTrue(enabledState.Enabled);
     }
 
@@ -78,13 +78,15 @@ public class SettingsCliTests
                 "FancyZones",
                 enabled: true,
                 settingsUtils,
-                _ => false));
+                _ => false,
+                () => false));
         Assert.ThrowsException<InvalidOperationException>(() =>
             SettingsCliHelper.SetModuleEnabled(
                 "FancyZones",
                 enabled: false,
                 settingsUtils,
-                _ => true));
+                _ => true,
+                () => false));
     }
 
     [TestMethod]
@@ -97,7 +99,8 @@ public class SettingsCliTests
                 "FancyZones",
                 enabled: false,
                 failingSettingsUtils,
-                _ => null));
+                _ => null,
+                () => false));
     }
 
     [TestMethod]
