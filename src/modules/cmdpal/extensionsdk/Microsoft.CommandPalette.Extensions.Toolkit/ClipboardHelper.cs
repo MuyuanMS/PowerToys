@@ -21,7 +21,10 @@ public static partial class ClipboardHelper
 
     public static void SetText(string text)
     {
-        ExecuteOnStaThread(() => SetClipboardData(Tuple.Create(text, CF_UNICODETEXT)));
+        if (!ExecuteOnStaThread(() => SetClipboardData(Tuple.Create(text, CF_UNICODETEXT))))
+        {
+            throw new InvalidOperationException("Failed to set clipboard text.");
+        }
     }
 
     public static void SetRtf(string plainText, string rtfText)
@@ -31,9 +34,12 @@ public static partial class ClipboardHelper
             s_CF_RTF = RegisterClipboardFormat("Rich Text Format");
         }
 
-        ExecuteOnStaThread(() => SetClipboardData(
+        if (!ExecuteOnStaThread(() => SetClipboardData(
             Tuple.Create(plainText, CF_UNICODETEXT),
-            Tuple.Create(rtfText, s_CF_RTF)));
+            Tuple.Create(rtfText, s_CF_RTF))))
+        {
+            throw new InvalidOperationException("Failed to set clipboard RTF.");
+        }
     }
 
     public static void SetImage(RandomAccessStreamReference image)
@@ -260,34 +266,54 @@ public static partial class ClipboardHelper
         return true;
     }
 
-    private static void ExecuteOnStaThread(Func<bool> action)
+    private static bool ExecuteOnStaThread(Func<bool> action)
     {
         const int RetryCount = 5;
         var tries = 0;
+        Exception? exception = null;
 
         if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
         {
-            while (tries++ < RetryCount && !action())
+            while (tries++ < RetryCount)
             {
-                // wait until RetryCount or action
-            }
-
-            return;
-        }
-
-        Exception? exception = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                while (tries++ < RetryCount && !action())
+                try
                 {
-                    // wait until RetryCount or action
+                    if (action())
+                    {
+                        return true;
+                    }
+                }
+                catch (Exception e)
+                {
+                    exception = e;
                 }
             }
-            catch (Exception e)
+
+            if (exception is not null)
             {
-                exception = e;
+                throw exception;
+            }
+
+            return false;
+        }
+
+        var succeeded = false;
+        var thread = new Thread(() =>
+        {
+            while (tries++ < RetryCount)
+            {
+                try
+                {
+                    if (action())
+                    {
+                        succeeded = true;
+                        return;
+                    }
+                }
+                catch (Exception e)
+                {
+                    exception = e;
+                }
             }
         });
 
@@ -299,5 +325,7 @@ public static partial class ClipboardHelper
         {
             throw exception;
         }
+
+        return succeeded;
     }
 }
