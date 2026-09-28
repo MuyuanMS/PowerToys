@@ -12,6 +12,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Data;
+using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.System;
@@ -136,6 +137,9 @@ public sealed partial class ContentFormControl : UserControl
             await _cardUpdater.UpdateAsync(card);
             AttachRenderedCard(_cardUpdater.RenderedCard);
         }
+        catch (OperationCanceledException)
+        {
+        }
         catch (Exception ex)
         {
             Logger.LogError("Failed to update an Adaptive Card", ex);
@@ -234,10 +238,15 @@ public sealed partial class ContentFormControl : UserControl
                     var label = FindAdjacentLabel(toggle);
                     if (label is not null)
                     {
+                        var bindingSource = label.Inlines.Count == 1 && label.Inlines[0] is Run run
+                            ? (object)run
+                            : label;
                         toggle.SetBinding(AutomationProperties.NameProperty, new Binding
                         {
-                            Source = label,
-                            Path = new PropertyPath(nameof(TextBlock.Text)),
+                            Source = bindingSource,
+                            Path = new PropertyPath(bindingSource is Run
+                                ? nameof(Run.Text)
+                                : nameof(TextBlock.Text)),
                             Mode = BindingMode.OneWay,
                         });
                     }
@@ -290,7 +299,10 @@ public sealed partial class ContentFormControl : UserControl
         {
             var child = VisualTreeHelper.GetChild(root, i);
 
-            if (child is TextBlock tb && !string.IsNullOrWhiteSpace(tb.Text))
+            if (child is TextBlock tb
+                && (!string.IsNullOrWhiteSpace(tb.Text)
+                    || (tb.Inlines.Count == 1 && tb.Inlines[0] is Run run
+                        && !string.IsNullOrWhiteSpace(run.Text))))
             {
                 return tb;
             }

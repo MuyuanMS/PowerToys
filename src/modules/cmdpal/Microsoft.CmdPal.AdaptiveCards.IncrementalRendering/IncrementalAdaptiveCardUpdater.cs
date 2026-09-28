@@ -136,6 +136,7 @@ public sealed partial class IncrementalAdaptiveCardUpdater
                     plan,
                     cancellationToken))
             {
+                // The retained renderer and its UserInputs still belong to the original card.
                 _snapshot = candidateSnapshot;
                 return;
             }

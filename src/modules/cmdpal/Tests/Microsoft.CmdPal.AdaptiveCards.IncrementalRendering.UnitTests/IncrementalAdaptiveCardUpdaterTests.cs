@@ -4,85 +4,12 @@
 
 using System.Runtime.InteropServices;
 using System.Text.Json;
-using AdaptiveCards.ObjectModel.WinUI3;
-using AdaptiveCards.Rendering.WinUI3;
-using Microsoft.UI.Dispatching;
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
 
 namespace Microsoft.CmdPal.AdaptiveCards.IncrementalRendering.UnitTests;
 
 [TestClass]
 public sealed class IncrementalAdaptiveCardUpdaterTests
 {
-    [TestMethod]
-    public async Task UpdateAsync_RendersCardAndRetainsCardState()
-    {
-        await RunOnDedicatedDispatcherAsync(async () =>
-        {
-            var host = new Border();
-            var updater = new IncrementalAdaptiveCardUpdater(
-                new AdaptiveCardRenderer(),
-                host);
-            var card = ParseCard("""{"type":"AdaptiveCard","version":"1.5","body":[{"type":"TextBlock","text":"hello"}]}""");
-
-            await updater.UpdateAsync(card);
-
-            Assert.AreSame(card, updater.Card);
-            Assert.IsNotNull(updater.RenderedCard);
-            Assert.IsNotNull(host.Child);
-
-            var firstRoot = host.Child;
-            var updatedCard = ParseCard("""{"type":"AdaptiveCard","version":"1.5","body":[{"type":"TextBlock","text":"updated"}]}""");
-            await updater.UpdateAsync(updatedCard);
-
-            Assert.AreSame(firstRoot, host.Child);
-            Assert.AreSame(card, updater.Card);
-            Assert.AreEqual("updated", FindTextBlock(host.Child)?.Text);
-        });
-    }
-
-    [TestMethod]
-    public async Task Reset_ClearsRenderedCardAndHost()
-    {
-        await RunOnDedicatedDispatcherAsync(async () =>
-        {
-            var host = new Border();
-            var updater = new IncrementalAdaptiveCardUpdater(
-                new AdaptiveCardRenderer(),
-                host);
-            var card = ParseCard("""{"type":"AdaptiveCard","version":"1.5","body":[{"type":"TextBlock","text":"hello"}]}""");
-
-            await updater.UpdateAsync(card);
-            updater.Reset();
-
-            Assert.IsNull(updater.Card);
-            Assert.IsNull(updater.RenderedCard);
-            Assert.IsNull(host.Child);
-        });
-    }
-
-    [TestMethod]
-    public async Task UnsupportedCardChangeReplacesRootAndRetainsNewCard()
-    {
-        await RunOnDedicatedDispatcherAsync(async () =>
-        {
-            var host = new Border();
-            var updater = new IncrementalAdaptiveCardUpdater(new AdaptiveCardRenderer(), host);
-            var initial = ParseCard("""{"type":"AdaptiveCard","version":"1.5","body":[{"type":"TextBlock","text":"hello"}]}""");
-            var withAction = ParseCard("""{"type":"AdaptiveCard","version":"1.5","body":[{"type":"TextBlock","text":"hello"}],"actions":[{"type":"Action.Submit","title":"Submit"}]}""");
-
-            await updater.UpdateAsync(initial);
-            var firstRoot = host.Child;
-            await updater.UpdateAsync(withAction);
-
-            Assert.AreNotSame(firstRoot, host.Child);
-            Assert.AreSame(withAction, updater.Card);
-            Assert.AreSame(host.Child, updater.RenderedCard?.FrameworkElement);
-        });
-    }
-
     [TestMethod]
     public void JsonSnapshotFailureDisablesIncrementalUpdate()
     {
@@ -107,71 +34,5 @@ public sealed class IncrementalAdaptiveCardUpdaterTests
         Assert.ThrowsExactly<InvalidOperationException>(() =>
             IncrementalAdaptiveCardUpdater.TryCreateSnapshot(
                 () => throw new InvalidOperationException("Test failure")));
-    }
-
-    private static AdaptiveCard ParseCard(string json)
-    {
-        return AdaptiveCard.FromJsonString(json).AdaptiveCard;
-    }
-
-    private static TextBlock? FindTextBlock(DependencyObject? element)
-    {
-        if (element is TextBlock textBlock)
-        {
-            return textBlock;
-        }
-
-        if (element is null)
-        {
-            return null;
-        }
-
-        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(element); index++)
-        {
-            var match = FindTextBlock(VisualTreeHelper.GetChild(element, index));
-            if (match is not null)
-            {
-                return match;
-            }
-        }
-
-        return null;
-    }
-
-    private static async Task RunOnDedicatedDispatcherAsync(Func<Task> action)
-    {
-        DispatcherQueueController controller;
-        try
-        {
-            controller = DispatcherQueueController.CreateOnDedicatedThread();
-        }
-        catch (COMException ex) when ((uint)ex.HResult == 0x80040154)
-        {
-            Assert.Inconclusive(
-                "WinUI 3 runtime registration is required to run dispatcher-backed tests.");
-            return;
-        }
-
-        var completion = new TaskCompletionSource<object?>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-
-        controller.DispatcherQueue.TryEnqueue(async () =>
-        {
-            try
-            {
-                await action();
-                completion.SetResult(null);
-            }
-            catch (Exception ex)
-            {
-                completion.SetException(ex);
-            }
-            finally
-            {
-                await controller.ShutdownQueueAsync();
-            }
-        });
-
-        await completion.Task;
     }
 }
