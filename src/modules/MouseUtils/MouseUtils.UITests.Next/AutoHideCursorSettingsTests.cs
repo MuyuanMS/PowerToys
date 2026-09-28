@@ -69,7 +69,7 @@ public class AutoHideCursorSettingsTests : UITestBase
     protected override void PrepareTestState()
     {
         var testingIdleDispatch = TestContext.TestName?.StartsWith(
-            nameof(IdleDeadlineSurvivesIgnoredInput), StringComparison.Ordinal) == true;
+            nameof(InjectedInputRestoresHiddenCursorAfterIdle), StringComparison.Ordinal) == true;
         MouseUtilsTestHelper.ReplaceModuleSettings(
             ModuleName,
             CreateSettings(hideOnTyping: !testingIdleDispatch, hideOnIdle: false, idleDelayMs: testingIdleDispatch ? 1000 : 5000));
@@ -210,6 +210,11 @@ public class AutoHideCursorSettingsTests : UITestBase
                 }
             }
 
+            Assert.IsTrue(
+                SpinWait.SpinUntil(
+                    () => injectedPairs > 20 && (!floodMessageQueue || postedMessages > 256),
+                    5_000),
+                "The injected-input workload did not reach the expected volume.");
             stopInput.Cancel();
             input.GetAwaiter().GetResult();
             var hidden = WaitHelper.WaitForStable(
@@ -220,7 +225,7 @@ public class AutoHideCursorSettingsTests : UITestBase
                 pollIntervalMS: 20);
             Assert.IsTrue(hidden.Succeeded, "The cursor did not hide after the idle deadline.");
 
-            MouseHelper.MoveBy(1, 0);
+            MouseHelper.MoveBy(2, 0);
             var restored = WaitHelper.WaitForStable(
                 IsSystemArrowTransparent,
                 transparent => !transparent,
