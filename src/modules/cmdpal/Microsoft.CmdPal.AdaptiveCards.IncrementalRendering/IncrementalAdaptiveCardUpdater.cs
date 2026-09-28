@@ -91,6 +91,11 @@ public sealed partial class IncrementalAdaptiveCardUpdater
         {
             await UpdateCoreAsync(request.Card, cancellation.Token);
         }
+        catch (OperationCanceledException) when (
+            cancellation.IsCancellationRequested
+            && !request.CallerCancellation.IsCancellationRequested)
+        {
+        }
         finally
         {
             _cancelActiveUpdate = null;
@@ -131,18 +136,16 @@ public sealed partial class IncrementalAdaptiveCardUpdater
                     plan,
                     cancellationToken))
             {
-                Card = card;
                 _snapshot = candidateSnapshot;
                 return;
             }
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        ReplaceRenderedCard(
-            card,
-            candidate,
-            candidateRoot,
-            candidateSnapshot);
+        RenderedCard = candidate;
+        Card = card;
+        _snapshot = candidateSnapshot;
+        _host.Child = candidateRoot;
     }
 
     internal static IncrementalTreeSnapshot? TryCreateSnapshot(Func<IncrementalTreeSnapshot> createSnapshot)
@@ -166,18 +169,6 @@ public sealed partial class IncrementalAdaptiveCardUpdater
         RenderedCard = null;
         Card = null;
         _snapshot = null;
-    }
-
-    private void ReplaceRenderedCard(
-        AdaptiveCard card,
-        RenderedAdaptiveCard renderedCard,
-        FrameworkElement renderedRoot,
-        IncrementalTreeSnapshot? snapshot)
-    {
-        RenderedCard = renderedCard;
-        Card = card;
-        _snapshot = snapshot;
-        _host.Child = renderedRoot;
     }
 
     private sealed record UpdateRequest(

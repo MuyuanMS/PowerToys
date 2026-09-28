@@ -38,7 +38,7 @@ public sealed class IncrementalAdaptiveCardUpdaterTests
             await updater.UpdateAsync(updatedCard);
 
             Assert.AreSame(firstRoot, host.Child);
-            Assert.AreSame(updatedCard, updater.Card);
+            Assert.AreSame(card, updater.Card);
             Assert.AreEqual("updated", FindTextBlock(host.Child)?.Text);
         });
     }
