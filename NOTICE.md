@@ -1660,7 +1660,6 @@ litigation is filed.
 - StreamJsonRpc
 - StyleCop.Analyzers
 - ToolGood.Words.Pinyin
-- UnicodeInformation
 - UnitsNet
 - UTF.Unknown
 - WinUIEx

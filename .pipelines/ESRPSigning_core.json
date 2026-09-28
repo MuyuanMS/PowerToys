@@ -353,7 +353,6 @@
                 "vcruntime140_1_app.dll",
                 "vcruntime140_app.dll",
 
-                "UnicodeInformation.dll",
                 "Microsoft.Web.WebView2.Core.dll",
                 "Microsoft.Web.WebView2.WinForms.dll",
                 "Microsoft.Web.WebView2.Wpf.dll",
