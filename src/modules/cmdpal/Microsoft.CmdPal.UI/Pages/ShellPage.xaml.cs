@@ -54,6 +54,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
     IRecipient<GoHomeMessage>,
     IRecipient<GoBackMessage>,
     IRecipient<ShowConfirmationMessage>,
+    IRecipient<ExternalCommandLinkRequestedMessage>,
     IRecipient<ShowToastMessage>,
     IRecipient<NavigateToPageMessage>,
     IRecipient<ShowHideDockMessage>,
@@ -84,6 +85,8 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
     private readonly string _quickAccessShelfChangeOrderDragCaption;
 
     private readonly ISettingsService _settingsService;
+    private readonly ShellContentDialogHost _dialogHost;
+    private readonly ExternalCommandLinkCoordinator _externalCommandLinks;
 
     private readonly IContextMenuFactory _contextMenuFactory;
 
@@ -125,14 +128,11 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
     private Point _quickAccessShelfPendingDragStart;
     private bool _quickAccessShelfStartDragPending;
     private bool _isDisposed;
+    private IHostWindow? _hostWindow;
 
-    public ShellViewModel ViewModel { get; private set; } = App.Current.Services.GetService<ShellViewModel>()!;
+    public ShellViewModel ViewModel { get; private set; }
 
     public QuickAccessShelfViewModel QuickAccessShelf { get; }
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    private IHostWindow? _hostWindow;
 
     public IHostWindow? HostWindow
     {
@@ -170,9 +170,38 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
     // Item keybindings act on the selected item, which is hidden while collapsed — only honor them when expanded.
     private bool ItemActionsAllowed => !_compactMode || ExpandedMode;
 
-    public ShellPage()
+    // Ignore shell shortcuts while a ContentDialog is active.
+    private bool IsContentDialogActive => _dialogHost.IsDialogActive;
+
+    /// <summary>
+    /// Gets the default page animation, depending on the settings
+    /// </summary>
+    private NavigationTransitionInfo DefaultPageAnimation
     {
-        _settingsService = App.Current.Services.GetRequiredService<ISettingsService>();
+        get
+        {
+            var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
+            return settings.DisableAnimations ? _noAnimation : _slideRightTransition;
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public ShellPage()
+        : this(
+            App.Current.Services.GetRequiredService<ShellViewModel>(),
+            App.Current.Services.GetRequiredService<ISettingsService>(),
+            App.Current.Services.GetRequiredService<ExternalCommandLinkCoordinatorFactory>())
+    {
+    }
+
+    internal ShellPage(
+        ShellViewModel viewModel,
+        ISettingsService settingsService,
+        ExternalCommandLinkCoordinatorFactory externalCommandLinkCoordinatorFactory)
+    {
+        ViewModel = viewModel;
+        _settingsService = settingsService;
         _contextMenuFactory = App.Current.Services.GetRequiredService<IContextMenuFactory>();
         var settings = _settingsService.Settings;
         _compactMode = settings.CompactMode;
@@ -196,6 +225,9 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         QuickAccessShelf.VisibleItems.CollectionChanged += QuickAccessShelfVisibleItems_CollectionChanged;
         UpdateQuickAccessShelfOverflowButton();
 
+        _dialogHost = new ShellContentDialogHost(this, SetContentDialogMode);
+        _externalCommandLinks = externalCommandLinkCoordinatorFactory.Create(_dialogHost, DispatcherQueue);
+
         // how we are doing navigation around
         WeakReferenceMessenger.Default.Register<NavigateBackMessage>(this);
         WeakReferenceMessenger.Default.Register<OpenSettingsMessage>(this);
@@ -212,6 +244,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         WeakReferenceMessenger.Default.Register<GoHomeMessage>(this);
         WeakReferenceMessenger.Default.Register<GoBackMessage>(this);
         WeakReferenceMessenger.Default.Register<ShowConfirmationMessage>(this);
+        WeakReferenceMessenger.Default.Register<ExternalCommandLinkRequestedMessage>(this);
         WeakReferenceMessenger.Default.Register<ShowToastMessage>(this);
         WeakReferenceMessenger.Default.Register<NavigateToPageMessage>(this);
 
@@ -245,18 +278,6 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         {
             _dockWindowManager = App.Current.Services.GetService<DockWindowManager>();
             _dockWindowManager?.ShowDocks();
-        }
-    }
-
-    /// <summary>
-    /// Gets the default page animation, depending on the settings
-    /// </summary>
-    private NavigationTransitionInfo DefaultPageAnimation
-    {
-        get
-        {
-            var settings = App.Current.Services.GetRequiredService<ISettingsService>().Settings;
-            return settings.DisableAnimations ? _noAnimation : _slideRightTransition;
         }
     }
 
@@ -332,6 +353,21 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         });
     }
 
+    public void Receive(ExternalCommandLinkRequestedMessage message) => _externalCommandLinks.Enqueue(message.Route);
+
+    private void SetContentDialogMode(bool active)
+    {
+        WeakReferenceMessenger.Default.Send(new MaximizeForDialogMessage(active));
+        if (active)
+        {
+            HandleExpandCompactOnUiThread(true);
+        }
+        else
+        {
+            UpdateCompactModeForCurrentPage();
+        }
+    }
+
     public void Receive(ShowToastMessage message)
     {
         DispatcherQueue.TryEnqueue(() =>
@@ -357,37 +393,47 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
     private async Task HandlePinToDockDialogOnUiThread(ShowPinToDockDialogMessage message)
     {
-        // Ask each dock window to display a teaching tip identifying its monitor,
-        // so the user can correlate the dialog's monitor list with the physical docks.
-        WeakReferenceMessenger.Default.Send(new ShowDockMonitorLabelsMessage(true));
-
-        try
+        (ContentDialogResult Result, PinToDockDialogContent Content) dialogResult;
+        using (var dialogLease = await _dialogHost.AcquireAsync(enterDialogMode: true))
         {
-            var (result, content) = await PinToDockDialogContent.ShowAsync(
-                this.XamlRoot,
-                message.Title,
-                message.Subtitle,
-                message.Icon,
-                message.DockSide,
-                message.AvailableMonitors);
-
-            if (result == ContentDialogResult.Primary)
+            if (dialogLease is null)
             {
-                var pinMessage = new PinToDockMessage(
-                    message.ProviderId,
-                    message.CommandId,
-                    Pin: true,
-                    Side: content.SelectedSide,
-                    ShowTitles: content.ShowTitles,
-                    ShowSubtitles: content.ShowSubtitles,
-                    MonitorDeviceId: content.SelectedMonitorDeviceId);
-                WeakReferenceMessenger.Default.Send(pinMessage);
+                return;
+            }
+
+            // Ask each dock window to display a teaching tip identifying its monitor,
+            // so the user can correlate the dialog's monitor list with the physical docks.
+            WeakReferenceMessenger.Default.Send(new ShowDockMonitorLabelsMessage(true));
+
+            try
+            {
+                dialogResult = await PinToDockDialogContent.ShowAsync(
+                    this.XamlRoot,
+                    message.Title,
+                    message.Subtitle,
+                    message.Icon,
+                    message.DockSide,
+                    message.AvailableMonitors);
+            }
+            finally
+            {
+                // Hide the teaching tips once the dialog is saved or dismissed.
+                WeakReferenceMessenger.Default.Send(new ShowDockMonitorLabelsMessage(false));
             }
         }
-        finally
+
+        if (dialogResult.Result == ContentDialogResult.Primary)
         {
-            // Hide the teaching tips once the dialog is saved or dismissed.
-            WeakReferenceMessenger.Default.Send(new ShowDockMonitorLabelsMessage(false));
+            var content = dialogResult.Content;
+            var pinMessage = new PinToDockMessage(
+                message.ProviderId,
+                message.CommandId,
+                Pin: true,
+                Side: content.SelectedSide,
+                ShowTitles: content.ShowTitles,
+                ShowSubtitles: content.ShowSubtitles,
+                MonitorDeviceId: content.SelectedMonitorDeviceId);
+            WeakReferenceMessenger.Default.Send(pinMessage);
         }
     }
 
@@ -432,24 +478,16 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
             // };
         }
 
-        // In compact mode the palette may be collapsed to just the search box. The confirmation
-        // dialog renders in the host window's popup layer, which is clipped to the card's HWND
-        // region, so merely expanding our own content isn't enough - the card must fill the whole
-        // window or the dialog is clipped. Ask the host window to maximize the card while the
-        // dialog is up (and expand our own content to match), then restore the normal compact
-        // behavior once it closes.
-        WeakReferenceMessenger.Default.Send(new MaximizeForDialogMessage(true));
-        HandleExpandCompactOnUiThread(true);
-
+        // Dialog mode expands the compact card so the popup is not clipped by its HWND region.
         ContentDialogResult result;
-        try
+        using (var dialogLease = await _dialogHost.AcquireAsync(enterDialogMode: true))
         {
+            if (dialogLease is null)
+            {
+                return;
+            }
+
             result = await dialog.ShowAsync();
-        }
-        finally
-        {
-            WeakReferenceMessenger.Default.Send(new MaximizeForDialogMessage(false));
-            UpdateCompactModeForCurrentPage();
         }
 
         if (result == ContentDialogResult.Primary)
@@ -600,13 +638,10 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
                 var topLevelCommand = tlcManager.LookupCommand(commandId);
                 if (topLevelCommand is not null)
                 {
-                    var command = topLevelCommand.CommandViewModel.Model.Unsafe;
-                    var isPage = command is not IInvokableCommand;
-
                     // If the bound command is an invokable command, then
                     // we don't want to open the window at all - we want to
                     // just do it.
-                    if (isPage)
+                    if (topLevelCommand.CommandViewModel.IsPage)
                     {
                         // If we're here, then the bound command was a page
                         // of some kind. Reset to root (clearing any transient dock state),
@@ -1688,8 +1723,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
             modifiers.Alt,
             modifiers.Shift,
             modifiers.Win,
-            QuickAccessShelf.VisibleItemCount,
-            isKeyTipDisplayMode: AccessKeyManager.IsDisplayModeEnabled))
+            QuickAccessShelf.VisibleItemCount))
         {
             case QuickAccessShelfShortcuts.SelectionShortcutTarget.Visible:
                 // Let the matching native access key move focus to the requested shelf item.
@@ -1833,6 +1867,11 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
     private static void ShellPage_OnPreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
         var shellPage = (ShellPage)sender;
+        if (shellPage.IsContentDialogActive)
+        {
+            return;
+        }
+
         var modifiers = KeyModifiers.GetCurrent();
 
         switch (e.Key)
@@ -1906,6 +1945,11 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
     private void ShellPage_OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        if (IsContentDialogActive)
+        {
+            return;
+        }
+
         if (ItemActionsAllowed && TryHandleItemAction(e))
         {
             return;
@@ -2243,6 +2287,8 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         }
 
         _isDisposed = true;
+        _externalCommandLinks.Dispose();
+        _dialogHost.Dispose();
         if (_quickAccessShelfDragStarted)
         {
             CompleteQuickAccessShelfDrag();

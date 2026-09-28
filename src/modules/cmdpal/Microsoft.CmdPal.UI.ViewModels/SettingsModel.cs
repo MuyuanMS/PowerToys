@@ -42,6 +42,8 @@ public record SettingsModel
 
     public bool ShowSystemTrayIcon { get; init; } = true;
 
+    public string Language { get; init; } = string.Empty;
+
     public bool IgnoreShortcutWhenFullscreen { get; init; } = true;
 
     public bool IgnoreShortcutWhenBusy { get; init; }
@@ -51,7 +53,7 @@ public record SettingsModel
     public ImmutableList<PinnedCommandSettings> PinnedCommands { get; init; }
         = ImmutableList<PinnedCommandSettings>.Empty;
 
-    public bool AllowExternalReload { get; init; }
+    public bool EnableExternalCommandLinks { get; init; } = true;
 
     public bool AllowAltF4 { get; init; }
 
@@ -210,6 +212,7 @@ public record SettingsModel
           string[]? fallbackRanks = null,
           ImmutableDictionary<string, CommandAlias>? aliases = null,
           ImmutableList<TopLevelHotkey>? commandHotkeys = null,
+          bool enableExternalCommandLinks = true,
           int quickAccessShelfPinnedCommandLimit = DefaultQuickAccessShelfPinnedCommandLimit,
           int recentCommandsDisplayLimit = DefaultRecentCommandsDisplayLimit)
     {
@@ -218,6 +221,7 @@ public record SettingsModel
         FallbackRanks = fallbackRanks ?? [];
         Aliases = aliases ?? ImmutableDictionary<string, CommandAlias>.Empty;
         CommandHotkeys = commandHotkeys ?? ImmutableList<TopLevelHotkey>.Empty;
+        EnableExternalCommandLinks = enableExternalCommandLinks;
         QuickAccessShelfPinnedCommandLimit = quickAccessShelfPinnedCommandLimit;
         RecentCommandsDisplayLimit = recentCommandsDisplayLimit;
     }

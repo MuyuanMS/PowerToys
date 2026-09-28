@@ -35,8 +35,9 @@ public sealed partial class AppearancePage : Page
         var themeService = App.Current.Services.GetRequiredService<IThemeService>();
         var topLevelCommandManager = App.Current.Services.GetService<TopLevelCommandManager>()!;
         var settingsService = App.Current.Services.GetRequiredService<ISettingsService>();
+        var languageService = App.Current.Services.GetRequiredService<ILanguageService>();
         _appStateService = App.Current.Services.GetRequiredService<IAppStateService>();
-        ViewModel = new SettingsViewModel(topLevelCommandManager, _mainTaskScheduler, themeService, settingsService);
+        ViewModel = new SettingsViewModel(topLevelCommandManager, _mainTaskScheduler, themeService, settingsService, languageService);
     }
 
     private void ClearRecentCommands_Click(object sender, RoutedEventArgs e)
