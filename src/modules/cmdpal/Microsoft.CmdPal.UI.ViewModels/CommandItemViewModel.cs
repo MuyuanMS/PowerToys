@@ -123,7 +123,9 @@ public partial class CommandItemViewModel : ExtensionObjectViewModel, ICommandBa
 
     public DataPackageView? DataPackage { get; private set; }
 
-    public Task<IReadOnlyDictionary<string, RandomAccessStreamReference>?>? DataPackageResourceMapTask { get; private set; }`r`n`r`n    public IReadOnlyList<IContextItemViewModel> AllCommands => _snapshot.AllCommands
+    public Task<IReadOnlyDictionary<string, RandomAccessStreamReference>?>? DataPackageResourceMapTask { get; private set; }
+
+    public IReadOnlyList<IContextItemViewModel> AllCommands => _snapshot.AllCommands;
 
     private static readonly IconInfoViewModel _errorIcon;
 
