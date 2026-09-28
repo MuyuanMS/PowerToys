@@ -169,7 +169,9 @@ inline wil::unique_mutex_nothrow create_msi_mutex()
 wil::unique_hfile create_settings_cli_lock()
 {
     const std::wstring lock_path = PTSettingsHelper::get_powertoys_general_save_file_location() + L".cli-lock";
-    while (true)
+    constexpr ULONGLONG lock_timeout_ms = 10000;
+    const ULONGLONG start_time = GetTickCount64();
+    while (GetTickCount64() - start_time < lock_timeout_ms)
     {
         wil::unique_hfile lock{ CreateFileW(lock_path.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr) };
         if (lock)
@@ -185,6 +187,8 @@ wil::unique_hfile create_settings_cli_lock()
 
         Sleep(50);
     }
+
+    throw std::runtime_error("Timed out waiting for the general settings lock. Close any stuck Settings CLI command and restart PowerToys.");
 }
 
 void open_menu_from_another_instance(std::optional<std::string> settings_window)
