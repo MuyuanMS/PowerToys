@@ -28,7 +28,7 @@ internal static class SettingsCliHelper
     {
         settingsUtils ??= SettingsUtils.Default;
         gpoEnabledStateProvider ??= GetModuleGpoEnabledState;
-        var generalSettings = SettingsRepository<GeneralSettings>.GetInstance(settingsUtils).SettingsConfig;
+        var generalSettings = settingsUtils.GetSettingsOrDefaultReadOnly<GeneralSettings>();
         var enabledModules = generalSettings.Enabled;
 
         var result = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
@@ -126,11 +126,10 @@ internal static class SettingsCliHelper
         settingsUtils ??= SettingsUtils.Default;
         gpoEnabledStateProvider ??= GetModuleGpoEnabledState;
         settingsLockProvider ??= () => AcquireSettingsFileLock(settingsUtils);
-        var moduleEntry = GetModuleEntry(moduleName, settingsUtils, gpoEnabledStateProvider);
-
-        CheckModuleGpoLock(moduleEntry.ModuleName, gpoEnabledStateProvider);
-
         using var settingsLock = settingsLockProvider();
+
+        var moduleEntry = GetModuleEntry(moduleName, settingsUtils, gpoEnabledStateProvider);
+        CheckModuleGpoLock(moduleEntry.ModuleName, gpoEnabledStateProvider);
 
         SetSettingCommandLineCommand.ExecuteAndThrowOnSaveFailure(
             $"GeneralSettings.Enabled.{moduleEntry.ModuleName}",

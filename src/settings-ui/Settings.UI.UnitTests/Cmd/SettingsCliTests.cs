@@ -18,11 +18,13 @@ namespace Settings.UI.UnitTests.Cmd;
 public class SettingsCliTests
 {
     private SettingsUtils settingsUtils;
+    private MockFileSystem mockFileSystem;
 
     [TestInitialize]
     public void Setup()
     {
-        settingsUtils = new SettingsUtils(new MockFileSystem());
+        mockFileSystem = new MockFileSystem();
+        settingsUtils = new SettingsUtils(mockFileSystem);
     }
 
     [TestMethod]
@@ -34,6 +36,19 @@ public class SettingsCliTests
         Assert.IsTrue(modules.Count > 0);
         Assert.IsTrue(modules.ContainsKey("FancyZones"));
         Assert.IsTrue(modules.ContainsKey("AlwaysOnTop"));
+    }
+
+    [TestMethod]
+    public void TestReadOnlyModuleStatusDoesNotOverwriteInvalidSettings()
+    {
+        const string corruptSettings = "{";
+        var settingsFilePath = settingsUtils.GetSettingsFilePath();
+        mockFileSystem.AddFile(settingsFilePath, new MockFileData(corruptSettings));
+
+        Assert.ThrowsException<InvalidOperationException>(() =>
+            SettingsCliHelper.GetModulesAndStatus(settingsUtils, _ => null));
+
+        Assert.AreEqual(corruptSettings, mockFileSystem.File.ReadAllText(settingsFilePath));
     }
 
     [TestMethod]
@@ -113,6 +128,7 @@ public class SettingsCliTests
                 settingsUtils,
                 _ => null,
                 () => throw new IOException("Settings lock is held.")));
+        Assert.IsFalse(settingsUtils.SettingsExists());
     }
 
     private sealed class EmptyDisposable : IDisposable
