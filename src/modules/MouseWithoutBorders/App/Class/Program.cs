@@ -280,11 +280,31 @@ namespace MouseWithoutBorders.Class
             Task<MachineSocketState[]> RequestMachineSocketStateAsync();
         }
 
+        internal sealed class ConnectionSnapshot
+        {
+            private readonly MachineInf[] machines;
+
+            internal ConnectionSnapshot(string securityKey, string[] matrix, MachinePool pool)
+            {
+                SecurityKey = securityKey;
+                MachineMatrix = (string[])matrix.Clone();
+                machines = pool.ListAllMachines().ToArray();
+            }
+
+            internal string SecurityKey { get; }
+
+            internal string[] MachineMatrix { get; }
+
+            internal void RestoreMachinePool(MachinePool pool)
+            {
+                pool.Initialize(machines);
+            }
+        }
+
         private sealed class SettingsSyncHelper : ISettingsSyncHelper
         {
             private static readonly object ConnectionSnapshotLock = new();
-            private static string previousSecurityKey;
-            private static string[] previousMachineMatrix;
+            private static ConnectionSnapshot previousConnection;
 
             public Task<ISettingsSyncHelper.MachineSocketState[]> RequestMachineSocketStateAsync()
             {
@@ -311,8 +331,7 @@ namespace MouseWithoutBorders.Class
             {
                 lock (ConnectionSnapshotLock)
                 {
-                    previousSecurityKey = Setting.Values.MyKey;
-                    previousMachineMatrix = (string[])MachineStuff.MachineMatrix.Clone();
+                    previousConnection = new ConnectionSnapshot(Setting.Values.MyKey, MachineStuff.MachineMatrix, MachineStuff.MachinePool);
                     Setting.Values.PauseInstantSaving = true;
                     try
                     {
@@ -345,7 +364,7 @@ namespace MouseWithoutBorders.Class
             {
                 lock (ConnectionSnapshotLock)
                 {
-                    if (previousMachineMatrix == null)
+                    if (previousConnection == null)
                     {
                         throw new InvalidOperationException("No previous connection configuration is available to restore.");
                     }
@@ -353,11 +372,11 @@ namespace MouseWithoutBorders.Class
                     Setting.Values.PauseInstantSaving = true;
                     try
                     {
-                        Setting.Values.MyKey = previousSecurityKey;
-                        Encryption.MyKey = previousSecurityKey;
+                        Setting.Values.MyKey = previousConnection.SecurityKey;
+                        Encryption.MyKey = previousConnection.SecurityKey;
                         Encryption.MagicNumber = Encryption.Get24BitHash(Encryption.MyKey);
-                        MachineStuff.MachineMatrix = previousMachineMatrix;
-                        MachineStuff.MachinePool.Initialize(previousMachineMatrix);
+                        MachineStuff.MachineMatrix = (string[])previousConnection.MachineMatrix.Clone();
+                        previousConnection.RestoreMachinePool(MachineStuff.MachinePool);
                         MachineStuff.UpdateMachinePoolStringSetting();
                         SocketStuff.InvalidKeyFound = false;
                         InitAndCleanup.ReopenSocketDueToReadError = true;
@@ -370,8 +389,7 @@ namespace MouseWithoutBorders.Class
                         Setting.Values.SaveSettings();
                     }
 
-                    previousMachineMatrix = null;
-                    previousSecurityKey = null;
+                    previousConnection = null;
 
                     return Task.CompletedTask;
                 }

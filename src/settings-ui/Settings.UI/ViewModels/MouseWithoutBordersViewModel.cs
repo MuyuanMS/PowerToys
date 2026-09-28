@@ -488,6 +488,11 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         public async Task SubmitReconnectRequestAsync()
         {
+            if (IsConnecting)
+            {
+                return;
+            }
+
             using (await _ipcSemaphore.EnterAsync())
             {
                 using (var syncHelper = await GetSettingsSyncHelperAsync())
@@ -504,6 +509,11 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
         public async Task SubmitNewKeyRequestAsync()
         {
+            if (IsConnecting)
+            {
+                return;
+            }
+
             using (await _ipcSemaphore.EnterAsync())
             {
                 using (var syncHelper = await GetSettingsSyncHelperAsync())

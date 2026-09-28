@@ -103,6 +103,7 @@
                             <Button
                                 x:Uid="MouseWithoutBorders_NewKey"
                                 Command="{x:Bind GenerateNewKeyCommand, Mode=OneTime}"
+                                IsEnabled="{x:Bind ViewModel.IsConnecting, Mode=OneWay, Converter={StaticResource BoolNegationConverter}}"
                                 Style="{StaticResource AccentButtonStyle}" />
                         </StackPanel>
                     </tkcontrols:SettingsExpander>
@@ -140,7 +141,7 @@
                             <ItemsControl
                                 x:Name="DevicesItemsControl"
                                 HorizontalAlignment="Center"
-                                IsEnabled="{x:Bind ViewModel.IsEnabled, Mode=OneWay}"
+                                IsEnabled="{x:Bind ViewModel.IsConnecting, Mode=OneWay, Converter={StaticResource BoolNegationConverter}}"
                                 ItemsSource="{Binding MachineMatrixString, Mode=TwoWay}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
@@ -192,7 +193,10 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <Button HorizontalAlignment="Right" Command="{x:Bind ReconnectCommand, Mode=OneTime}">
+                            <Button
+                                HorizontalAlignment="Right"
+                                Command="{x:Bind ReconnectCommand, Mode=OneTime}"
+                                IsEnabled="{x:Bind ViewModel.IsConnecting, Mode=OneWay, Converter={StaticResource BoolNegationConverter}}">
                                 <ToolTipService.ToolTip>
                                     <TextBlock x:Uid="MouseWithoutBorders_ReconnectTooltip" TextWrapping="Wrap" />
                                 </ToolTipService.ToolTip>

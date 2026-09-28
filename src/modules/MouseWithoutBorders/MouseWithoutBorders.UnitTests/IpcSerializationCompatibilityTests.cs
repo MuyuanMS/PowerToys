@@ -6,6 +6,7 @@ using System.Reflection;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MouseWithoutBorders.Class;
+using MouseWithoutBorders.Core;
 using Newtonsoft.Json;
 
 namespace MouseWithoutBorders.UnitTests;
@@ -32,5 +33,27 @@ public sealed class IpcSerializationCompatibilityTests
 
         Assert.AreEqual(typeof(Task), contract!.GetMethod("ConnectToMachineAsync")!.ReturnType);
         Assert.AreEqual(typeof(Task), contract.GetMethod("RestorePreviousConnectionAsync")!.ReturnType);
+    }
+
+    [TestMethod]
+    public void ConnectionSnapshotRestoresMatrixAndMachineIdsAfterFailedAttempt()
+    {
+        var pool = new MachinePool();
+        var originalNames = new[] { "REMOTE", "LOCAL" };
+        pool.Initialize(originalNames);
+        pool.TryUpdateMachineID("REMOTE", (ID)1, false);
+        var matrix = new[] { "REMOTE", "LOCAL", string.Empty, string.Empty };
+        var snapshot = new Program.ConnectionSnapshot("previous-key", matrix, pool);
+
+        matrix[0] = "OTHER";
+        var attemptedNames = new[] { "OTHER", "LOCAL" };
+        pool.Initialize(attemptedNames);
+        snapshot.RestoreMachinePool(pool);
+
+        Assert.AreEqual("previous-key", snapshot.SecurityKey);
+        Assert.AreEqual("REMOTE", snapshot.MachineMatrix[0]);
+        Assert.IsTrue(pool.TryFindMachineByName("REMOTE", out var restored));
+        Assert.AreEqual((ID)1, restored.Id);
+        Assert.IsFalse(pool.TryFindMachineByName("OTHER", out _));
     }
 }
