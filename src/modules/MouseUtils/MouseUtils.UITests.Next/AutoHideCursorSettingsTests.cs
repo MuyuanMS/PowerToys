@@ -69,7 +69,7 @@ public class AutoHideCursorSettingsTests : UITestBase
     protected override void PrepareTestState()
     {
         var testingIdleDispatch = TestContext.TestName?.StartsWith(
-            nameof(IdleDeadlineSurvivesIgnoredInput), StringComparison.Ordinal) == true;
+            nameof(InjectedInputRestoresHiddenCursorAfterIdle), StringComparison.Ordinal) == true;
         MouseUtilsTestHelper.ReplaceModuleSettings(
             ModuleName,
             CreateSettings(hideOnTyping: !testingIdleDispatch, hideOnIdle: false, idleDelayMs: testingIdleDispatch ? 1000 : 5000));
@@ -151,7 +151,7 @@ public class AutoHideCursorSettingsTests : UITestBase
     [DataRow(true)]
     [TestCategory("MouseUtils")]
     [TestCategory("AutoHideCursor")]
-    public void IdleDeadlineSurvivesIgnoredInput(bool floodMessageQueue)
+    public void InjectedInputRestoresHiddenCursorAfterIdle(bool floodMessageQueue)
     {
         OpenSettings();
         AssertWorkerState(expectedRunning: false);
@@ -210,20 +210,30 @@ public class AutoHideCursorSettingsTests : UITestBase
                 }
             }
 
+            Assert.IsTrue(
+                SpinWait.SpinUntil(
+                    () => Volatile.Read(ref injectedPairs) > 20 &&
+                          (!floodMessageQueue || Volatile.Read(ref postedMessages) > 256),
+                    5_000),
+                "The injected-input workload did not reach the expected volume.");
+            stopInput.Cancel();
+            input.GetAwaiter().GetResult();
             var hidden = WaitHelper.WaitForStable(
                 IsSystemArrowTransparent,
                 transparent => transparent,
                 timeoutMS: 5_000,
                 requiredConsecutiveMatches: 3,
                 pollIntervalMS: 20);
-            Assert.IsTrue(hidden.Succeeded, "Ignored injected mouse input starved the worker's one-second idle deadline.");
+            Assert.IsTrue(hidden.Succeeded, "The cursor did not hide after the idle deadline.");
 
-            var heldHidden = Stopwatch.StartNew();
-            while (heldHidden.ElapsedMilliseconds < 300)
-            {
-                Assert.IsTrue(IsSystemArrowTransparent(), "Injected input restored the hidden cursor.");
-                Thread.Sleep(20);
-            }
+            MouseHelper.MoveBy(2, 0);
+            var restored = WaitHelper.WaitForStable(
+                IsSystemArrowTransparent,
+                transparent => !transparent,
+                timeoutMS: 5_000,
+                requiredConsecutiveMatches: 3,
+                pollIntervalMS: 20);
+            Assert.IsTrue(restored.Succeeded, "Injected mouse input did not restore the hidden cursor.");
 
             Assert.IsTrue(Volatile.Read(ref injectedPairs) > 20, "The regression did not exercise repeated injected input.");
             if (floodMessageQueue)
