@@ -3,27 +3,16 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Runtime.InteropServices;
+using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage.Streams;
 
 namespace Microsoft.CommandPalette.Extensions.Toolkit;
 
-// shamelessly from https://github.com/PowerShell/PowerShell/blob/master/src/Microsoft.PowerShell.Commands.Management/commands/management/Clipboard.cs
+// This follows PowerShell's approach because extensions run without a foreground window.
 public static partial class ClipboardHelper
 {
-    private static readonly bool? _clipboardSupported = true;
-
-    // Used if an external clipboard is not available, e.g. if xclip is missing.
-    // This is useful for testing in CI as well.
-    private static string? _internalClipboard;
-
     public static string GetText()
     {
-        if (_clipboardSupported == false)
-        {
-            return _internalClipboard ?? string.Empty;
-        }
-
-        var tool = string.Empty;
-        var args = string.Empty;
         var clipboardText = string.Empty;
 
         ExecuteOnStaThread(() => GetTextImpl(out clipboardText));
@@ -32,16 +21,10 @@ public static partial class ClipboardHelper
 
     public static void SetText(string text)
     {
-        if (_clipboardSupported == false)
+        if (!ExecuteOnStaThread(() => SetClipboardData(Tuple.Create(text, CF_UNICODETEXT))))
         {
-            _internalClipboard = text;
-            return;
+            throw new InvalidOperationException("Failed to set clipboard text.");
         }
-
-        var tool = string.Empty;
-        var args = string.Empty;
-        ExecuteOnStaThread(() => SetClipboardData(Tuple.Create(text, CF_UNICODETEXT)));
-        return;
     }
 
     public static void SetRtf(string plainText, string rtfText)
@@ -51,9 +34,33 @@ public static partial class ClipboardHelper
             s_CF_RTF = RegisterClipboardFormat("Rich Text Format");
         }
 
-        ExecuteOnStaThread(() => SetClipboardData(
+        if (!ExecuteOnStaThread(() => SetClipboardData(
             Tuple.Create(plainText, CF_UNICODETEXT),
-            Tuple.Create(rtfText, s_CF_RTF)));
+            Tuple.Create(rtfText, s_CF_RTF))))
+        {
+            throw new InvalidOperationException("Failed to set clipboard RTF.");
+        }
+    }
+
+    public static void SetImage(RandomAccessStreamReference image)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+
+        var dataPackage = new DataPackage();
+        dataPackage.SetBitmap(image);
+        SetContent(dataPackage);
+    }
+
+    public static void SetContent(DataPackage content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+
+        ExecuteOnStaThread(() =>
+        {
+            Clipboard.SetContent(content);
+            Clipboard.Flush();
+            return true;
+        });
     }
 
 #pragma warning disable SA1310 // Field names should not contain underscore
@@ -234,6 +241,10 @@ public static partial class ClipboardHelper
                 // The clipboard owns this memory now, so don't free it.
                 hGlobal = IntPtr.Zero;
             }
+            else
+            {
+                return false;
+            }
         }
         catch
         {
@@ -255,34 +266,54 @@ public static partial class ClipboardHelper
         return true;
     }
 
-    private static void ExecuteOnStaThread(Func<bool> action)
+    private static bool ExecuteOnStaThread(Func<bool> action)
     {
         const int RetryCount = 5;
         var tries = 0;
+        Exception? exception = null;
 
         if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
         {
-            while (tries++ < RetryCount && !action())
+            while (tries++ < RetryCount)
             {
-                // wait until RetryCount or action
-            }
-
-            return;
-        }
-
-        Exception? exception = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                while (tries++ < RetryCount && !action())
+                try
                 {
-                    // wait until RetryCount or action
+                    if (action())
+                    {
+                        return true;
+                    }
+                }
+                catch (Exception e)
+                {
+                    exception = e;
                 }
             }
-            catch (Exception e)
+
+            if (exception is not null)
             {
-                exception = e;
+                throw exception;
+            }
+
+            return false;
+        }
+
+        var succeeded = false;
+        var thread = new Thread(() =>
+        {
+            while (tries++ < RetryCount)
+            {
+                try
+                {
+                    if (action())
+                    {
+                        succeeded = true;
+                        return;
+                    }
+                }
+                catch (Exception e)
+                {
+                    exception = e;
+                }
             }
         });
 
@@ -290,9 +321,11 @@ public static partial class ClipboardHelper
         thread.Start();
         thread.Join();
 
-        if (exception is not null)
+        if (!succeeded && exception is not null)
         {
             throw exception;
         }
+
+        return succeeded;
     }
 }
