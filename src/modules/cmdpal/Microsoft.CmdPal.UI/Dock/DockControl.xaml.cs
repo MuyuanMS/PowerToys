@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.Messaging;
+using CommunityToolkit.WinUI;
 using ManagedCommon;
 using Microsoft.CmdPal.Ext.Bookmarks;
 using Microsoft.CmdPal.UI.Messages;
@@ -317,6 +318,15 @@ public sealed partial class DockControl : UserControl, IRecipient<CloseContextMe
 
     private void BandItem_KeyDown(object sender, KeyRoutedEventArgs e)
     {
+        // Escape is how the user backs out of the dock after the focus shortcut put them
+        // there. Edit mode already owns Escape, so leave it alone in that case.
+        if (!IsEditMode && e.Key == VirtualKey.Escape)
+        {
+            KeyboardFocusReleaseRequested?.Invoke(this, EventArgs.Empty);
+            e.Handled = true;
+            return;
+        }
+
         // Tapped only fires for pointer input, so keyboard focus + Enter/Space
         // never invoked a dock item. This is the keyboard side of BandItem_Tapped.
         if (IsEditMode || (e.Key != VirtualKey.Enter && e.Key != VirtualKey.Space))
@@ -328,6 +338,34 @@ public sealed partial class DockControl : UserControl, IRecipient<CloseContextMe
         {
             e.Handled = true;
         }
+    }
+
+    /// <summary>
+    /// Raised when the user presses Escape while focus is in the dock.
+    /// </summary>
+    internal event EventHandler? KeyboardFocusReleaseRequested;
+
+    /// <summary>
+    /// Moves keyboard focus to the first dock item. Returns false when there is nothing to
+    /// focus, which tells the caller to leave the user where they were.
+    /// </summary>
+    internal bool TryFocusFirstItem()
+    {
+        ListView[] listViews = [StartListView, CenterListView, EndListView];
+
+        foreach (var listView in listViews)
+        {
+            var item = listView.FindDescendant<DockItemControl>();
+
+            // Keyboard, not Programmatic. Programmatic focus draws no focus rect, so on a
+            // pinned dock the shortcut would work and look like it did nothing.
+            if (item is not null && item.Focus(FocusState.Keyboard))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private bool TryInvokeBandItem(object sender)
