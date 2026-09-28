@@ -1147,23 +1147,32 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
                 break;
             case VirtualKey.Down when modifiers.OnlyAlt:
-                if (IsDescendantOf(e.OriginalSource as DependencyObject, shellPage.FiltersDropDown))
                 {
-                    goto default;
+                    var source = e.OriginalSource as DependencyObject;
+                    while (source is not null && !ReferenceEquals(source, shellPage.FiltersDropDown))
+                    {
+                        source = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(source);
+                    }
+
+                    if (source is not null)
+                    {
+                        goto default;
+                    }
+
+                    if (shellPage.TryExpandCollapsedCompact())
+                    {
+                        e.Handled = true;
+                    }
+                    else
+                    {
+                        // Outside collapsed compact mode, Alt+Down remains available to requested
+                        // command keybindings just like every other unreserved chord.
+                        goto default;
+                    }
+
+                    break;
                 }
 
-                if (shellPage.TryExpandCollapsedCompact())
-                {
-                    e.Handled = true;
-                }
-                else
-                {
-                    // Outside collapsed compact mode, Alt+Down remains available to requested
-                    // command keybindings just like every other unreserved chord.
-                    goto default;
-                }
-
-                break;
             case VirtualKey.Tab when modifiers.None:
                 // When the shelf is present, Tab must be allowed to enter its icon buttons.
                 // Without a shelf, retain compact mode's existing Tab-to-expand behavior.
@@ -1186,21 +1195,6 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
                     break;
                 }
         }
-    }
-
-    private static bool IsDescendantOf(DependencyObject? element, DependencyObject ancestor)
-    {
-        while (element is not null)
-        {
-            if (ReferenceEquals(element, ancestor))
-            {
-                return true;
-            }
-
-            element = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(element);
-        }
-
-        return false;
     }
 
     private void ShellPage_OnKeyDown(object sender, KeyRoutedEventArgs e)
