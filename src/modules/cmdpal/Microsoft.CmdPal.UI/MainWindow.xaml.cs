@@ -1797,7 +1797,7 @@ public sealed partial class MainWindow : WindowEx,
             // Handle unmatched menu characters here instead of letting DefWindowProc ignore
             // them and play the system chime. Repeated chimes may otherwise cause the machine
             // to experience sudden contact with the floor and subsequent rapid disassembly.
-            case PInvoke.WM_MENUCHAR:
+            case PInvoke.WM_MENUCHAR when (wParam.Value & 0xFFFF) is >= (nuint)'0' and <= (nuint)'9':
                 return (LRESULT)(1 << 16); // MAKELRESULT(0, MNC_CLOSE)
 
             // When restoring a saved position across monitors with different DPIs,

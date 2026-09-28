@@ -418,6 +418,9 @@ Right-click to remove the key combination, thereby deactivating the shortcut.</v
   <data name="QuickAccessShelfSurface.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
     <value>Quick access</value>
   </data>
+  <data name="QuickAccessShelfSurface.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.LocalizedLandmarkType" xml:space="preserve">
+    <value>Quick access shelf</value>
+  </data>
   <data name="QuickAccessShelfShortcutTextFormat" xml:space="preserve">
     <value>Alt+{0}</value>
     <comment>Tooltip shortcut text for a quick access item. {0} is a digit from 1 through 9.</comment>
