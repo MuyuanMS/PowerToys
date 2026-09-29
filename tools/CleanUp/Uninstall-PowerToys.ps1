@@ -192,22 +192,53 @@ function Test-MicrosoftSignedFile {
     }
 }
 
+function Release-ComObjectSafely {
+    param(
+        [object]$ComObject
+    )
+
+    if ($null -ne $ComObject -and [Runtime.InteropServices.Marshal]::IsComObject($ComObject)) {
+        [Runtime.InteropServices.Marshal]::FinalReleaseComObject($ComObject) | Out-Null
+    }
+}
+
+function New-WindowsInstallerObject {
+    return New-Object -ComObject WindowsInstaller.Installer
+}
+
 function Get-MsiDatabaseProperty {
     param(
         [string]$Path,
         [string]$Property
     )
 
-    $installer = New-Object -ComObject WindowsInstaller.Installer
-    $database = $installer.OpenDatabase($Path, 0)
-    $view = $database.OpenView("SELECT `Value` FROM Property WHERE `Property` = '$Property'")
-    $view.Execute()
-    $record = $view.Fetch()
-    if ($null -eq $record) {
-        return $null
-    }
+    $installer = $null
+    $database = $null
+    $view = $null
+    $record = $null
+    try {
+        $installer = New-WindowsInstallerObject
+        $database = $installer.OpenDatabase($Path, 0)
+        $view = $database.OpenView("SELECT `Value` FROM Property WHERE `Property` = '$Property'")
+        $view.Execute()
+        $record = $view.Fetch()
+        if ($null -eq $record) {
+            return $null
+        }
 
-    return $record.StringData(1)
+        return $record.StringData(1)
+    } finally {
+        try {
+            if ($null -ne $view) {
+                $view.Close()
+            }
+        } finally {
+            Release-ComObjectSafely -ComObject $record
+            Release-ComObjectSafely -ComObject $view
+            Release-ComObjectSafely -ComObject $database
+            Release-ComObjectSafely -ComObject $installer
+        }
+    }
 }
 
 function Test-PowerToysMsiProduct {

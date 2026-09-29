@@ -112,6 +112,78 @@ Describe 'Uninstall-PowerToys' {
         $message | Should Match 'Microsoft-signed PowerToys bootstrapper'
     }
 
+    It 'closes and releases every MSI database COM object after reading a property' {
+        $script:viewClosed = $false
+        $record = [pscustomobject]@{}
+        $record | Add-Member -MemberType ScriptMethod -Name StringData -Value { param($index) 'PropertyValue' }
+        $view = [pscustomobject]@{}
+        $view | Add-Member -MemberType ScriptMethod -Name Execute -Value {}
+        $view | Add-Member -MemberType ScriptMethod -Name Fetch -Value { $record }.GetNewClosure()
+        $view | Add-Member -MemberType ScriptMethod -Name Close -Value { $script:viewClosed = $true }
+        $database = [pscustomobject]@{}
+        $database | Add-Member -MemberType ScriptMethod -Name OpenView -Value { param($query) $view }.GetNewClosure()
+        $installer = [pscustomobject]@{}
+        $installer | Add-Member -MemberType ScriptMethod -Name OpenDatabase -Value {
+            param($path, $mode)
+            $database
+        }.GetNewClosure()
+
+        $script:fakeWindowsInstaller = $installer
+        Mock New-WindowsInstallerObject { $script:fakeWindowsInstaller }
+        Mock Release-ComObjectSafely {}
+
+        Get-MsiDatabaseProperty -Path (Join-Path $TestDrive 'staged.msi') -Property 'ProductCode' |
+            Should Be 'PropertyValue'
+
+        $script:viewClosed | Should Be $true
+        Assert-MockCalled Release-ComObjectSafely -Times 1 -Scope It -ParameterFilter {
+            $ComObject -eq $record
+        }
+        Assert-MockCalled Release-ComObjectSafely -Times 1 -Scope It -ParameterFilter {
+            $ComObject -eq $view
+        }
+        Assert-MockCalled Release-ComObjectSafely -Times 1 -Scope It -ParameterFilter {
+            $ComObject -eq $database
+        }
+        Assert-MockCalled Release-ComObjectSafely -Times 1 -Scope It -ParameterFilter {
+            $ComObject -eq $installer
+        }
+    }
+
+    It 'closes and releases opened MSI COM objects when property execution fails' {
+        $script:viewClosed = $false
+        $view = [pscustomobject]@{}
+        $view | Add-Member -MemberType ScriptMethod -Name Execute -Value { throw 'MSI query failed.' }
+        $view | Add-Member -MemberType ScriptMethod -Name Close -Value { $script:viewClosed = $true }
+        $database = [pscustomobject]@{}
+        $database | Add-Member -MemberType ScriptMethod -Name OpenView -Value { param($query) $view }.GetNewClosure()
+        $installer = [pscustomobject]@{}
+        $installer | Add-Member -MemberType ScriptMethod -Name OpenDatabase -Value {
+            param($path, $mode)
+            $database
+        }.GetNewClosure()
+
+        $script:fakeWindowsInstaller = $installer
+        Mock New-WindowsInstallerObject { $script:fakeWindowsInstaller }
+        Mock Release-ComObjectSafely {}
+
+        {
+            Get-MsiDatabaseProperty -Path (Join-Path $TestDrive 'staged.msi') -Property 'ProductCode'
+        } | Should Throw 'MSI query failed.'
+
+        $script:viewClosed | Should Be $true
+        Assert-MockCalled Release-ComObjectSafely -Times 3 -Scope It
+        Assert-MockCalled Release-ComObjectSafely -Times 1 -Scope It -ParameterFilter {
+            $ComObject -eq $view
+        }
+        Assert-MockCalled Release-ComObjectSafely -Times 1 -Scope It -ParameterFilter {
+            $ComObject -eq $database
+        }
+        Assert-MockCalled Release-ComObjectSafely -Times 1 -Scope It -ParameterFilter {
+            $ComObject -eq $installer
+        }
+    }
+
     It 'removes directory reparse points without enumerating their targets' {
         $root = Join-Path $TestDrive 'root'
         $normalDirectory = Join-Path $root 'normal'
