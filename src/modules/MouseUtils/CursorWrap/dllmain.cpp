@@ -85,7 +85,7 @@ private:
     bool m_autoActivate = false;
     bool m_disableWrapDuringDrag = true; // Default to true to prevent wrap during drag
     bool m_disableOnSingleMonitor = false; // Default to false
-    bool m_disableInGameMode = false; // Default to false: only disable wrapping in game mode when the user opts in
+    std::atomic_bool m_disableInGameMode{ false }; // Default to false: only disable wrapping in game mode when the user opts in
     int m_wrapMode = 0; // 0=Both (default), 1=VerticalOnly, 2=HorizontalOnly
     int m_activationMode = 0; // 0=Always (default), 1=HoldingCtrl (wraps only while held), 2=HoldingShift (wraps only while held)
     
