@@ -42,7 +42,7 @@ namespace ShortcutGuide.IndexYmlGenerator
         private const string WindowFilterPrefix = "WindowFilter:";
         private const string BackgroundProcessPrefix = "BackgroundProcess:";
         private const string ShortcutsPrefix = "Shortcuts:";
-        private const string ManifestSetFingerprintPrefix = "ManifestSetFingerprint:";
+        private const string ManifestSetFingerprintPrefix = "# ManifestSetFingerprint:";
 
         public static string DefaultManifestsPath => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -55,15 +55,15 @@ namespace ShortcutGuide.IndexYmlGenerator
 
         /// <summary>
         /// Determines whether index.yml needs to be created or regenerated based on the
-        /// existence of index.yml and the fingerprint of all manifest files in the
-        /// directory.
+        /// existence of index.yml, the manifest file names, and their last write timestamps.
         /// </summary>
         /// <param name="path">The directory containing manifest files and index.yml.
         /// </param>
-        /// <returns><c>true</c> if index.yml is missing, does not contain a fingerprint,
-        /// or its fingerprint differs from the current manifest set; otherwise
-        /// <c>false</c>.</returns>
-        public static bool NeedsIndexRegeneration(string path)
+        /// <param name="ignoredFileNames">Optional file names excluded from timestamp checks.
+        /// Their presence is still included in the manifest-set fingerprint.</param>
+        /// <returns><c>true</c> if index.yml is missing, the manifest set changed, or an
+        /// unignored manifest is newer than the index; otherwise <c>false</c>.</returns>
+        public static bool NeedsIndexRegeneration(string path, IEnumerable<string>? ignoredFileNames = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
@@ -78,14 +78,14 @@ namespace ShortcutGuide.IndexYmlGenerator
                 return true;
             }
 
-            IEnumerable<string> manifestPaths = Directory.EnumerateFiles(path, "*.yml")
+            List<string> manifestPaths = Directory.EnumerateFiles(path, "*.yml")
                 .Where(manifestPath =>
                 {
                     string fileName = Path.GetFileName(manifestPath);
                     return !string.Equals(fileName, IndexFileName, StringComparison.OrdinalIgnoreCase) &&
                            !string.Equals(fileName, TempIndexFileName, StringComparison.OrdinalIgnoreCase);
                 })
-                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
+                .ToList();
 
             if (!TryReadManifestSetFingerprint(indexPath, out string? storedFingerprint))
             {
@@ -93,7 +93,25 @@ namespace ShortcutGuide.IndexYmlGenerator
             }
 
             string currentFingerprint = ComputeManifestSetFingerprint(manifestPaths);
-            return !string.Equals(storedFingerprint, currentFingerprint, StringComparison.Ordinal);
+            if (!string.Equals(storedFingerprint, currentFingerprint, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            DateTime indexWriteTimeUtc = File.GetLastWriteTimeUtc(indexPath);
+            HashSet<string>? ignoredSet = ignoredFileNames != null
+                ? new HashSet<string>(ignoredFileNames, StringComparer.OrdinalIgnoreCase)
+                : null;
+            foreach (string manifestPath in manifestPaths)
+            {
+                if ((ignoredSet == null || !ignoredSet.Contains(Path.GetFileName(manifestPath))) &&
+                    File.GetLastWriteTimeUtc(manifestPath) > indexWriteTimeUtc)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public static IndexGenerationResult CreateIndexYmlFile(string path)
@@ -101,26 +119,20 @@ namespace ShortcutGuide.IndexYmlGenerator
             ArgumentException.ThrowIfNullOrWhiteSpace(path);
             Directory.CreateDirectory(path);
 
-            IEnumerable<string> files = Directory.EnumerateFiles(path, "*.yml")
-                .Where(file => !string.Equals(Path.GetFileName(file), IndexFileName, StringComparison.OrdinalIgnoreCase));
+            List<string> files = Directory.EnumerateFiles(path, "*.yml")
+                .Where(file => !string.Equals(Path.GetFileName(file), IndexFileName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            string manifestSetFingerprint = ComputeManifestSetFingerprint(files);
 
             ConcurrentBag<ManifestHeader> parsedHeaders = [];
             ConcurrentBag<(string FileName, Exception Exception)> errors = [];
             ConcurrentBag<(string FileName, string Warning)> warnings = [];
-
-            bool indexFileExists = false;
 
             // Parallel I/O and parsing hide Windows Defender/NTFS file handle inspection
             // latency, especially when manifests have just been copied and scanned.
             Parallel.ForEach(files, file =>
             {
                 string filename = Path.GetFileName(file);
-                if (string.Equals(filename, IndexFileName, StringComparison.OrdinalIgnoreCase))
-                {
-                    indexFileExists = true;
-                    return;
-                }
-
                 try
                 {
                     // ReadAllText() is a single I/O system call and faster than
@@ -167,7 +179,7 @@ namespace ShortcutGuide.IndexYmlGenerator
             sb.AppendLine("DefaultShellName: +WindowsNT.Shell");
             if (errors.IsEmpty)
             {
-                sb.AppendLine(CultureInfo.InvariantCulture, $"{ManifestSetFingerprintPrefix} {ComputeManifestSetFingerprint(files)}");
+                sb.AppendLine(CultureInfo.InvariantCulture, $"{ManifestSetFingerprintPrefix} {manifestSetFingerprint}");
             }
 
             List<(string WindowFilter, bool BackgroundProcess)> sortedKeys = new(processes.Keys);
@@ -210,7 +222,7 @@ namespace ShortcutGuide.IndexYmlGenerator
             File.Move(tempPath, indexPath, overwrite: true);
 
             return new IndexGenerationResult(
-                TotalFiles: files.Count() - (indexFileExists ? 1 : 0), // exclude index.yml itself from the count
+                TotalFiles: files.Count,
                 IndexedFiles: parsedHeaders.Count,
                 Errors: errors.ToArray(),
                 Warnings: warnings.ToArray());
@@ -225,15 +237,13 @@ namespace ShortcutGuide.IndexYmlGenerator
                 ? $"'{value.Replace("'", "''", StringComparison.Ordinal)}'"
                 : $"'{value}'";
 
-        private static string ComputeManifestSetFingerprint(IEnumerable<string> manifestPaths)
+        private static string ComputeManifestSetFingerprint(List<string> manifestPaths)
         {
             var fingerprintBuilder = new StringBuilder();
             foreach (string manifestPath in manifestPaths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
             {
                 fingerprintBuilder.Append(Path.GetFileName(manifestPath));
-                fingerprintBuilder.Append(':');
-                fingerprintBuilder.Append(File.GetLastWriteTimeUtc(manifestPath).ToBinary());
-                fingerprintBuilder.Append(';');
+                fingerprintBuilder.Append('\n');
             }
 
             byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(fingerprintBuilder.ToString()));

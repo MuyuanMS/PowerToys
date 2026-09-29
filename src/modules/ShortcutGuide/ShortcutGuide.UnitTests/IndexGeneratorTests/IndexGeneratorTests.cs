@@ -489,6 +489,60 @@ BackgroundProcess: false
     }
 
     [TestMethod]
+    [DataRow("delete", 0)]
+    [DataRow("rename", 1)]
+    [DataRow("add", 2)]
+    public void NeedsIndexRegeneration_WhenManifestSetChangesWithOldTimestamps_ReturnsTrue(string change, int expectedCount)
+    {
+        string manifestPath = Path.Combine(_tempDirectory, "Test.App.yml");
+        const string manifest = "PackageName: Test.App\nWindowFilter: Test.exe\nBackgroundProcess: false\nShortcuts: []\n";
+        DateTime oldTimestamp = DateTime.UtcNow.AddDays(-1);
+        File.WriteAllText(manifestPath, manifest);
+        File.SetLastWriteTimeUtc(manifestPath, oldTimestamp);
+        var firstResult = ManifestIndexGenerator.CreateIndexYmlFile(_tempDirectory);
+        Assert.AreEqual(1, firstResult.TotalFiles);
+        Assert.IsFalse(ManifestIndexGenerator.NeedsIndexRegeneration(_tempDirectory));
+
+        if (change == "delete")
+        {
+            File.Delete(manifestPath);
+        }
+        else if (change == "rename")
+        {
+            File.Move(manifestPath, Path.Combine(_tempDirectory, "Renamed.App.yml"));
+        }
+        else
+        {
+            string addedPath = Path.Combine(_tempDirectory, "Added.App.yml");
+            File.WriteAllText(addedPath, manifest.Replace("Test.App", "Added.App", StringComparison.Ordinal));
+            File.SetLastWriteTimeUtc(addedPath, oldTimestamp);
+        }
+
+        Assert.IsTrue(ManifestIndexGenerator.NeedsIndexRegeneration(_tempDirectory));
+        var result = ManifestIndexGenerator.CreateIndexYmlFile(_tempDirectory);
+        Assert.AreEqual(expectedCount, result.TotalFiles);
+        Assert.AreEqual(expectedCount, result.IndexedFiles);
+        Assert.AreEqual(0, result.Errors.Count);
+        Assert.IsFalse(ManifestIndexGenerator.NeedsIndexRegeneration(_tempDirectory));
+    }
+
+    [TestMethod]
+    public void NeedsIndexRegeneration_IgnoredManifestStillParticipatesInSetChanges()
+    {
+        const string fileName = "Generated.App.yml";
+        string manifestPath = Path.Combine(_tempDirectory, fileName);
+        File.WriteAllText(manifestPath, "PackageName: Generated.App\nWindowFilter: Test.exe\nShortcuts: []\n");
+        ManifestIndexGenerator.CreateIndexYmlFile(_tempDirectory);
+        File.SetLastWriteTimeUtc(manifestPath, DateTime.UtcNow.AddMinutes(1));
+
+        Assert.IsFalse(ManifestIndexGenerator.NeedsIndexRegeneration(_tempDirectory, [fileName]));
+        Assert.IsTrue(ManifestIndexGenerator.NeedsIndexRegeneration(_tempDirectory));
+
+        File.Delete(manifestPath);
+        Assert.IsTrue(ManifestIndexGenerator.NeedsIndexRegeneration(_tempDirectory, [fileName]));
+    }
+
+    [TestMethod]
     public void NeedsIndexRegeneration_WhenIndexDoesNotExist_ReturnsTrue()
     {
         string manifestContent = @"
