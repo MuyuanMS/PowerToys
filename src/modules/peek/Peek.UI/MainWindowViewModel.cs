@@ -77,10 +77,6 @@ namespace Peek.UI
         [NotifyPropertyChangedFor(nameof(HasMultipleItems))]
         private IReadOnlyList<IFileSystemItem>? _items;
 
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(HasMultipleItems))]
-        private bool _isMultipleItemsActivation;
-
         /// <summary>
         /// The number of items selected and available to preview. Decreases as the user deletes
         /// items. Displayed on the title bar.
@@ -101,11 +97,11 @@ namespace Peek.UI
         }
 
         /// <summary>
-        /// Gets a value indicating whether the activation selected more than one item,
-        /// from either Explorer or CLI.
+        /// Gets a value indicating whether more than one item is available for
+        /// navigation, from either Explorer or CLI.
         /// Controls the visibility of the index/total counter in the title bar.
         /// </summary>
-        public bool HasMultipleItems => IsMultipleItemsActivation;
+        public bool HasMultipleItems => (Items?.Count ?? 0) > 1;
 
         [ObservableProperty]
         private double _scalingFactor = 1.0;
@@ -176,7 +172,6 @@ namespace Peek.UI
             _currentIndex = DisplayIndex = 0;
 
             CurrentItem = (Items != null && Items.Count > 0) ? Items[0] : null;
-            IsMultipleItemsActivation = NeighboringItemsQuery.IsMultipleFilesActivation;
         }
 
         private void InitializeFromCli(string path)
@@ -187,12 +182,11 @@ namespace Peek.UI
         private void InitializeFromCliPaths(IReadOnlyList<string> paths)
         {
             _currentIndex = DisplayIndex = 0;
-            IsMultipleItemsActivation = paths.Count > 1;
 
             var items = new List<IFileSystemItem>(paths.Count);
             foreach (var path in paths)
             {
-                string name = GetDisplayName(path);
+                string name = Path.GetFileName(path);
                 items.Add(Directory.Exists(path)
                     ? new FolderItem(path, name, path)
                     : new FileItem(path, name));
@@ -202,21 +196,12 @@ namespace Peek.UI
             CurrentItem = items.Count > 0 ? items[0] : null;
         }
 
-        private static string GetDisplayName(string path)
-        {
-            var trimmedPath = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            var name = Path.GetFileName(trimmedPath.Length > 0 ? trimmedPath : path);
-
-            return string.IsNullOrEmpty(name) ? path : name;
-        }
-
         public void Uninitialize()
         {
             _currentIndex = DisplayIndex = 0;
             CurrentItem = null;
             _deletedItemIndexes.Clear();
             Items = null;
-            IsMultipleItemsActivation = false;
             _navigationDirection = NavigationDirection.Forwards;
             IsErrorVisible = false;
         }

@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using ManagedCommon;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,6 +42,7 @@ namespace Peek.UI
 
         private MainWindow? Window { get; set; }
 
+        private const string RunnerProcessName = "PowerToys";
         private const int CliInvalidArgumentsExitCode = 2;
 
         private bool _disposed;
@@ -121,7 +123,7 @@ namespace Peek.UI
 
                     case ClassificationMode.Cli:
                         TryHandleCliLaunch(classification.CliArguments!);
-                        break;
+                        return;
 
                     case ClassificationMode.InvalidRunnerArguments:
                         Logger.LogError("Peek: invalid runner arguments. Expected '--runner-pid <pid>'.");
@@ -195,11 +197,6 @@ namespace Peek.UI
         {
             resolvedPath = null;
 
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return false;
-            }
-
             try
             {
                 string fullPath = Path.GetFullPath(path);
@@ -219,7 +216,15 @@ namespace Peek.UI
 
         private static bool IsRunnerProcessAlive(int pid)
         {
-            return RunnerHelper.IsPowerToysRunner(pid);
+            try
+            {
+                using Process process = Process.GetProcessById(pid);
+                return !process.HasExited && string.Equals(process.ProcessName, RunnerProcessName, StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
