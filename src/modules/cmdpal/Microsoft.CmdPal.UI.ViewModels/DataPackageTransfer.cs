@@ -4,12 +4,36 @@
 
 using ManagedCommon;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage.Streams;
 
 namespace Microsoft.CmdPal.UI.ViewModels;
 
 public static class DataPackageTransfer
 {
+    public static async Task CopyAsync(DataPackageView source, DataPackage destination)
+    {
+        IReadOnlyDictionary<string, RandomAccessStreamReference>? resourceMap = null;
+        try
+        {
+            resourceMap = await source.GetResourceMapAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Failed to get the resource map during drag-and-drop", ex);
+        }
+
+        Copy(source, destination, resourceMap);
+    }
+
     public static void Copy(DataPackageView source, DataPackage destination)
+    {
+        Copy(source, destination, null);
+    }
+
+    private static void Copy(
+        DataPackageView source,
+        DataPackage destination,
+        IReadOnlyDictionary<string, RandomAccessStreamReference>? resourceMap)
     {
         destination.RequestedOperation = source.RequestedOperation;
 
@@ -22,6 +46,14 @@ public static class DataPackageTransfer
             catch (Exception)
             {
                 // Skip properties that cannot be copied into the drag data package.
+            }
+        }
+
+        if (resourceMap is not null)
+        {
+            foreach (var (key, value) in resourceMap)
+            {
+                destination.ResourceMap[key] = value;
             }
         }
 
