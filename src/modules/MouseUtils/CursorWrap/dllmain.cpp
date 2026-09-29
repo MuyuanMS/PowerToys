@@ -731,6 +731,7 @@ private:
 
                     if (g_cursorWrapInstance->m_gameModeActive)
                     {
+                        g_cursorWrapInstance->m_core.ResetWrapState();
                         return CallNextHookEx(nullptr, nCode, wParam, lParam);
                     }
                 }
