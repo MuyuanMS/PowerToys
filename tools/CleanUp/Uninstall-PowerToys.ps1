@@ -790,12 +790,14 @@ function Invoke-PowerToysCleanup {
                 -Description 'legacy installer component registry key'
         }
 
-        $installDirectories = @((Join-Path $env:LOCALAPPDATA 'PowerToys'))
+        $installDirectories = @()
         if ($isAdministrator) {
             $installDirectories += Join-Path $env:ProgramFiles 'PowerToys'
             if (-not [string]::IsNullOrWhiteSpace(${env:ProgramFiles(x86)})) {
                 $installDirectories += Join-Path ${env:ProgramFiles(x86)} 'PowerToys'
             }
+        } else {
+            $installDirectories += Join-Path $env:LOCALAPPDATA 'PowerToys'
         }
 
         foreach ($installDirectory in @($installDirectories | Select-Object -Unique)) {
@@ -803,12 +805,21 @@ function Invoke-PowerToysCleanup {
         }
 
         if ($RemoveSettings) {
-            Remove-KnownArtifact `
-                -Path (Join-Path $env:LOCALAPPDATA 'Microsoft\PowerToys') `
-                -Description 'current user settings and logs'
-            Remove-KnownArtifact `
-                -Path 'Registry::HKEY_CURRENT_USER\SOFTWARE\Classes\PowerToys' `
-                -Description 'current user registry settings'
+            if ($isAdministrator) {
+                $script:failures.Add(
+                    'Current-user settings were not removed from the elevated pass. ' +
+                    'Rerun with -RemoveSettings from a non-elevated PowerShell window in the affected user profile.')
+            } else {
+                Remove-KnownArtifact `
+                    -Path (Join-Path $env:LOCALAPPDATA 'Microsoft\PowerToys') `
+                    -Description 'current user settings and logs'
+                Remove-KnownArtifact `
+                    -Path 'Registry::HKEY_CURRENT_USER\SOFTWARE\Microsoft\PowerToys' `
+                    -Description 'current user PowerToys settings'
+                Remove-KnownArtifact `
+                    -Path 'Registry::HKEY_CURRENT_USER\SOFTWARE\Classes\PowerToys' `
+                    -Description 'current user registry settings'
+            }
         }
     }
 

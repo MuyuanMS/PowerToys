@@ -42,6 +42,10 @@ Also remove the current user's settings, logs, and update cache:
 .\Uninstall-PowerToys.ps1 -RemoveSettings
 ```
 
+Run `-RemoveSettings` from a non-elevated PowerShell window in the affected
+user profile. Elevated cleanup deliberately does not recursively delete
+profile-owned paths; run the profile pass after machine-wide cleanup.
+
 The script displays one confirmation prompt. For unattended support scenarios,
 append `-Confirm:$false`.
 

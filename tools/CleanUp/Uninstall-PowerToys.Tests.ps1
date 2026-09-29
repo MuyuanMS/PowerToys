@@ -332,4 +332,38 @@ Describe 'Uninstall-PowerToys' {
         $script:failures[1] | Should Match 'exit code 42'
         Assert-MockCalled Invoke-Uninstaller -Times 1 -Scope It
     }
+
+    It 'does not recursively remove profile-owned paths from an elevated pass' {
+        Mock Get-PowerToysMsiProducts { @() }
+        Mock Get-PowerToysBundles { @() }
+        Mock Test-IsAdministrator { $true }
+
+        {
+            Invoke-PowerToysCleanup -RemoveSettings -Confirm:$false
+        } | Should Throw 'One or more PowerToys cleanup operations failed.'
+
+        $script:failures.Count | Should Be 1
+        $script:failures[0] | Should Match 'Rerun with -RemoveSettings from a non-elevated PowerShell window'
+        Assert-MockCalled Remove-KnownArtifact -Times 0 -Scope It -ParameterFilter {
+            $Path -like "$env:LOCALAPPDATA*"
+        }
+        Assert-MockCalled Remove-KnownArtifact -Times 0 -Scope It -ParameterFilter {
+            $Path -eq 'Registry::HKEY_CURRENT_USER\SOFTWARE\Microsoft\PowerToys'
+        }
+    }
+
+    It 'removes the current user PowerToys settings key from a non-elevated settings pass' {
+        Mock Get-PowerToysMsiProducts { @() }
+        Mock Get-PowerToysBundles { @() }
+        Mock Test-IsAdministrator { $false }
+
+        Invoke-PowerToysCleanup -RemoveSettings -Confirm:$false
+
+        Assert-MockCalled Remove-KnownArtifact -Times 1 -Scope It -ParameterFilter {
+            $Path -eq 'Registry::HKEY_CURRENT_USER\SOFTWARE\Microsoft\PowerToys'
+        }
+        Assert-MockCalled Remove-KnownArtifact -Times 1 -Scope It -ParameterFilter {
+            $Path -eq (Join-Path $env:LOCALAPPDATA 'Microsoft\PowerToys')
+        }
+    }
 }
