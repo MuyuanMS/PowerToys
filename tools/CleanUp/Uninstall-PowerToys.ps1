@@ -356,6 +356,31 @@ function Get-ExecutableFromCommandLine {
     return $null
 }
 
+function Test-PowerToysBundleExecutable {
+    param(
+        [string]$Path
+    )
+
+    if (-not (Test-MicrosoftSignedFile -Path $Path)) {
+        return $false
+    }
+
+    try {
+        $versionInfo = (Get-Item -LiteralPath $Path -ErrorAction Stop).VersionInfo
+        return [string]::Equals(
+            $versionInfo.CompanyName,
+            'Microsoft Corporation',
+            [StringComparison]::Ordinal) -and
+            [string]::Equals(
+                $versionInfo.InternalName,
+                'burn',
+                [StringComparison]::OrdinalIgnoreCase) -and
+            $versionInfo.ProductName -like 'PowerToys (Preview)*'
+    } catch {
+        return $false
+    }
+}
+
 function Get-BundleExecutable {
     param(
         [object]$Bundle
@@ -369,26 +394,11 @@ function Get-BundleExecutable {
 
     foreach ($candidate in $candidates) {
         if ([string]::IsNullOrWhiteSpace($candidate) -or
-            -not (Test-MicrosoftSignedFile -Path $candidate)) {
+            -not (Test-PowerToysBundleExecutable -Path $candidate)) {
             continue
         }
 
-        try {
-            $versionInfo = (Get-Item -LiteralPath $candidate -ErrorAction Stop).VersionInfo
-            if ([string]::Equals(
-                $versionInfo.CompanyName,
-                'Microsoft Corporation',
-                [StringComparison]::Ordinal) -and
-                [string]::Equals(
-                    $versionInfo.InternalName,
-                    'burn',
-                    [StringComparison]::OrdinalIgnoreCase) -and
-                $versionInfo.ProductName -like 'PowerToys (Preview)*') {
-                return $candidate
-            }
-        } catch {
-            continue
-        }
+        return $candidate
     }
 
     return $null
@@ -438,8 +448,8 @@ function Copy-BundleExecutableForExecution {
 
     $destination = Join-Path $DestinationDirectory ([IO.Path]::GetFileName($Path))
     Copy-Item -LiteralPath $Path -Destination $destination -Force -ErrorAction Stop
-    if (-not (Test-MicrosoftSignedFile -Path $destination)) {
-        throw "The staged bundle at $destination is not an authentic Microsoft-signed file."
+    if (-not (Test-PowerToysBundleExecutable -Path $destination)) {
+        throw "The staged bundle at $destination is not an authentic Microsoft-signed PowerToys bootstrapper."
     }
 
     return $destination
@@ -496,6 +506,21 @@ function Stop-PowerToysProcesses {
     }
 }
 
+function Add-UninstallerExitCode {
+    param(
+        [int]$ExitCode,
+        [string]$Description
+    )
+
+    if ($rebootRequiredExitCodes -contains $ExitCode) {
+        $script:rebootRequired = $true
+    }
+
+    if ($successfulUninstallExitCodes -notcontains $ExitCode) {
+        $script:failures.Add("$Description failed with exit code $ExitCode.")
+    }
+}
+
 function Invoke-Uninstaller {
     param(
         [string]$FilePath,
@@ -511,13 +536,7 @@ function Invoke-Uninstaller {
         return
     }
 
-    if ($rebootRequiredExitCodes -contains $process.ExitCode) {
-        $script:rebootRequired = $true
-    }
-
-    if ($successfulUninstallExitCodes -notcontains $process.ExitCode) {
-        $script:failures.Add("$Description failed with exit code $($process.ExitCode).")
-    }
+    Add-UninstallerExitCode -ExitCode $process.ExitCode -Description $Description
 }
 
 function Remove-KnownArtifact {
@@ -562,207 +581,221 @@ function Remove-KnownRegistryValue {
     }
 }
 
-$products = @(Get-PowerToysMsiProducts)
-$bundles = @(Get-PowerToysBundles)
+function Invoke-PowerToysCleanup {
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
+    param(
+        [switch]$RemoveSettings
+    )
 
-Write-Host 'Detected PowerToys MSI products:'
-if ($products.Count -eq 0) {
-    Write-Host '  None'
-} else {
-    foreach ($product in $products) {
-        Write-Host "  $($product.Scope): $($product.ProductCode) [$($product.StateName)]"
-    }
-}
+    $script:rebootRequired = $false
+    $script:failures = [System.Collections.Generic.List[string]]::new()
 
-Write-Host 'Detected PowerToys bundles:'
-if ($bundles.Count -eq 0) {
-    Write-Host '  None'
-} else {
-    foreach ($bundle in $bundles) {
-        Write-Host "  $($bundle.Scope): $($bundle.DisplayName) $($bundle.DisplayVersion)"
-    }
-}
+    $products = @(Get-PowerToysMsiProducts)
+    $bundles = @(Get-PowerToysBundles)
 
-$target = "$($products.Count) MSI product(s), $($bundles.Count) bundle(s), and known PowerToys installation artifacts"
-if ($RemoveSettings) {
-    $target += ', including the current user settings'
-}
-
-if (-not $PSCmdlet.ShouldProcess($target, 'Remove PowerToys')) {
-    return
-}
-
-$isAdministrator = Test-IsAdministrator
-$machineTargets = @(
-    $products | Where-Object { $_.Scope -eq 'PerMachine' -and $_.State -ne -1 -and $_.State -ne 2 }
-) + @($bundles | Where-Object { $_.Scope -eq 'PerMachine' })
-
-$timestamp = Get-Date -Format 'yyyyMMdd-HHmm'
-$runId = "$timestamp-$([Guid]::NewGuid().ToString('N'))"
-if ($isAdministrator) {
-    $stagingDirectory = Join-Path $env:ProgramData "Microsoft\PowerToys\Cleanup\$runId"
-    $logDirectory = Join-Path $env:ProgramData "Microsoft\PowerToys\CleanupLogs\$runId"
-    New-ProtectedDirectory -Path $stagingDirectory -AdministratorOnly
-    New-ProtectedDirectory -Path $logDirectory -AdministratorOnly
-} else {
-    $stagingDirectory = Join-Path $env:LOCALAPPDATA "Microsoft\PowerToys\Cleanup\$runId"
-    $logDirectory = Join-Path $env:LOCALAPPDATA "PowerToysCleanupLogs\$runId"
-    New-ProtectedDirectory -Path $stagingDirectory
-    New-ProtectedDirectory -Path $logDirectory
-}
-
-try {
-    Stop-PowerToysProcesses
-
-    foreach ($product in $products) {
-        if (-not $isAdministrator -and $product.Scope -ne 'PerUser') {
-            continue
-        }
-
-        if ($product.State -eq -1 -or $product.State -eq 2) {
-            Write-Host "Skipping inactive $($product.Scope) MSI $($product.ProductCode) [$($product.StateName)]."
-            continue
-        }
-
-        if (-not (Test-PowerToysMsiProduct -Product $product)) {
-            $script:failures.Add(
-                "Refusing to run the uninstall command for $($product.Scope) MSI $($product.ProductCode) " +
-                'because its cached package is not an authentic Microsoft-signed PowerToys MSI.')
-            continue
-        }
-
-        $localPackage = Get-MsiProductProperty -ProductCode $product.ProductCode -Property 'LocalPackage'
-        try {
-            $stagedMsi = Copy-MsiForExecution `
-                -Product $product `
-                -Path $localPackage `
-                -DestinationDirectory $stagingDirectory
-        } catch {
-            $script:failures.Add(
-                "Could not stage the cached MSI for $($product.Scope) $($product.ProductCode) " +
-                "in a protected location: $($_.Exception.Message)")
-            continue
-        }
-
-        $logPath = Join-Path $logDirectory "$([Guid]::NewGuid().ToString('N')).log"
-        $arguments = @(
-            '/x',
-            "`"$stagedMsi`"",
-            '/quiet',
-            '/norestart',
-            '/L*v',
-            "`"$logPath`""
-        )
-        Invoke-Uninstaller `
-            -FilePath (Join-Path $env:SystemRoot 'System32\msiexec.exe') `
-            -Arguments $arguments `
-            -Description "Uninstalling $($product.Scope) MSI $($product.ProductCode)"
-    }
-
-    foreach ($bundle in $bundles) {
-        if (-not $isAdministrator -and $bundle.Scope -ne 'PerUser') {
-            continue
-        }
-
-        $bundleExecutable = Get-BundleExecutable -Bundle $bundle
-        if ($null -eq $bundleExecutable) {
-            $script:failures.Add(
-                "A trusted cached bootstrapper for $($bundle.Scope) $($bundle.DisplayVersion) was not found. " +
-                "Its registry entry remains at $($bundle.RegistryPath).")
-            continue
-        }
-
-        try {
-            $bundleExecutable = Copy-BundleExecutableForExecution -Path $bundleExecutable -DestinationDirectory $stagingDirectory
-        } catch {
-            $script:failures.Add(
-                "Could not stage the cached bootstrapper for $($bundle.Scope) $($bundle.DisplayVersion) " +
-                "in a protected location: $($_.Exception.Message)")
-            continue
-        }
-
-        Invoke-Uninstaller `
-            -FilePath $bundleExecutable `
-            -Arguments @('/uninstall', '/quiet', '/norestart') `
-            -Description "Removing $($bundle.Scope) bundle $($bundle.DisplayVersion)"
-    }
-} finally {
-    Remove-KnownArtifact -Path $stagingDirectory -Description 'protected cleanup staging directory'
-}
-
-$remainingProducts = @(Get-PowerToysMsiProducts | Where-Object {
-    ($isAdministrator -or $_.Scope -eq 'PerUser') -and
-    $_.State -ne -1 -and $_.State -ne 2
-})
-$remainingBundles = @(Get-PowerToysBundles | Where-Object {
-    $isAdministrator -or $_.Scope -eq 'PerUser'
-})
-
-if ($remainingProducts.Count -gt 0) {
-    $script:failures.Add(
-        "Active MSI products remain: $($remainingProducts.ProductCode -join ', ').")
-}
-
-if ($remainingBundles.Count -gt 0) {
-    $script:failures.Add(
-        "Registered bundles remain: $($remainingBundles.DisplayVersion -join ', ').")
-}
-
-if ($remainingProducts.Count -eq 0 -and $remainingBundles.Count -eq 0) {
-    $installScopeRegistryKeys = @('Registry::HKEY_CURRENT_USER\SOFTWARE\Classes\PowerToys')
-    if ($isAdministrator) {
-        $installScopeRegistryKeys += 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Classes\PowerToys'
-    }
-    foreach ($registryKey in $installScopeRegistryKeys) {
-        Remove-KnownRegistryValue `
-            -Path $registryKey `
-            -Name 'InstallScope' `
-            -Description 'legacy install-scope registry value'
-        Remove-KnownArtifact `
-            -Path "$registryKey\components" `
-            -Description 'legacy installer component registry key'
-    }
-
-    $installDirectories = @((Join-Path $env:LOCALAPPDATA 'PowerToys'))
-    if ($isAdministrator) {
-        $installDirectories += Join-Path $env:ProgramFiles 'PowerToys'
-        if (-not [string]::IsNullOrWhiteSpace(${env:ProgramFiles(x86)})) {
-            $installDirectories += Join-Path ${env:ProgramFiles(x86)} 'PowerToys'
+    Write-Host 'Detected PowerToys MSI products:'
+    if ($products.Count -eq 0) {
+        Write-Host '  None'
+    } else {
+        foreach ($product in $products) {
+            Write-Host "  $($product.Scope): $($product.ProductCode) [$($product.StateName)]"
         }
     }
 
-    foreach ($installDirectory in @($installDirectories | Select-Object -Unique)) {
-        Remove-KnownArtifact -Path $installDirectory -Description 'installation directory'
+    Write-Host 'Detected PowerToys bundles:'
+    if ($bundles.Count -eq 0) {
+        Write-Host '  None'
+    } else {
+        foreach ($bundle in $bundles) {
+            Write-Host "  $($bundle.Scope): $($bundle.DisplayName) $($bundle.DisplayVersion)"
+        }
     }
 
+    $target = "$($products.Count) MSI product(s), $($bundles.Count) bundle(s), and known PowerToys installation artifacts"
     if ($RemoveSettings) {
-        Remove-KnownArtifact `
-            -Path (Join-Path $env:LOCALAPPDATA 'Microsoft\PowerToys') `
-            -Description 'current user settings and logs'
-        Remove-KnownArtifact `
-            -Path 'Registry::HKEY_CURRENT_USER\SOFTWARE\Classes\PowerToys' `
-            -Description 'current user registry settings'
+        $target += ', including the current user settings'
     }
-}
 
-if ($script:failures.Count -gt 0) {
+    if (-not $PSCmdlet.ShouldProcess($target, 'Remove PowerToys')) {
+        return
+    }
+
+    $isAdministrator = Test-IsAdministrator
+    $machineTargets = @(
+        $products | Where-Object { $_.Scope -eq 'PerMachine' -and $_.State -ne -1 -and $_.State -ne 2 }
+    ) + @($bundles | Where-Object { $_.Scope -eq 'PerMachine' })
+
+    $timestamp = Get-Date -Format 'yyyyMMdd-HHmm'
+    $runId = "$timestamp-$([Guid]::NewGuid().ToString('N'))"
+    if ($isAdministrator) {
+        $stagingDirectory = Join-Path $env:ProgramData "Microsoft\PowerToys\Cleanup\$runId"
+        $logDirectory = Join-Path $env:ProgramData "Microsoft\PowerToys\CleanupLogs\$runId"
+        New-ProtectedDirectory -Path $stagingDirectory -AdministratorOnly
+        New-ProtectedDirectory -Path $logDirectory -AdministratorOnly
+    } else {
+        $stagingDirectory = Join-Path $env:LOCALAPPDATA "Microsoft\PowerToys\Cleanup\$runId"
+        $logDirectory = Join-Path $env:LOCALAPPDATA "PowerToysCleanupLogs\$runId"
+        New-ProtectedDirectory -Path $stagingDirectory
+        New-ProtectedDirectory -Path $logDirectory
+    }
+
+    try {
+        Stop-PowerToysProcesses
+
+        foreach ($product in $products) {
+            if (-not $isAdministrator -and $product.Scope -ne 'PerUser') {
+                continue
+            }
+
+            if ($product.State -eq -1 -or $product.State -eq 2) {
+                Write-Host "Skipping inactive $($product.Scope) MSI $($product.ProductCode) [$($product.StateName)]."
+                continue
+            }
+
+            if (-not (Test-PowerToysMsiProduct -Product $product)) {
+                $script:failures.Add(
+                    "Refusing to run the uninstall command for $($product.Scope) MSI $($product.ProductCode) " +
+                    'because its cached package is not an authentic Microsoft-signed PowerToys MSI.')
+                continue
+            }
+
+            $localPackage = Get-MsiProductProperty -ProductCode $product.ProductCode -Property 'LocalPackage'
+            try {
+                $stagedMsi = Copy-MsiForExecution `
+                    -Product $product `
+                    -Path $localPackage `
+                    -DestinationDirectory $stagingDirectory
+            } catch {
+                $script:failures.Add(
+                    "Could not stage the cached MSI for $($product.Scope) $($product.ProductCode) " +
+                    "in a protected location: $($_.Exception.Message)")
+                continue
+            }
+
+            $logPath = Join-Path $logDirectory "$([Guid]::NewGuid().ToString('N')).log"
+            $arguments = @(
+                '/x',
+                "`"$stagedMsi`"",
+                '/quiet',
+                '/norestart',
+                '/L*v',
+                "`"$logPath`""
+            )
+            Invoke-Uninstaller `
+                -FilePath (Join-Path $env:SystemRoot 'System32\msiexec.exe') `
+                -Arguments $arguments `
+                -Description "Uninstalling $($product.Scope) MSI $($product.ProductCode)"
+        }
+
+        foreach ($bundle in $bundles) {
+            if (-not $isAdministrator -and $bundle.Scope -ne 'PerUser') {
+                continue
+            }
+
+            $bundleExecutable = Get-BundleExecutable -Bundle $bundle
+            if ($null -eq $bundleExecutable) {
+                $script:failures.Add(
+                    "A trusted cached bootstrapper for $($bundle.Scope) $($bundle.DisplayVersion) was not found. " +
+                    "Its registry entry remains at $($bundle.RegistryPath).")
+                continue
+            }
+
+            try {
+                $bundleExecutable = Copy-BundleExecutableForExecution -Path $bundleExecutable -DestinationDirectory $stagingDirectory
+            } catch {
+                $script:failures.Add(
+                    "Could not stage the cached bootstrapper for $($bundle.Scope) $($bundle.DisplayVersion) " +
+                    "in a protected location: $($_.Exception.Message)")
+                continue
+            }
+
+            Invoke-Uninstaller `
+                -FilePath $bundleExecutable `
+                -Arguments @('/uninstall', '/quiet', '/norestart') `
+                -Description "Removing $($bundle.Scope) bundle $($bundle.DisplayVersion)"
+        }
+    } finally {
+        Remove-KnownArtifact -Path $stagingDirectory -Description 'protected cleanup staging directory'
+    }
+
+    $remainingProducts = @(Get-PowerToysMsiProducts | Where-Object {
+        ($isAdministrator -or $_.Scope -eq 'PerUser') -and
+        $_.State -ne -1 -and $_.State -ne 2
+    })
+    $remainingBundles = @(Get-PowerToysBundles | Where-Object {
+        $isAdministrator -or $_.Scope -eq 'PerUser'
+    })
+
+    if ($remainingProducts.Count -gt 0) {
+        $script:failures.Add(
+            "Active MSI products remain: $($remainingProducts.ProductCode -join ', ').")
+    }
+
+    if ($remainingBundles.Count -gt 0) {
+        $script:failures.Add(
+            "Registered bundles remain: $($remainingBundles.DisplayVersion -join ', ').")
+    }
+
+    if ($remainingProducts.Count -eq 0 -and $remainingBundles.Count -eq 0) {
+        $installScopeRegistryKeys = @('Registry::HKEY_CURRENT_USER\SOFTWARE\Classes\PowerToys')
+        if ($isAdministrator) {
+            $installScopeRegistryKeys += 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Classes\PowerToys'
+        }
+        foreach ($registryKey in $installScopeRegistryKeys) {
+            Remove-KnownRegistryValue `
+                -Path $registryKey `
+                -Name 'InstallScope' `
+                -Description 'legacy install-scope registry value'
+            Remove-KnownArtifact `
+                -Path "$registryKey\components" `
+                -Description 'legacy installer component registry key'
+        }
+
+        $installDirectories = @((Join-Path $env:LOCALAPPDATA 'PowerToys'))
+        if ($isAdministrator) {
+            $installDirectories += Join-Path $env:ProgramFiles 'PowerToys'
+            if (-not [string]::IsNullOrWhiteSpace(${env:ProgramFiles(x86)})) {
+                $installDirectories += Join-Path ${env:ProgramFiles(x86)} 'PowerToys'
+            }
+        }
+
+        foreach ($installDirectory in @($installDirectories | Select-Object -Unique)) {
+            Remove-KnownArtifact -Path $installDirectory -Description 'installation directory'
+        }
+
+        if ($RemoveSettings) {
+            Remove-KnownArtifact `
+                -Path (Join-Path $env:LOCALAPPDATA 'Microsoft\PowerToys') `
+                -Description 'current user settings and logs'
+            Remove-KnownArtifact `
+                -Path 'Registry::HKEY_CURRENT_USER\SOFTWARE\Classes\PowerToys' `
+                -Description 'current user registry settings'
+        }
+    }
+
+    if ($script:failures.Count -gt 0) {
+        Write-Host ''
+        Write-Host 'PowerToys cleanup did not complete:' -ForegroundColor Red
+        foreach ($failure in $script:failures) {
+            Write-Host "  - $failure" -ForegroundColor Red
+        }
+        Write-Host "MSI logs: $logDirectory"
+        throw 'One or more PowerToys cleanup operations failed.'
+    }
+
     Write-Host ''
-    Write-Host 'PowerToys cleanup did not complete:' -ForegroundColor Red
-    foreach ($failure in $script:failures) {
-        Write-Host "  - $failure" -ForegroundColor Red
+    if (-not $isAdministrator -and $machineTargets.Count -gt 0) {
+        Write-Host 'The current user PowerToys installation was removed successfully.' -ForegroundColor Green
+        Write-Host 'Machine-wide installations remain. Run the script again from an elevated PowerShell window.' -ForegroundColor Yellow
+    } else {
+        Write-Host 'PowerToys was removed successfully.' -ForegroundColor Green
     }
     Write-Host "MSI logs: $logDirectory"
-    throw 'One or more PowerToys cleanup operations failed.'
+    if ($script:rebootRequired) {
+        Write-Host 'Restart Windows to complete the cleanup.' -ForegroundColor Yellow
+    }
 }
 
-Write-Host ''
-if (-not $isAdministrator -and $machineTargets.Count -gt 0) {
-    Write-Host 'The current user PowerToys installation was removed successfully.' -ForegroundColor Green
-    Write-Host 'Machine-wide installations remain. Run the script again from an elevated PowerShell window.' -ForegroundColor Yellow
-} else {
-    Write-Host 'PowerToys was removed successfully.' -ForegroundColor Green
-}
-Write-Host "MSI logs: $logDirectory"
-if ($script:rebootRequired) {
-    Write-Host 'Restart Windows to complete the cleanup.' -ForegroundColor Yellow
+if ($MyInvocation.InvocationName -ne '.') {
+    Invoke-PowerToysCleanup @PSBoundParameters
 }
