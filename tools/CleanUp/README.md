@@ -32,9 +32,9 @@ Remove all detected PowerToys installations:
 .\Uninstall-PowerToys.ps1
 ```
 
-Run from the affected standard-user profile to remove only its per-user
-installation. Run again from an elevated PowerShell window to remove
-machine-wide installations.
+For a mixed-scope installation, run first from an elevated PowerShell window
+to remove the machine-wide installation. Then sign in to each affected user
+profile and run the script again to remove its per-user installation.
 
 Also remove the current user's settings, logs, and update cache:
 

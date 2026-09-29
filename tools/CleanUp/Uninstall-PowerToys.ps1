@@ -700,6 +700,13 @@ function Invoke-PowerToysCleanup {
                 continue
             }
 
+            if (-not $isAdministrator -and $machineTargets.Count -gt 0) {
+                $script:failures.Add(
+                    "Deferred the per-user bundle $($bundle.DisplayVersion) because a machine-wide installation remains. " +
+                    'Run the cleanup from an elevated PowerShell window, then rerun it from this user profile.')
+                continue
+            }
+
             $bundleExecutable = Get-BundleExecutable -Bundle $bundle
             if ($null -eq $bundleExecutable) {
                 $script:failures.Add(

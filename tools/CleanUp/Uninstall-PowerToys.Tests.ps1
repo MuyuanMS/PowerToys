@@ -109,6 +109,50 @@ Describe 'Uninstall-PowerToys' {
         $message | Should Match 'Microsoft-signed PowerToys bootstrapper'
     }
 
+    It 'defers a per-user bundle until the machine-wide installation is removed' {
+        $script:productCall = 0
+        Mock Get-PowerToysMsiProducts {
+            $script:productCall++
+            if ($script:productCall -eq 1) {
+                return [pscustomobject]@{
+                    Scope = 'PerMachine'
+                    ProductCode = '{55555555-5555-5555-5555-555555555555}'
+                    UpgradeCode = '{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}'
+                    State = 5
+                    StateName = 'Default'
+                }
+            }
+
+            return @()
+        }
+        $script:bundleCall = 0
+        Mock Get-PowerToysBundles {
+            $script:bundleCall++
+            if ($script:bundleCall -eq 1) {
+                return [pscustomobject]@{
+                    Scope = 'PerUser'
+                    DisplayName = 'PowerToys (Preview) x64'
+                    DisplayVersion = '0.100.2'
+                    RegistryPath = 'TestRegistryPath'
+                }
+            }
+
+            return @()
+        }
+        Mock Test-IsAdministrator { $false }
+        Mock Get-BundleExecutable { throw 'The deferred bundle must not be inspected.' }
+        Mock Invoke-Uninstaller { throw 'The deferred bundle must not be launched.' }
+
+        {
+            Invoke-PowerToysCleanup -Confirm:$false
+        } | Should Throw 'One or more PowerToys cleanup operations failed.'
+
+        $script:failures.Count | Should Be 1
+        $script:failures[0] | Should Match 'Deferred the per-user bundle'
+        Assert-MockCalled Get-BundleExecutable -Times 0 -Scope It
+        Assert-MockCalled Invoke-Uninstaller -Times 0 -Scope It
+    }
+
     It 'tracks reboot-required and failed uninstall exit codes' {
         $script:rebootRequired = $false
         $script:failures = [System.Collections.Generic.List[string]]::new()

@@ -94,8 +94,9 @@ msbuild -p:Platform=x64 -p:Configuration=Release .\tools\StylesReportTool\Styles
   - Removes cached WiX bundle registrations
   - Preserves settings by default; `-RemoveSettings` deletes current-user settings
 
-Run `Uninstall-PowerToys.ps1` from an elevated PowerShell window. Start with
-`-WhatIf` to review the installations it detects. See the
+For mixed-scope recovery, run `Uninstall-PowerToys.ps1` from an elevated
+PowerShell window first, then run it from each affected user profile. Start
+with `-WhatIf` to review the installations it detects. See the
 [cleanup tool README](../../../tools/CleanUp/README.md) for usage and limitations.
 
 ### Using Debugging Tools
