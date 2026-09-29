@@ -33,6 +33,15 @@ Describe 'Uninstall-PowerToys' {
         ${env:ProgramFiles(x86)} = Join-Path $TestDrive 'ProgramFilesX86'
         $env:SystemRoot = Join-Path $TestDrive 'Windows'
 
+        Mock Get-SpecialFolderPath {
+            switch ($Folder) {
+                'CommonApplicationData' { return Join-Path $TestDrive 'ApiProgramData' }
+                'LocalApplicationData' { return Join-Path $TestDrive 'ApiLocalAppData' }
+                'ProgramFiles' { return Join-Path $TestDrive 'ApiProgramFiles' }
+                'ProgramFilesX86' { return Join-Path $TestDrive 'ApiProgramFilesX86' }
+                default { throw "Unexpected special folder: $Folder" }
+            }
+        }
         Mock New-ProtectedDirectory {}
         Mock Stop-PowerToysProcesses {}
         Mock Remove-KnownArtifact {}
@@ -417,10 +426,37 @@ Describe 'Uninstall-PowerToys' {
         $script:failures.Count | Should Be 1
         $script:failures[0] | Should Match 'Rerun with -RemoveSettings from a non-elevated PowerShell window'
         Assert-MockCalled Remove-KnownArtifact -Times 0 -Scope It -ParameterFilter {
-            $Path -like "$env:LOCALAPPDATA*"
+            $Path -like "$(Join-Path $TestDrive 'ApiLocalAppData')*"
         }
         Assert-MockCalled Remove-KnownArtifact -Times 0 -Scope It -ParameterFilter {
             $Path -eq 'Registry::HKEY_CURRENT_USER\SOFTWARE\Microsoft\PowerToys'
+        }
+    }
+
+    It 'uses API-backed machine roots despite process environment overrides' {
+        $env:ProgramData = Join-Path $TestDrive 'PoisonedProgramData'
+        $env:ProgramFiles = Join-Path $TestDrive 'PoisonedProgramFiles'
+        ${env:ProgramFiles(x86)} = Join-Path $TestDrive 'PoisonedProgramFilesX86'
+        Mock Get-PowerToysMsiProducts { @() }
+        Mock Get-PowerToysBundles { @() }
+        Mock Test-IsAdministrator { $true }
+
+        Invoke-PowerToysCleanup -Confirm:$false
+
+        Assert-MockCalled New-ProtectedDirectory -Times 2 -Scope It -ParameterFilter {
+            $AdministratorOnly -and $Path -like "$(Join-Path $TestDrive 'ApiProgramData')*"
+        }
+        Assert-MockCalled Remove-KnownArtifact -Times 1 -Scope It -ParameterFilter {
+            $Path -eq (Join-Path (Join-Path $TestDrive 'ApiProgramFiles') 'PowerToys')
+        }
+        Assert-MockCalled Remove-KnownArtifact -Times 1 -Scope It -ParameterFilter {
+            $Path -eq (Join-Path (Join-Path $TestDrive 'ApiProgramFilesX86') 'PowerToys')
+        }
+        Assert-MockCalled New-ProtectedDirectory -Times 0 -Scope It -ParameterFilter {
+            $Path -like "$env:ProgramData*"
+        }
+        Assert-MockCalled Remove-KnownArtifact -Times 0 -Scope It -ParameterFilter {
+            $Path -like "$env:ProgramFiles*" -or $Path -like "${env:ProgramFiles(x86)}*"
         }
     }
 
@@ -435,7 +471,7 @@ Describe 'Uninstall-PowerToys' {
             $Path -eq 'Registry::HKEY_CURRENT_USER\SOFTWARE\Microsoft\PowerToys'
         }
         Assert-MockCalled Remove-KnownArtifact -Times 1 -Scope It -ParameterFilter {
-            $Path -eq (Join-Path $env:LOCALAPPDATA 'Microsoft\PowerToys')
+            $Path -eq (Join-Path (Join-Path $TestDrive 'ApiLocalAppData') 'Microsoft\PowerToys')
         }
     }
 }

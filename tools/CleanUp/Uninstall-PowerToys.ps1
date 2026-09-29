@@ -206,6 +206,19 @@ function New-WindowsInstallerObject {
     return New-Object -ComObject WindowsInstaller.Installer
 }
 
+function Get-SpecialFolderPath {
+    param(
+        [Environment+SpecialFolder]$Folder
+    )
+
+    $path = [Environment]::GetFolderPath($Folder)
+    if ([string]::IsNullOrWhiteSpace($path)) {
+        throw "Windows did not return a path for the $Folder special folder."
+    }
+
+    return $path
+}
+
 function Get-MsiDatabaseProperty {
     param(
         [string]$Path,
@@ -683,13 +696,15 @@ function Invoke-PowerToysCleanup {
     $timestamp = Get-Date -Format 'yyyyMMdd-HHmm'
     $runId = "$timestamp-$([Guid]::NewGuid().ToString('N'))"
     if ($isAdministrator) {
-        $stagingDirectory = Join-Path $env:ProgramData "Microsoft\PowerToys\Cleanup\$runId"
-        $logDirectory = Join-Path $env:ProgramData "Microsoft\PowerToys\CleanupLogs\$runId"
+        $commonApplicationData = Get-SpecialFolderPath -Folder CommonApplicationData
+        $stagingDirectory = Join-Path $commonApplicationData "Microsoft\PowerToys\Cleanup\$runId"
+        $logDirectory = Join-Path $commonApplicationData "Microsoft\PowerToys\CleanupLogs\$runId"
         New-ProtectedDirectory -Path $stagingDirectory -AdministratorOnly
         New-ProtectedDirectory -Path $logDirectory -AdministratorOnly
     } else {
-        $stagingDirectory = Join-Path $env:LOCALAPPDATA "Microsoft\PowerToys\Cleanup\$runId"
-        $logDirectory = Join-Path $env:LOCALAPPDATA "PowerToysCleanupLogs\$runId"
+        $localApplicationData = Get-SpecialFolderPath -Folder LocalApplicationData
+        $stagingDirectory = Join-Path $localApplicationData "Microsoft\PowerToys\Cleanup\$runId"
+        $logDirectory = Join-Path $localApplicationData "PowerToysCleanupLogs\$runId"
         New-ProtectedDirectory -Path $stagingDirectory
         New-ProtectedDirectory -Path $logDirectory
     }
@@ -823,12 +838,10 @@ function Invoke-PowerToysCleanup {
 
         $installDirectories = @()
         if ($isAdministrator) {
-            $installDirectories += Join-Path $env:ProgramFiles 'PowerToys'
-            if (-not [string]::IsNullOrWhiteSpace(${env:ProgramFiles(x86)})) {
-                $installDirectories += Join-Path ${env:ProgramFiles(x86)} 'PowerToys'
-            }
+            $installDirectories += Join-Path (Get-SpecialFolderPath -Folder ProgramFiles) 'PowerToys'
+            $installDirectories += Join-Path (Get-SpecialFolderPath -Folder ProgramFilesX86) 'PowerToys'
         } else {
-            $installDirectories += Join-Path $env:LOCALAPPDATA 'PowerToys'
+            $installDirectories += Join-Path $localApplicationData 'PowerToys'
         }
 
         foreach ($installDirectory in @($installDirectories | Select-Object -Unique)) {
@@ -842,7 +855,7 @@ function Invoke-PowerToysCleanup {
                     'Rerun with -RemoveSettings from a non-elevated PowerShell window in the affected user profile.')
             } else {
                 Remove-KnownArtifact `
-                    -Path (Join-Path $env:LOCALAPPDATA 'Microsoft\PowerToys') `
+                    -Path (Join-Path $localApplicationData 'Microsoft\PowerToys') `
                     -Description 'current user settings and logs'
                 Remove-KnownArtifact `
                     -Path 'Registry::HKEY_CURRENT_USER\SOFTWARE\Microsoft\PowerToys' `
