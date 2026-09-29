@@ -12,35 +12,22 @@ public static class DataPackageTransfer
 {
     public static async Task CopyAsync(DataPackageView source, DataPackage destination)
     {
-        var resourceMap = await PrepareResourceMapAsync(source);
-        Copy(source, destination, resourceMap);
-    }
-
-    public static async Task<IReadOnlyDictionary<string, RandomAccessStreamReference>?> PrepareResourceMapAsync(DataPackageView source)
-    {
+        IReadOnlyDictionary<string, RandomAccessStreamReference>? resourceMap = null;
         try
         {
-            return await source.GetResourceMapAsync();
+            resourceMap = await source.GetResourceMapAsync();
         }
         catch (Exception ex)
         {
             Logger.LogError("Failed to get the resource map during drag-and-drop", ex);
-            return null;
         }
+
+        Copy(source, destination, resourceMap);
     }
 
-    public static bool TryCopy(
-        DataPackageView source,
-        DataPackage destination,
-        Task<IReadOnlyDictionary<string, RandomAccessStreamReference>?>? resourceMapTask)
+    public static void Copy(DataPackageView source, DataPackage destination)
     {
-        if (resourceMapTask?.IsCompletedSuccessfully != true)
-        {
-            return false;
-        }
-
-        Copy(source, destination, resourceMapTask.Result);
-        return true;
+        Copy(source, destination, null);
     }
 
     private static void Copy(
@@ -83,19 +70,35 @@ public static class DataPackageTransfer
         }
     }
 
-    private static async void DelayRenderer(DataProviderRequest request, DataPackageView source, string format)
+    private static void DelayRenderer(DataProviderRequest request, DataPackageView source, string format)
     {
         var deferral = request.GetDeferral();
         try
         {
-            request.SetData(await source.GetDataAsync(format));
+            source.GetDataAsync(format)
+                .AsTask()
+                .ContinueWith(dataTask =>
+                {
+                    try
+                    {
+                        if (dataTask.IsCompletedSuccessfully)
+                        {
+                            request.SetData(dataTask.Result);
+                        }
+                        else if (dataTask.IsFaulted && dataTask.Exception is not null)
+                        {
+                            Logger.LogError($"Failed to get data for format '{format}' during drag-and-drop", dataTask.Exception);
+                        }
+                    }
+                    finally
+                    {
+                        deferral.Complete();
+                    }
+                });
         }
         catch (Exception ex)
         {
             Logger.LogError($"Failed to set data for format '{format}' during drag-and-drop", ex);
-        }
-        finally
-        {
             deferral.Complete();
         }
     }

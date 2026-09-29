@@ -1229,11 +1229,7 @@ public sealed partial class ListItemsView : UserControl,
                 return;
             }
 
-            if (!DataPackageTransfer.TryCopy(item.DataPackage, e.Data, item.DataPackageResourceMapTask))
-            {
-                e.Cancel = true;
-                return;
-            }
+            DataPackageTransfer.Copy(item.DataPackage, e.Data);
 
             WeakReferenceMessenger.Default.Send(new DragStartedMessage());
         }

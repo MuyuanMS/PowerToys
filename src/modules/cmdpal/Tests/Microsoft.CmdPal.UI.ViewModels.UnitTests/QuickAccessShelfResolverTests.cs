@@ -3,7 +3,6 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CommandPalette.Extensions.Toolkit;
@@ -108,6 +107,7 @@ public partial class QuickAccessShelfResolverTests
     {
         var source = new DataPackage { RequestedOperation = DataPackageOperation.Link };
         source.Properties["TestProperty"] = "TestValue";
+        source.ResourceMap["TestResource"] = RandomAccessStreamReference.CreateFromUri(new Uri("https://example.com/resource"));
         source.SetText("Test payload");
         var item = new ListItem { Title = "Recent", DataPackageView = source.GetView() };
         var shelfItem = QuickAccessShelfItem.CreateOrReuse([], item, shortcutIndex: 0, startsNewSection: false);
@@ -116,39 +116,11 @@ public partial class QuickAccessShelfResolverTests
         await DataPackageTransfer.CopyAsync(shelfItem.DataPackage!, destination);
 
         var destinationView = destination.GetView();
+        var destinationResourceMap = await destinationView.GetResourceMapAsync();
         Assert.AreEqual(DataPackageOperation.Link, destinationView.RequestedOperation);
         Assert.AreEqual("TestValue", destinationView.Properties["TestProperty"]);
+        Assert.IsTrue(destinationResourceMap.ContainsKey("TestResource"));
         Assert.AreEqual("Test payload", await destinationView.GetTextAsync().AsTask());
-    }
-
-    [TestMethod]
-    public async Task ShelfItemDataPackage_PreservesResourceMap()
-    {
-        var source = new DataPackage();
-        var resource = RandomAccessStreamReference.CreateFromUri(new Uri("https://example.com/image.png"));
-        source.ResourceMap["image.png"] = resource;
-        var destination = new DataPackage();
-
-        await DataPackageTransfer.CopyAsync(source.GetView(), destination);
-
-        var destinationResourceMap = await destination.GetView().GetResourceMapAsync();
-        Assert.AreEqual(1, destinationResourceMap.Count);
-        Assert.AreSame(resource, destinationResourceMap["image.png"]);
-    }
-
-    [TestMethod]
-    public async Task DataPackageTransfer_TryCopyRequiresPreparedResourceMap()
-    {
-        var source = new DataPackage();
-        source.ResourceMap["image.png"] = RandomAccessStreamReference.CreateFromUri(new Uri("https://example.com/image.png"));
-        var pendingResourceMap = new TaskCompletionSource<IReadOnlyDictionary<string, RandomAccessStreamReference>?>();
-
-        Assert.IsFalse(DataPackageTransfer.TryCopy(source.GetView(), new DataPackage(), pendingResourceMap.Task));
-
-        var preparedResourceMap = await DataPackageTransfer.PrepareResourceMapAsync(source.GetView());
-        var destination = new DataPackage();
-        Assert.IsTrue(DataPackageTransfer.TryCopy(source.GetView(), destination, Task.FromResult(preparedResourceMap)));
-        Assert.AreEqual(1, (await destination.GetView().GetResourceMapAsync()).Count);
     }
 
     [TestMethod]
