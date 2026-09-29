@@ -652,7 +652,15 @@ function Invoke-PowerToysCleanup {
                 continue
             }
 
-            if (-not (Test-PowerToysMsiProduct -Product $product)) {
+            try {
+                $isValidPowerToysMsi = Test-PowerToysMsiProduct -Product $product
+            } catch {
+                $script:failures.Add(
+                    "Could not validate $($product.Scope) MSI $($product.ProductCode): $($_.Exception.Message)")
+                continue
+            }
+
+            if (-not $isValidPowerToysMsi) {
                 $script:failures.Add(
                     "Refusing to run the uninstall command for $($product.Scope) MSI $($product.ProductCode) " +
                     'because its cached package is not an authentic Microsoft-signed PowerToys MSI.')

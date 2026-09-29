@@ -4,7 +4,28 @@
 $scriptPath = Join-Path $PSScriptRoot 'Uninstall-PowerToys.ps1'
 . $scriptPath
 
+$environmentVariableNames = @(
+    'LOCALAPPDATA',
+    'ProgramData',
+    'ProgramFiles',
+    'ProgramFiles(x86)',
+    'SystemRoot'
+)
+$originalEnvironmentVariables = @{}
+foreach ($name in $environmentVariableNames) {
+    $originalEnvironmentVariables[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+}
+
 Describe 'Uninstall-PowerToys' {
+    AfterAll {
+        foreach ($name in $environmentVariableNames) {
+            [Environment]::SetEnvironmentVariable(
+                $name,
+                $originalEnvironmentVariables[$name],
+                'Process')
+        }
+    }
+
     BeforeEach {
         $env:LOCALAPPDATA = Join-Path $TestDrive 'LocalAppData'
         $env:ProgramData = Join-Path $TestDrive 'ProgramData'
@@ -108,26 +129,47 @@ Describe 'Uninstall-PowerToys' {
         Mock Get-PowerToysMsiProducts {
             $script:productCall++
             if ($script:productCall -eq 1) {
-                return [pscustomobject]@{
-                    Scope = 'PerUser'
-                    ProductCode = '{33333333-3333-3333-3333-333333333333}'
-                    UpgradeCode = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
-                    State = 5
-                    StateName = 'Default'
-                }
+                return @(
+                    [pscustomobject]@{
+                        Scope = 'PerUser'
+                        ProductCode = '{33333333-3333-3333-3333-333333333333}'
+                        UpgradeCode = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
+                        State = 5
+                        StateName = 'Default'
+                    },
+                    [pscustomobject]@{
+                        Scope = 'PerUser'
+                        ProductCode = '{44444444-4444-4444-4444-444444444444}'
+                        UpgradeCode = '{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}'
+                        State = 5
+                        StateName = 'Default'
+                    })
             }
 
             return @()
         }
         Mock Get-PowerToysBundles { @() }
         Mock Test-IsAdministrator { $false }
-        Mock Test-PowerToysMsiProduct { $false }
+        Mock Test-PowerToysMsiProduct {
+            if ($Product.ProductCode -eq '{33333333-3333-3333-3333-333333333333}') {
+                throw 'MSI query failed.'
+            }
+
+            return $true
+        }
+        Mock Get-MsiProductProperty { Join-Path $TestDrive 'cached.msi' }
+        Mock Copy-MsiForExecution { Join-Path $TestDrive 'staged.msi' }
+        Mock Invoke-Uninstaller {
+            Add-UninstallerExitCode -ExitCode 42 -Description $Description
+        }
 
         {
             Invoke-PowerToysCleanup -Confirm:$false
         } | Should Throw 'One or more PowerToys cleanup operations failed.'
 
-        $script:failures.Count | Should Be 1
-        $script:failures[0] | Should Match 'Refusing to run the uninstall command'
+        $script:failures.Count | Should Be 2
+        $script:failures[0] | Should Match 'Could not validate'
+        $script:failures[0] | Should Match 'MSI query failed'
+        $script:failures[1] | Should Match 'exit code 42'
     }
 }
