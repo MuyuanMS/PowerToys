@@ -385,30 +385,31 @@ namespace ShortcutGuide.IndexYmlGenerator
         {
             span = span.Trim();
 
-            bool inSingleQuotes = false;
-            bool inDoubleQuotes = false;
-            for (int i = 0; i < span.Length; i++)
+            bool inSingleQuotes = !span.IsEmpty && span[0] == '\'';
+            bool inDoubleQuotes = !span.IsEmpty && span[0] == '"';
+            for (int i = inSingleQuotes || inDoubleQuotes ? 1 : 0; i < span.Length; i++)
             {
-                if (span[i] == '\'' && !inDoubleQuotes)
+                if (inDoubleQuotes && span[i] == '\\')
                 {
-                    if (inSingleQuotes && i + 1 < span.Length && span[i + 1] == '\'')
+                    i++;
+                    continue;
+                }
+
+                if (inSingleQuotes && span[i] == '\'')
+                {
+                    if (i + 1 < span.Length && span[i + 1] == '\'')
                     {
                         i++;
                         continue;
                     }
 
-                    inSingleQuotes = !inSingleQuotes;
+                    inSingleQuotes = false;
                     continue;
                 }
 
-                if (span[i] == '"' && !inSingleQuotes)
+                if (inDoubleQuotes && span[i] == '"')
                 {
-                    bool escaped = i > 0 && span[i - 1] == '\\';
-                    if (!escaped)
-                    {
-                        inDoubleQuotes = !inDoubleQuotes;
-                    }
-
+                    inDoubleQuotes = false;
                     continue;
                 }
 
@@ -439,8 +440,9 @@ namespace ShortcutGuide.IndexYmlGenerator
                     throw new YamlFormatException($"Invalid quoted scalar for '{propertyName}' in file '{filename}'.");
                 }
 
+                bool isSingleQuoted = span[0] == '\'';
                 span = span[1..^1];
-                if (span.IndexOf("''", StringComparison.Ordinal) >= 0)
+                if (isSingleQuoted && span.IndexOf("''", StringComparison.Ordinal) >= 0)
                 {
                     span = span.ToString().Replace("''", "'", StringComparison.Ordinal);
                 }

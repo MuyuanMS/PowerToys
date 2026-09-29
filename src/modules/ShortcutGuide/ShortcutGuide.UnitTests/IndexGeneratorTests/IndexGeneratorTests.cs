@@ -381,6 +381,28 @@ BackgroundProcess: false # trailing comment on bool
     }
 
     [TestMethod]
+    [DataRow("John's.exe # comment", "John's.exe")]
+    [DataRow("\"app''1.exe\"", "app''1.exe")]
+    [DataRow("'app''1.exe' # comment", "app'1.exe")]
+    [DataRow("'app #1.exe' # comment", "app #1.exe")]
+    [DataRow("app#1.exe # comment", "app#1.exe")]
+    public void CreateIndexYmlFile_WithScalarQuotes_PreservesApostrophesAndHashes(string scalar, string expected)
+    {
+        File.WriteAllText(
+            Path.Combine(_tempDirectory, "Test.App.yml"),
+            $"PackageName: Test.App\nWindowFilter: {scalar}\nBackgroundProcess: false\nShortcuts: []\n");
+
+        var result = ManifestIndexGenerator.CreateIndexYmlFile(_tempDirectory);
+        Assert.AreEqual(0, result.Errors.Count);
+        Assert.AreEqual(1, result.IndexedFiles);
+
+        var deserializer = new YamlDotNet.Serialization.Deserializer();
+        var index = deserializer.Deserialize<ShortcutGuide.Models.IndexFile>(
+            File.ReadAllText(Path.Combine(_tempDirectory, "index.yml")));
+        Assert.AreEqual(expected, index.Index[0].WindowFilter);
+    }
+
+    [TestMethod]
     public void CreateIndexYmlFile_WithCaseInsensitivePropertyKeys_ParsesSuccessfully()
     {
         // Manifest using non-standard casing for YAML keys.
