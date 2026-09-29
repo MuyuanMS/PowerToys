@@ -4,6 +4,7 @@
 #include <windows.h>
 
 #include <atomic>
+#include <system_error>
 #include <thread>
 #include <vector>
 
