@@ -91,6 +91,9 @@ Describe 'Uninstall-PowerToys' {
             $Product.Scope -eq 'PerMachine'
         }
         Assert-MockCalled Invoke-Uninstaller -Times 1
+        Assert-MockCalled Invoke-Uninstaller -Times 1 -ParameterFilter {
+            $FilePath -eq (Join-Path ([Environment]::SystemDirectory) 'msiexec.exe')
+        }
     }
 
     It 'rejects a staged bundle whose PowerToys identity does not survive the copy' {
@@ -107,6 +110,69 @@ Describe 'Uninstall-PowerToys' {
         }
 
         $message | Should Match 'Microsoft-signed PowerToys bootstrapper'
+    }
+
+    It 'removes directory reparse points without enumerating their targets' {
+        $root = Join-Path $TestDrive 'root'
+        $normalDirectory = Join-Path $root 'normal'
+        $file = Join-Path $normalDirectory 'file.txt'
+        $junction = Join-Path $root 'junction'
+        $provider = [pscustomobject]@{ Name = 'FileSystem' }
+        $items = @{
+            $root = [pscustomobject]@{
+                FullName = $root
+                PSIsContainer = $true
+                Attributes = [IO.FileAttributes]::Directory
+                PSProvider = $provider
+            }
+            $normalDirectory = [pscustomobject]@{
+                FullName = $normalDirectory
+                PSIsContainer = $true
+                Attributes = [IO.FileAttributes]::Directory
+                PSProvider = $provider
+            }
+            $file = [pscustomobject]@{
+                FullName = $file
+                PSIsContainer = $false
+                Attributes = [IO.FileAttributes]::Normal
+                PSProvider = $provider
+            }
+            $junction = [pscustomobject]@{
+                FullName = $junction
+                PSIsContainer = $true
+                Attributes = [IO.FileAttributes]::Directory -bor [IO.FileAttributes]::ReparsePoint
+                PSProvider = $provider
+            }
+        }
+
+        Mock Get-Item { $items[$LiteralPath] }
+        Mock Get-ChildItem {
+            if ($LiteralPath -eq $root) {
+                return @($items[$normalDirectory], $items[$junction])
+            }
+
+            if ($LiteralPath -eq $normalDirectory) {
+                return $items[$file]
+            }
+
+            throw "Unexpected enumeration of $LiteralPath"
+        }
+        Mock Remove-Item {}
+
+        Remove-FileSystemTreeWithoutFollowingReparsePoints -Path $root
+
+        Assert-MockCalled Get-ChildItem -Times 1 -Scope It -ParameterFilter {
+            $LiteralPath -eq $root
+        }
+        Assert-MockCalled Get-ChildItem -Times 1 -Scope It -ParameterFilter {
+            $LiteralPath -eq $normalDirectory
+        }
+        Assert-MockCalled Get-ChildItem -Times 0 -Scope It -ParameterFilter {
+            $LiteralPath -eq $junction
+        }
+        Assert-MockCalled Remove-Item -Times 4 -Scope It -ParameterFilter {
+            -not $Recurse
+        }
     }
 
     It 'defers a per-user bundle until the machine-wide installation is removed' {
@@ -215,5 +281,55 @@ Describe 'Uninstall-PowerToys' {
         $script:failures[0] | Should Match 'Could not validate'
         $script:failures[0] | Should Match 'MSI query failed'
         $script:failures[1] | Should Match 'exit code 42'
+    }
+
+    It 'aggregates a second MSI lookup failure and continues processing' {
+        $script:productCall = 0
+        Mock Get-PowerToysMsiProducts {
+            $script:productCall++
+            if ($script:productCall -eq 1) {
+                return @(
+                    [pscustomobject]@{
+                        Scope = 'PerUser'
+                        ProductCode = '{66666666-6666-6666-6666-666666666666}'
+                        UpgradeCode = '{FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF}'
+                        State = 5
+                        StateName = 'Default'
+                    },
+                    [pscustomobject]@{
+                        Scope = 'PerUser'
+                        ProductCode = '{77777777-7777-7777-7777-777777777777}'
+                        UpgradeCode = '{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}'
+                        State = 5
+                        StateName = 'Default'
+                    })
+            }
+
+            return @()
+        }
+        Mock Get-PowerToysBundles { @() }
+        Mock Test-IsAdministrator { $false }
+        Mock Test-PowerToysMsiProduct { $true }
+        Mock Get-MsiProductProperty {
+            if ($ProductCode -eq '{66666666-6666-6666-6666-666666666666}') {
+                throw 'Second LocalPackage lookup failed.'
+            }
+
+            return (Join-Path $TestDrive 'cached.msi')
+        }
+        Mock Copy-MsiForExecution { Join-Path $TestDrive 'staged.msi' }
+        Mock Invoke-Uninstaller {
+            Add-UninstallerExitCode -ExitCode 42 -Description $Description
+        }
+
+        {
+            Invoke-PowerToysCleanup -Confirm:$false
+        } | Should Throw 'One or more PowerToys cleanup operations failed.'
+
+        $script:failures.Count | Should Be 2
+        $script:failures[0] | Should Match 'Could not stage the cached MSI'
+        $script:failures[0] | Should Match 'Second LocalPackage lookup failed'
+        $script:failures[1] | Should Match 'exit code 42'
+        Assert-MockCalled Invoke-Uninstaller -Times 1 -Scope It
     }
 }

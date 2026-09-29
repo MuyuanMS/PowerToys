@@ -539,6 +539,25 @@ function Invoke-Uninstaller {
     Add-UninstallerExitCode -ExitCode $process.ExitCode -Description $Description
 }
 
+function Remove-FileSystemTreeWithoutFollowingReparsePoints {
+    param(
+        [string]$Path
+    )
+
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+    if (-not $item.PSIsContainer -or
+        ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        Remove-Item -LiteralPath $item.FullName -Force -ErrorAction Stop
+        return
+    }
+
+    foreach ($child in @(Get-ChildItem -LiteralPath $item.FullName -Force -ErrorAction Stop)) {
+        Remove-FileSystemTreeWithoutFollowingReparsePoints -Path $child.FullName
+    }
+
+    Remove-Item -LiteralPath $item.FullName -Force -ErrorAction Stop
+}
+
 function Remove-KnownArtifact {
     param(
         [string]$Path,
@@ -551,7 +570,12 @@ function Remove-KnownArtifact {
 
     Write-Host "Removing $Description at $Path..."
     try {
-        Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+        $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+        if ($item.PSProvider.Name -eq 'FileSystem') {
+            Remove-FileSystemTreeWithoutFollowingReparsePoints -Path $item.FullName
+        } else {
+            Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+        }
     } catch {
         $script:failures.Add("Could not remove $Description at ${Path}: $($_.Exception.Message)")
     }
@@ -667,8 +691,8 @@ function Invoke-PowerToysCleanup {
                 continue
             }
 
-            $localPackage = Get-MsiProductProperty -ProductCode $product.ProductCode -Property 'LocalPackage'
             try {
+                $localPackage = Get-MsiProductProperty -ProductCode $product.ProductCode -Property 'LocalPackage'
                 $stagedMsi = Copy-MsiForExecution `
                     -Product $product `
                     -Path $localPackage `
@@ -690,7 +714,7 @@ function Invoke-PowerToysCleanup {
                 "`"$logPath`""
             )
             Invoke-Uninstaller `
-                -FilePath (Join-Path $env:SystemRoot 'System32\msiexec.exe') `
+                -FilePath (Join-Path ([Environment]::SystemDirectory) 'msiexec.exe') `
                 -Arguments $arguments `
                 -Description "Uninstalling $($product.Scope) MSI $($product.ProductCode)"
         }
