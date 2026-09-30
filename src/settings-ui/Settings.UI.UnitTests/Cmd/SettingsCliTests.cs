@@ -69,9 +69,30 @@ public class SettingsCliTests
 
         var modulesAfterDisable = SettingsCliHelper.GetModulesAndStatus(settingsUtils, _ => null);
         Assert.IsFalse(modulesAfterDisable["FancyZones"]);
+        Assert.IsTrue(settingsUtils.GetSettings<GeneralSettings>().ShowWhatsNewAfterUpdates);
 
         var enabledState = SettingsCliHelper.SetModuleEnabled("FancyZones", enabled: true, settingsUtils, _ => null, () => EmptyDisposable.Instance);
         Assert.IsTrue(enabledState.Enabled);
+    }
+
+    [TestMethod]
+    public void TestSetModuleEnabledCreatesSettingsFolderBeforeAcquiringLock()
+    {
+        var settingsFolderExistsWhenLockAcquired = false;
+
+        SettingsCliHelper.SetModuleEnabled(
+            "FancyZones",
+            enabled: false,
+            settingsUtils,
+            _ => null,
+            () =>
+            {
+                settingsFolderExistsWhenLockAcquired = mockFileSystem.Directory.Exists(
+                    Path.GetDirectoryName(settingsUtils.GetSettingsFilePath()));
+                return EmptyDisposable.Instance;
+            });
+
+        Assert.IsTrue(settingsFolderExistsWhenLockAcquired);
     }
 
     [TestMethod]
@@ -152,6 +173,19 @@ public class SettingsCliTests
         var parseResult = parser.Parse([command]);
 
         Assert.IsTrue(parseResult.Errors.Count > 0);
+    }
+
+    [DataTestMethod]
+    [DataRow(new string[] { "list" }, "list")]
+    [DataRow(new string[] { "status", "FancyZones" }, "status")]
+    [DataRow(new string[] { "enable", "FancyZones" }, "enable")]
+    [DataRow(new string[] { "disable", "FancyZones" }, "disable")]
+    [DataRow(new string[] { "--help" }, "help")]
+    [DataRow(new string[] { "unexpected", "sensitive-value" }, "unknown")]
+    [DataRow(new string[] { }, "none")]
+    public void TestTelemetryCommandNameDoesNotIncludeArguments(string[] args, string expected)
+    {
+        Assert.AreEqual(expected, Program.GetTelemetryCommandName(args));
     }
 
     private sealed class FailingSaveSettingsUtils : SettingsUtils
