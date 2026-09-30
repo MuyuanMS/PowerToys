@@ -44,7 +44,7 @@ namespace Helpers
     void SetDummyKeyEvent(std::vector<INPUT>& keyEventArray, ULONG_PTR extraInfo);
 
     // Function to send text input directly, with multiline support.
-    // Sends each line via KEYEVENTF_UNICODE and newlines via VK_RETURN
+    // Sends bounded KEYEVENTF_UNICODE batches and newlines via VK_RETURN
     // as separate SendInput calls to avoid mixing event types.
     bool SendTextInput(const std::wstring& text, KeyboardManagerInput::InputInterface& ii);
 

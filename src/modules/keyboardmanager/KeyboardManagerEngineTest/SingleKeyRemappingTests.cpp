@@ -608,7 +608,7 @@ namespace RemappingLogicTests
             Assert::AreEqual(1, static_cast<int>(result));
             Assert::AreEqual(std::wstring(), testState.textReplacementBuffer);
             Assert::AreEqual(false, mockedInputHandler.GetVirtualKeyState(VK_LSHIFT));
-            Assert::AreEqual(static_cast<size_t>(4), injectedInput.size());
+            Assert::AreEqual(static_cast<size_t>(3), injectedInput.size());
 
             Assert::AreEqual(static_cast<size_t>(1), injectedInput[0].size());
             Assert::AreEqual(static_cast<WORD>(VK_LSHIFT), injectedInput[0][0].ki.wVk);
@@ -620,12 +620,11 @@ namespace RemappingLogicTests
             Assert::IsTrue((injectedInput[1][0].ki.dwFlags & KEYEVENTF_KEYUP) == 0);
             Assert::IsTrue((injectedInput[1][1].ki.dwFlags & KEYEVENTF_KEYUP) != 0);
 
-            Assert::AreEqual(static_cast<size_t>(2), injectedInput[2].size());
+            Assert::AreEqual(static_cast<size_t>(4), injectedInput[2].size());
             Assert::AreEqual(static_cast<wchar_t>(L'h'), static_cast<wchar_t>(injectedInput[2][0].ki.wScan));
             Assert::AreEqual(static_cast<wchar_t>(L'h'), static_cast<wchar_t>(injectedInput[2][1].ki.wScan));
-            Assert::AreEqual(static_cast<size_t>(2), injectedInput[3].size());
-            Assert::AreEqual(static_cast<wchar_t>(L'i'), static_cast<wchar_t>(injectedInput[3][0].ki.wScan));
-            Assert::AreEqual(static_cast<wchar_t>(L'i'), static_cast<wchar_t>(injectedInput[3][1].ki.wScan));
+            Assert::AreEqual(static_cast<wchar_t>(L'i'), static_cast<wchar_t>(injectedInput[2][2].ki.wScan));
+            Assert::AreEqual(static_cast<wchar_t>(L'i'), static_cast<wchar_t>(injectedInput[2][3].ki.wScan));
 
             keyEvent.wParam = WM_KEYUP;
             Assert::AreEqual(1, static_cast<int>(KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState)));
@@ -657,6 +656,28 @@ namespace RemappingLogicTests
             Assert::AreEqual(static_cast<size_t>(1), attemptedInput.size());
             Assert::AreEqual(static_cast<size_t>(2), attemptedInput[0].size());
             Assert::AreEqual(static_cast<WORD>(VK_BACK), attemptedInput[0][0].ki.wVk);
+        }
+
+        TEST_METHOD (HandleTextReplacementEvent_ShouldBatchLargeReplacementInput)
+        {
+            const std::wstring replacement(4096, L'x');
+            testState.AddTextReplacement(L" ", replacement);
+
+            std::vector<size_t> batchSizes;
+            mockedInputHandler.SetSendVirtualInputShouldFail([&batchSizes](const std::vector<INPUT>& inputs) {
+                batchSizes.push_back(inputs.size());
+                return false;
+            });
+
+            KBDLLHOOKSTRUCT lParam{};
+            lParam.vkCode = VK_SPACE;
+            LowlevelKeyboardEvent keyEvent{};
+            keyEvent.wParam = WM_KEYDOWN;
+            keyEvent.lParam = &lParam;
+
+            Assert::AreEqual(1, static_cast<int>(KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState)));
+            Assert::AreEqual(static_cast<size_t>(256), batchSizes.size());
+            Assert::IsTrue(std::all_of(batchSizes.begin(), batchSizes.end(), [](size_t size) { return size == 32; }));
         }
 
         TEST_METHOD (HandleTextReplacementEvent_ShouldSuppressOverlappingTriggerKeyUps)

@@ -311,11 +311,25 @@ namespace Helpers
     }
 
     // Sends text input directly via SendInput, handling newlines by sending
-    // Shift+Enter. Each character is sent individually to avoid a synchronization
-    // error across key-down and key-up events that causes repeated or dropped characters
-    // when large batches of KEYEVENTF_UNICODE events are sent at once.
+    // Shift+Enter. Keep batches bounded to avoid both large-batch synchronization
+    // errors and one SendInput call per UTF-16 code unit.
     bool SendTextInput(const std::wstring& text, KeyboardManagerInput::InputInterface& ii)
     {
+        constexpr size_t MaxUnicodeCodeUnitsPerBatch = 16;
+        std::vector<INPUT> unicodeInputs;
+        unicodeInputs.reserve(MaxUnicodeCodeUnitsPerBatch * 2);
+
+        const auto flushUnicodeInputs = [&]() {
+            if (unicodeInputs.empty())
+            {
+                return true;
+            }
+
+            const bool sent = ii.SendVirtualInput(unicodeInputs);
+            unicodeInputs.clear();
+            return sent;
+        };
+
         for (size_t i = 0; i < text.size(); ++i)
         {
             wchar_t c = text[i];
@@ -328,6 +342,11 @@ namespace Helpers
 
             if (c == L'\r' || c == L'\n')
             {
+                if (!flushUnicodeInputs())
+                {
+                    return false;
+                }
+
                 // Send Shift+Enter instead of bare Enter so that chat apps
                 // (Teams, Slack, Discord, etc.) insert a new line rather than
                 // submitting the message. In plain text editors both behave
@@ -367,23 +386,18 @@ namespace Helpers
                 continue;
             }
 
-            INPUT charInputs[2]{};
-            charInputs[0].type = INPUT_KEYBOARD;
-            charInputs[0].ki.dwFlags = KEYEVENTF_UNICODE;
-            charInputs[0].ki.dwExtraInfo = KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG;
-            charInputs[0].ki.wScan = c;
+            Helpers::SetKeyEvent(unicodeInputs, INPUT_KEYBOARD, 0, KEYEVENTF_UNICODE, KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG);
+            unicodeInputs.back().ki.wScan = c;
+            Helpers::SetKeyEvent(unicodeInputs, INPUT_KEYBOARD, 0, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG);
+            unicodeInputs.back().ki.wScan = c;
 
-            charInputs[1].type = INPUT_KEYBOARD;
-            charInputs[1].ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;
-            charInputs[1].ki.dwExtraInfo = KeyboardManagerConstants::KEYBOARDMANAGER_SHORTCUT_FLAG;
-            charInputs[1].ki.wScan = c;
-
-            if (!ii.SendVirtualInput(std::vector<INPUT>(charInputs, charInputs + ARRAYSIZE(charInputs))))
+            if (unicodeInputs.size() == MaxUnicodeCodeUnitsPerBatch * 2 && !flushUnicodeInputs())
             {
                 return false;
             }
         }
-        return true;
+
+        return flushUnicodeInputs();
     }
 
     // Function to filter the key codes for artificial key codes
