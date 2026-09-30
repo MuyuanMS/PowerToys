@@ -71,7 +71,9 @@ public sealed class LayoutsResource : BaseResource
         // Only call Set if the desired state is different from the current state
         if (!data.TestState())
         {
+            var warningCount = data.Warnings.Count;
             data.SetState();
+            WriteWarnings(data, warningCount);
 
             // Report the canonical form of the applied layouts as the new state
             data.Output.Layouts = data.GetDesiredState();
@@ -199,10 +201,11 @@ public sealed class LayoutsResource : BaseResource
     /// the input through the DSC warning channel.
     /// </summary>
     /// <param name="data">The function data whose state was read.</param>
-    private void WriteWarnings(LayoutsFunctionData data)
+    private void WriteWarnings(LayoutsFunctionData data, int firstWarning = 0)
     {
-        foreach (var warning in data.Warnings)
+        for (var index = firstWarning; index < data.Warnings.Count; index++)
         {
+            var warning = data.Warnings[index];
             WriteMessageOutputLine(DscMessageLevel.Warning, string.Format(CultureInfo.InvariantCulture, LayoutsWarning, warning));
         }
     }
