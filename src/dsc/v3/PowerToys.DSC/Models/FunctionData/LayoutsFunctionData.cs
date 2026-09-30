@@ -205,7 +205,28 @@ public sealed class LayoutsFunctionData : BaseFunctionData
     /// <returns>The JSON schema string.</returns>
     public string Schema()
     {
-        return GenerateSchema<LayoutsResourceObject>();
+        var schema = JsonNode.Parse(GenerateSchema<LayoutsResourceObject>()) as JsonObject
+            ?? throw new InvalidOperationException("The generated layouts schema is not an object");
+        var customLayoutSchema = schema["definitions"]?[nameof(FzCustomLayout)] as JsonObject
+            ?? throw new InvalidOperationException($"The generated layouts schema is missing '{nameof(FzCustomLayout)}'");
+        var alternatives = new JsonArray();
+        foreach (var propertyName in new[] { "canvas", "grid" })
+        {
+            alternatives.Add(new JsonObject
+            {
+                ["required"] = new JsonArray(JsonValue.Create(propertyName)),
+                ["properties"] = new JsonObject
+                {
+                    [propertyName] = new JsonObject
+                    {
+                        ["type"] = JsonValue.Create("object"),
+                    },
+                },
+            });
+        }
+
+        customLayoutSchema["oneOf"] = alternatives;
+        return schema.ToJsonString();
     }
 
     /// <summary>
@@ -220,15 +241,18 @@ public sealed class LayoutsFunctionData : BaseFunctionData
         return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "PowerToys", "FancyZones");
     }
 
-    private static void WriteFile<T>(EditorData<T> data, string fileName, T value)
+    private void WriteFile<T>(EditorData<T> data, string fileName, T value)
     {
         var folder = DataFolder();
         Directory.CreateDirectory(folder);
         File.WriteAllText(Path.Combine(folder, fileName), data.Serialize(value));
-        NotifyFancyZones(fileName);
+        if (!NotifyFancyZones(fileName))
+        {
+            Warnings.Add($"The layout file '{fileName}' was written, but the direct FancyZones reload notification failed; the running utility may need to be restarted.");
+        }
     }
 
-    private static void NotifyFancyZones(string fileName)
+    private static bool NotifyFancyZones(string fileName)
     {
         var messageName = fileName switch
         {
@@ -239,14 +263,13 @@ public sealed class LayoutsFunctionData : BaseFunctionData
             _ => null,
         };
 
-        if (messageName != null)
+        if (messageName == null)
         {
-            var message = RegisterWindowMessageW(messageName);
-            if (message != 0)
-            {
-                _ = PostMessageW(new IntPtr(0xFFFF), message, UIntPtr.Zero, IntPtr.Zero);
-            }
+            return true;
         }
+
+        var message = RegisterWindowMessageW(messageName);
+        return message != 0 && PostMessageW(new IntPtr(0xFFFF), message, UIntPtr.Zero, IntPtr.Zero);
     }
 
     private static bool AreEqual<T>(T expected, T actual)

@@ -161,6 +161,20 @@ public sealed class LayoutsResourceFancyZonesTest : BaseDscTest
     }
 
     [TestMethod]
+    public void Get_BlankTemplateWithoutZoneCount_UsesZero()
+    {
+        WriteEditorFile(LayoutsFunctionData.LayoutTemplatesFileName, /*lang=json,strict*/ """{"layout-templates":[{"type":"blank"}]}""");
+        WriteEditorFile(LayoutsFunctionData.DefaultLayoutsFileName, /*lang=json,strict*/ """{"default-layouts":[{"monitor-configuration":"horizontal","layout":{"type":"blank"}}]}""");
+
+        var result = ExecuteDscCommand<GetCommand>("--resource", LayoutsResource.ResourceName, "--module", Module);
+        var state = result.OutputState<LayoutsResourceObject>();
+
+        Assert.IsTrue(result.Success);
+        Assert.AreEqual<int?>(0, state.Layouts.Templates.Single().ZoneCount);
+        Assert.AreEqual<int?>(0, state.Layouts.Defaults.Horizontal.ZoneCount);
+    }
+
+    [TestMethod]
     public void Export_Success()
     {
         // Arrange

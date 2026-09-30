@@ -65,6 +65,10 @@ the changed files immediately; otherwise the layouts take effect the next time
 PowerToys starts. Note that the layouts are only used when the FancyZones
 utility is enabled (see the [FancyZones module][02]).
 
+The `AppSettings` resource replaces the complete general-settings object.
+Include the other general settings you need to preserve when enabling
+FancyZones; see the general settings examples in the [settings resource][01].
+
 ## Layouts schema
 
 The `layouts` object is required. Each of its sections is optional.
@@ -267,13 +271,11 @@ resources:
       source: winget
 
   - name: Enable FancyZones
-    type: Microsoft.PowerToys/FancyZonesSettings
+    type: Microsoft.PowerToys/AppSettings
     properties:
       settings:
-        properties:
-          Enabled: true
-        name: FancyZones
-        version: 1.0
+        enabled:
+          FancyZones: true
 
   - name: Deploy FancyZones layouts
     type: Microsoft.PowerToys/FancyZonesLayouts

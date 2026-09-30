@@ -280,6 +280,11 @@ resources:
         version: 1.0
 ```
 
+> **Note:** `AppSettings` replaces the complete general-settings object. These
+> examples show selected settings only; omitted settings are reset to their
+> defaults. Use a complete exported state if you need to preserve other
+> general settings.
+
 ### Example 2: Configure multiple utilities
 
 Save the following configuration as `multi-utility.dsc.config.yaml`:
@@ -292,16 +297,13 @@ resources:
     type: Microsoft.PowerToys/AppSettings
     properties:
       settings:
-        properties:
-          Enabled:
-            Awake: true
-            FancyZones: true
-            PowerRename: true
-            ColorPicker: true
-          run_elevated: true
-          startup: true
-        name: App
-        version: 1.0
+        enabled:
+          Awake: true
+          FancyZones: true
+          PowerRename: true
+          ColorPicker: true
+        run_elevated: true
+        startup: true
   
   - name: Configure Awake
     type: Microsoft.PowerToys/AwakeSettings
@@ -346,21 +348,8 @@ resources:
     type: Microsoft.PowerToys/AppSettings
     properties:
       settings:
-        properties:
-          startup: true
-          theme: "dark"
-        name: App
-        version: 1.0
-  
-  - name: Configure PowerToys Run
-    type: Microsoft.PowerToys/PowerLauncherSettings
-    properties:
-      settings:
-        properties:
-          maximum_number_of_results: 8
-          clear_input_on_launch: true
-        name: PowerLauncher
-        version: 1.0
+        startup: true
+        theme: "dark"
 ```
 
 ## Available resources
@@ -376,7 +365,7 @@ Common resources include:
 - `Microsoft.PowerToys/AwakeSettings` - Awake keep-awake settings
 - `Microsoft.PowerToys/ColorPickerSettings` - Color Picker settings
 - `Microsoft.PowerToys/FancyZonesSettings` - FancyZones window management
-- `Microsoft.PowerToys/PowerLauncherSettings` - PowerToys Run settings
+- `Microsoft.PowerToys/FancyZonesLayouts` - FancyZones layouts
 - `Microsoft.PowerToys/PowerRenameSettings` - PowerRename bulk rename
 - And many more for each PowerToys utility
 

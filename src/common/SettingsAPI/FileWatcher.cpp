@@ -40,7 +40,11 @@ FileWatcher::FileWatcher(const std::wstring& path, std::function<void()> callbac
                 auto lastWrite = MyFileTime();
                 if (!m_lastWrite.has_value())
                 {
-                    m_lastWrite = lastWrite;
+                    if (lastWrite.has_value())
+                    {
+                        m_lastWrite = lastWrite;
+                        m_callback();
+                    }
                 }
                 else if (lastWrite.has_value())
                 {

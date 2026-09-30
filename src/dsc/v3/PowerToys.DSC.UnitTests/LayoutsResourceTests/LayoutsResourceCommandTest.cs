@@ -64,6 +64,16 @@ public sealed class LayoutsResourceCommandTest : BaseDscTest
         Assert.IsNotNull(sections[FzLayoutsModel.TemplatesJsonPropertyName]);
         Assert.IsNotNull(sections[FzLayoutsModel.HotkeysJsonPropertyName]);
         Assert.IsNotNull(sections[FzLayoutsModel.DefaultsJsonPropertyName]);
+
+        var customLayouts = ResolveReference(schema, sections[FzLayoutsModel.CustomJsonPropertyName]);
+        var customLayout = ResolveReference(schema, customLayouts?["items"]);
+        var choices = customLayout?["oneOf"]?.AsArray();
+        Assert.IsNotNull(choices);
+        Assert.AreEqual(2, choices.Count);
+        Assert.AreEqual("canvas", choices[0]?["required"]?.AsArray()[0]?.GetValue<string>());
+        Assert.AreEqual("grid", choices[1]?["required"]?.AsArray()[0]?.GetValue<string>());
+        Assert.AreEqual("object", choices[0]?["properties"]?["canvas"]?["type"]?.GetValue<string>());
+        Assert.AreEqual("object", choices[1]?["properties"]?["grid"]?["type"]?.GetValue<string>());
     }
 
     [TestMethod]

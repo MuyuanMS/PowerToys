@@ -419,11 +419,8 @@ resources:
     type: Microsoft.PowerToys/AppSettings
     properties:
       settings:
-        properties:
-          Enabled:
-            FancyZones: true
-        name: App
-        version: 1.0
+        enabled:
+          FancyZones: true
   
   - name: Configure FancyZones
     type: Microsoft.PowerToys/FancyZonesSettings

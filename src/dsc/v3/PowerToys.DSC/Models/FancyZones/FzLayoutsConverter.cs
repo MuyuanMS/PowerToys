@@ -317,7 +317,9 @@ public static class FzLayoutsConverter
             result.Add(new FzTemplateLayout
             {
                 Type = template.Type,
-                ZoneCount = template.ZoneCount,
+                ZoneCount = string.Equals(template.Type, Constants.TemplateLayoutJsonTags[Constants.TemplateLayout.Empty], StringComparison.Ordinal)
+                    ? 0
+                    : template.ZoneCount,
                 ShowSpacing = template.ShowSpacing,
                 Spacing = template.Spacing,
                 SensitivityRadius = template.SensitivityRadius,
@@ -419,7 +421,9 @@ public static class FzLayoutsConverter
             var entry = new FzDefaultLayout
             {
                 Type = layout.Type,
-                ZoneCount = layout.ZoneCount,
+                ZoneCount = string.Equals(layout.Type, Constants.TemplateLayoutJsonTags[Constants.TemplateLayout.Empty], StringComparison.Ordinal)
+                    ? 0
+                    : layout.ZoneCount,
                 ShowSpacing = layout.ShowSpacing,
                 Spacing = layout.Spacing,
                 SensitivityRadius = layout.SensitivityRadius,
