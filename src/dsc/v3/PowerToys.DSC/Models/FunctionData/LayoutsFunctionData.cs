@@ -10,6 +10,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using FancyZonesEditorCommon.Data;
 using PowerToys.DSC.Models.FancyZones;
 using PowerToys.DSC.Models.ResourceObjects;
@@ -23,6 +24,11 @@ namespace PowerToys.DSC.Models.FunctionData;
 /// </summary>
 public sealed class LayoutsFunctionData : BaseFunctionData
 {
+    private static readonly JsonSerializerOptions InputSerializerOptions = new()
+    {
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+    };
+
     private const string CustomLayoutsFileUpdateMessage = "{0972787e-cdab-4e16-b228-91acdc38f40f}";
     private const string LayoutTemplatesFileUpdateMessage = "{4686f019-5d3d-4c5c-9051-b7cbbccca77d}";
     private const string LayoutHotkeysFileUpdateMessage = "{07229b7e-4f22-4357-b136-33c289be2295}";
@@ -36,6 +42,7 @@ public sealed class LayoutsFunctionData : BaseFunctionData
     // Structural problems with the input JSON (missing or mistyped members)
     // detected before the model is materialized.
     private readonly IList<string> _inputErrors;
+    private readonly HashSet<string> _malformedFiles = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Gets or sets the resolver of the folder holding the FancyZones data
@@ -78,7 +85,7 @@ public sealed class LayoutsFunctionData : BaseFunctionData
         _inputErrors = ValidateInputStructure(node);
         if (_inputErrors.Count == 0)
         {
-            Input = node.Deserialize<LayoutsResourceObject>() ?? new();
+            Input = node.Deserialize<LayoutsResourceObject>(InputSerializerOptions) ?? new();
         }
     }
 
@@ -100,10 +107,18 @@ public sealed class LayoutsFunctionData : BaseFunctionData
     public void GetState()
     {
         var layouts = Output.Layouts;
-        layouts.Custom = FzLayoutsConverter.FromCustomLayouts(ReadFile(new CustomLayouts(), CustomLayoutsFileName), Warnings);
-        layouts.Templates = FzLayoutsConverter.FromLayoutTemplates(ReadFile(new LayoutTemplates(), LayoutTemplatesFileName), Warnings);
-        layouts.Hotkeys = FzLayoutsConverter.FromLayoutHotkeys(ReadFile(new LayoutHotkeys(), LayoutHotkeysFileName), Warnings);
-        layouts.Defaults = FzLayoutsConverter.FromDefaultLayouts(ReadFile(new DefaultLayouts(), DefaultLayoutsFileName), Warnings);
+        layouts.Custom = FzLayoutsConverter.FromCustomLayouts(
+            ReadFile(new CustomLayouts(), CustomLayoutsFileName, "custom-layouts"),
+            Warnings);
+        layouts.Templates = FzLayoutsConverter.FromLayoutTemplates(
+            ReadFile(new LayoutTemplates(), LayoutTemplatesFileName, "layout-templates"),
+            Warnings);
+        layouts.Hotkeys = FzLayoutsConverter.FromLayoutHotkeys(
+            ReadFile(new LayoutHotkeys(), LayoutHotkeysFileName, "layout-hotkeys"),
+            Warnings);
+        layouts.Defaults = FzLayoutsConverter.FromDefaultLayouts(
+            ReadFile(new DefaultLayouts(), DefaultLayoutsFileName, "default-layouts"),
+            Warnings);
     }
 
     /// <summary>
@@ -118,21 +133,25 @@ public sealed class LayoutsFunctionData : BaseFunctionData
         if (sections.Contains(FzLayoutsModel.CustomJsonPropertyName))
         {
             WriteFile(new CustomLayouts(), CustomLayoutsFileName, FzLayoutsConverter.ToCustomLayouts(desired.Custom!));
+            _malformedFiles.Remove(CustomLayoutsFileName);
         }
 
         if (sections.Contains(FzLayoutsModel.TemplatesJsonPropertyName))
         {
             WriteFile(new LayoutTemplates(), LayoutTemplatesFileName, FzLayoutsConverter.ToLayoutTemplates(desired.Templates!));
+            _malformedFiles.Remove(LayoutTemplatesFileName);
         }
 
         if (sections.Contains(FzLayoutsModel.HotkeysJsonPropertyName))
         {
             WriteFile(new LayoutHotkeys(), LayoutHotkeysFileName, FzLayoutsConverter.ToLayoutHotkeys(desired.Hotkeys!));
+            _malformedFiles.Remove(LayoutHotkeysFileName);
         }
 
         if (sections.Contains(FzLayoutsModel.DefaultsJsonPropertyName))
         {
             WriteFile(new DefaultLayouts(), DefaultLayoutsFileName, FzLayoutsConverter.ToDefaultLayouts(desired.Defaults!, KnownCustomLayouts));
+            _malformedFiles.Remove(DefaultLayoutsFileName);
         }
     }
 
@@ -374,7 +393,7 @@ public sealed class LayoutsFunctionData : BaseFunctionData
     /// Reads a layout file. A missing file yields the default (empty) wrapper;
     /// a malformed file is reported as a warning and also yields the default.
     /// </summary>
-    private T ReadFile<T>(EditorData<T> data, string fileName)
+    private T ReadFile<T>(EditorData<T> data, string fileName, string arrayPropertyName)
         where T : struct
     {
         var path = Path.Combine(DataFolder(), fileName);
@@ -385,10 +404,21 @@ public sealed class LayoutsFunctionData : BaseFunctionData
 
         try
         {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            if (document.RootElement.ValueKind != JsonValueKind.Object ||
+                !document.RootElement.TryGetProperty(arrayPropertyName, out var layouts) ||
+                layouts.ValueKind != JsonValueKind.Array)
+            {
+                _malformedFiles.Add(fileName);
+                Warnings.Add($"{fileName} is malformed and is treated as empty: expected a top-level '{arrayPropertyName}' array");
+                return default;
+            }
+
             return data.Read(path);
         }
         catch (JsonException ex)
         {
+            _malformedFiles.Add(fileName);
             Warnings.Add($"{fileName} is malformed and is treated as empty: {ex.Message}");
             return default;
         }
@@ -405,22 +435,26 @@ public sealed class LayoutsFunctionData : BaseFunctionData
         var current = Output.Layouts;
         var sections = new List<string>();
 
-        if (desired.Custom != null && !AreEqual(SortByUuid(desired.Custom), SortByUuid(current.Custom ?? [])))
+        if (desired.Custom != null &&
+            (_malformedFiles.Contains(CustomLayoutsFileName) || !AreEqual(SortByUuid(desired.Custom), SortByUuid(current.Custom ?? []))))
         {
             sections.Add(FzLayoutsModel.CustomJsonPropertyName);
         }
 
-        if (desired.Templates != null && !AreEqual(desired.Templates, current.Templates ?? []))
+        if (desired.Templates != null &&
+            (_malformedFiles.Contains(LayoutTemplatesFileName) || !AreEqual(desired.Templates, current.Templates ?? [])))
         {
             sections.Add(FzLayoutsModel.TemplatesJsonPropertyName);
         }
 
-        if (desired.Hotkeys != null && !AreEqual(desired.Hotkeys, current.Hotkeys ?? []))
+        if (desired.Hotkeys != null &&
+            (_malformedFiles.Contains(LayoutHotkeysFileName) || !AreEqual(desired.Hotkeys, current.Hotkeys ?? [])))
         {
             sections.Add(FzLayoutsModel.HotkeysJsonPropertyName);
         }
 
-        if (desired.Defaults != null && !AreEqual(desired.Defaults, current.Defaults ?? new()))
+        if (desired.Defaults != null &&
+            (_malformedFiles.Contains(DefaultLayoutsFileName) || !AreEqual(desired.Defaults, current.Defaults ?? new())))
         {
             sections.Add(FzLayoutsModel.DefaultsJsonPropertyName);
         }

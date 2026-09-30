@@ -600,6 +600,16 @@ public static class FzLayoutsConverter
                 continue;
             }
 
+            if (zone.X < 0)
+            {
+                errors.Add($"{zoneContext}.x must not be negative");
+            }
+
+            if (zone.Y < 0)
+            {
+                errors.Add($"{zoneContext}.y must not be negative");
+            }
+
             if (zone.Width <= 0)
             {
                 errors.Add($"{zoneContext}.width must be greater than 0");
@@ -821,11 +831,6 @@ public static class FzLayoutsConverter
                     {
                         ValidateLayoutReference(uuid, $"{context}.uuid", model, current, errors, warnings);
                     }
-                }
-
-                if (layout.ZoneCount != null || layout.ShowSpacing != null || layout.Spacing != null || layout.SensitivityRadius != null)
-                {
-                    errors.Add($"{context}: zoneCount, showSpacing, spacing, and sensitivityRadius must not be set when type is '{CustomLayoutType}'");
                 }
             }
             else if (!string.IsNullOrEmpty(layout.Uuid))

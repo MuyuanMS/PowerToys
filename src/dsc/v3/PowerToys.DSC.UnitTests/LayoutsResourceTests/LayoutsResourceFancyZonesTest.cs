@@ -368,6 +368,16 @@ public sealed class LayoutsResourceFancyZonesTest : BaseDscTest
         Assert.AreEqual(0, horizontal.ZoneCount);
         Assert.AreEqual(0, horizontal.SensitivityRadius);
         Assert.IsNull(state.Layouts.Defaults.Vertical);
+
+        var roundTripResult = ExecuteDscCommand<SetCommand>(
+            "--resource",
+            LayoutsResource.ResourceName,
+            "--module",
+            Module,
+            "--input",
+            CreateInput(state.Layouts));
+
+        Assert.IsTrue(roundTripResult.Success);
     }
 
     [TestMethod]
@@ -458,6 +468,7 @@ public sealed class LayoutsResourceFancyZonesTest : BaseDscTest
     [DataRow(/*lang=json,strict*/ """{"layouts":{"hotkeys":[{"key":"one","layoutId":"$GRID_GUID"}]}}""", "could not be converted")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"hotkeys":[{"layoutId":"$GRID_GUID"}]}}""", "'layouts.hotkeys[0].key' is required")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$CANVAS_GUID","name":"A","canvas":{"refWidth":1920,"refHeight":1080,"zones":[{"y":0,"width":100,"height":100}]}}]}}""", "'layouts.custom[0].canvas.zones[0].x' is required")]
+    [DataRow(/*lang=json,strict*/ """{"layouts":{"templates":[{"type":"focus","zoneCounnt":4}]}}""", "zoneCounnt")]
     public void Set_MalformedInput_FailsAndLeavesFilesUntouched(string input, string expectedError)
     {
         // Arrange: a stored hotkey that a bad input must not erase
@@ -491,6 +502,8 @@ public sealed class LayoutsResourceFancyZonesTest : BaseDscTest
     [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","grid":{"rows":3,"columns":1,"rowsPercentage":[2147483647,2147483647,10002],"columnsPercentage":[10000],"cellChildMap":[[0],[0],[0]]}}]}}""", "custom[0].grid.rowsPercentage must sum to 10000 (100.00%) but sums to 4294977296")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","canvas":{"refWidth":1920,"refHeight":1080,"zones":[]}}]}}""", "custom[0].canvas.zones must contain at least one zone")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","canvas":{"refWidth":1920,"refHeight":1080,"zones":[{"x":0,"y":0,"width":0,"height":100}]}}]}}""", "custom[0].canvas.zones[0].width must be greater than 0")]
+    [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"Off-screen","canvas":{"refWidth":1920,"refHeight":1080,"zones":[{"x":-1000,"y":0,"width":100,"height":100}]}}]}}""", "custom[0].canvas.zones[0].x must not be negative")]
+    [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"Off-screen","canvas":{"refWidth":1920,"refHeight":1080,"zones":[{"x":0,"y":-1000,"width":100,"height":100}]}}]}}""", "custom[0].canvas.zones[0].y must not be negative")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"hotkeys":[{"key":10,"layoutId":"$GRID_GUID"}]}}""", "hotkeys[0].key must be between 0 and 9")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"hotkeys":[{"key":1,"layoutId":"$GRID_GUID"},{"key":1,"layoutId":"$CANVAS_GUID"}]}}""", "hotkeys[1].key: key 1 is assigned more than once")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"hotkeys":[{"key":1,"layoutId":"$GRID_GUID"},{"key":2,"layoutId":"$GRID_GUID"}]}}""", "hotkeys[1].layoutId: layout '$GRID_GUID' is assigned more than one key")]
@@ -500,7 +513,6 @@ public sealed class LayoutsResourceFancyZonesTest : BaseDscTest
     [DataRow(/*lang=json,strict*/ """{"layouts":{"templates":[{"type":"blank","zoneCount":1}]}}""", "templates[0].zoneCount must be 0 when type is 'blank'")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"templates":[{"type":"grid","zoneCount":129}]}}""", "templates[0].zoneCount must not be greater than 128")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"defaults":{"horizontal":{"type":"custom"}}}}""", "defaults.horizontal.uuid is required when type is 'custom'")]
-    [DataRow(/*lang=json,strict*/ """{"layouts":{"defaults":{"horizontal":{"type":"custom","uuid":"$GRID_GUID","spacing":16}}}}""", "defaults.horizontal: zoneCount, showSpacing, spacing, and sensitivityRadius must not be set when type is 'custom'")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"defaults":{"vertical":{"type":"rows","uuid":"$GRID_GUID"}}}}""", "defaults.vertical.uuid must only be set when type is 'custom'")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"defaults":{"vertical":{"type":"hexagons"}}}}""", "defaults.vertical.type: invalid value 'hexagons'; allowed values are: blank, focus, rows, columns, grid, priority-grid, custom")]
     [DataRow(/*lang=json,strict*/ """{"layouts":{"custom":[{"uuid":"$GRID_GUID","name":"A","grid":$VALID_GRID}],"hotkeys":[{"key":1,"layoutId":"$CANVAS_GUID"}]}}""", "hotkeys[0].layoutId: layout '$CANVAS_GUID' is not defined in 'custom'")]
@@ -576,6 +588,45 @@ public sealed class LayoutsResourceFancyZonesTest : BaseDscTest
         Assert.AreEqual(1, messages.Count);
         Assert.AreEqual(DscMessageLevel.Warning, messages[0].Level);
         StringAssert.Contains(messages[0].Message, $"{LayoutsFunctionData.CustomLayoutsFileName} is malformed");
+    }
+
+    [DataTestMethod]
+    [DataRow(LayoutsFunctionData.CustomLayoutsFileName, "custom-layouts", "{}")]
+    [DataRow(LayoutsFunctionData.LayoutTemplatesFileName, "layout-templates", "{}")]
+    [DataRow(LayoutsFunctionData.LayoutHotkeysFileName, "layout-hotkeys", "{}")]
+    [DataRow(LayoutsFunctionData.DefaultLayoutsFileName, "default-layouts", "{}")]
+    [DataRow(LayoutsFunctionData.CustomLayoutsFileName, "custom-layouts", "null")]
+    public void Get_InvalidStoredWrapper_WarnsAndTreatsAsEmpty(string fileName, string arrayPropertyName, string contents)
+    {
+        WriteEditorFile(fileName, contents);
+
+        var result = ExecuteDscCommand<GetCommand>("--resource", LayoutsResource.ResourceName, "--module", Module);
+        var warnings = result.Messages().Where(message => message.Level == DscMessageLevel.Warning).ToList();
+
+        Assert.IsTrue(result.Success);
+        Assert.AreEqual(1, warnings.Count);
+        StringAssert.Contains(warnings[0].Message, $"{fileName} is malformed");
+        StringAssert.Contains(warnings[0].Message, $"'{arrayPropertyName}' array");
+    }
+
+    [DataTestMethod]
+    [DataRow("{ this is not json")]
+    [DataRow("{}")]
+    [DataRow("null")]
+    public void Set_EmptyCustomSection_RepairsMalformedExistingFile(string invalidFile)
+    {
+        WriteEditorFile(LayoutsFunctionData.CustomLayoutsFileName, invalidFile);
+
+        var result = ExecuteDscCommand<SetCommand>(
+            "--resource",
+            LayoutsResource.ResourceName,
+            "--module",
+            Module,
+            "--input",
+            /*lang=json,strict*/ """{"layouts":{"custom":[]}}""");
+
+        Assert.IsTrue(result.Success);
+        Assert.AreEqual(0, JsonNode.Parse(ReadFile(LayoutsFunctionData.CustomLayoutsFileName))["custom-layouts"].AsArray().Count);
     }
 
     [TestMethod]
