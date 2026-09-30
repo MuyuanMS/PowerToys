@@ -1762,6 +1762,16 @@ static void StopInteraction()
 #endif
 }
 
+static void ResumeModifierAfterTitleBarInteraction(bool fromTitleBar)
+{
+    if (fromTitleBar &&
+        g_modifierSession.pressed &&
+        g_modifierSession.disposition == ModifierHoldDisposition::Passthrough)
+    {
+        g_modifierSession.disposition = ModifierHoldDisposition::Undecided;
+    }
+}
+
 static ResizeHandle GetClosestHandle(POINT pt, const RECT& rc)
 {
     int cx = (rc.left + rc.right) / 2;
@@ -2116,6 +2126,18 @@ static void ReplayPendingClick(MouseButton button, bool completeModifier = false
     }
 }
 
+static void ReplayPendingClickAfterHook(MouseButton button, bool fromTitleBar, bool completeModifier = false, MouseButton followingButton = MouseButton::None)
+{
+    if (fromTitleBar)
+    {
+        PostMessage(g_hMsgWnd, WM_REPLAY_CLICK, static_cast<WPARAM>(button), static_cast<LPARAM>(followingButton));
+    }
+    else
+    {
+        ReplayPendingClick(button, completeModifier);
+    }
+}
+
 static void MarkButtonUpForSwallow(MouseButton button)
 {
     g_swallowButtonUpMask |= ButtonBit(button);
@@ -2411,6 +2433,12 @@ static void TrackHeldNonModifierKey(DWORD vkCode, WPARAM message)
 
 static HookDisposition ReleaseModifierSession()
 {
+    if (g_interaction.fromTitleBar)
+    {
+        g_modifierSession = {};
+        return HookDisposition::Chain;
+    }
+
     g_modifierSession.pressed = false;
     FlushPendingClickOnModifierRelease();
 
@@ -2512,6 +2540,11 @@ static HookDisposition HandleKeyboardEvent(WPARAM message, const KBDLLHOOKSTRUCT
     // A title bar drag is already in progress; the modifier has no part in it.
     if (g_interaction.fromTitleBar)
     {
+        g_modifierSession = {};
+        g_modifierSession.modifier = g_settings.modifierKey;
+        g_modifierSession.disposition = ModifierHoldDisposition::Passthrough;
+        g_modifierSession.pressed = true;
+        g_modifierSession.key = { key.vkCode, key.scanCode, key.flags };
         return HookDisposition::Chain;
     }
 
@@ -2770,28 +2803,32 @@ static HookDisposition HandleActionButtonDown(MouseButton button, POINT point)
     return HookDisposition::Swallow;
 }
 
-static void RecoverStaleInteraction(MouseButton incomingButton)
+static bool RecoverStaleInteraction(MouseButton incomingButton)
 {
     if (g_interaction.phase == InteractionPhase::Idle)
     {
-        return;
+        return false;
     }
 
     const MouseButton button = g_interaction.button;
-    if (g_interaction.phase == InteractionPhase::Pending)
+    const bool fromTitleBar = g_interaction.fromTitleBar;
+    const bool pending = g_interaction.phase == InteractionPhase::Pending;
+    if (pending)
     {
         StopInteraction();
-        ReplayPendingClick(button, true);
+        ReplayPendingClickAfterHook(button, fromTitleBar, true, fromTitleBar ? incomingButton : MouseButton::None);
     }
     else
     {
         StopInteraction();
     }
+    ResumeModifierAfterTitleBarInteraction(fromTitleBar);
 
     if (incomingButton != button)
     {
         MarkButtonUpForSwallow(button);
     }
+    return fromTitleBar && pending;
 }
 
 // A right-button press on a title bar, with no modifier involved. It is held
@@ -2832,7 +2869,10 @@ static HookDisposition HandleMouseEvent(WPARAM message, const MSLLHOOKSTRUCT& mo
 
     if (downButton != MouseButton::None && !IsActivationModifierPressed())
     {
-        RecoverStaleInteraction(downButton);
+        if (RecoverStaleInteraction(downButton))
+        {
+            return HookDisposition::Swallow;
+        }
     }
 
     if (g_interaction.phase == InteractionPhase::Idle &&
@@ -2901,7 +2941,8 @@ static HookDisposition HandleMouseEvent(WPARAM message, const MSLLHOOKSTRUCT& mo
                 {
                     g_modifierSession.disposition = ModifierHoldDisposition::Passthrough;
                 }
-                ReplayPendingClick(pending.button);
+                ReplayPendingClickAfterHook(pending.button, pending.fromTitleBar);
+                ResumeModifierAfterTitleBarInteraction(pending.fromTitleBar);
                 MarkButtonUpForSwallow(pending.button);
             }
         }
@@ -2939,16 +2980,8 @@ static HookDisposition HandleMouseEvent(WPARAM message, const MSLLHOOKSTRUCT& mo
         const MouseButton button = g_interaction.button;
         const bool fromTitleBar = g_interaction.fromTitleBar;
         StopInteraction();
-        if (fromTitleBar)
-        {
-            // SendInput from inside the hook stalls until the hook times out,
-            // which delays the title bar menu. Replay once the hook has returned.
-            PostMessage(g_hMsgWnd, WM_REPLAY_CLICK, static_cast<WPARAM>(button), 0);
-        }
-        else
-        {
-            ReplayPendingClick(button);
-        }
+        ReplayPendingClickAfterHook(button, fromTitleBar);
+        ResumeModifierAfterTitleBarInteraction(fromTitleBar);
         return HookDisposition::Swallow;
     }
 
@@ -2980,7 +3013,9 @@ static HookDisposition HandleMouseEvent(WPARAM message, const MSLLHOOKSTRUCT& mo
                 true);
         }
 
+        const bool fromTitleBar = g_interaction.fromTitleBar;
         StopInteraction();
+        ResumeModifierAfterTitleBarInteraction(fromTitleBar);
         return HookDisposition::Swallow;
     }
 
@@ -3282,6 +3317,13 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 
     case WM_REPLAY_CLICK:
         ReplayPendingClick(static_cast<MouseButton>(wParam));
+        if (lParam != 0)
+        {
+            INPUT input{};
+            input.type = INPUT_MOUSE;
+            input.mi.dwFlags = MouseEventFlagForButton(static_cast<MouseButton>(lParam), false);
+            SendInput(1, &input, sizeof(INPUT));
+        }
         return 0;
 
     case WM_CLOSE:
