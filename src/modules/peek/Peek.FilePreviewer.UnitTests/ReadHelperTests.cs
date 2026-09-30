@@ -101,10 +101,8 @@ namespace Peek.FilePreviewer.UnitTests
                 () => ReadHelper.Read(_tempFilePath, ReadHelper.MaxReadableFileSizeBytes, cts.Token));
         }
 
-        // Larger than the 64 KB charset-detection sample: the body must still be decoded to EOF,
-        // not just the sampled prefix.
         [TestMethod]
-        public async Task Read_FileLargerThanCharsetSample_ShouldReturnFullContent()
+        public async Task Read_LargeFile_ShouldReturnFullContent()
         {
             string expected = new string('a', 200_000);
             File.WriteAllText(_tempFilePath, expected, Encoding.UTF8);
@@ -114,8 +112,7 @@ namespace Peek.FilePreviewer.UnitTests
             Assert.AreEqual(expected, content);
         }
 
-        // File larger than the sample, non-UTF-8 encoding identified from a BOM in the sampled prefix:
-        // the streamed decode must honour that encoding and strip the BOM for the whole body.
+        // A large BOM-marked file must retain its encoding and have the BOM stripped.
         [TestMethod]
         public async Task Read_LargeUtf16FileWithBom_ShouldDecodeFullContent()
         {
@@ -127,14 +124,126 @@ namespace Peek.FilePreviewer.UnitTests
             Assert.AreEqual(expected, content);
         }
 
-        // File larger than the sample, dense non-ASCII UTF-8 (no BOM) in the sampled prefix: detection
-        // should pick UTF-8 and every multi-byte character must survive the streamed decode.
+        // A large BOM-less UTF-8 file must preserve every multi-byte character.
         [TestMethod]
         public async Task Read_LargeUtf8FileNoBom_ShouldDecodeCorrectly()
         {
             string prefix = string.Concat(Enumerable.Repeat("café résumé naïve piñata ", 400));
             string expected = prefix + new string('x', 200_000);
             File.WriteAllText(_tempFilePath, expected, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+            string content = await ReadHelper.Read(_tempFilePath);
+
+            Assert.AreEqual(expected, content);
+        }
+
+        [TestMethod]
+        public async Task Read_Utf8UnicodeAfterCharsetSample_ShouldDecodeCorrectly()
+        {
+            string expected = new string('a', 65_536) + "\n\u4F60\u597D\uFF0C\u4E16\u754C\u3002 caf\u00E9 r\u00E9sum\u00E9 na\u00EFve pi\u00F1ata";
+            File.WriteAllText(_tempFilePath, expected, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+            string content = await ReadHelper.Read(_tempFilePath);
+
+            Assert.AreEqual(expected, content);
+        }
+
+        [TestMethod]
+        public async Task Read_Utf8MultibyteCharacterAtCharsetSampleBoundary_ShouldDecodeCorrectly()
+        {
+            string expected = new string('a', 65_535) + "\u4F60\u597D\uFF0C\u4E16\u754C\u3002 caf\u00E9 r\u00E9sum\u00E9 na\u00EFve pi\u00F1ata";
+            File.WriteAllText(_tempFilePath, expected, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+            string content = await ReadHelper.Read(_tempFilePath);
+
+            Assert.AreEqual(expected, content);
+        }
+
+        [TestMethod]
+        public async Task Read_Windows1252WithLateNonAsciiContent_ShouldDecodeCorrectly()
+        {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            Encoding windows1252 = Encoding.GetEncoding(1252);
+            string expected = new string('a', 70_000) + "café";
+            File.WriteAllText(_tempFilePath, expected, windows1252);
+
+            string content = await ReadHelper.Read(_tempFilePath);
+
+            Assert.AreEqual(expected, content);
+        }
+
+        [TestMethod]
+        public async Task Read_BomlessUtf16LeFile_ShouldDecodeCorrectly()
+        {
+            string expected = "Plain text café";
+            File.WriteAllText(_tempFilePath, expected, new UnicodeEncoding(bigEndian: false, byteOrderMark: false));
+
+            string content = await ReadHelper.Read(_tempFilePath);
+
+            Assert.AreEqual(expected, content);
+        }
+
+        [TestMethod]
+        public async Task Read_ShortBomlessUtf16LeFile_ShouldDecodeCorrectly()
+        {
+            const string expected = "abc";
+            File.WriteAllText(_tempFilePath, expected, new UnicodeEncoding(bigEndian: false, byteOrderMark: false));
+
+            string content = await ReadHelper.Read(_tempFilePath);
+
+            Assert.AreEqual(expected, content);
+        }
+
+        [TestMethod]
+        public async Task Read_NonLatinBomlessUtf16LeFile_ShouldDecodeCorrectly()
+        {
+            const string expected = "你好a";
+            File.WriteAllText(_tempFilePath, expected, new UnicodeEncoding(bigEndian: false, byteOrderMark: false));
+
+            string content = await ReadHelper.Read(_tempFilePath);
+
+            Assert.AreEqual(expected, content);
+        }
+
+        [TestMethod]
+        public async Task Read_PredominantlyNonLatinBomlessUtf16LeFile_ShouldDecodeCorrectly()
+        {
+            const string expected = "你好世界和平a";
+            File.WriteAllText(_tempFilePath, expected, new UnicodeEncoding(bigEndian: false, byteOrderMark: false));
+
+            string content = await ReadHelper.Read(_tempFilePath);
+
+            Assert.AreEqual(expected, content);
+        }
+
+        [TestMethod]
+        public async Task Read_BomlessUtf32BeFile_ShouldDecodeCorrectly()
+        {
+            string expected = "Plain text café";
+            File.WriteAllText(_tempFilePath, expected, new UTF32Encoding(bigEndian: true, byteOrderMark: false));
+
+            string content = await ReadHelper.Read(_tempFilePath);
+
+            Assert.AreEqual(expected, content);
+            Assert.AreEqual(expected, content);
+        }
+
+        [TestMethod]
+        public async Task Read_BomlessUtf32SupplementaryCharacters_ShouldDecodeCorrectly()
+        {
+            const string expected = "\U0001F600\U0001F600\U0001F600";
+            File.WriteAllBytes(_tempFilePath, new UTF32Encoding(bigEndian: false, byteOrderMark: false).GetBytes(expected));
+
+            string content = await ReadHelper.Read(_tempFilePath);
+
+            Assert.AreEqual(expected, content);
+        }
+
+        [TestMethod]
+        public async Task Read_BomlessUtf16SupplementaryCharacters_ShouldDecodeCorrectly()
+        {
+            const string expected = "\U0001F600\U0001F600\U0001F600";
+            File.WriteAllBytes(_tempFilePath, new UnicodeEncoding(bigEndian: false, byteOrderMark: false).GetBytes(expected));
 
             string content = await ReadHelper.Read(_tempFilePath);
 

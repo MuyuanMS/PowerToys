@@ -3,6 +3,10 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -18,7 +22,7 @@ namespace Peek.FilePreviewer.Previewers
     public static class TextFileHelper
     {
         // Matches the sample size commonly used by tools like git to decide whether a file is text or binary.
-        private const int SampleSize = 8000;
+        internal const int SampleSize = 8000;
 
         /// <summary>
         /// Determines whether the file at the given path is likely to be a text file, based on its size and content.
@@ -56,6 +60,11 @@ namespace Peek.FilePreviewer.Previewers
 
                 // If the file starts with a Unicode BOM, we can assume it's a text file.
                 if (HasUnicodeBom(buffer, bytesRead))
+                {
+                    return true;
+                }
+
+                if (TryDetectBomlessUnicodeEncoding(buffer, bytesRead, bytesRead < stream.Length) != null)
                 {
                     return true;
                 }
@@ -104,6 +113,247 @@ namespace Peek.FilePreviewer.Previewers
                 ((buffer[0] == 0xFF && buffer[1] == 0xFE) ||
                  (buffer[0] == 0xFE && buffer[1] == 0xFF));
             return isUtf16;
+        }
+
+        internal static Encoding? TryDetectBomlessUnicodeEncoding(byte[] buffer, int bytesRead, bool isSampleTruncated = false)
+        {
+            if (HasExpectedNullPattern(buffer, bytesRead, unitSize: 4, textByteIndex: 0, requiredNullByteIndexes: [2, 3]) &&
+                IsPlausibleBomlessUtf32Text(buffer, bytesRead, bigEndian: false))
+            {
+                return new UTF32Encoding(bigEndian: false, byteOrderMark: false);
+            }
+
+            if (HasExpectedNullPattern(buffer, bytesRead, unitSize: 4, textByteIndex: 3, requiredNullByteIndexes: [0, 1]) &&
+                IsPlausibleBomlessUtf32Text(buffer, bytesRead, bigEndian: true))
+            {
+                return new UTF32Encoding(bigEndian: true, byteOrderMark: false);
+            }
+
+            Encoding? utf32Encoding = TryDetectBomlessUtf32WithValidatedText(buffer, bytesRead);
+            if (utf32Encoding != null)
+            {
+                return utf32Encoding;
+            }
+
+            return TryDetectBomlessUtf16WithValidatedText(buffer, bytesRead, isSampleTruncated);
+        }
+
+        private static Encoding? TryDetectBomlessUtf32WithValidatedText(byte[] buffer, int bytesRead)
+        {
+            if (bytesRead < 8 || bytesRead % 4 != 0)
+            {
+                return null;
+            }
+
+            bool isLittleEndianText = IsPlausibleBomlessUtf32Text(buffer, bytesRead, bigEndian: false);
+            bool isBigEndianText = IsPlausibleBomlessUtf32Text(buffer, bytesRead, bigEndian: true);
+            if (isLittleEndianText == isBigEndianText)
+            {
+                return null;
+            }
+
+            return new UTF32Encoding(bigEndian: isBigEndianText, byteOrderMark: false);
+        }
+
+        private static bool IsPlausibleBomlessUtf32Text(byte[] buffer, int bytesRead, bool bigEndian)
+        {
+            string text;
+            try
+            {
+                text = new UTF32Encoding(bigEndian, byteOrderMark: false, throwOnInvalidCharacters: true)
+                    .GetString(buffer, 0, bytesRead);
+            }
+            catch (DecoderFallbackException)
+            {
+                return false;
+            }
+
+            int runeCount = 0;
+            foreach (Rune rune in text.EnumerateRunes())
+            {
+                if (!IsTextRune(rune))
+                {
+                    return false;
+                }
+
+                runeCount++;
+            }
+
+            return runeCount >= 2;
+        }
+
+        private static bool HasExpectedNullPattern(byte[] buffer, int bytesRead, int unitSize, int textByteIndex, int[] requiredNullByteIndexes)
+        {
+            int unitCount = bytesRead / unitSize;
+            if (unitCount < 2)
+            {
+                return false;
+            }
+
+            int textNulls = 0;
+            var requiredNullCounts = new int[requiredNullByteIndexes.Length];
+            for (int unit = 0; unit < unitCount; unit++)
+            {
+                int offset = unit * unitSize;
+                if (buffer[offset + textByteIndex] == 0)
+                {
+                    textNulls++;
+                }
+
+                for (int index = 0; index < requiredNullByteIndexes.Length; index++)
+                {
+                    if (buffer[offset + requiredNullByteIndexes[index]] == 0)
+                    {
+                        requiredNullCounts[index]++;
+                    }
+                }
+            }
+
+            return requiredNullCounts.All(count => count * 10 >= unitCount * 3) &&
+                textNulls * 10 <= unitCount * 3;
+        }
+
+        private static Encoding? TryDetectBomlessUtf16WithValidatedText(byte[] buffer, int bytesRead, bool isSampleTruncated)
+        {
+            if (bytesRead < 6 || bytesRead % 2 != 0)
+            {
+                return null;
+            }
+
+            int littleEndianNulls = 0;
+            int bigEndianNulls = 0;
+            for (int offset = 0; offset < bytesRead; offset += 2)
+            {
+                if (buffer[offset + 1] == 0)
+                {
+                    littleEndianNulls++;
+                }
+
+                if (buffer[offset] == 0)
+                {
+                    bigEndianNulls++;
+                }
+            }
+
+            bool isLittleEndianText = IsPlausibleBomlessUtf16Text(buffer, bytesRead, bigEndian: false, out int littleEndianSupplementaryRunes, isSampleTruncated);
+            bool isBigEndianText = IsPlausibleBomlessUtf16Text(buffer, bytesRead, bigEndian: true, out int bigEndianSupplementaryRunes, isSampleTruncated);
+            if (isLittleEndianText && !isBigEndianText &&
+                (littleEndianSupplementaryRunes >= 2 || littleEndianNulls > bigEndianNulls))
+            {
+                return Encoding.Unicode;
+            }
+
+            if (isBigEndianText && !isLittleEndianText &&
+                (bigEndianSupplementaryRunes >= 2 || bigEndianNulls > littleEndianNulls))
+            {
+                return Encoding.BigEndianUnicode;
+            }
+
+            if (isLittleEndianText && isBigEndianText)
+            {
+                if (littleEndianNulls > bigEndianNulls)
+                {
+                    return Encoding.Unicode;
+                }
+
+                if (bigEndianNulls > littleEndianNulls)
+                {
+                    return Encoding.BigEndianUnicode;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool IsPlausibleBomlessUtf16Text(byte[] buffer, int bytesRead, bool bigEndian, out int supplementaryRuneCount, bool isSampleTruncated)
+        {
+            supplementaryRuneCount = 0;
+            bool hasNonAsciiByte = false;
+            int highByteNulls = 0;
+            int unitCount = bytesRead / 2;
+            for (int index = 0; index < bytesRead; index++)
+            {
+                byte value = buffer[index];
+                if (value != 0 && (value < 0x20 || value > 0x7E))
+                {
+                    hasNonAsciiByte = true;
+                }
+            }
+
+            for (int unit = 0; unit < unitCount; unit++)
+            {
+                int highByteIndex = (unit * 2) + (bigEndian ? 0 : 1);
+                if (buffer[highByteIndex] == 0)
+                {
+                    highByteNulls++;
+                }
+            }
+
+            bool hasStrongNullLane = highByteNulls * 10 >= unitCount * 6;
+            if (!hasNonAsciiByte && highByteNulls * 10 < unitCount * 3)
+            {
+                return false;
+            }
+
+            int bytesToDecode = bytesRead;
+            if (isSampleTruncated && bytesToDecode >= 2)
+            {
+                int finalCodeUnit = bigEndian
+                    ? (buffer[bytesToDecode - 2] << 8) | buffer[bytesToDecode - 1]
+                    : buffer[bytesToDecode - 2] | (buffer[bytesToDecode - 1] << 8);
+                if (finalCodeUnit is >= 0xD800 and <= 0xDBFF)
+                {
+                    bytesToDecode -= 2;
+                }
+            }
+
+            string text;
+            try
+            {
+                text = new UnicodeEncoding(bigEndian, byteOrderMark: false, throwOnInvalidBytes: true)
+                    .GetString(buffer, 0, bytesToDecode);
+            }
+            catch (DecoderFallbackException)
+            {
+                return false;
+            }
+
+            var distinctRunes = new HashSet<Rune>();
+            int decodedSupplementaryRunes = 0;
+            foreach (Rune rune in text.EnumerateRunes())
+            {
+                if (!IsTextRune(rune))
+                {
+                    supplementaryRuneCount = 0;
+                    return false;
+                }
+
+                distinctRunes.Add(rune);
+                if (rune.Value > 0xFFFF)
+                {
+                    decodedSupplementaryRunes++;
+                }
+            }
+
+            // Sparse NULs alone are ambiguous; require a varied valid decoding to avoid mistaking ASCII or binary data for UTF-16.
+            if (distinctRunes.Count >= 3 || decodedSupplementaryRunes >= 2 || hasStrongNullLane)
+            {
+                supplementaryRuneCount = decodedSupplementaryRunes;
+                return true;
+            }
+
+            supplementaryRuneCount = 0;
+            return false;
+        }
+
+        private static bool IsTextRune(Rune rune)
+        {
+            UnicodeCategory category = Rune.GetUnicodeCategory(rune);
+            return Rune.IsLetterOrDigit(rune) ||
+                Rune.IsWhiteSpace(rune) ||
+                Rune.IsPunctuation(rune) ||
+                Rune.IsSymbol(rune) ||
+                category is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.EnclosingMark or UnicodeCategory.Format;
         }
     }
 }

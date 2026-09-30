@@ -101,6 +101,120 @@ namespace Peek.FilePreviewer.UnitTests
         }
 
         [TestMethod]
+        public async Task IsTextFile_Utf16LeWithoutBom_ShouldReturnTrue()
+        {
+            File.WriteAllText(_tempFilePath, "Text without a UTF-16LE BOM", new UnicodeEncoding(bigEndian: false, byteOrderMark: false));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_Utf16BeWithoutBom_ShouldReturnTrue()
+        {
+            File.WriteAllText(_tempFilePath, "Text without a UTF-16BE BOM", new UnicodeEncoding(bigEndian: true, byteOrderMark: false));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_ShortBomlessUtf16Le_ShouldReturnTrue()
+        {
+            File.WriteAllBytes(_tempFilePath, new UnicodeEncoding(bigEndian: false, byteOrderMark: false).GetBytes("abc"));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_NonLatinBomlessUtf16Le_ShouldReturnTrue()
+        {
+            File.WriteAllBytes(_tempFilePath, new UnicodeEncoding(bigEndian: false, byteOrderMark: false).GetBytes("你好a"));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_PredominantlyNonLatinBomlessUtf16Le_ShouldReturnTrue()
+        {
+            File.WriteAllBytes(_tempFilePath, new UnicodeEncoding(bigEndian: false, byteOrderMark: false).GetBytes("你好世界和平a"));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_Utf32LeWithoutBom_ShouldReturnTrue()
+        {
+            File.WriteAllText(_tempFilePath, "Text without a UTF-32LE BOM", new UTF32Encoding(bigEndian: false, byteOrderMark: false));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_Utf32BeWithoutBom_ShouldReturnTrue()
+        {
+            File.WriteAllText(_tempFilePath, "Text without a UTF-32BE BOM", new UTF32Encoding(bigEndian: true, byteOrderMark: false));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_BomlessUtf32SupplementaryCharacters_ShouldReturnTrue()
+        {
+            const string expected = "\U0001F600\U0001F600\U0001F600";
+            File.WriteAllBytes(_tempFilePath, new UTF32Encoding(bigEndian: false, byteOrderMark: false).GetBytes(expected));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_BomlessUtf16SupplementaryCharacters_ShouldReturnTrue()
+        {
+            const string expected = "\U0001F600\U0001F600\U0001F600";
+            File.WriteAllBytes(_tempFilePath, new UnicodeEncoding(bigEndian: false, byteOrderMark: false).GetBytes(expected));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_BomlessUtf32RepeatedContent_ShouldReturnTrue()
+        {
+            const string expected = "aaaa";
+            File.WriteAllBytes(_tempFilePath, new UTF32Encoding(bigEndian: false, byteOrderMark: false).GetBytes(expected));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_BomlessUtf16RepeatedContent_ShouldReturnTrue()
+        {
+            const string expected = "aaaa";
+            File.WriteAllBytes(_tempFilePath, new UnicodeEncoding(bigEndian: false, byteOrderMark: false).GetBytes(expected));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_BomlessUtf16SurrogatePairAtSampleBoundary_ShouldReturnTrue()
+        {
+            string expected = new string('a', 3997) + "bc" + "\U0001F600" + "after";
+            File.WriteAllBytes(_tempFilePath, new UnicodeEncoding(bigEndian: false, byteOrderMark: false).GetBytes(expected));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_BomlessUtf16TrailingHighSurrogateAtEof_ShouldReturnFalse()
+        {
+            byte[] ascii = new UnicodeEncoding(bigEndian: false, byteOrderMark: false).GetBytes(new string('a', 3999));
+            byte[] invalidUtf16 = new byte[ascii.Length + 2];
+            Buffer.BlockCopy(ascii, 0, invalidUtf16, 0, ascii.Length);
+            invalidUtf16[^2] = 0x3D;
+            invalidUtf16[^1] = 0xD8;
+            File.WriteAllBytes(_tempFilePath, invalidUtf16);
+
+            Assert.IsFalse(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
         public async Task IsTextFile_FileExceedsMaxSize_ShouldReturnFalse()
         {
             byte[] buffer = new byte[ReadHelper.MaxReadableFileSizeBytes + 1];
@@ -165,6 +279,22 @@ namespace Peek.FilePreviewer.UnitTests
 
             buffer[7999] = 0;
             File.WriteAllBytes(_tempFilePath, buffer);
+
+            Assert.IsFalse(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_AsciiContentWithEmbeddedNul_ShouldReturnFalse()
+        {
+            File.WriteAllBytes(_tempFilePath, Encoding.ASCII.GetBytes("abcdef\0ghi"));
+
+            Assert.IsFalse(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_ControlHeavyBinary_ShouldReturnFalse()
+        {
+            File.WriteAllBytes(_tempFilePath, [0x01, 0x00, 0x02, 0x00]);
 
             Assert.IsFalse(await TextFileHelper.IsTextFileAsync(_tempFilePath));
         }
