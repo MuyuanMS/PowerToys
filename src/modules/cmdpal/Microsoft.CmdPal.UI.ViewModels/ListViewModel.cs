@@ -695,6 +695,27 @@ public partial class ListViewModel : PageViewModel, IDisposable
         return initialized;
     }
 
+    internal static async Task<bool> TryRequestInitializationAsync(
+        ListItemViewModel item,
+        Action<ListItemViewModel> onInitializationFailed,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await item.RequestInitializationAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            CoreLogger.LogError("Failed to initialize a selected list item", ex);
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                NotifyInitializationFailure(item, onInitializationFailed);
+            }
+
+            return false;
+        }
+    }
+
     private static void NotifyInitializationFailure(ListItemViewModel item, Action<ListItemViewModel> onInitializationFailed)
     {
         try
@@ -1043,7 +1064,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
                         return;
                     }
 
-                    var initialized = await item.RequestInitializationAsync(ct).ConfigureAwait(false);
+                    var initialized = await TryRequestInitializationAsync(item, OnItemInitializationFailed, ct).ConfigureAwait(false);
 
                     if (!initialized || ct.IsCancellationRequested)
                     {

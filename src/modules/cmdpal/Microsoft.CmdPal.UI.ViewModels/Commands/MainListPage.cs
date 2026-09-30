@@ -252,13 +252,9 @@ public sealed partial class MainListPage : DynamicListPage,
             do
             {
                 _refreshRequested.Clear();
-                lock (_tlcManager.TopLevelCommands)
+                if (!ConsumeSearchRefreshRequest())
                 {
-                    var searchCatalogChanged = _searchCatalogRefreshRequested.Clear();
-                    if (!searchCatalogChanged && _filteredItemsIncludesApps == _includeApps)
-                    {
-                        break;
-                    }
+                    break;
                 }
 
                 var currentSearchText = SearchText;
@@ -277,6 +273,20 @@ public sealed partial class MainListPage : DynamicListPage,
             {
                 _ = Task.Run(RunRefreshLoop);
             }
+        }
+    }
+
+    internal bool ConsumeSearchRefreshRequest()
+    {
+        lock (_tlcManager.TopLevelCommands)
+        {
+            var searchCatalogChanged = _searchCatalogRefreshRequested.Clear();
+            if (searchCatalogChanged)
+            {
+                ClearResults();
+            }
+
+            return searchCatalogChanged || _filteredItemsIncludesApps != _includeApps;
         }
     }
 

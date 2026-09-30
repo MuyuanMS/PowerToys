@@ -368,6 +368,42 @@ public partial class TopLevelCommandManagerTests
         AssertSearchCacheIsCleared(mainPage, "_globalFallbackSources");
     }
 
+    [TestMethod]
+    public async Task ConsumingCatalogRefreshSignalClearsSearchCachesAgain()
+    {
+        await using var services = CreateServices();
+        var settingsService = services.GetRequiredService<ISettingsService>();
+        using var manager = new TopLevelCommandManager(services, []);
+        await manager.LoadExternalProvidersAsync();
+        var appStateService = new Mock<IAppStateService>();
+        appStateService.SetupGet(service => service.State).Returns(new AppStateModel());
+        using var mainPage = new MainListPage(
+            manager,
+            new AliasManager(manager, settingsService),
+            Mock.Of<Microsoft.CmdPal.Common.Text.IFuzzyMatcherProvider>(),
+            settingsService,
+            appStateService.Object);
+
+        SetEmptySearchCache(mainPage, "_filteredItems");
+        SetEmptySearchCache(mainPage, "_fallbackItems");
+        SetEmptySearchCache(mainPage, "_globalFallbackSources");
+        var refreshSignalField = typeof(MainListPage).GetField(
+            "_searchCatalogRefreshRequested",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.IsNotNull(refreshSignalField);
+        var refreshSignal = refreshSignalField.GetValue(mainPage);
+        Assert.IsNotNull(refreshSignal);
+        var setSignal = refreshSignal.GetType().GetMethod("Set");
+        Assert.IsNotNull(setSignal);
+        setSignal.Invoke(refreshSignal, null);
+        refreshSignalField.SetValue(mainPage, refreshSignal);
+
+        Assert.IsTrue(mainPage.ConsumeSearchRefreshRequest());
+        AssertSearchCacheIsCleared(mainPage, "_filteredItems");
+        AssertSearchCacheIsCleared(mainPage, "_fallbackItems");
+        AssertSearchCacheIsCleared(mainPage, "_globalFallbackSources");
+    }
+
     private static void SetEmptySearchCache(MainListPage mainPage, string fieldName)
     {
         var field = typeof(MainListPage).GetField(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);

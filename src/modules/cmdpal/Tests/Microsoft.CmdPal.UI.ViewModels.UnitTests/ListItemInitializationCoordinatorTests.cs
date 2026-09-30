@@ -831,6 +831,25 @@ public sealed partial class ListItemInitializationCoordinatorTests
     }
 
     [TestMethod]
+    public async Task SelectionInitializationCleanupFailureNotifiesFailureHandler()
+    {
+        var cleanupItem = new ThrowingCleanupContextItem();
+        var model = new ThrowingTitleListItem { ThrowOnTitle = true };
+        var viewModel = new CleanupFailureListItemViewModel(model, cleanupItem);
+        ListItemViewModel? failedItem = null;
+
+        var initialized = await ListViewModel.TryRequestInitializationAsync(
+            viewModel,
+            item => failedItem = item,
+            CancellationToken.None);
+
+        Assert.IsFalse(initialized);
+        Assert.AreSame(viewModel, failedItem);
+        Assert.AreEqual(1, cleanupItem.CleanupCount);
+        Assert.IsFalse(viewModel.IsInErrorState);
+    }
+
+    [TestMethod]
     [Timeout(15000)]
     public void FirstItemsContainEscapedFailuresAndContinueInitializing()
     {
