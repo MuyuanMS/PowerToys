@@ -184,6 +184,15 @@ namespace Peek.FilePreviewer.UnitTests
         }
 
         [TestMethod]
+        public async Task IsTextFile_BomlessUtf16RepeatedContent_ShouldReturnTrue()
+        {
+            const string expected = "aaaa";
+            File.WriteAllBytes(_tempFilePath, new UnicodeEncoding(bigEndian: false, byteOrderMark: false).GetBytes(expected));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
         public async Task IsTextFile_BomlessUtf16SurrogatePairAtSampleBoundary_ShouldReturnTrue()
         {
             string expected = new string('a', 3997) + "bc" + "\U0001F600" + "after";

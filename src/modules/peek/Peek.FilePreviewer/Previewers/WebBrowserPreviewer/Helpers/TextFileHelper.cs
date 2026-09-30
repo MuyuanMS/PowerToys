@@ -289,6 +289,7 @@ namespace Peek.FilePreviewer.Previewers
                 }
             }
 
+            bool hasStrongNullLane = highByteNulls * 10 >= unitCount * 6;
             if (!hasNonAsciiByte && highByteNulls * 10 < unitCount * 3)
             {
                 return false;
@@ -335,7 +336,7 @@ namespace Peek.FilePreviewer.Previewers
             }
 
             // Sparse NULs alone are ambiguous; require a varied valid decoding to avoid mistaking ASCII or binary data for UTF-16.
-            if (distinctRunes.Count >= 3 || decodedSupplementaryRunes >= 2)
+            if (distinctRunes.Count >= 3 || decodedSupplementaryRunes >= 2 || hasStrongNullLane)
             {
                 supplementaryRuneCount = decodedSupplementaryRunes;
                 return true;
