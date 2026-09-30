@@ -702,25 +702,35 @@ public partial class ListViewModel : PageViewModel, IDisposable
     {
         try
         {
-            return await item.RequestInitializationAsync(cancellationToken).ConfigureAwait(false);
+            var initialized = await item.RequestInitializationAsync(cancellationToken).ConfigureAwait(false);
+            if (!initialized && HasInitializationFailed(item))
+            {
+                NotifyInitializationFailure(item, onInitializationFailed);
+            }
+
+            return initialized;
         }
-        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException ex)
+        {
+            if (!HasInitializationFailed(item))
+            {
+                throw;
+            }
+
+            CoreLogger.LogError("Failed to initialize a selected list item", ex);
+            NotifyInitializationFailure(item, onInitializationFailed);
+            return false;
+        }
+        catch (Exception ex)
         {
             CoreLogger.LogError("Failed to initialize a selected list item", ex);
             NotifyInitializationFailure(item, onInitializationFailed);
             return false;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            CoreLogger.LogError("Failed to initialize a selected list item", ex);
-            if (!cancellationToken.IsCancellationRequested)
-            {
-                NotifyInitializationFailure(item, onInitializationFailed);
-            }
-
-            return false;
-        }
     }
+
+    private static bool HasInitializationFailed(ListItemViewModel item) =>
+        item.IsInErrorState || (item.IsInitializationComplete && !item.InitializationWasSuccessful);
 
     private static void NotifyInitializationFailure(ListItemViewModel item, Action<ListItemViewModel> onInitializationFailed)
     {
@@ -1076,11 +1086,6 @@ public partial class ListViewModel : PageViewModel, IDisposable
                     {
                         if (!ct.IsCancellationRequested)
                         {
-                            if (item.IsInErrorState)
-                            {
-                                PruneErroredTopLevelItem(item.Model.Unsafe);
-                            }
-
                             WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
                         }
 

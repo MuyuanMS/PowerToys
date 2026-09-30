@@ -52,19 +52,25 @@ public sealed partial class ListItemInitializationCoordinatorTests
 
     private sealed partial class ThrowingCleanupContextItem : CommandContextItemViewModel
     {
-        internal ThrowingCleanupContextItem(bool throwOperationCanceledException = false)
+        internal ThrowingCleanupContextItem(
+            bool throwOperationCanceledException = false,
+            Action? onCleanup = null)
             : base(new CommandContextItem(new NoOpCommand()), new(TestContext))
         {
             ThrowOperationCanceledException = throwOperationCanceledException;
+            OnCleanup = onCleanup;
         }
 
         internal int CleanupCount { get; private set; }
 
         private bool ThrowOperationCanceledException { get; }
 
+        private Action? OnCleanup { get; }
+
         public override void SafeCleanup()
         {
             CleanupCount++;
+            OnCleanup?.Invoke();
             if (ThrowOperationCanceledException)
             {
                 throw new OperationCanceledException("Expected cleanup cancellation");
@@ -890,6 +896,30 @@ public sealed partial class ListItemInitializationCoordinatorTests
         Assert.AreSame(viewModel, failedItem);
         Assert.AreEqual(1, cleanupItem.CleanupCount);
         Assert.IsFalse(viewModel.IsInErrorState);
+    }
+
+    [TestMethod]
+    public async Task SelectionCancellationAfterInitializationFailureStillNotifiesFailureHandler()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var cleanupItem = new ThrowingCleanupContextItem(
+            throwOperationCanceledException: true,
+            onCleanup: cancellation.Cancel);
+        var model = new ThrowingTitleListItem { ThrowOnTitle = true };
+        var viewModel = new CleanupFailureListItemViewModel(model, cleanupItem);
+        ListItemViewModel? failedItem = null;
+
+        var initialized = await ListViewModel.TryRequestInitializationAsync(
+            viewModel,
+            item => failedItem = item,
+            cancellation.Token);
+
+        Assert.IsFalse(initialized);
+        Assert.IsTrue(cancellation.IsCancellationRequested);
+        Assert.IsTrue(viewModel.IsInitializationComplete);
+        Assert.IsFalse(viewModel.InitializationWasSuccessful);
+        Assert.AreSame(viewModel, failedItem);
+        Assert.AreEqual(1, cleanupItem.CleanupCount);
     }
 
     [TestMethod]
