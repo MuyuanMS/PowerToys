@@ -36,9 +36,13 @@ public static class SettingsLinkIds
         public const string DisableAnimations = "disable-animations";
         public const string Layout = "appearance-layout";
         public const string CompactMode = "compact-mode";
+        public const string HomeRecentCommands = "home-recent-commands";
+        public const string RecentCommandsDisplayLimit = "recent-commands-display-limit";
+        public const string ClearRecentCommands = "clear-recent-commands";
         public const string LaunchPosition = "launch-position";
         public const string ToastPosition = "toast-position";
         public const string Interaction = "appearance-interaction";
+        public const string ListItemAltNumberBehavior = "list-item-alt-number-behavior";
         public const string SingleClickActivation = "single-click-activation";
         public const string ShowAppDetails = "show-app-details";
         public const string BackspaceGoesBack = "backspace-goes-back";
