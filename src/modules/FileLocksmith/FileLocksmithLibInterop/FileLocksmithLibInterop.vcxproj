@@ -32,6 +32,8 @@
   </PropertyGroup>
   <PropertyGroup Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <!-- Uses the DLL CRT (/MD) in both configurations. -->
+    <EnableHybridCRT>false</EnableHybridCRT>
     
     <CharacterSet>Unicode</CharacterSet>
     <GenerateManifest>false</GenerateManifest>
