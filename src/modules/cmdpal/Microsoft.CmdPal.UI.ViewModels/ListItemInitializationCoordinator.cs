@@ -141,19 +141,30 @@ internal sealed class ListItemInitializationCoordinator
 
     private void InitializeItem(ListItemViewModel item)
     {
+        var initializationFailed = false;
         try
         {
             item.InitializePropertiesOnce();
-            if (item.IsInErrorState)
-            {
-                _onInitializationFailed?.Invoke(item);
-            }
+            initializationFailed = item.IsInErrorState;
         }
         catch (Exception ex)
         {
             // SafeInitializeProperties handles ordinary extension failures. Contain
             // an exception from its error cleanup to this item as well.
             CoreLogger.LogError("Failed to initialize a list item", ex);
+            initializationFailed = true;
+        }
+
+        if (initializationFailed)
+        {
+            try
+            {
+                _onInitializationFailed?.Invoke(item);
+            }
+            catch (Exception ex)
+            {
+                CoreLogger.LogError("Failed to handle a list item initialization failure", ex);
+            }
         }
     }
 

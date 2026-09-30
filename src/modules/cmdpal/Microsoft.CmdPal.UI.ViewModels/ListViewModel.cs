@@ -473,16 +473,10 @@ public partial class ListViewModel : PageViewModel, IDisposable
             ThrowIfFetchCanceledOrStale(fetchGeneration, cancellationToken);
 
             var firstTwenty = newViewModels.Take(20);
-            foreach (var item in firstTwenty)
-            {
-                ThrowIfFetchCanceledOrStale(fetchGeneration, cancellationToken);
-
-                item?.InitializePropertiesOnce();
-                if (item?.IsInErrorState == true)
-                {
-                    PruneErroredTopLevelItem(item.Model.Unsafe);
-                }
-            }
+            InitializeFirstItems(
+                firstTwenty,
+                item => PruneErroredTopLevelItem(item.Model.Unsafe),
+                () => ThrowIfFetchCanceledOrStale(fetchGeneration, cancellationToken));
 
             ThrowIfFetchCanceledOrStale(fetchGeneration, cancellationToken);
 
@@ -680,9 +674,41 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
     private void OnItemInitializationFailed(ListItemViewModel item)
     {
-        if (item.IsInErrorState)
+        PruneErroredTopLevelItem(item.Model.Unsafe);
+    }
+
+    internal static void InitializeFirstItems(
+        IEnumerable<ListItemViewModel> items,
+        Action<ListItemViewModel> onInitializationFailed,
+        Action beforeEach)
+    {
+        foreach (var item in items)
         {
-            PruneErroredTopLevelItem(item.Model.Unsafe);
+            beforeEach();
+
+            var initializationFailed = false;
+            try
+            {
+                item.InitializePropertiesOnce();
+                initializationFailed = item.IsInErrorState;
+            }
+            catch (Exception ex)
+            {
+                CoreLogger.LogError("Failed to initialize a list item", ex);
+                initializationFailed = true;
+            }
+
+            if (initializationFailed)
+            {
+                try
+                {
+                    onInitializationFailed(item);
+                }
+                catch (Exception ex)
+                {
+                    CoreLogger.LogError("Failed to handle a list item initialization failure", ex);
+                }
+            }
         }
     }
 

@@ -7,6 +7,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.CmdPal.UI.ViewModels.MainPage;
 using Microsoft.CmdPal.UI.ViewModels.Services;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
@@ -282,6 +283,57 @@ public partial class TopLevelCommandManagerTests
         Assert.AreEqual(1, manager.PinnedCommands.Count);
         Assert.AreEqual(TestCommandProvider.NestedCommandId, manager.PinnedCommands[0].CommandId);
         Assert.AreEqual(TestCommandProvider.NestedCommandId, services.GetRequiredService<ISettingsService>().Settings.PinnedCommands[0].CommandId);
+    }
+
+    [TestMethod]
+    public async Task PruneErroredTopLevelItem_InvalidatesMainPageSearchCaches()
+    {
+        await using var services = CreateServices();
+        var settingsService = services.GetRequiredService<ISettingsService>();
+        var provider = new TestCommandProvider(TestCommandProvider.NestedCommandId)
+        {
+            IncludeTopLevelCommand = true,
+        };
+        var wrapper = new CommandProviderWrapper(provider, TaskScheduler.Default);
+        using var manager = new TopLevelCommandManager(services, [CreateExtensionService(wrapper).Object]);
+        await manager.LoadExternalProvidersAsync();
+        var appStateService = new Mock<IAppStateService>();
+        appStateService.SetupGet(service => service.State).Returns(new AppStateModel());
+        using var mainPage = new MainListPage(
+            manager,
+            new AliasManager(manager, settingsService),
+            Mock.Of<Microsoft.CmdPal.Common.Text.IFuzzyMatcherProvider>(),
+            settingsService,
+            appStateService.Object);
+
+        SetEmptySearchCache(mainPage, "_filteredItems");
+        SetEmptySearchCache(mainPage, "_fallbackItems");
+        SetEmptySearchCache(mainPage, "_globalFallbackSources");
+
+        var erroredItem = manager.TopLevelCommands.Single(item => item.Id == TestCommandProvider.NestedCommandId);
+        manager.PruneErroredTopLevelItem(erroredItem);
+
+        AssertSearchCacheIsCleared(mainPage, "_filteredItems");
+        AssertSearchCacheIsCleared(mainPage, "_fallbackItems");
+        AssertSearchCacheIsCleared(mainPage, "_globalFallbackSources");
+    }
+
+    private static void SetEmptySearchCache(MainListPage mainPage, string fieldName)
+    {
+        var field = typeof(MainListPage).GetField(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.IsNotNull(field);
+        var elementType = field.FieldType.IsArray
+            ? field.FieldType.GetElementType()
+            : field.FieldType.GetGenericArguments().Single();
+        Assert.IsNotNull(elementType);
+        field.SetValue(mainPage, Array.CreateInstance(elementType, 0));
+    }
+
+    private static void AssertSearchCacheIsCleared(MainListPage mainPage, string fieldName)
+    {
+        var field = typeof(MainListPage).GetField(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.IsNotNull(field);
+        Assert.IsNull(field.GetValue(mainPage));
     }
 
     private static ServiceProvider CreateServices(SettingsModel? initialSettings = null)

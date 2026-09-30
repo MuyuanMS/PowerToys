@@ -99,6 +99,7 @@ public sealed partial class MainListPage : DynamicListPage,
     private InterlockedBoolean _fullRefreshRequested;
     private InterlockedBoolean _refreshRunning;
     private InterlockedBoolean _refreshRequested;
+    private InterlockedBoolean _searchCatalogRefreshRequested;
 
     private CancellationTokenSource? _cancellationTokenSource;
 
@@ -207,7 +208,20 @@ public sealed partial class MainListPage : DynamicListPage,
     {
         _defaultViewDirty = true;
         _includeApps = _tlcManager.IsProviderActive(AllAppsCommandProvider.WellKnownId);
-        if (_includeApps != _filteredItemsIncludesApps)
+
+        var searchCatalogChanged = e.Action is NotifyCollectionChangedAction.Remove or NotifyCollectionChangedAction.Reset;
+        if (searchCatalogChanged)
+        {
+            lock (_tlcManager.TopLevelCommands)
+            {
+                _searchCatalogRefreshRequested.Set();
+                ClearResults();
+            }
+
+            _searchTelemetry.CancelPendingResults();
+        }
+
+        if (_includeApps != _filteredItemsIncludesApps || searchCatalogChanged)
         {
             ReapplySearchInBackground();
         }
@@ -252,7 +266,8 @@ public sealed partial class MainListPage : DynamicListPage,
                 _refreshRequested.Clear();
                 lock (_tlcManager.TopLevelCommands)
                 {
-                    if (_filteredItemsIncludesApps == _includeApps)
+                    var searchCatalogChanged = _searchCatalogRefreshRequested.Clear();
+                    if (!searchCatalogChanged && _filteredItemsIncludesApps == _includeApps)
                     {
                         break;
                     }
