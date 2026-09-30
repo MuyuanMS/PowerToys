@@ -52,16 +52,24 @@ public sealed partial class ListItemInitializationCoordinatorTests
 
     private sealed partial class ThrowingCleanupContextItem : CommandContextItemViewModel
     {
-        internal ThrowingCleanupContextItem()
+        internal ThrowingCleanupContextItem(bool throwOperationCanceledException = false)
             : base(new CommandContextItem(new NoOpCommand()), new(TestContext))
         {
+            ThrowOperationCanceledException = throwOperationCanceledException;
         }
 
         internal int CleanupCount { get; private set; }
 
+        private bool ThrowOperationCanceledException { get; }
+
         public override void SafeCleanup()
         {
             CleanupCount++;
+            if (ThrowOperationCanceledException)
+            {
+                throw new OperationCanceledException("Expected cleanup cancellation");
+            }
+
             throw new InvalidOperationException("Expected cleanup failure");
         }
     }
@@ -831,6 +839,22 @@ public sealed partial class ListItemInitializationCoordinatorTests
     }
 
     [TestMethod]
+    public void FastInitializationCleanupCancellationNotifiesFailureHandler()
+    {
+        var cleanupItem = new ThrowingCleanupContextItem(throwOperationCanceledException: true);
+        var model = new ThrowingTitleListItem { ThrowOnTitle = true };
+        var viewModel = new CleanupFailureListItemViewModel(model, cleanupItem);
+        ListItemViewModel? failedItem = null;
+
+        var initialized = ListViewModel.TryFastInitialize(viewModel, item => failedItem = item);
+
+        Assert.IsFalse(initialized);
+        Assert.AreSame(viewModel, failedItem);
+        Assert.AreEqual(1, cleanupItem.CleanupCount);
+        Assert.IsFalse(viewModel.IsInErrorState);
+    }
+
+    [TestMethod]
     public async Task SelectionInitializationCleanupFailureNotifiesFailureHandler()
     {
         var cleanupItem = new ThrowingCleanupContextItem();
@@ -847,6 +871,45 @@ public sealed partial class ListItemInitializationCoordinatorTests
         Assert.AreSame(viewModel, failedItem);
         Assert.AreEqual(1, cleanupItem.CleanupCount);
         Assert.IsFalse(viewModel.IsInErrorState);
+    }
+
+    [TestMethod]
+    public async Task SelectionInitializationCleanupCancellationNotifiesFailureHandler()
+    {
+        var cleanupItem = new ThrowingCleanupContextItem(throwOperationCanceledException: true);
+        var model = new ThrowingTitleListItem { ThrowOnTitle = true };
+        var viewModel = new CleanupFailureListItemViewModel(model, cleanupItem);
+        ListItemViewModel? failedItem = null;
+
+        var initialized = await ListViewModel.TryRequestInitializationAsync(
+            viewModel,
+            item => failedItem = item,
+            CancellationToken.None);
+
+        Assert.IsFalse(initialized);
+        Assert.AreSame(viewModel, failedItem);
+        Assert.AreEqual(1, cleanupItem.CleanupCount);
+        Assert.IsFalse(viewModel.IsInErrorState);
+    }
+
+    [TestMethod]
+    public async Task SelectionInitializationCancellationDoesNotNotifyFailureHandler()
+    {
+        var cleanupItem = new ThrowingCleanupContextItem(throwOperationCanceledException: true);
+        var model = new ThrowingTitleListItem { ThrowOnTitle = true };
+        var viewModel = new CleanupFailureListItemViewModel(model, cleanupItem);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var failureNotified = false;
+
+        await Assert.ThrowsExceptionAsync<OperationCanceledException>(() =>
+            ListViewModel.TryRequestInitializationAsync(
+                viewModel,
+                _ => failureNotified = true,
+                cancellation.Token));
+
+        Assert.IsFalse(failureNotified);
+        Assert.AreEqual(0, cleanupItem.CleanupCount);
     }
 
     [TestMethod]

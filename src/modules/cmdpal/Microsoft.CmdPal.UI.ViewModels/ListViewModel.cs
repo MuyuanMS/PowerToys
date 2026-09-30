@@ -680,7 +680,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
         {
             initialized = item.SafeFastInit();
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
         {
             CoreLogger.LogError("Failed to fast-initialize a list item", ex);
             NotifyInitializationFailure(item, onInitializationFailed);
@@ -703,6 +703,12 @@ public partial class ListViewModel : PageViewModel, IDisposable
         try
         {
             return await item.RequestInitializationAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            CoreLogger.LogError("Failed to initialize a selected list item", ex);
+            NotifyInitializationFailure(item, onInitializationFailed);
+            return false;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
