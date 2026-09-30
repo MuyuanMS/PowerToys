@@ -46,6 +46,11 @@ namespace mousebuttonlock
         int moveCancelPixels = 5;
     };
 
+    constexpr bool ShouldInjectEscape(bool controlDown, bool altDown)
+    {
+        return !controlDown && !altDown;
+    }
+
     // Abstraction over the synthetic button-up injection (SendInput in production, a recording fake in
     // tests). Returns true if the OS accepted the synthetic event. A lock is held by suppressing the
     // physical up, so the only injection the engine needs is the up that releases a lock.

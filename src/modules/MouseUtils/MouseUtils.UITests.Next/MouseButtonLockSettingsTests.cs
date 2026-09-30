@@ -70,6 +70,8 @@ public class MouseButtonLockSettingsTests : UITestBase
                 CreateSettings(lmbLock: false, rmbLock: false, mmbLock: true, holdDurationMs: FastHoldDurationMs, moveCancelPixels: 5),
             nameof(HeldButtonLocksPastThresholdAndReleasesOnTap) =>
                 CreateSettings(lmbLock: true, rmbLock: false, mmbLock: false, holdDurationMs: FastHoldDurationMs, moveCancelPixels: 5),
+            nameof(DisablingModuleReleasesLockedButton) =>
+                CreateSettings(lmbLock: true, rmbLock: false, mmbLock: false, holdDurationMs: FastHoldDurationMs, moveCancelPixels: 5),
             nameof(ButtonLockCheckboxesPersistIndependently) =>
                 CreateSettings(lmbLock: false, rmbLock: false, mmbLock: false, holdDurationMs: 1200, moveCancelPixels: 5),
             _ =>
@@ -147,6 +149,37 @@ public class MouseButtonLockSettingsTests : UITestBase
         Assert.IsTrue(expander.IsEnabled, "Buttons and behavior options should be enabled with the module.");
 
         AssertLockOnceSettled(Middle, expectLock: true);
+    }
+
+    [TestMethod]
+    [TestCategory("MouseUtils")]
+    [TestCategory("MouseButtonLock")]
+    public void DisablingModuleReleasesLockedButton()
+    {
+        MouseUtilsTestHelper.NavigateToMouseUtilities(this);
+        MouseUtilsTestHelper.SetModuleEnabled(this, ModuleToggleId, true);
+
+        WindowHelper.MinimizeWindow(new IntPtr(Session.WindowHandle));
+        var (centerX, centerY) = WindowHelper.GetScreenCenter();
+        MouseHelper.MoveTo(centerX, centerY);
+        Left.Down();
+        Thread.Sleep(FastHoldDurationMs + HoldSlackMs);
+        Left.Up();
+
+        Assert.IsTrue(
+            WaitHelper.WaitForStable(
+                () => IsButtonDown(Left.VirtualKey),
+                isDown => isDown,
+                timeoutMS: LockObservationMs,
+                requiredConsecutiveMatches: 2,
+                pollIntervalMS: 20).Succeeded,
+            "The left button did not remain held after its lock engaged.");
+
+        Session.EnsureForeground();
+        MouseUtilsTestHelper.SetModuleEnabled(this, ModuleToggleId, false);
+        Assert.IsTrue(
+            WaitForButtonReleased(Left, HookSettleTimeoutMs),
+            "Disabling Mouse Button Lock did not release the locked left button.");
     }
 
     [TestMethod]

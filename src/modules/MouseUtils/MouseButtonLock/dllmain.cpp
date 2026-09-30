@@ -171,6 +171,13 @@ namespace
 
         static void InjectEscape()
         {
+            const bool controlDown = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+            const bool altDown = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
+            if (!mousebuttonlock::ShouldInjectEscape(controlDown, altDown))
+            {
+                return;
+            }
+
             INPUT keys[2]{};
             keys[0].type = INPUT_KEYBOARD;
             keys[0].ki.wVk = VK_ESCAPE;
