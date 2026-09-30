@@ -20,15 +20,19 @@ namespace FancyZonesEditorCommon.Data
 
         public struct TemplateLayoutWrapper
         {
+            public TemplateLayoutWrapper()
+            {
+            }
+
             public string Type { get; set; }
 
-            public bool ShowSpacing { get; set; }
+            public bool ShowSpacing { get; set; } = LayoutDefaultSettings.DefaultShowSpacing;
 
-            public int Spacing { get; set; }
+            public int Spacing { get; set; } = LayoutDefaultSettings.DefaultSpacing;
 
-            public int ZoneCount { get; set; }
+            public int ZoneCount { get; set; } = LayoutDefaultSettings.DefaultZoneCount;
 
-            public int SensitivityRadius { get; set; }
+            public int SensitivityRadius { get; set; } = LayoutDefaultSettings.DefaultSensitivityRadius;
         }
 
         public struct TemplateLayoutsListWrapper

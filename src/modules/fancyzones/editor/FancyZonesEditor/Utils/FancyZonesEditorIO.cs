@@ -375,6 +375,8 @@ namespace FancyZonesEditor.Utils
                     Type = LayoutTypeToJsonTag(layout.Type),
                     SensitivityRadius = layout.SensitivityRadius,
                     ZoneCount = layout.TemplateZoneCount,
+                    ShowSpacing = false,
+                    Spacing = 0,
                 };
 
                 if (layout is GridLayoutModel grid)
@@ -519,6 +521,8 @@ namespace FancyZonesEditor.Utils
                         Type = LayoutTypeToJsonTag(layout.Type),
                         SensitivityRadius = layout.SensitivityRadius,
                         ZoneCount = layout.TemplateZoneCount,
+                        ShowSpacing = false,
+                        Spacing = 0,
                     };
 
                     if (layout is GridLayoutModel grid)
@@ -560,6 +564,10 @@ namespace FancyZonesEditor.Utils
                     {
                         Uuid = layout.Uuid,
                         Type = LayoutTypeToJsonTag(LayoutType.Custom),
+                        ShowSpacing = false,
+                        Spacing = 0,
+                        ZoneCount = 0,
+                        SensitivityRadius = 0,
                     };
 
                     if (layout is GridLayoutModel grid)
