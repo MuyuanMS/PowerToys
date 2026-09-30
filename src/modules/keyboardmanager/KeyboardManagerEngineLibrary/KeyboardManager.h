@@ -53,6 +53,7 @@ private:
     EventWaiter settingsEventWaiter;
 
     std::atomic_bool loadingSettings = false;
+    std::atomic<unsigned int> activeHookCallbacks = 0;
 
     HANDLE editorIsRunningEvent = nullptr;
 

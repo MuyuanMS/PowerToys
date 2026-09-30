@@ -43,6 +43,11 @@ KeyboardManager::KeyboardManager()
         }
 
         loadingSettings = true;
+        while (activeHookCallbacks.load() != 0)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+
         bool loadedSuccessfully = false;
         try
         {
@@ -189,6 +194,23 @@ bool KeyboardManager::HasRegisteredRemappingsUnchecked() const
 
 intptr_t KeyboardManager::HandleKeyboardHookEvent(LowlevelKeyboardEvent* data) noexcept
 {
+    struct CallbackGuard
+    {
+        std::atomic<unsigned int>& activeCallbacks;
+
+        explicit CallbackGuard(std::atomic<unsigned int>& counter) :
+            activeCallbacks(counter)
+        {
+            activeCallbacks.fetch_add(1);
+        }
+
+        ~CallbackGuard()
+        {
+            activeCallbacks.fetch_sub(1);
+        }
+    };
+    [[maybe_unused]] const CallbackGuard callbackGuard{ activeHookCallbacks };
+
     const DWORD vkCode = Helpers::ClearKeyNumpadOrigin(data->lParam->vkCode);
     if ((data->wParam == WM_KEYUP || data->wParam == WM_SYSKEYUP) && state.ConsumeTextReplacementKeyUp(vkCode))
     {
