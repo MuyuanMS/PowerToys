@@ -75,6 +75,20 @@ public sealed partial class ListItemInitializationCoordinatorTests
         }
     }
 
+    private sealed partial class ThrowingTitleListItem : ListItem
+    {
+        internal ThrowingTitleListItem()
+            : base(new NoOpCommand())
+        {
+        }
+
+        internal bool ThrowOnTitle { get; set; }
+
+        public override string Title => ThrowOnTitle
+            ? throw new InvalidOperationException("Expected fast-initialization failure")
+            : base.Title;
+    }
+
     private sealed partial class TrackingListItem : ListItem
     {
         private readonly int _index;
@@ -761,6 +775,23 @@ public sealed partial class ListItemInitializationCoordinatorTests
 
     [TestMethod]
     [Timeout(15000)]
+    public void FailedItemNotifiesOwnerAndContinuesInitialization()
+    {
+        var order = new ConcurrentQueue<int>();
+        var (models, viewModels) = CreateItems(4, order);
+        var failedItems = new List<ListItemViewModel>();
+        models[1].OnInitializing = () => throw new InvalidOperationException("Expected extension failure");
+        var coordinator = new ListItemInitializationCoordinator(viewModels, failedItems.Add);
+
+        coordinator.Run(CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { viewModels[1] }, failedItems);
+        Assert.IsTrue(viewModels[2].InitializationWasSuccessful);
+        Assert.IsTrue(viewModels[3].InitializationWasSuccessful);
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
     public void EscapedErrorCleanupFailureDoesNotStopRemainingItems()
     {
         var order = new ConcurrentQueue<int>();
@@ -769,14 +800,94 @@ public sealed partial class ListItemInitializationCoordinatorTests
         viewModels[1] = new CleanupFailureListItemViewModel(models[1], cleanupItem);
         Assert.IsTrue(viewModels[1].SafeFastInit());
         models[1].OnInitializing = () => throw new InvalidOperationException("Expected extension failure");
+        var failedItems = new List<ListItemViewModel>();
 
-        var coordinator = new ListItemInitializationCoordinator(viewModels);
+        var coordinator = new ListItemInitializationCoordinator(viewModels, failedItems.Add);
         coordinator.Run(CancellationToken.None);
 
         Assert.AreEqual(1, cleanupItem.CleanupCount);
+        CollectionAssert.AreEqual(new[] { viewModels[1] }, failedItems);
         CollectionAssert.AreEqual(SequentialOrder, order.ToArray());
         Assert.IsTrue(viewModels[1].IsInitializationComplete);
         Assert.IsFalse(viewModels[1].InitializationWasSuccessful);
+        Assert.IsTrue(viewModels[2].InitializationWasSuccessful);
+        Assert.IsTrue(viewModels[3].InitializationWasSuccessful);
+    }
+
+    [TestMethod]
+    public void FastInitializationCleanupFailureNotifiesFailureHandler()
+    {
+        var cleanupItem = new ThrowingCleanupContextItem();
+        var model = new ThrowingTitleListItem { ThrowOnTitle = true };
+        var viewModel = new CleanupFailureListItemViewModel(model, cleanupItem);
+        ListItemViewModel? failedItem = null;
+
+        var initialized = ListViewModel.TryFastInitialize(viewModel, item => failedItem = item);
+
+        Assert.IsFalse(initialized);
+        Assert.AreSame(viewModel, failedItem);
+        Assert.AreEqual(1, cleanupItem.CleanupCount);
+        Assert.IsFalse(viewModel.IsInErrorState);
+    }
+
+    [TestMethod]
+    public async Task SelectionInitializationCleanupFailureNotifiesFailureHandler()
+    {
+        var cleanupItem = new ThrowingCleanupContextItem();
+        var model = new ThrowingTitleListItem { ThrowOnTitle = true };
+        var viewModel = new CleanupFailureListItemViewModel(model, cleanupItem);
+        ListItemViewModel? failedItem = null;
+
+        var initialized = await ListViewModel.TryRequestInitializationAsync(
+            viewModel,
+            item => failedItem = item,
+            CancellationToken.None);
+
+        Assert.IsFalse(initialized);
+        Assert.AreSame(viewModel, failedItem);
+        Assert.AreEqual(1, cleanupItem.CleanupCount);
+        Assert.IsFalse(viewModel.IsInErrorState);
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
+    public void FirstItemsContainEscapedFailuresAndContinueInitializing()
+    {
+        var order = new ConcurrentQueue<int>();
+        var (models, viewModels) = CreateItems(4, order);
+        var cleanupItem = new ThrowingCleanupContextItem();
+        viewModels[1] = new CleanupFailureListItemViewModel(models[1], cleanupItem);
+        Assert.IsTrue(viewModels[1].SafeFastInit());
+        models[1].OnInitializing = () => throw new InvalidOperationException("Expected extension failure");
+        var failedItems = new List<ListItemViewModel>();
+
+        ListViewModel.InitializeFirstItems(viewModels, failedItems.Add, static () => { });
+
+        Assert.AreEqual(1, cleanupItem.CleanupCount);
+        CollectionAssert.AreEqual(new[] { viewModels[1] }, failedItems);
+        CollectionAssert.AreEqual(SequentialOrder, order.ToArray());
+        Assert.IsTrue(viewModels[2].InitializationWasSuccessful);
+        Assert.IsTrue(viewModels[3].InitializationWasSuccessful);
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
+    public void InitializationFailureCallbackExceptionDoesNotStopRemainingItems()
+    {
+        var order = new ConcurrentQueue<int>();
+        var (models, viewModels) = CreateItems(4, order);
+        models[1].OnInitializing = () => throw new InvalidOperationException("Expected extension failure");
+        var coordinator = new ListItemInitializationCoordinator(viewModels, item =>
+        {
+            if (ReferenceEquals(item, viewModels[1]))
+            {
+                throw new InvalidOperationException("Expected callback failure");
+            }
+        });
+
+        coordinator.Run(CancellationToken.None);
+
+        CollectionAssert.AreEqual(SequentialOrder, order.ToArray());
         Assert.IsTrue(viewModels[2].InitializationWasSuccessful);
         Assert.IsTrue(viewModels[3].InitializationWasSuccessful);
     }

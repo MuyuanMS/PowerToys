@@ -99,6 +99,7 @@ public sealed partial class MainListPage : DynamicListPage,
     private InterlockedBoolean _fullRefreshRequested;
     private InterlockedBoolean _refreshRunning;
     private InterlockedBoolean _refreshRequested;
+    private InterlockedBoolean _searchCatalogRefreshRequested;
 
     private CancellationTokenSource? _cancellationTokenSource;
 
@@ -207,14 +208,20 @@ public sealed partial class MainListPage : DynamicListPage,
     {
         _defaultViewDirty = true;
         _includeApps = _tlcManager.IsProviderActive(AllAppsCommandProvider.WellKnownId);
-        if (_includeApps != _filteredItemsIncludesApps)
+
+        lock (_tlcManager.TopLevelCommands)
         {
-            ReapplySearchInBackground();
+            _searchCatalogRefreshRequested.Set();
+            ClearResults();
         }
-        else
-        {
-            RequestRefresh(fullRefresh: false);
-        }
+
+        _searchTelemetry.CancelPendingResults();
+        ReapplySearchInBackground();
+    }
+
+    internal void PruneErroredTopLevelItem(TopLevelViewModel item)
+    {
+        _tlcManager.PruneErroredTopLevelItem(item);
     }
 
     private void RequestRefresh(bool fullRefresh, TimeSpan? interval = null)
@@ -245,12 +252,9 @@ public sealed partial class MainListPage : DynamicListPage,
             do
             {
                 _refreshRequested.Clear();
-                lock (_tlcManager.TopLevelCommands)
+                if (!ConsumeSearchRefreshRequest())
                 {
-                    if (_filteredItemsIncludesApps == _includeApps)
-                    {
-                        break;
-                    }
+                    break;
                 }
 
                 var currentSearchText = SearchText;
@@ -269,6 +273,20 @@ public sealed partial class MainListPage : DynamicListPage,
             {
                 _ = Task.Run(RunRefreshLoop);
             }
+        }
+    }
+
+    internal bool ConsumeSearchRefreshRequest()
+    {
+        lock (_tlcManager.TopLevelCommands)
+        {
+            var searchCatalogChanged = _searchCatalogRefreshRequested.Clear();
+            if (searchCatalogChanged)
+            {
+                ClearResults();
+            }
+
+            return searchCatalogChanged || _filteredItemsIncludesApps != _includeApps;
         }
     }
 

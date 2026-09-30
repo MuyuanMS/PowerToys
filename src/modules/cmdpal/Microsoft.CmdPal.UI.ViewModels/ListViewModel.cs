@@ -9,6 +9,8 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.CmdPal.Common;
 using Microsoft.CmdPal.Common.Helpers;
+using Microsoft.CmdPal.UI.ViewModels.Commands;
+using Microsoft.CmdPal.UI.ViewModels.MainPage;
 using Microsoft.CmdPal.UI.ViewModels.Messages;
 using Microsoft.CmdPal.UI.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
@@ -435,8 +437,8 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
                     var viewModel = new ListItemViewModel(item, new(this), _contextMenuFactory);
 
-                    // If an item fails to load, silently ignore it.
-                    if (viewModel.SafeFastInit())
+                    // If an item fails to load, prune it from the top-level command list.
+                    if (TryFastInitialize(viewModel, OnItemInitializationFailed))
                     {
                         viewModel.LayoutShowsTitle = showsTitle;
                         viewModel.LayoutShowsSubtitle = showsSubtitle;
@@ -467,12 +469,10 @@ public partial class ListViewModel : PageViewModel, IDisposable
             ThrowIfFetchCanceledOrStale(fetchGeneration, cancellationToken);
 
             var firstTwenty = newViewModels.Take(20);
-            foreach (var item in firstTwenty)
-            {
-                ThrowIfFetchCanceledOrStale(fetchGeneration, cancellationToken);
-
-                item?.InitializePropertiesOnce();
-            }
+            InitializeFirstItems(
+                firstTwenty,
+                item => PruneErroredTopLevelItem(item.Model.Unsafe),
+                () => ThrowIfFetchCanceledOrStale(fetchGeneration, cancellationToken));
 
             ThrowIfFetchCanceledOrStale(fetchGeneration, cancellationToken);
 
@@ -637,7 +637,7 @@ public partial class ListViewModel : PageViewModel, IDisposable
             // attach items to an older coordinator after a newer one was installed.
             var initializeItemsCts = new CancellationTokenSource();
             var initializeItemsToken = initializeItemsCts.Token;
-            var coordinator = new ListItemInitializationCoordinator(itemSnapshot);
+            var coordinator = new ListItemInitializationCoordinator(itemSnapshot, OnItemInitializationFailed);
             var previousCoordinator = Interlocked.Exchange(ref _itemInitializationCoordinator, coordinator);
             var previousCancellation = Interlocked.Exchange(ref _cancellationTokenSource, initializeItemsCts);
 
@@ -665,6 +665,111 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
             _initializeItemsTask = new Task(() => coordinator.Run(initializeItemsToken));
             _initializeItemsTask.Start();
+        }
+    }
+
+    private void OnItemInitializationFailed(ListItemViewModel item)
+    {
+        PruneErroredTopLevelItem(item.Model.Unsafe);
+    }
+
+    internal static bool TryFastInitialize(ListItemViewModel item, Action<ListItemViewModel> onInitializationFailed)
+    {
+        bool initialized;
+        try
+        {
+            initialized = item.SafeFastInit();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            CoreLogger.LogError("Failed to fast-initialize a list item", ex);
+            NotifyInitializationFailure(item, onInitializationFailed);
+            return false;
+        }
+
+        if (!initialized && item.IsInErrorState)
+        {
+            NotifyInitializationFailure(item, onInitializationFailed);
+        }
+
+        return initialized;
+    }
+
+    internal static async Task<bool> TryRequestInitializationAsync(
+        ListItemViewModel item,
+        Action<ListItemViewModel> onInitializationFailed,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await item.RequestInitializationAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            CoreLogger.LogError("Failed to initialize a selected list item", ex);
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                NotifyInitializationFailure(item, onInitializationFailed);
+            }
+
+            return false;
+        }
+    }
+
+    private static void NotifyInitializationFailure(ListItemViewModel item, Action<ListItemViewModel> onInitializationFailed)
+    {
+        try
+        {
+            onInitializationFailed(item);
+        }
+        catch (Exception ex)
+        {
+            CoreLogger.LogError("Failed to handle a list item initialization failure", ex);
+        }
+    }
+
+    internal static void InitializeFirstItems(
+        IEnumerable<ListItemViewModel> items,
+        Action<ListItemViewModel> onInitializationFailed,
+        Action beforeEach)
+    {
+        foreach (var item in items)
+        {
+            beforeEach();
+
+            var initializationFailed = false;
+            try
+            {
+                item.InitializePropertiesOnce();
+                initializationFailed = item.IsInErrorState;
+            }
+            catch (Exception ex)
+            {
+                CoreLogger.LogError("Failed to initialize a list item", ex);
+                initializationFailed = true;
+            }
+
+            if (initializationFailed)
+            {
+                try
+                {
+                    onInitializationFailed(item);
+                }
+                catch (Exception ex)
+                {
+                    CoreLogger.LogError("Failed to handle a list item initialization failure", ex);
+                }
+            }
+        }
+    }
+
+    private void PruneErroredTopLevelItem(IListItem? item)
+    {
+        if (IsMainPage &&
+            _model.Unsafe is MainListPage mainListPage &&
+            item is TopLevelViewModel topLevelItem)
+        {
+            mainListPage.PruneErroredTopLevelItem(topLevelItem);
         }
     }
 
@@ -959,12 +1064,17 @@ public partial class ListViewModel : PageViewModel, IDisposable
                         return;
                     }
 
-                    var initialized = await item.RequestInitializationAsync(ct).ConfigureAwait(false);
+                    var initialized = await TryRequestInitializationAsync(item, OnItemInitializationFailed, ct).ConfigureAwait(false);
 
                     if (!initialized || ct.IsCancellationRequested)
                     {
                         if (!ct.IsCancellationRequested)
                         {
+                            if (item.IsInErrorState)
+                            {
+                                PruneErroredTopLevelItem(item.Model.Unsafe);
+                            }
+
                             WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
                         }
 
@@ -976,6 +1086,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
                         if (ct.IsCancellationRequested)
                         {
                             return;
+                        }
+
+                        if (item.IsInErrorState)
+                        {
+                            PruneErroredTopLevelItem(item.Model.Unsafe);
                         }
 
                         WeakReferenceMessenger.Default.Send<HideDetailsMessage>();

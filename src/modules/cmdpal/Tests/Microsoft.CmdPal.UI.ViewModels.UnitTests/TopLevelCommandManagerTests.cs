@@ -3,8 +3,11 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Immutable;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.CmdPal.UI.ViewModels.MainPage;
 using Microsoft.CmdPal.UI.ViewModels.Services;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
@@ -251,9 +254,177 @@ public partial class TopLevelCommandManagerTests
         item.VerifyRemove(commandItem => commandItem.PropChanged -= It.IsAny<TypedEventHandler<object, IPropChangedEventArgs>>(), Times.Exactly(2));
     }
 
-    private static ServiceProvider CreateServices()
+    [TestMethod]
+    public async Task PruneErroredTopLevelItem_RemovesOnlyTheItemAndPreservesPinnedSettings()
     {
-        var settings = new SettingsModel();
+        const string retainedCommandId = "retained-command";
+        var settings = new SettingsModel
+        {
+            PinnedCommands = ImmutableList.Create(new PinnedCommandSettings("test-provider", TestCommandProvider.NestedCommandId)),
+        };
+        using var services = CreateServices(settings);
+        var provider = new TestCommandProvider(TestCommandProvider.NestedCommandId)
+        {
+            IncludeTopLevelCommand = true,
+            AdditionalTopLevelItems =
+            [
+                new CommandItem(new NoOpCommand { Id = retainedCommandId, Name = "Retained command" }),
+            ],
+        };
+        var wrapper = new CommandProviderWrapper(provider, TaskScheduler.Default);
+        using var manager = new TopLevelCommandManager(services, [CreateExtensionService(wrapper).Object]);
+        await manager.LoadExternalProvidersAsync();
+        var erroredItem = manager.TopLevelCommands.Single(item => item.Id == TestCommandProvider.NestedCommandId);
+
+        manager.PruneErroredTopLevelItem(erroredItem);
+
+        Assert.AreEqual(1, manager.TopLevelCommands.Count);
+        Assert.AreEqual(retainedCommandId, manager.TopLevelCommands[0].Id);
+        Assert.AreEqual(1, manager.PinnedCommands.Count);
+        Assert.AreEqual(TestCommandProvider.NestedCommandId, manager.PinnedCommands[0].CommandId);
+        Assert.AreEqual(TestCommandProvider.NestedCommandId, services.GetRequiredService<ISettingsService>().Settings.PinnedCommands[0].CommandId);
+    }
+
+    [TestMethod]
+    public async Task PruneErroredTopLevelItem_InvalidatesMainPageSearchCaches()
+    {
+        await using var services = CreateServices();
+        var settingsService = services.GetRequiredService<ISettingsService>();
+        var provider = new TestCommandProvider(TestCommandProvider.NestedCommandId)
+        {
+            IncludeTopLevelCommand = true,
+        };
+        var wrapper = new CommandProviderWrapper(provider, TaskScheduler.Default);
+        using var manager = new TopLevelCommandManager(services, [CreateExtensionService(wrapper).Object]);
+        await manager.LoadExternalProvidersAsync();
+        var appStateService = new Mock<IAppStateService>();
+        appStateService.SetupGet(service => service.State).Returns(new AppStateModel());
+        using var mainPage = new MainListPage(
+            manager,
+            new AliasManager(manager, settingsService),
+            Mock.Of<Microsoft.CmdPal.Common.Text.IFuzzyMatcherProvider>(),
+            settingsService,
+            appStateService.Object);
+
+        SetEmptySearchCache(mainPage, "_filteredItems");
+        SetEmptySearchCache(mainPage, "_fallbackItems");
+        SetEmptySearchCache(mainPage, "_globalFallbackSources");
+
+        var erroredItem = manager.TopLevelCommands.Single(item => item.Id == TestCommandProvider.NestedCommandId);
+        manager.PruneErroredTopLevelItem(erroredItem);
+
+        AssertSearchCacheIsCleared(mainPage, "_filteredItems");
+        AssertSearchCacheIsCleared(mainPage, "_fallbackItems");
+        AssertSearchCacheIsCleared(mainPage, "_globalFallbackSources");
+    }
+
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task CommandCollectionAddOrReplace_InvalidatesMainPageSearchCaches(bool replace)
+    {
+        await using var services = CreateServices();
+        var settingsService = services.GetRequiredService<ISettingsService>();
+        var provider = new TestCommandProvider(TestCommandProvider.NestedCommandId)
+        {
+            IncludeTopLevelCommand = true,
+            AdditionalTopLevelItems =
+            [
+                new CommandItem(new NoOpCommand { Id = "replacement-command", Name = "Replacement command" }),
+            ],
+        };
+        var wrapper = new CommandProviderWrapper(provider, TaskScheduler.Default);
+        using var manager = new TopLevelCommandManager(services, [CreateExtensionService(wrapper).Object]);
+        await manager.LoadExternalProvidersAsync();
+        var appStateService = new Mock<IAppStateService>();
+        appStateService.SetupGet(service => service.State).Returns(new AppStateModel());
+        using var mainPage = new MainListPage(
+            manager,
+            new AliasManager(manager, settingsService),
+            Mock.Of<Microsoft.CmdPal.Common.Text.IFuzzyMatcherProvider>(),
+            settingsService,
+            appStateService.Object);
+
+        SetEmptySearchCache(mainPage, "_filteredItems");
+        SetEmptySearchCache(mainPage, "_fallbackItems");
+        SetEmptySearchCache(mainPage, "_globalFallbackSources");
+
+        var replacement = manager.TopLevelCommands.Single(item => item.Id == "replacement-command");
+        if (replace)
+        {
+            manager.TopLevelCommands[0] = manager.TopLevelCommands[0];
+        }
+        else
+        {
+            manager.TopLevelCommands.Remove(replacement);
+            SetEmptySearchCache(mainPage, "_filteredItems");
+            SetEmptySearchCache(mainPage, "_fallbackItems");
+            SetEmptySearchCache(mainPage, "_globalFallbackSources");
+            manager.TopLevelCommands.Add(replacement);
+        }
+
+        AssertSearchCacheIsCleared(mainPage, "_filteredItems");
+        AssertSearchCacheIsCleared(mainPage, "_fallbackItems");
+        AssertSearchCacheIsCleared(mainPage, "_globalFallbackSources");
+    }
+
+    [TestMethod]
+    public async Task ConsumingCatalogRefreshSignalClearsSearchCachesAgain()
+    {
+        await using var services = CreateServices();
+        var settingsService = services.GetRequiredService<ISettingsService>();
+        using var manager = new TopLevelCommandManager(services, []);
+        await manager.LoadExternalProvidersAsync();
+        var appStateService = new Mock<IAppStateService>();
+        appStateService.SetupGet(service => service.State).Returns(new AppStateModel());
+        using var mainPage = new MainListPage(
+            manager,
+            new AliasManager(manager, settingsService),
+            Mock.Of<Microsoft.CmdPal.Common.Text.IFuzzyMatcherProvider>(),
+            settingsService,
+            appStateService.Object);
+
+        SetEmptySearchCache(mainPage, "_filteredItems");
+        SetEmptySearchCache(mainPage, "_fallbackItems");
+        SetEmptySearchCache(mainPage, "_globalFallbackSources");
+        var refreshSignalField = typeof(MainListPage).GetField(
+            "_searchCatalogRefreshRequested",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.IsNotNull(refreshSignalField);
+        var refreshSignal = refreshSignalField.GetValue(mainPage);
+        Assert.IsNotNull(refreshSignal);
+        var setSignal = refreshSignal.GetType().GetMethod("Set");
+        Assert.IsNotNull(setSignal);
+        setSignal.Invoke(refreshSignal, null);
+        refreshSignalField.SetValue(mainPage, refreshSignal);
+
+        Assert.IsTrue(mainPage.ConsumeSearchRefreshRequest());
+        AssertSearchCacheIsCleared(mainPage, "_filteredItems");
+        AssertSearchCacheIsCleared(mainPage, "_fallbackItems");
+        AssertSearchCacheIsCleared(mainPage, "_globalFallbackSources");
+    }
+
+    private static void SetEmptySearchCache(MainListPage mainPage, string fieldName)
+    {
+        var field = typeof(MainListPage).GetField(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.IsNotNull(field);
+        var elementType = field.FieldType.IsArray
+            ? field.FieldType.GetElementType()
+            : field.FieldType.GetGenericArguments().Single();
+        Assert.IsNotNull(elementType);
+        field.SetValue(mainPage, Array.CreateInstance(elementType, 0));
+    }
+
+    private static void AssertSearchCacheIsCleared(MainListPage mainPage, string fieldName)
+    {
+        var field = typeof(MainListPage).GetField(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.IsNotNull(field);
+        Assert.IsNull(field.GetValue(mainPage));
+    }
+
+    private static ServiceProvider CreateServices(SettingsModel? initialSettings = null)
+    {
+        var settings = initialSettings ?? new SettingsModel();
         var settingsService = new Mock<ISettingsService>();
         settingsService.SetupGet(service => service.Settings).Returns(() => settings);
         settingsService.Setup(service => service.UpdateSettings(It.IsAny<Func<SettingsModel, SettingsModel>>(), It.IsAny<bool>()))
@@ -285,6 +456,8 @@ public partial class TopLevelCommandManagerTests
 
         public bool IncludeTopLevelCommand { get; init; }
 
+        public ICommandItem[] AdditionalTopLevelItems { get; init; } = [];
+
         public Action? OnLookup { get; set; }
 
         public TestCommandProvider(string resolvedCommandId, ICommandItem? resolvedItem = null)
@@ -298,7 +471,7 @@ public partial class TopLevelCommandManagerTests
             });
         }
 
-        public override ICommandItem[] TopLevelCommands() => IncludeTopLevelCommand ? [_resolvedItem] : [];
+        public override ICommandItem[] TopLevelCommands() => IncludeTopLevelCommand ? [_resolvedItem, .. AdditionalTopLevelItems] : [];
 
         public override ICommandItem? GetCommandItem(string id)
         {
