@@ -47,11 +47,11 @@ internal static class Program
 
             if (parseResult.Errors.Count > 0 || exitCode != 0)
             {
-                Logger.LogWarning($"Settings CLI command failed with exit code {exitCode}: [{string.Join(", ", args)}]");
+                Logger.LogWarning($"Settings CLI command '{GetTelemetryCommandName(args)}' failed with exit code {exitCode}.");
             }
             else
             {
-                Logger.LogInfo($"Settings CLI command completed: [{string.Join(", ", args)}]");
+                Logger.LogInfo($"Settings CLI command '{GetTelemetryCommandName(args)}' completed successfully.");
             }
 
             LogCliTelemetry(GetTelemetryCommandName(args), exitCode == 0);
