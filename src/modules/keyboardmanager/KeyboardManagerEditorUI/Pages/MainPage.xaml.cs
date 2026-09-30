@@ -416,10 +416,16 @@ namespace KeyboardManagerEditorUI.Pages
 
                 if (saved)
                 {
+                    if (_isEditMode && _editingItem?.Item is TextMapping { Id.Length: > 0 } originalMapping)
+                    {
+                        SettingsManager.RemoveShortcutKeyMappingFromSettings(originalMapping.Id);
+                    }
+
                     LoadAllMappings();
                 }
                 else
                 {
+                    RestoreOriginalTextMapping();
                     UnifiedMappingControl.ShowValidationError(ResourceHelper.GetString("Error_SaveFailed_Title"), ResourceHelper.GetString("Error_SaveFailed_Message"));
                     args.Cancel = true;
                 }
@@ -621,33 +627,51 @@ namespace KeyboardManagerEditorUI.Pages
             bool saved = _mappingService!.AddTextReplacementMapping(triggerText, textContent);
             if (!saved)
             {
-                RestoreOriginalTextReplacement();
                 return false;
             }
 
             if (!_mappingService.SaveSettings())
             {
                 _mappingService.DeleteTextReplacementMapping(triggerText);
-                RestoreOriginalTextReplacement();
                 return false;
-            }
-
-            if (_isEditMode && _editingItem?.Item is TextMapping { Id.Length: > 0 } originalMapping)
-            {
-                SettingsManager.RemoveShortcutKeyMappingFromSettings(originalMapping.Id);
             }
 
             SettingsManager.AddShortcutKeyMappingToSettings(shortcutKeyMapping);
             return true;
         }
 
-        private void RestoreOriginalTextReplacement()
+        private void RestoreOriginalTextMapping()
         {
-            if (_mappingService != null &&
-                _isEditMode &&
-                _editingItem?.Item is TextMapping { IsActive: true, TriggerText.Length: > 0 } originalMapping)
+            if (_mappingService == null ||
+                !_isEditMode ||
+                _editingItem?.Item is not TextMapping { IsActive: true } originalMapping)
             {
-                _mappingService.AddTextReplacementMapping(originalMapping.TriggerText, originalMapping.Text);
+                return;
+            }
+
+            bool restored;
+            if (!string.IsNullOrEmpty(originalMapping.TriggerText))
+            {
+                restored = _mappingService.AddTextReplacementMapping(originalMapping.TriggerText, originalMapping.Text);
+            }
+            else if (_editingItem.OriginalTriggerKeys.Count == 1)
+            {
+                int originalKey = _mappingService.GetKeyCodeFromName(_editingItem.OriginalTriggerKeys[0]);
+                restored = originalKey != 0 && _mappingService.AddSingleKeyToTextMapping(originalKey, originalMapping.Text);
+            }
+            else
+            {
+                string originalKeys = string.Join(
+                    ";",
+                    _editingItem.OriginalTriggerKeys.Select(key => _mappingService.GetKeyCodeFromName(key).ToString(CultureInfo.InvariantCulture)));
+                restored = originalMapping.IsAllApps
+                    ? _mappingService.AddShortcutMapping(originalKeys, originalMapping.Text, operationType: ShortcutOperationType.RemapText)
+                    : _mappingService.AddShortcutMapping(originalKeys, originalMapping.Text, originalMapping.AppName, ShortcutOperationType.RemapText);
+            }
+
+            if (restored)
+            {
+                _mappingService.SaveSettings();
             }
         }
 
