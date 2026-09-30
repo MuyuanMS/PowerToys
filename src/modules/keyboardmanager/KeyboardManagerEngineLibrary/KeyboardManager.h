@@ -8,6 +8,7 @@ class KeyboardManager
 {
 public:
     static const inline DWORD StartHookMessageID = WM_APP + 1;
+    static const inline DWORD StopHookMessageID = WM_APP + 2;
 
     // Constructor
     KeyboardManager();

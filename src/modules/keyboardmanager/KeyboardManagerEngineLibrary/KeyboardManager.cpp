@@ -192,6 +192,11 @@ intptr_t KeyboardManager::HandleKeyboardHookEvent(LowlevelKeyboardEvent* data) n
     const DWORD vkCode = Helpers::ClearKeyNumpadOrigin(data->lParam->vkCode);
     if ((data->wParam == WM_KEYUP || data->wParam == WM_SYSKEYUP) && state.textReplacementSuppressedKeys.erase(vkCode) != 0)
     {
+        if (!HasRegisteredRemappingsUnchecked())
+        {
+            PostThreadMessageW(mainThreadId, StopHookMessageID, 0, 0);
+        }
+
         return 1;
     }
 
