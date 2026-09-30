@@ -64,7 +64,7 @@ public sealed partial class CopilotKeyRegistration : IDisposable
                 fmtid = new Guid("38652BCA-4329-4E74-86F9-39CF29345EEA"),
                 pid = 2,
             };
-            propertyStore->SetValue(&key, &value);
+            propertyStore->SetValue(&key, &value).ThrowOnFailure();
         }
         finally
         {
