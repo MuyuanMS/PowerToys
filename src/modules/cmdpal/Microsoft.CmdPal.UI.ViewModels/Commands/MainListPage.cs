@@ -209,26 +209,14 @@ public sealed partial class MainListPage : DynamicListPage,
         _defaultViewDirty = true;
         _includeApps = _tlcManager.IsProviderActive(AllAppsCommandProvider.WellKnownId);
 
-        var searchCatalogChanged = e.Action is NotifyCollectionChangedAction.Remove or NotifyCollectionChangedAction.Reset;
-        if (searchCatalogChanged)
+        lock (_tlcManager.TopLevelCommands)
         {
-            lock (_tlcManager.TopLevelCommands)
-            {
-                _searchCatalogRefreshRequested.Set();
-                ClearResults();
-            }
-
-            _searchTelemetry.CancelPendingResults();
+            _searchCatalogRefreshRequested.Set();
+            ClearResults();
         }
 
-        if (_includeApps != _filteredItemsIncludesApps || searchCatalogChanged)
-        {
-            ReapplySearchInBackground();
-        }
-        else
-        {
-            RequestRefresh(fullRefresh: false);
-        }
+        _searchTelemetry.CancelPendingResults();
+        ReapplySearchInBackground();
     }
 
     internal void PruneErroredTopLevelItem(TopLevelViewModel item)

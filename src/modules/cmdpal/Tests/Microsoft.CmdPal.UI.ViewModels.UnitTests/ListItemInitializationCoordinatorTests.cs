@@ -75,6 +75,20 @@ public sealed partial class ListItemInitializationCoordinatorTests
         }
     }
 
+    private sealed partial class ThrowingTitleListItem : ListItem
+    {
+        internal ThrowingTitleListItem()
+            : base(new NoOpCommand())
+        {
+        }
+
+        internal bool ThrowOnTitle { get; set; }
+
+        public override string Title => ThrowOnTitle
+            ? throw new InvalidOperationException("Expected fast-initialization failure")
+            : base.Title;
+    }
+
     private sealed partial class TrackingListItem : ListItem
     {
         private readonly int _index;
@@ -798,6 +812,22 @@ public sealed partial class ListItemInitializationCoordinatorTests
         Assert.IsFalse(viewModels[1].InitializationWasSuccessful);
         Assert.IsTrue(viewModels[2].InitializationWasSuccessful);
         Assert.IsTrue(viewModels[3].InitializationWasSuccessful);
+    }
+
+    [TestMethod]
+    public void FastInitializationCleanupFailureNotifiesFailureHandler()
+    {
+        var cleanupItem = new ThrowingCleanupContextItem();
+        var model = new ThrowingTitleListItem { ThrowOnTitle = true };
+        var viewModel = new CleanupFailureListItemViewModel(model, cleanupItem);
+        ListItemViewModel? failedItem = null;
+
+        var initialized = ListViewModel.TryFastInitialize(viewModel, item => failedItem = item);
+
+        Assert.IsFalse(initialized);
+        Assert.AreSame(viewModel, failedItem);
+        Assert.AreEqual(1, cleanupItem.CleanupCount);
+        Assert.IsFalse(viewModel.IsInErrorState);
     }
 
     [TestMethod]

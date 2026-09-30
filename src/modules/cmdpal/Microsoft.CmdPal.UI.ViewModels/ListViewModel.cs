@@ -437,8 +437,8 @@ public partial class ListViewModel : PageViewModel, IDisposable
 
                     var viewModel = new ListItemViewModel(item, new(this), _contextMenuFactory);
 
-                    // If an item fails to load, silently ignore it.
-                    if (viewModel.SafeFastInit())
+                    // If an item fails to load, prune it from the top-level command list.
+                    if (TryFastInitialize(viewModel, OnItemInitializationFailed))
                     {
                         viewModel.LayoutShowsTitle = showsTitle;
                         viewModel.LayoutShowsSubtitle = showsSubtitle;
@@ -447,10 +447,6 @@ public partial class ListViewModel : PageViewModel, IDisposable
                         createdViewModels.Add(viewModel);
                         nextCache[item] = viewModel;
                         created++;
-                    }
-                    else if (viewModel.IsInErrorState)
-                    {
-                        PruneErroredTopLevelItem(item);
                     }
                 }
                 catch (OperationCanceledException)
@@ -675,6 +671,40 @@ public partial class ListViewModel : PageViewModel, IDisposable
     private void OnItemInitializationFailed(ListItemViewModel item)
     {
         PruneErroredTopLevelItem(item.Model.Unsafe);
+    }
+
+    internal static bool TryFastInitialize(ListItemViewModel item, Action<ListItemViewModel> onInitializationFailed)
+    {
+        bool initialized;
+        try
+        {
+            initialized = item.SafeFastInit();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            CoreLogger.LogError("Failed to fast-initialize a list item", ex);
+            NotifyInitializationFailure(item, onInitializationFailed);
+            return false;
+        }
+
+        if (!initialized && item.IsInErrorState)
+        {
+            NotifyInitializationFailure(item, onInitializationFailed);
+        }
+
+        return initialized;
+    }
+
+    private static void NotifyInitializationFailure(ListItemViewModel item, Action<ListItemViewModel> onInitializationFailed)
+    {
+        try
+        {
+            onInitializationFailed(item);
+        }
+        catch (Exception ex)
+        {
+            CoreLogger.LogError("Failed to handle a list item initialization failure", ex);
+        }
     }
 
     internal static void InitializeFirstItems(

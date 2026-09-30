@@ -318,6 +318,56 @@ public partial class TopLevelCommandManagerTests
         AssertSearchCacheIsCleared(mainPage, "_globalFallbackSources");
     }
 
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task CommandCollectionAddOrReplace_InvalidatesMainPageSearchCaches(bool replace)
+    {
+        await using var services = CreateServices();
+        var settingsService = services.GetRequiredService<ISettingsService>();
+        var provider = new TestCommandProvider(TestCommandProvider.NestedCommandId)
+        {
+            IncludeTopLevelCommand = true,
+            AdditionalTopLevelItems =
+            [
+                new CommandItem(new NoOpCommand { Id = "replacement-command", Name = "Replacement command" }),
+            ],
+        };
+        var wrapper = new CommandProviderWrapper(provider, TaskScheduler.Default);
+        using var manager = new TopLevelCommandManager(services, [CreateExtensionService(wrapper).Object]);
+        await manager.LoadExternalProvidersAsync();
+        var appStateService = new Mock<IAppStateService>();
+        appStateService.SetupGet(service => service.State).Returns(new AppStateModel());
+        using var mainPage = new MainListPage(
+            manager,
+            new AliasManager(manager, settingsService),
+            Mock.Of<Microsoft.CmdPal.Common.Text.IFuzzyMatcherProvider>(),
+            settingsService,
+            appStateService.Object);
+
+        SetEmptySearchCache(mainPage, "_filteredItems");
+        SetEmptySearchCache(mainPage, "_fallbackItems");
+        SetEmptySearchCache(mainPage, "_globalFallbackSources");
+
+        var replacement = manager.TopLevelCommands.Single(item => item.Id == "replacement-command");
+        if (replace)
+        {
+            manager.TopLevelCommands[0] = manager.TopLevelCommands[0];
+        }
+        else
+        {
+            manager.TopLevelCommands.Remove(replacement);
+            SetEmptySearchCache(mainPage, "_filteredItems");
+            SetEmptySearchCache(mainPage, "_fallbackItems");
+            SetEmptySearchCache(mainPage, "_globalFallbackSources");
+            manager.TopLevelCommands.Add(replacement);
+        }
+
+        AssertSearchCacheIsCleared(mainPage, "_filteredItems");
+        AssertSearchCacheIsCleared(mainPage, "_fallbackItems");
+        AssertSearchCacheIsCleared(mainPage, "_globalFallbackSources");
+    }
+
     private static void SetEmptySearchCache(MainListPage mainPage, string fieldName)
     {
         var field = typeof(MainListPage).GetField(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
