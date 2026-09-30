@@ -189,6 +189,12 @@ bool KeyboardManager::HasRegisteredRemappingsUnchecked() const
 
 intptr_t KeyboardManager::HandleKeyboardHookEvent(LowlevelKeyboardEvent* data) noexcept
 {
+    const DWORD vkCode = Helpers::ClearKeyNumpadOrigin(data->lParam->vkCode);
+    if ((data->wParam == WM_KEYUP || data->wParam == WM_SYSKEYUP) && state.textReplacementSuppressedKeys.erase(vkCode) != 0)
+    {
+        return 1;
+    }
+
     if (loadingSettings)
     {
         return 0;
