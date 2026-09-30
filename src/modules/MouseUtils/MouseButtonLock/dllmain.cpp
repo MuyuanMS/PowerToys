@@ -68,7 +68,8 @@ namespace
     // SendInput synchronously from inside the low-level hook callback lets the very event we are
     // trying to suppress leak to applications (it reads as a stray click that collapses a text
     // selection). Posting the injection back to the hook thread's own message loop runs it AFTER the
-    // callback has returned 1 and the triggering event is fully suppressed. wParam carries the button.
+    // callback has returned 1 and the triggering event is fully suppressed. wParam packs the button
+    // in bits 1+ and the dismiss-context-menu intent in bit 0.
     constexpr UINT WM_MOUSEBUTTONLOCK_INJECT = WM_APP + 1;
 
     // Default values mirror the C# MouseButtonLockProperties defaults.
@@ -97,9 +98,9 @@ namespace
 
         // The module only ever injects button-UPs: a lock is held by suppressing the physical up (no
         // down injection), and every release injects the matching up.
-        bool InjectUp(mousebuttonlock::MouseButton button) override
+        bool InjectUp(mousebuttonlock::MouseButton button, bool dismissContextMenu) override
         {
-            return Post(button);
+            return Post(button, dismissContextMenu);
         }
 
         void SetFailureHandler(std::function<void(mousebuttonlock::MouseButton)> handler) override
@@ -112,8 +113,9 @@ namespace
         // callback has returned and suppressed the physical event.
         void PerformDeferred(WPARAM packed)
         {
-            const auto button = static_cast<mousebuttonlock::MouseButton>(packed);
-            const bool success = InjectUpNow(button);
+            const auto button = static_cast<mousebuttonlock::MouseButton>(packed >> 1);
+            const bool dismissContextMenu = (packed & 1) != 0;
+            const bool success = InjectUpNow(button, dismissContextMenu);
             if (!success && m_failureHandler)
             {
                 m_failureHandler(button);
@@ -124,18 +126,18 @@ namespace
         // Defer the SendInput to the hook thread's message loop. If the thread id isn't known yet
         // (should not happen once the hook is running) fall back to an inline inject so a release is
         // never silently dropped.
-        bool Post(mousebuttonlock::MouseButton button)
+        bool Post(mousebuttonlock::MouseButton button, bool dismissContextMenu)
         {
+            const WPARAM packed = (static_cast<WPARAM>(button) << 1) | (dismissContextMenu ? 1 : 0);
             const DWORD threadId = m_threadId.load();
-            if (threadId != 0 && PostThreadMessageW(threadId, WM_MOUSEBUTTONLOCK_INJECT, static_cast<WPARAM>(button), 0))
+            if (threadId != 0 && PostThreadMessageW(threadId, WM_MOUSEBUTTONLOCK_INJECT, packed, 0))
             {
                 return true;
             }
-            const bool success = InjectUpNow(button);
-            return success;
+            return InjectUpNow(button, dismissContextMenu);
         }
 
-        static bool InjectUpNow(mousebuttonlock::MouseButton button)
+        static bool InjectUpNow(mousebuttonlock::MouseButton button, bool dismissContextMenu)
         {
             DWORD flag = MOUSEEVENTF_RIGHTUP;
             switch (button)
@@ -160,7 +162,24 @@ namespace
                 Logger::warn(L"Failed to inject synthetic button-up event.");
                 return false;
             }
+            if (dismissContextMenu && button == mousebuttonlock::MouseButton::Right)
+            {
+                InjectEscape();
+            }
             return true;
+        }
+
+        static void InjectEscape()
+        {
+            INPUT keys[2]{};
+            keys[0].type = INPUT_KEYBOARD;
+            keys[0].ki.wVk = VK_ESCAPE;
+            keys[0].ki.dwExtraInfo = INJECTION_TAG;
+            keys[1].type = INPUT_KEYBOARD;
+            keys[1].ki.wVk = VK_ESCAPE;
+            keys[1].ki.dwFlags = KEYEVENTF_KEYUP;
+            keys[1].ki.dwExtraInfo = INJECTION_TAG;
+            SendInput(2, keys, sizeof(INPUT));
         }
 
         std::atomic<DWORD> m_threadId{ 0 };
@@ -548,7 +567,7 @@ bool MouseButtonLock::HandleMouseMessage(WPARAM wParam, const MSLLHOOKSTRUCT* da
     case WM_MBUTTONUP:
         return m_engine.OnButtonUp(mousebuttonlock::MouseButton::Middle, tick, snapshot);
     case WM_XBUTTONDOWN:
-        m_engine.ReleaseAll();
+        m_engine.ReleaseAll(/*dismissContextMenu=*/false);
         return false;
     case WM_MOUSEMOVE:
         m_engine.OnMove(tick, pt, snapshot);

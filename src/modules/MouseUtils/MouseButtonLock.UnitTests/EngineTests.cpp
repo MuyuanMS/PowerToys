@@ -17,13 +17,19 @@ namespace
     class FakeInjector : public IButtonUpInjector
     {
     public:
-        std::vector<MouseButton> upCalls;
+        struct UpCall
+        {
+            MouseButton button;
+            bool dismissContextMenu;
+        };
+
+        std::vector<UpCall> upCalls;
         bool succeed = true;
         std::function<void(MouseButton)> failureHandler;
 
-        bool InjectUp(MouseButton button) override
+        bool InjectUp(MouseButton button, bool dismissContextMenu) override
         {
-            upCalls.push_back(button);
+            upCalls.push_back({ button, dismissContextMenu });
             return succeed;
         }
 
@@ -114,7 +120,8 @@ namespace MouseButtonLockEngineTests
             Assert::IsTrue(e.OnButtonDown(MouseButton::Right, 1000, PointL{ 0, 0 }, s)); // suppress DOWN
             Assert::IsFalse(e.IsLocked(MouseButton::Right));
             Assert::AreEqual(static_cast<size_t>(1), injector.upCalls.size());
-            Assert::IsTrue(injector.upCalls[0] == MouseButton::Right);
+            Assert::IsTrue(injector.upCalls[0].button == MouseButton::Right);
+            Assert::IsTrue(injector.upCalls[0].dismissContextMenu);
 
             // The paired physical UP is swallowed so the app never sees an unbalanced up.
             Assert::IsTrue(e.OnButtonUp(MouseButton::Right, 1005, s));
@@ -234,7 +241,8 @@ namespace MouseButtonLockEngineTests
             e.OnButtonDown(MouseButton::Middle, 500, PointL{ 0, 0 }, s);
             Assert::IsFalse(e.IsLocked(MouseButton::Right));
             Assert::AreEqual(static_cast<size_t>(1), injector.upCalls.size());
-            Assert::IsTrue(injector.upCalls[0] == MouseButton::Right);
+            Assert::IsTrue(injector.upCalls[0].button == MouseButton::Right);
+            Assert::IsFalse(injector.upCalls[0].dismissContextMenu);
             // The middle tap itself is quick, so it does not lock.
             Assert::IsFalse(e.OnButtonUp(MouseButton::Middle, 550, s));
             Assert::IsFalse(e.IsLocked(MouseButton::Middle));
@@ -279,7 +287,8 @@ namespace MouseButtonLockEngineTests
             Assert::IsTrue(e.OnButtonDown(MouseButton::Left, 1000, PointL{ 0, 0 }, s));
             Assert::IsFalse(e.IsLocked(MouseButton::Left));
             Assert::AreEqual(static_cast<size_t>(1), injector.upCalls.size());
-            Assert::IsTrue(injector.upCalls[0] == MouseButton::Left);
+            Assert::IsTrue(injector.upCalls[0].button == MouseButton::Left);
+            Assert::IsTrue(injector.upCalls[0].dismissContextMenu);
         }
 
         TEST_METHOD(LockedButtonIsIndependentUntilAnotherButtonIsPressed)
@@ -301,7 +310,8 @@ namespace MouseButtonLockEngineTests
             e.OnButtonDown(MouseButton::Right, 500, PointL{ 0, 0 }, s);
             Assert::IsFalse(e.IsLocked(MouseButton::Left));
             Assert::AreEqual(static_cast<size_t>(1), injector.upCalls.size());
-            Assert::IsTrue(injector.upCalls[0] == MouseButton::Left);
+            Assert::IsTrue(injector.upCalls[0].button == MouseButton::Left);
+            Assert::IsFalse(injector.upCalls[0].dismissContextMenu);
             Assert::IsFalse(e.OnButtonUp(MouseButton::Right, 550, s));
             Assert::IsFalse(e.IsLocked(MouseButton::Right));
             Assert::IsFalse(e.IsLocked(MouseButton::Middle));
@@ -321,6 +331,7 @@ namespace MouseButtonLockEngineTests
             e.EnforceEnabled(s);
             Assert::IsFalse(e.IsLocked(MouseButton::Right));
             Assert::AreEqual(static_cast<size_t>(1), injector.upCalls.size()); // released via the injector
+            Assert::IsTrue(injector.upCalls[0].dismissContextMenu);
         }
 
         TEST_METHOD(ReleaseAllReleasesLockedButtons)
@@ -334,6 +345,22 @@ namespace MouseButtonLockEngineTests
             e.ReleaseAll();
             Assert::IsFalse(e.IsLocked(MouseButton::Right));
             Assert::AreEqual(static_cast<size_t>(1), injector.upCalls.size());
+            Assert::IsTrue(injector.upCalls[0].dismissContextMenu);
+        }
+
+        TEST_METHOD(ReleaseAllCanPreserveChordedClick)
+        {
+            FakeInjector injector;
+            Engine e(injector);
+            Settings s = DefaultSettings();
+
+            e.OnButtonDown(MouseButton::Right, 0, PointL{ 0, 0 }, s);
+            e.OnButtonUp(MouseButton::Right, 400, s);
+            e.ReleaseAll(/*dismissContextMenu=*/false);
+
+            Assert::IsFalse(e.IsLocked(MouseButton::Right));
+            Assert::AreEqual(static_cast<size_t>(1), injector.upCalls.size());
+            Assert::IsFalse(injector.upCalls[0].dismissContextMenu);
         }
 
         TEST_METHOD(ResetTransientClearsStaleHold)

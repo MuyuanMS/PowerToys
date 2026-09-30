@@ -52,7 +52,7 @@ namespace mousebuttonlock
     struct IButtonUpInjector
     {
         virtual ~IButtonUpInjector() = default;
-        virtual bool InjectUp(MouseButton button) = 0;
+        virtual bool InjectUp(MouseButton button, bool dismissContextMenu) = 0;
         virtual void SetFailureHandler(std::function<void(MouseButton)>)
         {
         }
@@ -65,6 +65,11 @@ namespace mousebuttonlock
             m_injector(injector)
         {
             m_injector.SetFailureHandler([this](MouseButton button) { OnInjectionFailed(button); });
+        }
+
+        ~Engine()
+        {
+            m_injector.SetFailureHandler({});
         }
 
         Engine(const Engine&) = delete;
@@ -89,7 +94,7 @@ namespace mousebuttonlock
             // events through so the OS can resolve the state.
             if (st.locked.exchange(false))
             {
-                if (m_injector.InjectUp(button))
+                if (m_injector.InjectUp(button, /*dismissContextMenu=*/true))
                 {
                     st.swallowNextRealUp = true;
                     ReleaseAllExcept(button); // also free any other held button
@@ -168,31 +173,33 @@ namespace mousebuttonlock
             CheckMoveCancel(m_middle, pixels, pt);
         }
 
-        // Release any button whose lock has just been turned off in settings.
+        // Release any button whose lock has just been turned off in settings. These releases are not
+        // chorded, so a right-button up should dismiss the surfaced context menu.
         void EnforceEnabled(const Settings& s)
         {
             std::scoped_lock lock(m_stateMutex);
             if (!s.lmbEnabled)
             {
-                ReleaseButton(m_left, MouseButton::Left);
+                ReleaseButton(m_left, MouseButton::Left, /*dismissContextMenu=*/true);
             }
             if (!s.rmbEnabled)
             {
-                ReleaseButton(m_right, MouseButton::Right);
+                ReleaseButton(m_right, MouseButton::Right, /*dismissContextMenu=*/true);
             }
             if (!s.mmbEnabled)
             {
-                ReleaseButton(m_middle, MouseButton::Middle);
+                ReleaseButton(m_middle, MouseButton::Middle, /*dismissContextMenu=*/true);
             }
         }
 
-        // Release every locked button (crash/shutdown safety).
-        void ReleaseAll()
+        // Release every locked button (crash/shutdown safety). Non-chorded releases dismiss a right-button
+        // context menu by default; callers that are handling a chorded click can opt out.
+        void ReleaseAll(bool dismissContextMenu = true)
         {
             std::scoped_lock lock(m_stateMutex);
-            ReleaseButton(m_left, MouseButton::Left);
-            ReleaseButton(m_right, MouseButton::Right);
-            ReleaseButton(m_middle, MouseButton::Middle);
+            ReleaseButton(m_left, MouseButton::Left, dismissContextMenu);
+            ReleaseButton(m_right, MouseButton::Right, dismissContextMenu);
+            ReleaseButton(m_middle, MouseButton::Middle, dismissContextMenu);
         }
 
         // Clear transient hold state. Call when (re)enabling so a button held across a
@@ -299,12 +306,12 @@ namespace mousebuttonlock
             }
         }
 
-        void ReleaseButton(ButtonState& st, MouseButton button)
+        void ReleaseButton(ButtonState& st, MouseButton button, bool dismissContextMenu)
         {
             // exchange() claims the lock atomically so among racing releasers exactly one injects.
             if (st.locked.exchange(false))
             {
-                if (!m_injector.InjectUp(button))
+                if (!m_injector.InjectUp(button, dismissContextMenu))
                 {
                     st.locked.store(true);
                 }
@@ -312,20 +319,21 @@ namespace mousebuttonlock
         }
 
         // Release every locked button other than `keep` (the one currently being pressed). Used so any
-        // button press frees a held button instead of leaving the mouse stuck on the locked one.
+        // button press frees a held button instead of leaving the mouse stuck on the locked one. The
+        // injected up is chorded with `keep`'s press, so never send Escape to the foreground app.
         void ReleaseAllExcept(MouseButton keep)
         {
             if (keep != MouseButton::Left)
             {
-                ReleaseButton(m_left, MouseButton::Left);
+                ReleaseButton(m_left, MouseButton::Left, /*dismissContextMenu=*/false);
             }
             if (keep != MouseButton::Right)
             {
-                ReleaseButton(m_right, MouseButton::Right);
+                ReleaseButton(m_right, MouseButton::Right, /*dismissContextMenu=*/false);
             }
             if (keep != MouseButton::Middle)
             {
-                ReleaseButton(m_middle, MouseButton::Middle);
+                ReleaseButton(m_middle, MouseButton::Middle, /*dismissContextMenu=*/false);
             }
         }
 
