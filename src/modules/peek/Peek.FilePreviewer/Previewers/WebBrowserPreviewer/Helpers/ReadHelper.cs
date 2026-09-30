@@ -32,7 +32,7 @@ namespace Peek.FilePreviewer.Previewers
             int sampleSize = (int)Math.Min(fs.Length, TextFileHelper.SampleSize);
             var sample = new byte[sampleSize];
             int sampleRead = await fs.ReadAtLeastAsync(sample, sampleSize, throwOnEndOfStream: false, cancellationToken).ConfigureAwait(false);
-            Encoding? bomlessUnicodeEncoding = TextFileHelper.TryDetectBomlessUnicodeEncoding(sample, sampleRead);
+            Encoding? bomlessUnicodeEncoding = TextFileHelper.TryDetectBomlessUnicodeEncoding(sample, sampleRead, sampleRead < fs.Length);
             fs.Position = 0;
 
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);

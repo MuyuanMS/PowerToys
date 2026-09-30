@@ -64,7 +64,7 @@ namespace Peek.FilePreviewer.Previewers
                     return true;
                 }
 
-                if (TryDetectBomlessUnicodeEncoding(buffer, bytesRead) != null)
+                if (TryDetectBomlessUnicodeEncoding(buffer, bytesRead, bytesRead < stream.Length) != null)
                 {
                     return true;
                 }
@@ -115,7 +115,7 @@ namespace Peek.FilePreviewer.Previewers
             return isUtf16;
         }
 
-        internal static Encoding? TryDetectBomlessUnicodeEncoding(byte[] buffer, int bytesRead)
+        internal static Encoding? TryDetectBomlessUnicodeEncoding(byte[] buffer, int bytesRead, bool isSampleTruncated = false)
         {
             if (HasExpectedNullPattern(buffer, bytesRead, unitSize: 4, textByteIndex: 0, requiredNullByteIndexes: [2, 3]) &&
                 IsPlausibleBomlessUtf32Text(buffer, bytesRead, bigEndian: false))
@@ -135,7 +135,7 @@ namespace Peek.FilePreviewer.Previewers
                 return utf32Encoding;
             }
 
-            return TryDetectBomlessUtf16WithValidatedText(buffer, bytesRead);
+            return TryDetectBomlessUtf16WithValidatedText(buffer, bytesRead, isSampleTruncated);
         }
 
         private static Encoding? TryDetectBomlessUtf32WithValidatedText(byte[] buffer, int bytesRead)
@@ -169,8 +169,6 @@ namespace Peek.FilePreviewer.Previewers
             }
 
             int runeCount = 0;
-            int supplementaryRuneCount = 0;
-            var distinctRunes = new HashSet<Rune>();
             foreach (Rune rune in text.EnumerateRunes())
             {
                 if (!IsTextRune(rune))
@@ -178,15 +176,10 @@ namespace Peek.FilePreviewer.Previewers
                     return false;
                 }
 
-                distinctRunes.Add(rune);
                 runeCount++;
-                if (rune.Value > 0xFFFF)
-                {
-                    supplementaryRuneCount++;
-                }
             }
 
-            return runeCount >= 2 && (distinctRunes.Count >= 2 || supplementaryRuneCount >= 2);
+            return runeCount >= 2;
         }
 
         private static bool HasExpectedNullPattern(byte[] buffer, int bytesRead, int unitSize, int textByteIndex, int[] requiredNullByteIndexes)
@@ -220,7 +213,7 @@ namespace Peek.FilePreviewer.Previewers
                 textNulls * 10 <= unitCount * 3;
         }
 
-        private static Encoding? TryDetectBomlessUtf16WithValidatedText(byte[] buffer, int bytesRead)
+        private static Encoding? TryDetectBomlessUtf16WithValidatedText(byte[] buffer, int bytesRead, bool isSampleTruncated)
         {
             if (bytesRead < 6 || bytesRead % 2 != 0)
             {
@@ -242,8 +235,8 @@ namespace Peek.FilePreviewer.Previewers
                 }
             }
 
-            bool isLittleEndianText = IsPlausibleBomlessUtf16Text(buffer, bytesRead, bigEndian: false, out int littleEndianSupplementaryRunes);
-            bool isBigEndianText = IsPlausibleBomlessUtf16Text(buffer, bytesRead, bigEndian: true, out int bigEndianSupplementaryRunes);
+            bool isLittleEndianText = IsPlausibleBomlessUtf16Text(buffer, bytesRead, bigEndian: false, out int littleEndianSupplementaryRunes, isSampleTruncated);
+            bool isBigEndianText = IsPlausibleBomlessUtf16Text(buffer, bytesRead, bigEndian: true, out int bigEndianSupplementaryRunes, isSampleTruncated);
             if (isLittleEndianText && !isBigEndianText &&
                 (littleEndianSupplementaryRunes >= 2 || littleEndianNulls > bigEndianNulls))
             {
@@ -272,7 +265,7 @@ namespace Peek.FilePreviewer.Previewers
             return null;
         }
 
-        private static bool IsPlausibleBomlessUtf16Text(byte[] buffer, int bytesRead, bool bigEndian, out int supplementaryRuneCount)
+        private static bool IsPlausibleBomlessUtf16Text(byte[] buffer, int bytesRead, bool bigEndian, out int supplementaryRuneCount, bool isSampleTruncated)
         {
             supplementaryRuneCount = 0;
             bool hasNonAsciiByte = false;
@@ -301,11 +294,23 @@ namespace Peek.FilePreviewer.Previewers
                 return false;
             }
 
+            int bytesToDecode = bytesRead;
+            if (isSampleTruncated && bytesToDecode >= 2)
+            {
+                int finalCodeUnit = bigEndian
+                    ? (buffer[bytesToDecode - 2] << 8) | buffer[bytesToDecode - 1]
+                    : buffer[bytesToDecode - 2] | (buffer[bytesToDecode - 1] << 8);
+                if (finalCodeUnit is >= 0xD800 and <= 0xDBFF)
+                {
+                    bytesToDecode -= 2;
+                }
+            }
+
             string text;
             try
             {
                 text = new UnicodeEncoding(bigEndian, byteOrderMark: false, throwOnInvalidBytes: true)
-                    .GetString(buffer, 0, bytesRead);
+                    .GetString(buffer, 0, bytesToDecode);
             }
             catch (DecoderFallbackException)
             {

@@ -175,6 +175,37 @@ namespace Peek.FilePreviewer.UnitTests
         }
 
         [TestMethod]
+        public async Task IsTextFile_BomlessUtf32RepeatedContent_ShouldReturnTrue()
+        {
+            const string expected = "aaaa";
+            File.WriteAllBytes(_tempFilePath, new UTF32Encoding(bigEndian: false, byteOrderMark: false).GetBytes(expected));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_BomlessUtf16SurrogatePairAtSampleBoundary_ShouldReturnTrue()
+        {
+            string expected = new string('a', 3997) + "bc" + "\U0001F600" + "after";
+            File.WriteAllBytes(_tempFilePath, new UnicodeEncoding(bigEndian: false, byteOrderMark: false).GetBytes(expected));
+
+            Assert.IsTrue(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
+        public async Task IsTextFile_BomlessUtf16TrailingHighSurrogateAtEof_ShouldReturnFalse()
+        {
+            byte[] ascii = new UnicodeEncoding(bigEndian: false, byteOrderMark: false).GetBytes(new string('a', 3999));
+            byte[] invalidUtf16 = new byte[ascii.Length + 2];
+            Buffer.BlockCopy(ascii, 0, invalidUtf16, 0, ascii.Length);
+            invalidUtf16[^2] = 0x3D;
+            invalidUtf16[^1] = 0xD8;
+            File.WriteAllBytes(_tempFilePath, invalidUtf16);
+
+            Assert.IsFalse(await TextFileHelper.IsTextFileAsync(_tempFilePath));
+        }
+
+        [TestMethod]
         public async Task IsTextFile_FileExceedsMaxSize_ShouldReturnFalse()
         {
             byte[] buffer = new byte[ReadHelper.MaxReadableFileSizeBytes + 1];
