@@ -82,13 +82,14 @@ public sealed partial class FallbackCalculatorItem : FallbackCommandItem
 
     private static void UpdateCommand(IInvokableCommand command, string query, ListItem result)
     {
+        var operationalResult = string.IsNullOrEmpty(result.TextToSuggest) ? result.Title : result.TextToSuggest;
         switch (command)
         {
             case CalculatorPasteCommand pasteCommand:
-                pasteCommand.Update(result.Title, query);
+                pasteCommand.Update(operationalResult, query);
                 break;
             case CalculatorCopyCommand copyCommand:
-                copyCommand.Update(result.Title, query);
+                copyCommand.Update(operationalResult, query);
                 break;
         }
     }
