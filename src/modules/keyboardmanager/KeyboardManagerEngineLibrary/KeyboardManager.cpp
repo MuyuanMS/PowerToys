@@ -192,7 +192,7 @@ intptr_t KeyboardManager::HandleKeyboardHookEvent(LowlevelKeyboardEvent* data) n
     const DWORD vkCode = Helpers::ClearKeyNumpadOrigin(data->lParam->vkCode);
     if ((data->wParam == WM_KEYUP || data->wParam == WM_SYSKEYUP) && state.ConsumeTextReplacementKeyUp(vkCode))
     {
-        if (!HasRegisteredRemappingsUnchecked())
+        if (!state.HasPendingTextReplacementKeyUp())
         {
             PostThreadMessageW(mainThreadId, StopHookMessageID, 0, 0);
         }

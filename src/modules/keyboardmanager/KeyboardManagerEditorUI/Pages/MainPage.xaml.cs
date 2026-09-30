@@ -489,16 +489,21 @@ namespace KeyboardManagerEditorUI.Pages
                     default:
                         if (_editingItem.Item is IToggleableShortcut shortcut)
                         {
+                            if (!shortcut.IsActive)
+                            {
+                                break;
+                            }
+
                             if (shortcut is TextMapping { TriggerText.Length: > 0 } textReplacement)
                             {
-                                if (shortcut.IsActive && !_mappingService.DeleteTextReplacementMapping(textReplacement.TriggerText))
+                                if (!_mappingService.DeleteTextReplacementMapping(textReplacement.TriggerText))
                                 {
                                     return false;
                                 }
                             }
-                            else
+                            else if (!DeleteShortcutMapping(_editingItem.OriginalTriggerKeys, _editingItem.AppName ?? string.Empty))
                             {
-                                DeleteShortcutMapping(_editingItem.OriginalTriggerKeys, _editingItem.AppName ?? string.Empty);
+                                return false;
                             }
 
                             if (shortcut is not TextMapping && !string.IsNullOrEmpty(shortcut.Id))
@@ -519,16 +524,13 @@ namespace KeyboardManagerEditorUI.Pages
             }
         }
 
-        private void DeleteShortcutMapping(List<string> originalKeys, string targetApp = "")
+        private bool DeleteShortcutMapping(List<string> originalKeys, string targetApp = "")
         {
             bool deleted = originalKeys.Count == 1
                 ? DeleteSingleKeyToTextMapping(originalKeys[0])
                 : DeleteMultiKeyMapping(originalKeys, targetApp);
 
-            if (deleted)
-            {
-                _mappingService!.SaveSettings();
-            }
+            return deleted && _mappingService!.SaveSettings();
         }
 
         private bool DeleteMultiKeyMapping(List<string> originalKeys, string targetApp = "")
