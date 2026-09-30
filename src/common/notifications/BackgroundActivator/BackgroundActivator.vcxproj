@@ -18,6 +18,8 @@
   </PropertyGroup>
   <PropertyGroup Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
+    <!-- Uses the DLL CRT (/MD) that is also used by BackgroundActivatorDLL. -->
+    <EnableHybridCRT>false</EnableHybridCRT>
     
     <CharacterSet>Unicode</CharacterSet>
     <GenerateManifest>false</GenerateManifest>
