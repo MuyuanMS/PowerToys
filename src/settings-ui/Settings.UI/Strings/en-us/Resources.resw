@@ -5060,7 +5060,7 @@ Press **Shift + a color key** for a translucent highlighter, **X** for blur, or 
 Press **Shift** for a line, **Ctrl** for a rectangle, **Tab** for an ellipse, or **Shift + Ctrl** for an arrow.
 
 **Screen**
-Press **K** or **W** for a black or white sketch pad.
+Press **Ctrl + K** or **Ctrl + W** for a black or white sketch pad.
 Press **Ctrl + C** to copy or **Ctrl + S** to save, and **Ctrl + Shift** to crop.
     </value>
   </data>
@@ -6224,6 +6224,9 @@ The break timer font matches the text font.</value>
   <data name="PowerDisplay_ProfileEditor_Description.Text" xml:space="preserve">
     <value>Select what monitors and settings to include for this profile</value>
   </data>
+  <data name="PowerDisplay_ProfileEditor_PreservedSettings.Message" xml:space="preserve">
+    <value>Saved settings for unavailable monitors or features are kept. Uncheck a setting to remove it. Applying the profile still respects monitor capabilities.</value>
+  </data>
   <data name="PowerDisplay_ProfileEditor_Brightness.Text" xml:space="preserve">
     <value>Brightness</value>
   </data>
@@ -6765,5 +6768,15 @@ Text uses the current drawing color.</value>
   <data name="GrabAndMove_ExcludeApps_TextBoxControl.PlaceholderText" xml:space="preserve">
     <value>Example: outlook</value>
     <comment>{Locked="outlook"}</comment>
+  </data>
+  <data name="GrabAndMove_ExcludeAppsForModifier.Header" xml:space="preserve">
+    <value>Excluded apps (for modifier)</value>
+  </data>
+  <data name="GrabAndMove_ExcludeAppsForModifier.Description" xml:space="preserve">
+    <value>Prevents Grab And Move from processing the modifier key while an excluded application is in the foreground - add one application name per line</value>
+  </data>
+  <data name="GrabAndMove_ExcludeAppsForModifier_TextBoxControl.PlaceholderText" xml:space="preserve">
+    <value>Example: game.exe</value>
+    <comment>{Locked="game.exe"}</comment>
   </data>
 </root>

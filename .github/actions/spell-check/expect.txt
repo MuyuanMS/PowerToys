@@ -1043,7 +1043,6 @@ manifestdependency
 MAPPEDTOSAMEKEY
 MAPTOSAMESHORTCUT
 MAPVK
-MARKDOWNPREVIEWHANDLERCPP
 maximizebox
 MAXSHORTCUTSIZE
 maxversiontested
@@ -1490,6 +1489,7 @@ psapi
 pscid
 pscustomobject
 PSECURITY
+pseudolocalizer
 psfgao
 psfi
 PSMODULEPATH
