@@ -71,6 +71,16 @@ internal sealed class IconLoadDiagnosticsSession
     private readonly ElementKindMeasurements[] _elementKindMeasurements = CreateElementKindMeasurements();
     private readonly ConditionalWeakTable<Task<IconSource?>, IconLoadMeasurement> _loadsByTask = new();
     private readonly ConcurrentDictionary<CacheDescriptor, CacheMeasurements> _cacheMeasurements = new();
+    private readonly long[] _shellIconRequestKinds = new long[Enum.GetValues<ShellIconRequestKind>().Length];
+    private readonly long[] _shellIconIdentityKinds = new long[Enum.GetValues<ShellIconIdentityKind>().Length];
+    private readonly long[] _shellIconExtractionKinds = new long[Enum.GetValues<ShellIconIdentityKind>().Length];
+    private readonly long[] _shellIconCacheInvalidationReasons = new long[Enum.GetValues<ShellIconCacheInvalidationReason>().Length];
+    private readonly long[] _shellImageListSizes = new long[Enum.GetValues<ShellImageListSize>().Length];
+    private readonly DiagnosticHistogram _shellIconIdentityResolutionLatency = new();
+    private readonly DiagnosticHistogram _shellIconExtractionLatency = new();
+    private readonly DiagnosticHistogram _shellHIconConversionLatency = new();
+    private readonly DiagnosticHistogram _shellTypeFallbackLatency = new();
+    private readonly DiagnosticHistogram _shellIntermediatePresentationLatency = new();
     private readonly ConcurrentDictionary<long, RequestDemandState> _requestDemandStates = new();
 
     // These lightweight states intentionally survive load completion so later cache hits can be
@@ -167,6 +177,35 @@ internal sealed class IconLoadDiagnosticsSession
     private long _uiProbeCompleted;
     private long _uiProbeSkipped;
     private long _uiProbeRejected;
+    private long _shellIconLocationCacheHits;
+    private long _shellIconLocationCacheMisses;
+    private long _shellIconRawInFlightJoins;
+    private long _shellIconCanonicalCacheHits;
+    private long _shellIconCanonicalInFlightJoins;
+    private long _shellIconCanonicalNewLoads;
+    private long _shellIconExtractionsSucceeded;
+    private long _shellIconExtractionsEmpty;
+    private long _shellIconExtractionsFailed;
+    private long _shellTypeFallbacksSucceeded;
+    private long _shellTypeFallbacksEmpty;
+    private long _shellTypeFallbacksFailed;
+    private long _shellIntermediateSourcesPublished;
+    private long _shellIntermediateSourcesRejected;
+    private long _shellIntermediatePresentationsApplied;
+    private long _shellIntermediatePresentationsSkipped;
+    private long _shellExactRefinementsSame;
+    private long _shellExactRefinementsDifferent;
+    private long _shellExactRefinementsFailed;
+    private long _shellIconAssociationChangedNotifications;
+    private long _shellImageListRequestedPixelTotal;
+    private long _shellImageListSourceWidthTotal;
+    private long _shellImageListSourceHeightTotal;
+    private long _shellImageListSourceSizeSamples;
+    private long _shellImageListSourceSmallerThanRequest;
+    private long _shellImageListSourceEqualToRequest;
+    private long _shellImageListSourceLargerThanRequest;
+    private long _shellImageListMaximumRequestedPixels;
+    private long _shellImageListMaximumSourcePixels;
 
     public long Id { get; }
 
@@ -202,23 +241,176 @@ internal sealed class IconLoadDiagnosticsSession
 
     internal void RecordUiProbeRejected() => Interlocked.Increment(ref _uiProbeRejected);
 
-    internal void RecordCacheLookup(Size iconSize, int capacity, bool hit)
+    internal void RecordCacheLookup(
+        Size iconSize,
+        IconCachePartition partition,
+        int capacity,
+        bool hit)
     {
-        GetCacheMeasurements(iconSize, capacity).RecordLookup(hit);
+        GetCacheMeasurements(iconSize, partition, capacity).RecordLookup(hit);
     }
 
-    internal void RecordCacheEntryAdded(Size iconSize, int capacity, int entryCount)
+    internal void RecordCacheEntryAdded(
+        Size iconSize,
+        IconCachePartition partition,
+        int capacity,
+        int entryCount)
     {
-        GetCacheMeasurements(iconSize, capacity).RecordAdded(entryCount);
+        GetCacheMeasurements(iconSize, partition, capacity).RecordAdded(entryCount);
     }
 
     internal void RecordCacheEntryRemoved(
         Size iconSize,
+        IconCachePartition partition,
         int capacity,
         int entryCount,
         AdaptiveCacheRemovalReason reason)
     {
-        GetCacheMeasurements(iconSize, capacity).RecordRemoved(entryCount, reason);
+        GetCacheMeasurements(iconSize, partition, capacity).RecordRemoved(entryCount, reason);
+    }
+
+    internal void RecordShellIconStep(ShellIconDiagnosticStep step, int detail, long elapsedTicks)
+    {
+        switch (step)
+        {
+            case ShellIconDiagnosticStep.Request:
+                Interlocked.Increment(ref _shellIconRequestKinds[detail]);
+                break;
+            case ShellIconDiagnosticStep.LocationCacheHit:
+                Interlocked.Increment(ref _shellIconLocationCacheHits);
+                break;
+            case ShellIconDiagnosticStep.LocationCacheMiss:
+                Interlocked.Increment(ref _shellIconLocationCacheMisses);
+                break;
+            case ShellIconDiagnosticStep.RawInFlightJoin:
+                Interlocked.Increment(ref _shellIconRawInFlightJoins);
+                break;
+            case ShellIconDiagnosticStep.IdentityResolved:
+                Interlocked.Increment(ref _shellIconIdentityKinds[detail]);
+                _shellIconIdentityResolutionLatency.Record(elapsedTicks);
+                break;
+            case ShellIconDiagnosticStep.CanonicalCacheHit:
+                Interlocked.Increment(ref _shellIconCanonicalCacheHits);
+                break;
+            case ShellIconDiagnosticStep.CanonicalInFlightJoin:
+                Interlocked.Increment(ref _shellIconCanonicalInFlightJoins);
+                break;
+            case ShellIconDiagnosticStep.CanonicalNewLoad:
+                Interlocked.Increment(ref _shellIconCanonicalNewLoads);
+                break;
+            case ShellIconDiagnosticStep.ExtractionSucceeded:
+                Interlocked.Increment(ref _shellIconExtractionsSucceeded);
+                Interlocked.Increment(ref _shellIconExtractionKinds[detail]);
+                _shellIconExtractionLatency.Record(elapsedTicks);
+                break;
+            case ShellIconDiagnosticStep.ExtractionEmpty:
+                Interlocked.Increment(ref _shellIconExtractionsEmpty);
+                Interlocked.Increment(ref _shellIconExtractionKinds[detail]);
+                _shellIconExtractionLatency.Record(elapsedTicks);
+                break;
+            case ShellIconDiagnosticStep.ExtractionFailed:
+                Interlocked.Increment(ref _shellIconExtractionsFailed);
+                Interlocked.Increment(ref _shellIconExtractionKinds[detail]);
+                _shellIconExtractionLatency.Record(elapsedTicks);
+                break;
+            case ShellIconDiagnosticStep.AssociationChangedNotification:
+                Interlocked.Increment(ref _shellIconAssociationChangedNotifications);
+                break;
+            case ShellIconDiagnosticStep.LocationCacheInvalidated:
+                Interlocked.Increment(ref _shellIconCacheInvalidationReasons[detail]);
+                break;
+            case ShellIconDiagnosticStep.TypeFallbackSucceeded:
+                Interlocked.Increment(ref _shellTypeFallbacksSucceeded);
+                _shellTypeFallbackLatency.Record(elapsedTicks);
+                break;
+            case ShellIconDiagnosticStep.TypeFallbackEmpty:
+                Interlocked.Increment(ref _shellTypeFallbacksEmpty);
+                _shellTypeFallbackLatency.Record(elapsedTicks);
+                break;
+            case ShellIconDiagnosticStep.TypeFallbackFailed:
+                Interlocked.Increment(ref _shellTypeFallbacksFailed);
+                _shellTypeFallbackLatency.Record(elapsedTicks);
+                break;
+            case ShellIconDiagnosticStep.IntermediateDispatchAccepted:
+                Interlocked.Increment(ref _shellIntermediateSourcesPublished);
+                break;
+            case ShellIconDiagnosticStep.IntermediateDispatchRejected:
+                Interlocked.Increment(ref _shellIntermediateSourcesRejected);
+                break;
+            case ShellIconDiagnosticStep.ExactRefinementSame:
+                Interlocked.Increment(ref _shellExactRefinementsSame);
+                break;
+            case ShellIconDiagnosticStep.ExactRefinementDifferent:
+                Interlocked.Increment(ref _shellExactRefinementsDifferent);
+                break;
+            case ShellIconDiagnosticStep.ExactRefinementFailed:
+                Interlocked.Increment(ref _shellExactRefinementsFailed);
+                break;
+            case ShellIconDiagnosticStep.IntermediatePresentationApplied:
+                Interlocked.Increment(ref _shellIntermediatePresentationsApplied);
+                _shellIntermediatePresentationLatency.Record(elapsedTicks);
+                break;
+            case ShellIconDiagnosticStep.IntermediatePresentationSkipped:
+                Interlocked.Increment(ref _shellIntermediatePresentationsSkipped);
+                break;
+        }
+
+        IconLoadEventSource.Log.ShellIconStepCompleted(
+            Id,
+            (int)step,
+            detail,
+            ToMicroseconds(elapsedTicks));
+    }
+
+    internal void RecordShellImageListExtraction(
+        ShellImageListSize imageListSize,
+        int requestedPixelSize,
+        int sourceWidth,
+        int sourceHeight,
+        long hIconConversionTicks)
+    {
+        var normalizedRequestedSize = Math.Max(0, requestedPixelSize);
+        var normalizedSourceWidth = Math.Max(0, sourceWidth);
+        var normalizedSourceHeight = Math.Max(0, sourceHeight);
+        var sourceEdge = Math.Max(normalizedSourceWidth, normalizedSourceHeight);
+
+        Interlocked.Increment(ref _shellImageListSizes[(int)imageListSize]);
+        Interlocked.Add(ref _shellImageListRequestedPixelTotal, normalizedRequestedSize);
+        UpdateMaximum(ref _shellImageListMaximumRequestedPixels, normalizedRequestedSize);
+
+        if (sourceEdge > 0)
+        {
+            Interlocked.Increment(ref _shellImageListSourceSizeSamples);
+            Interlocked.Add(ref _shellImageListSourceWidthTotal, normalizedSourceWidth);
+            Interlocked.Add(ref _shellImageListSourceHeightTotal, normalizedSourceHeight);
+            UpdateMaximum(ref _shellImageListMaximumSourcePixels, sourceEdge);
+
+            if (sourceEdge < normalizedRequestedSize)
+            {
+                Interlocked.Increment(ref _shellImageListSourceSmallerThanRequest);
+            }
+            else if (sourceEdge == normalizedRequestedSize)
+            {
+                Interlocked.Increment(ref _shellImageListSourceEqualToRequest);
+            }
+            else
+            {
+                Interlocked.Increment(ref _shellImageListSourceLargerThanRequest);
+            }
+        }
+
+        if (hIconConversionTicks > 0)
+        {
+            _shellHIconConversionLatency.Record(hIconConversionTicks);
+        }
+
+        IconLoadEventSource.Log.ShellImageListExtractionCompleted(
+            Id,
+            (int)imageListSize,
+            normalizedRequestedSize,
+            normalizedSourceWidth,
+            normalizedSourceHeight,
+            ToMicroseconds(hIconConversionTicks));
     }
 
     internal bool IsLoadDemanded(long loadId)
@@ -924,6 +1116,18 @@ internal sealed class IconLoadDiagnosticsSession
         IconLoadEventSource.Log.LoadStarted(Id, loadId, ToMicroseconds(queueTicks), activeWorkers);
     }
 
+    public void RecordWorkerReleased(long loadId)
+    {
+        var activeWorkers = Interlocked.Decrement(ref _activeWorkers);
+        Debug.Assert(activeWorkers >= 0, "An icon worker can only be released after it starts.");
+        if (_loadDemandStates.TryGetValue(loadId, out var demandState))
+        {
+            demandState.MarkWorkerReleased();
+        }
+
+        IconLoadEventSource.Log.LoadWorkerReleased(Id, loadId, activeWorkers);
+    }
+
     public void RecordBackgroundPreparation(long loadId, IconLoadInputKind inputKind, long elapsedTicks)
     {
         _backgroundPreparationLatency.Record(elapsedTicks);
@@ -1095,7 +1299,6 @@ internal sealed class IconLoadDiagnosticsSession
 
     public void RecordLoadCompleted(long loadId, IconLoadInputKind inputKind, IconLoadResultKind resultKind, long elapsedTicks)
     {
-        Interlocked.Decrement(ref _activeWorkers);
         Interlocked.Increment(ref _resultKinds[(int)resultKind]);
         _loadLatency.Record(elapsedTicks);
         _inputKindMeasurements[(int)inputKind].LoadLatency.Record(elapsedTicks);
@@ -1211,6 +1414,10 @@ internal sealed class IconLoadDiagnosticsSession
 
         builder.AppendLine("Icon caches");
         AppendCacheMeasurements(builder);
+        builder.AppendLine();
+
+        builder.AppendLine("Shell item identity and reuse");
+        AppendShellIconMeasurements(builder);
         builder.AppendLine();
 
         builder.AppendLine("Request origins");
@@ -1499,7 +1706,13 @@ internal sealed class IconLoadDiagnosticsSession
                 }
 
                 var height = left.Key.Height.CompareTo(right.Key.Height);
-                return height != 0 ? height : left.Key.Capacity.CompareTo(right.Key.Capacity);
+                if (height != 0)
+                {
+                    return height;
+                }
+
+                var partition = left.Key.Partition.CompareTo(right.Key.Partition);
+                return partition != 0 ? partition : left.Key.Capacity.CompareTo(right.Key.Capacity);
             });
 
         foreach (var (descriptor, measurements) in caches)
@@ -1510,7 +1723,9 @@ internal sealed class IconLoadDiagnosticsSession
                 .Append(descriptor.Width)
                 .Append('x')
                 .Append(descriptor.Height)
-                .Append(", capacity ")
+                .Append(' ')
+                .Append(descriptor.Partition)
+                .Append(" cache, capacity ")
                 .AppendLine(descriptor.Capacity.ToString(CultureInfo.InvariantCulture));
             AppendValue(builder, "Lookups", snapshot.Hits + snapshot.Misses, "    ");
             AppendValue(builder, "Hits", snapshot.Hits, "    ");
@@ -1530,11 +1745,159 @@ internal sealed class IconLoadDiagnosticsSession
         }
     }
 
-    private CacheMeasurements GetCacheMeasurements(Size iconSize, int capacity)
+    private void AppendShellIconMeasurements(StringBuilder builder)
+    {
+        var requestCount = Sum(_shellIconRequestKinds);
+        var canonicalCacheHits = Volatile.Read(ref _shellIconCanonicalCacheHits);
+        var canonicalInFlightJoins = Volatile.Read(ref _shellIconCanonicalInFlightJoins);
+        var canonicalNewLoads = Volatile.Read(ref _shellIconCanonicalNewLoads);
+        var canonicalOutcomes = canonicalCacheHits + canonicalInFlightJoins + canonicalNewLoads;
+        var extractionCount = Volatile.Read(ref _shellIconExtractionsSucceeded)
+            + Volatile.Read(ref _shellIconExtractionsEmpty)
+            + Volatile.Read(ref _shellIconExtractionsFailed);
+        var imageListExtractionCount = Sum(_shellImageListSizes);
+        var imageListSourceSizeSamples = Volatile.Read(ref _shellImageListSourceSizeSamples);
+
+        builder.AppendLine("  Definition: location aliases map submitted paths to non-sensitive Shell identities; canonical outcomes describe materialized source reuse after that mapping.");
+        builder.AppendLine("  The same identity has independent materialized entries for each icon size and scale.");
+        AppendValue(builder, "Requests", requestCount);
+        builder.AppendLine("  Requests by kind");
+        AppendEnumCounts<ShellIconRequestKind>(builder, _shellIconRequestKinds, "    ");
+        builder.AppendLine("  Location invalidation");
+        AppendValue(builder, "Association-change notifications received", Volatile.Read(ref _shellIconAssociationChangedNotifications), "    ");
+        builder.AppendLine("    Invalidations by reason");
+        AppendEnumCounts<ShellIconCacheInvalidationReason>(builder, _shellIconCacheInvalidationReasons, "      ");
+        builder.AppendLine("  Progressive type fallback");
+        AppendValue(builder, "Succeeded", Volatile.Read(ref _shellTypeFallbacksSucceeded), "    ");
+        AppendValue(builder, "Empty", Volatile.Read(ref _shellTypeFallbacksEmpty), "    ");
+        AppendValue(builder, "Failed", Volatile.Read(ref _shellTypeFallbacksFailed), "    ");
+        _shellTypeFallbackLatency.Append(builder, "Request to type fallback", "    ");
+        AppendValue(builder, "Intermediate dispatches accepted", Volatile.Read(ref _shellIntermediateSourcesPublished), "    ");
+        AppendValue(builder, "Intermediate dispatches rejected", Volatile.Read(ref _shellIntermediateSourcesRejected), "    ");
+        AppendValue(builder, "Intermediate UI updates applied", Volatile.Read(ref _shellIntermediatePresentationsApplied), "    ");
+        AppendValue(builder, "Intermediate UI updates skipped", Volatile.Read(ref _shellIntermediatePresentationsSkipped), "    ");
+        _shellIntermediatePresentationLatency.Append(builder, "Request to applied intermediate", "    ");
+        builder.AppendLine("    Exact refinement outcomes");
+        AppendValue(builder, "Same source", Volatile.Read(ref _shellExactRefinementsSame), "      ");
+        AppendValue(builder, "Different source", Volatile.Read(ref _shellExactRefinementsDifferent), "      ");
+        AppendValue(builder, "Failed", Volatile.Read(ref _shellExactRefinementsFailed), "      ");
+        builder.AppendLine("  Location aliases");
+        AppendValue(builder, "Cache hits", Volatile.Read(ref _shellIconLocationCacheHits), "    ");
+        AppendValue(builder, "Cache misses", Volatile.Read(ref _shellIconLocationCacheMisses), "    ");
+        AppendValue(builder, "Raw in-flight joins before identity resolution", Volatile.Read(ref _shellIconRawInFlightJoins), "    ");
+        AppendValue(builder, "Identity resolutions", Sum(_shellIconIdentityKinds), "    ");
+        _shellIconIdentityResolutionLatency.Append(builder, "Identity resolution", "    ");
+        builder.AppendLine("    Resolved identity kinds");
+        AppendEnumCounts<ShellIconIdentityKind>(builder, _shellIconIdentityKinds, "      ");
+        builder.AppendLine("  Canonical source outcomes");
+        AppendValue(builder, "Cache hits", canonicalCacheHits, "    ");
+        AppendValue(builder, "In-flight joins", canonicalInFlightJoins, "    ");
+        AppendValue(builder, "New loads", canonicalNewLoads, "    ");
+        AppendPercentage(builder, "Reuse rate", canonicalCacheHits + canonicalInFlightJoins, canonicalOutcomes, "    ");
+        builder.AppendLine("  Shell extraction");
+        AppendValue(builder, "Started", extractionCount, "    ");
+        AppendValue(builder, "Succeeded", Volatile.Read(ref _shellIconExtractionsSucceeded), "    ");
+        AppendValue(builder, "Empty", Volatile.Read(ref _shellIconExtractionsEmpty), "    ");
+        AppendValue(builder, "Failed", Volatile.Read(ref _shellIconExtractionsFailed), "    ");
+        _shellIconExtractionLatency.Append(builder, "Extraction", "    ");
+        builder.AppendLine("    Extraction routes");
+        AppendEnumCounts<ShellIconIdentityKind>(builder, _shellIconExtractionKinds, "      ");
+        AppendPercentage(builder, "Requests avoiding extraction", Math.Max(0, requestCount - extractionCount), requestCount, "    ");
+        builder.AppendLine("    Direct system image-list extraction");
+        AppendValue(builder, "Attempts", imageListExtractionCount, "      ");
+        builder.AppendLine("      Image-list levels used");
+        AppendEnumCounts<ShellImageListSize>(builder, _shellImageListSizes, "        ");
+        AppendAveragePixels(
+            builder,
+            "Requested physical edge",
+            Volatile.Read(ref _shellImageListRequestedPixelTotal),
+            imageListExtractionCount,
+            Volatile.Read(ref _shellImageListMaximumRequestedPixels),
+            "      ");
+        AppendAverageDimensions(
+            builder,
+            "Source image-list dimensions",
+            Volatile.Read(ref _shellImageListSourceWidthTotal),
+            Volatile.Read(ref _shellImageListSourceHeightTotal),
+            imageListSourceSizeSamples,
+            Volatile.Read(ref _shellImageListMaximumSourcePixels),
+            "      ");
+        AppendValue(builder, "Source smaller than request", Volatile.Read(ref _shellImageListSourceSmallerThanRequest), "      ");
+        AppendValue(builder, "Source equal to request", Volatile.Read(ref _shellImageListSourceEqualToRequest), "      ");
+        AppendValue(builder, "Source larger than request", Volatile.Read(ref _shellImageListSourceLargerThanRequest), "      ");
+        _shellHIconConversionLatency.Append(builder, "HICON to SoftwareBitmap", "      ");
+    }
+
+    private static void AppendAveragePixels(
+        StringBuilder builder,
+        string name,
+        long total,
+        long count,
+        long maximum,
+        string indentation)
+    {
+        builder.Append(indentation).Append(name).Append(": ");
+        if (count == 0)
+        {
+            builder.AppendLine("no samples");
+            return;
+        }
+
+        builder
+            .Append("count=").Append(count.ToString(CultureInfo.InvariantCulture))
+            .Append(", avg=").Append((total / (double)count).ToString("0.###", CultureInfo.InvariantCulture)).Append(" px")
+            .Append(", max=").Append(maximum.ToString(CultureInfo.InvariantCulture)).AppendLine(" px");
+    }
+
+    private static void AppendAverageDimensions(
+        StringBuilder builder,
+        string name,
+        long totalWidth,
+        long totalHeight,
+        long count,
+        long maximumEdge,
+        string indentation)
+    {
+        builder.Append(indentation).Append(name).Append(": ");
+        if (count == 0)
+        {
+            builder.AppendLine("no samples");
+            return;
+        }
+
+        builder
+            .Append("count=").Append(count.ToString(CultureInfo.InvariantCulture))
+            .Append(", avg=").Append((totalWidth / (double)count).ToString("0.###", CultureInfo.InvariantCulture))
+            .Append('x').Append((totalHeight / (double)count).ToString("0.###", CultureInfo.InvariantCulture)).Append(" px")
+            .Append(", max edge=").Append(maximumEdge.ToString(CultureInfo.InvariantCulture)).AppendLine(" px");
+    }
+
+    private static void AppendPercentage(
+        StringBuilder builder,
+        string name,
+        long numerator,
+        long denominator,
+        string indentation)
+    {
+        builder.Append(indentation).Append(name).Append(": ");
+        if (denominator == 0)
+        {
+            builder.AppendLine("n/a");
+            return;
+        }
+
+        builder.Append((100d * numerator / denominator).ToString("0.###", CultureInfo.InvariantCulture)).AppendLine("%");
+    }
+
+    private CacheMeasurements GetCacheMeasurements(
+        Size iconSize,
+        IconCachePartition partition,
+        int capacity)
     {
         var descriptor = new CacheDescriptor(
             NormalizeCacheDimension(iconSize.Width),
             NormalizeCacheDimension(iconSize.Height),
+            partition,
             capacity);
         return _cacheMeasurements.GetOrAdd(descriptor, static _ => new CacheMeasurements());
     }
@@ -1664,6 +2027,7 @@ internal sealed class IconLoadDiagnosticsSession
         var lostBeforeEnqueue = 0L;
         var lostWhileQueued = 0L;
         var lostWhileWorkerActive = 0L;
+        var lostWhileAwaitingSharedLoad = 0L;
         var loadsWhereDemandReturned = 0L;
         var workersStartedWithoutRequester = 0L;
         var loadsCompletedWithoutRequester = 0L;
@@ -1693,6 +2057,7 @@ internal sealed class IconLoadDiagnosticsSession
             lostBeforeEnqueue += snapshot.LostLastRequesterBeforeEnqueue;
             lostWhileQueued += snapshot.LostLastRequesterWhileQueued;
             lostWhileWorkerActive += snapshot.LostLastRequesterWhileWorkerActive;
+            lostWhileAwaitingSharedLoad += snapshot.LostLastRequesterWhileAwaitingSharedLoad;
             if (snapshot.DemandReturnedBeforeCompletion)
             {
                 loadsWhereDemandReturned++;
@@ -1735,6 +2100,7 @@ internal sealed class IconLoadDiagnosticsSession
         AppendValue(builder, "Before enqueue", lostBeforeEnqueue, "    ");
         AppendValue(builder, "Queued", lostWhileQueued, "    ");
         AppendValue(builder, "Worker active", lostWhileWorkerActive, "    ");
+        AppendValue(builder, "Awaiting shared load", lostWhileAwaitingSharedLoad, "    ");
         AppendValue(builder, "Loads where demand returned before completion", loadsWhereDemandReturned);
         AppendValue(builder, "Workers started with no live requester", workersStartedWithoutRequester);
         AppendValue(builder, "Loads completed with no live requester", loadsCompletedWithoutRequester);
@@ -1746,7 +2112,7 @@ internal sealed class IconLoadDiagnosticsSession
         AppendValue(builder, "Later cache-hit requests", retainedResultCacheHits);
         withoutRequesterToWorkerStart.Append(builder, "No-requester time before worker start");
         withoutRequesterToCompletion.Append(builder, "No-requester time before load completion");
-        builder.AppendLine("  Scope: UI IconBox requests and IconLoader work only. Extension-side icon-data preloading, including CommandItemViewModel.InitializeProperties reading AppListItem.Icon for Installed Apps, occurs before this pipeline and is not classified as unused work.");
+        builder.AppendLine("  Scope: UI IconBox requests and IconLoader work only. Installed Apps icon extraction enters this pipeline as SpecializedAppIcon work. Other extension-side icon-data preloading before this pipeline is not classified as unused work.");
     }
 
     private void AppendDemandQueueMeasurements(StringBuilder builder)
@@ -2268,7 +2634,11 @@ internal sealed class IconLoadDiagnosticsSession
         long StartedAt,
         long ElapsedTicks);
 
-    private readonly record struct CacheDescriptor(int Width, int Height, int Capacity);
+    private readonly record struct CacheDescriptor(
+        int Width,
+        int Height,
+        IconCachePartition Partition,
+        int Capacity);
 
     private readonly record struct CacheMeasurementsSnapshot(
         long Hits,
@@ -2371,6 +2741,7 @@ internal sealed class IconLoadDiagnosticsSession
         int LostLastRequesterBeforeEnqueue,
         int LostLastRequesterWhileQueued,
         int LostLastRequesterWhileWorkerActive,
+        int LostLastRequesterWhileAwaitingSharedLoad,
         bool DemandReturnedBeforeCompletion,
         bool WorkerStartedWithoutLiveRequester,
         long WithoutRequesterToWorkerStartTicks,
@@ -2532,6 +2903,9 @@ internal sealed class IconLoadDiagnosticsSession
         private int _lostLastRequesterBeforeEnqueue;
         private int _lostLastRequesterWhileQueued;
         private int _lostLastRequesterWhileWorkerActive;
+        private int _lostLastRequesterWhileAwaitingSharedLoad;
+        private bool _workerActive;
+        private bool _activeWorkerDemanded;
         private bool _withoutRequester;
         private long _withoutRequesterAt;
         private bool _demandReturnedBeforeCompletion;
@@ -2606,9 +2980,10 @@ internal sealed class IconLoadDiagnosticsSession
                             becameDemanded: true,
                             _workerCount);
                     }
-                    else if (_stage == IconLoadDemandStage.WorkerActive)
+                    else if (_stage == IconLoadDemandStage.WorkerActive && _workerActive)
                     {
                         _session.RecordActiveWorkerDemandTransition(_inputKind, becameDemanded: true);
+                        _activeWorkerDemanded = true;
                     }
                 }
 
@@ -2647,9 +3022,10 @@ internal sealed class IconLoadDiagnosticsSession
                             becameDemanded: false,
                             _workerCount);
                     }
-                    else if (_stage == IconLoadDemandStage.WorkerActive)
+                    else if (_stage == IconLoadDemandStage.WorkerActive && _workerActive)
                     {
                         _session.RecordActiveWorkerDemandTransition(_inputKind, becameDemanded: false);
+                        _activeWorkerDemanded = false;
                     }
                 }
 
@@ -2667,9 +3043,13 @@ internal sealed class IconLoadDiagnosticsSession
                     _liveRequesters--;
                 }
 
-                if (wasDemanded && _liveRequesters == 0 && _stage == IconLoadDemandStage.WorkerActive)
+                if (wasDemanded
+                    && _liveRequesters == 0
+                    && _stage == IconLoadDemandStage.WorkerActive
+                    && _workerActive)
                 {
                     _session.RecordActiveWorkerDemandTransition(_inputKind, becameDemanded: false);
+                    _activeWorkerDemanded = false;
                 }
             }
         }
@@ -2697,6 +3077,9 @@ internal sealed class IconLoadDiagnosticsSession
                     break;
                 case IconLoadDemandStage.WorkerActive:
                     _lostLastRequesterWhileWorkerActive++;
+                    break;
+                case IconLoadDemandStage.AwaitingSharedLoad:
+                    _lostLastRequesterWhileAwaitingSharedLoad++;
                     break;
             }
         }
@@ -2771,6 +3154,8 @@ internal sealed class IconLoadDiagnosticsSession
                     and not IconLoadDemandStage.Abandoned)
                 {
                     _stage = IconLoadDemandStage.WorkerActive;
+                    _workerActive = true;
+                    _activeWorkerDemanded = _liveRequesters > 0;
                 }
 
                 if (_withoutRequester && _liveRequesters == 0)
@@ -2785,15 +3170,28 @@ internal sealed class IconLoadDiagnosticsSession
             }
         }
 
+        public void MarkWorkerReleased()
+        {
+            lock (_lock)
+            {
+                if (!_workerActive)
+                {
+                    return;
+                }
+
+                _session.RecordActiveWorkerCompleted(_inputKind, _activeWorkerDemanded);
+                _workerActive = false;
+                if (_stage == IconLoadDemandStage.WorkerActive)
+                {
+                    _stage = IconLoadDemandStage.AwaitingSharedLoad;
+                }
+            }
+        }
+
         public LoadCompletionDemandResult MarkCompleted(long completedAt, IconLoadResultKind resultKind)
         {
             lock (_lock)
             {
-                if (_stage == IconLoadDemandStage.WorkerActive)
-                {
-                    _session.RecordActiveWorkerCompleted(_inputKind, _liveRequesters > 0);
-                }
-
                 _stage = IconLoadDemandStage.Completed;
                 _resultKind = resultKind;
                 if (_withoutRequester && _liveRequesters == 0)
@@ -2821,6 +3219,7 @@ internal sealed class IconLoadDiagnosticsSession
                     _lostLastRequesterBeforeEnqueue,
                     _lostLastRequesterWhileQueued,
                     _lostLastRequesterWhileWorkerActive,
+                    _lostLastRequesterWhileAwaitingSharedLoad,
                     _demandReturnedBeforeCompletion,
                     _workerStartedWithoutLiveRequester,
                     _withoutRequesterToWorkerStartTicks,

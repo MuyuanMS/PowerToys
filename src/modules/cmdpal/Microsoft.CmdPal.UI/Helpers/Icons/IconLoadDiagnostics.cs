@@ -106,28 +106,66 @@ internal static class IconLoadDiagnostics
         return session.CreateLoad(ClassifyInput(iconString, hasStream), width, height, scale);
     }
 
-    internal static void RecordCacheLookup(Size iconSize, int capacity, bool hit)
+    internal static void RecordCacheLookup(
+        Size iconSize,
+        IconCachePartition partition,
+        int capacity,
+        bool hit)
     {
-        GetCurrentSession()?.RecordCacheLookup(iconSize, capacity, hit);
+        GetCurrentSession()?.RecordCacheLookup(iconSize, partition, capacity, hit);
     }
 
-    internal static void RecordCacheEntryAdded(Size iconSize, int capacity, int entryCount)
+    internal static void RecordCacheEntryAdded(
+        Size iconSize,
+        IconCachePartition partition,
+        int capacity,
+        int entryCount)
     {
-        GetCurrentSession()?.RecordCacheEntryAdded(iconSize, capacity, entryCount);
+        GetCurrentSession()?.RecordCacheEntryAdded(iconSize, partition, capacity, entryCount);
     }
 
     internal static void RecordCacheEntryRemoved(
         Size iconSize,
+        IconCachePartition partition,
         int capacity,
         int entryCount,
         AdaptiveCacheRemovalReason reason)
     {
         GetCurrentSession()?.RecordCacheEntryRemoved(
             iconSize,
+            partition,
             capacity,
             entryCount,
             reason);
     }
+
+    internal static ShellIconMeasurement BeginShellIconRequest(ShellItemIconRequest request)
+    {
+        var session = GetCurrentSession();
+        if (session is null)
+        {
+            return default;
+        }
+
+        var requestKind = Microsoft.CommandPalette.Extensions.Toolkit.ShellItemIconProtocol.IsProtocol(request.CacheIdentity)
+            ? ShellIconRequestKind.Protocol
+            : request.CacheIdentity.StartsWith("file:", StringComparison.OrdinalIgnoreCase)
+                ? ShellIconRequestKind.FileUri
+                : ShellIconRequestKind.LegacyPath;
+        return new ShellIconMeasurement(session, requestKind);
+    }
+
+    internal static void RecordShellAssociationChangedNotification() =>
+        GetCurrentSession()?.RecordShellIconStep(
+            ShellIconDiagnosticStep.AssociationChangedNotification,
+            0,
+            0);
+
+    internal static void RecordShellIconCacheInvalidation(ShellIconCacheInvalidationReason reason) =>
+        GetCurrentSession()?.RecordShellIconStep(
+            ShellIconDiagnosticStep.LocationCacheInvalidated,
+            (int)reason,
+            0);
 
     public static long BeginElementUpdate()
     {
@@ -267,6 +305,16 @@ internal static class IconLoadDiagnostics
     {
         if (!string.IsNullOrEmpty(iconString))
         {
+            if (IconProtocolRegistry.Find(iconString) is { } protocolProcessor)
+            {
+                return protocolProcessor.ClassifyInput(iconString);
+            }
+
+            if (ShellItemIconRequestClassifier.TryClassify(iconString, out _))
+            {
+                return IconLoadInputKind.ShellItemIcon;
+            }
+
             var path = iconString.AsSpan();
             var comma = path.IndexOf(',');
             if (comma >= 0)
@@ -274,9 +322,9 @@ internal static class IconLoadDiagnostics
                 path = path[..comma];
             }
 
-            if (path.EndsWith(".exe", StringComparison.Ordinal)
-                || path.EndsWith(".dll", StringComparison.Ordinal)
-                || path.EndsWith(".lnk", StringComparison.Ordinal))
+            if (path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
             {
                 return IconLoadInputKind.ShellBinary;
             }
