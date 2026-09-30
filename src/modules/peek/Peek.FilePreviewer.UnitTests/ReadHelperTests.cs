@@ -138,6 +138,28 @@ namespace Peek.FilePreviewer.UnitTests
         }
 
         [TestMethod]
+        public async Task Read_Utf8UnicodeAfterCharsetSample_ShouldDecodeCorrectly()
+        {
+            string expected = new string('a', 65_536) + "\n\u4F60\u597D\uFF0C\u4E16\u754C\u3002 caf\u00E9 r\u00E9sum\u00E9 na\u00EFve pi\u00F1ata";
+            File.WriteAllText(_tempFilePath, expected, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+            string content = await ReadHelper.Read(_tempFilePath);
+
+            Assert.AreEqual(expected, content);
+        }
+
+        [TestMethod]
+        public async Task Read_Utf8MultibyteCharacterAtCharsetSampleBoundary_ShouldDecodeCorrectly()
+        {
+            string expected = new string('a', 65_535) + "\u4F60\u597D\uFF0C\u4E16\u754C\u3002 caf\u00E9 r\u00E9sum\u00E9 na\u00EFve pi\u00F1ata";
+            File.WriteAllText(_tempFilePath, expected, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+            string content = await ReadHelper.Read(_tempFilePath);
+
+            Assert.AreEqual(expected, content);
+        }
+
+        [TestMethod]
         public async Task Read_Windows1252WithLateNonAsciiContent_ShouldDecodeCorrectly()
         {
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
