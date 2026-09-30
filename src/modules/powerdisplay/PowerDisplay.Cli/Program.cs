@@ -51,6 +51,8 @@ public static class Program
     // version renderer (static readonly to satisfy CA1861 — the array is passed, never mutated).
     private static readonly string[] VersionArgs = { "--version" };
 
+    private static readonly string[] HelpArgs = { "--help" };
+
     // Stable program identifier stamped into the `command` field of root-level error envelopes.
     // For an error that resolves to the RootCommand (e.g. an unrecognized top-level option),
     // CommandResult.Command.Name is the auto-derived executable name ("PowerToys.PowerDisplay.Cli");
@@ -102,7 +104,12 @@ public static class Program
         // Help / version short-circuit through the default invocation pipeline (which owns
         // the version + help renderers). Done BEFORE the logger is created so a pure
         // --help/--version invocation has no file-system side effects.
-        if (parseResult.Tokens.Count == 0 || HasHelpToken(parseResult))
+        if (parseResult.Tokens.Count == 0)
+        {
+            return await InvokeWithDefaultsAsync(root, HelpArgs);
+        }
+
+        if (HasHelpToken(parseResult))
         {
             return await InvokeWithDefaultsAsync(root, args);
         }

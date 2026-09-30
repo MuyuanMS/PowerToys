@@ -25,6 +25,32 @@ public class ProgramTokenTests
         => Assert.IsTrue(Program.HasHelpToken(Parse("--help")));
 
     [TestMethod]
+    public async System.Threading.Tasks.Task NoArguments_ShowsHelpAndSucceeds()
+    {
+        var originalOut = System.Console.Out;
+        var originalError = System.Console.Error;
+        using var stdout = new System.IO.StringWriter();
+        using var stderr = new System.IO.StringWriter();
+
+        try
+        {
+            System.Console.SetOut(stdout);
+            System.Console.SetError(stderr);
+
+            var exitCode = await Program.Main(System.Array.Empty<string>());
+
+            Assert.AreEqual(0, exitCode);
+            StringAssert.Contains(stdout.ToString(), "Usage:");
+            Assert.AreEqual(string.Empty, stderr.ToString());
+        }
+        finally
+        {
+            System.Console.SetOut(originalOut);
+            System.Console.SetError(originalError);
+        }
+    }
+
+    [TestMethod]
     public void HelpUnderSubcommand_IsDetected()
         => Assert.IsTrue(Program.HasHelpToken(Parse("get", "--help")));
 
