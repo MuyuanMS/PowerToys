@@ -46,7 +46,7 @@ namespace FancyZonesEditorCommon.Data
 
         public struct DefaultLayoutsListWrapper
         {
-            public List<DefaultLayoutWrapper> DefaultLayouts { get; set; }
+            public List<DefaultLayoutWrapper> DefaultLayouts { get; init; }
         }
     }
 }
