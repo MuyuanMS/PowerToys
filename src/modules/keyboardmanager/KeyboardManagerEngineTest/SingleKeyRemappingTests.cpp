@@ -653,7 +653,7 @@ namespace RemappingLogicTests
 
             Assert::AreEqual(1, static_cast<int>(result));
             Assert::AreEqual(std::wstring(), testState.textReplacementBuffer);
-            Assert::AreEqual(static_cast<size_t>(1), testState.textReplacementSuppressedKeys.count(VK_SPACE));
+            Assert::IsTrue(testState.HasPendingTextReplacementKeyUp());
             Assert::AreEqual(static_cast<size_t>(1), attemptedInput.size());
             Assert::AreEqual(static_cast<size_t>(2), attemptedInput[0].size());
             Assert::AreEqual(static_cast<WORD>(VK_BACK), attemptedInput[0][0].ki.wVk);
@@ -662,8 +662,9 @@ namespace RemappingLogicTests
         TEST_METHOD (HandleTextReplacementEvent_ShouldSuppressOverlappingTriggerKeyUps)
         {
             testState.AddTextReplacement(L" ", L"hello");
-            testState.textReplacementSuppressedKeys.insert(0x41);
-            testState.textReplacementSuppressedKeys.insert(0x42);
+            testState.SuppressTextReplacementKeyUp(0x41);
+            testState.SuppressTextReplacementKeyUp(0x42);
+            Assert::IsTrue(testState.HasPendingTextReplacementKeyUp());
 
             KBDLLHOOKSTRUCT lParam{};
             LowlevelKeyboardEvent keyEvent{};
@@ -672,13 +673,33 @@ namespace RemappingLogicTests
 
             lParam.vkCode = 0x41;
             Assert::AreEqual(1, static_cast<int>(KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState)));
-            Assert::AreEqual(static_cast<size_t>(0), testState.textReplacementSuppressedKeys.count(0x41));
-            Assert::AreEqual(static_cast<size_t>(1), testState.textReplacementSuppressedKeys.count(0x42));
+            Assert::IsTrue(testState.HasPendingTextReplacementKeyUp());
 
             lParam.vkCode = 0x42;
             testState.ClearTextReplacements();
             Assert::AreEqual(1, static_cast<int>(KeyboardEventHandlers::HandleTextReplacementEvent(mockedInputHandler, &keyEvent, testState)));
-            Assert::AreEqual(static_cast<size_t>(0), testState.textReplacementSuppressedKeys.size());
+            Assert::IsFalse(testState.HasPendingTextReplacementKeyUp());
+        }
+
+        TEST_METHOD (TextReplacementSuppressedKeyState_ShouldExposePendingStateAcrossThreads)
+        {
+            testState.SuppressTextReplacementKeyUp(0x41);
+
+            bool pending = false;
+            std::thread reader([&] {
+                pending = testState.HasPendingTextReplacementKeyUp();
+            });
+            reader.join();
+
+            Assert::IsTrue(pending);
+            Assert::IsTrue(testState.ConsumeTextReplacementKeyUp(0x41));
+
+            reader = std::thread([&] {
+                pending = testState.HasPendingTextReplacementKeyUp();
+            });
+            reader.join();
+
+            Assert::IsFalse(pending);
         }
 
         TEST_METHOD (HandleTextReplacementEvent_ShouldProcessSingleKeyRemapOutput)

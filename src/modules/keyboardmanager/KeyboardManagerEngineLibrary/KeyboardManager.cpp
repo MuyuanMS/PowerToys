@@ -184,13 +184,13 @@ bool KeyboardManager::HasRegisteredRemappings() const
 
 bool KeyboardManager::HasRegisteredRemappingsUnchecked() const
 {
-    return !(state.appSpecificShortcutReMap.empty() && state.appSpecificShortcutReMapSortedKeys.empty() && state.osLevelShortcutReMap.empty() && state.osLevelShortcutReMapSortedKeys.empty() && state.singleKeyReMap.empty() && state.singleKeyToTextReMap.empty() && state.textReplacements.empty() && state.textReplacementSuppressedKeys.empty());
+    return !(state.appSpecificShortcutReMap.empty() && state.appSpecificShortcutReMapSortedKeys.empty() && state.osLevelShortcutReMap.empty() && state.osLevelShortcutReMapSortedKeys.empty() && state.singleKeyReMap.empty() && state.singleKeyToTextReMap.empty() && state.textReplacements.empty() && !state.HasPendingTextReplacementKeyUp());
 }
 
 intptr_t KeyboardManager::HandleKeyboardHookEvent(LowlevelKeyboardEvent* data) noexcept
 {
     const DWORD vkCode = Helpers::ClearKeyNumpadOrigin(data->lParam->vkCode);
-    if ((data->wParam == WM_KEYUP || data->wParam == WM_SYSKEYUP) && state.textReplacementSuppressedKeys.erase(vkCode) != 0)
+    if ((data->wParam == WM_KEYUP || data->wParam == WM_SYSKEYUP) && state.ConsumeTextReplacementKeyUp(vkCode))
     {
         if (!HasRegisteredRemappingsUnchecked())
         {

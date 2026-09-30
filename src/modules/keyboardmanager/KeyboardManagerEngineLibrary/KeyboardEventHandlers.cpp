@@ -2112,7 +2112,7 @@ namespace KeyboardEventHandlers
     intptr_t HandleTextReplacementEvent(KeyboardManagerInput::InputInterface& ii, LowlevelKeyboardEvent* data, State& state)
     {
         const DWORD vkCode = Helpers::ClearKeyNumpadOrigin(data->lParam->vkCode);
-        if ((data->wParam == WM_KEYUP || data->wParam == WM_SYSKEYUP) && state.textReplacementSuppressedKeys.erase(vkCode) != 0)
+        if ((data->wParam == WM_KEYUP || data->wParam == WM_SYSKEYUP) && state.ConsumeTextReplacementKeyUp(vkCode))
         {
             return 1;
         }
@@ -2184,11 +2184,11 @@ namespace KeyboardEventHandlers
                 if (!SendTextReplacementInput(ii, trigger.length() > text->length() ? trigger.length() - text->length() : 0, replacement->second))
                 {
                     state.textReplacementBuffer.clear();
-                    state.textReplacementSuppressedKeys.insert(vkCode);
+                    state.SuppressTextReplacementKeyUp(vkCode);
                     return 1;
                 }
                 state.textReplacementBuffer.clear();
-                state.textReplacementSuppressedKeys.insert(vkCode);
+                state.SuppressTextReplacementKeyUp(vkCode);
                 return 1;
             }
         }

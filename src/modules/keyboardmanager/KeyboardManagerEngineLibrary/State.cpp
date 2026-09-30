@@ -90,3 +90,27 @@ bool State::ConsumeSingleKeyRemapInjectionFailed(const DWORD sourceKey)
 {
     return singleKeyRemapInjectionFailedKeys.erase(sourceKey) > 0;
 }
+
+void State::SuppressTextReplacementKeyUp(const DWORD sourceKey)
+{
+    hasPendingTextReplacementKeyUp.store(true);
+    textReplacementSuppressedKeys.insert(sourceKey);
+}
+
+bool State::ConsumeTextReplacementKeyUp(const DWORD sourceKey)
+{
+    const bool consumed = textReplacementSuppressedKeys.erase(sourceKey) > 0;
+    hasPendingTextReplacementKeyUp.store(!textReplacementSuppressedKeys.empty());
+    return consumed;
+}
+
+bool State::HasPendingTextReplacementKeyUp() const noexcept
+{
+    return hasPendingTextReplacementKeyUp.load();
+}
+
+void State::ClearPendingTextReplacementKeyUps()
+{
+    textReplacementSuppressedKeys.clear();
+    hasPendingTextReplacementKeyUp.store(false);
+}

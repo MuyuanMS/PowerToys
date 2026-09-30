@@ -1,5 +1,6 @@
 #pragma once
 #include <keyboardmanager/common/MappingConfiguration.h>
+#include <atomic>
 #include <unordered_set>
 
 class State : public MappingConfiguration
@@ -14,6 +15,11 @@ private:
     // the (serialized) low-level keyboard hook thread.
     std::unordered_set<DWORD> singleKeyRemapInjectionFailedKeys;
 
+    // Trigger keys whose key-down was suppressed after a replacement. Mutated only by
+    // the serialized low-level keyboard hook thread.
+    std::unordered_set<DWORD> textReplacementSuppressedKeys;
+    std::atomic_bool hasPendingTextReplacementKeyUp = false;
+
 public:
     // Stores typed characters for text replacement matching.
     std::wstring textReplacementBuffer;
@@ -23,9 +29,6 @@ public:
 
     // Stores the focused window/control associated with textReplacementBuffer.
     HWND textReplacementWindow = nullptr;
-
-    // Stores trigger keys whose key-down was suppressed after a replacement.
-    std::unordered_set<DWORD> textReplacementSuppressedKeys;
 
     // Function to get the iterator of a single key remap given the source key. Returns nullopt if it isn't remapped
     std::optional<SingleKeyRemapTable::iterator> GetSingleKeyRemap(const DWORD& originalKey);
@@ -55,4 +58,9 @@ public:
     // injection was previously blocked, indicating that its key-up should be passed
     // through as well.
     bool ConsumeSingleKeyRemapInjectionFailed(const DWORD sourceKey);
+
+    void SuppressTextReplacementKeyUp(const DWORD sourceKey);
+    bool ConsumeTextReplacementKeyUp(const DWORD sourceKey);
+    bool HasPendingTextReplacementKeyUp() const noexcept;
+    void ClearPendingTextReplacementKeyUps();
 };
