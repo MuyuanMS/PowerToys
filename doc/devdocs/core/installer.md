@@ -85,6 +85,16 @@
   - `%LOCALAPPDATA%\Temp\PowerToys_*.log` - Custom installer logs
 - Logs in Bug Reports are useful for troubleshooting installation issues
 
+### Recovering from mixed-scope installations
+
+If per-user and per-machine installations are both registered, older
+bundle executables can block each other from uninstalling. Run
+[`tools\CleanUp\Uninstall-PowerToys.ps1`](../../../tools/CleanUp/README.md) from
+an elevated PowerShell window first to remove the machine-wide installation,
+then run it from each affected user profile to remove per-user installations
+before reinstalling one scope. The script preserves PowerToys settings unless
+`-RemoveSettings` is specified.
+
 ### Building PowerToys Locally
 
 #### One stop script for building installer
