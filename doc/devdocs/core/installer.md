@@ -16,7 +16,7 @@
 - Separate builds for machine-wide and user-scope installation
 - Supports x64 and ARM64
 - Custom actions DLL must be signed separately before installer build
-- WXS files generated during build process for file components (into `installer\PowerToysSetupVNext\obj\<platform>\Generated`, with deterministic component GUIDs)
+- File-list .wxs templates are copied and populated during the build in `installer\PowerToysSetupVNext\obj\<platform>\Generated`
 - Localization handling for resource DLLs
 - Firewall exceptions for certain modules
 
@@ -25,7 +25,7 @@
 - First builds `PowerToysSetupCustomActionsVNext` DLL and signs it
 - Then builds the installer without cleaning, to reuse the signed DLL
 - `generateAllFileComponents.ps1` copies the checked-in template .wxs files to `obj\<platform>\Generated` and fills them in; checked-in .wxs files are never modified
-- Component GUIDs are UUIDv5 values derived from component ID, install scope, platform and file set, so repeated builds are reproducible
+- File-list components emitted by `generateAllFileComponents.ps1` use UUIDv5 GUIDs derived from component ID, install scope, platform and file set; this does not make other generated WiX sources, such as Monaco, deterministic
 - Scripts (`applyBuildInfo.ps1` and `generateFileList.ps1`) dynamically update files list for installer
   - Helps manage all self-contained dependencies (.NET, WinAppSDK DLLs, etc.)
   - Avoids manual maintenance of file lists
