@@ -153,6 +153,7 @@ public static class UnicodeHelper
         // version 1903 (May 2019) and later.
         // CharSet.None keeps the marshaller out of encoding decisions - the function
         // writes a null-terminated ASCII string which we decode manually.
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         [DllImport("icu.dll", EntryPoint = "u_charName", CharSet = CharSet.None, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int UCharName(
             int codePoint,

@@ -3988,6 +3988,9 @@ Activate by holding the key for the character you want to add an accent to, then
   <data name="QuickAccent_ReferenceGuide_NoResults.Text" xml:space="preserve">
     <value>No characters found matching your search.</value>
   </data>
+  <data name="QuickAccent_ReferenceGuide_NumpadDivide" xml:space="preserve">
+    <value>Numpad /</value>
+  </data>
   <data name="QuickAccent_ReferenceGuide_SelectedSets" xml:space="preserve">
     <value>Selected sets</value>
   </data>

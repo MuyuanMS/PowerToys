@@ -116,7 +116,7 @@ namespace ViewModelTests
                 .ToHashSet();
 
             CollectionAssert.IsSubsetOf(
-                new[] { "+", ",", ".", "-", "*", "/", "\\" },
+                new[] { "+", ",", ".", "-", "*", "/", "\\", "Numpad /" },
                 keyLabels.ToArray());
         }
 
@@ -130,6 +130,7 @@ namespace ViewModelTests
             return resourceId switch
             {
                 "QuickAccent_ReferenceGuide_SelectedSets" => "Selected sets",
+                "QuickAccent_ReferenceGuide_NumpadDivide" => "Numpad /",
                 "QuickAccent_Group_Language" => "Language sets",
                 "QuickAccent_Group_Special" => "Special sets",
                 "QuickAccent_Group_UserDefined" => "User-defined sets",
