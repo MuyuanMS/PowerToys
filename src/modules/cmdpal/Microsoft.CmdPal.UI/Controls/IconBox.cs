@@ -23,10 +23,7 @@ public partial class IconBox : ContentControl
     private static long _nextDiagnosticId;
     private readonly IconPresentationState<IconSource> _presentation = new();
     private readonly DispatcherQueue _dispatcherQueue;
-    private readonly IconUnloadController _unloadController;
-    private readonly DispatcherQueueHandler _unloadDispatcherCallback;
 
-    private XamlRoot? _subscribedXamlRoot;
     private double _lastScale;
     private ElementTheme _lastTheme;
     private double _lastFontSize;
@@ -154,12 +151,6 @@ public partial class IconBox : ContentControl
     public IconBox()
     {
         _dispatcherQueue = DispatcherQueue;
-        _unloadController = new(
-            () => IsLoaded,
-            CompleteUnload,
-            TryEnqueueUnload,
-            static ex => Logger.LogError("Failed to update icon lifetime", ex));
-        _unloadDispatcherCallback = _unloadController.ProcessUnload;
         TabFocusNavigation = KeyboardNavigationMode.Once;
         IsTabStop = false;
         HorizontalContentAlignment = HorizontalAlignment.Center;
@@ -221,8 +212,6 @@ public partial class IconBox : ContentControl
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        _unloadController.Loaded();
-
         // Handler attachment can request an icon before this control enters the visual tree.
         // Recompute any derived diagnostic placement now that its parent chain is available.
         _hasDerivedRequestSite = false;
@@ -236,7 +225,10 @@ public partial class IconBox : ContentControl
         _lastScale = newScale;
         UpdateLastFontSize();
 
-        UpdateXamlRootSubscription(XamlRoot);
+        if (XamlRoot is not null)
+        {
+            XamlRoot.Changed += OnXamlRootChanged;
+        }
 
         if (SourceKey is not null && (changedTheme || changedScale))
         {
@@ -259,82 +251,55 @@ public partial class IconBox : ContentControl
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
-        // Recycling can deliver Unloaded after a row reloads, without another Loaded.
-        _unloadController.Unloaded();
-    }
-
-    private bool TryEnqueueUnload()
-    {
-        return _dispatcherQueue.TryEnqueue(_unloadDispatcherCallback);
-    }
-
-    private void CompleteUnload()
-    {
-        _hasDerivedRequestSite = false;
-        _derivedRequestSite = IconRequestSite.Unknown;
-        try
-        {
-            if (_activeRequestDemand is not null)
-            {
-                try
-                {
-                    AdvanceRequestVersion();
-                }
-                finally
-                {
-                    // Keep the reload pending even if request cleanup fails.
-                    MarkRefreshPending(IconRequestReason.Loaded);
-                }
-            }
-        }
-        finally
-        {
-            UpdateXamlRootSubscription(null);
-        }
-    }
-
-    private void UpdateXamlRootSubscription(XamlRoot? root)
-    {
-        if (_subscribedXamlRoot == root)
+        // ListView recycling can deliver an Unloaded event after the same template
+        // instance has already been rebound, loaded, and arranged for a new item.
+        // No matching Loaded event follows that stale notification, so invalidating
+        // the new request here would leave the previous icon in the visible row.
+        if (_activeRequestDemand is not null && IsLoaded && IsWithinXamlRootBounds())
         {
             return;
         }
 
-        var previousRoot = _subscribedXamlRoot;
-        _subscribedXamlRoot = null;
-        if (previousRoot is not null)
+        if (XamlRoot is not null)
         {
-            try
-            {
-                previousRoot.Changed -= OnXamlRootChanged;
-            }
-            catch (Exception ex)
-            {
-                _unloadController.ReportFailure(ex);
-            }
+            XamlRoot.Changed -= OnXamlRootChanged;
         }
 
-        if (root is not null)
+        if (_activeRequestDemand is not null)
         {
-            try
-            {
-                root.Changed += OnXamlRootChanged;
-                _subscribedXamlRoot = root;
-            }
-            catch (Exception ex)
-            {
-                _unloadController.ReportFailure(ex);
-            }
+            AdvanceRequestVersion();
+            MarkRefreshPending(IconRequestReason.Loaded);
+        }
+
+        _hasDerivedRequestSite = false;
+        _derivedRequestSite = IconRequestSite.Unknown;
+    }
+
+    private bool IsWithinXamlRootBounds()
+    {
+        var xamlRoot = XamlRoot;
+        if (xamlRoot is null || ActualWidth <= 0 || ActualHeight <= 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            var bounds = TransformToVisual(null).TransformBounds(new Rect(0, 0, ActualWidth, ActualHeight));
+            var rootSize = xamlRoot.Size;
+            return bounds.Right > 0
+                && bounds.Bottom > 0
+                && bounds.Left < rootSize.Width
+                && bounds.Top < rootSize.Height;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
         }
     }
 
     private void OnXamlRootChanged(XamlRoot sender, XamlRootChangedEventArgs args)
     {
-        if (sender != _subscribedXamlRoot)
-        {
-            return;
-        }
-
         var newScale = sender.RasterizationScale;
         var changedLastTheme = _lastTheme != ActualTheme;
         var changedScale = Math.Abs(newScale - _lastScale) > 0.01;
@@ -359,10 +324,8 @@ public partial class IconBox : ContentControl
         }
     }
 
-    private void MarkRefreshPending(IconRequestReason reason)
-    {
+    private void MarkRefreshPending(IconRequestReason reason) =>
         _refreshState.Request(SourceKey is not null, reason);
-    }
 
     private void RequestRefresh(IconRequestReason reason)
     {
@@ -388,23 +351,14 @@ public partial class IconBox : ContentControl
 
     private long AdvanceRequestVersion()
     {
-        var diagnostics = _activeRequestDiagnostics;
+        _activeRequestDiagnostics.Invalidate();
         _activeRequestDiagnostics = default;
-        var demand = _activeRequestDemand;
+        _activeRequestDemand?.Release();
         _activeRequestDemand = null;
         var requestVersion = ++_requestVersion;
-        try
-        {
-            diagnostics.Invalidate();
-            CompleteIntermediatePresentation(
-                Interlocked.Exchange(ref _pendingIntermediatePresentation, null),
-                applied: false);
-        }
-        finally
-        {
-            demand?.Release();
-        }
-
+        CompleteIntermediatePresentation(
+            Interlocked.Exchange(ref _pendingIntermediatePresentation, null),
+            applied: false);
         return requestVersion;
     }
 
@@ -504,7 +458,6 @@ public partial class IconBox : ContentControl
 
                 self.Padding = default;
                 break;
-
             case FontIconSource fontIcon:
                 var fontElementStartedAt = IconLoadDiagnostics.BeginElementUpdate();
                 self.ClearImagePresenter();
@@ -524,7 +477,6 @@ public partial class IconBox : ContentControl
                 self.UpdatePaddingForFontIcon();
 
                 break;
-
             case BitmapIconSource bitmapIcon:
                 var bitmapElementStartedAt = IconLoadDiagnostics.BeginElementUpdate();
                 self.ClearImagePresenter();
@@ -1015,20 +967,6 @@ public partial class IconBox : ContentControl
         }
     }
 
-    private void UpdatePresentedSource()
-    {
-        var resolvedSource = _presentation.ResolvedSource;
-
-        // Replacing a valid glyph requires both opt-ins: the placement must prefer
-        // an image fallback, and the provider must identify this as an image request.
-        // This keeps app hero images image-only without replacing emoji or other glyph heroes.
-        var preferFallback = resolvedSource is null
-            || (PreferFallbackSourceForFontIcons && _presentation.ResolvedSourceExpectsImage && resolvedSource is FontIconSource)
-            || resolvedSource is BitmapIconSource { UriSource: null }
-            || resolvedSource is ImageIconSource { ImageSource: null };
-        Source = _presentation.SelectSource(preferFallback);
-    }
-
     private sealed class PendingIntermediatePresentation(
         long requestVersion,
         object sourceKey,
@@ -1045,5 +983,19 @@ public partial class IconBox : ContentControl
         public IconSource Source { get; } = source;
 
         public Action<bool>? PresentationCompleted { get; } = presentationCompleted;
+    }
+
+    private void UpdatePresentedSource()
+    {
+        var resolvedSource = _presentation.ResolvedSource;
+
+        // Replacing a valid glyph requires both opt-ins: the placement must prefer
+        // an image fallback, and the provider must identify this as an image request.
+        // This keeps app hero images image-only without replacing emoji or other glyph heroes.
+        var preferFallback = resolvedSource is null
+            || (PreferFallbackSourceForFontIcons && _presentation.ResolvedSourceExpectsImage && resolvedSource is FontIconSource)
+            || resolvedSource is BitmapIconSource { UriSource: null }
+            || resolvedSource is ImageIconSource { ImageSource: null };
+        Source = _presentation.SelectSource(preferFallback);
     }
 }

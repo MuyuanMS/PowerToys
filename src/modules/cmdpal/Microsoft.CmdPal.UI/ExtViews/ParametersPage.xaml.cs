@@ -4,6 +4,7 @@
 
 using Microsoft.CmdPal.Common;
 using Microsoft.CmdPal.UI.ViewModels;
+using Microsoft.CmdPal.UI.ViewModels.Commands;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
@@ -49,20 +50,12 @@ public sealed partial class ParametersPage : Page
         base.OnNavigatedTo(e);
     }
 
-    protected override void OnNavigatedFrom(NavigationEventArgs e)
+    protected override void OnNavigatingFrom(NavigatingCancelEventArgs e)
     {
-        base.OnNavigatedFrom(e);
+        base.OnNavigatingFrom(e);
 
-        var viewModel = ViewModel;
-        Bindings.StopTracking();
+        // Clean-up event listeners
         ViewModel = null;
-        ParameterListView.DetachFromPage();
-        CleanupHelper.ClearItemsSources(this);
-
-        if (e.NavigationMode != NavigationMode.New)
-        {
-            _ = viewModel?.CleanupAsync();
-        }
     }
 
     private static void OnViewModelChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)

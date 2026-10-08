@@ -19,10 +19,6 @@ public class IconPathParserTests
     [DataRow(@"C:\Windows\NOTEPAD.EXE", @"C:\Windows\NOTEPAD.EXE", 0)]
     [DataRow(@"C:\Windows\System32\SHELL32.DLL,-210", @"C:\Windows\System32\SHELL32.DLL", -210)]
     [DataRow(@"C:\SHORTCUT.LNK,0", @"C:\SHORTCUT.LNK", 0)]
-    [DataRow(@"C:\APP.EXE,0", @"C:\APP.EXE", 0)]
-    [DataRow(@"C:\folder,with-comma\icons.dll,1", @"C:\folder,with-comma\icons.dll", 1)]
-    [DataRow(@"C:\folder,with-comma\icons.dll", @"C:\folder,with-comma\icons.dll", 0)]
-    [DataRow(@"C:\Icons, custom\APP.ICO,0", @"C:\Icons, custom\APP.ICO", 0)]
     public void ParsesSupportedBinaryIconReferences(string input, string expectedPath, int expectedIndex)
     {
         Assert.IsTrue(IconPathParser.TryParseBinaryIconReference(input, out var result));
@@ -33,7 +29,8 @@ public class IconPathParserTests
     [TestMethod]
     [DataRow(@"C:\icon.png")]
     [DataRow(@"C:\icons.dll,not-an-index")]
-    public void RejectsUnsupportedBinaryIconReferences(string input)
+    [DataRow(@"C:\folder,with-comma\icons.dll,1")]
+    public void RejectsInputsTheNativeConverterDidNotTreatAsBinaryIcons(string input)
     {
         Assert.IsFalse(IconPathParser.TryParseBinaryIconReference(input, out _));
     }

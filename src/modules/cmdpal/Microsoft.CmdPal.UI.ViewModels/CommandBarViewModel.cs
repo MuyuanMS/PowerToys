@@ -150,8 +150,7 @@ public sealed partial class CommandBarViewModel : ObservableObject
     {
         if (command is not null)
         {
-            var message = new PerformCommandMessage(command);
-            WeakReferenceMessenger.Default.Send(message);
+            WeakReferenceMessenger.Default.Send<PerformCommandMessage>(new(command.Command.Model, command.Model));
         }
     }
 }

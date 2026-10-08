@@ -101,8 +101,7 @@
                 PreviewKeyDown="FilterBox_PreviewKeyDown"
                 PreviewKeyUp="FilterBox_PreviewKeyUp"
                 Style="{StaticResource SearchTextBoxStyle}"
-                TextChanged="FilterBox_TextChanged"
-                TextChanging="FilterBox_TextChanging">
+                TextChanged="FilterBox_TextChanged">
                 <TextBox.ContextFlyout>
                     <TextCommandBarFlyout Opening="FilterBoxContextFlyout_Opening" />
                 </TextBox.ContextFlyout>

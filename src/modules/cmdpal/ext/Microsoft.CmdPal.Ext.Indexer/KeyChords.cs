@@ -17,7 +17,5 @@ internal static class KeyChords
 
     internal static KeyChord OpenInConsole { get; } = WellKnownKeyChords.OpenInConsole;
 
-    internal static KeyChord RunAsAdministrator { get; } = WellKnownKeyChords.RunAsAdministrator;
-
     internal static KeyChord Peek { get; } = KeyChordHelpers.FromModifiers(ctrl: true, vkey: (int)VirtualKey.Space);
 }

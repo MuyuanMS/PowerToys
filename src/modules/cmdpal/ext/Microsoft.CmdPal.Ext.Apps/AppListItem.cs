@@ -139,8 +139,7 @@ public sealed partial class AppListItem : ListItem, IPrecomputedListItem
 
     private static IconInfo CreateIcon(AppItem app, bool useThumbnails)
     {
-        var fallbackPath = GetIconFallbackPath(app);
-        var iconPath = !string.IsNullOrEmpty(app.IcoPath) ? app.IcoPath : fallbackPath;
+        var iconPath = !string.IsNullOrEmpty(app.IcoPath) ? app.IcoPath : app.ExePath;
         if (string.IsNullOrEmpty(iconPath))
         {
             return Icons.GenericAppIcon;
@@ -148,26 +147,18 @@ public sealed partial class AppListItem : ListItem, IPrecomputedListItem
 
         return new IconInfo(
             !app.IsPackaged && useThumbnails
-                ? AppIconProtocol.Create(iconPath, fallbackPath)
+                ? AppIconProtocol.Create(iconPath, app.ExePath)
                 : iconPath);
     }
 
     private static IconInfo? CreateHeroIcon(AppItem app)
     {
-        var fallbackPath = GetIconFallbackPath(app);
         if (!string.IsNullOrEmpty(app.JumboIconPath))
         {
             return new IconInfo(
                 app.IsPackaged
                     ? app.JumboIconPath
-                    : AppIconProtocol.CreateJumbo(app.JumboIconPath, app.IcoPath, fallbackPath));
-        }
-
-        if (!app.IsPackaged && app.ExePath.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
-        {
-            // Let Shell preserve the shortcut's configured icon and native padding.
-            // Direct jumbo resource extraction can enlarge small artwork to 256 pixels.
-            return new IconInfo(AppIconProtocol.CreateJumbo(app.ExePath, app.IcoPath, fallbackPath));
+                    : AppIconProtocol.CreateJumbo(app.JumboIconPath, app.IcoPath, app.ExePath));
         }
 
         if (!string.IsNullOrEmpty(app.IcoPath))
@@ -175,25 +166,18 @@ public sealed partial class AppListItem : ListItem, IPrecomputedListItem
             return new IconInfo(
                 app.IsPackaged
                     ? app.IcoPath
-                    : AppIconProtocol.CreateJumbo(app.IcoPath, fallbackPath));
+                    : AppIconProtocol.CreateJumbo(app.IcoPath, app.ExePath));
         }
 
-        if (!string.IsNullOrEmpty(fallbackPath))
+        if (!string.IsNullOrEmpty(app.ExePath))
         {
             return new IconInfo(
                 app.IsPackaged
-                    ? fallbackPath
-                    : AppIconProtocol.CreateJumbo(fallbackPath));
+                    ? app.ExePath
+                    : AppIconProtocol.CreateJumbo(app.ExePath));
         }
 
         return null;
-    }
-
-    private static string GetIconFallbackPath(AppItem app)
-    {
-        return app.ExePath.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(app.FullExecutablePath)
-            ? app.FullExecutablePath
-            : app.ExePath;
     }
 
     public FuzzyTarget GetTitleTarget(IPrecomputedFuzzyMatcher matcher)

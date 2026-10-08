@@ -13,8 +13,6 @@ namespace Microsoft.CmdPal.UI.Controls;
 [ContentProperty(Name = nameof(PreviewContent))]
 public sealed partial class ScreenPreview : UserControl
 {
-    private const int WallpaperPreviewDecodePixelWidth = 1024;
-
     public static readonly DependencyProperty PreviewContentProperty =
         DependencyProperty.Register(nameof(PreviewContent), typeof(object), typeof(ScreenPreview), new PropertyMetadata(null!))!;
 
@@ -24,16 +22,12 @@ public sealed partial class ScreenPreview : UserControl
         set => SetValue(PreviewContentProperty, value);
     }
 
-    public ImageSource? WallpaperImageSource => WallpaperImage.Source;
-
-    public Brush? WallpaperBackground => ScreenBorder.Background;
-
     public ScreenPreview()
     {
         InitializeComponent();
 
         var wallpaperHelper = new WallpaperHelper();
-        WallpaperImage!.Source = wallpaperHelper.GetWallpaperImage(WallpaperPreviewDecodePixelWidth)!;
+        WallpaperImage!.Source = wallpaperHelper.GetWallpaperImage()!;
         ScreenBorder!.Background = new SolidColorBrush(wallpaperHelper.GetWallpaperColor());
     }
 }

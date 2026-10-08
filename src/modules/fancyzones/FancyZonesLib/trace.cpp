@@ -43,7 +43,6 @@
 #define EditorLaunchValueKey "Value"
 #define ShiftDragKey "ShiftDrag"
 #define MouseSwitchKey "MouseSwitch"
-#define MouseWheelLayoutSwitchKey "MouseWheelLayoutSwitch"
 #define MoveWindowsOnDisplayChangeKey "MoveWindowsOnDisplayChange"
 #define FlashZonesOnZoneSetChangeKey "FlashZonesOnZoneSetChange"
 #define MoveWindowsOnZoneSetChangeKey "MoveWindowsOnZoneSetChange"
@@ -299,7 +298,6 @@ void Trace::SettingsTelemetry(const Settings& settings) noexcept
         TraceLoggingKeyword(PROJECT_KEYWORD_MEASURE),
         TraceLoggingBoolean(settings.shiftDrag, ShiftDragKey),
         TraceLoggingBoolean(settings.mouseSwitch, MouseSwitchKey),
-        TraceLoggingBoolean(settings.mouseWheelLayoutSwitch, MouseWheelLayoutSwitchKey),
         TraceLoggingBoolean(settings.displayOrWorkAreaChange_moveWindows, MoveWindowsOnDisplayChangeKey),
         TraceLoggingBoolean(settings.zoneSetChange_flashZones, FlashZonesOnZoneSetChangeKey),
         TraceLoggingBoolean(settings.zoneSetChange_moveWindows, MoveWindowsOnZoneSetChangeKey),

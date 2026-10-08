@@ -161,31 +161,20 @@ namespace JsonUtils
         }
     };
 
-    struct ParsedCustomLayouts
+    CustomLayouts::TCustomLayoutMap ParseJson(const json::JsonObject& json)
     {
-        CustomLayouts::TCustomLayoutMap map;
-        std::vector<GUID> order; // layout ids in the order they appear in the file
-    };
-
-    ParsedCustomLayouts ParseJson(const json::JsonObject& json)
-    {
-        ParsedCustomLayouts result{};
+        CustomLayouts::TCustomLayoutMap map{};
         auto layouts = json.GetNamedArray(NonLocalizable::CustomLayoutsIds::CustomLayoutsArrayID);
 
         for (uint32_t i = 0; i < layouts.Size(); ++i)
         {
             if (auto obj = CustomLayoutJSON::FromJson(layouts.GetObjectAt(i)); obj.has_value())
             {
-                if (!result.map.contains(obj->layoutId))
-                {
-                    result.order.push_back(obj->layoutId);
-                }
-
-                result.map[obj->layoutId] = std::move(obj->data);
+                map[obj->layoutId] = std::move(obj->data);
             }
         }
 
-        return result;
+        return std::move(map);
     }
 }
 
@@ -213,14 +202,11 @@ void CustomLayouts::LoadData()
     {
         if (data)
         {
-            auto parsed = JsonUtils::ParseJson(data.value());
-            m_layouts = std::move(parsed.map);
-            m_layoutIdsOrder = std::move(parsed.order);
+            m_layouts = JsonUtils::ParseJson(data.value());
         }
         else
         {
             m_layouts.clear();
-            m_layoutIdsOrder.clear();
             Logger::info(L"custom-layouts.json file is missing or malformed");
         }
     }
@@ -276,9 +262,4 @@ std::optional<FancyZonesDataTypes::CustomLayoutData> CustomLayouts::GetCustomLay
 const CustomLayouts::TCustomLayoutMap& CustomLayouts::GetAllLayouts() const noexcept
 {
     return m_layouts;
-}
-
-const std::vector<GUID>& CustomLayouts::GetLayoutIdsInOrder() const noexcept
-{
-    return m_layoutIdsOrder;
 }

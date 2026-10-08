@@ -4,7 +4,6 @@
 #include <map>
 #include <memory>
 #include <optional>
-#include <vector>
 
 #include <FancyZonesLib/ModuleConstants.h>
 
@@ -41,7 +40,6 @@ public:
     void LoadData();
 
     std::optional<GUID> GetLayoutId(int key) const noexcept;
-    std::vector<GUID> GetLayoutIds() const noexcept; // in hotkey order
     size_t GetHotkeysCount() const noexcept;
 
 private:

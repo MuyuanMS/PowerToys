@@ -5,6 +5,7 @@
 using ManagedCommon;
 using Microsoft.CmdPal.UI.Helpers;
 using Microsoft.CmdPal.UI.ViewModels;
+using Microsoft.CmdPal.UI.ViewModels.Commands;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
@@ -66,20 +67,18 @@ public sealed partial class ListPage : Page
         base.OnNavigatedTo(e);
     }
 
-    protected override void OnNavigatedFrom(NavigationEventArgs e)
+    protected override void OnNavigatingFrom(NavigatingCancelEventArgs e)
     {
-        base.OnNavigatedFrom(e);
-
-        var viewModel = ViewModel;
-        Bindings.StopTracking();
-        ViewModel = null;
-        ListView.DetachFromPage();
-        CleanupHelper.ClearItemsSources(this);
+        base.OnNavigatingFrom(e);
 
         if (e.NavigationMode != NavigationMode.New)
         {
-            _ = viewModel?.CleanupAsync();
+            ViewModel?.SafeCleanup();
+            CleanupHelper.Cleanup(this);
         }
+
+        // Clean-up event listeners
+        ViewModel = null;
 
         ExtensionObjectReleaser.AfterNavigation();
     }

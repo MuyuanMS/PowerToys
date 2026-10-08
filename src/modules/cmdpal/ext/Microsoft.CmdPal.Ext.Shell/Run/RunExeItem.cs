@@ -3,7 +3,6 @@
 // See the LICENSE file in the project root for more information.
 
 using Microsoft.CmdPal.Common.Commands;
-using Microsoft.CmdPal.Common.Helpers;
 using Microsoft.CmdPal.Common.Services;
 using Microsoft.CmdPal.Ext.Shell;
 using Microsoft.CommandPalette.Extensions;
@@ -131,7 +130,7 @@ internal sealed partial class RunExeItem : FileItem
         {
             if (runAsAdminCommand is not null)
             {
-                items.Add(new CommandContextItem(runAsAdminCommand) { RequestedShortcut = WellKnownKeyChords.RunAsAdministrator });
+                items.Add(new CommandContextItem(runAsAdminCommand));
             }
 
             if (runAsOtherUserCommand is not null)

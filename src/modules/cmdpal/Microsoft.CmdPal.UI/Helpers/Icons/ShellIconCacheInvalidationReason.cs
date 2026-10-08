@@ -8,5 +8,4 @@ internal enum ShellIconCacheInvalidationReason
 {
     AssociationChanged,
     ShellRestarted,
-    NonClientMetricsChanged,
 }

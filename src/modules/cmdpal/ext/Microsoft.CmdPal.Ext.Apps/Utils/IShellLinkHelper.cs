@@ -13,6 +13,4 @@ public interface IShellLinkHelper
     string Arguments { get; set; }
 
     bool HasArguments { get; set; }
-
-    string IconLocation { get; }
 }

@@ -14,15 +14,11 @@ public record PerformCommandMessage
 {
     public ExtensionObject<ICommand> Command { get; }
 
-    public object? CommandContext { get; }
-
-    public SourceContext? Context { get; private set; }
+    public object? Context { get; }
 
     public bool WithAnimation { get; set; } = true;
 
     public bool TransientPage { get; set; }
-
-    public Func<ICommandResult, bool>? ResultHandler { get; set; }
 
     /// <summary>
     /// Optional callback raised by <see cref="ShellViewModel"/> just before a
@@ -45,40 +41,39 @@ public record PerformCommandMessage
     /// </summary>
     public ListPageLaunchOptions? ListPageOptions { get; set; }
 
-    public PerformCommandMessage(ExtensionObject<ICommand> command, PageViewModel? sourcePage = null)
+    public PerformCommandMessage(ExtensionObject<ICommand> command)
     {
         Command = command;
-        Context = sourcePage is null ? null : new(sourcePage);
+        Context = null;
     }
 
-    public PerformCommandMessage(ExtensionObject<ICommand> command, ExtensionObject<IListItem> context, PageViewModel? sourcePage = null)
-        : this(command, sourcePage)
+    public PerformCommandMessage(ExtensionObject<ICommand> command, ExtensionObject<IListItem> context)
     {
-        CommandContext = context.Unsafe;
+        Command = command;
+        Context = context.Unsafe;
     }
 
-    public PerformCommandMessage(ExtensionObject<ICommand> command, ExtensionObject<ICommandItem> context, PageViewModel? sourcePage = null)
-        : this(command, sourcePage)
+    public PerformCommandMessage(ExtensionObject<ICommand> command, ExtensionObject<ICommandItem> context)
     {
-        CommandContext = context.Unsafe;
+        Command = command;
+        Context = context.Unsafe;
     }
 
-    public PerformCommandMessage(ExtensionObject<ICommand> command, ExtensionObject<ICommandContextItem> context, PageViewModel? sourcePage = null)
-        : this(command, sourcePage)
+    public PerformCommandMessage(ExtensionObject<ICommand> command, ExtensionObject<ICommandContextItem> context)
     {
-        CommandContext = context.Unsafe;
+        Command = command;
+        Context = context.Unsafe;
     }
 
-    public PerformCommandMessage(CommandItemViewModel contextCommand)
-        : this(
-            contextCommand.Command.Model,
-            contextCommand.Model,
-            contextCommand.PageContext.TryGetTarget(out var pageContext) ? pageContext as PageViewModel : null)
+    public PerformCommandMessage(CommandContextItemViewModel contextCommand)
     {
+        Command = contextCommand.Command.Model;
+        Context = contextCommand.Model.Unsafe;
     }
 
-    public PerformCommandMessage(ConfirmResultViewModel vm, PageViewModel? sourcePage = null)
-        : this(vm.PrimaryCommand.Model, sourcePage)
+    public PerformCommandMessage(ConfirmResultViewModel vm)
     {
+        Command = vm.PrimaryCommand.Model;
+        Context = null;
     }
 }
