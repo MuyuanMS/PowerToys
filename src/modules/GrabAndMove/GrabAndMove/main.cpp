@@ -626,9 +626,18 @@ static void CALLBACK WinEventProc(HWINEVENTHOOK, DWORD, HWND hwnd, LONG, LONG, D
     g_excludedCache.clear();
     g_modifierExcludedCache.clear();
 
-    // A title bar drag holds no modifier, so there is nothing to validate here.
+    // A title bar drag itself holds no modifier, but a modifier pressed during it
+    // can lose its key-up when focus moves to an elevated window.
     if (g_interaction.fromTitleBar)
+    {
+        if (g_modifierSession.disposition == ModifierHoldDisposition::Passthrough &&
+            g_modifierSession.pressed &&
+            !IsModifierPhysicallyHeld(g_modifierSession.modifier))
+        {
+            g_modifierSession = {};
+        }
         return;
+    }
 
     // Only validate modifier state when there is actually something to reset.
     // Skipping here when all flags are clear prevents spurious resets that would
