@@ -284,7 +284,8 @@ internal static class DataPackageHelpers
         {
             var storageItems = await dataPackageView.GetStorageItemsAsync();
             var file = storageItems.Count == 1 ? storageItems[0] as StorageFile : null;
-            if (file != null)
+            if (file != null && SupportedFileTypes.Value
+                .Any(item => item.Format == ClipboardFormat.Image && item.FileTypes.Contains(file.FileType)))
             {
                 return await file.OpenReadAsync();
             }

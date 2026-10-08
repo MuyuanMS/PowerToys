@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using AdvancedPaste.Helpers;
@@ -103,5 +104,25 @@ public sealed class HtmlToTextHelperTests
 
         Assert.AreEqual(string.Empty, await data.GetView().GetTextOrHtmlTextAsync());
         await Assert.ThrowsExceptionAsync<PasteActionException>(() => data.GetView().GetClipboardTextOrThrowAsync());
+    }
+
+    [TestMethod]
+    public async Task VideoStorageItemIsNotDecodedAsAnImage()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.mp4");
+        await File.WriteAllBytesAsync(filePath, [0]);
+        try
+        {
+            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(filePath);
+            var data = new DataPackage();
+            data.SetStorageItems([file]);
+
+            Assert.IsNull(await data.GetView().GetImageAsPngBytesAsync());
+            Assert.IsTrue((await data.GetView().GetAvailableFormatsAsync()).HasFlag(ClipboardFormat.Video));
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
     }
 }
