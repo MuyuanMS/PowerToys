@@ -316,6 +316,26 @@ namespace CommonLibTest
         }
 
         [TestMethod]
+        public void GetSettingsOrDefaultRetriesWhenCheckingUnreadableSettings()
+        {
+            // Arrange
+            var fileSystem = new MockFileSystem();
+            var file = new FaultyFile(fileSystem);
+            var settingsUtils = CreateSettingsUtils(fileSystem, file);
+            string settingsPath = settingsUtils.GetSettingsFilePath(ModuleName);
+            fileSystem.AddFile(settingsPath, new MockFileData(UnreadableSettings));
+            file.ReadsBeforeFailure = 1;
+            file.ReadsThatFail = 1;
+
+            // Act
+            BasePTSettingsTest settings = settingsUtils.GetSettingsOrDefault<BasePTSettingsTest>(ModuleName);
+
+            // Assert
+            Assert.AreEqual(string.Empty, settings.Name);
+            Assert.AreEqual(UnreadableSettings, fileSystem.File.ReadAllText(settingsPath + ".corrupt"));
+        }
+
+        [TestMethod]
         public void GetSettingsOrDefaultDoesNotOverwriteSettingsRepairedBeforeCorruptCopy()
         {
             // Arrange
@@ -436,6 +456,8 @@ namespace CommonLibTest
             // How many of the next attempts to read a file fail because another process is writing to it.
             public int ReadsThatFail { get; set; }
 
+            public int ReadsBeforeFailure { get; set; }
+
             public string PathToRepair { get; set; }
 
             public int ReadsBeforeRepair { get; set; }
@@ -537,7 +559,11 @@ namespace CommonLibTest
 
             public override byte[] ReadAllBytes(string path)
             {
-                if (ReadsThatFail > 0)
+                if (ReadsBeforeFailure > 0)
+                {
+                    ReadsBeforeFailure--;
+                }
+                else if (ReadsThatFail > 0)
                 {
                     ReadsThatFail--;
                     throw new IOException("The process cannot access the file because it is being used by another process.", SharingViolation);

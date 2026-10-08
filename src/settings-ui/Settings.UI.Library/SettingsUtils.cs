@@ -262,8 +262,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             // This, while not totally ideal, does work around the problem by trimming the end.
             // The file itself did write the content correctly but something is off with the actual end of the file, hence the 0x00 bug
             string path = _settingsPath.GetSettingsPath(powertoyFolderName, fileName);
-            byte[] fileContents = Array.Empty<byte>();
-            RetryWhileFileIsInUse(() => fileContents = _file.ReadAllBytes(path));
+            byte[] fileContents = ReadAllBytesRetryingWhileInUse(path);
             var jsonSettingsString = ReadSettingsText(fileContents).Trim('\0');
 
             // For Native AOT compatibility, get JsonTypeInfo from the TypeInfoResolver
@@ -290,6 +289,13 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             using var stream = new MemoryStream(contents);
             using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
             return reader.ReadToEnd();
+        }
+
+        private byte[] ReadAllBytesRetryingWhileInUse(string path)
+        {
+            byte[] contents = Array.Empty<byte>();
+            RetryWhileFileIsInUse(() => contents = _file.ReadAllBytes(path));
+            return contents;
         }
 
         private static byte[]? GetUnreadableContents(JsonException exception)
@@ -353,10 +359,10 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             try
             {
                 string path = _settingsPath.GetSettingsPath(powertoy, fileName);
-                byte[] contents = failedContents ?? _file.ReadAllBytes(path);
+                byte[] contents = failedContents ?? ReadAllBytesRetryingWhileInUse(path);
                 if (failedContents != null)
                 {
-                    byte[] currentContents = _file.ReadAllBytes(path);
+                    byte[] currentContents = ReadAllBytesRetryingWhileInUse(path);
                     if (!currentContents.AsSpan().SequenceEqual(failedContents))
                     {
                         return false;
