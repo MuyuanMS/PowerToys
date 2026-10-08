@@ -33,7 +33,7 @@
 ### Special Build Processes
 
 - .NET applications need publishing for correct WebView2 DLL inclusion
-- WXS files regenerated into `obj\` during build
+- File-list WXS templates are generated under `obj\`; Monaco WXS is separately generated into `MonacoSRC.wxs`
 - Monaco UI components (JavaScript/HTML) generated during build
 - Localization files downloaded from server during CI release builds
 
