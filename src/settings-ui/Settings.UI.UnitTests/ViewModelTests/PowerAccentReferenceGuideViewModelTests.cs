@@ -11,8 +11,6 @@ namespace ViewModelTests
     [TestClass]
     public sealed class PowerAccentReferenceGuideViewModelTests
     {
-        private static readonly string[] ExpectedSpecialKeyLabels = ["+", ",", ".", "-", "*", "/", "\\", "Numpad /"];
-
         [TestMethod]
         public void Constructor_SelectedLanguages_AppearInSelectedSetsGroup()
         {
@@ -107,21 +105,6 @@ namespace ViewModelTests
             Assert.AreEqual("y\u0300", model.DisplayValue);
         }
 
-        [TestMethod]
-        public void Constructor_SpecialKeys_UsesSymbolicLabels()
-        {
-            var keyLabels = CreateViewModel([])
-                .FilteredGroups
-                .SelectMany(group => group.Languages)
-                .SelectMany(language => language.KeyMappings)
-                .Select(mapping => mapping.KeyLabel)
-                .ToHashSet();
-
-            CollectionAssert.IsSubsetOf(
-                ExpectedSpecialKeyLabels,
-                keyLabels.ToArray());
-        }
-
         private static PowerAccentReferenceGuideViewModel CreateViewModel(string[] selectedLanguageCodes)
         {
             return new PowerAccentReferenceGuideViewModel(selectedLanguageCodes, GetLocalizedString);
@@ -132,7 +115,6 @@ namespace ViewModelTests
             return resourceId switch
             {
                 "QuickAccent_ReferenceGuide_SelectedSets" => "Selected sets",
-                "QuickAccent_ReferenceGuide_NumpadDivide" => "Numpad /",
                 "QuickAccent_Group_Language" => "Language sets",
                 "QuickAccent_Group_Special" => "Special sets",
                 "QuickAccent_Group_UserDefined" => "User-defined sets",

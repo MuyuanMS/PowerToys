@@ -9,6 +9,8 @@ using PowerAccent.Common;
 using PowerAccent.Core.Services;
 using PowerAccent.Core.Tools;
 using PowerToys.PowerAccentKeyboardService;
+using LetterKey = PowerToys.PowerAccentKeyboardService.LetterKey;
+using PowerAccentActivationKey = Microsoft.PowerToys.Settings.UI.Library.Enumerations.PowerAccentActivationKey;
 
 using LetterKey = PowerToys.PowerAccentKeyboardService.LetterKey;
 using PowerAccentActivationKey = Microsoft.PowerToys.Settings.UI.Library.Enumerations.PowerAccentActivationKey;
@@ -189,11 +191,7 @@ public partial class PowerAccent : IDisposable
 
         // Multiple code points. Build the description string with each code point's information.
         string displayTextAndCodes = string.Join(" - ", codePointInfo.Select(info =>
-            string.Format(
-                CultureInfo.InvariantCulture,
-                "{0}: (U+{1:X4})",
-                UnicodeHelper.GetDisplayText(info.Str),
-                info.CodePoint)));
+            string.Format(CultureInfo.InvariantCulture, "{0}: (U+{1:X4})", info.Str, info.CodePoint)));
 
         string names = string.Join(", ", codePointInfo.Select(info => info.Name));
 

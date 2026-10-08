@@ -152,7 +152,9 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                     var keyMappings = lang.Characters
                         .OrderBy(kvp => kvp.Key)
                         .Select(kvp => new KeyMappingModel(
-                            GetKeyLabel(kvp.Key, getLocalizedString),
+                            kvp.Key.ToString()
+                                .Replace("VK_", string.Empty, StringComparison.Ordinal)
+                                .TrimEnd('_'),
                             kvp.Value.Select(ch => new CharacterModel(ch)).ToList()))
                         .ToList();
 
@@ -216,22 +218,6 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
 
             return groups;
-        }
-
-        private static string GetKeyLabel(LetterKey key, Func<string, string> getLocalizedString)
-        {
-            return key switch
-            {
-                LetterKey.VK_PLUS => "+",
-                LetterKey.VK_COMMA => ",",
-                LetterKey.VK_PERIOD => ".",
-                LetterKey.VK_MINUS => "-",
-                LetterKey.VK_MULTIPLY_ => "*",
-                LetterKey.VK_SLASH_ => "/",
-                LetterKey.VK_DIVIDE_ => getLocalizedString("QuickAccent_ReferenceGuide_NumpadDivide"),
-                LetterKey.VK_BACKSLASH => "\\",
-                _ => key.ToString().Replace("VK_", string.Empty, StringComparison.Ordinal).TrimEnd('_'),
-            };
         }
     }
 }
