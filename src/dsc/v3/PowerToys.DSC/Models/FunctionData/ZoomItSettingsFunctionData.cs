@@ -76,7 +76,7 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
 
     /// <summary>
     /// Gets or sets the name of the event signaled after the settings are
-    /// written. Defaults to the event a running ZoomIt instance listens on;
+    /// written. Defaults to the name of ZoomIt's settings refresh event;
     /// tests replace it so they never signal a real ZoomIt instance.
     /// </summary>
     public static string RefreshSettingsEventName { get; set; } = ZoomItRefreshSettingsEventName;
