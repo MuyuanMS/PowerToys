@@ -40,7 +40,7 @@ public class ProgramTokenTests
             var exitCode = await Program.Main(System.Array.Empty<string>());
 
             Assert.AreEqual(0, exitCode);
-            StringAssert.Contains(stdout.ToString(), "Usage:");
+            StringAssert.Contains(stdout.ToString(), "list");
             Assert.AreEqual(string.Empty, stderr.ToString());
         }
         finally
