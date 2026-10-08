@@ -12,9 +12,6 @@ using PowerToys.PowerAccentKeyboardService;
 using LetterKey = PowerToys.PowerAccentKeyboardService.LetterKey;
 using PowerAccentActivationKey = Microsoft.PowerToys.Settings.UI.Library.Enumerations.PowerAccentActivationKey;
 
-using LetterKey = PowerToys.PowerAccentKeyboardService.LetterKey;
-using PowerAccentActivationKey = Microsoft.PowerToys.Settings.UI.Library.Enumerations.PowerAccentActivationKey;
-
 namespace PowerAccent.Core;
 
 public partial class PowerAccent : IDisposable

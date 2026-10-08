@@ -7,7 +7,6 @@ using System.Globalization;
 using System.Linq;
 using Microsoft.PowerToys.Settings.UI.Helpers;
 using Microsoft.PowerToys.Settings.UI.Library;
-using Microsoft.PowerToys.Settings.UI.Services;
 using Microsoft.PowerToys.Settings.UI.ViewModels;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -173,17 +172,6 @@ namespace Microsoft.PowerToys.Settings.UI.Views
                 .ToArray();
 
             ((App)Application.Current).OpenPowerAccentReferenceGuideWindow(selectedCodes);
-        }
-
-        private void ReferenceGuideButton_Click(object sender, RoutedEventArgs e)
-        {
-            // Pass the currently selected language codes so the reference guide can
-            // surface them at the top and mark them as selected.
-            var selectedCodes = ViewModel.SelectedLanguageOptions
-                .Select(l => l.LanguageCode)
-                .ToArray();
-
-            NavigationService.Navigate<PowerAccentReferenceGuidePage>(selectedCodes);
         }
     }
 }
