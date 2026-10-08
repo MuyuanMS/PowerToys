@@ -36,9 +36,12 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         public CharacterModel(string value)
         {
             Value = value;
-            DisplayValue = ContainsOnlyCombiningMarks(value) ? $"◌{value}" : value;
+            DisplayValue = GetDisplayValue(value);
             Tooltip = UnicodeHelper.GetCharacterName(value) ?? value;
         }
+
+        internal static string GetDisplayValue(string value) =>
+            ContainsOnlyCombiningMarks(value) ? $"◌{value}" : value;
 
         private static bool ContainsOnlyCombiningMarks(string value)
         {

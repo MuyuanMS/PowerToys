@@ -5,6 +5,7 @@
 using System.Linq;
 using Microsoft.PowerToys.Settings.UI.ViewModels;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using PowerAccent.Common;
 
 namespace ViewModelTests
 {
@@ -110,6 +111,7 @@ namespace ViewModelTests
 
             Assert.AreEqual("\u0301", model.Value);
             Assert.AreEqual("◌\u0301", model.DisplayValue);
+            Assert.AreEqual("◌\u0301", CharacterModel.GetDisplayValue("\u0301"));
         }
 
         [TestMethod]
@@ -119,6 +121,22 @@ namespace ViewModelTests
 
             Assert.AreEqual("y\u0300", model.Value);
             Assert.AreEqual("y\u0300", model.DisplayValue);
+            Assert.AreEqual("y\u0300", CharacterModel.GetDisplayValue("y\u0300"));
+        }
+
+        [TestMethod]
+        public void BuildCharacterPreview_CombiningMarks_UsesDottedCircleDisplayValues()
+        {
+            var language = new LanguageInfo(
+                default,
+                "Test",
+                default,
+                new System.Collections.Generic.Dictionary<LetterKey, string[]>
+                {
+                    [default] = ["\u05B0", "\u05B8"],
+                });
+
+            Assert.AreEqual("◌\u05B0 ◌\u05B8", PowerAccentViewModel.BuildCharacterPreview(language));
         }
 
         private static PowerAccentReferenceGuideViewModel CreateViewModel(string[] selectedLanguageCodes)

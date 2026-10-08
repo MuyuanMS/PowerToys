@@ -195,6 +195,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 .OrderBy(kvp => kvp.Key)
                 .SelectMany(kvp => kvp.Value)
                 .Distinct(StringComparer.Ordinal)
+                .Select(CharacterModel.GetDisplayValue)
                 .ToList();
 
             string preview = string.Join(' ', characters.Take(CharacterPreviewLength));
