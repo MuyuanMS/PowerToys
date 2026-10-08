@@ -133,6 +133,25 @@ namespace CommonLibTest
         }
 
         [TestMethod]
+        public void SaveSettingsOrThrowThrowsAndKeepsThePreviousSettingsWhenTheDiskIsFull()
+        {
+            // Arrange
+            var fileSystem = new MockFileSystem();
+            var file = new FaultyFile(fileSystem);
+            var settingsUtils = CreateSettingsUtils(fileSystem, file);
+            string settingsPath = settingsUtils.GetSettingsFilePath(ModuleName);
+            fileSystem.AddFile(settingsPath, new MockFileData(OldSettings));
+
+            // Act
+            file.DiskIsFull = true;
+            Assert.ThrowsExactly<IOException>(() => settingsUtils.SaveSettingsOrThrow(NewSettings, ModuleName));
+
+            // Assert
+            Assert.AreEqual(OldSettings, fileSystem.File.ReadAllText(settingsPath));
+            CollectionAssert.AreEqual(new[] { settingsPath }, fileSystem.Directory.GetFiles(fileSystem.Path.GetDirectoryName(settingsPath)));
+        }
+
+        [TestMethod]
         public void SaveSettingsSavesEvenIfAnotherProcessBrieflyHasTheFileOpen()
         {
             // Arrange
@@ -148,6 +167,25 @@ namespace CommonLibTest
 
             // Assert
             Assert.AreEqual(NewSettings, fileSystem.File.ReadAllText(settingsPath));
+        }
+
+        [TestMethod]
+        public void SaveSettingsUpdatesTheLastWriteTimeEvenIfAnotherProcessBrieflyHasTheFileOpen()
+        {
+            // Arrange
+            var fileSystem = new MockFileSystem();
+            var file = new FaultyFile(fileSystem);
+            var settingsUtils = CreateSettingsUtils(fileSystem, file);
+            string settingsPath = settingsUtils.GetSettingsFilePath(ModuleName);
+            fileSystem.AddFile(settingsPath, new MockFileData(OldSettings));
+
+            // Act
+            file.MetadataUpdatesThatFail = 2;
+            settingsUtils.SaveSettings(NewSettings, ModuleName);
+
+            // Assert
+            Assert.AreEqual(NewSettings, fileSystem.File.ReadAllText(settingsPath));
+            Assert.AreEqual(settingsPath, file.LastWrittenPath);
         }
 
         [TestMethod]
@@ -176,15 +214,17 @@ namespace CommonLibTest
             var file = new FaultyFile(fileSystem);
             var settingsUtils = CreateSettingsUtils(fileSystem, file);
             string settingsPath = settingsUtils.GetSettingsFilePath(ModuleName);
-            fileSystem.AddFile(settingsPath, new MockFileData(OldSettings));
-            fileSystem.File.SetAttributes(settingsPath, FileAttributes.ReparsePoint);
+            string targetPath = fileSystem.Path.Combine(fileSystem.Path.GetDirectoryName(settingsPath), "settings-target.json");
+            fileSystem.AddFile(targetPath, new MockFileData(OldSettings));
+            fileSystem.File.CreateSymbolicLink(settingsPath, targetPath);
 
             // Act
             settingsUtils.SaveSettings(NewSettings, ModuleName);
 
             // Assert
             Assert.AreEqual(NewSettings, fileSystem.File.ReadAllText(settingsPath));
-            CollectionAssert.DoesNotContain(file.ReplacedFiles, settingsPath, "The link was replaced by a regular file.");
+            Assert.IsTrue(fileSystem.File.GetAttributes(settingsPath).HasFlag(FileAttributes.ReparsePoint), "The link was replaced by a regular file.");
+            CollectionAssert.Contains(file.ReplacedFiles, targetPath, "The link target was not replaced atomically.");
         }
 
         [TestMethod]
@@ -356,6 +396,9 @@ namespace CommonLibTest
             // How many of the next attempts to read a file fail because another process is writing to it.
             public int ReadsThatFail { get; set; }
 
+            // How many of the next attempts to update file metadata fail because another process has it open.
+            public int MetadataUpdatesThatFail { get; set; }
+
             // When set, a file can still be created or truncated, but nothing can be written to it.
             public bool DiskIsFull { get; set; }
 
@@ -410,6 +453,12 @@ namespace CommonLibTest
 
             public override void SetLastWriteTimeUtc(string path, DateTime lastWriteTimeUtc)
             {
+                if (MetadataUpdatesThatFail > 0)
+                {
+                    MetadataUpdatesThatFail--;
+                    throw new IOException("The process cannot access the file because it is being used by another process.", SharingViolation);
+                }
+
                 base.SetLastWriteTimeUtc(path, lastWriteTimeUtc);
                 LastWrittenPath = path;
             }

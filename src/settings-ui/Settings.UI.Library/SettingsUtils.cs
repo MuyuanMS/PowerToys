@@ -200,7 +200,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
                     return newSettings;
                 }
-                catch (Exception)
+                catch (Exception e) when (e is not IOException and not UnauthorizedAccessException)
                 {
                     // do nothing, the problem wasn't that the settings was stored in the previous format, continue with the default settings
                     Logger.LogError($"{powertoy} settings are corrupt or the format is not supported any longer. Using default settings instead.", ex);
@@ -320,7 +320,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                     _file.WriteAllBytes(path + UnreadableFileSuffix, contents);
                 }
             }
-            catch (Exception e)
+            catch (Exception e) when (e is not IOException and not UnauthorizedAccessException)
             {
                 Logger.LogError($"Failed to keep a copy of the unreadable {powertoy} settings.", e);
             }
@@ -333,14 +333,14 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         /// </summary>
         private void WriteFileAtomically(string path, string contents)
         {
-            // Renaming over a symbolic link would replace the link itself, so write through it instead.
+            string destinationPath = path;
             if (_file.Exists(path) && _file.GetAttributes(path).HasFlag(FileAttributes.ReparsePoint))
             {
-                _file.WriteAllText(path, contents);
-                return;
+                destinationPath = _file.ResolveLinkTarget(path, returnFinalTarget: true)?.FullName
+                    ?? throw new IOException($"Could not resolve the settings file link at {path}.");
             }
 
-            string temporaryPath = $"{path}.{Guid.NewGuid():N}.tmp";
+            string temporaryPath = $"{destinationPath}.{Guid.NewGuid():N}.tmp";
             try
             {
                 using (var stream = _file.Create(temporaryPath))
@@ -351,7 +351,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                     stream.Flush(true);
                 }
 
-                RetryWhileFileIsInUse(() => _file.Move(temporaryPath, path, true));
+                RetryWhileFileIsInUse(() => _file.Move(temporaryPath, destinationPath, true));
             }
             catch
             {
@@ -369,7 +369,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
             // A rename does not change the last write time, and that is the only thing the settings
             // file watchers listen for. Without this they would never see the new file.
-            _file.SetLastWriteTimeUtc(path, DateTime.UtcNow);
+            RetryWhileFileIsInUse(() => _file.SetLastWriteTimeUtc(destinationPath, DateTime.UtcNow));
         }
 
         private static void RetryWhileFileIsInUse(Action action)
@@ -395,6 +395,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             return e is UnauthorizedAccessException
                 || (e is IOException && (e.HResult == SharingViolation || e.HResult == LockViolation));
         }
+
         // Returns the file path to the settings file, that is exposed from the local ISettingsPath instance.
         public string GetSettingsFilePath(string powertoy = "", string fileName = "settings.json")
         {
