@@ -373,7 +373,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                 // worth keeping and must not replace an earlier copy that has.
                 if (Array.Exists(contents, b => b != 0 && !char.IsWhiteSpace((char)b)))
                 {
-                    _file.WriteAllBytes(path + UnreadableFileSuffix, contents);
+                    RetryWhileFileIsInUse(() => _file.WriteAllBytes(path + UnreadableFileSuffix, contents));
                 }
 
                 return true;

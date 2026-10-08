@@ -316,6 +316,27 @@ namespace CommonLibTest
         }
 
         [TestMethod]
+        public void GetSettingsOrDefaultRetriesWhenKeepingUnreadableSettings()
+        {
+            // Arrange
+            var fileSystem = new MockFileSystem();
+            var file = new FaultyFile(fileSystem);
+            var settingsUtils = CreateSettingsUtils(fileSystem, file);
+            string settingsPath = settingsUtils.GetSettingsFilePath(ModuleName);
+            fileSystem.AddFile(settingsPath, new MockFileData(UnreadableSettings));
+            fileSystem.AddFile(settingsPath + ".corrupt", new MockFileData("previous backup"));
+            file.PathToLockOnWrite = settingsPath + ".corrupt";
+            file.WritesThatFail = 2;
+
+            // Act
+            BasePTSettingsTest settings = settingsUtils.GetSettingsOrDefault<BasePTSettingsTest>(ModuleName);
+
+            // Assert
+            Assert.AreEqual(string.Empty, settings.Name);
+            Assert.AreEqual(UnreadableSettings, fileSystem.File.ReadAllText(settingsPath + ".corrupt"));
+        }
+
+        [TestMethod]
         public void GetSettingsOrDefaultRetriesWhenCheckingUnreadableSettings()
         {
             // Arrange
@@ -464,6 +485,10 @@ namespace CommonLibTest
 
             public byte[] RepairedContents { get; set; }
 
+            public string PathToLockOnWrite { get; set; }
+
+            public int WritesThatFail { get; set; }
+
             // How many of the next attempts to update file metadata fail because another process has it open.
             public int MetadataUpdatesThatFail { get; set; }
 
@@ -575,6 +600,17 @@ namespace CommonLibTest
                 }
 
                 return base.ReadAllBytes(path);
+            }
+
+            public override void WriteAllBytes(string path, byte[] bytes)
+            {
+                if (path == PathToLockOnWrite && WritesThatFail > 0)
+                {
+                    WritesThatFail--;
+                    throw new IOException("The process cannot access the file because it is being used by another process.", SharingViolation);
+                }
+
+                base.WriteAllBytes(path, bytes);
             }
 
             private sealed class FullDiskStream : FileSystemStream
