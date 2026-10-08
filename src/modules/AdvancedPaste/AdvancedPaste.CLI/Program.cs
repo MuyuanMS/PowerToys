@@ -282,7 +282,18 @@ public static partial class Program
             {
                 try
                 {
-                    AdvancedPasteTempFileManager.CleanupStaleDirectories(TimeSpan.FromDays(1), systemClipboard.ReadFilePaths());
+                    var protectedFilePaths = systemClipboard.ReadFilePaths().ToList();
+                    if (inputFile is not null)
+                    {
+                        protectedFilePaths.Add(inputFile.FullName);
+                    }
+
+                    if (outputFile is not null)
+                    {
+                        protectedFilePaths.Add(outputFile.FullName);
+                    }
+
+                    AdvancedPasteTempFileManager.CleanupStaleDirectories(TimeSpan.FromDays(1), protectedFilePaths);
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.Runtime.InteropServices.ExternalException)
                 {

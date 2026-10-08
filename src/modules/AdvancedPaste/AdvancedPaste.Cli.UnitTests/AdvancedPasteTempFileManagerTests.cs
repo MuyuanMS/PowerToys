@@ -105,7 +105,7 @@ public class AdvancedPasteTempFileManagerTests
     }
 
     [TestMethod]
-    public void CleanupStaleDirectories_PreservesDirectoriesReferencedByClipboard()
+    public void CleanupStaleDirectories_PreservesDirectoriesReferencedByProtectedFiles()
     {
         var directory = AdvancedPasteTempFileManager.CreateDirectory(_testTempDirectory);
         var filePath = Path.Combine(directory.FullName, "clipboard-output.txt");
