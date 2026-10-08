@@ -118,4 +118,44 @@ internal static class RunFiles
             timeout,
             "An owned directory remained in use after bounded resource cleanup: " + path);
     }
+
+    public static void RemoveEmptyRunControlParent(string runId, TimeSpan timeout)
+    {
+        if (!Guid.TryParseExact(runId, "D", out var parsedRunId))
+        {
+            throw new ArgumentException("The run identifier must be a GUID.", nameof(runId));
+        }
+
+        var path = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Microsoft",
+            "PowerToysUiTestControl",
+            parsedRunId.ToString());
+        Wait(
+            () =>
+            {
+                if (!Directory.Exists(path))
+                {
+                    return true;
+                }
+
+                _ = WinAppSandboxPayload.PlainFiles(path).ToArray();
+                if (Directory.EnumerateFileSystemEntries(path).Any())
+                {
+                    throw new InvalidOperationException("Refusing to remove a nonempty run control parent: " + path);
+                }
+
+                try
+                {
+                    Directory.Delete(path, recursive: false);
+                    return true;
+                }
+                catch (IOException error) when ((error.HResult & 0xffff) is 32 or 33 or 145)
+                {
+                    return false;
+                }
+            },
+            timeout,
+            "An empty run control parent remained in use after bounded cleanup: " + path);
+    }
 }

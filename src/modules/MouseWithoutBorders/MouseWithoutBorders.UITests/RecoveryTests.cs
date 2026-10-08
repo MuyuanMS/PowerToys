@@ -266,9 +266,11 @@ public sealed class RecoveryTests
                 {
                     _ = WinAppSandboxPayload.PlainFiles(control).ToArray();
                     RunFiles.RemoveOwnedDirectory(control, TimeSpan.FromSeconds(45));
+                    RunFiles.RemoveEmptyRunControlParent(runId, TimeSpan.FromSeconds(45));
                     RunFiles.Write(Path.Combine(root, "test-isolation.json"), new
                     {
-                        RunId = runId, OwnedControlRemoved = !Directory.Exists(control), OwnedResourcesAbsent = true,
+                        RunId = runId, OwnedControlRemoved = !Directory.Exists(control),
+                        RunControlParentRemoved = !Directory.Exists(Path.GetDirectoryName(control)!), OwnedResourcesAbsent = true,
                     });
                 }
             }

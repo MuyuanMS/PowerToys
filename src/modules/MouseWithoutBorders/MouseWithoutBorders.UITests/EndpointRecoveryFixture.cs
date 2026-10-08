@@ -276,10 +276,12 @@ internal sealed class EndpointRecoveryFixture : IDisposable
 
             _ = WinAppSandboxPayload.PlainFiles(controlRoot).ToArray();
             RunFiles.RemoveOwnedDirectory(controlRoot, TimeSpan.FromSeconds(45));
+            RunFiles.RemoveEmptyRunControlParent(RunId, TimeSpan.FromSeconds(45));
             RunFiles.Write(Path.Combine(RunRoot, "test-isolation.json"), new
             {
                 RunId, SettingsStillOriginal = true, OwnedProcessesAbsent = true,
                 PrivateBackupsRemoved = !Directory.Exists(BackupRoot), OwnedControlRemoved = !Directory.Exists(controlRoot),
+                RunControlParentRemoved = !Directory.Exists(Path.GetDirectoryName(controlRoot)!),
                 IndependentClipboardGuardRestored = clipboardLost,
                 RecoveryRequiresBaselineReset = recovery["RequiresBaselineReset"]!.GetValue<bool>(),
             });
