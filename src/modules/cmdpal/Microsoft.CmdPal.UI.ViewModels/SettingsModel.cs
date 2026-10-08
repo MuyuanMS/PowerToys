@@ -18,7 +18,7 @@ public record SettingsModel
     ///////////////////////////////////////////////////////////////////////////
     // SETTINGS HERE
     internal const int MinQuickAccessShelfPinnedCommandLimit = 0;
-    internal const int MaxQuickAccessShelfPinnedCommandLimit = 9;
+    internal const int MaxQuickAccessShelfPinnedCommandLimit = 99;
     internal const int DefaultQuickAccessShelfPinnedCommandLimit = 9;
     internal const int MinRecentCommandsDisplayLimit = 1;
     internal const int MaxRecentCommandsDisplayLimit = 10;
@@ -53,6 +53,12 @@ public record SettingsModel
         get => _dockFocusHotkey;
         init => _dockFocusHotkey = value ?? DefaultDockFocusShortcut;
     }
+
+    public bool DockFocusPrimaryFirst { get; init; }
+
+    public bool DockFocusAcrossMonitors { get; init; } = true;
+
+    public bool DockRememberLastFocusedItem { get; init; } = true;
 
     public bool UseLowLevelGlobalHotkey { get; init; }
 
@@ -242,7 +248,10 @@ public record SettingsModel
           ImmutableList<TopLevelHotkey>? commandHotkeys = null,
           bool enableExternalCommandLinks = true,
           int quickAccessShelfPinnedCommandLimit = DefaultQuickAccessShelfPinnedCommandLimit,
-          int recentCommandsDisplayLimit = DefaultRecentCommandsDisplayLimit)
+          int recentCommandsDisplayLimit = DefaultRecentCommandsDisplayLimit,
+          bool dockFocusAcrossMonitors = true,
+          bool dockRememberLastFocusedItem = true,
+          bool dockFocusPrimaryFirst = false)
     {
         PinnedCommands = pinnedCommands ?? ImmutableList<PinnedCommandSettings>.Empty;
         ProviderSettings = providerSettings ?? ImmutableDictionary<string, ProviderSettings>.Empty;
@@ -252,6 +261,9 @@ public record SettingsModel
         EnableExternalCommandLinks = enableExternalCommandLinks;
         QuickAccessShelfPinnedCommandLimit = quickAccessShelfPinnedCommandLimit;
         RecentCommandsDisplayLimit = recentCommandsDisplayLimit;
+        DockFocusAcrossMonitors = dockFocusAcrossMonitors;
+        DockRememberLastFocusedItem = dockRememberLastFocusedItem;
+        DockFocusPrimaryFirst = dockFocusPrimaryFirst;
     }
 
     public SettingsModel()
