@@ -132,6 +132,7 @@
                                                     <DataTemplate x:DataType="vm:CharacterModel">
                                                         <Button
                                                             Click="CharacterButton_Click"
+                                                            AutomationProperties.Name="{x:Bind Tooltip}"
                                                             Content="{x:Bind DisplayValue}"
                                                             Style="{StaticResource CharacterButtonStyle}"
                                                             ToolTipService.ToolTip="{x:Bind Tooltip}" />
