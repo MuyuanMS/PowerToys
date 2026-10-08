@@ -153,6 +153,8 @@ public class ProgramTests
         Assert.AreEqual(2, result.ExitCode);
         using var document = JsonDocument.Parse(result.Stderr);
         Assert.AreEqual("error", document.RootElement.GetProperty("status").GetString());
+        StringAssert.Contains(document.RootElement.GetProperty("usage").GetString(), "actions list [--json]");
+        Assert.IsFalse(document.RootElement.GetProperty("usage").GetString()!.Contains(" transform ", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -590,13 +592,15 @@ public class ProgramTests
     }
 
     [TestMethod]
-    public void DisabledByPolicy_WritesStableJsonError()
+    public async Task DisabledByPolicy_WritesStableJsonError()
     {
-        var stderr = new StringWriter();
+        var result = await RunAsync(
+            ["transform", "--action", "plain-text", "--stdin", "--json"],
+            "hello",
+            runtime: new ExceptionRuntime(new CliPolicyDisabledException()));
 
-        Assert.IsTrue(Program.TryWritePolicyDisabledError(isEnabledByPolicy: false, ["transform", "--json"], stderr));
-
-        using var document = JsonDocument.Parse(stderr.ToString());
+        Assert.AreEqual(1, result.ExitCode);
+        using var document = JsonDocument.Parse(result.Stderr);
         Assert.AreEqual("disabled_by_policy", document.RootElement.GetProperty("code").GetString());
     }
 
@@ -604,6 +608,48 @@ public class ProgramTests
     public void LoggerInitializationFailure_DoesNotPreventCliStartup()
     {
         Assert.IsFalse(Program.TryInitializeLogger(() => throw new UnauthorizedAccessException()));
+    }
+
+    [TestMethod]
+    public void CreateUtf8InputReader_PreservesRedirectedUnicodeInput()
+    {
+        const string input = "こんにちは PowerToys";
+        using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(input));
+        using var reader = Program.CreateUtf8InputReader(stream);
+
+        Assert.AreEqual(input, reader.ReadToEnd());
+    }
+
+    [DataTestMethod]
+    [DataRow(new string[] { }, "help")]
+    [DataRow(new[] { "transform", "--help" }, "help")]
+    [DataRow(new[] { "transform", "--action", "plain-text", "--input", "-h", "--stdout" }, "transform")]
+    [DataRow(new[] { "transform", "--input", "-h", "--invalid" }, "transform")]
+    [DataRow(new[] { "transform", "--action", "plain-text" }, "transform")]
+    [DataRow(new[] { "actions", "list", "--json" }, "actions list")]
+    [DataRow(new[] { "unexpected", "--prompt", "sensitive prompt" }, "unknown")]
+    public void TelemetryCommandName_IsBounded(string[] args, string expected)
+    {
+        Assert.AreEqual(expected, Program.GetTelemetryCommandName(args));
+    }
+
+    [TestMethod]
+    public void CreateCLITelemetryEvent_SetsBoundedCommandAndSuccessStatus()
+    {
+        var telemetryEvent = Program.CreateCLITelemetryEvent("transform", successful: true);
+
+        Assert.AreEqual("AdvancedPaste_CLICommand", telemetryEvent.EventName);
+        Assert.AreEqual("transform", telemetryEvent.CommandName);
+        Assert.IsTrue(telemetryEvent.Successful);
+    }
+
+    [TestMethod]
+    public async Task HelpLikeOptionValue_WithParseError_ReturnsArgumentError()
+    {
+        var result = await RunAsync(["transform", "--input", "-h", "--invalid"]);
+
+        Assert.AreEqual(Program.ArgumentErrorExitCode, result.ExitCode);
+        StringAssert.Contains(result.Stderr, "Usage:");
     }
 
     private static async Task<RunResult> RunAsync(
