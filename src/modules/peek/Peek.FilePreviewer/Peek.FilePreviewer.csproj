@@ -72,10 +72,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="PowerToys.Peek.FilePreviewer.UnitTests" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Page Update="Controls\AudioControl.xaml">
       <Generator>MSBuild:Compile</Generator>
     </Page>

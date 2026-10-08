@@ -18,18 +18,10 @@ namespace Peek.FilePreviewer.Previewers
     public class PreviewerFactory
     {
         private readonly IPreviewSettings _previewSettings;
-        private readonly bool _useCurrentDispatcher;
 
         public PreviewerFactory()
         {
             _previewSettings = Application.Current.GetService<IPreviewSettings>();
-            _useCurrentDispatcher = true;
-        }
-
-        internal PreviewerFactory(IPreviewSettings previewSettings, bool useCurrentDispatcher = true)
-        {
-            _previewSettings = previewSettings;
-            _useCurrentDispatcher = useCurrentDispatcher;
         }
 
         public IPreviewer Create(IFileSystemItem item)
@@ -48,7 +40,7 @@ namespace Peek.FilePreviewer.Previewers
             }
             else if (WebBrowserPreviewer.IsItemSupported(item))
             {
-                return CreateWebBrowserPreviewer(item);
+                return new WebBrowserPreviewer(item, _previewSettings);
             }
             else if (SqliteNS.SqlitePreviewer.IsItemSupported(item))
             {
@@ -75,7 +67,7 @@ namespace Peek.FilePreviewer.Previewers
                 // No recognized extension. The content check is done asynchronously in
                 // LoadDisplayInfoAsync; if it isn't text, the previewer fails over to
                 // the default/info preview.
-                return CreateWebBrowserPreviewer(item);
+                return new WebBrowserPreviewer(item, _previewSettings);
             }
 
             // Other previewer types check their supported file types here
@@ -86,13 +78,6 @@ namespace Peek.FilePreviewer.Previewers
         {
             PowerToysTelemetry.Log.WriteEvent(new ErrorEvent() { Failure = ErrorEvent.FailureType.FileNotSupported });
             return new UnsupportedFilePreviewer(file);
-        }
-
-        private WebBrowserPreviewer CreateWebBrowserPreviewer(IFileSystemItem item)
-        {
-            return _useCurrentDispatcher
-                ? new WebBrowserPreviewer(item, _previewSettings)
-                : new WebBrowserPreviewer(item, _previewSettings, dispatcher: null);
         }
     }
 }

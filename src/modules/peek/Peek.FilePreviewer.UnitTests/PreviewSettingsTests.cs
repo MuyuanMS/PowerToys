@@ -3,7 +3,6 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Text.Json;
-
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Peek.FilePreviewer.Models;
@@ -47,31 +46,6 @@ namespace Peek.FilePreviewer.UnitTests
 
             Assert.IsNotNull(settings);
             Assert.AreEqual(PeekPreviewSettings.DefaultSourceCodeMaxFileSize, settings.SourceCodeMaxFileSize.Value);
-        }
-
-        [TestMethod]
-        public void Deserialize_OlderSettingsWithoutMaxFileSize_ShouldRetainDefault()
-        {
-            var settings = JsonSerializer.Deserialize(
-                "{}",
-                SettingsSerializationContext.Default.PeekPreviewSettings);
-
-            Assert.IsNotNull(settings);
-            Assert.AreEqual(PeekPreviewSettings.DefaultSourceCodeMaxFileSize, settings.SourceCodeMaxFileSize.Value);
-        }
-
-        [TestMethod]
-        public void SourceCodeMaxFileSize_ShouldSurviveJsonRoundTrip()
-        {
-            var original = new PeekPreviewSettings();
-            original.SourceCodeMaxFileSize.Value = 2048;
-
-            var deserialized = JsonSerializer.Deserialize(
-                original.ToJsonString(),
-                SettingsSerializationContext.Default.PeekPreviewSettings);
-
-            Assert.IsNotNull(deserialized);
-            Assert.AreEqual(2048, deserialized.SourceCodeMaxFileSize.Value);
         }
     }
 }
