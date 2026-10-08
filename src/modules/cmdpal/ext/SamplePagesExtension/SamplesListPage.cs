@@ -157,11 +157,6 @@ public partial class SamplesListPage : ListPage
         },
 
         // Data package samples
-        new ListItem(new SampleClipboardPage())
-        {
-            Title = "Clipboard Helper Samples",
-            Subtitle = "Test text, RTF, images, and custom data packages with ClipboardHelper",
-        },
         new ListItem(new SampleDataTransferPage())
         {
             Title = "Clipboard and Drag-and-Drop Demo",

@@ -73,11 +73,7 @@ public sealed class PersistenceService : IPersistenceService
         }
         catch (Exception ex)
         {
-            var message = $"Failed to save to {filePath}:";
-#if DEBUG
-            message += $"{Environment.NewLine}Save caller stack:{Environment.NewLine}{new System.Diagnostics.StackTrace(skipFrames: 1, fNeedFileInfo: true)}";
-#endif
-            Logger.LogError(message, ex);
+            Logger.LogError($"Failed to save to {filePath}:", ex);
         }
     }
 }

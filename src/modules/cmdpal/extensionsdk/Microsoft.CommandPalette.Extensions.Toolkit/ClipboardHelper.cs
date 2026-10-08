@@ -84,7 +84,7 @@ public static partial class ClipboardHelper
     private static partial bool GlobalUnlock(IntPtr hMem);
 
     [LibraryImport("kernel32.dll", EntryPoint = "RtlMoveMemory")]
-    private static partial void CopyMemory(IntPtr dest, IntPtr src, UIntPtr count);
+    private static partial void CopyMemory(IntPtr dest, IntPtr src, uint count);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -108,7 +108,7 @@ public static partial class ClipboardHelper
     [LibraryImport("user32.dll")]
     private static partial IntPtr SetClipboardData(uint format, IntPtr data);
 
-    [LibraryImport("user32.dll", EntryPoint = "RegisterClipboardFormatW", StringMarshalling = StringMarshalling.Utf16)]
+    [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16)]
     private static partial uint RegisterClipboardFormat(string lpszFormat);
 
 #pragma warning disable SA1310 // Field names should not contain underscore
@@ -131,19 +131,10 @@ public static partial class ClipboardHelper
                     var data = GetClipboardData(CF_UNICODETEXT);
                     if (data != IntPtr.Zero)
                     {
-                        var dataPointer = GlobalLock(data);
-                        if (dataPointer != IntPtr.Zero)
-                        {
-                            try
-                            {
-                                text = Marshal.PtrToStringUni(dataPointer) ?? string.Empty;
-                                return true;
-                            }
-                            finally
-                            {
-                                GlobalUnlock(data);
-                            }
-                        }
+                        data = GlobalLock(data);
+                        text = Marshal.PtrToStringUni(data) ?? string.Empty;
+                        GlobalUnlock(data);
+                        return true;
                     }
                 }
             }
@@ -154,19 +145,10 @@ public static partial class ClipboardHelper
                     var data = GetClipboardData(CF_TEXT);
                     if (data != IntPtr.Zero)
                     {
-                        var dataPointer = GlobalLock(data);
-                        if (dataPointer != IntPtr.Zero)
-                        {
-                            try
-                            {
-                                text = Marshal.PtrToStringAnsi(dataPointer) ?? string.Empty;
-                                return true;
-                            }
-                            finally
-                            {
-                                GlobalUnlock(data);
-                            }
-                        }
+                        data = GlobalLock(data);
+                        text = Marshal.PtrToStringAnsi(data) ?? string.Empty;
+                        GlobalUnlock(data);
+                        return true;
                     }
                 }
             }
@@ -252,7 +234,7 @@ public static partial class ClipboardHelper
                 return false;
             }
 
-            CopyMemory(dataCopy, data, (UIntPtr)bytes);
+            CopyMemory(dataCopy, data, bytes);
             GlobalUnlock(hGlobal);
 
             if (SetClipboardData(format, hGlobal) != IntPtr.Zero)

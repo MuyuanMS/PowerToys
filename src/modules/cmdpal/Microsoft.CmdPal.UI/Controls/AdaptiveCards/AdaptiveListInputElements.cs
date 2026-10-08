@@ -68,8 +68,7 @@ internal abstract partial class AdaptiveListInputElement : IAdaptiveInputElement
 
     public bool IsVisible { get; set; } = true;
 
-    // Use an explicit constructor so CsWinRT generates AOT collection marshalling.
-    public IList<AdaptiveRequirement> Requirements { get; } = new List<AdaptiveRequirement>();
+    public IList<AdaptiveRequirement> Requirements { get; } = [];
 
     public bool Separator { get; set; }
 

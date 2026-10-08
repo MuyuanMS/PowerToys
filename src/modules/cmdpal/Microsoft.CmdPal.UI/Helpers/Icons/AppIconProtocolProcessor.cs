@@ -4,7 +4,6 @@
 
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.UI.Xaml;
-using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
 
 namespace Microsoft.CmdPal.UI.Helpers;
@@ -12,24 +11,17 @@ namespace Microsoft.CmdPal.UI.Helpers;
 internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
 {
     private readonly Func<string, bool, Task<IRandomAccessStream?>> _getThumbnail;
-    private readonly Func<string, int, SoftwareBitmap?>? _getJumboIcon;
-    private readonly Func<string, int, SoftwareBitmap?>? _getShortcutIcon;
 
     public static AppIconProtocolProcessor Instance { get; } = new();
 
     private AppIconProtocolProcessor()
-        : this(ThumbnailHelper.GetThumbnail, ShellItemImageFactoryIconExtractor.Extract, ExtractShortcutIcon)
+        : this(ThumbnailHelper.GetThumbnail)
     {
     }
 
-    internal AppIconProtocolProcessor(
-        Func<string, bool, Task<IRandomAccessStream?>> getThumbnail,
-        Func<string, int, SoftwareBitmap?>? getJumboIcon = null,
-        Func<string, int, SoftwareBitmap?>? getShortcutIcon = null)
+    internal AppIconProtocolProcessor(Func<string, bool, Task<IRandomAccessStream?>> getThumbnail)
     {
         _getThumbnail = getThumbnail;
-        _getJumboIcon = getJumboIcon;
-        _getShortcutIcon = getShortcutIcon;
     }
 
     public IconCachePartition CachePartition => IconCachePartition.Other;
@@ -57,6 +49,7 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
         int targetSize,
         ElementTheme theme)
     {
+        _ = targetSize;
         _ = theme;
 
         if (!AppIconProtocol.TryParse(value, out var candidates, out var jumbo))
@@ -64,38 +57,10 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
             return IconProtocolProcessingResult.Empty();
         }
 
-        for (var candidateIndex = 0; candidateIndex < candidates.Length; candidateIndex++)
+        foreach (var candidate in candidates)
         {
-            var candidate = candidates[candidateIndex];
-            if (candidate.Contains('/') && Path.IsPathFullyQualified(candidate))
-            {
-                // Native icon loaders need Windows separators, including for cached file paths.
-                candidate = candidate.Replace('/', Path.DirectorySeparatorChar);
-                candidates[candidateIndex] = candidate;
-            }
-
             try
             {
-                if (jumbo && _getJumboIcon?.Invoke(candidate, targetSize) is { } bitmap)
-                {
-                    return IconProtocolProcessingResult.FromPreparedIcon(IconPathConverter.PreparedIcon.FromBinary(bitmap));
-                }
-
-                if (!jumbo && candidate.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
-                {
-                    try
-                    {
-                        if (_getShortcutIcon?.Invoke(candidate, targetSize) is { } shortcutBitmap)
-                        {
-                            return IconProtocolProcessingResult.FromPreparedIcon(IconPathConverter.PreparedIcon.FromBinary(shortcutBitmap));
-                        }
-                    }
-                    catch
-                    {
-                        // Keep the ordinary thumbnail fallback if base-icon extraction fails.
-                    }
-                }
-
                 if (await _getThumbnail(candidate, jumbo).ConfigureAwait(false) is { } stream)
                 {
                     return IconProtocolProcessingResult.FromBitmapStream(stream);
@@ -108,26 +73,5 @@ internal sealed class AppIconProtocolProcessor : IIconProtocolProcessor
         }
 
         return IconProtocolProcessingResult.FromFallbackIconStrings(candidates);
-    }
-
-    private static SoftwareBitmap? ExtractShortcutIcon(string path, int targetSize)
-    {
-        var request = new ShellItemIconRequest(path, jumbo: false);
-
-        // A missing item's registered type icon must not mask later app candidates.
-        if (!ShellItemIconLocator.Instance.TryLocate(request, out var locatedIcon)
-            || !locatedIcon.CacheRawRequestAlias
-            || locatedIcon.Identity.Kind != ShellIconIdentityKind.SystemImageList)
-        {
-            return null;
-        }
-
-        // App-icon requests use the base entry to omit shortcut overlays.
-        // Keep the shared Toolkit thumbnail API's decorated shortcut behavior.
-        using var extraction = ShellSystemImageListIconExtractor.Extract(
-            locatedIcon.Identity.SystemImageListIndex,
-            jumbo: false,
-            requestedPixelSize: targetSize);
-        return extraction.TakeSoftwareBitmap();
     }
 }

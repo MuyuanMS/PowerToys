@@ -6,9 +6,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.CmdPal.Common.Helpers;
-using Microsoft.CmdPal.UI.ViewModels.Messages;
 using Microsoft.CmdPal.UI.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
 
@@ -166,29 +164,21 @@ public partial class PageViewModel : ExtensionObjectViewModel, IPageContext
         }
 
         // Notify we're done back on the UI Thread.
-        DoOnUiThread(
+        Task.Factory.StartNew(
             () =>
             {
-                if (IsDiscarded)
-                {
-                    return;
-                }
-
                 IsInitialized = true;
 
                 // TODO: Do we want an event/signal here that the Page Views can listen to? (i.e. ListPage setting the selected index to 0, however, in async world the user may have already started navigating around page...)
-            });
+            },
+            CancellationToken.None,
+            TaskCreationOptions.None,
+            Scheduler);
         return Task.FromResult(true);
     }
 
     public override void InitializeProperties()
     {
-        using var operation = TryBeginPageOperation();
-        if (operation is null)
-        {
-            return;
-        }
-
         var page = _pageModel.Unsafe;
         if (page is null)
         {
@@ -217,12 +207,6 @@ public partial class PageViewModel : ExtensionObjectViewModel, IPageContext
 
     private void Model_PropChanged(object sender, IPropChangedEventArgs args)
     {
-        using var operation = TryBeginPageOperation();
-        if (operation is null)
-        {
-            return;
-        }
-
         try
         {
             var propName = args.PropertyName;
@@ -250,12 +234,6 @@ public partial class PageViewModel : ExtensionObjectViewModel, IPageContext
     {
         // The base page has no notion of data, so we do nothing here...
         // subclasses should override.
-    }
-
-    protected void SendPageUiMessage<TMessage>(TMessage message)
-        where TMessage : class
-    {
-        WeakReferenceMessenger.Default.Send<TMessage>(message);
     }
 
     protected virtual void FetchProperty(string propertyName)
@@ -313,14 +291,11 @@ public partial class PageViewModel : ExtensionObjectViewModel, IPageContext
 
     protected void ShowErrorMessage(string message)
     {
-        DoOnUiThread(
-            () =>
-            {
-                if (!IsDiscarded)
-                {
-                    ErrorMessage += message;
-                }
-            });
+        Task.Factory.StartNew(
+            () => ErrorMessage += message,
+            CancellationToken.None,
+            TaskCreationOptions.None,
+            Scheduler);
     }
 
     public override string ToString() => $"{Title} ViewModel";

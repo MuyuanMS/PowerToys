@@ -19,14 +19,12 @@ using Windows.Foundation.Collections;
 
 namespace Microsoft.CmdPal.UI.Controls;
 
-public sealed partial class FallbackRankerDialog : UserControl, IDisposable
+public sealed partial class FallbackRankerDialog : UserControl
 {
     public FallbackRankerDialog()
     {
         InitializeComponent();
     }
-
-    public void Dispose() => FallbackRanker?.Dispose();
 
     public IAsyncOperation<ContentDialogResult> ShowAsync()
     {

@@ -14,8 +14,4 @@ public record OpenSettingsMessage(
     string SettingsPageTag = "",
     string? ExtensionGalleryId = null,
     string? SettingsLinkId = null,
-    string? ExtensionProviderId = null)
-{
-    /// <summary>Command to reveal in extension settings, used by in-app search.</summary>
-    public string? CommandId { get; init; }
-}
+    string? ExtensionProviderId = null);

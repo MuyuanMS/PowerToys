@@ -81,7 +81,7 @@ public class QuickAccessShelfItemActionsTests
         if (hasSecondary)
         {
             Assert.AreSame(item.SecondaryCommand!.Command.Model, invoked[0].Command);
-            Assert.AreSame(item.Model.Unsafe, invoked[0].CommandContext);
+            Assert.AreSame(item.Model.Unsafe, invoked[0].Context);
         }
     }
 
@@ -111,8 +111,6 @@ public class QuickAccessShelfItemActionsTests
     [DataRow(VirtualKey.F6, VirtualKeyModifiers.None, true)]
     [DataRow(VirtualKey.K, VirtualKeyModifiers.Control, false)]
     [DataRow(VirtualKey.K, VirtualKeyModifiers.Control, true)]
-    [DataRow(VirtualKey.Enter, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, false)]
-    [DataRow(VirtualKey.Enter, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, true)]
     public void RequestedShortcut_UsesCurrentCommandOrSubmenu(VirtualKey key, VirtualKeyModifiers modifiers, bool hasSubmenu)
     {
         var chord = new KeyChord(modifiers, (int)key, 0);
@@ -129,7 +127,7 @@ public class QuickAccessShelfItemActionsTests
 
         Assert.HasCount(hasSubmenu ? 0 : 1, invoked);
         Assert.HasCount(hasSubmenu ? 1 : 0, opened);
-        Assert.AreSame(requested, hasSubmenu ? opened[0]?.Model.Unsafe : invoked[0].CommandContext);
+        Assert.AreSame(requested, hasSubmenu ? opened[0]?.Model.Unsafe : invoked[0].Context);
     }
 
     private ListItemViewModel CreateItem(params IContextItem[] commands)
