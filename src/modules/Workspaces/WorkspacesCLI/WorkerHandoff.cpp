@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <algorithm>
 #include <vector>
+#include <tlhelp32.h>
 #include <common/interop/pipe_caller_auth.h>
 #include <WorkspacesLib/CliCommands.h>
 #include <WorkspacesLib/IPCHelper.h>
@@ -168,6 +169,22 @@ namespace WorkspacesCli
             if (!result.accepted)
                 Fail("Worker handoff peer identity was rejected.");
         }
+
+        DWORD ParentProcessId()
+        {
+            wil::unique_handle snapshot(CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0));
+            if (!snapshot)
+                Fail("Cannot inspect the worker parent process.");
+            PROCESSENTRY32W entry{ sizeof(entry) };
+            if (!Process32FirstW(snapshot.get(), &entry))
+                Fail("Cannot inspect the worker parent process.");
+            do
+            {
+                if (entry.th32ProcessID == GetCurrentProcessId())
+                    return entry.th32ParentProcessID;
+            } while (Process32NextW(snapshot.get(), &entry));
+            Fail("Cannot inspect the worker parent process.");
+        }
     }
 
     bool SameUserSession(HANDLE first, HANDLE second)
@@ -179,6 +196,34 @@ namespace WorkspacesCli
     {
         const auto context = Context(process);
         return context.session != 0 && !context.elevated && context.integrity == SECURITY_MANDATORY_MEDIUM_RID;
+    }
+
+    void ValidateApprovalOrigin(HANDLE pipe, DWORD ownerPid)
+    {
+        ULONG serverPid = 0;
+        ULONG clientPid = 0;
+        if (!ownerPid ||
+            !GetNamedPipeServerProcessId(pipe, &serverPid) ||
+            !GetNamedPipeClientProcessId(pipe, &clientPid) ||
+            serverPid != ownerPid ||
+            clientPid != ownerPid ||
+            ParentProcessId() != ownerPid)
+            Fail("Approval channel is not owned by the worker's CLI parent.");
+
+        wil::unique_handle owner(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, FALSE, ownerPid));
+        if (!owner || WaitForSingleObject(owner.get(), 0) != WAIT_TIMEOUT ||
+            !SameUserSession(GetCurrentProcess(), owner.get()) ||
+            !IsMediumProcess(owner.get()))
+            Fail("Approval channel owner is not a live same-user CLI process.");
+
+        std::wstring ownerPath(32768, L'\0');
+        DWORD ownerPathLength = static_cast<DWORD>(ownerPath.size());
+        if (!QueryFullProcessImageNameW(owner.get(), 0, ownerPath.data(), &ownerPathLength))
+            Fail("Cannot verify the approval channel owner image.");
+        ownerPath.resize(ownerPathLength);
+        const auto ownPath = OwnPath();
+        if (CompareStringOrdinal(ownerPath.c_str(), -1, ownPath.c_str(), -1, TRUE) != CSTR_EQUAL)
+            Fail("Approval channel owner is not the Workspaces CLI frontend.");
     }
 
     wil::unique_process_information StartMediumWorker(const std::wstring& executable, const std::wstring& operationId, const WorkerHandles& handles, ULONGLONG deadline)

@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 #include "pch.h"
 #include <WorkspacesCLI/WorkerHandoff.h>
+#include <WorkspacesCLI/ApprovalChannel.h>
 #include <WorkspacesLib/CliCommands.h>
 #include <wil/resource.h>
 #include <filesystem>
@@ -28,6 +29,14 @@ namespace WorkspacesLibUnitTests
             });
             Assert::ExpectException<WorkspacesCli::Error>([] {
                 WorkspacesCli::ReceiveWorkerHandles(L"{EF762D6C-EDBF-4C45-98F2-878BBF67583F}", 0);
+            });
+        }
+
+        TEST_METHOD (ApprovalChannelsFromUntrustedParentAreRejected)
+        {
+            auto channels = WorkspacesCli::ApprovalPipe::Create();
+            Assert::ExpectException<WorkspacesCli::Error>([&] {
+                WorkspacesCli::ValidateApprovalOrigin(channels.write.get(), GetCurrentProcessId());
             });
         }
 
