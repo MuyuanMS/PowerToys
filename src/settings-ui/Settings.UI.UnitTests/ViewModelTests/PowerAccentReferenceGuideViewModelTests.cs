@@ -105,6 +105,21 @@ namespace ViewModelTests
             Assert.AreEqual("y\u0300", model.DisplayValue);
         }
 
+        [TestMethod]
+        public void Constructor_SpecialKeys_UsesSymbolicLabels()
+        {
+            var keyLabels = CreateViewModel([])
+                .FilteredGroups
+                .SelectMany(group => group.Languages)
+                .SelectMany(language => language.KeyMappings)
+                .Select(mapping => mapping.KeyLabel)
+                .ToHashSet();
+
+            CollectionAssert.IsSubsetOf(
+                new[] { "+", ",", ".", "-", "*", "/", "\\" },
+                keyLabels.ToArray());
+        }
+
         private static PowerAccentReferenceGuideViewModel CreateViewModel(string[] selectedLanguageCodes)
         {
             return new PowerAccentReferenceGuideViewModel(selectedLanguageCodes, GetLocalizedString);

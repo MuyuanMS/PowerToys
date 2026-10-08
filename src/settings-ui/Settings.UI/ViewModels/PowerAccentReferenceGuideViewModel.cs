@@ -152,9 +152,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                     var keyMappings = lang.Characters
                         .OrderBy(kvp => kvp.Key)
                         .Select(kvp => new KeyMappingModel(
-                            kvp.Key.ToString()
-                                .Replace("VK_", string.Empty, StringComparison.Ordinal)
-                                .TrimEnd('_'),
+                            GetKeyLabel(kvp.Key),
                             kvp.Value.Select(ch => new CharacterModel(ch)).ToList()))
                         .ToList();
 
@@ -218,6 +216,21 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             }
 
             return groups;
+        }
+
+        private static string GetKeyLabel(LetterKey key)
+        {
+            return key switch
+            {
+                LetterKey.VK_PLUS => "+",
+                LetterKey.VK_COMMA => ",",
+                LetterKey.VK_PERIOD => ".",
+                LetterKey.VK_MINUS => "-",
+                LetterKey.VK_MULTIPLY_ => "*",
+                LetterKey.VK_SLASH_ or LetterKey.VK_DIVIDE_ => "/",
+                LetterKey.VK_BACKSLASH => "\\",
+                _ => key.ToString().Replace("VK_", string.Empty, StringComparison.Ordinal).TrimEnd('_'),
+            };
         }
     }
 }
