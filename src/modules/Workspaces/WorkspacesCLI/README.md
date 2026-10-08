@@ -97,7 +97,7 @@ $root = (Get-Location).Path
     -ExtraArgs @("/p:SolutionDir=$root\", "/p:WorkspacesCliLiveTests=true")
 $env:WORKSPACES_CLI_LIVE_TESTS = '1'
 vstest.console.exe "$root\x64\Debug\tests\Workspaces\Workspaces.Lib.UnitTests.dll" `
-    "/TestCaseFilter:FullyQualifiedName~CliApprovalTests|FullyQualifiedName~CliApprovalConsoleTests|FullyQualifiedName~CliContractTests|FullyQualifiedName~CliWorkerTests|FullyQualifiedName~WorkspaceStoreTests"
+    "/TestCaseFilter:FullyQualifiedName~CliApprovalTests|FullyQualifiedName~CliApprovalConsoleTests|FullyQualifiedName~CliContractTests|FullyQualifiedName~CliWorkerTests|FullyQualifiedName~CliHandoffTests|FullyQualifiedName~WorkspaceStoreTests"
 ```
 
 `CliHandoffTests` additionally builds `Tests\HandoffFixture`, which checks Explorer-mediated

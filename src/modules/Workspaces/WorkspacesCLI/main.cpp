@@ -92,13 +92,13 @@ namespace
             {
                 const auto project = item.GetObjectW();
                 std::cout << winrt::to_string(project.GetNamedString(L"id")) << '\t'
-                          << winrt::to_string(project.GetNamedString(L"name")) << '\t';
+                          << winrt::to_string(EscapeApprovalText(project.GetNamedString(L"name"))) << '\t';
                 bool first = true;
                 for (const auto& app : project.GetNamedArray(L"applications"))
                 {
                     if (!first)
                         std::cout << ", ";
-                    std::cout << winrt::to_string(app.GetObjectW().GetNamedString(L"application"));
+                    std::cout << winrt::to_string(EscapeApprovalText(app.GetObjectW().GetNamedString(L"application")));
                     first = false;
                 }
                 std::cout << '\n';

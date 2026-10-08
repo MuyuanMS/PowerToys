@@ -70,7 +70,9 @@ Summary entries are a subset of the existing stored workspace JSON:
 Both unfiltered and selected lists contain `view: "summary"` or `"detail"` and a top-level
 `workspaces` array, even for one selected workspace or no workspaces. Scripts can read
 `.workspaces` directly. Summary preserves application order, duplicates, field names, types
-and values; no `apps`, per-app `name`, or count alias is added.
+and values; no `apps`, per-app `name`, or count alias is added. Human-readable table output
+escapes terminal control and bidirectional formatting characters in workspace/application names
+as `\uXXXX`; JSON output preserves the original values.
 
 Detail reuses the native workspace serializer, including existing kebab-case names, timestamp
 units and monitor/DPI configuration. Paths and command arguments may contain sensitive data:
