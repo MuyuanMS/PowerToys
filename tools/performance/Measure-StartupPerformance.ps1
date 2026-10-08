@@ -59,11 +59,15 @@ Name for this run. It's used in the result file name and by Compare-StartupPerfo
 Folder for the JSON result file. The copy of the PowerToys data folder is kept here during the run,
 and stays here if it can't be put back.
 
-.EXAMPLE
-.\Measure-StartupPerformance.ps1 -PowerToysRoot C:\src\PowerToys\x64\Release -Label main
+.PARAMETER AllowPowerToysDataRestore
+Explicitly allow Runner, Settings, or PowerToysRun scenarios to restore PowerToys data at the end.
+Do not change PowerToys data while the benchmark is running.
 
 .EXAMPLE
-.\Measure-StartupPerformance.ps1 -PowerToysRoot 'C:\Program Files\PowerToys' -Scenario Settings,MarkdownPreview -Iterations 20
+.\Measure-StartupPerformance.ps1 -PowerToysRoot C:\src\PowerToys\x64\Release -Label main -AllowPowerToysDataRestore
+
+.EXAMPLE
+.\Measure-StartupPerformance.ps1 -PowerToysRoot 'C:\Program Files\PowerToys' -Scenario Settings,MarkdownPreview -Iterations 20 -AllowPowerToysDataRestore
 #>
 [CmdletBinding()]
 param(
@@ -84,7 +88,9 @@ param(
 
     [string]$Label = 'run',
 
-    [string]$OutputDirectory = (Join-Path $env:TEMP 'PowerToys-Startup-Performance')
+    [string]$OutputDirectory = (Join-Path $env:TEMP 'PowerToys-Startup-Performance'),
+
+    [switch]$AllowPowerToysDataRestore
 )
 
 $ErrorActionPreference = 'Stop'
@@ -1574,6 +1580,12 @@ function Get-Percentile
     param([double[]]$Values, [double]$Percentile)
 
     $sorted = @($Values | Sort-Object)
+    if ($Percentile -eq 0.5 -and $sorted.Count % 2 -eq 0)
+    {
+        $middle = [int]($sorted.Count / 2)
+        return [Math]::Round(($sorted[$middle - 1] + $sorted[$middle]) / 2, 1)
+    }
+
     $index = [Math]::Max(0, [Math]::Ceiling($Percentile * $sorted.Count) - 1)
     return [Math]::Round($sorted[$index], 1)
 }
@@ -1661,6 +1673,24 @@ foreach ($name in $Scenario)
     }
 }
 
+$requiresDataRestore = @($Scenario | Where-Object { $_ -in 'Runner', 'Settings', 'PowerToysRun' }).Count -gt 0
+if ($requiresDataRestore)
+{
+    if (-not $AllowPowerToysDataRestore)
+    {
+        throw 'Runner, Settings, and PowerToysRun scenarios restore PowerToys data. Pass -AllowPowerToysDataRestore only when no other process or user will change that data during the run.'
+    }
+
+    $dataPath = [IO.Path]::GetFullPath($powerToysDataFolder).TrimEnd('\')
+    $outputPath = [IO.Path]::GetFullPath($OutputDirectory).TrimEnd('\')
+    if ($outputPath -eq $dataPath -or $outputPath.StartsWith($dataPath + '\', [StringComparison]::OrdinalIgnoreCase))
+    {
+        throw '-OutputDirectory cannot be inside %LOCALAPPDATA%\Microsoft\PowerToys for scenarios that restore that data tree.'
+    }
+
+    Write-Warning 'PowerToys data will be restored at the end of this run; concurrent changes to that data will be discarded.'
+}
+
 # Fail before stopping anything when the runner can't report its stages.
 if ($Scenario -contains 'Runner' -and -not [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($runnerPath)).Contains('Startup stages (ms since process start)'))
 {
@@ -1675,7 +1705,7 @@ try
 {
     $script:recorder = [PowerToysPerformance.WindowShowRecorder]::new()
 
-    if ($Scenario | Where-Object { $_ -in 'Runner', 'Settings', 'PowerToysRun' })
+    if ($requiresDataRestore)
     {
         Stop-AllRunners
         $script:tookOver = $true

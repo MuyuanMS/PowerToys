@@ -11,7 +11,7 @@ Scripts that measure how fast PowerToys starts and how much memory it uses. Use 
 ## Measure startup
 
 ```powershell
-.\tools\performance\Measure-StartupPerformance.ps1 -PowerToysRoot .\x64\Release -Label main
+.\tools\performance\Measure-StartupPerformance.ps1 -PowerToysRoot .\x64\Release -Label main -AllowPowerToysDataRestore
 ```
 
 `-PowerToysRoot` is any folder that contains `PowerToys.exe`: a build output folder or an install folder. Use `-Scenario` to pick scenarios, and `-Iterations` (default 10) and `-WarmupIterations` (default 2) to set the number of samples. The script prints a summary table and writes every sample to a JSON file in `-OutputDirectory` (default `%TEMP%\PowerToys-Startup-Performance`).
@@ -47,18 +47,18 @@ Machines drift, so alternate the runs between the builds, and pass all the resul
 
 ```powershell
 $measure = '.\tools\performance\Measure-StartupPerformance.ps1'
-& $measure -PowerToysRoot C:\builds\main -Label main -Iterations 5
-& $measure -PowerToysRoot C:\builds\change -Label change -Iterations 5
-& $measure -PowerToysRoot C:\builds\change -Label change -Iterations 5
-& $measure -PowerToysRoot C:\builds\main -Label main -Iterations 5
+& $measure -PowerToysRoot C:\builds\main -Label main -Iterations 5 -AllowPowerToysDataRestore
+& $measure -PowerToysRoot C:\builds\change -Label change -Iterations 5 -AllowPowerToysDataRestore
+& $measure -PowerToysRoot C:\builds\change -Label change -Iterations 5 -AllowPowerToysDataRestore
+& $measure -PowerToysRoot C:\builds\main -Label main -Iterations 5 -AllowPowerToysDataRestore
 
 .\tools\performance\Compare-StartupPerformance.ps1 -Baseline (Get-ChildItem $env:TEMP\PowerToys-Startup-Performance\main-*.json) -Candidate (Get-ChildItem $env:TEMP\PowerToys-Startup-Performance\change-*.json)
 ```
 
 ## Before you run it
 
-- **It takes over PowerToys.** `Runner`, `Settings`, and `PowerToysRun` stop every running PowerToys runner first and start them again at the end. If PowerToys runs elevated, exit it first or run the script elevated. The other scenarios leave a running PowerToys alone.
-- **It restores your settings.** Local and installed builds share `%LOCALAPPDATA%\Microsoft\PowerToys`, and a build of another version rewrites files there: version stamps, PowerToys Run's plugin data, default settings of modules. So for the three scenarios above, the script copies that folder (without logs) first and puts it back exactly at the end. It also writes the measured build's version to `last_version_run.json`, so "What's new" doesn't open during the run. `FileLocksmith` restores the `last-run.log` file it uses.
+- **It takes over PowerToys.** `Runner`, `Settings`, and `PowerToysRun` require `-AllowPowerToysDataRestore`, stop every running PowerToys runner first, and start them again at the end. If PowerToys runs elevated, exit it first or run the script elevated. Do not change PowerToys data while the benchmark runs; concurrent changes are discarded when the original data is restored. The other scenarios leave a running PowerToys alone.
+- **It restores your settings.** Local and installed builds share `%LOCALAPPDATA%\Microsoft\PowerToys`, and a build of another version rewrites files there: version stamps, PowerToys Run's plugin data, default settings of modules. For the three scenarios above, the script copies that folder (without logs) first and puts it back at the end. It also writes the measured build's version to `last_version_run.json`, so "What's new" doesn't open. `FileLocksmith` restores the `last-run.log` file it uses.
 - **Compare like with like.** The results record the enabled modules. The runner's stage times and memory depend on them, so compare runs with the same settings.
 - **Keep the machine quiet.** Close other apps, stay on AC power, and don't build at the same time.
 - **Keep the warm-up.** The first start of a new build can take seconds longer, because antivirus scans new executables. Warm-up samples absorb that.

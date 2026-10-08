@@ -46,6 +46,12 @@ function Get-Percentile
     param([double[]]$Values, [double]$Percentile)
 
     $sorted = @($Values | Sort-Object)
+    if ($Percentile -eq 0.5 -and $sorted.Count % 2 -eq 0)
+    {
+        $middle = [int]($sorted.Count / 2)
+        return ($sorted[$middle - 1] + $sorted[$middle]) / 2
+    }
+
     $index = [Math]::Max(0, [Math]::Ceiling($Percentile * $sorted.Count) - 1)
     return $sorted[$index]
 }
@@ -73,6 +79,36 @@ function Format-Change
 
 $baselineSamples = Get-Samples -Paths $Baseline
 $candidateSamples = Get-Samples -Paths $Candidate
+
+$allScenarios = @($baselineSamples | ForEach-Object Scenario) + @($candidateSamples | ForEach-Object Scenario) | Select-Object -Unique
+if ($allScenarios.Count -eq 0)
+{
+    throw 'Both result sets must contain at least one measured sample.'
+}
+
+foreach ($scenario in $allScenarios)
+{
+    $baselineScenarioSamples = @($baselineSamples | Where-Object { $_.Scenario -eq $scenario })
+    $candidateScenarioSamples = @($candidateSamples | Where-Object { $_.Scenario -eq $scenario })
+    if ($baselineScenarioSamples.Count -eq 0 -or $candidateScenarioSamples.Count -eq 0)
+    {
+        throw "Scenario '$scenario' must be present in both result sets."
+    }
+
+    $metadata = @('Scenario', 'Iteration', 'IsWarmup')
+    $baselineMetrics = @($baselineScenarioSamples | ForEach-Object { $_.PSObject.Properties.Name } | Where-Object { $_ -notin $metadata } | Select-Object -Unique)
+    $candidateMetrics = @($candidateScenarioSamples | ForEach-Object { $_.PSObject.Properties.Name } | Where-Object { $_ -notin $metadata } | Select-Object -Unique)
+    $allMetrics = @($baselineMetrics) + @($candidateMetrics) | Select-Object -Unique
+    foreach ($metric in $allMetrics)
+    {
+        $before = Get-Values -Samples $baselineScenarioSamples -Scenario $scenario -Metric $metric
+        $after = Get-Values -Samples $candidateScenarioSamples -Scenario $scenario -Metric $metric
+        if ($before.Count -ne $baselineScenarioSamples.Count -or $after.Count -ne $candidateScenarioSamples.Count)
+        {
+            throw "Metric '$metric' for scenario '$scenario' must be present in every sample on both sides."
+        }
+    }
+}
 
 Write-Host '| Scenario | Metric | n | Baseline median | Candidate median | Change | Baseline P90 | Candidate P90 | Change |'
 Write-Host '|---|---|--:|--:|--:|--:|--:|--:|--:|'
