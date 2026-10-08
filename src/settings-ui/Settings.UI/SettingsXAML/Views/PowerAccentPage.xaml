@@ -183,7 +183,7 @@
                         <!--  Undo the app-wide ListViewItem override (App.xaml) so the list uses the stock look  -->
                         <Style BasedOn="{StaticResource DefaultListViewItemStyle}" TargetType="ListViewItem" />
                     </ContentDialog.Resources>
-                    <Grid Width="540" RowSpacing="8">
+                    <Grid MaxWidth="540" RowSpacing="8">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -209,7 +209,7 @@
                         <ListView
                             x:Name="AvailableCharacterSetsList"
                             Grid.Row="2"
-                            Height="520"
+                            MaxHeight="520"
                             Margin="-14,-8,0,0"
                             SelectionChanged="AvailableCharacterSetsList_SelectionChanged"
                             SelectionMode="Multiple">

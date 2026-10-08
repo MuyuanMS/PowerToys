@@ -129,8 +129,10 @@ public partial class PowerAccent : IDisposable
     {
         _initialShiftState = WindowsFunctions.IsShiftState();
         _characters = GetCharacters(letterKey);
-        _characterDescriptions = GetCharacterDescriptions(_characters);
         _showUnicodeDescription = _settingService.ShowUnicodeDescription;
+        _characterDescriptions = _showUnicodeDescription
+            ? GetCharacterDescriptions(_characters)
+            : Array.Empty<string>();
     }
 
     private string[] GetCharacters(LetterKey letterKey)
