@@ -2739,6 +2739,12 @@ static HWND ResolveTitleBarWindow(POINT pt)
         {
             return root;
         }
+        if (hitTest == HTCLIENT && hwnd != root)
+        {
+            // A custom title bar may define its drag region only in the root window.
+            hwnd = root;
+            continue;
+        }
         if (hitTest != HTTRANSPARENT || hwnd == root)
         {
             return nullptr;
