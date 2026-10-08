@@ -2705,8 +2705,9 @@ static HWND ResolveTitleBarWindow(POINT pt)
         return nullptr;
     }
 
-    constexpr UINT HIT_TEST_TIMEOUT_MS = 100;
+    constexpr UINT HIT_TEST_TOTAL_TIMEOUT_MS = 100;
     constexpr int MAX_DEPTH = 32;
+    const ULONGLONG deadline = GetTickCount64() + HIT_TEST_TOTAL_TIMEOUT_MS;
     for (int depth = 0; hwnd && depth < MAX_DEPTH; depth++)
     {
         // WM_NCHITTEST takes screen coordinates in the target's own DPI space.
@@ -2714,7 +2715,21 @@ static HWND ResolveTitleBarWindow(POINT pt)
         PhysicalToLogicalPointForPerMonitorDPI(hwnd, &local);
 
         DWORD_PTR hit = 0;
-        if (!SendMessageTimeoutW(hwnd, WM_NCHITTEST, 0, MAKELPARAM(local.x, local.y), SMTO_ABORTIFHUNG, HIT_TEST_TIMEOUT_MS, &hit))
+        const ULONGLONG now = GetTickCount64();
+        if (now >= deadline)
+        {
+            return nullptr;
+        }
+
+        const UINT remainingTimeoutMs = static_cast<UINT>(deadline - now);
+        if (!SendMessageTimeoutW(
+                hwnd,
+                WM_NCHITTEST,
+                0,
+                MAKELPARAM(local.x, local.y),
+                SMTO_ABORTIFHUNG,
+                remainingTimeoutMs,
+                &hit))
         {
             return nullptr;
         }
