@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -37,6 +38,22 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
     {
         MaxDepth = 0,
         IncludeFields = true,
+    };
+
+    private static readonly Dictionary<string, (int Minimum, int Maximum)> _numericSettingRanges = new(StringComparer.Ordinal)
+    {
+        ["BreakTimeout"] = (1, 99),
+        ["BreakOpacity"] = (1, 100),
+        ["BreakTimerPosition"] = (0, 8),
+        ["DemoTypeSpeedSlider"] = (10, 100),
+        ["ZoominSliderLevel"] = (0, 5),
+        ["RecordScaling"] = (10, 100),
+        ["WebcamPosition"] = (0, 3),
+        ["WebcamSize"] = (0, 4),
+        ["WebcamShape"] = (0, 3),
+        ["WebcamBackgroundMode"] = (0, 2),
+        ["WebcamBrightness"] = (0, 100),
+        ["code"] = (0, 255),
     };
 
     private readonly SettingsResourceObject<ZoomItSettings> _input;
@@ -124,27 +141,6 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
     {
         if (node is JsonObject jsonObject)
         {
-            if (jsonObject["value"] is JsonValue value)
-            {
-                if (value.TryGetValue<int>(out var integerValue) &&
-                    (integerValue < 0 || (settingName == "ZoominSliderLevel" && integerValue > 5)))
-                {
-                    throw new ArgumentOutOfRangeException(
-                        nameof(node),
-                        settingName == "ZoominSliderLevel"
-                            ? "ZoominSliderLevel must be between 0 and 5."
-                            : "ZoomIt numeric settings cannot be negative.");
-                }
-
-                if (settingName == "RecordFormat" &&
-                    value.TryGetValue<string>(out var recordFormat) &&
-                    recordFormat != "GIF" &&
-                    recordFormat != "MP4")
-                {
-                    throw new ArgumentOutOfRangeException(nameof(node), "RecordFormat must be GIF or MP4.");
-                }
-            }
-
             foreach (var (name, child) in jsonObject)
             {
                 ValidateSettingValues(child, name == "value" ? settingName : name);
@@ -155,6 +151,36 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
             foreach (var child in jsonArray)
             {
                 ValidateSettingValues(child, settingName);
+            }
+        }
+        else if (node is JsonValue value)
+        {
+            if (value.TryGetValue<int>(out var integerValue))
+            {
+                if (integerValue < 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(node), "ZoomIt numeric settings cannot be negative.");
+                }
+
+                if (settingName is not null &&
+                    _numericSettingRanges.TryGetValue(settingName, out var range) &&
+                    (integerValue < range.Minimum ||
+                        integerValue > range.Maximum ||
+                        (settingName == "RecordScaling" && integerValue % 10 != 0)))
+                {
+                    var incrementText = settingName == "RecordScaling" ? " in increments of 10" : string.Empty;
+                    throw new ArgumentOutOfRangeException(
+                        nameof(node),
+                        $"{settingName} must be between {range.Minimum} and {range.Maximum}{incrementText}.");
+                }
+            }
+
+            if (settingName == "RecordFormat" &&
+                value.TryGetValue<string>(out var recordFormat) &&
+                recordFormat != "GIF" &&
+                recordFormat != "MP4")
+            {
+                throw new ArgumentOutOfRangeException(nameof(node), "RecordFormat must be GIF or MP4.");
             }
         }
     }

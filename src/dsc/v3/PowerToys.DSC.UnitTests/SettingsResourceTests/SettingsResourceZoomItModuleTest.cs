@@ -239,6 +239,93 @@ public sealed class SettingsResourceZoomItModuleTest : BaseDscTest
     }
 
     [TestMethod]
+    public void SetWithOutOfRangeNumericSettings_RejectsBeforeWriting()
+    {
+        var invalidValues = new (string Name, int Value)[]
+        {
+            ("BreakOpacity", 0),
+            ("BreakOpacity", 101),
+            ("BreakTimerPosition", 9),
+            ("DemoTypeSpeedSlider", 9),
+            ("DemoTypeSpeedSlider", 101),
+            ("BreakTimeout", 0),
+            ("BreakTimeout", 100),
+            ("RecordScaling", 0),
+            ("RecordScaling", 101),
+            ("RecordScaling", 55),
+            ("WebcamPosition", 4),
+            ("WebcamSize", 5),
+            ("WebcamShape", 4),
+            ("WebcamBackgroundMode", 3),
+            ("WebcamBrightness", 101),
+        };
+
+        foreach (var (name, value) in invalidValues)
+        {
+            var data = new ZoomItSettingsFunctionData(CreateInputWithIntegerProperty(name, value));
+            data.GetState();
+            data.Output.SettingsInternal = data.Input.SettingsInternal;
+
+            Assert.ThrowsExactly<ArgumentOutOfRangeException>(data.SetState, $"{name}={value} should be rejected.");
+        }
+
+        var invalidHotkey = CreateInput(properties =>
+            properties.ToggleKey = new KeyboardKeysProperty(new HotkeySettings(false, false, false, false, 256)));
+        var hotkeyData = new ZoomItSettingsFunctionData(invalidHotkey);
+        hotkeyData.GetState();
+        hotkeyData.Output.SettingsInternal = hotkeyData.Input.SettingsInternal;
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(hotkeyData.SetState);
+
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    [TestMethod]
+    public void SetWithNumericSettingBoundaries_AcceptsSupportedValues()
+    {
+        var inputs = new[]
+        {
+            CreateInput(properties =>
+            {
+                properties.BreakTimeout = new IntProperty(1);
+                properties.BreakOpacity = new IntProperty(1);
+                properties.BreakTimerPosition = new IntProperty(0);
+                properties.DemoTypeSpeedSlider = new IntProperty(10);
+                properties.ZoominSliderLevel = new IntProperty(0);
+                properties.RecordScaling = new IntProperty(10);
+                properties.WebcamPosition = new IntProperty(0);
+                properties.WebcamSize = new IntProperty(0);
+                properties.WebcamShape = new IntProperty(0);
+                properties.WebcamBackgroundMode = new IntProperty(0);
+                properties.WebcamBrightness = new IntProperty(0);
+            }),
+            CreateInput(properties =>
+            {
+                properties.BreakTimeout = new IntProperty(99);
+                properties.BreakOpacity = new IntProperty(100);
+                properties.BreakTimerPosition = new IntProperty(8);
+                properties.DemoTypeSpeedSlider = new IntProperty(100);
+                properties.ZoominSliderLevel = new IntProperty(5);
+                properties.RecordScaling = new IntProperty(100);
+                properties.WebcamPosition = new IntProperty(3);
+                properties.WebcamSize = new IntProperty(4);
+                properties.WebcamShape = new IntProperty(3);
+                properties.WebcamBackgroundMode = new IntProperty(2);
+                properties.WebcamBrightness = new IntProperty(100);
+            }),
+        };
+
+        foreach (var input in inputs)
+        {
+            var data = new ZoomItSettingsFunctionData(input);
+            data.GetState();
+            data.Output.SettingsInternal = data.Input.SettingsInternal;
+            data.SetState();
+        }
+
+        Assert.AreEqual(2, _saved.Count);
+    }
+
+    [TestMethod]
     public void SetWithUnsupportedRecordFormat_RejectsBeforeWriting()
     {
         // Arrange
@@ -316,10 +403,39 @@ public sealed class SettingsResourceZoomItModuleTest : BaseDscTest
         Assert.IsNotNull(settings.Properties.RecordFormat);
     }
 
+    [TestMethod]
+    public void Interop_SaveSettingsJson_RejectsOversizedNativeValues()
+    {
+        var oversizedStringJson = JsonSerializer.Serialize(new
+        {
+            name = "ZoomIt",
+            version = "1.0",
+            properties = new { DemoTypeFile = new { value = new string('x', 260) } },
+        });
+        var invalidBinaryJson = JsonSerializer.Serialize(new
+        {
+            name = "ZoomIt",
+            version = "1.0",
+            properties = new { Font = new { value = "AA==" } },
+        });
+
+        Assert.ThrowsException<ArgumentException>(
+            () => global::PowerToys.ZoomItSettingsInterop.ZoomItSettings.SaveSettingsJson(oversizedStringJson));
+        Assert.ThrowsException<ArgumentException>(
+            () => global::PowerToys.ZoomItSettingsInterop.ZoomItSettings.SaveSettingsJson(invalidBinaryJson));
+    }
+
     private static string CreateInput(Action<ZoomItProperties> configure)
     {
         var settings = new ZoomItSettings();
         configure(settings.Properties);
         return JsonSerializer.Serialize(new SettingsResourceObject<ZoomItSettings> { Settings = settings }, _inputSerializerOptions);
+    }
+
+    private static string CreateInputWithIntegerProperty(string propertyName, int value)
+    {
+        var inputNode = JsonNode.Parse(CreateInput(_ => { }));
+        inputNode!["settings"]!["properties"]![propertyName] = new JsonObject { ["value"] = value };
+        return inputNode.ToJsonString();
     }
 }
