@@ -19,7 +19,9 @@ internal static class AdvancedPasteTempFileManager
 
     internal static DirectoryInfo CreateDirectory(string? parentDirectory = null)
     {
-        var directory = Directory.CreateTempSubdirectory(DirectoryPrefix, parentDirectory);
+        var directory = parentDirectory is null
+            ? Directory.CreateTempSubdirectory(DirectoryPrefix)
+            : Directory.CreateDirectory(Path.Combine(parentDirectory, $"{DirectoryPrefix}{Guid.NewGuid():N}"));
         File.WriteAllText(Path.Combine(directory.FullName, OwnershipMarkerName), OwnershipMarkerContent);
         return directory;
     }

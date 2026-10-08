@@ -82,16 +82,26 @@ public class AdvancedPasteTempFileManagerTests
     [TestMethod]
     public async Task TryCleanupAfterDelayAsync_RemovesOwnershipMarkerFromConsumedFileDirectory()
     {
-        var directory = AdvancedPasteTempFileManager.CreateDirectory(_testTempDirectory);
-        var filePath = Path.Combine(directory.FullName, "result.txt");
-        File.WriteAllText(filePath, "generated");
-        var storageFile = await StorageFile.GetFileFromPathAsync(filePath);
-        var package = new DataPackage();
-        package.SetStorageItems([storageFile]);
+        var directory = AdvancedPasteTempFileManager.CreateDirectory();
+        try
+        {
+            var filePath = Path.Combine(directory.FullName, "result.txt");
+            File.WriteAllText(filePath, "generated");
+            var storageFile = await StorageFile.GetFileFromPathAsync(filePath);
+            var package = new DataPackage();
+            package.SetStorageItems([storageFile]);
 
-        await package.GetView().TryCleanupAfterDelayAsync(TimeSpan.Zero);
+            await package.GetView().TryCleanupAfterDelayAsync(TimeSpan.Zero);
 
-        Assert.IsFalse(Directory.Exists(directory.FullName));
+            Assert.IsFalse(Directory.Exists(directory.FullName));
+        }
+        finally
+        {
+            if (Directory.Exists(directory.FullName))
+            {
+                Directory.Delete(directory.FullName, recursive: true);
+            }
+        }
     }
 
     [TestMethod]

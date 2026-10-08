@@ -115,6 +115,17 @@ public class ProgramTests
     }
 
     [TestMethod]
+    public void PolicyDisabled_WritesMachineReadableError()
+    {
+        using var stderr = new StringWriter();
+
+        Assert.IsTrue(Program.TryWritePolicyDisabledError(["actions", "list", "--json"], stderr, policyEnabled: false));
+
+        using var document = JsonDocument.Parse(stderr.ToString());
+        Assert.AreEqual("disabled_by_policy", document.RootElement.GetProperty("code").GetString());
+    }
+
+    [TestMethod]
     public async Task ActionsListJson_ExplicitTrue_IsMachineReadable()
     {
         var result = await RunAsync(["actions", "list", "--json=true"]);

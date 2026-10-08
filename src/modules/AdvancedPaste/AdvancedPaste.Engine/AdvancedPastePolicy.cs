@@ -14,6 +14,10 @@ public static class AdvancedPastePolicy
     public static bool IsOnlineAIAllowed =>
         PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOnlineAIModelsValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled;
 
+    public static bool IsOpenAIAllowed =>
+        IsOnlineAIAllowed &&
+        PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOpenAIValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled;
+
     public static bool IsProviderAllowed(PasteAIProviderDefinition provider)
     {
         if (provider is null)
@@ -30,7 +34,7 @@ public static class AdvancedPastePolicy
 
         return serviceType switch
         {
-            AIServiceType.OpenAI => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteOpenAIValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
+            AIServiceType.OpenAI => IsOpenAIAllowed,
             AIServiceType.AzureOpenAI => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteAzureOpenAIValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
             AIServiceType.AzureAIInference => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteAzureAIInferenceValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,
             AIServiceType.Mistral => PowerToys.GPOWrapper.GPOWrapper.GetAllowedAdvancedPasteMistralValue() != PowerToys.GPOWrapper.GpoRuleConfigured.Disabled,

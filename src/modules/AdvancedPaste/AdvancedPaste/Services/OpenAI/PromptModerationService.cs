@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.ClientModel;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,6 +23,13 @@ public sealed class PromptModerationService(IAICredentialsProvider aiCredentials
 
     public async Task ValidateAsync(string fullPrompt, CancellationToken cancellationToken)
     {
+        if (!AdvancedPastePolicy.IsOpenAIAllowed)
+        {
+            throw new PasteActionException(
+                "OpenAI moderation is disabled by policy.",
+                new InvalidOperationException("The OpenAI service is disabled by policy."));
+        }
+
         try
         {
             _aiCredentialsProvider.Refresh();

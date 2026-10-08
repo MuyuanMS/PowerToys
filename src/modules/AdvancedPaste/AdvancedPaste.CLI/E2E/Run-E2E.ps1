@@ -75,10 +75,10 @@ try {
         throw 'JSON success envelope did not contain the expected values.'
     }
 
-    & $Executable transform --format plain-text --input (Join-Path $PSScriptRoot 'empty.txt') 2>$null | Out-Null
+    & $Executable transform --format plain-text --input (Join-Path $PSScriptRoot 'empty.txt') --stdout 2>$null | Out-Null
     Assert-ExitCode 1 'Empty input'
 
-    & $Executable transform --format plain-text --input (Join-Path $outputDirectory 'missing.txt') 2>$null | Out-Null
+    & $Executable transform --format plain-text --input (Join-Path $outputDirectory 'missing.txt') --stdout 2>$null | Out-Null
     Assert-ExitCode 1 'Missing file'
 
     & $Executable transform --format json --stdin --clipboard 2>$null | Out-Null

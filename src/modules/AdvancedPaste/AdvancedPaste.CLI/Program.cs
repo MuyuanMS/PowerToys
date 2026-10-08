@@ -60,6 +60,12 @@ public static partial class Program
             return helpExitCode;
         }
 
+        if (TryWritePolicyDisabledError(args, Console.Error, AdvancedPastePolicy.IsAdvancedPasteEnabled))
+        {
+            LogCLITelemetry(GetTelemetryCommandName(args), successful: false, loggerInitialized: false);
+            return RuntimeErrorExitCode;
+        }
+
         using var cancellationSource = new CancellationTokenSource();
         var exitCode = RuntimeErrorExitCode;
         var telemetryCommandName = GetTelemetryCommandName(args);
@@ -207,6 +213,11 @@ public static partial class Program
                 : TransformUsage;
             WriteError(stderr, json, "invalid_arguments", message, usage);
             return ArgumentErrorExitCode;
+        }
+
+        if (TryWritePolicyDisabledError(args, stderr, AdvancedPastePolicy.IsAdvancedPasteEnabled))
+        {
+            return RuntimeErrorExitCode;
         }
 
         if (parseResult.CommandResult.Command.Name == "list")
@@ -372,6 +383,17 @@ public static partial class Program
 
     internal static void WriteStartupError(string[] args, TextWriter stderr)
         => WriteError(stderr, IsJsonRequested(args), "internal_error", "Advanced Paste CLI failed.");
+
+    internal static bool TryWritePolicyDisabledError(string[] args, TextWriter stderr, bool policyEnabled)
+    {
+        if (policyEnabled)
+        {
+            return false;
+        }
+
+        WriteError(stderr, IsJsonRequested(args), "disabled_by_policy", "Advanced Paste is disabled by policy.");
+        return true;
+    }
 
     internal static bool TryInitializeLogger(Action initializeLogger)
     {
