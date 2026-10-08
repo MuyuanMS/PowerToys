@@ -29,6 +29,17 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         private const int SharingViolation = unchecked((int)0x80070020);
         private const int LockViolation = unchecked((int)0x80070021);
 
+        private sealed class SettingsJsonException : JsonException
+        {
+            public SettingsJsonException(byte[] contents, JsonException innerException)
+                : base(innerException.Message, innerException)
+            {
+                Contents = contents;
+            }
+
+            public byte[] Contents { get; }
+        }
+
         private readonly IFile _file;
         private readonly SettingPath _settingsPath;
         private readonly JsonSerializerOptions _serializerOptions;
@@ -106,6 +117,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         public virtual T GetSettingsOrDefault<T>(string powertoy = DefaultModuleName, string fileName = DefaultFileName)
             where T : ISettingsConfig, new()
         {
+            bool canWriteDefaults = true;
             try
             {
                 return GetSettings<T>(powertoy, fileName);
@@ -117,7 +129,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             catch (JsonException ex)
             {
                 Logger.LogError($"Exception encountered while loading {powertoy} settings.", ex);
-                KeepUnreadableSettings(powertoy, fileName);
+                canWriteDefaults = KeepUnreadableSettings(powertoy, fileName, GetUnreadableContents(ex));
             }
             catch (FileNotFoundException)
             {
@@ -126,7 +138,11 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
             // If the settings file does not exist or if the file is corrupt, to create a new object with default parameters and save it to a newly created settings file.
             T newSettingsItem = new T();
-            SaveSettings(newSettingsItem.ToJsonString(), powertoy, fileName);
+            if (canWriteDefaults)
+            {
+                SaveSettings(newSettingsItem.ToJsonString(), powertoy, fileName);
+            }
+
             return newSettingsItem;
         }
 
@@ -173,6 +189,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             where T : ISettingsConfig, new()
             where T2 : ISettingsConfig, new()
         {
+            bool canWriteDefaults = true;
             try
             {
                 return GetSettings<T>(powertoy, fileName);
@@ -204,7 +221,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                 {
                     // do nothing, the problem wasn't that the settings was stored in the previous format, continue with the default settings
                     Logger.LogError($"{powertoy} settings are corrupt or the format is not supported any longer. Using default settings instead.", ex);
-                    KeepUnreadableSettings(powertoy, fileName);
+                    canWriteDefaults = KeepUnreadableSettings(powertoy, fileName, GetUnreadableContents(ex));
                 }
             }
             catch (FileNotFoundException)
@@ -214,7 +231,11 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
             // If the settings file does not exist or if the file is corrupt, to create a new object with default parameters and save it to a newly created settings file.
             T newSettingsItem = new T();
-            SaveSettings(newSettingsItem.ToJsonString(), powertoy, fileName);
+            if (canWriteDefaults)
+            {
+                SaveSettings(newSettingsItem.ToJsonString(), powertoy, fileName);
+            }
+
             return newSettingsItem;
         }
 
@@ -241,9 +262,9 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             // This, while not totally ideal, does work around the problem by trimming the end.
             // The file itself did write the content correctly but something is off with the actual end of the file, hence the 0x00 bug
             string path = _settingsPath.GetSettingsPath(powertoyFolderName, fileName);
-            string fileContents = string.Empty;
-            RetryWhileFileIsInUse(() => fileContents = _file.ReadAllText(path));
-            var jsonSettingsString = fileContents.Trim('\0');
+            byte[] fileContents = Array.Empty<byte>();
+            RetryWhileFileIsInUse(() => fileContents = _file.ReadAllBytes(path));
+            var jsonSettingsString = ReadSettingsText(fileContents).Trim('\0');
 
             // For Native AOT compatibility, get JsonTypeInfo from the TypeInfoResolver
             var typeInfo = _serializerOptions.TypeInfoResolver?.GetTypeInfo(typeof(T), _serializerOptions);
@@ -254,7 +275,28 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             }
 
             // Use AOT-friendly deserialization
-            return (T)JsonSerializer.Deserialize(jsonSettingsString, typeInfo)!;
+            try
+            {
+                return (T)JsonSerializer.Deserialize(jsonSettingsString, typeInfo)!;
+            }
+            catch (JsonException e)
+            {
+                throw new SettingsJsonException(fileContents, e);
+            }
+        }
+
+        private static string ReadSettingsText(byte[] contents)
+        {
+            using var stream = new MemoryStream(contents);
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            return reader.ReadToEnd();
+        }
+
+        private static byte[]? GetUnreadableContents(JsonException exception)
+        {
+            return exception is SettingsJsonException settingsException
+                ? settingsException.Contents
+                : null;
         }
 
         // Save settings to a json file.
@@ -306,12 +348,20 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         /// Keeps a copy of a settings file that could not be parsed next to the original, because the
         /// caller is about to replace that file with default settings.
         /// </summary>
-        private void KeepUnreadableSettings(string powertoy, string fileName)
+        private bool KeepUnreadableSettings(string powertoy, string fileName, byte[]? failedContents)
         {
             try
             {
                 string path = _settingsPath.GetSettingsPath(powertoy, fileName);
-                byte[] contents = _file.ReadAllBytes(path);
+                byte[] contents = failedContents ?? _file.ReadAllBytes(path);
+                if (failedContents != null)
+                {
+                    byte[] currentContents = _file.ReadAllBytes(path);
+                    if (!currentContents.AsSpan().SequenceEqual(failedContents))
+                    {
+                        return false;
+                    }
+                }
 
                 // A file that is empty, or only holds the zero bytes of an interrupted write, has nothing
                 // worth keeping and must not replace an earlier copy that has.
@@ -319,10 +369,13 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                 {
                     _file.WriteAllBytes(path + UnreadableFileSuffix, contents);
                 }
+
+                return true;
             }
             catch (Exception e) when (e is not IOException and not UnauthorizedAccessException)
             {
                 Logger.LogError($"Failed to keep a copy of the unreadable {powertoy} settings.", e);
+                return false;
             }
         }
 

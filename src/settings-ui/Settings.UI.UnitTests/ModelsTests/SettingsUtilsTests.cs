@@ -316,6 +316,28 @@ namespace CommonLibTest
         }
 
         [TestMethod]
+        public void GetSettingsOrDefaultDoesNotOverwriteSettingsRepairedBeforeCorruptCopy()
+        {
+            // Arrange
+            var fileSystem = new MockFileSystem();
+            var file = new FaultyFile(fileSystem);
+            var settingsUtils = CreateSettingsUtils(fileSystem, file);
+            string settingsPath = settingsUtils.GetSettingsFilePath(ModuleName);
+            fileSystem.AddFile(settingsPath, new MockFileData(UnreadableSettings));
+            file.PathToRepair = settingsPath;
+            file.ReadsBeforeRepair = 2;
+            file.RepairedContents = Encoding.UTF8.GetBytes(OldSettings);
+
+            // Act
+            BasePTSettingsTest settings = settingsUtils.GetSettingsOrDefault<BasePTSettingsTest>(ModuleName);
+
+            // Assert
+            Assert.AreEqual(string.Empty, settings.Name);
+            Assert.AreEqual(OldSettings, fileSystem.File.ReadAllText(settingsPath));
+            Assert.IsFalse(fileSystem.File.Exists(settingsPath + ".corrupt"));
+        }
+
+        [TestMethod]
         public void GetSettingsOrDefaultWithAnUpgraderKeepsACopyOfSettingsItCannotParse()
         {
             // Arrange
@@ -414,6 +436,12 @@ namespace CommonLibTest
             // How many of the next attempts to read a file fail because another process is writing to it.
             public int ReadsThatFail { get; set; }
 
+            public string PathToRepair { get; set; }
+
+            public int ReadsBeforeRepair { get; set; }
+
+            public byte[] RepairedContents { get; set; }
+
             // How many of the next attempts to update file metadata fail because another process has it open.
             public int MetadataUpdatesThatFail { get; set; }
 
@@ -505,6 +533,22 @@ namespace CommonLibTest
                 }
 
                 return base.ReadAllText(path);
+            }
+
+            public override byte[] ReadAllBytes(string path)
+            {
+                if (ReadsThatFail > 0)
+                {
+                    ReadsThatFail--;
+                    throw new IOException("The process cannot access the file because it is being used by another process.", SharingViolation);
+                }
+
+                if (path == PathToRepair && ReadsBeforeRepair > 0 && --ReadsBeforeRepair == 0)
+                {
+                    base.WriteAllBytes(path, RepairedContents);
+                }
+
+                return base.ReadAllBytes(path);
             }
 
             private sealed class FullDiskStream : FileSystemStream
