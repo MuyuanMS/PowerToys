@@ -147,16 +147,24 @@ public static class DepsJsonAudit
             {
                 if (target.Value.ValueKind != JsonValueKind.Object)
                 {
-                    continue;
+                    throw new InvalidDataException($"Invalid deps.json structure in {path}: target '{target.Name}' must be an object.");
                 }
 
                 foreach (var package in target.Value.EnumerateObject())
                 {
-                    if (package.Value.ValueKind != JsonValueKind.Object ||
-                        !package.Value.TryGetProperty("runtime", out var runtime) ||
-                        runtime.ValueKind != JsonValueKind.Object)
+                    if (package.Value.ValueKind != JsonValueKind.Object)
+                    {
+                        throw new InvalidDataException($"Invalid deps.json structure in {path}: package '{package.Name}' must be an object.");
+                    }
+
+                    if (!package.Value.TryGetProperty("runtime", out var runtime))
                     {
                         continue;
+                    }
+
+                    if (runtime.ValueKind != JsonValueKind.Object)
+                    {
+                        throw new InvalidDataException($"Invalid deps.json structure in {path}: package '{package.Name}' has a non-object runtime value.");
                     }
 
                     foreach (var entry in runtime.EnumerateObject())
@@ -166,13 +174,22 @@ public static class DepsJsonAudit
                             continue;
                         }
 
-                        if (entry.Value.ValueKind != JsonValueKind.Object ||
-                            !entry.Value.TryGetProperty("fileVersion", out var fv))
+                        if (entry.Value.ValueKind != JsonValueKind.Object)
+                        {
+                            throw new InvalidDataException($"Invalid deps.json structure in {path}: DLL runtime entry '{entry.Name}' must be an object.");
+                        }
+
+                        if (!entry.Value.TryGetProperty("fileVersion", out var fv))
                         {
                             continue;
                         }
 
-                        string version = fv.ValueKind == JsonValueKind.String ? fv.GetString() : string.Empty;
+                        if (fv.ValueKind != JsonValueKind.String)
+                        {
+                            throw new InvalidDataException($"Invalid deps.json structure in {path}: DLL runtime entry '{entry.Name}' has a non-string fileVersion.");
+                        }
+
+                        string version = fv.GetString();
                         string dllName = Path.GetFileName(entry.Name);
 
                         // After VS 17.11 some PowerToys dlls have no fileVersion in deps.json even though the
@@ -277,4 +294,4 @@ if ($totalFailures -gt 0) {
 }
 
 Write-Host -ForegroundColor Green "All  $($referencedFileVersionsPerDll.Count)  libraries are mentioned with the same version across the dependencies.`r`n"
-exit 0
+return
