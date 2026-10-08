@@ -852,7 +852,7 @@ function Wait-WindowShown
 function Wait-AutomationElement
 {
     param(
-        [Parameter(Mandatory)][IntPtr]$WindowHandle,
+        [Parameter(Mandatory)][Diagnostics.Process]$Process,
         [Parameter(Mandatory)][string]$AutomationId,
         [int]$TimeoutMs = 60000
     )
@@ -863,9 +863,21 @@ function Wait-AutomationElement
     $stopwatch = [Diagnostics.Stopwatch]::StartNew()
     do
     {
+        if ($Process.HasExited)
+        {
+            throw "Process $($Process.Id) exited before UI Automation element '$AutomationId' was found."
+        }
+
         try
         {
-            $window = [System.Windows.Automation.AutomationElement]::FromHandle($WindowHandle)
+            $windowHandle = [PowerToysPerformance.WindowFinder]::FindTopLevelWindow($Process.Id, 'WinUIDesktopWin32WindowClass')
+            if ($windowHandle -eq [IntPtr]::Zero)
+            {
+                Start-Sleep -Milliseconds 15
+                continue
+            }
+
+            $window = [System.Windows.Automation.AutomationElement]::FromHandle($windowHandle)
             if ($null -ne $window.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition))
             {
                 return [Diagnostics.Stopwatch]::GetTimestamp()
@@ -1358,7 +1370,7 @@ function Measure-Settings
             $shown = Wait-WindowShown -Description 'The Settings window' -Process $settings -Match {
                 param($e) $e.ProcessId -eq $settingsId -and $e.Root -eq $e.Handle -and $e.ClassName -eq 'WinUIDesktopWin32WindowClass'
             }.GetNewClosure()
-            $shellReady = Wait-AutomationElement -WindowHandle $shown.Handle -AutomationId 'DashboardNavItem'
+            $shellReady = Wait-AutomationElement -Process $settings -AutomationId 'DashboardNavItem'
 
             $metrics = [ordered]@{
                 WindowShownMs = Get-ElapsedMs -From $start -To $shown.Timestamp
@@ -1430,7 +1442,7 @@ function Measure-FileLocksmith
         $shown = Wait-WindowShown -Description 'The File Locksmith window' -Process $process -Match {
             param($e) $e.ProcessId -eq $processId -and $e.Root -eq $e.Handle -and $e.ClassName -eq 'WinUIDesktopWin32WindowClass'
         }.GetNewClosure()
-        $ready = Wait-AutomationElement -WindowHandle $shown.Handle -AutomationId 'ReloadBtn'
+        $ready = Wait-AutomationElement -Process $process -AutomationId 'ReloadBtn'
 
         $metrics = [ordered]@{
             WindowShownMs = Get-ElapsedMs -From $start -To $shown.Timestamp
