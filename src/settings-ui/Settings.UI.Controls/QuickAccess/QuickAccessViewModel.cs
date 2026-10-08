@@ -65,6 +65,7 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
             _disposed = true;
             _settingsRepository.SettingsChanged -= OnSettingsChanged;
             _kbmSettingsRepository.SettingsChanged -= OnKbmSettingsChanged;
+            _generalSettings.RemoveEnabledModuleChangeNotification(ModuleEnabledChanged);
             GC.SuppressFinalize(this);
         }
 

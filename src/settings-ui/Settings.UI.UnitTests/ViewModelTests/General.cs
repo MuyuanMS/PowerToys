@@ -28,6 +28,29 @@ namespace ViewModelTests
             mockGeneralSettingsUtils = ISettingsUtilsMocks.GetStubSettingsUtils<GeneralSettings>();
         }
 
+        [TestMethod]
+        public void RemoveEnabledModuleChangeNotificationOnlyRemovesMatchingCallback()
+        {
+            var settings = new GeneralSettings { Enabled = new EnabledModules() };
+            int originalCallCount = 0;
+            int replacementCallCount = 0;
+            Action originalCallback = () => originalCallCount++;
+            Action replacementCallback = () => replacementCallCount++;
+
+            settings.AddEnabledModuleChangeNotification(originalCallback);
+            settings.AddEnabledModuleChangeNotification(replacementCallback);
+            settings.RemoveEnabledModuleChangeNotification(originalCallback);
+            settings.Enabled.FancyZones = false;
+
+            Assert.AreEqual(0, originalCallCount);
+            Assert.AreEqual(1, replacementCallCount);
+
+            settings.RemoveEnabledModuleChangeNotification(replacementCallback);
+            settings.Enabled.FancyZones = true;
+
+            Assert.AreEqual(1, replacementCallCount);
+        }
+
         private sealed class TestGeneralViewModel : GeneralViewModel
         {
             public TestGeneralViewModel(
