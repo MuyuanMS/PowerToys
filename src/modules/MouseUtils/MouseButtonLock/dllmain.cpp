@@ -173,7 +173,9 @@ namespace
         {
             const bool controlDown = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
             const bool altDown = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
-            if (!mousebuttonlock::ShouldInjectEscape(controlDown, altDown))
+            const bool leftWindowsKeyDown = (GetAsyncKeyState(VK_LWIN) & 0x8000) != 0;
+            const bool rightWindowsKeyDown = (GetAsyncKeyState(VK_RWIN) & 0x8000) != 0;
+            if (!mousebuttonlock::ShouldInjectEscape(controlDown, altDown, leftWindowsKeyDown, rightWindowsKeyDown))
             {
                 return;
             }

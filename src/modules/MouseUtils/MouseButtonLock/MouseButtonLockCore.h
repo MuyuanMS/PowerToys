@@ -46,9 +46,9 @@ namespace mousebuttonlock
         int moveCancelPixels = 5;
     };
 
-    constexpr bool ShouldInjectEscape(bool controlDown, bool altDown)
+    constexpr bool ShouldInjectEscape(bool controlDown, bool altDown, bool leftWindowsKeyDown, bool rightWindowsKeyDown)
     {
-        return !controlDown && !altDown;
+        return !controlDown && !altDown && !leftWindowsKeyDown && !rightWindowsKeyDown;
     }
 
     // Abstraction over the synthetic button-up injection (SendInput in production, a recording fake in

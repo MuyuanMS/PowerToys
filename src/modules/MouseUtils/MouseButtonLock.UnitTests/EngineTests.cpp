@@ -61,16 +61,22 @@ namespace MouseButtonLockEngineTests
     TEST_CLASS(ContextMenuDismissal)
     {
     public:
-        TEST_METHOD(EscapeIsInjectedWithoutCtrlOrAlt)
+        TEST_METHOD(EscapeIsInjectedWithoutModifiers)
         {
-            Assert::IsTrue(ShouldInjectEscape(false, false));
+            Assert::IsTrue(ShouldInjectEscape(false, false, false, false));
         }
 
         TEST_METHOD(EscapeIsSkippedWhileCtrlOrAltIsHeld)
         {
-            Assert::IsFalse(ShouldInjectEscape(true, false));
-            Assert::IsFalse(ShouldInjectEscape(false, true));
-            Assert::IsFalse(ShouldInjectEscape(true, true));
+            Assert::IsFalse(ShouldInjectEscape(true, false, false, false));
+            Assert::IsFalse(ShouldInjectEscape(false, true, false, false));
+            Assert::IsFalse(ShouldInjectEscape(true, true, false, false));
+        }
+
+        TEST_METHOD(EscapeIsSkippedWhileEitherWindowsKeyIsHeld)
+        {
+            Assert::IsFalse(ShouldInjectEscape(false, false, true, false));
+            Assert::IsFalse(ShouldInjectEscape(false, false, false, true));
         }
     };
 
