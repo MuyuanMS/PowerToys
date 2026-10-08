@@ -295,7 +295,7 @@ public static partial class Program
 
                     AdvancedPasteTempFileManager.CleanupStaleDirectories(TimeSpan.FromDays(1), protectedFilePaths);
                 }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.Runtime.InteropServices.ExternalException)
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or System.Runtime.InteropServices.ExternalException)
                 {
                     if (loggerInitialized)
                     {

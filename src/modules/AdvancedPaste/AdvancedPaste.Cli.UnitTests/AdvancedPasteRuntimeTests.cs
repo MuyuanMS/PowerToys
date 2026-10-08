@@ -39,6 +39,27 @@ public class AdvancedPasteRuntimeTests
     }
 
     [TestMethod]
+    public async Task PasteWithAi_AcceptsHtmlOnlyInputForCustomTextProvider()
+    {
+        var package = new DataPackage();
+        package.SetHtmlFormat("<html><body><p>content</p></body></html>");
+        var executor = new TestPasteFormatExecutor();
+        var runtime = new AdvancedPasteRuntime(
+            executor,
+            new TestUserSettings(isAIEnabled: true, configuration: CreateProviderConfiguration("active")),
+            isAdvancedPasteEnabled: () => true,
+            isProviderAllowed: _ => true);
+
+        await runtime.ExecuteAsync(
+            new CliActionRequest("paste-with-ai", null, "prompt", null),
+            package.GetView(),
+            CancellationToken.None);
+
+        Assert.IsTrue(executor.WasCalled);
+        Assert.AreEqual(PasteFormats.CustomTextTransformation, executor.LastPasteFormat?.Format);
+    }
+
+    [TestMethod]
     public async Task AiActions_WhenDisabledInSettings_AreRejectedBeforeExecution()
     {
         var package = new DataPackage();
