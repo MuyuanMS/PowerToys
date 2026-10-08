@@ -139,7 +139,7 @@ public static class DepsJsonAudit
                 !doc.RootElement.TryGetProperty("targets", out var targets) ||
                 targets.ValueKind != JsonValueKind.Object)
             {
-                return result;
+                throw new InvalidDataException($"Invalid deps.json structure in {path}: expected an object with an object-valued 'targets' property.");
             }
 
             // targets.<tfm>.<package>.runtime.<dll>.fileVersion
@@ -196,12 +196,10 @@ public static class DepsJsonAudit
     // Returns: AuditResult containing total parsed files and DllName > fileVersion > deps.json file names that reference it.
     public static AuditResult Collect(string root)
     {
-        var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true };
-        var files = new List<string>();
-        foreach (var f in Directory.EnumerateFiles(root, "*.deps.json", options))
-        {
-            if (!IsExcluded(f, Path.GetFileName(f))) files.Add(f);
-        }
+        var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = false };
+        var files = new List<string>(Directory.EnumerateFiles(root, "*.deps.json", options));
+        var scannedFilesCount = files.Count;
+        files.RemoveAll(f => IsExcluded(f, Path.GetFileName(f)));
 
         // Parse in parallel, then merge sequentially in file order so output is deterministic.
         var perFile = new List<KeyValuePair<string, string>>[files.Count];
@@ -236,7 +234,7 @@ public static class DepsJsonAudit
             }
         }
 
-        return new AuditResult { ScannedFilesCount = files.Count, Versions = all };
+        return new AuditResult { ScannedFilesCount = scannedFilesCount, Versions = all };
     }
 }
 '@
