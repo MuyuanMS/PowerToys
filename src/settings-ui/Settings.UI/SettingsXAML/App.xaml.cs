@@ -435,6 +435,7 @@ namespace Microsoft.PowerToys.Settings.UI
             }
             else
             {
+                powerAccentReferenceGuideWindow.ViewModel.UpdateSelectedLanguageCodes(selectedLanguageCodes ?? []);
                 WindowHelpers.BringToForeground(powerAccentReferenceGuideWindow.GetWindowHandle());
             }
         }

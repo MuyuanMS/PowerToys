@@ -154,8 +154,6 @@ namespace Microsoft.PowerToys.Settings.UI.Views
                 totalChecked,
                 total);
 
-            // Require at least one set; with none selected Quick Accent would never show anything.
-            CharacterSetsDialog.IsPrimaryButtonEnabled = totalChecked > 0;
         }
 
         private void CharacterSetsDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)

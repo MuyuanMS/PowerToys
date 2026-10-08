@@ -49,6 +49,22 @@ namespace ViewModelTests
         }
 
         [TestMethod]
+        public void UpdateSelectedLanguageCodes_RefreshesSelectedSetsGroup()
+        {
+            var viewModel = CreateViewModel(["FR"]);
+
+            viewModel.UpdateSelectedLanguageCodes(["DE"]);
+
+            var selectedGroup = viewModel.FilteredGroups.First(group => group.GroupHeader == "Selected sets");
+            Assert.IsTrue(selectedGroup.Languages.Any(language => language.DisplayName == "German" && language.IsSelected));
+            Assert.IsFalse(selectedGroup.Languages.Any(language => language.DisplayName == "French"));
+            Assert.IsTrue(viewModel.FilteredGroups
+                .Where(group => group.GroupHeader != "Selected sets")
+                .SelectMany(group => group.Languages)
+                .Any(language => language.DisplayName == "French" && !language.IsSelected));
+        }
+
+        [TestMethod]
         public void SearchQuery_FiltersGroupsToMatchingCharacters()
         {
             var viewModel = CreateViewModel([]);

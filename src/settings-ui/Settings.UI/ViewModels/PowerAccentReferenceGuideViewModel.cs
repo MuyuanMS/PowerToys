@@ -47,7 +47,9 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         /// The full unfiltered reference data, built once at construction time from
         /// <see cref="CharacterMappings.All"/> using the provided selected language codes.
         /// </summary>
-        private readonly IReadOnlyList<ReferenceGroupModel> _allGroups;
+        private IReadOnlyList<ReferenceGroupModel> _allGroups;
+
+        private readonly Func<string, string> _getLocalizedString;
 
         /// <summary>
         /// Gets the reference data filtered by <see cref="SearchQuery"/>. When the query
@@ -85,11 +87,24 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             IReadOnlyCollection<string> selectedLanguageCodes,
             Func<string, string> getLocalizedString)
         {
-            _allGroups = BuildGroups(selectedLanguageCodes, getLocalizedString);
+            _getLocalizedString = getLocalizedString;
+            _allGroups = BuildGroups(selectedLanguageCodes, _getLocalizedString);
             foreach (var group in _allGroups)
             {
                 FilteredGroups.Add(group);
             }
+        }
+
+        /// <summary>
+        /// Refreshes the selected-set group after the active character-set selection changes.
+        /// </summary>
+        /// <param name="selectedLanguageCodes">The currently selected language codes.</param>
+        public void UpdateSelectedLanguageCodes(IReadOnlyCollection<string> selectedLanguageCodes)
+        {
+            _allGroups = BuildGroups(selectedLanguageCodes, _getLocalizedString);
+            UpdateFilteredGroups(SearchQuery);
+            OnPropertyChanged(nameof(IsEmpty));
+            FilteredGroupsReplaced?.Invoke(this, EventArgs.Empty);
         }
 
         private void UpdateFilteredGroups(string query)
