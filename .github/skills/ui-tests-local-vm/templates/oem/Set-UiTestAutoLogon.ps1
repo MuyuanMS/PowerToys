@@ -3,6 +3,10 @@
 # See the LICENSE file in the project root for more information.
 
 [CmdletBinding()]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+    'PSAvoidUsingConvertToSecureStringWithPlainText',
+    '',
+    Justification = 'The generated plaintext password is required by LogonUser and LSA APIs; SecureString is only needed for local-user cmdlets.')]
 param(
     [Parameter(Mandatory)]
     [string]$StandardUser,
