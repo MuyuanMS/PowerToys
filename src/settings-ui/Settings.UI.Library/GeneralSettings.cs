@@ -201,5 +201,10 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         {
             Enabled.AddEnabledModuleChangeNotification(callBack);
         }
+
+        public void RemoveEnabledModuleChangeNotification(Action callBack)
+        {
+            Enabled.RemoveEnabledModuleChangeNotification(callBack);
+        }
     }
 }

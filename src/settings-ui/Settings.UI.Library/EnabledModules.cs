@@ -653,5 +653,13 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         {
             notifyEnabledChangedAction = callBack;
         }
+
+        internal void RemoveEnabledModuleChangeNotification(Action callBack)
+        {
+            if (notifyEnabledChangedAction == callBack)
+            {
+                notifyEnabledChangedAction = null;
+            }
+        }
     }
 }
