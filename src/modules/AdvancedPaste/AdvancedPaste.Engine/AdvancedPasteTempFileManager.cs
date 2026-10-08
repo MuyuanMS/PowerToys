@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -23,10 +24,11 @@ internal static class AdvancedPasteTempFileManager
         return directory;
     }
 
-    internal static void CleanupStaleDirectories(TimeSpan maximumAge)
+    internal static void CleanupStaleDirectories(TimeSpan maximumAge, IEnumerable<string> clipboardFilePaths)
     {
         var cutoff = DateTime.UtcNow - maximumAge;
         var tempDirectory = new DirectoryInfo(Path.GetTempPath());
+        var protectedFilePaths = new HashSet<string>(clipboardFilePaths.Select(Path.GetFullPath), StringComparer.OrdinalIgnoreCase);
 
         foreach (var directory in tempDirectory.EnumerateDirectories($"{DirectoryPrefix}*"))
         {
@@ -38,6 +40,14 @@ internal static class AdvancedPasteTempFileManager
                 }
 
                 if (!HasOwnershipMarker(directory))
+                {
+                    continue;
+                }
+
+                var directoryPath = Path.GetFullPath(directory.FullName).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                if (protectedFilePaths.Any(path =>
+                    path.Equals(directoryPath, StringComparison.OrdinalIgnoreCase) ||
+                    path.StartsWith(directoryPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))
                 {
                     continue;
                 }

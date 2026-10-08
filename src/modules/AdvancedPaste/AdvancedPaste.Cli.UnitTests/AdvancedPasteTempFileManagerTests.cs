@@ -27,7 +27,7 @@ public class AdvancedPasteTempFileManagerTests
 
         try
         {
-            AdvancedPasteTempFileManager.CleanupStaleDirectories(TimeSpan.FromDays(1));
+            AdvancedPasteTempFileManager.CleanupStaleDirectories(TimeSpan.FromDays(1), []);
 
             Assert.IsTrue(File.Exists(userFilePath));
             Assert.AreEqual("preserve", File.ReadAllText(userFilePath));
@@ -50,7 +50,7 @@ public class AdvancedPasteTempFileManagerTests
 
         try
         {
-            AdvancedPasteTempFileManager.CleanupStaleDirectories(TimeSpan.FromDays(1));
+            AdvancedPasteTempFileManager.CleanupStaleDirectories(TimeSpan.FromDays(1), []);
 
             Assert.IsFalse(Directory.Exists(directory.FullName));
         }
@@ -73,13 +73,13 @@ public class AdvancedPasteTempFileManagerTests
 
         try
         {
-            AdvancedPasteTempFileManager.CleanupStaleDirectories(TimeSpan.FromDays(1));
+            AdvancedPasteTempFileManager.CleanupStaleDirectories(TimeSpan.FromDays(1), []);
 
             Assert.IsTrue(File.Exists(Path.Combine(directory.FullName, ".powertoys-advanced-paste-owned")));
             Assert.IsTrue(Directory.Exists(directory.FullName));
 
             Directory.Delete(nestedDirectory.FullName, recursive: true);
-            AdvancedPasteTempFileManager.CleanupStaleDirectories(TimeSpan.FromDays(1));
+            AdvancedPasteTempFileManager.CleanupStaleDirectories(TimeSpan.FromDays(1), []);
 
             Assert.IsFalse(Directory.Exists(directory.FullName));
         }
@@ -105,5 +105,32 @@ public class AdvancedPasteTempFileManagerTests
         await package.GetView().TryCleanupAfterDelayAsync(TimeSpan.Zero);
 
         Assert.IsFalse(Directory.Exists(directory.FullName));
+    }
+
+    [TestMethod]
+    public void CleanupStaleDirectories_PreservesDirectoriesReferencedByClipboard()
+    {
+        var directory = AdvancedPasteTempFileManager.CreateDirectory();
+        var filePath = Path.Combine(directory.FullName, "clipboard-output.txt");
+        File.WriteAllText(filePath, "keep");
+        Directory.SetCreationTimeUtc(directory.FullName, DateTime.UtcNow.AddDays(-2));
+
+        try
+        {
+            AdvancedPasteTempFileManager.CleanupStaleDirectories(TimeSpan.FromDays(1), [filePath]);
+
+            Assert.IsTrue(File.Exists(filePath));
+            Assert.IsTrue(Directory.Exists(directory.FullName));
+
+            AdvancedPasteTempFileManager.CleanupStaleDirectories(TimeSpan.FromDays(1), []);
+            Assert.IsFalse(Directory.Exists(directory.FullName));
+        }
+        finally
+        {
+            if (Directory.Exists(directory.FullName))
+            {
+                Directory.Delete(directory.FullName, recursive: true);
+            }
+        }
     }
 }

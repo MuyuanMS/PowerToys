@@ -43,15 +43,21 @@ internal static class CliInputReader
             throw new IOException();
         }
 
-        var storageFile = await StorageFile.GetFileFromPathAsync(inputFile.FullName);
-        package.SetStorageItems([storageFile]);
-
-        using var reader = inputFile.OpenText();
+        using var reader = new StreamReader(inputFile.OpenRead(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true), detectEncodingFromByteOrderMarks: true);
         var sample = new char[TextDetectionSampleLength];
-        var sampleLength = await reader.ReadAsync(sample.AsMemory(), cancellationToken);
+        int sampleLength;
+        try
+        {
+            sampleLength = await reader.ReadAsync(sample.AsMemory(), cancellationToken);
+        }
+        catch (DecoderFallbackException)
+        {
+            return await CreateFilePackageViewAsync(package, inputFile);
+        }
+
         if (!LooksLikeText(sample.AsSpan(0, sampleLength)))
         {
-            return package.GetView();
+            return await CreateFilePackageViewAsync(package, inputFile);
         }
 
         if (sampleLength > maximumTextCharacters)
@@ -61,7 +67,15 @@ internal static class CliInputReader
 
         var textBuilder = new StringBuilder(sampleLength);
         textBuilder.Append(sample, 0, sampleLength);
-        textBuilder.Append(await ReadBoundedAsync(reader, maximumTextCharacters - sampleLength, cancellationToken));
+        try
+        {
+            textBuilder.Append(await ReadBoundedAsync(reader, maximumTextCharacters - sampleLength, cancellationToken));
+        }
+        catch (DecoderFallbackException)
+        {
+            return await CreateFilePackageViewAsync(package, inputFile);
+        }
+
         var text = textBuilder.ToString();
 
         package.SetText(text);
@@ -80,7 +94,6 @@ internal static class CliInputReader
         foreach (var character in sample)
         {
             if (character == '\0' ||
-                character == '\uFFFD' ||
                 (char.IsControl(character) && character is not '\r' and not '\n' and not '\t'))
             {
                 return false;
@@ -88,6 +101,13 @@ internal static class CliInputReader
         }
 
         return true;
+    }
+
+    private static async Task<DataPackageView> CreateFilePackageViewAsync(DataPackage package, FileInfo inputFile)
+    {
+        var storageFile = await StorageFile.GetFileFromPathAsync(inputFile.FullName);
+        package.SetStorageItems([storageFile]);
+        return package.GetView();
     }
 
     private static async Task<string> ReadBoundedAsync(TextReader reader, int maximumCharacters, CancellationToken cancellationToken)

@@ -30,6 +30,16 @@ internal sealed class SystemClipboardAdapter : IClipboardAdapter
     public DataPackageView Read()
         => RunOnSta(() => CreateDataPackageView(FormsClipboard.GetDataObject()));
 
+    internal IReadOnlyList<string> ReadFilePaths()
+        => RunOnSta(() =>
+        {
+            var dataObject = FormsClipboard.GetDataObject();
+            return dataObject?.GetDataPresent(FormsDataFormats.FileDrop, autoConvert: false) == true &&
+                dataObject.GetData(FormsDataFormats.FileDrop, autoConvert: false) is string[] paths
+                    ? paths
+                    : Array.Empty<string>();
+        });
+
     public void Write(DataPackage content)
         => RunOnSta(() =>
         {

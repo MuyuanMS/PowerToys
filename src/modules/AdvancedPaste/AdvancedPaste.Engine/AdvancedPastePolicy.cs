@@ -21,7 +21,7 @@ public static class AdvancedPastePolicy
             return false;
         }
 
-        var serviceType = provider.ServiceType.ToAIServiceType();
+        var serviceType = NormalizeServiceType(provider.ServiceTypeKind);
         var metadata = AIServiceTypeRegistry.GetMetadata(serviceType);
         if (metadata.IsOnlineService && !IsOnlineAIAllowed)
         {
@@ -40,4 +40,7 @@ public static class AdvancedPastePolicy
             _ => true,
         };
     }
+
+    internal static AIServiceType NormalizeServiceType(AIServiceType serviceType)
+        => serviceType == AIServiceType.Unknown ? AIServiceType.OpenAI : serviceType;
 }

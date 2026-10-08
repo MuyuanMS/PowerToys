@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using AdvancedPaste.Cli;
+using AdvancedPaste.Helpers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Windows.ApplicationModel.DataTransfer;
 
@@ -81,6 +82,80 @@ public class CliInputReaderTests
                 cancellationToken: CancellationToken.None);
 
             Assert.IsFalse(input.Contains(StandardDataFormats.Text));
+        }
+        finally
+        {
+            File.Delete(inputPath);
+        }
+    }
+
+    [TestMethod]
+    public async Task TextFile_IsNotExposedAsImageStorageItem()
+    {
+        var inputPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.txt");
+        await File.WriteAllTextAsync(inputPath, "notes");
+        try
+        {
+            var input = await CliInputReader.ReadAsync(
+                inputFile: new FileInfo(inputPath),
+                stdinRequested: false,
+                clipboard: new TestClipboardAdapter(),
+                stdin: TextReader.Null,
+                maximumTextCharacters: 100,
+                cancellationToken: CancellationToken.None);
+
+            Assert.AreEqual("notes", await input.GetTextAsync());
+            Assert.IsFalse(input.Contains(StandardDataFormats.StorageItems));
+            Assert.IsNull(await input.GetImageAsPngBytesAsync());
+        }
+        finally
+        {
+            File.Delete(inputPath);
+        }
+    }
+
+    [TestMethod]
+    public async Task ValidReplacementCharacter_IsReadAsText()
+    {
+        const string expected = "valid \uFFFD text";
+        var inputPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.txt");
+        await File.WriteAllTextAsync(inputPath, expected);
+        try
+        {
+            var input = await CliInputReader.ReadAsync(
+                inputFile: new FileInfo(inputPath),
+                stdinRequested: false,
+                clipboard: new TestClipboardAdapter(),
+                stdin: TextReader.Null,
+                maximumTextCharacters: 100,
+                cancellationToken: CancellationToken.None);
+
+            Assert.AreEqual(expected, await input.GetTextAsync());
+            Assert.IsFalse(input.Contains(StandardDataFormats.StorageItems));
+        }
+        finally
+        {
+            File.Delete(inputPath);
+        }
+    }
+
+    [TestMethod]
+    public async Task MalformedUtf8File_IsExposedAsBinaryStorageItem()
+    {
+        var inputPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.bin");
+        await File.WriteAllBytesAsync(inputPath, [0x41, 0xFF, 0x42]);
+        try
+        {
+            var input = await CliInputReader.ReadAsync(
+                inputFile: new FileInfo(inputPath),
+                stdinRequested: false,
+                clipboard: new TestClipboardAdapter(),
+                stdin: TextReader.Null,
+                maximumTextCharacters: 100,
+                cancellationToken: CancellationToken.None);
+
+            Assert.IsFalse(input.Contains(StandardDataFormats.Text));
+            Assert.IsTrue(input.Contains(StandardDataFormats.StorageItems));
         }
         finally
         {
