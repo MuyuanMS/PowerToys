@@ -11,6 +11,8 @@ namespace ViewModelTests
     [TestClass]
     public sealed class PowerAccentReferenceGuideViewModelTests
     {
+        private static readonly string[] ExpectedSpecialKeyLabels = ["+", ",", ".", "-", "*", "/", "\\", "Numpad /"];
+
         [TestMethod]
         public void Constructor_SelectedLanguages_AppearInSelectedSetsGroup()
         {
@@ -116,7 +118,7 @@ namespace ViewModelTests
                 .ToHashSet();
 
             CollectionAssert.IsSubsetOf(
-                new[] { "+", ",", ".", "-", "*", "/", "\\", "Numpad /" },
+                ExpectedSpecialKeyLabels,
                 keyLabels.ToArray());
         }
 
