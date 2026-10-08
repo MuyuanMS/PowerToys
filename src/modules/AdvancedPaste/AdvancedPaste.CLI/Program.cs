@@ -8,7 +8,6 @@ using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
 using System.Text.Json;
@@ -76,18 +75,6 @@ public static partial class Program
             Console.CancelKeyPress += cancelHandler;
             loggerInitialized = TryInitializeLogger(() => Logger.InitializeLogger("\\AdvancedPaste\\CLI\\Logs"));
             var clipboard = new SystemClipboardAdapter();
-            try
-            {
-                AdvancedPasteTempFileManager.CleanupStaleDirectories(TimeSpan.FromDays(1), clipboard.ReadFilePaths());
-            }
-            catch (ExternalException ex)
-            {
-                ReportSkippedCleanup(ex, loggerInitialized);
-            }
-            catch (InvalidOperationException ex)
-            {
-                ReportSkippedCleanup(ex, loggerInitialized);
-            }
 
             using var host = Host.CreateDefaultBuilder()
                 .UseContentRoot(AppContext.BaseDirectory)
@@ -97,7 +84,7 @@ public static partial class Program
                 host.Services.GetRequiredService<IPasteFormatExecutor>(),
                 host.Services.GetRequiredService<IUserSettings>());
 
-            exitCode = await RunAsync(args, Console.In, Console.Out, Console.Error, clipboard, runtime, cancellationSource.Token);
+            exitCode = await RunAsync(args, Console.In, Console.Out, Console.Error, clipboard, runtime, cancellationSource.Token, loggerInitialized);
             return exitCode;
         }
         catch (Exception ex)
@@ -115,19 +102,6 @@ public static partial class Program
         {
             Console.CancelKeyPress -= cancelHandler;
             LogCLITelemetry(telemetryCommandName, exitCode == SuccessExitCode, loggerInitialized);
-        }
-    }
-
-    private static void ReportSkippedCleanup(Exception exception, bool loggerInitialized)
-    {
-        var message = $"Skipping stale Advanced Paste temporary-file cleanup because the clipboard could not be read: {exception.Message}";
-        if (loggerInitialized)
-        {
-            Logger.LogWarning(message);
-        }
-        else
-        {
-            Console.Error.WriteLine(message);
         }
     }
 
@@ -205,7 +179,8 @@ public static partial class Program
         TextWriter stderr,
         IClipboardAdapter clipboard,
         IAdvancedPasteRuntime runtime,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool loggerInitialized = true)
     {
         var root = CreateRootCommand(out var options);
         var parseResult = new Parser(root).Parse(args);
@@ -289,6 +264,22 @@ public static partial class Program
             if (CountSelected(outputFile is not null, stdoutRequested, outputClipboardRequested) > 1)
             {
                 return WriteArgumentError(stderr, json, "invalid_output_mode", "Specify at most one output mode: --output, --stdout, or --output-clipboard. Clipboard is the default.");
+            }
+
+            var clipboardOutputRequested = outputClipboardRequested || (outputFile is null && !stdoutRequested);
+            if ((clipboardRequested || clipboardOutputRequested) && clipboard is SystemClipboardAdapter systemClipboard)
+            {
+                try
+                {
+                    AdvancedPasteTempFileManager.CleanupStaleDirectories(TimeSpan.FromDays(1), systemClipboard.ReadFilePaths());
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.Runtime.InteropServices.ExternalException)
+                {
+                    if (loggerInitialized)
+                    {
+                        Logger.LogWarning($"Skipping stale Advanced Paste temporary-file cleanup because the clipboard could not be read: {ex.Message}");
+                    }
+                }
             }
 
             var input = await CliInputReader.ReadAsync(inputFile, stdinRequested, clipboard, stdin, MaximumInputCharacters, cancellationToken);

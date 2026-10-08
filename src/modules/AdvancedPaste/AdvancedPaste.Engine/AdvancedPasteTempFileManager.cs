@@ -17,17 +17,17 @@ internal static class AdvancedPasteTempFileManager
     private const string OwnershipMarkerName = ".powertoys-advanced-paste-owned";
     private const string OwnershipMarkerContent = "PowerToys Advanced Paste temporary directory";
 
-    internal static DirectoryInfo CreateDirectory()
+    internal static DirectoryInfo CreateDirectory(string? parentDirectory = null)
     {
-        var directory = Directory.CreateTempSubdirectory(DirectoryPrefix);
+        var directory = Directory.CreateTempSubdirectory(DirectoryPrefix, parentDirectory);
         File.WriteAllText(Path.Combine(directory.FullName, OwnershipMarkerName), OwnershipMarkerContent);
         return directory;
     }
 
-    internal static void CleanupStaleDirectories(TimeSpan maximumAge, IEnumerable<string> clipboardFilePaths)
+    internal static void CleanupStaleDirectories(TimeSpan maximumAge, IEnumerable<string> clipboardFilePaths, string? tempDirectoryPath = null)
     {
         var cutoff = DateTime.UtcNow - maximumAge;
-        var tempDirectory = new DirectoryInfo(Path.GetTempPath());
+        var tempDirectory = new DirectoryInfo(tempDirectoryPath ?? Path.GetTempPath());
         var protectedFilePaths = new HashSet<string>(clipboardFilePaths.Select(Path.GetFullPath), StringComparer.OrdinalIgnoreCase);
 
         foreach (var directory in tempDirectory.EnumerateDirectories($"{DirectoryPrefix}*"))

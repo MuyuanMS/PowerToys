@@ -22,6 +22,23 @@ namespace AdvancedPaste.Cli.UnitTests;
 public class AdvancedPasteRuntimeTests
 {
     [TestMethod]
+    public async Task MarkdownAction_AcceptsHtmlOnlyInput()
+    {
+        var package = new DataPackage();
+        package.SetHtmlFormat("<html><body><p>content</p></body></html>");
+        var executor = new TestPasteFormatExecutor();
+        var runtime = new AdvancedPasteRuntime(executor, new TestUserSettings(isAIEnabled: true), isAdvancedPasteEnabled: () => true);
+
+        await runtime.ExecuteAsync(
+            new CliActionRequest("markdown", null, null, null),
+            package.GetView(),
+            CancellationToken.None);
+
+        Assert.IsTrue(executor.WasCalled);
+        Assert.AreEqual(PasteFormats.Markdown, executor.LastPasteFormat?.Format);
+    }
+
+    [TestMethod]
     public async Task AiActions_WhenDisabledInSettings_AreRejectedBeforeExecution()
     {
         var package = new DataPackage();

@@ -24,7 +24,7 @@ public enum PasteFormats
         IconGlyph = "\ue8a5",
         RequiresAIService = false,
         CanPreview = false,
-        SupportedClipboardFormats = ClipboardFormat.Text,
+        SupportedClipboardFormats = ClipboardFormat.Text | ClipboardFormat.Html,
         KernelFunctionDescription = "Takes clipboard text and formats it as markdown text.")]
     Markdown,
 
