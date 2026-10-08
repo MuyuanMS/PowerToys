@@ -224,6 +224,35 @@ public sealed class SettingsResourceZoomItModuleTest : BaseDscTest
     }
 
     [TestMethod]
+    public void SetWithOutOfRangeZoominSliderLevel_RejectsBeforeWriting()
+    {
+        // Arrange
+        var inputNode = JsonNode.Parse(CreateInput(properties => properties.BreakTimeout = new IntProperty(25)));
+        inputNode!["settings"]!["properties"]!["ZoominSliderLevel"] = new JsonObject { ["value"] = 6 };
+        var data = new ZoomItSettingsFunctionData(inputNode.ToJsonString());
+        data.GetState();
+        data.Output.SettingsInternal = data.Input.SettingsInternal;
+
+        // Act and assert
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(data.SetState);
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    [TestMethod]
+    public void SetWithUnsupportedRecordFormat_RejectsBeforeWriting()
+    {
+        // Arrange
+        var input = CreateInput(properties => properties.RecordFormat = new StringProperty("AVI"));
+        var data = new ZoomItSettingsFunctionData(input);
+        data.GetState();
+        data.Output.SettingsInternal = data.Input.SettingsInternal;
+
+        // Act and assert
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(data.SetState);
+        Assert.AreEqual(0, _saved.Count);
+    }
+
+    [TestMethod]
     public void TestWithDiff_Success()
     {
         // Arrange

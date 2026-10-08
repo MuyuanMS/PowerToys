@@ -104,7 +104,7 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
     {
         Debug.Assert(_output.Settings != null, "Output settings should not be null");
         var settings = JsonSerializer.SerializeToNode(_output.Settings, _serializerOptions);
-        ValidateUnsignedIntegerSettings(settings);
+        ValidateSettingValues(settings);
         if (_recordScalingSpecified &&
             !string.Equals(_currentRecordFormat, _output.Settings.Properties.RecordFormat?.Value, StringComparison.Ordinal) &&
             settings?[PropertiesJsonPropertyName] is JsonObject properties &&
@@ -120,27 +120,41 @@ public sealed class ZoomItSettingsFunctionData : BaseFunctionData, ISettingsFunc
         SignalRefreshSettingsEvent();
     }
 
-    private static void ValidateUnsignedIntegerSettings(JsonNode? node)
+    private static void ValidateSettingValues(JsonNode? node, string? settingName = null)
     {
         if (node is JsonObject jsonObject)
         {
-            if (jsonObject["value"] is JsonValue value &&
-                value.TryGetValue<int>(out var integerValue) &&
-                integerValue < 0)
+            if (jsonObject["value"] is JsonValue value)
             {
-                throw new ArgumentOutOfRangeException(nameof(node), "ZoomIt numeric settings cannot be negative.");
+                if (value.TryGetValue<int>(out var integerValue) &&
+                    (integerValue < 0 || (settingName == "ZoominSliderLevel" && integerValue > 5)))
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(node),
+                        settingName == "ZoominSliderLevel"
+                            ? "ZoominSliderLevel must be between 0 and 5."
+                            : "ZoomIt numeric settings cannot be negative.");
+                }
+
+                if (settingName == "RecordFormat" &&
+                    value.TryGetValue<string>(out var recordFormat) &&
+                    recordFormat != "GIF" &&
+                    recordFormat != "MP4")
+                {
+                    throw new ArgumentOutOfRangeException(nameof(node), "RecordFormat must be GIF or MP4.");
+                }
             }
 
-            foreach (var (_, child) in jsonObject)
+            foreach (var (name, child) in jsonObject)
             {
-                ValidateUnsignedIntegerSettings(child);
+                ValidateSettingValues(child, name == "value" ? settingName : name);
             }
         }
         else if (node is JsonArray jsonArray)
         {
             foreach (var child in jsonArray)
             {
-                ValidateUnsignedIntegerSettings(child);
+                ValidateSettingValues(child, settingName);
             }
         }
     }
