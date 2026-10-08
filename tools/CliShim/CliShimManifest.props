@@ -22,6 +22,9 @@
     <CliShim Include="PowerToys.LightSwitch.CLI">
       <RelativeTarget>../PowerToys.LightSwitch.Cli.exe</RelativeTarget>
     </CliShim>
+    <CliShim Include="PowerToys.Workspaces.CLI">
+      <RelativeTarget>../PowerToys.WorkspacesCLI.exe</RelativeTarget>
+    </CliShim>
   </ItemGroup>
 
   <!--
