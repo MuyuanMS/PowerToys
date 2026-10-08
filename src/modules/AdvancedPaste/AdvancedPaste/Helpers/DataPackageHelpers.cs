@@ -120,9 +120,12 @@ internal static class DataPackageHelpers
                 Logger.LogDebug($"Cleaning up temporary file with extension [{tempFile.Extension}] from data package after delay");
 
                 tempFile.Delete();
-                if (NormalizeDirectoryPath(tempFile.Directory?.Parent?.FullName) == NormalizeDirectoryPath(Path.GetTempPath()))
+                var tempDirectory = tempFile.Directory;
+                if (tempDirectory is not null &&
+                    NormalizeDirectoryPath(tempDirectory.Parent?.FullName) == NormalizeDirectoryPath(Path.GetTempPath()))
                 {
-                    tempFile.Directory?.Delete();
+                    AdvancedPasteTempFileManager.RemoveOwnershipMarkerIfDirectoryWillBeEmpty(tempDirectory);
+                    tempDirectory.Delete();
                 }
             }
         }
@@ -281,7 +284,8 @@ internal static class DataPackageHelpers
         {
             var storageItems = await dataPackageView.GetStorageItemsAsync();
             var file = storageItems.Count == 1 ? storageItems[0] as StorageFile : null;
-            if (file != null)
+            if (file != null && SupportedFileTypes.Value
+                .Any(item => item.Format == ClipboardFormat.Image && item.FileTypes.Contains(file.FileType)))
             {
                 return await file.OpenReadAsync();
             }
