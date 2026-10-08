@@ -43,13 +43,14 @@
             SubtitleTemplate="{StaticResource SubtitleTemplate}" />
     </Page.Resources>
     <Grid>
-        <ScrollViewer>
+        <ScrollViewer IsTabStop="False">
             <ItemsRepeater
                 x:Name="MainItemsRepeater"
                 Margin="0,0,0,24"
                 ElementClearing="MainItemsRepeater_ElementClearing"
                 ItemTemplate="{StaticResource RowTemplateSelector}"
-                ItemsSource="{x:Bind Rows, Mode=OneWay}" />
+                ItemsSource="{x:Bind Rows, Mode=OneWay}"
+                TabFocusNavigation="Once" />
         </ScrollViewer>
         <TextBlock
             x:Name="NoResultsTextBlock"
