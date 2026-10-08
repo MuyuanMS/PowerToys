@@ -1691,6 +1691,25 @@ if ($requiresDataRestore)
     Write-Warning 'PowerToys data will be restored at the end of this run; concurrent changes to that data will be discarded.'
 }
 
+if (($Scenario -contains 'Runner' -or $Scenario -contains 'Settings') -and (Test-Path -LiteralPath (Join-Path $powerToysDataFolder 'settings.json')))
+{
+    $generalSettings = Get-Content -LiteralPath (Join-Path $powerToysDataFolder 'settings.json') -Raw | ConvertFrom-Json
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    try
+    {
+        $isElevated = [Security.Principal.WindowsPrincipal]::new($identity).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    }
+    finally
+    {
+        $identity.Dispose()
+    }
+
+    if ($generalSettings.run_elevated -eq $true -and -not $isElevated)
+    {
+        throw 'The saved run_elevated setting replaces a non-elevated Runner process. Launch this script elevated, or disable run_elevated before measuring Runner or Settings.'
+    }
+}
+
 # Fail before stopping anything when the runner can't report its stages.
 if ($Scenario -contains 'Runner' -and -not [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($runnerPath)).Contains('Startup stages (ms since process start)'))
 {

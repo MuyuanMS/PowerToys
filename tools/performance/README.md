@@ -14,7 +14,7 @@ Scripts that measure how fast PowerToys starts and how much memory it uses. Use 
 .\tools\performance\Measure-StartupPerformance.ps1 -PowerToysRoot .\x64\Release -Label main -AllowPowerToysDataRestore
 ```
 
-`-PowerToysRoot` is any folder that contains `PowerToys.exe`: a build output folder or an install folder. Use `-Scenario` to pick scenarios, and `-Iterations` (default 10) and `-WarmupIterations` (default 2) to set the number of samples. The script prints a summary table and writes every sample to a JSON file in `-OutputDirectory` (default `%TEMP%\PowerToys-Startup-Performance`).
+`-PowerToysRoot` is any folder that contains `PowerToys.exe`: a build output folder or an install folder. Use `-Scenario` to pick scenarios, and `-Iterations` (default 10) and `-WarmupIterations` (default 2) to set the number of samples. The script prints a summary table and writes every sample to a JSON file in `-OutputDirectory` (default `%TEMP%\PowerToys-Startup-Performance`). For scenarios that restore PowerToys data, `-OutputDirectory` cannot be inside `%LOCALAPPDATA%\Microsoft\PowerToys`.
 
 Each sample starts a new process, after warm-up samples that load the files into the OS file cache. That makes the numbers "new process, warm disk cache" startup, which is what JIT, ReadyToRun, and AOT changes affect. A cold boot isn't simulated.
 
@@ -33,13 +33,29 @@ Window times come from `EVENT_OBJECT_SHOW` events, so they're taken when Windows
 
 ### To measure what ships
 
-The installer ships published builds of Settings, PowerToys Run, File Locksmith, and the four .NET preview handlers and thumbnail providers. A normal build produces runnable output too, but publish settings such as ReadyToRun only apply when you publish. To measure those, publish the same projects that CI publishes (`csProjectsToPublish` in [`job-build-project.yml`](/.pipelines/v2/templates/job-build-project.yml)), with the same arguments, after the build:
+The installer ships published builds of Settings, PowerToys Run, File Locksmith, and the four .NET preview handlers and thumbnail providers. A normal build produces runnable output too, but publish settings such as ReadyToRun only apply when you publish. To measure those, publish all seven projects that CI publishes (`csProjectsToPublish` in [`job-build-project.yml`](/.pipelines/v2/templates/job-build-project.yml)), with the same arguments, after the build:
 
-```cmd
-msbuild src\settings-ui\Settings.UI\PowerToys.Settings.csproj /t:Publish /graph /p:Configuration=Release /p:Platform=x64 /p:AppxBundle=Never /p:VCRTForwarders-IncludeDebugCRT=false /p:PowerToysRoot=%CD% /p:PublishProfile=InstallationPublishProfile.pubxml /p:TargetFramework=net10.0-windows10.0.26100.0
+```powershell
+$projects = @(
+    'src\settings-ui\Settings.UI\PowerToys.Settings.csproj',
+    'src\modules\launcher\PowerLauncher\PowerLauncher.csproj',
+    'src\modules\previewpane\MonacoPreviewHandler\MonacoPreviewHandler.csproj',
+    'src\modules\previewpane\MarkdownPreviewHandler\MarkdownPreviewHandler.csproj',
+    'src\modules\previewpane\SvgPreviewHandler\SvgPreviewHandler.csproj',
+    'src\modules\previewpane\SvgThumbnailProvider\SvgThumbnailProvider.csproj',
+    'src\modules\FileLocksmith\FileLocksmithUI\FileLocksmithUI.csproj'
+)
+$platform = 'x64'
+$powerToysRoot = (Get-Location).Path
+foreach ($project in $projects) {
+    & msbuild $project /t:Publish /graph /p:Configuration=Release "/p:Platform=$platform" /p:AppxBundle=Never /p:VCRTForwarders-IncludeDebugCRT=false "/p:PowerToysRoot=$powerToysRoot" /p:PublishProfile=InstallationPublishProfile.pubxml /p:TargetFramework=net10.0-windows10.0.26100.0
+    if ($LASTEXITCODE -ne 0) {
+        throw "Publish failed for $project."
+    }
+}
 ```
 
-Use a lowercase platform (`x64` or `arm64`), because the publish profiles build the runtime identifier from it.
+Set `$platform` to lowercase `x64` or `arm64`, because the publish profiles build the runtime identifier from it.
 
 ## Compare two builds
 
@@ -57,7 +73,7 @@ $measure = '.\tools\performance\Measure-StartupPerformance.ps1'
 
 ## Before you run it
 
-- **It takes over PowerToys.** `Runner`, `Settings`, and `PowerToysRun` require `-AllowPowerToysDataRestore`, stop every running PowerToys runner first, and start them again at the end. If PowerToys runs elevated, exit it first or run the script elevated. Do not change PowerToys data while the benchmark runs; concurrent changes are discarded when the original data is restored. The other scenarios leave a running PowerToys alone.
+- **It takes over PowerToys.** `Runner`, `Settings`, and `PowerToysRun` require `-AllowPowerToysDataRestore`, stop every running PowerToys runner first, and start them again at the end. If PowerToys runs elevated, exit it first or run the script elevated. If the saved `run_elevated` setting is enabled, run the script elevated or disable the setting before measuring Runner or Settings; otherwise the preflight stops before changing app state. Do not change PowerToys data while the benchmark runs; concurrent changes are discarded when the original data is restored. The other scenarios leave a running PowerToys alone.
 - **It restores your settings.** Local and installed builds share `%LOCALAPPDATA%\Microsoft\PowerToys`, and a build of another version rewrites files there: version stamps, PowerToys Run's plugin data, default settings of modules. For the three scenarios above, the script copies that folder (without logs) first and puts it back at the end. It also writes the measured build's version to `last_version_run.json`, so "What's new" doesn't open. `FileLocksmith` restores the `last-run.log` file it uses.
 - **Compare like with like.** The results record the enabled modules. The runner's stage times and memory depend on them, so compare runs with the same settings.
 - **Keep the machine quiet.** Close other apps, stay on AC power, and don't build at the same time.
