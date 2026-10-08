@@ -8,6 +8,7 @@ using System;
 using System.IO;
 using System.IO.Abstractions;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 
@@ -21,6 +22,24 @@ namespace Microsoft.PowerToys.Settings.UI.Library
     {
         public const string DefaultFileName = "settings.json";
         private const string DefaultModuleName = "";
+        private const string UnreadableFileSuffix = ".corrupt";
+
+        // A file that another process has open is only held for a moment, so a few short retries are enough.
+        private const int FileInUseRetries = 5;
+        private const int SharingViolation = unchecked((int)0x80070020);
+        private const int LockViolation = unchecked((int)0x80070021);
+
+        private sealed class SettingsJsonException : JsonException
+        {
+            public SettingsJsonException(byte[] contents, JsonException innerException)
+                : base(innerException.Message, innerException)
+            {
+                Contents = contents;
+            }
+
+            public byte[] Contents { get; }
+        }
+
         private readonly IFile _file;
         private readonly SettingPath _settingsPath;
         private readonly JsonSerializerOptions _serializerOptions;
@@ -98,6 +117,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         public virtual T GetSettingsOrDefault<T>(string powertoy = DefaultModuleName, string fileName = DefaultFileName)
             where T : ISettingsConfig, new()
         {
+            bool canWriteDefaults = true;
             try
             {
                 return GetSettings<T>(powertoy, fileName);
@@ -109,6 +129,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             catch (JsonException ex)
             {
                 Logger.LogError($"Exception encountered while loading {powertoy} settings.", ex);
+                canWriteDefaults = KeepUnreadableSettings(powertoy, fileName, GetUnreadableContents(ex));
             }
             catch (FileNotFoundException)
             {
@@ -117,7 +138,11 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
             // If the settings file does not exist or if the file is corrupt, to create a new object with default parameters and save it to a newly created settings file.
             T newSettingsItem = new T();
-            SaveSettings(newSettingsItem.ToJsonString(), powertoy, fileName);
+            if (canWriteDefaults)
+            {
+                SaveSettings(newSettingsItem.ToJsonString(), powertoy, fileName);
+            }
+
             return newSettingsItem;
         }
 
@@ -164,6 +189,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             where T : ISettingsConfig, new()
             where T2 : ISettingsConfig, new()
         {
+            bool canWriteDefaults = true;
             try
             {
                 return GetSettings<T>(powertoy, fileName);
@@ -191,10 +217,11 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
                     return newSettings;
                 }
-                catch (Exception)
+                catch (Exception e) when (e is not IOException and not UnauthorizedAccessException)
                 {
                     // do nothing, the problem wasn't that the settings was stored in the previous format, continue with the default settings
                     Logger.LogError($"{powertoy} settings are corrupt or the format is not supported any longer. Using default settings instead.", ex);
+                    canWriteDefaults = KeepUnreadableSettings(powertoy, fileName, GetUnreadableContents(ex));
                 }
             }
             catch (FileNotFoundException)
@@ -204,7 +231,11 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
             // If the settings file does not exist or if the file is corrupt, to create a new object with default parameters and save it to a newly created settings file.
             T newSettingsItem = new T();
-            SaveSettings(newSettingsItem.ToJsonString(), powertoy, fileName);
+            if (canWriteDefaults)
+            {
+                SaveSettings(newSettingsItem.ToJsonString(), powertoy, fileName);
+            }
+
             return newSettingsItem;
         }
 
@@ -230,7 +261,9 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             // Look at issue https://github.com/microsoft/PowerToys/issues/6413 you'll see the file has a large sum of \0 to fill up a 4096 byte buffer for writing to disk
             // This, while not totally ideal, does work around the problem by trimming the end.
             // The file itself did write the content correctly but something is off with the actual end of the file, hence the 0x00 bug
-            var jsonSettingsString = _file.ReadAllText(_settingsPath.GetSettingsPath(powertoyFolderName, fileName)).Trim('\0');
+            string path = _settingsPath.GetSettingsPath(powertoyFolderName, fileName);
+            byte[] fileContents = ReadAllBytesRetryingWhileInUse(path);
+            var jsonSettingsString = ReadSettingsText(fileContents).Trim('\0');
 
             // For Native AOT compatibility, get JsonTypeInfo from the TypeInfoResolver
             var typeInfo = _serializerOptions.TypeInfoResolver?.GetTypeInfo(typeof(T), _serializerOptions);
@@ -241,7 +274,35 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             }
 
             // Use AOT-friendly deserialization
-            return (T)JsonSerializer.Deserialize(jsonSettingsString, typeInfo)!;
+            try
+            {
+                return (T)JsonSerializer.Deserialize(jsonSettingsString, typeInfo)!;
+            }
+            catch (JsonException e)
+            {
+                throw new SettingsJsonException(fileContents, e);
+            }
+        }
+
+        private static string ReadSettingsText(byte[] contents)
+        {
+            using var stream = new MemoryStream(contents);
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            return reader.ReadToEnd();
+        }
+
+        private byte[] ReadAllBytesRetryingWhileInUse(string path)
+        {
+            byte[] contents = Array.Empty<byte>();
+            RetryWhileFileIsInUse(() => contents = _file.ReadAllBytes(path));
+            return contents;
+        }
+
+        private static byte[]? GetUnreadableContents(JsonException exception)
+        {
+            return exception is SettingsJsonException settingsException
+                ? settingsException.Contents
+                : null;
         }
 
         // Save settings to a json file.
@@ -285,8 +346,139 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                     _settingsPath.CreateSettingsFolder(powertoy);
                 }
 
-                _file.WriteAllText(_settingsPath.GetSettingsPath(powertoy, fileName), jsonSettings);
+                WriteFileAtomically(_settingsPath.GetSettingsPath(powertoy, fileName), jsonSettings);
             }
+        }
+
+        /// <summary>
+        /// Keeps a copy of a settings file that could not be parsed next to the original, because the
+        /// caller is about to replace that file with default settings.
+        /// </summary>
+        private bool KeepUnreadableSettings(string powertoy, string fileName, byte[]? failedContents)
+        {
+            try
+            {
+                string path = _settingsPath.GetSettingsPath(powertoy, fileName);
+                byte[] contents = failedContents ?? ReadAllBytesRetryingWhileInUse(path);
+                if (failedContents != null)
+                {
+                    byte[] currentContents = ReadAllBytesRetryingWhileInUse(path);
+                    if (!currentContents.AsSpan().SequenceEqual(failedContents))
+                    {
+                        return false;
+                    }
+                }
+
+                // A file that is empty, or only holds the zero bytes of an interrupted write, has nothing
+                // worth keeping and must not replace an earlier copy that has.
+                if (Array.Exists(contents, b => b != 0 && !char.IsWhiteSpace((char)b)))
+                {
+                    RetryWhileFileIsInUse(() => _file.WriteAllBytes(path + UnreadableFileSuffix, contents));
+                }
+
+                return true;
+            }
+            catch (Exception e) when (e is not IOException and not UnauthorizedAccessException)
+            {
+                Logger.LogError($"Failed to keep a copy of the unreadable {powertoy} settings.", e);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Writes a file so that it is always complete on disk: the contents go to a temporary file,
+        /// which then takes the place of the old file in a single step. A write that fails or is
+        /// interrupted halfway leaves the old file as it was.
+        /// </summary>
+        private void WriteFileAtomically(string path, string contents)
+        {
+            string destinationPath = path;
+            if (_file.Exists(path) && _file.GetAttributes(path).HasFlag(FileAttributes.ReparsePoint))
+            {
+                destinationPath = _file.ResolveLinkTarget(path, returnFinalTarget: true)?.FullName
+                    ?? throw new IOException($"Could not resolve the settings file link at {path}.");
+            }
+
+            string temporaryPath = $"{destinationPath}.{Guid.NewGuid():N}.tmp";
+            try
+            {
+                using (var stream = _file.Create(temporaryPath))
+                {
+                    // The same bytes File.WriteAllText writes: UTF-8 without a byte order mark.
+                    byte[] bytes = Encoding.UTF8.GetBytes(contents);
+                    stream.Write(bytes, 0, bytes.Length);
+                    stream.Flush(true);
+                }
+
+                RetryWhileFileIsInUse(() => ReplaceOrMoveFile(temporaryPath, destinationPath));
+            }
+            catch
+            {
+                try
+                {
+                    _file.Delete(temporaryPath);
+                }
+                catch (Exception)
+                {
+                    // A leftover temporary file is harmless, and the failure that brought us here matters more.
+                }
+
+                throw;
+            }
+
+            // A rename does not change the last write time, and that is the only thing the settings
+            // file watchers listen for. Without this they would never see the new file.
+            RetryWhileFileIsInUse(() => _file.SetLastWriteTimeUtc(destinationPath, DateTime.UtcNow));
+        }
+
+        private void ReplaceOrMoveFile(string sourcePath, string destinationPath)
+        {
+            if (_file.Exists(destinationPath))
+            {
+                try
+                {
+                    _file.Replace(sourcePath, destinationPath, null);
+                }
+                catch (FileNotFoundException) when (!_file.Exists(destinationPath))
+                {
+                    _file.Move(sourcePath, destinationPath);
+                }
+
+                return;
+            }
+
+            try
+            {
+                _file.Move(sourcePath, destinationPath);
+            }
+            catch (IOException) when (_file.Exists(destinationPath))
+            {
+                _file.Replace(sourcePath, destinationPath, null);
+            }
+        }
+
+        private static void RetryWhileFileIsInUse(Action action)
+        {
+            for (int attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    action();
+                    return;
+                }
+                catch (Exception e) when (attempt < FileInUseRetries && IsFileInUse(e))
+                {
+                    // 10, 20, 40, 80 and 160 ms.
+                    Thread.Sleep(10 << attempt);
+                }
+            }
+        }
+
+        private static bool IsFileInUse(Exception e)
+        {
+            // Renaming over a file that another process has open is reported as access denied.
+            return e is UnauthorizedAccessException
+                || (e is IOException && (e.HResult == SharingViolation || e.HResult == LockViolation));
         }
 
         // Returns the file path to the settings file, that is exposed from the local ISettingsPath instance.

@@ -56,11 +56,15 @@ namespace Microsoft.PowerToys.Settings.UI.UnitTests.Mocks
         /// <returns>Mocked IFile</returns>
         internal static Mock<IFile> GetMockIOReadWithStubFile(string savePath, Expression<Func<string, bool>> filterExpression)
         {
+            byte[] saveContentBytes = File.ReadAllBytes(savePath);
             string saveContent = File.ReadAllText(savePath);
             var fileMock = new Mock<IFile>();
 
             fileMock.Setup(x => x.ReadAllText(It.Is<string>(filterExpression)))
                          .Returns(() => saveContent).Verifiable();
+
+            fileMock.Setup(x => x.ReadAllBytes(It.Is<string>(filterExpression)))
+                         .Returns(() => saveContentBytes).Verifiable();
 
             fileMock.Setup(x => x.Exists(It.Is<string>(filterExpression)))
                           .Returns(true);
@@ -70,7 +74,7 @@ namespace Microsoft.PowerToys.Settings.UI.UnitTests.Mocks
 
         internal static void VerifyIOReadWithStubFile(Mock<IFile> fileMock, Expression<Func<string, bool>> filterExpression, int expectedCallCount)
         {
-            fileMock.Verify(x => x.ReadAllText(It.Is<string>(filterExpression)), Times.Exactly(expectedCallCount));
+            fileMock.Verify(x => x.ReadAllBytes(It.Is<string>(filterExpression)), Times.Exactly(expectedCallCount));
         }
     }
 }
