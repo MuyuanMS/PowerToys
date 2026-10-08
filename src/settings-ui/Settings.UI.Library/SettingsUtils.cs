@@ -351,7 +351,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                     stream.Flush(true);
                 }
 
-                RetryWhileFileIsInUse(() => _file.Move(temporaryPath, destinationPath, true));
+                RetryWhileFileIsInUse(() => ReplaceOrMoveFile(temporaryPath, destinationPath));
             }
             catch
             {
@@ -370,6 +370,32 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             // A rename does not change the last write time, and that is the only thing the settings
             // file watchers listen for. Without this they would never see the new file.
             RetryWhileFileIsInUse(() => _file.SetLastWriteTimeUtc(destinationPath, DateTime.UtcNow));
+        }
+
+        private void ReplaceOrMoveFile(string sourcePath, string destinationPath)
+        {
+            if (_file.Exists(destinationPath))
+            {
+                try
+                {
+                    _file.Replace(sourcePath, destinationPath, null);
+                }
+                catch (FileNotFoundException) when (!_file.Exists(destinationPath))
+                {
+                    _file.Move(sourcePath, destinationPath);
+                }
+
+                return;
+            }
+
+            try
+            {
+                _file.Move(sourcePath, destinationPath);
+            }
+            catch (IOException) when (_file.Exists(destinationPath))
+            {
+                _file.Replace(sourcePath, destinationPath, null);
+            }
         }
 
         private static void RetryWhileFileIsInUse(Action action)

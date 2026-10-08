@@ -207,6 +207,24 @@ namespace CommonLibTest
         }
 
         [TestMethod]
+        public void SaveSettingsUsesMetadataPreservingReplaceForAnExistingFile()
+        {
+            // Arrange
+            var fileSystem = new MockFileSystem();
+            var file = new FaultyFile(fileSystem);
+            var settingsUtils = CreateSettingsUtils(fileSystem, file);
+            string settingsPath = settingsUtils.GetSettingsFilePath(ModuleName);
+            fileSystem.AddFile(settingsPath, new MockFileData(OldSettings));
+
+            // Act
+            settingsUtils.SaveSettings(NewSettings, ModuleName);
+
+            // Assert
+            Assert.AreEqual(NewSettings, fileSystem.File.ReadAllText(settingsPath));
+            CollectionAssert.Contains(file.MetadataPreservingReplacements, settingsPath);
+        }
+
+        [TestMethod]
         public void SaveSettingsWritesThroughASymbolicLink()
         {
             // Arrange
@@ -224,7 +242,7 @@ namespace CommonLibTest
             // Assert
             Assert.AreEqual(NewSettings, fileSystem.File.ReadAllText(settingsPath));
             Assert.IsTrue(fileSystem.File.GetAttributes(settingsPath).HasFlag(FileAttributes.ReparsePoint), "The link was replaced by a regular file.");
-            CollectionAssert.Contains(file.ReplacedFiles, targetPath, "The link target was not replaced atomically.");
+            CollectionAssert.Contains(file.MetadataPreservingReplacements, targetPath, "The link target was not replaced atomically.");
         }
 
         [TestMethod]
@@ -405,8 +423,11 @@ namespace CommonLibTest
             // The file whose last write time changed most recently. Renaming a file does not change its last write time.
             public string LastWrittenPath { get; private set; }
 
-            // The files that were replaced by renaming another file over them.
+            // The files that were replaced by moving another file over them.
             public List<string> ReplacedFiles { get; } = new List<string>();
+
+            // The existing files replaced through the metadata-preserving API.
+            public List<string> MetadataPreservingReplacements { get; } = new List<string>();
 
             public override void WriteAllText(string path, string contents)
             {
@@ -449,6 +470,18 @@ namespace CommonLibTest
 
                 base.Move(sourceFileName, destFileName, overwrite);
                 ReplacedFiles.Add(destFileName);
+            }
+
+            public override void Replace(string sourceFileName, string destinationFileName, string destinationBackupFileName)
+            {
+                if (TimesTheFileIsInUse > 0)
+                {
+                    TimesTheFileIsInUse--;
+                    throw new UnauthorizedAccessException("Access to the path is denied.");
+                }
+
+                base.Replace(sourceFileName, destinationFileName, destinationBackupFileName);
+                MetadataPreservingReplacements.Add(destinationFileName);
             }
 
             public override void SetLastWriteTimeUtc(string path, DateTime lastWriteTimeUtc)
