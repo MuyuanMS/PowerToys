@@ -36,4 +36,5 @@ namespace WorkspacesCli
     ReceivedWorkerHandles ReceiveWorkerHandles(const std::wstring& operationId, DWORD ownerPid);
     bool SameUserSession(HANDLE first, HANDLE second);
     bool IsMediumProcess(HANDLE process);
+    void ValidateApprovalOrigin(HANDLE pipe, DWORD ownerPid);
 }

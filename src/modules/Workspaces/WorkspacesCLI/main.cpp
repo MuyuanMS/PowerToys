@@ -177,6 +177,7 @@ namespace
             throw WorkspacesCli::Error(9, L"timeout", "Operation deadline has expired.");
         WorkspacesCli::OperationLifetime lifetime(parentPid, options.timeoutSeconds * 1000 + 5000, ownerLifetime);
         std::optional<WorkspacesCli::WorkerApproval> approval;
+        std::optional<bool> approvalOriginValid;
         if (args.size() == 6)
         {
             const auto requestWrite = reinterpret_cast<HANDLE>(std::stoull(args[4]));
@@ -189,6 +190,21 @@ namespace
                 return WaitForSingleObject(cancel, 0) == WAIT_OBJECT_0 || GetTickCount64() >= options.deadline;
             });
             options.requestApproval = [&](const auto& name, const auto& path, const auto& arguments, const auto& verification) {
+                if (!ownerLifetime && !approvalOriginValid.has_value())
+                {
+                    try
+                    {
+                        WorkspacesCli::ValidateApprovalOrigin(requestWrite, parentPid);
+                        WorkspacesCli::ValidateApprovalOrigin(responseRead, parentPid);
+                        approvalOriginValid = true;
+                    }
+                    catch (const WorkspacesCli::Error&)
+                    {
+                        approvalOriginValid = false;
+                    }
+                }
+                if (!ownerLifetime && !approvalOriginValid.value_or(false))
+                    return LaunchDecision::UiUnavailable;
                 return approval->Request(name, path, arguments, verification);
             };
         }
