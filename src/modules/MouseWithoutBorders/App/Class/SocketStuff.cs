@@ -912,9 +912,9 @@ namespace MouseWithoutBorders.Class
                 {
                     useName2IP = true;
 
-                    Logger.LogDebug("Using both user-defined Name-to-IP mappings and DNS result for " + machineName);
+                    Logger.LogDebug("Using configured Name-to-IP mappings with DNS lookup for " + machineName);
 
-                    Common.ShowToolTip("Using both user-defined Name-to-IP mappings and DNS result for " + machineName, 3000, ToolTipIcon.Info, false);
+                    Common.ShowToolTip("Using configured Name-to-IP mappings with DNS lookup for " + machineName, 3000, ToolTipIcon.Info, false);
 
                     if (!CheckForSameSubNet(validatedAddresses, machineName))
                     {
