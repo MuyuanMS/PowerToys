@@ -191,6 +191,18 @@ internal sealed class TwoEndpointFixture : IDisposable
             }
         }
 
+        if (cleanupErrors.Count == 0)
+        {
+            Attempt("Remove the owned control directory after successful cleanup", () =>
+            {
+                if (Directory.Exists(controlRoot))
+                {
+                    _ = WinAppSandboxPayload.PlainFiles(controlRoot).ToArray();
+                    RunFiles.RemoveOwnedDirectory(controlRoot, TimeSpan.FromSeconds(45));
+                }
+            });
+        }
+
         status = cleanupErrors.Count == 0 ? "Cleaned" : "RecoveryRequired";
         Attempt("Persist final cleanup outcome", SaveJournal);
         return cleanupErrors;

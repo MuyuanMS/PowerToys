@@ -39,6 +39,24 @@ public sealed class SocketMappingTests
     }
 
     [TestMethod]
+    public void PolicyOnlyMappingsAreSelectedWithoutUserMappings()
+    {
+        const string policyMapping = "POLICY 192.0.2.2";
+
+        Assert.IsTrue(SocketStuff.HasName2IpMappings(policyMapping, string.Empty));
+        CollectionAssert.AreEqual(
+            new[] { policyMapping },
+            SocketStuff.GetName2IpMappingLines(policyMapping, string.Empty));
+    }
+
+    [TestMethod]
+    public void MappingSelectionRequiresAtLeastOneConfiguredSource()
+    {
+        Assert.IsFalse(SocketStuff.HasName2IpMappings(string.Empty, string.Empty));
+        Assert.IsTrue(SocketStuff.HasName2IpMappings(string.Empty, "PEER 192.0.2.1"));
+    }
+
+    [TestMethod]
     public void EmptyMappingListsProduceNoRules()
     {
         CollectionAssert.AreEqual(Array.Empty<string>(), SocketStuff.GetName2IpMappingLines(string.Empty, string.Empty));

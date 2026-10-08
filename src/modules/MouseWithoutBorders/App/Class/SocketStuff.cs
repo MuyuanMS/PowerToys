@@ -901,9 +901,11 @@ namespace MouseWithoutBorders.Class
 
                 Logger.LogDebug("Connecting to: " + machineName);
 
-                if (!string.IsNullOrEmpty(Setting.Values.Name2IP))
+                string policyMappings = Setting.Values.Name2IpPolicyList;
+                string userMappings = Setting.Values.Name2IP;
+                if (HasName2IpMappings(policyMappings, userMappings))
                 {
-                    string[] name2ip = GetName2IpMappingLines(Setting.Values.Name2IpPolicyList, Setting.Values.Name2IP);
+                    string[] name2ip = GetName2IpMappingLines(policyMappings, userMappings);
                     string[] nameNip;
 
                     if (name2ip != null)
@@ -1261,6 +1263,11 @@ namespace MouseWithoutBorders.Class
         {
             string combinedMappings = policyMappings + Separator[0] + userMappings;
             return combinedMappings.Split(Separator, StringSplitOptions.RemoveEmptyEntries);
+        }
+
+        internal static bool HasName2IpMappings(string policyMappings, string userMappings)
+        {
+            return !string.IsNullOrEmpty(policyMappings) || !string.IsNullOrEmpty(userMappings);
         }
 
         private void MainTCPRoutine(TcpSk tcp, string machineName, bool isClient)
