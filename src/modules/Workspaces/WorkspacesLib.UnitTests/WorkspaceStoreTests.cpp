@@ -72,6 +72,72 @@ namespace WorkspacesLibUnitTests
             Assert::AreEqual(std::wstring(L"New editor name"), std::wstring(item.GetNamedString(L"name")));
         }
 
+        TEST_METHOD (ApplicationMetadataUpdatePreservesOtherWorkspaceChanges)
+        {
+            StoreFixture fixture;
+            WorkspacesData::WorkspacesProject project;
+            project.id = Id;
+            project.name = L"Edited name";
+            project.creationTime = 10;
+            WorkspacesData::WorkspacesProject::Application app;
+            app.id = L"app-1";
+            app.path = L"old.exe";
+            app.packageFullName = L"old";
+            project.apps.push_back(app);
+            const auto originalWorkspace = WorkspacesData::WorkspacesProjectJSON::ToJson(project);
+            json::JsonArray initialWorkspaces;
+            initialWorkspaces.Append(originalWorkspace);
+            json::JsonObject originalList;
+            originalList.SetNamedValue(L"workspaces", initialWorkspaces);
+            originalList.SetNamedValue(L"extra", json::value(42));
+            Assert::IsTrue(WorkspaceStore::Write(fixture.file, originalList));
+
+            auto updated = json::JsonObject::Parse(originalWorkspace.Stringify());
+            auto updatedApp = updated.GetNamedArray(L"applications").GetObjectAt(0);
+            updatedApp.SetNamedValue(L"path", json::value(L"new.exe"));
+            updatedApp.SetNamedValue(L"packageFullName", json::value(L"new"));
+
+            auto concurrent = WorkspacesCli::ReadJson(fixture.file);
+            auto concurrentWorkspaces = concurrent->GetNamedArray(L"workspaces");
+            concurrentWorkspaces.Append(json::JsonObject::Parse(LR"({"id":"{00000000-0000-0000-0000-000000000001}","name":"New workspace","applications":[]})"));
+            Assert::IsTrue(WorkspaceStore::Write(fixture.file, *concurrent));
+
+            Assert::IsTrue(WorkspaceStore::UpdateApplicationMetadata(fixture.file, originalWorkspace, updated) == WorkspaceStore::UpdateResult::Updated);
+            const auto savedDocument = WorkspacesCli::ReadJson(fixture.file);
+            const auto saved = savedDocument->GetNamedArray(L"workspaces");
+            Assert::AreEqual(2u, saved.Size());
+            Assert::AreEqual(42.0, savedDocument->GetNamedNumber(L"extra"));
+            Assert::AreEqual(std::wstring(L"New workspace"), std::wstring(saved.GetObjectAt(1).GetNamedString(L"name")));
+            const auto savedApp = saved.GetObjectAt(0).GetNamedArray(L"applications").GetObjectAt(0);
+            Assert::AreEqual(std::wstring(L"new.exe"), std::wstring(savedApp.GetNamedString(L"path")));
+            Assert::AreEqual(std::wstring(L"Edited name"), std::wstring(saved.GetObjectAt(0).GetNamedString(L"name")));
+        }
+
+        TEST_METHOD (ApplicationMetadataUpdateRejectsConcurrentEditToSelectedWorkspace)
+        {
+            StoreFixture fixture;
+            WorkspacesData::WorkspacesProject project;
+            project.id = Id;
+            project.name = L"Edited name";
+            project.creationTime = 10;
+            const auto originalWorkspace = WorkspacesData::WorkspacesProjectJSON::ToJson(project);
+            json::JsonArray workspaces;
+            workspaces.Append(originalWorkspace);
+            json::JsonObject originalList;
+            originalList.SetNamedValue(L"workspaces", workspaces);
+            Assert::IsTrue(WorkspaceStore::Write(fixture.file, originalList));
+
+            auto updated = json::JsonObject::Parse(originalWorkspace.Stringify());
+            updated.SetNamedValue(L"name", json::value(L"Stale launch snapshot"));
+            auto concurrent = WorkspacesCli::ReadJson(fixture.file);
+            concurrent->GetNamedArray(L"workspaces").GetObjectAt(0).SetNamedValue(L"name", json::value(L"New editor name"));
+            Assert::IsTrue(WorkspaceStore::Write(fixture.file, *concurrent));
+
+            Assert::IsTrue(WorkspaceStore::UpdateApplicationMetadata(fixture.file, originalWorkspace, updated) == WorkspaceStore::UpdateResult::Conflict);
+            const auto saved = WorkspacesCli::ReadJson(fixture.file)->GetNamedArray(L"workspaces").GetObjectAt(0);
+            Assert::AreEqual(std::wstring(L"New editor name"), std::wstring(saved.GetNamedString(L"name")));
+        }
+
         TEST_METHOD (DeletedWorkspaceIsNotRecreated)
         {
             StoreFixture fixture;

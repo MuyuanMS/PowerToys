@@ -89,6 +89,15 @@ namespace WorkspaceStore
                         break;
                     }
                 }
+
+                bool SameWorkspaceExceptLaunchTime(const json::JsonObject& first, const json::JsonObject& second)
+                {
+                    auto firstWithoutLaunchTime = json::JsonObject::Parse(first.Stringify());
+                    auto secondWithoutLaunchTime = json::JsonObject::Parse(second.Stringify());
+                    firstWithoutLaunchTime.Remove(L"last-launched-time");
+                    secondWithoutLaunchTime.Remove(L"last-launched-time");
+                    return firstWithoutLaunchTime.Stringify() == secondWithoutLaunchTime.Stringify();
+                }
             }
         }
     }
@@ -118,6 +127,78 @@ namespace WorkspaceStore
             Logger::error("Workspace file could not be saved");
         }
         return false;
+    }
+
+    UpdateResult UpdateApplicationMetadata(const std::filesystem::path& fileName, const json::JsonObject& original, const json::JsonObject& updated)
+    {
+        try
+        {
+            auto lock = Lock(fileName);
+            const auto current = WorkspacesCli::ReadJson(fileName);
+            if (!current)
+                return UpdateResult::Conflict;
+
+            const auto originalId = WorkspacesCli::NormalizeId(original.GetNamedString(L"id").c_str());
+            if (originalId != WorkspacesCli::NormalizeId(updated.GetNamedString(L"id").c_str()))
+                return UpdateResult::Conflict;
+
+            const auto workspaces = current->GetNamedArray(L"workspaces");
+            json::JsonObject selected{ nullptr };
+            for (const auto& value : workspaces)
+            {
+                const auto item = value.GetObjectW();
+                if (WorkspacesCli::NormalizeId(item.GetNamedString(L"id").c_str()) == originalId)
+                {
+                    if (selected)
+                        return UpdateResult::Conflict;
+                    selected = item;
+                }
+            }
+            if (!selected)
+                return UpdateResult::Conflict;
+
+            const auto selectedProject = WorkspacesData::WorkspacesProjectJSON::FromJson(selected);
+            const auto originalProject = WorkspacesData::WorkspacesProjectJSON::FromJson(original);
+            if (!selectedProject || !originalProject ||
+                !SameWorkspaceExceptLaunchTime(WorkspacesData::WorkspacesProjectJSON::ToJson(*selectedProject),
+                                               WorkspacesData::WorkspacesProjectJSON::ToJson(*originalProject)))
+                return UpdateResult::Conflict;
+
+            const auto currentApps = selected.GetNamedArray(L"applications");
+            const auto updatedApps = updated.GetNamedArray(L"applications");
+            if (currentApps.Size() != updatedApps.Size())
+                return UpdateResult::Conflict;
+
+            for (uint32_t index = 0; index < currentApps.Size(); ++index)
+            {
+                const auto currentApp = currentApps.GetObjectAt(index);
+                const auto updatedApp = updatedApps.GetObjectAt(index);
+                for (const auto property : { L"id", L"path", L"packageFullName" })
+                {
+                    if (updatedApp.HasKey(property))
+                        currentApp.SetNamedValue(property, updatedApp.GetNamedValue(property));
+                    else
+                        currentApp.Remove(property);
+                }
+            }
+
+            Commit(fileName, *current);
+            return UpdateResult::Updated;
+        }
+        catch (const VerificationError&)
+        {
+            Logger::error("Workspace replacement completed but verification failed");
+            return UpdateResult::Unverified;
+        }
+        catch (const winrt::hresult_error&)
+        {
+            Logger::warn("Workspace application metadata could not be saved");
+        }
+        catch (const std::exception&)
+        {
+            Logger::warn("Workspace application metadata could not be saved");
+        }
+        return UpdateResult::Failed;
     }
 
     UpdateResult UpdateLastLaunched(const std::filesystem::path& fileName, const std::wstring& workspaceId, time_t timestamp)
