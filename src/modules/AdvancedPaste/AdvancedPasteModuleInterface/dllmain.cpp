@@ -46,6 +46,8 @@ namespace
     const wchar_t JSON_KEY_PROPERTIES[] = L"properties";
     const wchar_t JSON_KEY_CUSTOM_ACTIONS[] = L"custom-actions";
     const wchar_t JSON_KEY_ADDITIONAL_ACTIONS[] = L"additional-actions";
+    const wchar_t JSON_KEY_PASTE_AS_FILE[] = L"paste-as-file";
+    const wchar_t JSON_KEY_PASTE_AS_JPG_FILE[] = L"paste-as-jpg-file";
     const wchar_t JSON_KEY_SHORTCUT[] = L"shortcut";
     const wchar_t JSON_KEY_IS_SHOWN[] = L"isShown";
     const wchar_t JSON_KEY_ID[] = L"id";
@@ -270,6 +272,28 @@ private:
                         coachingHotkey
                     };
                     m_additional_actions.push_back(coachingAction);
+                }
+            }
+        }
+        else if (actionName == JSON_KEY_PASTE_AS_FILE)
+        {
+            // Keep the hotkey sequence stable when older settings omit the JPEG action.
+            const std::vector<winrt::hstring> expectedOrder = {
+                L"paste-as-txt-file",
+                L"paste-as-png-file",
+                JSON_KEY_PASTE_AS_JPG_FILE,
+                L"paste-as-html-file"
+            };
+
+            for (const auto& subActionName : expectedOrder)
+            {
+                if (action.HasKey(subActionName))
+                {
+                    process_additional_action(subActionName, action.GetNamedValue(subActionName), actionIsShown);
+                }
+                else if (subActionName == JSON_KEY_PASTE_AS_JPG_FILE)
+                {
+                    m_additional_actions.push_back({ subActionName.c_str(), {} });
                 }
             }
         }
