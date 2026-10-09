@@ -51,6 +51,8 @@ Function Get-ComponentGuid() {
         [Parameter(Mandatory = $True)]
         [string]$scope,
         [Parameter(Mandatory = $True)]
+        [string]$platform,
+        [Parameter(Mandatory = $True)]
         [string]$installPath,
         [Parameter(Mandatory = $True)]
         [string[]]$fileList
@@ -191,8 +193,8 @@ Function Generate-FileComponents() {
     # $installPath is the unexpanded <fileListName>Path define (e.g. "$(var.BinDir)WinUI3Apps\Assets\ColorPicker\")
     # rather than its resolved value, but it still uniquely identifies the component's target
     # directory and changes if the component is retargeted to a new path/define.
-    $perUserGuid = Get-ComponentGuid -componentId $componentId -scope "perUser" -installPath $installPath -fileList $fileList
-    $perMachineGuid = Get-ComponentGuid -componentId $componentId -scope "perMachine" -installPath $installPath -fileList $fileList
+    $perUserGuid = Get-ComponentGuid -componentId $componentId -scope "perUser" -platform $platform -installPath $installPath -fileList $fileList
+    $perMachineGuid = Get-ComponentGuid -componentId $componentId -scope "perMachine" -platform $platform -installPath $installPath -fileList $fileList
 
     $componentDefs = "`r`n"
     $componentDefs +=
@@ -235,7 +237,7 @@ Function Generate-FileComponents() {
     Set-Content -Path $wxsFilePath -Value $wxsFile
 }
 
-if ($platform -ceq "arm64") {
+if ($platform -ieq "arm64") {
     $platform = "ARM64"
 }
 
