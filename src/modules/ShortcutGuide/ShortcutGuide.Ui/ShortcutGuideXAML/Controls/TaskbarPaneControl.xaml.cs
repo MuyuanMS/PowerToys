@@ -45,6 +45,7 @@ namespace ShortcutGuide.Controls
         /// <param name="overlayPhysicalOriginY">The overlay window's physical top in screen coordinates.</param>
         /// <param name="dpi">DPI scale factor of the host overlay window.</param>
         /// <param name="edge">The screen edge the taskbar is docked to.</param>
+        /// <param name="playEntrance">Whether to play the indicators' entrance animations.</param>
         /// <param name="monitor">The monitor whose taskbar buttons should be queried.</param>
         internal TaskbarPaneLayout? UpdateTasklistButtons(
             int overlayPhysicalOriginX, int overlayPhysicalOriginY, float dpi, TaskbarEdge edge, bool playEntrance, IntPtr monitor)
