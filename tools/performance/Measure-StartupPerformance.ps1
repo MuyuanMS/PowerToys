@@ -1500,9 +1500,17 @@ function Measure-PreviewHandler
     try
     {
         $hostHandle = $hostWindow.Handle
+        $hostHandleValue = if ([IntPtr]::Size -eq 4)
+        {
+            [BitConverter]::ToUInt32([BitConverter]::GetBytes($hostHandle.ToInt32()), 0)
+        }
+        else
+        {
+            [BitConverter]::ToUInt64([BitConverter]::GetBytes($hostHandle.ToInt64()), 0)
+        }
 
         # Same command line as src\modules\previewpane\FileExplorerDllExporter: file, parent HWND, left, right, top, bottom.
-        $arguments = '"{0}" {1:X} 0 {2} 0 {3}' -f (Join-Path $workFolder $handler.Sample), $hostHandle.ToInt64(), $hostWindow.ClientWidth, $hostWindow.ClientHeight
+        $arguments = '"{0}" {1:X} 0 {2} 0 {3}' -f (Join-Path $workFolder $handler.Sample), $hostHandleValue, $hostWindow.ClientWidth, $hostWindow.ClientHeight
 
         for ($iteration = 1; $iteration -le $WarmupIterations + $Iterations; $iteration++)
         {

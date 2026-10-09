@@ -1,6 +1,7 @@
 #include "pch.h"
 #include <ShellScalingApi.h>
 #include <lmcons.h>
+#include <chrono>
 #include <filesystem>
 #include <sstream>
 #include "tray_icon.h"
@@ -72,6 +73,12 @@ namespace
     class StartupStages
     {
     public:
+        StartupStages() :
+            processStartElapsedMs(get_process_elapsed_ms()),
+            monotonicStart(std::chrono::steady_clock::now())
+        {
+        }
+
         void reached(const char* stage)
         {
             const auto ms = ms_since_process_start();
@@ -93,7 +100,7 @@ namespace
         }
 
     private:
-        static uint64_t ms_since_process_start()
+        static uint64_t get_process_elapsed_ms()
         {
             FILETIME creation{}, exit{}, kernel{}, user{};
             if (!GetProcessTimes(GetCurrentProcess(), &creation, &exit, &kernel, &user))
@@ -112,6 +119,15 @@ namespace
             return current > start ? (current - start) / 10'000 : 0;
         }
 
+        uint64_t ms_since_process_start() const
+        {
+            const auto elapsed = std::chrono::steady_clock::now() - monotonicStart;
+            return processStartElapsedMs + static_cast<uint64_t>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count());
+        }
+
+        const uint64_t processStartElapsedMs;
+        const std::chrono::steady_clock::time_point monotonicStart;
         std::string summary;
     };
 }
