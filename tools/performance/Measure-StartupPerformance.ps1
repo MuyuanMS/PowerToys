@@ -103,6 +103,7 @@ if (-not ('PowerToysPerformance.WindowShowRecorder' -as [type]))
     Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -129,6 +130,7 @@ namespace PowerToysPerformance
         private readonly Thread thread;
         private NativeMethods.WinEventProc callback;
         private uint threadId;
+        private Exception hookStartupException;
 
         public WindowShowRecorder()
         {
@@ -136,6 +138,10 @@ namespace PowerToysPerformance
             thread.IsBackground = true;
             thread.Start();
             started.WaitOne();
+            if (hookStartupException != null)
+            {
+                throw new InvalidOperationException("Couldn't start the window-show event hook.", hookStartupException);
+            }
         }
 
         public void Clear()
@@ -180,6 +186,12 @@ namespace PowerToysPerformance
                 0,
                 0,
                 NativeMethods.WINEVENT_OUTOFCONTEXT | NativeMethods.WINEVENT_SKIPOWNPROCESS);
+            if (hook == IntPtr.Zero)
+            {
+                hookStartupException = new Win32Exception(Marshal.GetLastWin32Error());
+                started.Set();
+                return;
+            }
 
             NativeMethods.MSG msg;
             NativeMethods.PeekMessage(out msg, IntPtr.Zero, 0, 0, 0);
@@ -567,7 +579,7 @@ namespace PowerToysPerformance
             public IntPtr InheritedFromUniqueProcessId;
         }
 
-        [DllImport("user32.dll")]
+        [DllImport("user32.dll", SetLastError = true)]
         public static extern IntPtr SetWinEventHook(uint eventMin, uint eventMax, IntPtr hmodWinEventProc, WinEventProc lpfnWinEventProc, uint idProcess, uint idThread, uint dwFlags);
 
         [DllImport("user32.dll")]

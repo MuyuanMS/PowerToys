@@ -110,8 +110,8 @@ foreach ($scenario in $allScenarios)
     }
 }
 
-Write-Host '| Scenario | Metric | n | Baseline median | Candidate median | Change | Baseline P90 | Candidate P90 | Change |'
-Write-Host '|---|---|--:|--:|--:|--:|--:|--:|--:|'
+Write-Output '| Scenario | Metric | n | Baseline median | Candidate median | Change | Baseline P90 | Candidate P90 | Change |'
+Write-Output '|---|---|--:|--:|--:|--:|--:|--:|--:|'
 
 $scenarios = @($baselineSamples | ForEach-Object Scenario | Select-Object -Unique)
 foreach ($scenario in $scenarios)
@@ -131,7 +131,7 @@ foreach ($scenario in $scenarios)
         $medianAfter = Get-Percentile -Values $after -Percentile 0.5
         $p90Before = Get-Percentile -Values $before -Percentile 0.9
         $p90After = Get-Percentile -Values $after -Percentile 0.9
-        Write-Host ('| {0} | {1} | {2}/{3} | {4:0.#} | {5:0.#} | {6} | {7:0.#} | {8:0.#} | {9} |' -f
+        Write-Output ('| {0} | {1} | {2}/{3} | {4:0.#} | {5:0.#} | {6} | {7:0.#} | {8:0.#} | {9} |' -f
             $scenario, $metric, $before.Count, $after.Count,
             $medianBefore, $medianAfter, (Format-Change -From $medianBefore -To $medianAfter),
             $p90Before, $p90After, (Format-Change -From $p90Before -To $p90After))
