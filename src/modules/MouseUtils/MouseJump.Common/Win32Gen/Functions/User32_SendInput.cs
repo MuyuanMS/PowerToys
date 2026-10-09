@@ -49,7 +49,7 @@ internal static partial class User32
         // This function fails when it is blocked by UIPI.
         // Note that neither GetLastError nor the return value will indicate the failure was caused by UIPI blocking.
         var result = PInvoke.SendInput(pInputs, cbSize);
-        return result == (uint)pInputs.Length
+        return result != 0 && result == (uint)pInputs.Length
             ? new Win32Result<uint>(result, success: true)
             : new Win32Result<uint>(result, success: false, lastError: Marshal.GetLastPInvokeError());
     }
