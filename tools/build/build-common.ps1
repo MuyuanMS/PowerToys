@@ -74,8 +74,21 @@ function RunMSBuild {
     # Logs go to <repo>\artifacts\logs\<project name>\, not the project folder: the context-menu
     # projects run MakeAppx on their own folder before compiling, and MSBuild's open log files
     # there make it fail with 0x80070020 (file in use).
-    $projectName = [System.IO.Path]::GetFileNameWithoutExtension($Solution)
-    $logRoot = Join-Path (Get-LogRepoRoot $Solution) "artifacts\logs\$projectName"
+    $normalizedSolution = $Solution.TrimEnd([char[]]@(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    ))
+    $projectName = [System.IO.Path]::GetFileNameWithoutExtension($normalizedSolution)
+    if ([string]::IsNullOrWhiteSpace($projectName)) {
+        $projectName = [System.IO.Path]::GetFileName($normalizedSolution)
+    }
+    if ([string]::IsNullOrWhiteSpace($projectName)) {
+        throw "Cannot determine a project name from '$Solution'."
+    }
+    $logRoot = Get-LogRepoRoot $Solution
+    $logRoot = Join-Path $logRoot 'artifacts'
+    $logRoot = Join-Path $logRoot 'logs'
+    $logRoot = Join-Path $logRoot $projectName
     New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
 
     $cfg = $null
