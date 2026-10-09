@@ -193,7 +193,11 @@ namespace PowerToysPerformance
                 return;
             }
 
-            long timestamp = Stopwatch.GetTimestamp();
+            // Map the OS event tick count onto Stopwatch's clock; callbacks can wait in this thread's queue.
+            long callbackTimestamp = Stopwatch.GetTimestamp();
+            uint callbackTickCount = unchecked((uint)Environment.TickCount);
+            uint callbackDelayMilliseconds = unchecked(callbackTickCount - eventTime);
+            long timestamp = callbackTimestamp - (long)callbackDelayMilliseconds * Stopwatch.Frequency / 1000;
             uint processId;
             NativeMethods.GetWindowThreadProcessId(hwnd, out processId);
             StringBuilder className = new StringBuilder(256);

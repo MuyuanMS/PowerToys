@@ -61,14 +61,17 @@ Set `$platform` to lowercase `x64` or `arm64`, because the publish profiles buil
 
 Machines drift, so alternate the runs between the builds, and pass all the result files to the compare script. It pools the samples of each side:
 
+Use a fresh output directory for each comparison so previous runs with the same labels are not included.
+
 ```powershell
 $measure = '.\tools\performance\Measure-StartupPerformance.ps1'
-& $measure -PowerToysRoot C:\builds\main -Label main -Iterations 5 -AllowPowerToysDataRestore
-& $measure -PowerToysRoot C:\builds\change -Label change -Iterations 5 -AllowPowerToysDataRestore
-& $measure -PowerToysRoot C:\builds\change -Label change -Iterations 5 -AllowPowerToysDataRestore
-& $measure -PowerToysRoot C:\builds\main -Label main -Iterations 5 -AllowPowerToysDataRestore
+$outputDirectory = Join-Path $env:TEMP ("PowerToys-Startup-Performance-" + [guid]::NewGuid().ToString('N'))
+& $measure -PowerToysRoot C:\builds\main -Label main -Iterations 5 -AllowPowerToysDataRestore -OutputDirectory $outputDirectory
+& $measure -PowerToysRoot C:\builds\change -Label change -Iterations 5 -AllowPowerToysDataRestore -OutputDirectory $outputDirectory
+& $measure -PowerToysRoot C:\builds\change -Label change -Iterations 5 -AllowPowerToysDataRestore -OutputDirectory $outputDirectory
+& $measure -PowerToysRoot C:\builds\main -Label main -Iterations 5 -AllowPowerToysDataRestore -OutputDirectory $outputDirectory
 
-.\tools\performance\Compare-StartupPerformance.ps1 -Baseline (Get-ChildItem $env:TEMP\PowerToys-Startup-Performance\main-*.json) -Candidate (Get-ChildItem $env:TEMP\PowerToys-Startup-Performance\change-*.json)
+.\tools\performance\Compare-StartupPerformance.ps1 -Baseline (Get-ChildItem (Join-Path $outputDirectory 'main-*.json')) -Candidate (Get-ChildItem (Join-Path $outputDirectory 'change-*.json'))
 ```
 
 ## Before you run it
