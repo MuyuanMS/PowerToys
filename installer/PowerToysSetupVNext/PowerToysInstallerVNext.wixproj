@@ -31,10 +31,6 @@ call "..\..\..\publish.cmd" arm64
 call powershell.exe -NonInteractive -executionpolicy Unrestricted -File $(MSBuildThisFileDirectory)\generateMonacoWxs.ps1 -monacoWxsFile "$(MSBuildThisFileDirectory)\MonacoSRC.wxs" -Platform "$(Platform)" -nugetHeatPath "$(NUGET_PACKAGES)\wixtoolset.heat\5.0.2"
     </PreBuildEvent>
   </PropertyGroup>
-  <!-- The common PreBuildEvent target checks the command itself, so clear it for MSI-only steps. -->
-  <PropertyGroup Condition="'$(RunBuildEvents)'=='false'">
-    <PreBuildEvent></PreBuildEvent>
-  </PropertyGroup>
   <PropertyGroup Label="UserMacros" Condition=" '$(PerUser)' == 'true' ">
     <DefineConstants>$(DefineConstants);PerUser=true</DefineConstants>
   </PropertyGroup>
