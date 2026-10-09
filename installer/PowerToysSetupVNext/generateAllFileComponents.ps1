@@ -174,8 +174,8 @@ Function Generate-FileComponents() {
         }
     }
 
-    if (-not $installPathFound) {
-        throw "Expected WiX preprocessor define '<?define $($fileListName)Path=...?>' was not found in '$wxsFilePath'."
+    if (-not $installPathFound -or [string]::IsNullOrWhiteSpace($installPath)) {
+        throw "Expected WiX preprocessor define '<?define $($fileListName)Path=...?>' was missing or empty in '$wxsFilePath'."
     }
     if (-not $fileListFound) {
         throw "Expected WiX preprocessor define '<?define $($fileListName)=...?>' was not found in '$wxsFilePath'."
