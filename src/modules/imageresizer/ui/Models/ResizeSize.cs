@@ -53,8 +53,8 @@ namespace ImageResizer.Models
         public bool HasAuto
             => Width == 0 || Height == 0 || double.IsNaN(Width) || double.IsNaN(Height);
 
-        // Declared after the hand-written properties so System.Text.Json keeps the existing
-        // settings.json key order (these were previously generated members, emitted last).
+        // Declared after the hand-written properties to match the existing settings.json key
+        // order observed in the before/after serialization comparison.
         [ObservableProperty]
         [JsonPropertyName("Id")]
         public partial int Id { get; set; }
