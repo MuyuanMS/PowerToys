@@ -1675,6 +1675,39 @@ function Get-ModuleProfile
     }
 }
 
+function Test-FileContainsAsciiText
+{
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$Text
+    )
+
+    $encoding = [Text.Encoding]::ASCII
+    $buffer = New-Object byte[] 65536
+    $tail = ''
+    $stream = [IO.File]::OpenRead($Path)
+    try
+    {
+        while (($bytesRead = $stream.Read($buffer, 0, $buffer.Length)) -gt 0)
+        {
+            $chunk = $tail + $encoding.GetString($buffer, 0, $bytesRead)
+            if ($chunk.IndexOf($Text, [StringComparison]::Ordinal) -ge 0)
+            {
+                return $true
+            }
+
+            $tailLength = [Math]::Min($chunk.Length, $Text.Length - 1)
+            $tail = if ($tailLength -gt 0) { $chunk.Substring($chunk.Length - $tailLength) } else { '' }
+        }
+    }
+    finally
+    {
+        $stream.Dispose()
+    }
+
+    return $false
+}
+
 if (-not (Test-Path -LiteralPath $runnerPath))
 {
     throw "PowerToys.exe wasn't found in $root."
@@ -1737,7 +1770,7 @@ if (($Scenario -contains 'Runner' -or $Scenario -contains 'Settings') -and (Test
 }
 
 # Fail before stopping anything when the runner can't report its stages.
-if ($Scenario -contains 'Runner' -and -not [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($runnerPath)).Contains('Startup stages (ms since process start)'))
+if ($Scenario -contains 'Runner' -and -not (Test-FileContainsAsciiText -Path $runnerPath -Text 'Startup stages (ms since process start)'))
 {
     throw "The Runner scenario needs a runner that logs its startup stages, and $runnerPath doesn't. Measure a newer build, or leave out Runner."
 }
