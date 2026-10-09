@@ -297,8 +297,19 @@ internal sealed class LockingProcessFixture : IDisposable
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
         do
         {
-            var started = Process.GetProcessesByName(LockerProcessName)
-                .FirstOrDefault(process => !knownProcessIds.Contains(process.Id));
+            Process? started = null;
+            foreach (var process in Process.GetProcessesByName(LockerProcessName))
+            {
+                if (started is null && !knownProcessIds.Contains(process.Id))
+                {
+                    started = process;
+                }
+                else
+                {
+                    process.Dispose();
+                }
+            }
+
             if (started is not null)
             {
                 return started;

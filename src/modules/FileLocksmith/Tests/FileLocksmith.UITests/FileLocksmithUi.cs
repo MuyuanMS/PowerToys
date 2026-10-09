@@ -141,7 +141,10 @@ internal static class FileLocksmithUi
             }
 
             ClickReload(ui);
-            WaitForLoaded(ui, timeoutMS: 30_000);
+            if (!WaitForLoaded(ui, timeoutMS: 30_000))
+            {
+                return false;
+            }
         }
     }
 
