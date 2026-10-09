@@ -146,11 +146,19 @@ namespace PowerToysPerformance
             }
         }
 
-        public WindowShowEvent[] GetEvents()
+        public WindowShowEvent[] GetEventsSince(int startIndex)
         {
             lock (sync)
             {
-                return events.ToArray();
+                if (startIndex >= events.Count)
+                {
+                    return Array.Empty<WindowShowEvent>();
+                }
+
+                int count = events.Count - startIndex;
+                var result = new WindowShowEvent[count];
+                events.CopyTo(startIndex, result, 0, count);
+                return result;
             }
         }
 
@@ -839,10 +847,13 @@ function Wait-WindowShown
         [int]$TimeoutMs = 60000
     )
 
+    $eventIndex = 0
     $stopwatch = [Diagnostics.Stopwatch]::StartNew()
     do
     {
-        foreach ($showEvent in $script:recorder.GetEvents())
+        $newEvents = $script:recorder.GetEventsSince($eventIndex)
+        $eventIndex += $newEvents.Length
+        foreach ($showEvent in $newEvents)
         {
             if (& $Match $showEvent)
             {
@@ -1136,7 +1147,15 @@ function Wait-RunnerStartupStages
                 }
 
                 $null = $stream.Seek($offset, 'Begin')
-                $text = [IO.StreamReader]::new($stream).ReadToEnd()
+                $reader = [IO.StreamReader]::new($stream)
+                try
+                {
+                    $text = $reader.ReadToEnd()
+                }
+                finally
+                {
+                    $reader.Dispose()
+                }
             }
             finally
             {
