@@ -16,6 +16,15 @@ namespace WorkspaceStore
             VerificationError() : std::runtime_error("Workspace replacement could not be verified") {}
         };
 
+        bool SameWorkspaceExceptLaunchTime(const json::JsonObject& first, const json::JsonObject& second)
+        {
+            auto firstWithoutLaunchTime = json::JsonObject::Parse(first.Stringify());
+            auto secondWithoutLaunchTime = json::JsonObject::Parse(second.Stringify());
+            firstWithoutLaunchTime.Remove(L"last-launched-time");
+            secondWithoutLaunchTime.Remove(L"last-launched-time");
+            return firstWithoutLaunchTime.Stringify() == secondWithoutLaunchTime.Stringify();
+        }
+
         wil::unique_handle Lock(const std::filesystem::path& path)
         {
             const auto lockPath = path.wstring() + L".lock";
@@ -88,15 +97,6 @@ namespace WorkspaceStore
                             item.SetNamedValue(L"last-launched-time", old.GetNamedValue(L"last-launched-time"));
                         break;
                     }
-                }
-
-                bool SameWorkspaceExceptLaunchTime(const json::JsonObject& first, const json::JsonObject& second)
-                {
-                    auto firstWithoutLaunchTime = json::JsonObject::Parse(first.Stringify());
-                    auto secondWithoutLaunchTime = json::JsonObject::Parse(second.Stringify());
-                    firstWithoutLaunchTime.Remove(L"last-launched-time");
-                    secondWithoutLaunchTime.Remove(L"last-launched-time");
-                    return firstWithoutLaunchTime.Stringify() == secondWithoutLaunchTime.Stringify();
                 }
             }
         }
