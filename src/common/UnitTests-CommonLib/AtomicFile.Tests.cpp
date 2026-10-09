@@ -122,6 +122,16 @@ namespace UnitTestsCommonLib
     TEST_CLASS (AtomicFileTests)
     {
     public:
+        TEST_METHOD_INITIALIZE (InitializeWinRT)
+        {
+            winrt::init_apartment();
+        }
+
+        TEST_METHOD_CLEANUP (UninitializeWinRT)
+        {
+            winrt::uninit_apartment();
+        }
+
         TEST_METHOD (WriteCreatesAndReplacesUtf8Json)
         {
             TemporaryDirectory directory;
