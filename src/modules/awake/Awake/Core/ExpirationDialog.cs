@@ -146,7 +146,14 @@ namespace Awake.Core
                     switch ((int)(wParam.ToInt64() & 0xFFFF))
                     {
                         case Native.Constants.IDOK:
-                            DateTimeOffset expireAt = new(ReadPickers(hDlg));
+                            DateTime localExpiration = ReadPickers(hDlg);
+                            if (TimeZoneInfo.Local.IsInvalidTime(localExpiration))
+                            {
+                                _ = Bridge.MessageBox(hDlg, Resources.AWAKE_EXPIRATION_DIALOG_INVALID_TIME, Constants.FullAppName, Native.Constants.MB_OK | Native.Constants.MB_ICONWARNING);
+                                return 1;
+                            }
+
+                            DateTimeOffset expireAt = new(localExpiration);
                             if (expireAt <= DateTimeOffset.Now)
                             {
                                 _ = Bridge.MessageBox(hDlg, Resources.AWAKE_EXPIRATION_DIALOG_PAST, Constants.FullAppName, Native.Constants.MB_OK | Native.Constants.MB_ICONWARNING);

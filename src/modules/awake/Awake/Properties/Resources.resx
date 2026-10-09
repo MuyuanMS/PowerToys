@@ -124,6 +124,10 @@
     <value>Cancel</value>
     <comment>Button that closes the expiration dialog without changes.</comment>
   </data>
+  <data name="AWAKE_EXPIRATION_DIALOG_INVALID_TIME" xml:space="preserve">
+    <value>This local time does not exist because the time zone changes its clock. Please choose a different time.</value>
+    <comment>Warning shown when the picked expiration date and time falls in a local daylight-saving or time-zone transition gap.</comment>
+  </data>
   <data name="AWAKE_EXPIRATION_DIALOG_LABEL" xml:space="preserve">
     <value>Keep awake until:</value>
     <comment>Label above the date and time pickers in the expiration dialog opened from the tray menu.</comment>

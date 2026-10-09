@@ -187,6 +187,15 @@ namespace Awake.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to This local time does not exist because the time zone changes its clock. Please choose a different time..
+        /// </summary>
+        internal static string AWAKE_EXPIRATION_DIALOG_INVALID_TIME {
+            get {
+                return ResourceManager.GetString("AWAKE_EXPIRATION_DIALOG_INVALID_TIME", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Keep awake until:.
         /// </summary>
         internal static string AWAKE_EXPIRATION_DIALOG_LABEL {
