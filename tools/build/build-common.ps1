@@ -18,7 +18,9 @@ Dot-source this file from a script to load helpers:
 . "$PSScriptRoot\build-common.ps1"
 
 ERROR DETAILS
-When a build fails, check the logs written next to the solution/project folder:
+When a build fails, check the logs in <repo>\artifacts\logs\<project name>\, where <repo> is the repo/worktree
+containing the project being built (first parent folder with PowerToys.slnx) and <project name> is the
+solution or project file name without its extension, or the directory name for a direct directory path:
 - build.<configuration>.<platform>.all.log — full MSBuild text log
 - build.<configuration>.<platform>.errors.log — extracted errors only
 - build.<configuration>.<platform>.warnings.log — extracted warnings only
@@ -28,6 +30,55 @@ When a build fails, check the logs written next to the solution/project folder:
 Do not execute this file directly; dot-source it from `build.ps1` or `build-installer.ps1` so helpers are available in your script scope.
 #>
 
+function Resolve-BuildInputPath {
+    param (
+        [Parameter(Mandatory)]
+        [string]$Path
+    )
+
+    if ([System.IO.Path]::IsPathRooted($Path)) {
+        return [System.IO.Path]::GetFullPath($Path)
+    }
+
+    $workingPath = [System.IO.Path]::GetFullPath((Join-Path (Get-Location).Path $Path))
+    if (Test-Path -LiteralPath $workingPath) {
+        return $workingPath
+    }
+
+    if ($script:RepoRoot) {
+        return [System.IO.Path]::GetFullPath((Join-Path $script:RepoRoot $Path))
+    }
+
+    return $workingPath
+}
+
+function Get-LogRepoRoot {
+    param (
+        [string]$Solution
+    )
+
+    $fallback = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+    if (-not $Solution) { return $fallback }
+
+    try {
+        $fullPath = Resolve-BuildInputPath $Solution
+        $item = Get-Item -LiteralPath $fullPath -ErrorAction Stop
+        $dir = if ($item.PSIsContainer) { $item.FullName } else { $item.DirectoryName }
+        while ($dir) {
+            if (Test-Path -LiteralPath (Join-Path $dir 'PowerToys.slnx') -PathType Leaf) {
+                return $dir
+            }
+            $parent = Split-Path $dir -Parent
+            if ($parent -eq $dir) { break }
+            $dir = $parent
+        }
+    } catch {
+        Write-Verbose ("Could not resolve the project repo root for '{0}'; falling back to the build-script repo root. {1}" -f $Solution, $_.Exception.Message)
+    }
+
+    return $fallback
+}
+
 function RunMSBuild {
     param (
         [string]$Solution,
@@ -36,9 +87,31 @@ function RunMSBuild {
         [string]$Configuration
     )
 
-    # Prefer the solution's folder for logs; fall back to current directory
-    $logRoot = Split-Path -Path $Solution
-    if (-not $logRoot) { $logRoot = '.' }
+    # Logs go to <repo>\artifacts\logs\<project name>\, not the project folder: the context-menu
+    # projects run MakeAppx on their own folder before compiling, and MSBuild's open log files
+    # there make it fail with 0x80070020 (file in use).
+    $resolvedSolution = Resolve-BuildInputPath $Solution
+    $item = Get-Item -LiteralPath $resolvedSolution -ErrorAction SilentlyContinue
+    $projectName = if ($item -and $item.PSIsContainer) {
+        $item.Name
+    } else {
+        [System.IO.Path]::GetFileNameWithoutExtension($resolvedSolution)
+    }
+    if ([string]::IsNullOrWhiteSpace($projectName)) {
+        $projectName = [System.IO.Path]::GetFileName($resolvedSolution)
+    }
+    if ([string]::IsNullOrWhiteSpace($projectName) -and
+        (Test-Path -LiteralPath (Join-Path $resolvedSolution 'PowerToys.slnx') -PathType Leaf)) {
+        $projectName = 'PowerToys'
+    }
+    if ([string]::IsNullOrWhiteSpace($projectName)) {
+        throw "Cannot determine a project name from '$Solution'."
+    }
+    $logRoot = Get-LogRepoRoot $Solution
+    $logRoot = Join-Path $logRoot 'artifacts'
+    $logRoot = Join-Path $logRoot 'logs'
+    $logRoot = Join-Path $logRoot $projectName
+    New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
 
     $cfg = $null
     if ($Configuration) { $cfg = $Configuration.ToLower() } else { $cfg = 'unknown' }
@@ -51,7 +124,7 @@ function RunMSBuild {
     $binLog = Join-Path $logRoot ("build.{0}.{1}.trace.binlog" -f $cfg, $plat)
 
     $base = @(
-        $Solution
+        $resolvedSolution
         "/p:Platform=$Platform"
         "/p:Configuration=$Configuration"
         "/verbosity:normal"
