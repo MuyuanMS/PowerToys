@@ -201,7 +201,7 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
     // Exclusive scheduler ensures writes to the extension's Text property are
     // serialized in the order they were submitted from the UI, so rapid
     // typing can't deliver updates out of order.
-    private readonly TaskFactory _writeTaskFactory = new(new ConcurrentExclusiveSchedulerPair().ExclusiveScheduler);
+    private readonly TaskFactory _writeTaskFactory;
 
     private ExtensionObject<IStringParameterRun> _model;
 
@@ -213,8 +213,14 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
     public string TextForUI { get => _modelText; set => SetTextFromUi(value); }
 
     public StringParameterRunViewModel(IStringParameterRun stringRun, WeakReference<IPageContext> context)
+        : this(stringRun, context, new ConcurrentExclusiveSchedulerPair().ExclusiveScheduler)
+    {
+    }
+
+    internal StringParameterRunViewModel(IStringParameterRun stringRun, WeakReference<IPageContext> context, TaskScheduler writeScheduler)
         : base(stringRun, context)
     {
+        _writeTaskFactory = new(writeScheduler);
         _model = new(stringRun);
     }
 
@@ -318,6 +324,7 @@ public partial class StringParameterRunViewModel : ParameterValueRunViewModel, I
                 var newText = model.Text;
                 if (newText != _modelText)
                 {
+                    CancelAndDisposeTokenSource(ref _writeCancellationTokenSource);
                     _modelText = newText;
                     UpdateProperty(nameof(TextForUI));
                 }
