@@ -241,7 +241,7 @@ namespace Awake.Core.Native
         internal static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
 
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        internal static extern int GetLocaleInfoEx(string? lpLocaleName, uint lcType, [Out] char[] lpLCData, int cchData);
+        internal static extern int GetLocaleInfoEx(string? lpLocaleName, uint lcType, [Out] char[]? lpLCData, int cchData);
 
         [DllImport("comctl32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]

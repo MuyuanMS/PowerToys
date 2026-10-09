@@ -246,10 +246,18 @@ namespace Awake.Core
         // format gets en spaces; a regular space is too narrow to be noticed.
         private static string SetPaddedFormat(IntPtr picker, uint localeFormat, bool padEnd)
         {
-            char[] buffer = new char[80];
-            int length = Bridge.GetLocaleInfoEx(null, localeFormat, buffer, buffer.Length);
+            int length = Bridge.GetLocaleInfoEx(null, localeFormat, null, 0);
+            if (length <= 0)
+            {
+                Logger.LogError($"Failed to query locale format {localeFormat}. Error code: {Marshal.GetLastWin32Error()}");
+                return string.Empty;
+            }
+
+            char[] buffer = new char[length];
+            length = Bridge.GetLocaleInfoEx(null, localeFormat, buffer, buffer.Length);
             if (length <= 1)
             {
+                Logger.LogError($"Failed to retrieve locale format {localeFormat}. Error code: {Marshal.GetLastWin32Error()}");
                 return string.Empty;
             }
 
