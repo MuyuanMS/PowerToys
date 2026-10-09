@@ -709,19 +709,32 @@ function Get-RootProcesses
     # Opening the handle first means the process id can't be reused while the path is checked or
     # while the caller uses the process. Dispose the processes when done with them.
     $prefix = $Folder.TrimEnd('\') + '\'
-    return @(Get-Process -Name $Name -ErrorAction SilentlyContinue | Where-Object {
+    $rootProcesses = [Collections.Generic.List[Diagnostics.Process]]::new()
+    foreach ($process in Get-Process -Name $Name -ErrorAction SilentlyContinue)
+    {
         $path = $null
+        $isRootProcess = $false
         try
         {
-            $null = $_.Handle
-            $path = $_.Path
+            $null = $process.Handle
+            $path = $process.Path
+            $isRootProcess = $path -and $path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)
         }
         catch
         {
         }
 
-        $path -and $path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)
-    })
+        if ($isRootProcess)
+        {
+            $rootProcesses.Add($process)
+        }
+        else
+        {
+            $process.Dispose()
+        }
+    }
+
+    return $rootProcesses.ToArray()
 }
 
 function Stop-Processes
@@ -1127,7 +1140,7 @@ function Get-RunnerLogOffsets
     $offsets = @{}
     foreach ($file in Get-ChildItem -Path $runnerLogFolder -Filter 'runner-log*.log' -ErrorAction SilentlyContinue)
     {
-        $stream = [IO.File]::Open($file.FullName, 'Open', 'Read', 'ReadWrite, Delete')
+        $stream = [IO.File]::Open($file.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)
         try { $offsets[$file.FullName] = $stream.Length } finally { $stream.Dispose() }
     }
 
@@ -1150,7 +1163,7 @@ function Wait-RunnerStartupStages
                 $offset = $Offsets[$file.FullName]
             }
 
-            $stream = [IO.File]::Open($file.FullName, 'Open', 'Read', 'ReadWrite, Delete')
+            $stream = [IO.File]::Open($file.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)
             try
             {
                 if ($stream.Length -le $offset)
@@ -1366,10 +1379,17 @@ function Close-Settings
 {
     param([Parameter(Mandatory)][Diagnostics.Process]$Process)
 
-    $null = $Process.CloseMainWindow()
-    if (-not $Process.WaitForExit(5000))
+    try
     {
-        Stop-Processes -Processes @($Process)
+        $null = $Process.CloseMainWindow()
+        if (-not $Process.WaitForExit(5000))
+        {
+            Stop-Processes -Processes @($Process)
+        }
+    }
+    finally
+    {
+        $Process.Dispose()
     }
 }
 
@@ -1398,7 +1418,18 @@ function Measure-Settings
             $stopwatch = [Diagnostics.Stopwatch]::StartNew()
             while ($null -eq $settings -and $stopwatch.ElapsedMilliseconds -lt 30000)
             {
-                $settings = Get-RootProcesses -Name 'PowerToys.Settings' | Where-Object { $_.Id -notin $existingIds } | Select-Object -First 1
+                foreach ($candidate in Get-RootProcesses -Name 'PowerToys.Settings')
+                {
+                    if ($null -eq $settings -and $candidate.Id -notin $existingIds)
+                    {
+                        $settings = $candidate
+                    }
+                    else
+                    {
+                        $candidate.Dispose()
+                    }
+                }
+
                 if ($null -eq $settings)
                 {
                     Start-Sleep -Milliseconds 10
