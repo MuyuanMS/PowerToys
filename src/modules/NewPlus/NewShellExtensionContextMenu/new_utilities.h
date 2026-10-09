@@ -522,7 +522,7 @@ namespace newplus::utilities
                             0,
                             nullptr,
                             REG_OPTION_NON_VOLATILE,
-                            KEY_ALL_ACCESS,
+                            KEY_SET_VALUE,
                             nullptr,
                             &key,
                             nullptr) != ERROR_SUCCESS)
@@ -550,7 +550,7 @@ namespace newplus::utilities
         const LONG open_result = RegOpenKeyExW(HKEY_CURRENT_USER,
                                                built_in_new_registry_path,
                                                0,
-                                               KEY_ALL_ACCESS,
+                                               KEY_SET_VALUE,
                                                &key);
         if (open_result != ERROR_SUCCESS)
         {
