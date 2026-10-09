@@ -160,10 +160,10 @@ Function Generate-FileComponents() {
     $wxsFile | ForEach-Object {
         if ($_ -match "(<?define $($fileListName)Path=)(.*)\?>") {
             [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', 'installPath',
-            Justification = 'variable is used in another scope')]
+            Justification = 'variable is used after the pipeline')]
 
             $installPath = $matches[2]
-            return
+            return $_
         }
         if ($_ -match "(<?define $fileListName=)(.*)\?>") {
             [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', 'fileList',
