@@ -284,10 +284,17 @@ int runner(bool isProcessElevated, bool openSettings, std::string settingsWindow
         // When running elevated, we try to clean up the device registration from previous installations.
         // A user-scope installer can't remove the HKCR / HKLM WOW6432Node registration due to lack of permissions,
         // and upgrades from 0.87 or older may still have it, so the elevated runner is the only place this reliably happens.
-        // The cleanup only needs to happen once, so a marker is recorded after the first elevated run and checked on later starts.
-        if (isProcessElevated && !is_video_conference_cleanup_done() && clean_video_conference())
+        // The HKCR cleanup is per-user, so a marker is recorded after the first successful elevated run for this user and checked on later starts.
+        if (isProcessElevated && !is_video_conference_cleanup_done())
         {
-            mark_video_conference_cleanup_done();
+            if (clean_video_conference())
+            {
+                mark_video_conference_cleanup_done();
+            }
+            else
+            {
+                Logger::warn(L"Failed to clean up Video Conference Mute registry entries; cleanup will be retried on the next elevated start");
+            }
         }
 
         // Load PowerToys DLLs
