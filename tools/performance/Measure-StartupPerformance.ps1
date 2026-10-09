@@ -1070,6 +1070,87 @@ function Test-LogFile
     return $parts[-1] -match '(\.etl|\d{4}-\d{2}-\d{2}\.(log|txt))$'
 }
 
+function Test-ReparsePoint
+{
+    param([Parameter(Mandatory)][IO.FileSystemInfo]$Item)
+
+    return ($Item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
+}
+
+function Get-DataFolderItems
+{
+    param([Parameter(Mandatory)][string]$Path)
+
+    $root = Get-Item -LiteralPath $Path -Force
+    if (-not $root.PSIsContainer -or (Test-ReparsePoint -Item $root))
+    {
+        throw "PowerToys data folder '$Path' must be a directory and cannot be a reparse point."
+    }
+
+    $pending = New-Object 'System.Collections.Generic.Stack[string]'
+    $pending.Push($root.FullName)
+    while ($pending.Count -gt 0)
+    {
+        $directory = $pending.Pop()
+        foreach ($item in Get-ChildItem -LiteralPath $directory -Force)
+        {
+            if (Test-ReparsePoint -Item $item)
+            {
+                continue
+            }
+
+            $item
+            if ($item.PSIsContainer)
+            {
+                $pending.Push($item.FullName)
+            }
+        }
+    }
+}
+
+function Ensure-DataFolderPath
+{
+    param([Parameter(Mandatory)][string]$RelativePath)
+
+    if (-not (Test-Path -LiteralPath $powerToysDataFolder))
+    {
+        $null = New-Item -ItemType Directory -Force -Path $powerToysDataFolder
+    }
+
+    $root = Get-Item -LiteralPath $powerToysDataFolder -Force
+    if (-not $root.PSIsContainer -or (Test-ReparsePoint -Item $root))
+    {
+        throw "PowerToys data folder '$powerToysDataFolder' must be a directory and cannot be a reparse point."
+    }
+
+    $parts = $RelativePath -split '[\\/]'
+    $parent = $powerToysDataFolder
+    for ($i = 0; $i -lt $parts.Count - 1; $i++)
+    {
+        $parent = Join-Path $parent $parts[$i]
+        if (-not (Test-Path -LiteralPath $parent))
+        {
+            $null = New-Item -ItemType Directory -Force -Path $parent
+        }
+
+        $directory = Get-Item -LiteralPath $parent -Force
+        if (-not $directory.PSIsContainer -or (Test-ReparsePoint -Item $directory))
+        {
+            throw "PowerToys data path '$parent' must be a directory and cannot be a reparse point."
+        }
+    }
+
+    $target = Join-Path $powerToysDataFolder $RelativePath
+    if (Test-Path -LiteralPath $target)
+    {
+        $item = Get-Item -LiteralPath $target -Force
+        if (Test-ReparsePoint -Item $item)
+        {
+            throw "PowerToys data path '$target' cannot be a reparse point."
+        }
+    }
+}
+
 function Save-DataFolder
 {
     # A build of another version rewrites shared files: version stamps in settings.json and
@@ -1083,7 +1164,7 @@ function Save-DataFolder
 
     if (Test-Path -LiteralPath $powerToysDataFolder)
     {
-        foreach ($item in Get-ChildItem -LiteralPath $powerToysDataFolder -Recurse -Force)
+        foreach ($item in Get-DataFolderItems -Path $powerToysDataFolder)
         {
             $relative = $item.FullName.Substring($powerToysDataFolder.Length + 1)
             if ($item.PSIsContainer)
@@ -1110,13 +1191,19 @@ function Restore-DataFolder
 
     if (Test-Path -LiteralPath $powerToysDataFolder)
     {
-        foreach ($file in @(Get-ChildItem -LiteralPath $powerToysDataFolder -Recurse -File -Force))
+        foreach ($file in @(Get-DataFolderItems -Path $powerToysDataFolder | Where-Object { -not $_.PSIsContainer }))
         {
             $relative = $file.FullName.Substring($powerToysDataFolder.Length + 1)
             if (-not $snapshot.Files.Contains($relative) -and -not (Test-LogFile -RelativePath $relative))
             {
                 try
                 {
+                    $currentFile = Get-Item -LiteralPath $file.FullName -Force
+                    if (Test-ReparsePoint -Item $currentFile)
+                    {
+                        continue
+                    }
+
                     Remove-Item -LiteralPath $file.FullName -Force
                 }
                 catch
@@ -1134,12 +1221,12 @@ function Restore-DataFolder
         $target = Join-Path $powerToysDataFolder $relative
         try
         {
+            Ensure-DataFolderPath -RelativePath $relative
             if ((Test-Path -LiteralPath $target) -and (Get-FileHash -LiteralPath $target).Hash -eq (Get-FileHash -LiteralPath $source).Hash)
             {
                 continue
             }
 
-            $null = New-Item -ItemType Directory -Force -Path (Split-Path $target -Parent)
             Copy-Item -LiteralPath $source -Destination $target -Force
         }
         catch
@@ -1152,11 +1239,12 @@ function Restore-DataFolder
     # Folders that the run created go too, unless they hold logs.
     if (Test-Path -LiteralPath $powerToysDataFolder)
     {
-        $folders = @(Get-ChildItem -LiteralPath $powerToysDataFolder -Recurse -Directory -Force | Sort-Object { $_.FullName.Length } -Descending)
+        $folders = @(Get-DataFolderItems -Path $powerToysDataFolder | Where-Object { $_.PSIsContainer } | Sort-Object { $_.FullName.Length } -Descending)
         foreach ($folder in $folders)
         {
             $relative = $folder.FullName.Substring($powerToysDataFolder.Length + 1)
-            if (-not $snapshot.Folders.Contains($relative) -and $null -eq (Get-ChildItem -LiteralPath $folder.FullName -Force | Select-Object -First 1))
+            $currentFolder = Get-Item -LiteralPath $folder.FullName -Force
+            if (-not (Test-ReparsePoint -Item $currentFolder) -and -not $snapshot.Folders.Contains($relative) -and $null -eq (Get-ChildItem -LiteralPath $folder.FullName -Force | Select-Object -First 1))
             {
                 Remove-Item -LiteralPath $folder.FullName -Force -ErrorAction SilentlyContinue
             }
