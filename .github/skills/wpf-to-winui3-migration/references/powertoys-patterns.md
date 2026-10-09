@@ -124,6 +124,7 @@ public partial class ResizeSize : ObservableObject  // MUST be partial
     public partial int Id { get; set; }
 
     [ObservableProperty]
+    [JsonPropertyName("fit")]
     [NotifyPropertyChangedFor(nameof(ShowHeight))]  // Replaces manual UpdateShowHeight()
     public partial ResizeFit Fit { get; set; } = ResizeFit.Fit;
 
