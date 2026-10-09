@@ -47,8 +47,7 @@ Describe 'UI test signing selection' {
         'PowerRename.UITests',
         'PowerRename.UITests.Next',
         'RegistryPreview.UITests',
-        'Workspaces.UITests.Next',
-        'ZoomIt.UITests'
+        'Workspaces.UITests.Next'
     )
 
     It 'requires both IPC companions for <Module>' -TestCases @(
@@ -70,7 +69,6 @@ Describe 'UI test signing selection' {
         'AdvancedPaste.UITests.Next.Extra',
         'FancyZones.UITests.Next',
         'Workspaces.Editor.UITests',
-        'ZoomIt.UITests.Extra',
         'FileLocksmith.UITests' | ForEach-Object { @{ Module = $_ } }
     ) {
         param($Module)

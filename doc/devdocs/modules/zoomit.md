@@ -6,8 +6,7 @@
 
 [All Issues](https://github.com/microsoft/PowerToys/issues?q=is%3Aopen%20label%3AProduct-ZoomIt)<br>
 [Bugs](https://github.com/microsoft/PowerToys/issues?q=is%3Aopen%20label%3AProduct-ZoomIt%20label%3AIssue-Bug%20)<br>
-[Pull Requests](https://github.com/microsoft/PowerToys/pulls?q=is%3Apr+is%3Aopen+label%3AProduct-ZoomIt)<br>
-[UI test coverage and execution](../../../src/modules/ZoomIt/Tests/ZoomIt.UITests/README.md)
+[Pull Requests](https://github.com/microsoft/PowerToys/pulls?q=is%3Apr+is%3Aopen+label%3AProduct-ZoomIt)
 
 ## Overview
 
@@ -49,7 +48,6 @@ The ZoomIt module consists of the following components:
 src/
 ├── modules/
 │   └── ZoomIt/
-│       ├── Tests/ZoomIt.UITests/   # winappcli UI tests and deterministic fixtures
 │       ├── ZoomIt/             # Main ZoomIt application code
 │       ├── ZoomItModuleInterface/  # PowerToys module interface implementation
 │       └── ZoomItSettingsInterop/  # WinRT/C++ interop for settings

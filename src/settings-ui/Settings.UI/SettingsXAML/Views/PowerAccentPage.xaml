@@ -136,7 +136,7 @@
                                                             CheckBrush="{ThemeResource CheckBoxCheckGlyphForegroundChecked}"
                                                             CheckDisabledBrush="{ThemeResource CheckBoxCheckGlyphForegroundCheckedDisabled}"
                                                             CheckMode="Inline"
-                                                            CheckPressedBrush="{ThemeResource CheckBoxCheckGlyphForegroundCheckedPressed}"
+                                                            CheckPressedBrush="{ThemeResource CheckBoxCheckGlyphForegroundUncheckedPressed}"
                                                             ContentMargin="{TemplateBinding Padding}"
                                                             ContentTransitions="{TemplateBinding ContentTransitions}"
                                                             DisabledOpacity="{ThemeResource ListViewItemDisabledThemeOpacity}"
