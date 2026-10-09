@@ -245,6 +245,7 @@ namespace PowerToysPerformance
         private readonly ManualResetEvent created = new ManualResetEvent(false);
         private readonly Thread thread;
         private uint threadId;
+        private Exception startupError;
 
         public HostWindow(int width, int height)
         {
@@ -253,6 +254,11 @@ namespace PowerToysPerformance
             thread.SetApartmentState(ApartmentState.STA);
             thread.Start();
             created.WaitOne();
+            if (startupError != null)
+            {
+                thread.Join();
+                throw new InvalidOperationException("Could not create the performance measurement host window.", startupError);
+            }
         }
 
         public IntPtr Handle { get; private set; }
@@ -272,32 +278,63 @@ namespace PowerToysPerformance
             threadId = NativeMethods.GetCurrentThreadId();
             IntPtr instance = NativeMethods.GetModuleHandle(null);
 
-            NativeMethods.WNDCLASSEX windowClass = new NativeMethods.WNDCLASSEX();
-            windowClass.cbSize = (uint)Marshal.SizeOf(typeof(NativeMethods.WNDCLASSEX));
-            windowClass.lpfnWndProc = NativeMethods.GetProcAddress(NativeMethods.GetModuleHandle("user32.dll"), "DefWindowProcW");
-            windowClass.hInstance = instance;
-            windowClass.hbrBackground = new IntPtr(NativeMethods.COLOR_WINDOW + 1);
-            windowClass.lpszClassName = "PowerToysStartupMeasurementHost";
-            NativeMethods.RegisterClassEx(ref windowClass);
+            try
+            {
+                NativeMethods.WNDCLASSEX windowClass = new NativeMethods.WNDCLASSEX();
+                windowClass.cbSize = (uint)Marshal.SizeOf(typeof(NativeMethods.WNDCLASSEX));
+                windowClass.lpfnWndProc = NativeMethods.GetProcAddress(NativeMethods.GetModuleHandle("user32.dll"), "DefWindowProcW");
+                windowClass.hInstance = instance;
+                windowClass.hbrBackground = new IntPtr(NativeMethods.COLOR_WINDOW + 1);
+                windowClass.lpszClassName = "PowerToysStartupMeasurementHost";
+                if (NativeMethods.RegisterClassEx(ref windowClass) == 0)
+                {
+                    int error = Marshal.GetLastWin32Error();
+                    if (error != NativeMethods.ERROR_CLASS_ALREADY_EXISTS)
+                    {
+                        throw new Win32Exception(error, "RegisterClassEx failed.");
+                    }
+                }
 
-            Handle = NativeMethods.CreateWindowEx(
-                0,
-                windowClass.lpszClassName,
-                "PowerToys startup measurement",
-                NativeMethods.WS_OVERLAPPEDWINDOW | NativeMethods.WS_CLIPCHILDREN | NativeMethods.WS_VISIBLE,
-                80,
-                80,
-                width,
-                height,
-                IntPtr.Zero,
-                IntPtr.Zero,
-                instance,
-                IntPtr.Zero);
+                Handle = NativeMethods.CreateWindowEx(
+                    0,
+                    windowClass.lpszClassName,
+                    "PowerToys startup measurement",
+                    NativeMethods.WS_OVERLAPPEDWINDOW | NativeMethods.WS_CLIPCHILDREN | NativeMethods.WS_VISIBLE,
+                    80,
+                    80,
+                    width,
+                    height,
+                    IntPtr.Zero,
+                    IntPtr.Zero,
+                    instance,
+                    IntPtr.Zero);
+                if (Handle == IntPtr.Zero)
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateWindowEx failed.");
+                }
 
-            NativeMethods.RECT client;
-            NativeMethods.GetClientRect(Handle, out client);
-            ClientWidth = client.Right - client.Left;
-            ClientHeight = client.Bottom - client.Top;
+                NativeMethods.RECT client;
+                if (!NativeMethods.GetClientRect(Handle, out client))
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error(), "GetClientRect failed.");
+                }
+
+                ClientWidth = client.Right - client.Left;
+                ClientHeight = client.Bottom - client.Top;
+            }
+            catch (Exception exception)
+            {
+                if (Handle != IntPtr.Zero)
+                {
+                    NativeMethods.DestroyWindow(Handle);
+                    Handle = IntPtr.Zero;
+                }
+
+                startupError = exception;
+                created.Set();
+                return;
+            }
+
             created.Set();
 
             NativeMethods.MSG msg;
@@ -502,6 +539,7 @@ namespace PowerToysPerformance
         public const uint WS_CLIPCHILDREN = 0x02000000;
         public const uint WS_VISIBLE = 0x10000000;
         public const int COLOR_WINDOW = 5;
+        public const int ERROR_CLASS_ALREADY_EXISTS = 1410;
         public const uint TH32CS_SNAPPROCESS = 0x00000002;
         public const uint PROCESS_TERMINATE = 0x0001;
         public const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
@@ -615,16 +653,16 @@ namespace PowerToysPerformance
         [DllImport("user32.dll")]
         public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
 
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern ushort RegisterClassEx(ref WNDCLASSEX lpwcx);
 
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern IntPtr CreateWindowEx(uint dwExStyle, string lpClassName, string lpWindowName, uint dwStyle, int x, int y, int nWidth, int nHeight, IntPtr hWndParent, IntPtr hMenu, IntPtr hInstance, IntPtr lpParam);
 
         [DllImport("user32.dll")]
         public static extern bool DestroyWindow(IntPtr hWnd);
 
-        [DllImport("user32.dll")]
+        [DllImport("user32.dll", SetLastError = true)]
         public static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
 
         [DllImport("kernel32.dll")]
