@@ -1054,6 +1054,7 @@ LRESULT FancyZones::WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lpa
                 m_pendingNewWindows.Add(hwnd, GetTickCount64());
                 if (!timerArmed && SetTimer(m_window, NewWindowSettleTimerId, NewWindowSettleDelayMillis, nullptr) == 0)
                 {
+                    Logger::error(L"Failed to set the new window settle timer, {}", get_last_error_or_default(GetLastError()));
                     m_pendingNewWindows.Remove(hwnd);
                     WindowCreated(hwnd);
                 }
