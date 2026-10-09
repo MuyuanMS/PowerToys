@@ -1342,30 +1342,38 @@ function Stop-AllRunners
 {
     foreach ($runner in @(Get-Process -Name 'PowerToys' -ErrorAction SilentlyContinue | Where-Object SessionId -eq $sessionId))
     {
-        $path = $null
         try
         {
-            $null = $runner.Handle
-            $path = $runner.Path
-        }
-        catch
-        {
-        }
-
-        if (-not $path)
-        {
-            if (Get-Process -Id $runner.Id -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -eq 'PowerToys' })
+            $path = $null
+            try
             {
-                throw "Can't access the running PowerToys (pid $($runner.Id)). If it runs elevated, exit it or run this script elevated."
+                $null = $runner.Handle
+                $path = $runner.Path
+            }
+            catch
+            {
             }
 
-            continue
-        }
+            if (-not $path)
+            {
+                if (Get-Process -Id $runner.Id -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -eq 'PowerToys' })
+                {
+                    throw "Can't access the running PowerToys (pid $($runner.Id)). If it runs elevated, exit it or run this script elevated."
+                }
 
-        Stop-Runner -Process $runner -Folder (Split-Path $path -Parent)
-        if (-not $script:stoppedRunnerPaths.Contains($path))
+                continue
+            }
+
+            Stop-Runner -Process $runner -Folder (Split-Path $path -Parent)
+            if (-not $script:stoppedRunnerPaths.Contains($path))
+            {
+                $script:stoppedRunnerPaths.Add($path)
+            }
+
+        }
+        finally
         {
-            $script:stoppedRunnerPaths.Add($path)
+            $runner.Dispose()
         }
     }
 }
