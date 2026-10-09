@@ -20,7 +20,7 @@ Dot-source this file from a script to load helpers:
 ERROR DETAILS
 When a build fails, check the logs in <repo>\artifacts\logs\<project name>\, where <repo> is the repo/worktree
 containing the project being built (first parent folder with PowerToys.slnx) and <project name> is the
-solution or project file name without its extension:
+solution or project file name without its extension, or the directory name for a direct directory path:
 - build.<configuration>.<platform>.all.log — full MSBuild text log
 - build.<configuration>.<platform>.errors.log — extracted errors only
 - build.<configuration>.<platform>.warnings.log — extracted warnings only
@@ -58,6 +58,7 @@ function Get-LogRepoRoot {
             $dir = $parent
         }
     } catch {
+        Write-Verbose ("Could not resolve the project repo root for '{0}'; falling back to the build-script repo root. {1}" -f $Solution, $_.Exception.Message)
     }
 
     return $fallback
@@ -78,7 +79,17 @@ function RunMSBuild {
         [System.IO.Path]::DirectorySeparatorChar,
         [System.IO.Path]::AltDirectorySeparatorChar
     ))
-    $projectName = [System.IO.Path]::GetFileNameWithoutExtension($normalizedSolution)
+    $projectPath = $normalizedSolution
+    if (-not [System.IO.Path]::IsPathRooted($projectPath)) {
+        $base = $script:RepoRoot
+        if (-not $base) { $base = (Get-Location).Path }
+        $projectPath = Join-Path $base $projectPath
+    }
+    $projectName = if (Test-Path -LiteralPath $projectPath -PathType Container) {
+        [System.IO.Path]::GetFileName($normalizedSolution)
+    } else {
+        [System.IO.Path]::GetFileNameWithoutExtension($normalizedSolution)
+    }
     if ([string]::IsNullOrWhiteSpace($projectName)) {
         $projectName = [System.IO.Path]::GetFileName($normalizedSolution)
     }
