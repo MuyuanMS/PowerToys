@@ -162,16 +162,18 @@ Function Generate-FileComponents() {
     $fileList = $null
     $installPathFound = $false
     $fileListFound = $false
+    $installPathPattern = '^\s*<\?define\s+' + [regex]::Escape($fileListName) + 'Path=(.*?)\?>\s*$'
+    $fileListPattern = '^\s*<\?define\s+' + [regex]::Escape($fileListName) + '=(.*?)\?>\s*$'
 
     foreach ($line in $wxsFile) {
-        if ($line -match "(<?define $($fileListName)Path=)(.*)\?>") {
-            $installPath = $matches[2]
+        if ($line -match $installPathPattern) {
+            $installPath = $matches[1]
             $installPathFound = $true
             continue
         }
 
-        if ($line -match "(<?define $fileListName=)(.*)\?>") {
-            $fileList = $matches[2] -split ';' | Where-Object { $_ -ne '' }
+        if ($line -match $fileListPattern) {
+            $fileList = $matches[1] -split ';' | Where-Object { $_ -ne '' }
             $fileListFound = $true
         }
     }
@@ -241,7 +243,7 @@ if ($platform -ieq "arm64") {
     $platform = "ARM64"
 }
 
-if ([string]::IsNullOrEmpty($outputDir)) {
+if ([string]::IsNullOrWhiteSpace($outputDir)) {
     $outputDir = "$PSScriptRoot\obj\$platform\Generated"
 }
 
