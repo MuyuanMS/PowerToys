@@ -15,10 +15,12 @@
 
   <ItemGroup>
     <Content Remove="Assets\image_with_text_example.png" />
+    <Content Remove="Assets\grayscale.png" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Assets\image_with_text_example.png" />
+    <EmbeddedResource Include="Assets\grayscale.png" />
   </ItemGroup>
 
   <ItemGroup>

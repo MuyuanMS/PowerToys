@@ -34,4 +34,24 @@ public class AdvancedPasteSettingsTests
         Assert.IsNotNull(deserialized);
         Assert.AreEqual(67, deserialized.Properties.PasteAsJpgQuality.Value);
     }
+
+    [TestMethod]
+    public void LegacyFileActions_ReserveJpegAccessorBeforeHtml()
+    {
+        const string json = """
+            {"properties":{"additional-actions":{"paste-as-file":{
+                "isShown":true,
+                "paste-as-txt-file":{"isShown":true,"shortcut":{}},
+                "paste-as-png-file":{"isShown":true,"shortcut":{}},
+                "paste-as-html-file":{"isShown":true,"shortcut":{}}
+            }}}}
+            """;
+        var settings = JsonSerializer.Deserialize<AdvancedPasteSettings>(json);
+        Assert.IsNotNull(settings);
+
+        var accessors = settings.GetAllHotkeyAccessors();
+        Assert.AreEqual("PasteAsPngFile", accessors[7].LocalizationHeaderKey);
+        Assert.AreEqual("PasteAsJpgFile", accessors[8].LocalizationHeaderKey);
+        Assert.AreEqual("PasteAsHtmlFile", accessors[9].LocalizationHeaderKey);
+    }
 }

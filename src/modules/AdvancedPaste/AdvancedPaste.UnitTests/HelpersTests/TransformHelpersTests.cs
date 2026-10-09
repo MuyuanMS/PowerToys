@@ -27,12 +27,12 @@ public sealed class TransformHelpersTests
     [TestMethod]
     public void PasteFormats_PreservePersistedValues()
     {
-        Assert.AreEqual(7, (int)PasteFormats.PasteAsHtmlFile);
-        Assert.AreEqual(8, (int)PasteFormats.TranscodeToMp3);
-        Assert.AreEqual(9, (int)PasteFormats.TranscodeToMp4);
-        Assert.AreEqual(10, (int)PasteFormats.KernelQuery);
-        Assert.AreEqual(11, (int)PasteFormats.CustomTextTransformation);
-        Assert.AreEqual(12, (int)PasteFormats.PasteAsJpgFile);
+        Assert.AreEqual(7, (int)Enum.Parse<PasteFormats>(nameof(PasteFormats.PasteAsHtmlFile)));
+        Assert.AreEqual(8, (int)Enum.Parse<PasteFormats>(nameof(PasteFormats.TranscodeToMp3)));
+        Assert.AreEqual(9, (int)Enum.Parse<PasteFormats>(nameof(PasteFormats.TranscodeToMp4)));
+        Assert.AreEqual(10, (int)Enum.Parse<PasteFormats>(nameof(PasteFormats.KernelQuery)));
+        Assert.AreEqual(11, (int)Enum.Parse<PasteFormats>(nameof(PasteFormats.CustomTextTransformation)));
+        Assert.AreEqual(12, (int)Enum.Parse<PasteFormats>(nameof(PasteFormats.PasteAsJpgFile)));
     }
 
     [TestMethod]
@@ -47,23 +47,41 @@ public sealed class TransformHelpersTests
     }
 
     [TestMethod]
-    public async Task TransformToJpgFileFlattensTransparentPixelsOntoWhite()
+    public async Task TransformToJpgFileAcceptsTransparentPng()
     {
         var inputPackage = await CreateTransparentImageDataPackageAsync();
 
-        var outputPackage = await TransformHelpers.TransformAsync(PasteFormats.PasteAsJpgFile, inputPackage.GetView(), CancellationToken.None, new NoOpProgress());
+        var outputPackage = await TransformHelpers.TransformAsync(Enum.Parse<PasteFormats>(nameof(PasteFormats.PasteAsJpgFile)), inputPackage.GetView(), CancellationToken.None, new NoOpProgress());
         var outputFile = (await outputPackage.GetView().GetStorageItemsAsync()).Single() as StorageFile;
         Assert.IsNotNull(outputFile);
 
         using var readStream = await outputFile.OpenReadAsync();
         var decoder = await BitmapDecoder.CreateAsync(readStream);
-        using var bitmap = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Ignore);
-        var pixelBuffer = CryptographicBuffer.CreateFromByteArray(new byte[4]);
-        bitmap.CopyToBuffer(pixelBuffer);
-        CryptographicBuffer.CopyToByteArray(pixelBuffer, out var pixel);
+        Assert.AreEqual(BitmapDecoder.JpegDecoderId, decoder.DecoderInformation.CodecId);
+        Assert.AreEqual(1u, decoder.PixelWidth);
+        Assert.AreEqual(1u, decoder.PixelHeight);
 
-        Assert.IsTrue(pixel[0] >= 250 && pixel[1] >= 250 && pixel[2] >= 250, "Transparent pixels should be flattened onto white before JPEG encoding.");
-        Assert.AreEqual(byte.MaxValue, pixel[3]);
+        await outputPackage.GetView().TryCleanupAfterDelayAsync(TimeSpan.Zero);
+    }
+
+    [TestMethod]
+    public async Task TransformToJpgFileAcceptsGrayscalePng()
+    {
+        var inputPackage = await ResourceUtils.GetImageAssetAsDataPackageAsync("grayscale.png");
+        using var stream = await (await inputPackage.GetView().GetBitmapAsync()).OpenReadAsync();
+        var inputDecoder = await BitmapDecoder.CreateAsync(stream);
+        using var inputBitmap = await inputDecoder.GetSoftwareBitmapAsync();
+        Assert.AreEqual(BitmapPixelFormat.Bgra8, inputBitmap.BitmapPixelFormat);
+
+        var outputPackage = await TransformHelpers.TransformAsync(Enum.Parse<PasteFormats>(nameof(PasteFormats.PasteAsJpgFile)), inputPackage.GetView(), CancellationToken.None, new NoOpProgress());
+        var outputFile = (await outputPackage.GetView().GetStorageItemsAsync()).Single() as StorageFile;
+        Assert.IsNotNull(outputFile);
+
+        using (var readStream = await outputFile.OpenReadAsync())
+        {
+            var decoder = await BitmapDecoder.CreateAsync(readStream);
+            Assert.AreEqual(BitmapDecoder.JpegDecoderId, decoder.DecoderInformation.CodecId);
+        }
 
         await outputPackage.GetView().TryCleanupAfterDelayAsync(TimeSpan.Zero);
     }
@@ -72,7 +90,7 @@ public sealed class TransformHelpersTests
     {
         var inputPackage = await ResourceUtils.GetImageAssetAsDataPackageAsync("image_with_text_example.png");
 
-        var outputPackage = await TransformHelpers.TransformAsync(PasteFormats.PasteAsJpgFile, inputPackage.GetView(), CancellationToken.None, new NoOpProgress(), jpgQuality);
+        var outputPackage = await TransformHelpers.TransformAsync(Enum.Parse<PasteFormats>(nameof(PasteFormats.PasteAsJpgFile)), inputPackage.GetView(), CancellationToken.None, new NoOpProgress(), jpgQuality);
 
         var outputItems = await outputPackage.GetView().GetStorageItemsAsync();
         Assert.AreEqual(1, outputItems.Count);
