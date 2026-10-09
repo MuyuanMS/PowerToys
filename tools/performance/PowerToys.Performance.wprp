@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Captures the PowerToys performance markers (Microsoft.PowerToys.Performance provider). Combine it with
      a built-in profile to see them next to CPU and disk activity, for example:
-     wpr -start CPU -start PowerToys.Performance.wprp -filemode -->
+     wpr -start CPU -start tools\performance\PowerToys.Performance.wprp -filemode -->
 <WindowsPerformanceRecorder Version="1.0" Author="Microsoft Corporation" Copyright="Microsoft Corporation" Company="Microsoft Corporation">
   <Profiles>
     <EventCollector Id="EventCollector_PowerToysPerformance" Name="PowerToys performance markers">

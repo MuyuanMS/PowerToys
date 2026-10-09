@@ -31,14 +31,14 @@ function Get-Samples
 {
     param([string[]]$Paths)
 
-    $samples = @()
+    $samples = [System.Collections.Generic.List[object]]::new()
     foreach ($path in $Paths)
     {
         $result = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
-        $samples += @($result.Samples | Where-Object { -not $_.IsWarmup })
+        $samples.AddRange([object[]]@($result.Samples | Where-Object { -not $_.IsWarmup }))
     }
 
-    return $samples
+    return $samples.ToArray()
 }
 
 function Get-Percentile

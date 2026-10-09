@@ -91,7 +91,7 @@ The runner marks five startup stages: `SettingsLoaded`, `TrayIconReady`, `Module
 Once the runner is ready, it also writes all the stage times to its log (`%LOCALAPPDATA%\Microsoft\PowerToys\RunnerLogs`) as one line, which is what `Measure-StartupPerformance.ps1` reads, so it doesn't need elevation:
 
 ```text
-[info] Startup stages (ms since process start): SettingsLoaded=47 TrayIconReady=56 ModulesLoaded=166 EnabledModulesStarted=433 Ready=434
+[2026-10-09 12:34:56.123456] [p-1234] [t-5678] [info] Startup stages (ms since process start): SettingsLoaded=47 TrayIconReady=56 ModulesLoaded=166 EnabledModulesStarted=433 Ready=434
 ```
 
 To see the stages next to CPU and disk activity, record a trace from an elevated prompt and open it in WPA:
