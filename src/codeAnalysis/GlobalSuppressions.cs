@@ -29,7 +29,7 @@ using System.Diagnostics.CodeAnalysis;
 [assembly: SuppressMessage("Performance", "CA1838:Avoid 'StringBuilder' parameters for P/Invokes", Justification = "We are not concerned about the performance impact of marshaling a StringBuilder")]
 [assembly: SuppressMessage("Performance", "CA1852:Seal internal types", Justification = "The assembly is getting a ComVisible set to false already.", Scope = "namespaceanddescendants", Target = "MouseWithoutBorders")]
 
-// Localization suppressions
+// Globalization suppressions
 [assembly: SuppressMessage("Globalization", "CA1309:Use ordinal string comparison", Justification = "The user's search term should be compared with culture based rules.", Scope = "type", Target = "~T:Microsoft.PowerToys.Run.Plugin.TimeDate.Components.SearchController")]
 
 // Uninstantiated TestFixture classes
