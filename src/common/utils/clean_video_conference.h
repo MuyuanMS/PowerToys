@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Windows.h>
 #include <common/logger/logger.h>
 
 // Video Conference Mute was deprecated, but its camera registration could remain after an older installation, so we include the registry cleanup here.
